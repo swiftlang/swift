@@ -897,7 +897,7 @@ TypeVarRefCollector::walkToExprPre(Expr *expr) {
     auto loc = declRef->getLoc();
     if (name.isSimpleName() && loc.isValid()) {
       auto *SF = CS.DC->getParentSourceFile();
-      auto *D = ASTScope::lookupSingleLocalDecl(SF, name.getFullName(), loc);
+      auto *D = ASTScope::lookupSingleLocalDecl(SF, name, loc);
       inferTypeVars(D);
     }
   }
@@ -944,7 +944,6 @@ namespace {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
     DeclContext *CurDC;
-    ConstraintSystemPhase CurrPhase;
 
     /// A map from each UnresolvedMemberExpr to the respective (implicit) base
     /// found during our walk.
@@ -1158,6 +1157,33 @@ namespace {
       if (addedTypeVars)
         addedTypeVars->push_back(memberTy);
 
+      SmallVector<AnyFunctionType::Param, 8> params;
+      getMatchingParams(argList, params);
+
+      // Add the constraint that the index expression's type be convertible
+      // to the input type of the subscript operator.
+      auto addApplicableFn = [&]() {
+        CS.addApplicationConstraint(
+            FunctionType::get(params, outputTy), memberTy,
+            /*trailingClosureMatching=*/std::nullopt, CurDC, fnLocator);
+      };
+
+      // If we have a dynamic member base we need to add the applicable function
+      // first since solving the member constraint requires the constraint to be
+      // available since it may retire it. We can't yet do this in the general
+      // case since the simplifying of the applicable fn in CSGen is currently
+      // load-bearing for existential opening.
+      // FIXME: Once existential opening is no longer sensitive to solving
+      // order, we ought to be able to just always record the applicable fn as
+      // an unsolved constraint before the member.
+      auto hasDynamicMemberLookup = CS.simplifyType(baseTy)
+                                        ->getRValueType()
+                                        ->getMetatypeInstanceType()
+                                        ->eraseDynamicSelfType()
+                                        ->hasDynamicMemberLookupAttribute();
+      if (hasDynamicMemberLookup)
+        addApplicableFn();
+
       // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
       // a known subscript here. This might be cleaner if we split off a new
       // UnresolvedSubscriptExpr from SubscriptExpr.
@@ -1173,14 +1199,10 @@ namespace {
                                     /*outerAlternatives=*/{}, memberLocator);
       }
 
-      SmallVector<AnyFunctionType::Param, 8> params;
-      getMatchingParams(argList, params);
-
-      // Add the constraint that the index expression's type be convertible
-      // to the input type of the subscript operator.
-      CS.addApplicationConstraint(FunctionType::get(params, outputTy), memberTy,
-                                  /*trailingClosureMatching=*/std::nullopt,
-                                  CurDC, fnLocator);
+      // If we don't have a dynamic member, we add the application after the
+      // member, see the above comment.
+      if (!hasDynamicMemberLookup)
+        addApplicableFn();
 
       if (CS.performanceHacksEnabled()) {
         Type fixedOutputType =
@@ -1250,13 +1272,7 @@ namespace {
 
   public:
     ConstraintGenerator(ConstraintSystem &CS, DeclContext *DC)
-        : CS(CS), CurDC(DC ? DC : CS.DC), CurrPhase(CS.getPhase()) {
-      // Although constraint system is initialized in `constraint
-      // generation` phase, we have to set it here manually because e.g.
-      // result builders could generate constraints for its body
-      // in the middle of the solving.
-      CS.setPhase(ConstraintSystemPhase::ConstraintGeneration);
-
+        : CS(CS), CurDC(DC ? DC : CS.DC) {
       // Pick up the saved stack of pack expansions so we can continue
       // to handle pack element references inside the closure body.
       if (auto *ACE = dyn_cast<AbstractClosureExpr>(CurDC)) {
@@ -1264,9 +1280,7 @@ namespace {
       }
     }
 
-    virtual ~ConstraintGenerator() {
-      CS.setPhase(CurrPhase);
-    }
+    virtual ~ConstraintGenerator() = default;
 
     ConstraintSystem &getConstraintSystem() const { return CS; }
 
@@ -1440,7 +1454,7 @@ namespace {
         if (!protocol)
           return Type();
 
-        auto macroIdent = ctx.getIdentifier(kind);
+        auto macroIdent = DeclNameRef(ctx.getIdentifier(kind));
         auto macros = lookupMacros(Identifier(), macroIdent,
                                    FunctionRefInfo::unappliedBaseName(),
                                    MacroRole::Expression);
@@ -2046,8 +2060,18 @@ namespace {
       return valueTy;
     }
 
-    Type visitAnyTryExpr(AnyTryExpr *expr) {
+    Type visitTryExpr(AnyTryExpr *expr) {
       return CS.getType(expr->getSubExpr());
+    }
+
+    Type visitForceTryExpr(AnyTryExpr *expr) {
+      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                           TVO_PrefersSubtypeBinding |
+                                               TVO_CanBindToNoEscape);
+      CS.addConstraint(ConstraintKind::Equal, valueTy,
+                       CS.getType(expr->getSubExpr()),
+                       CS.getConstraintLocator(expr));
+      return valueTy;
     }
 
     Type visitOptionalTryExpr(OptionalTryExpr *expr) {
@@ -3870,10 +3894,9 @@ namespace {
           componentTypeVars.push_back(memberTy);
           auto lookupName =
               kind == KeyPathExpr::Component::Kind::UnresolvedMember
-                  ? DeclNameRef(
-                        component.getUnresolvedDeclName()) // FIXME: type change
-                                                           // needed
-                  : component.getDeclRef().getDecl()->createNameRef();
+                  ? component.getUnresolvedDeclName()
+                  : component.getDeclRef().getDecl()->createNameRef(
+                                                          /*modSel=*/true);
 
           auto refKind = component.getFunctionRefInfo();
           CS.addValueMemberConstraint(base, lookupName, memberTy, CurDC,
@@ -4112,12 +4135,12 @@ namespace {
 
     /// Lookup all macros with the given macro name.
     SmallVector<OverloadChoice, 1> lookupMacros(DeclName moduleName,
-                                                DeclName macroName,
+                                                DeclNameRef macroName,
                                                 FunctionRefInfo functionRefInfo,
                                                 MacroRoles roles) {
       SmallVector<OverloadChoice, 1> choices;
       auto results = namelookup::lookupMacros(CurDC, DeclNameRef(moduleName),
-                                              DeclNameRef(macroName), roles);
+                                              macroName, roles);
       for (const auto &result : results) {
         // Ignore invalid results. This matches the OverloadedDeclRefExpr
         // logic.
@@ -4144,11 +4167,21 @@ namespace {
 
       // Look up the macros with this name.
       auto moduleIdent = expr->getModuleName().getBaseName();
-      auto macroIdent = expr->getMacroName().getBaseName();
+      auto macroIdent = expr->getMacroName().withoutArgumentLabels(ctx);
       FunctionRefInfo functionRefInfo = FunctionRefInfo::singleBaseNameApply();
       auto macros = lookupMacros(moduleIdent, macroIdent, functionRefInfo,
                                  expr->getMacroRoles());
       if (macros.empty()) {
+        // Try removing a module selector if present.
+        if (macroIdent.hasModuleSelector()) {
+          auto anyMacroIdent = DeclNameRef(macroIdent.getFullName());
+          ModuleSelectorCorrection correction(
+            lookupMacros(moduleIdent, anyMacroIdent, functionRefInfo,
+                         expr->getMacroRoles()));
+          if (correction.diagnose(ctx, expr->getMacroNameLoc(), macroIdent))
+            return Type();
+        }
+
         ctx.Diags.diagnose(expr->getMacroNameLoc(), diag::macro_undefined,
                            macroIdent)
             .highlight(expr->getMacroNameLoc().getSourceRange());
@@ -4340,6 +4373,11 @@ namespace {
       auto &CS = CG.getConstraintSystem();
 
       if (CS.isArgumentIgnoredForCodeCompletion(expr)) {
+        // Make sure we invalidate any nested VarDecls to ensure the body
+        // VarDecl for a case statement still gets a type assigned.
+        expr->forEachUnresolvedVariable([&](VarDecl *VD) {
+          CS.setType(VD, ErrorType::get(CS.getASTContext()));
+        });
         CG.setTypeForArgumentIgnoredForCompletion(expr);
         return Action::SkipNode(expr);
       }
@@ -5306,10 +5344,14 @@ ResolvedMemberResult swift::resolveValueMember(DeclContext &DC, Type BaseTy,
   ResolvedMemberResult Result;
   ConstraintSystem CS(&DC, std::nullopt);
 
+  // OK: By contract, `Name` should be derived from an existing Decl, not a
+  // name written by the user in source code. So when used as intended, we won't
+  // be dropping a module selector here.
+  DeclNameRef NameRef(Name);
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult =
-      CS.performMemberLookup(ConstraintKind::ValueMember, DeclNameRef(Name),
-                             BaseTy, FunctionRefInfo::singleBaseNameApply(),
+      CS.performMemberLookup(ConstraintKind::ValueMember, NameRef, BaseTy,
+                             FunctionRefInfo::singleBaseNameApply(),
                              CS.getConstraintLocator({}), false);
 
   // Keep track of all the unviable members.

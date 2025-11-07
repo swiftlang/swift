@@ -29,6 +29,7 @@
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -212,30 +213,10 @@ static void enumerateStoredPropertiesAndMissing(
   // If we have a distributed actor, find the id and actorSystem
   // properties. We always want them first, and in a specific
   // order.
-  if (decl->isDistributedActor()) {
-    VarDecl *distributedActorId = nullptr;
-    VarDecl *distributedActorSystem = nullptr;
-    ASTContext &ctx = decl->getASTContext();
-    for (auto *member : implDecl->getMembers()) {
-      if (auto *var = dyn_cast<VarDecl>(member)) {
-        if (!var->isStatic() && var->hasStorage()) {
-          if (var->getName() == ctx.Id_id) {
-            distributedActorId = var;
-          } else if (var->getName() == ctx.Id_actorSystem) {
-            distributedActorSystem = var;
-          }
-        }
-
-        if (distributedActorId && distributedActorSystem)
-          break;
-      }
-    }
-
-    if (distributedActorId)
-      addStoredProperty(distributedActorId);
-    if (distributedActorSystem)
-      addStoredProperty(distributedActorSystem);
-  }
+  if (auto idVar = decl->getDistributedActorIDProperty())
+    addStoredProperty(idVar);
+  if (auto actorSystemVar = decl->getDistributedActorSystemProperty())
+    addStoredProperty(actorSystemVar);
 
   for (auto *member : implDecl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member)) {
@@ -406,16 +387,58 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
   return decl->getASTContext().AllocateCopy(results);
 }
 
+static Type getLazyInterfaceTypeForSynthesizedVar(VarDecl *var) {
+  // For DistributedActor, the `id` and `actorSystem` properties have their
+  // types computed lazily.
+  if (auto distPropKind = var->isSpecialDistributedActorProperty()) {
+    auto *NTD = var->getDeclContext()->getSelfNominalTypeDecl();
+    ASSERT(NTD);
+    switch (distPropKind.value()) {
+    case SpecialDistributedActorProperty::Id:
+      return getDistributedActorIDType(NTD);
+    case SpecialDistributedActorProperty::ActorSystem:
+      return getDistributedActorSystemType(NTD);
+    }
+    llvm_unreachable("Unhandled case in switch!");
+  }
+  return Type();
+}
+
+static Pattern *
+getLazilySynthesizedPattern(PatternBindingDecl *PBD, Pattern *P) {
+  // Check to see if we have a pattern that binds a single synthesized var.
+  auto *NP = dyn_cast<NamedPattern>(P->getSemanticsProvidingPattern());
+  if (!NP)
+    return P;
+
+  auto *var = NP->getDecl();
+  if (!var->isSynthesized())
+    return P;
+
+  auto interfaceTy = getLazyInterfaceTypeForSynthesizedVar(var);
+  if (!interfaceTy)
+    return P;
+
+  auto *DC = var->getDeclContext();
+  auto &ctx = DC->getASTContext();
+  auto patternTy = DC->mapTypeIntoContext(interfaceTy);
+  return TypedPattern::createImplicit(ctx, P, patternTy);
+}
+
 /// Validate the \c entryNumber'th entry in \c binding.
 const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     Evaluator &eval, PatternBindingDecl *binding, unsigned entryNumber) const {
   const auto &pbe = binding->getPatternList()[entryNumber];
   auto &Context = binding->getASTContext();
 
+  // Resolve a lazily synthesized pattern if necessary.
+  auto *pattern = binding->getPattern(entryNumber);
+  pattern = getLazilySynthesizedPattern(binding, pattern);
+  binding->setPattern(entryNumber, pattern);
+
   // Resolve the pattern.
-  auto *pattern = TypeChecker::resolvePattern(binding->getPattern(entryNumber),
-                                              binding->getDeclContext(),
-                                              /*isStmtCondition*/ true);
+  pattern = TypeChecker::resolvePattern(pattern, binding->getDeclContext(),
+                                        /*isStmtCondition*/ true);
   if (!pattern) {
     binding->setInvalid();
     binding->getPattern(entryNumber)->setType(ErrorType::get(Context));
@@ -491,16 +514,22 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     }
   }
 
-  auto isInitAccessorProperty = [](Pattern *pattern) {
-    auto *var = pattern->getSingleVar();
-    return var && var->getAccessor(AccessorKind::Init);
+  auto supportsInitialization = [&] {
+    bool anySupportsInitialization = false;
+    pattern->forEachVariable([&](VarDecl *var) {
+      if (var->supportsInitialization()) {
+        anySupportsInitialization = true;
+      }
+    });
+
+    return anySupportsInitialization;
   };
 
   // If we have a type but no initializer, check whether the type is
   // default-initializable. If so, do it.
   if (!pbe.isInitialized() &&
       binding->isDefaultInitializable(entryNumber) &&
-      (pattern->hasStorage() || isInitAccessorProperty(pattern))) {
+      supportsInitialization()) {
     if (auto defaultInit = TypeChecker::buildDefaultInitializer(patternType)) {
       // If we got a default initializer, install it and re-type-check it
       // to make sure it is properly coerced to the pattern type.
@@ -575,7 +604,16 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     Context.Diags.diagnose(binding->getPattern(entryNumber)->getLoc(),
                            diag::destructuring_let_struct_stored_property_unsupported);
   }
-  
+
+  // Extern declarations are not permitted to have initializers.
+  if (auto singleVar = binding->getSingleVar()) {
+    if (singleVar->getAttrs().hasAttribute<ExternAttr>() &&
+        pbe.isInitialized()) {
+      singleVar->diagnose(diag::extern_variable_initializer)
+          .highlight(pbe.getOriginalInitRange());
+    }
+  }
+
   return &pbe;
 }
 
@@ -1875,6 +1913,13 @@ synthesizeModify2CoroutineSetterBody(AccessorDecl *setter, ASTContext &ctx) {
       setter, TargetImpl::Implementation, setter->getStorage(), ctx);
 }
 
+static std::pair<BraceStmt *, bool>
+synthesizeMutateSetterBody(AccessorDecl *setter, ASTContext &ctx) {
+  // This should call the mutate accessor.
+  return synthesizeTrivialSetterBodyWithStorage(
+      setter, TargetImpl::Implementation, setter->getStorage(), ctx);
+}
+
 static Expr *maybeWrapInOutExpr(Expr *expr, ASTContext &ctx) {
   if (auto lvalueType = expr->getType()->getAs<LValueType>()) {
     auto type = lvalueType->getObjectType();
@@ -2071,7 +2116,7 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
     return synthesizeModify2CoroutineSetterBody(setter, ctx);
 
   case WriteImplKind::Mutate:
-    llvm_unreachable("synthesizing setter from mutate");
+    return synthesizeMutateSetterBody(setter, ctx);
   }
   llvm_unreachable("bad WriteImplKind");
 }
@@ -2476,7 +2521,9 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
     }
     break;
   case WriteImplKind::Mutate:
-    llvm_unreachable("mutate accessor is not yet implemented");
+    if (auto mutate = storage->getOpaqueAccessor(AccessorKind::Mutate)) {
+      asAvailableAs.push_back(mutate);
+    }
   }
   
   if (!asAvailableAs.empty()) {
@@ -2804,11 +2851,6 @@ bool RequiresOpaqueModifyCoroutineRequest::evaluate(
     if (protoDecl->isObjC())
       return false;
 
-  // If a mutate accessor is present, we don't need a modify coroutine
-  if (storage->getAccessor(AccessorKind::Mutate)) {
-    return false;
-  }
-
   return true;
 }
 
@@ -2937,9 +2979,8 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
     case WriteImplKind::MutableAddress:
     case WriteImplKind::Modify:
     case WriteImplKind::Modify2:
-      break;
     case WriteImplKind::Mutate:
-      llvm_unreachable("mutate accessor is not yet implemented");
+      break;
     }
     break;
 
@@ -2950,14 +2991,12 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   case AccessorKind::Init:
     break;
   case AccessorKind::Borrow:
-    llvm_unreachable("borrow accessor is not yet implemented");
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
-    llvm_unreachable("bad synthesized function kind");
   case AccessorKind::Mutate:
-    llvm_unreachable("mutate accessor is not yet implemented");
+    llvm_unreachable("bad synthesized function kind");
   }
 
   switch (storage->getReadWriteImpl()) {

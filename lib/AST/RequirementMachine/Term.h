@@ -59,6 +59,9 @@ public:
 
   Symbol back() const;
 
+  bool hasShape() const;
+  MutableTerm termWithoutShape() const;
+
   Symbol operator[](size_t index) const;
 
   /// Returns an opaque pointer that uniquely identifies this term.
@@ -183,6 +186,9 @@ public:
   Symbol &back() {
     return Symbols.back();
   }
+
+  bool hasShape() const;
+  void removeShape();
 
   Symbol operator[](size_t index) const {
     return Symbols[index];

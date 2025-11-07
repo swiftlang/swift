@@ -121,7 +121,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
   }
 
   func isActiveTargetObjectFormat(name: String) throws -> Bool {
-    try staticBuildConfiguration.isActiveTargetObjectFormat(name: name)
+    staticBuildConfiguration.isActiveTargetObjectFormat(name: name)
   }
 
   var targetAtomicBitWidths: [Int] {

@@ -1238,19 +1238,6 @@ private:
                 ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes,
                 SmallVectorImpl<InferredTypeWitnessesSolution> &solutions);
 
-  /// We may need to determine a type witness, regardless of the existence of a
-  /// default value for it, e.g. when a 'distributed actor' is looking up its
-  /// 'ID', the default defined in an extension for 'Identifiable' would be
-  /// located using the lookup resolve. This would not be correct, since the
-  /// type actually must be based on the associated 'ActorSystem'.
-  ///
-  /// TODO(distributed): perhaps there is a better way to avoid this mixup?
-  ///   Note though that this issue seems to only manifest in "real" builds
-  ///   involving multiple files/modules, and not in tests within the Swift
-  ///   project itself.
-  bool canAttemptEagerTypeWitnessDerivation(
-      DeclContext *DC, AssociatedTypeDecl *assocType);
-
 public:
   /// Describes a mapping from associated type declarations to their
   /// type witnesses (as interface types).
@@ -1667,6 +1654,17 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
       for (auto assocTypeDecl : allUnresolved)
         assocTypeDecl->dump(out);
     });
+  }
+
+  // The `id` and `actorSystem` DistributedActor properties are never viable
+  // for type witness inference since their synthesis relies on the type
+  // witnesses already being resolved.
+  if (auto *nominal = dc->getSelfNominalTypeDecl()) {
+    if (nominal->isDistributedActor() &&
+        req->isSpecialDistributedActorProperty(/*onlyCheckName*/ true)) {
+      LLVM_DEBUG(llvm::dbgs() << "skipping special distributed property\n");
+      return {};
+    }
   }
 
   TypeReprCycleCheckWalker cycleCheck(dc->getASTContext(), allUnresolved);
@@ -2634,12 +2632,6 @@ deriveTypeWitness(const NormalProtocolConformance *Conformance,
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(AssocType);
   case KnownProtocolKind::DistributedActor:
-    return derived.deriveDistributedActor(AssocType);
-  case KnownProtocolKind::Identifiable:
-    // Identifiable only has derivation logic for distributed actors,
-    // because how it depends on the ActorSystem the actor is associated with.
-    // If the nominal wasn't a distributed actor, we should not end up here,
-    // but either way, then we'd return null (fail derivation).
     return derived.deriveDistributedActor(AssocType);
   default:
     return std::make_pair(nullptr, nullptr);
@@ -3990,20 +3982,6 @@ bool AssociatedTypeInference::diagnoseAmbiguousSolutions(
   return false;
 }
 
-bool AssociatedTypeInference::canAttemptEagerTypeWitnessDerivation(
-    DeclContext *DC, AssociatedTypeDecl *assocType) {
-
-  /// Rather than locating the TypeID via the default implementation of
-  /// Identifiable, we need to find the type based on the associated ActorSystem
-  if (auto *nominal = DC->getSelfNominalTypeDecl())
-    if (nominal->isDistributedActor() &&
-        assocType->getProtocol()->isSpecificProtocol(KnownProtocolKind::Identifiable)) {
-    return true;
-  }
-
-  return false;
-}
-
 auto AssociatedTypeInference::solve() -> std::optional<InferredTypeWitnesses> {
   LLVM_DEBUG(llvm::dbgs() << "============ Start " << conformance->getType()
                           << ": " << conformance->getProtocol()->getName()
@@ -4021,16 +3999,6 @@ auto AssociatedTypeInference::solve() -> std::optional<InferredTypeWitnesses> {
     // If we already have a type witness, do nothing.
     if (conformance->hasTypeWitness(assocType))
       continue;
-
-    if (canAttemptEagerTypeWitnessDerivation(dc, assocType)) {
-      auto derivedType = computeDerivedTypeWitness(assocType);
-      if (derivedType.first) {
-        recordTypeWitness(conformance, assocType,
-                          derivedType.first->mapTypeOutOfContext(),
-                          derivedType.second);
-        continue;
-      }
-    }
 
     // Try to resolve this type witness via name lookup, which is the
     // most direct mechanism, overriding all others.

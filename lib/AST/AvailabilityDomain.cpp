@@ -169,9 +169,17 @@ bool AvailabilityDomain::isVersionValid(
     return true;
 
   case Kind::Platform:
+    // If the platform kind corresponds to a specific OS, LLVM is the source of
+    // truth for version validity.
     if (auto osType = tripleOSTypeForPlatform(getPlatformKind()))
       return llvm::Triple::isValidVersionForOS(*osType, version);
+
+    // Unified versioning for Apple's operating systems starts at 26.0.
+    if (getPlatformKind() == PlatformKind::anyAppleOS)
+      return (version.getMajor() >= 26);
+
     return true;
+
   case Kind::Custom:
     return true;
   }
@@ -400,16 +408,103 @@ AvailabilityDomain AvailabilityDomain::getRootDomain() const {
   return *this;
 }
 
-const AvailabilityDomain
-AvailabilityDomain::getRemappedDomain(const ASTContext &ctx,
-                                      bool &didRemap) const {
+static std::optional<PlatformKind>
+getApplePlatformKindForTarget(const llvm::Triple &target) {
+  if (target.isMacOSX())
+    return PlatformKind::macOS;
+  if (target.isTvOS()) // Must be checked before isiOS.
+    return PlatformKind::tvOS;
+  if (target.isiOS())
+    return PlatformKind::iOS;
+  if (target.isWatchOS())
+    return PlatformKind::watchOS;
+  if (target.isXROS())
+    return PlatformKind::visionOS;
+
+  return std::nullopt;
+}
+
+std::optional<AvailabilityDomain>
+AvailabilityDomain::getRemappedDomainOrNull(const ASTContext &ctx) const {
   if (getPlatformKind() == PlatformKind::iOS &&
-      isPlatformActive(PlatformKind::visionOS, ctx.LangOpts)) {
-    didRemap = true;
+      isPlatformActive(PlatformKind::visionOS, ctx.LangOpts))
     return AvailabilityDomain::forPlatform(PlatformKind::visionOS);
+
+  if (getPlatformKind() == PlatformKind::anyAppleOS) {
+    if (auto applePlatformKind =
+            getApplePlatformKindForTarget(ctx.LangOpts.Target))
+      return AvailabilityDomain::forPlatform(*applePlatformKind);
+
+    return std::nullopt;
   }
 
-  return *this;
+  return std::nullopt;
+}
+
+static const clang::DarwinSDKInfo::RelatedTargetVersionMapping *
+getFallbackVersionMapping(const ASTContext &Ctx,
+                          clang::DarwinSDKInfo::OSEnvPair Kind) {
+  auto *SDKInfo = Ctx.getDarwinSDKInfo();
+  if (SDKInfo)
+    return SDKInfo->getVersionMapping(Kind);
+
+  return Ctx.getAuxiliaryDarwinPlatformRemapInfo(Kind);
+}
+
+static std::optional<clang::VersionTuple>
+getRemappedIntroducedVersionForFallbackPlatform(
+    const ASTContext &Ctx, const llvm::VersionTuple &Version) {
+  const auto *Mapping = getFallbackVersionMapping(
+      Ctx, clang::DarwinSDKInfo::OSEnvPair(
+               llvm::Triple::IOS, llvm::Triple::UnknownEnvironment,
+               llvm::Triple::XROS, llvm::Triple::UnknownEnvironment));
+  if (!Mapping)
+    return std::nullopt;
+  return Mapping->mapIntroducedAvailabilityVersion(Version);
+}
+
+static std::optional<clang::VersionTuple>
+getRemappedDeprecatedObsoletedVersionForFallbackPlatform(
+    const ASTContext &Ctx, const llvm::VersionTuple &Version) {
+  const auto *Mapping = getFallbackVersionMapping(
+      Ctx, clang::DarwinSDKInfo::OSEnvPair(
+               llvm::Triple::IOS, llvm::Triple::UnknownEnvironment,
+               llvm::Triple::XROS, llvm::Triple::UnknownEnvironment));
+  if (!Mapping)
+    return std::nullopt;
+  return Mapping->mapDeprecatedObsoletedAvailabilityVersion(Version);
+}
+
+AvailabilityDomainAndRange AvailabilityDomain::getRemappedDomainAndRange(
+    const llvm::VersionTuple &version, AvailabilityVersionKind versionKind,
+    const ASTContext &ctx) const {
+  auto remappedDomain = getRemappedDomainOrNull(ctx);
+  if (!remappedDomain)
+    return {*this, AvailabilityRange{version}};
+
+  if (getPlatformKind() == PlatformKind::anyAppleOS)
+    return {*remappedDomain, AvailabilityRange{version}};
+
+  if (getPlatformKind() == PlatformKind::iOS) {
+    std::optional<clang::VersionTuple> remappedVersion;
+    switch (versionKind) {
+    case AvailabilityVersionKind::Introduced:
+      remappedVersion =
+          getRemappedIntroducedVersionForFallbackPlatform(ctx, version);
+      break;
+    case AvailabilityVersionKind::Deprecated:
+    case AvailabilityVersionKind::Obsoleted:
+      remappedVersion =
+          getRemappedDeprecatedObsoletedVersionForFallbackPlatform(ctx,
+                                                                   version);
+      break;
+    }
+
+    if (remappedVersion)
+      return {*remappedDomain, AvailabilityRange{*remappedVersion}};
+  }
+
+  return {*this, AvailabilityRange{version}};
 }
 
 bool IsCustomAvailabilityDomainPermanentlyEnabled::evaluate(
@@ -567,6 +662,13 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
   if (domain->isCustom() && !hasCustomAvailability) {
     diags.diagnose(loc, diag::availability_domain_requires_feature, *domain,
                    "CustomAvailability");
+    return std::nullopt;
+  }
+
+  if (domain->getPlatformKind() == PlatformKind::anyAppleOS &&
+      !ctx.LangOpts.hasFeature(Feature::AnyAppleOSAvailability)) {
+    diags.diagnose(loc, diag::availability_domain_requires_feature, *domain,
+                   "AnyAppleOSAvailability");
     return std::nullopt;
   }
 

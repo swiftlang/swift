@@ -399,6 +399,10 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
         return SpecialPointerAuthDiscriminators::CoroAllocationFunction;
       case Special::CoroDeallocationFunction:
         return SpecialPointerAuthDiscriminators::CoroDeallocationFunction;
+      case Special::CoroFrameAllocationFunction:
+        return SpecialPointerAuthDiscriminators::CoroFrameAllocationFunction;
+      case Special::CoroFrameDeallocationFunction:
+        return SpecialPointerAuthDiscriminators::CoroFrameDeallocationFunction;
       }
       llvm_unreachable("bad kind");
     };
@@ -767,6 +771,16 @@ void ConstantAggregateBuilderBase::addSignedPointer(llvm::Constant *pointer,
                    llvm::ConstantInt::get(IGM().Int64Ty, otherDiscriminator));
 }
 
+llvm::ConstantInt *IRGenModule::getMallocTypeId(llvm::Function *fn) {
+  if (!getOptions().EmitTypeMallocForCoroFrame) {
+    // Even when typed malloc isn't enabled, a type id may be required for ABI
+    // reasons (e.g. as an argument to swift_coro_alloc).  Use a cheaply
+    // materialized value.
+    return llvm::ConstantInt::get(Int64Ty, 0);
+  }
+  return getDiscriminatorForString(*this, fn->getName());
+}
+
 llvm::ConstantInt* IRGenFunction::getMallocTypeId() {
-  return getDiscriminatorForString(IGM, CurFn->getName());
+  return IGM.getMallocTypeId(CurFn);
 }

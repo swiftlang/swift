@@ -518,6 +518,7 @@ SwiftDependencyTracker::createTreeFromDependencies() {
 
 ModuleDependencyScanner::ModuleDependencyScanner(
     SwiftDependencyScanningService &ScanningService,
+    ModuleDependenciesCache &Cache,
     const CompilerInvocation &ScanCompilerInvocation,
     const SILOptions &SILOptions, ASTContext &ScanASTContext,
     swift::DependencyTracker &DependencyTracker,
@@ -530,6 +531,7 @@ ModuleDependencyScanner::ModuleDependencyScanner(
                        .ExplicitModulesOutputPath),
       SDKModuleOutputPath(ScanCompilerInvocation.getFrontendOptions()
                           .ExplicitSDKModulesOutputPath),
+      DependencyCache(Cache),
       NumThreads(ParallelScan
                      ? llvm::hardware_concurrency().compute_thread_count()
                      : 1),
@@ -846,14 +848,13 @@ static void discoverCrossImportOverlayFiles(
 }
 
 std::vector<ModuleDependencyID>
-ModuleDependencyScanner::performDependencyScan(ModuleDependencyID rootModuleID,
-                                               ModuleDependenciesCache &cache) {
+ModuleDependencyScanner::performDependencyScan(ModuleDependencyID rootModuleID) {
   PrettyStackTraceStringAction trace("Performing dependency scan of: ",
                                      rootModuleID.ModuleName);
   // If scanning for an individual Clang module, simply resolve its imports
   if (rootModuleID.Kind == ModuleDependencyKind::Clang) {
     ModuleDependencyIDSetVector discoveredClangModules;
-    resolveAllClangModuleDependencies({}, cache, discoveredClangModules);
+    resolveAllClangModuleDependencies({}, discoveredClangModules);
     return discoveredClangModules.takeVector();
   }
 
@@ -865,7 +866,7 @@ ModuleDependencyScanner::performDependencyScan(ModuleDependencyID rootModuleID,
   //    This may call into 'resolveImportedModuleDependencies'
   //    for the newly-added Swift overlay dependencies.
   ModuleDependencyIDSetVector allModules =
-    resolveImportedModuleDependencies(rootModuleID, cache);
+    resolveImportedModuleDependencies(rootModuleID);
 
   // 5. Resolve cross-import overlays
   // This must only be done for the main source module, since textual and
@@ -873,11 +874,11 @@ ModuleDependencyScanner::performDependencyScan(ModuleDependencyID rootModuleID,
   // overlays with explicit imports.
   if (ScanCompilerInvocation.getLangOptions().EnableCrossImportOverlays)
     resolveCrossImportOverlayDependencies(
-        rootModuleID.ModuleName, cache,
+        rootModuleID.ModuleName,
         [&](ModuleDependencyID id) { allModules.insert(id); });
 
   if (ScanCompilerInvocation.getSearchPathOptions().BridgingHeaderChaining) {
-    auto err = performBridgingHeaderChaining(rootModuleID, cache, allModules);
+    auto err = performBridgingHeaderChaining(rootModuleID, allModules);
     if (err)
       IssueReporter.Diagnostics.diagnose(SourceLoc(),
                                          diag::error_scanner_extra,
@@ -889,7 +890,7 @@ ModuleDependencyScanner::performDependencyScan(ModuleDependencyID rootModuleID,
 
 ModuleDependencyIDSetVector
 ModuleDependencyScanner::resolveImportedModuleDependencies(
-    const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache) {
+    const ModuleDependencyID &rootModuleID) {
   ModuleDependencyIDSetVector allModules;
   PrettyStackTraceStringAction trace(
       "Resolving transitive closure of dependencies of: ",
@@ -898,7 +899,7 @@ ModuleDependencyScanner::resolveImportedModuleDependencies(
   // Resolve all imports for which a Swift module can be found,
   // transitively, starting at 'rootModuleID'.
   ModuleDependencyIDSetVector discoveredSwiftModules;
-  resolveSwiftModuleDependencies(rootModuleID, cache, discoveredSwiftModules);
+  resolveSwiftModuleDependencies(rootModuleID, discoveredSwiftModules);
   allModules.insert(discoveredSwiftModules.begin(),
                     discoveredSwiftModules.end());
 
@@ -907,26 +908,25 @@ ModuleDependencyScanner::resolveImportedModuleDependencies(
   // This operation is done by gathering all unresolved import
   // identifiers and querying them in-parallel to the Clang
   // dependency scanner.
-  resolveAllClangModuleDependencies(discoveredSwiftModules.getArrayRef(), cache,
+  resolveAllClangModuleDependencies(discoveredSwiftModules.getArrayRef(),
                                     allModules);
 
   // For each discovered Swift module which was built with a
   // bridging header, scan the header for module dependencies.
   // This includes the source module bridging header.
-  resolveHeaderDependencies(discoveredSwiftModules.getArrayRef(), cache,
-                            allModules);
+  resolveHeaderDependencies(discoveredSwiftModules.getArrayRef(), allModules);
 
   // For each Swift module which imports Clang modules,
   // query whether all visible Clang dependencies from such imports
   // have a Swift overaly module.
-  resolveSwiftOverlayDependencies(discoveredSwiftModules.getArrayRef(), cache,
+  resolveSwiftOverlayDependencies(discoveredSwiftModules.getArrayRef(),
                                   allModules);
 
   return allModules;
 }
 
 void ModuleDependencyScanner::resolveSwiftModuleDependencies(
-    const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
+    const ModuleDependencyID &rootModuleID,
     ModuleDependencyIDSetVector &allDiscoveredSwiftModules) {
   PrettyStackTraceStringAction trace(
       "Resolving transitive closure of Swift dependencies of: ",
@@ -940,7 +940,7 @@ void ModuleDependencyScanner::resolveSwiftModuleDependencies(
        currentModuleIdx < allDiscoveredSwiftModules.size();
        ++currentModuleIdx) {
     auto moduleID = allDiscoveredSwiftModules[currentModuleIdx];
-    auto moduleDependencyInfo = cache.findKnownDependency(moduleID);
+    auto moduleDependencyInfo = DependencyCache.findKnownDependency(moduleID);
 
     // If this dependency module's Swift imports are already resolved,
     // we do not need to scan it.
@@ -952,7 +952,7 @@ void ModuleDependencyScanner::resolveSwiftModuleDependencies(
       // Find the Swift dependencies of every module this module directly
       // depends on.
       ModuleDependencyIDSetVector importedSwiftDependencies;
-      resolveSwiftImportsForModule(moduleID, cache, importedSwiftDependencies);
+      resolveSwiftImportsForModule(moduleID, importedSwiftDependencies);
       allDiscoveredSwiftModules.insert(importedSwiftDependencies.begin(),
                                        importedSwiftDependencies.end());
     }
@@ -1035,7 +1035,6 @@ gatherUnresolvedImports(ModuleDependenciesCache &cache,
 }
 
 void ModuleDependencyScanner::reQueryMissedModulesFromCache(
-    ModuleDependenciesCache &cache,
     const std::vector<std::pair<ModuleDependencyID, ScannerImportStatementInfo>>
         &failedToResolveImports,
     std::unordered_map<ModuleDependencyID, ModuleDependencyIDSetVector>
@@ -1068,18 +1067,18 @@ void ModuleDependencyScanner::reQueryMissedModulesFromCache(
   for (const auto &unresolvedImport : failedToResolveImports) {
     auto unresolvedModuleID = ModuleDependencyID{
         unresolvedImport.second.importIdentifier, ModuleDependencyKind::Clang};
-    auto optionalCachedModuleInfo = cache.findDependency(unresolvedModuleID);
+    auto optionalCachedModuleInfo =
+        DependencyCache.findDependency(unresolvedModuleID);
     if (optionalCachedModuleInfo) {
       resolvedClangDependenciesMap[unresolvedImport.first].insert(
           unresolvedModuleID);
-      cache.addVisibleClangModules(unresolvedImport.first,
-                                   {unresolvedImport.second.importIdentifier});
+      DependencyCache.addVisibleClangModules(
+          unresolvedImport.first, {unresolvedImport.second.importIdentifier});
     } else {
       // Failed to resolve module dependency.
       IssueReporter.diagnoseModuleNotFoundFailure(
-          unresolvedImport.second, cache, unresolvedImport.first,
-          attemptToFindResolvingSerializedSearchPath(unresolvedImport.second,
-                                                     cache));
+          unresolvedImport.second, DependencyCache, unresolvedImport.first,
+          attemptToFindResolvingSerializedSearchPath(unresolvedImport.second));
     }
   }
 }
@@ -1087,8 +1086,8 @@ void ModuleDependencyScanner::reQueryMissedModulesFromCache(
 void ModuleDependencyScanner::performParallelClangModuleLookup(
     const ImportStatementInfoMap &unresolvedImportsMap,
     const ImportStatementInfoMap &unresolvedOptionalImportsMap,
-    ModuleDependenciesCache &cache, BatchClangModuleLookupResult &result) {
-  auto seenClangModules = cache.getAlreadySeenClangModules();
+    BatchClangModuleLookupResult &result) {
+  auto seenClangModules = DependencyCache.getAlreadySeenClangModules();
   std::mutex resultAccessLock;
   auto scanForClangModuleDependency = [this, &result, &resultAccessLock,
                                        &seenClangModules](
@@ -1134,7 +1133,6 @@ void ModuleDependencyScanner::cacheComputedClangModuleLookupResults(
     const ImportStatementInfoMap &unresolvedImportsMap,
     const ImportStatementInfoMap &unresolvedOptionalImportsMap,
     ArrayRef<ModuleDependencyID> swiftModuleDependents,
-    ModuleDependenciesCache &cache,
     ModuleDependencyIDSetVector &allDiscoveredClangModules,
     std::vector<std::pair<ModuleDependencyID, ScannerImportStatementInfo>>
         &failedToResolveImports,
@@ -1142,7 +1140,7 @@ void ModuleDependencyScanner::cacheComputedClangModuleLookupResults(
         &resolvedClangDependenciesMap) {
   for (const auto &moduleID : swiftModuleDependents) {
     auto recordResolvedClangModuleImport =
-        [this, &lookupResult, &cache, &resolvedClangDependenciesMap,
+        [this, &lookupResult, &resolvedClangDependenciesMap,
          &allDiscoveredClangModules, moduleID, &failedToResolveImports](
             const ScannerImportStatementInfo &moduleImport,
             bool optionalImport) {
@@ -1153,7 +1151,7 @@ void ModuleDependencyScanner::cacheComputedClangModuleLookupResults(
           // Add visible Clang modules for this query to the depending
           // Swift module
           if (lookupResult.visibleModules.contains(moduleIdentifier))
-            cache.addVisibleClangModules(
+            DependencyCache.addVisibleClangModules(
                 moduleID, lookupResult.visibleModules.at(moduleIdentifier));
 
           // Add the resolved dependency ID
@@ -1162,7 +1160,7 @@ void ModuleDependencyScanner::cacheComputedClangModuleLookupResults(
             auto dependencyInfo = lookupResult.discoveredDependencyInfos.at(
                 moduleImport.importIdentifier);
             allDiscoveredClangModules.insert(dependencyID);
-            cache.recordClangDependency(
+            DependencyCache.recordClangDependency(
                 dependencyInfo, ScanASTContext.Diags, [this](auto &clangDep) {
                   return bridgeClangModuleDependency(clangDep);
                 });
@@ -1190,7 +1188,7 @@ void ModuleDependencyScanner::cacheComputedClangModuleLookupResults(
     auto depID =
         ModuleDependencyID{dep.getKey().str(), ModuleDependencyKind::Clang};
     if (!allDiscoveredClangModules.contains(depID)) {
-      cache.recordClangDependency(
+      DependencyCache.recordClangDependency(
           dep.second, ScanASTContext.Diags, [this](auto &clangDep) {
             return bridgeClangModuleDependency(clangDep);
           });
@@ -1201,13 +1199,12 @@ void ModuleDependencyScanner::cacheComputedClangModuleLookupResults(
 
 void ModuleDependencyScanner::resolveAllClangModuleDependencies(
     ArrayRef<ModuleDependencyID> swiftModuleDependents,
-    ModuleDependenciesCache &cache,
     ModuleDependencyIDSetVector &allDiscoveredClangModules) {
   // Gather all unresolved imports which must correspond to
   // Clang modules (since no Swift module for them was found).
   ImportStatementInfoMap unresolvedImportsMap;
   ImportStatementInfoMap unresolvedOptionalImportsMap;
-  gatherUnresolvedImports(cache, ScanASTContext, swiftModuleDependents,
+  gatherUnresolvedImports(DependencyCache, ScanASTContext, swiftModuleDependents,
                           allDiscoveredClangModules, unresolvedImportsMap,
                           unresolvedOptionalImportsMap);
 
@@ -1215,7 +1212,7 @@ void ModuleDependencyScanner::resolveAllClangModuleDependencies(
   // identifiers as Clang modules.
   BatchClangModuleLookupResult lookupResult;
   performParallelClangModuleLookup(
-      unresolvedImportsMap, unresolvedOptionalImportsMap, cache, lookupResult);
+      unresolvedImportsMap, unresolvedOptionalImportsMap, lookupResult);
 
   // Use the computed scan results to record directly-queried clang module
   // dependencies.
@@ -1225,12 +1222,12 @@ void ModuleDependencyScanner::resolveAllClangModuleDependencies(
       resolvedClangDependenciesMap;
   cacheComputedClangModuleLookupResults(
       lookupResult, unresolvedImportsMap, unresolvedOptionalImportsMap,
-      swiftModuleDependents, cache, allDiscoveredClangModules,
+      swiftModuleDependents, allDiscoveredClangModules,
       failedToResolveImports, resolvedClangDependenciesMap);
 
   // Re-query some failed-to-resolve Clang imports from cache
   // in chance they were brought in as transitive dependencies.
-  reQueryMissedModulesFromCache(cache, failedToResolveImports,
+  reQueryMissedModulesFromCache(failedToResolveImports,
                                 resolvedClangDependenciesMap);
 
   // Record the computed result for each Swift module in the graph.
@@ -1238,23 +1235,23 @@ void ModuleDependencyScanner::resolveAllClangModuleDependencies(
     auto resolvedDependencies =
         resolvedClangDependenciesMap[moduleID].getArrayRef();
     if (!resolvedDependencies.empty())
-      cache.setImportedClangDependencies(moduleID, resolvedDependencies);
+      DependencyCache.setImportedClangDependencies(moduleID,
+                                                   resolvedDependencies);
   }
 }
 
 void ModuleDependencyScanner::resolveHeaderDependencies(
     ArrayRef<ModuleDependencyID> allSwiftModules,
-    ModuleDependenciesCache &cache,
     ModuleDependencyIDSetVector &allDiscoveredHeaderDependencyClangModules) {
   for (const auto &moduleID : allSwiftModules) {
-    auto moduleDependencyInfo = cache.findKnownDependency(moduleID);
+    auto moduleDependencyInfo = DependencyCache.findKnownDependency(moduleID);
     if (!moduleDependencyInfo.getHeaderClangDependencies().empty()) {
       allDiscoveredHeaderDependencyClangModules.insert(
           moduleDependencyInfo.getHeaderClangDependencies().begin(),
           moduleDependencyInfo.getHeaderClangDependencies().end());
     } else {
       ModuleDependencyIDSetVector headerClangModuleDependencies;
-      resolveHeaderDependenciesForModule(moduleID, cache,
+      resolveHeaderDependenciesForModule(moduleID,
                                          headerClangModuleDependencies);
       allDiscoveredHeaderDependencyClangModules.insert(
           headerClangModuleDependencies.begin(),
@@ -1265,18 +1262,17 @@ void ModuleDependencyScanner::resolveHeaderDependencies(
 
 void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
     ArrayRef<ModuleDependencyID> allSwiftModules,
-    ModuleDependenciesCache &cache,
     ModuleDependencyIDSetVector &allDiscoveredDependencies) {
   ModuleDependencyIDSetVector discoveredSwiftOverlays;
   for (const auto &moduleID : allSwiftModules) {
-    auto moduleDependencyInfo = cache.findKnownDependency(moduleID);
+    auto moduleDependencyInfo = DependencyCache.findKnownDependency(moduleID);
     if (!moduleDependencyInfo.getSwiftOverlayDependencies().empty()) {
       allDiscoveredDependencies.insert(
           moduleDependencyInfo.getSwiftOverlayDependencies().begin(),
           moduleDependencyInfo.getSwiftOverlayDependencies().end());
     } else {
       ModuleDependencyIDSetVector swiftOverlayDependencies;
-      resolveSwiftOverlayDependenciesForModule(moduleID, cache,
+      resolveSwiftOverlayDependenciesForModule(moduleID,
                                                swiftOverlayDependencies);
       discoveredSwiftOverlays.insert(swiftOverlayDependencies.begin(),
                                      swiftOverlayDependencies.end());
@@ -1287,7 +1283,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
   // in case it itself has unresolved module dependencies.
   for (const auto &overlayDepID : discoveredSwiftOverlays) {
     ModuleDependencyIDSetVector allNewModules =
-        resolveImportedModuleDependencies(overlayDepID, cache);
+        resolveImportedModuleDependencies(overlayDepID);
     allDiscoveredDependencies.insert(allNewModules.begin(),
                                      allNewModules.end());
   }
@@ -1297,26 +1293,26 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
 }
 
 void ModuleDependencyScanner::resolveSwiftImportsForModule(
-    const ModuleDependencyID &moduleID, ModuleDependenciesCache &cache,
+    const ModuleDependencyID &moduleID,
     ModuleDependencyIDSetVector &importedSwiftDependencies) {
   PrettyStackTraceStringAction trace("Resolving Swift imports of: ",
                                      moduleID.ModuleName);
   if (!isSwiftDependencyKind(moduleID.Kind))
     return;
 
-  auto moduleDependencyInfo = cache.findKnownDependency(moduleID);
+  auto moduleDependencyInfo = DependencyCache.findKnownDependency(moduleID);
   llvm::StringMap<SwiftModuleScannerQueryResult> moduleLookupResult;
   std::mutex lookupResultLock;
 
   // A scanning task to query a module by-name. If the module already exists
   // in the cache, do nothing and return.
   auto scanForSwiftModuleDependency =
-      [this, &cache, &lookupResultLock,
+      [this, &lookupResultLock,
        &moduleLookupResult](Identifier moduleIdentifier, bool isTestable) {
         auto moduleName = moduleIdentifier.str().str();
         {
           std::lock_guard<std::mutex> guard(lookupResultLock);
-          if (cache.hasSwiftDependency(moduleName))
+          if (DependencyCache.hasSwiftDependency(moduleName))
             return;
         }
 
@@ -1356,7 +1352,7 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
   ScanningThreadPool.wait();
 
   auto recordResolvedModuleImport =
-      [this, &cache, &moduleLookupResult, &importedSwiftDependencies,
+      [this, &moduleLookupResult, &importedSwiftDependencies,
        moduleID](const ScannerImportStatementInfo &moduleImport) {
         if (moduleID.ModuleName == moduleImport.importIdentifier)
           return;
@@ -1364,8 +1360,8 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
 
         // Query found module
         if (lookupResult.foundDependencyInfo) {
-          cache.recordDependency(moduleImport.importIdentifier,
-                                 *(lookupResult.foundDependencyInfo));
+          DependencyCache.recordDependency(moduleImport.importIdentifier,
+                                           *(lookupResult.foundDependencyInfo));
           importedSwiftDependencies.insert(
               {moduleImport.importIdentifier,
                lookupResult.foundDependencyInfo->getKind()});
@@ -1373,14 +1369,14 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
               moduleImport.importIdentifier,
               lookupResult.incompatibleCandidates);
           // Module was resolved from a cache
-        } else if (auto cachedInfo = cache.findSwiftDependency(
+        } else if (auto cachedInfo = DependencyCache.findSwiftDependency(
                        moduleImport.importIdentifier))
           importedSwiftDependencies.insert(
               {moduleImport.importIdentifier, cachedInfo.value()->getKind()});
         else
           IssueReporter.diagnoseFailureOnOnlyIncompatibleCandidates(
-              moduleImport, lookupResult.incompatibleCandidates, cache,
-              std::nullopt);
+              moduleImport, lookupResult.incompatibleCandidates,
+              DependencyCache, std::nullopt);
       };
 
   for (const auto &importInfo : moduleDependencyInfo.getModuleImports())
@@ -1389,18 +1385,18 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
     recordResolvedModuleImport(importInfo);
 
   // Resolve the dependency info with Swift dependency module information.
-  cache.setImportedSwiftDependencies(moduleID,
-                                     importedSwiftDependencies.getArrayRef());
+  DependencyCache.setImportedSwiftDependencies(
+      moduleID, importedSwiftDependencies.getArrayRef());
 }
 
 void ModuleDependencyScanner::resolveHeaderDependenciesForModule(
-    const ModuleDependencyID &moduleID, ModuleDependenciesCache &cache,
+    const ModuleDependencyID &moduleID,
     ModuleDependencyIDSetVector &headerClangModuleDependencies) {
   PrettyStackTraceStringAction trace(
       "Resolving header dependencies of Swift module", moduleID.ModuleName);
   std::vector<std::string> allClangModules;
   llvm::StringSet<> alreadyKnownModules;
-  auto moduleDependencyInfo = cache.findKnownDependency(moduleID);
+  auto moduleDependencyInfo = DependencyCache.findKnownDependency(moduleID);
 
   bool isTextualModuleWithABridgingHeader =
       moduleDependencyInfo.isTextualSwiftModule() &&
@@ -1455,11 +1451,11 @@ void ModuleDependencyScanner::resolveHeaderDependenciesForModule(
         auto headerScanResult =
             ScanningWorker->scanHeaderDependenciesOfSwiftModule(
                 moduleID, headerPath, sourceBufferRef, lookupModuleOutput,
-                cache.getAlreadySeenClangModules());
+                DependencyCache.getAlreadySeenClangModules());
 
         if (headerScanResult) {
           // Record module dependencies for each new module we found.
-          cache.recordClangDependencies(
+          DependencyCache.recordClangDependencies(
               headerScanResult->ModuleGraph, ScanASTContext.Diags,
               [this](auto &clangDep) {
                 return bridgeClangModuleDependency(clangDep);
@@ -1474,7 +1470,7 @@ void ModuleDependencyScanner::resolveHeaderDependenciesForModule(
           headerClangModuleDependencies.insert(bridgedDependencyIDs.begin(),
                                                bridgedDependencyIDs.end());
 
-          auto targetModuleInfo = cache.findKnownDependency(moduleID);
+          auto targetModuleInfo = DependencyCache.findKnownDependency(moduleID);
           if (targetModuleInfo.isTextualSwiftModule()) {
             if (auto TreeID = headerScanResult->IncludeTreeID)
               includeTreeID = TreeID;
@@ -1497,7 +1493,7 @@ void ModuleDependencyScanner::resolveHeaderDependenciesForModule(
           moduleDependencyInfo.addVisibleClangModules(
               headerScanResult->VisibleModules);
           // Update the dependency in the cache
-          cache.updateDependency(moduleID, moduleDependencyInfo);
+          DependencyCache.updateDependency(moduleID, moduleDependencyInfo);
         } else {
           // Failure to scan header
         }
@@ -1506,25 +1502,28 @@ void ModuleDependencyScanner::resolveHeaderDependenciesForModule(
 }
 
 void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
-    const ModuleDependencyID &moduleID, ModuleDependenciesCache &cache,
+    const ModuleDependencyID &moduleID,
     ModuleDependencyIDSetVector &swiftOverlayDependencies) {
   PrettyStackTraceStringAction trace(
       "Resolving Swift Overlay dependencies of module", moduleID.ModuleName);
-  auto visibleClangDependencies = cache.getVisibleClangModules(moduleID);
+  auto visibleClangDependencies =
+      DependencyCache.getVisibleClangModules(moduleID);
 
   llvm::StringMap<SwiftModuleScannerQueryResult> swiftOverlayLookupResult;
   std::mutex lookupResultLock;
 
   // A scanning task to query a Swift module by-name. If the module already
   // exists in the cache, do nothing and return.
-  auto scanForSwiftDependency = [this, &moduleID, &cache, &lookupResultLock,
+  auto scanForSwiftDependency = [this, &moduleID, &lookupResultLock,
                                  &swiftOverlayLookupResult](
                                     Identifier moduleIdentifier) {
     auto moduleName = moduleIdentifier.str();
     {
       std::lock_guard<std::mutex> guard(lookupResultLock);
-      if (cache.hasDependency(moduleName, ModuleDependencyKind::SwiftInterface) ||
-          cache.hasDependency(moduleName, ModuleDependencyKind::SwiftBinary))
+      if (DependencyCache.hasDependency(moduleName,
+                                        ModuleDependencyKind::SwiftInterface) ||
+          DependencyCache.hasDependency(moduleName,
+                                        ModuleDependencyKind::SwiftBinary))
         return;
     }
 
@@ -1549,12 +1548,13 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
 
   // Enque asynchronous lookup tasks
   for (const auto &clangDep : visibleClangDependencies)
-    ScanningThreadPool.async(scanForSwiftDependency,
-                             getModuleImportIdentifier(clangDep.getKey().str()));
+    ScanningThreadPool.async(
+        scanForSwiftDependency,
+        getModuleImportIdentifier(clangDep.getKey().str()));
   ScanningThreadPool.wait();
 
   // Aggregate both previously-cached and freshly-scanned module results
-  auto recordResult = [this, &cache, &swiftOverlayLookupResult,
+  auto recordResult = [this, &swiftOverlayLookupResult,
                        &swiftOverlayDependencies,
                        moduleID](const std::string &moduleName) {
     auto lookupResult = swiftOverlayLookupResult[moduleName];
@@ -1562,19 +1562,22 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
 
       // Query found module
       if (lookupResult.foundDependencyInfo) {
-        cache.recordDependency(moduleName, *(lookupResult.foundDependencyInfo));
+        DependencyCache.recordDependency(moduleName,
+                                         *(lookupResult.foundDependencyInfo));
         swiftOverlayDependencies.insert(
             {moduleName, lookupResult.foundDependencyInfo->getKind()});
         IssueReporter.warnOnIncompatibleCandidates(
             moduleName, lookupResult.incompatibleCandidates);
         // Module was resolved from a cache
-      } else if (auto cachedInfo = cache.findSwiftDependency(moduleName))
+      } else if (auto cachedInfo =
+                     DependencyCache.findSwiftDependency(moduleName))
         swiftOverlayDependencies.insert(
             {moduleName, cachedInfo.value()->getKind()});
       else
         IssueReporter.diagnoseFailureOnOnlyIncompatibleCandidates(
             ScannerImportStatementInfo(moduleName),
-            lookupResult.incompatibleCandidates, cache, std::nullopt);
+            lookupResult.incompatibleCandidates, DependencyCache,
+            std::nullopt);
     }
   };
   for (const auto &clangDep : visibleClangDependencies)
@@ -1585,7 +1588,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
       ScanCompilerInvocation.getLangOptions().EnableCXXInterop;
   if (lookupCxxStdLibOverlay &&
       moduleID.Kind == ModuleDependencyKind::SwiftInterface) {
-    const auto &moduleInfo = cache.findKnownDependency(moduleID);
+    const auto &moduleInfo = DependencyCache.findKnownDependency(moduleID);
     const auto commandLine = moduleInfo.getCommandline();
     // If the textual interface was built without C++ interop, do not query
     // the C++ Standard Library Swift overlay for its compilation.
@@ -1595,7 +1598,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
   } else if (lookupCxxStdLibOverlay &&
              moduleID.Kind == ModuleDependencyKind::SwiftBinary) {
     const auto &moduleDetails =
-        cache.findKnownDependency(moduleID).getAsSwiftBinaryModule();
+      DependencyCache.findKnownDependency(moduleID).getAsSwiftBinaryModule();
     // If the binary module was built without C++ interop, do not query
     // the C++ Standard Library Swift overlay.
     if (!moduleDetails->isBuiltWithCxxInterop)
@@ -1617,7 +1620,8 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
       // loaded the overlay for it so far, it is a split libc++ module (e.g.
       // std_vector). Load the CxxStdlib overlay explicitly.
       const auto &clangDepInfo =
-          cache.findDependency(clangDepName, ModuleDependencyKind::Clang)
+        DependencyCache.findDependency(clangDepName,
+                                       ModuleDependencyKind::Clang)
               .value()
               ->getAsClangModule();
       if (importer::isCxxStdModule(clangDepName, clangDepInfo->IsSystem) &&
@@ -1635,18 +1639,18 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
 
   // Resolve the dependency info with Swift overlay dependency module
   // information.
-  cache.setSwiftOverlayDependencies(moduleID,
-                                    swiftOverlayDependencies.getArrayRef());
+  DependencyCache.setSwiftOverlayDependencies(
+      moduleID, swiftOverlayDependencies.getArrayRef());
 }
 
 void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
-    StringRef mainModuleName, ModuleDependenciesCache &cache,
+    StringRef mainModuleName,
     llvm::function_ref<void(ModuleDependencyID)> action) {
   // Modules explicitly imported. Only these can be secondary module.
   llvm::SetVector<Identifier> newOverlays;
   std::set<std::pair<std::string, std::string>> overlayFiles;
-  discoverCrossImportOverlayFiles(mainModuleName, cache, ScanASTContext,
-                                  newOverlays, overlayFiles);
+  discoverCrossImportOverlayFiles(mainModuleName, DependencyCache,
+                                  ScanASTContext, newOverlays, overlayFiles);
 
   // No new cross-import overlays are found, return.
   if (newOverlays.empty())
@@ -1671,21 +1675,21 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
 
   // Record the dummy main module's direct dependencies. The dummy main module
   // only directly depend on these newly discovered overlay modules.
-  if (cache.findDependency(dummyMainID))
-    cache.updateDependency(dummyMainID, dummyMainDependencies);
+  if (DependencyCache.findDependency(dummyMainID))
+    DependencyCache.updateDependency(dummyMainID, dummyMainDependencies);
   else
-    cache.recordDependency(dummyMainName, dummyMainDependencies);
+    DependencyCache.recordDependency(dummyMainName, dummyMainDependencies);
 
   ModuleDependencyIDSetVector allModules =
-    resolveImportedModuleDependencies(dummyMainID, cache);
+      resolveImportedModuleDependencies(dummyMainID);
 
   // Update main module's dependencies to include these new overlays.
-  cache.setCrossImportOverlayDependencies(actualMainID,
-                                          cache.getAllDependencies(dummyMainID));
+  DependencyCache.setCrossImportOverlayDependencies(
+      actualMainID, DependencyCache.getAllDependencies(dummyMainID));
 
   // Update the command-line on the main module to disable implicit
   // cross-import overlay search.
-  auto mainDep = cache.findKnownDependency(actualMainID);
+  auto mainDep = DependencyCache.findKnownDependency(actualMainID);
   std::vector<std::string> cmdCopy = mainDep.getCommandline();
   cmdCopy.push_back("-disable-cross-import-overlay-search");
   for (auto &entry : overlayFiles) {
@@ -1696,7 +1700,7 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
     cmdCopy.push_back(overlayPath);
   }
   mainDep.updateCommandLine(cmdCopy);
-  cache.updateDependency(actualMainID, mainDep);
+  DependencyCache.updateDependency(actualMainID, mainDep);
 
   // Report any discovered modules to the clients, which include all overlays
   // and their dependencies.
@@ -1705,7 +1709,7 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
 }
 
 llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
-    const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
+    const ModuleDependencyID &rootModuleID,
     ModuleDependencyIDSetVector &allModules) {
   if (rootModuleID.Kind != ModuleDependencyKind::SwiftSource)
     return llvm::Error::success();
@@ -1758,7 +1762,7 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
     if (moduleID.Kind != ModuleDependencyKind::SwiftBinary)
       continue;
 
-    auto moduleDependencyInfo = cache.findKnownDependency(moduleID);
+    auto moduleDependencyInfo = DependencyCache.findKnownDependency(moduleID);
     if (auto *binaryMod = moduleDependencyInfo.getAsSwiftBinaryModule()) {
       if (binaryMod->headerImport.empty())
         continue;
@@ -1771,7 +1775,7 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
   }
 
   // Handle bridging header in main module.
-  auto mainModuleDeps = cache.findKnownDependency(rootModuleID);
+  auto mainModuleDeps = DependencyCache.findKnownDependency(rootModuleID);
   auto *mainModule = mainModuleDeps.getAsSwiftSourceModule();
   assert(mainModule && "expect main module to be a swift source module");
   std::unique_ptr<llvm::MemoryBuffer> sourceBuffer;
@@ -1842,7 +1846,7 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
             ScanningWorker->scanHeaderDependenciesOfSwiftModule(
                 rootModuleID, /*headerPath=*/std::nullopt,
                 sourceBuffer->getMemBufferRef(), lookupModuleOutput,
-                cache.getAlreadySeenClangModules());
+                DependencyCache.getAlreadySeenClangModules());
 
         if (!headerScanResult)
           return llvm::createStringError(
@@ -1850,7 +1854,7 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
               sourceBuffer->getBufferIdentifier());
 
         // Record module dependencies for each new module we found.
-        cache.recordClangDependencies(
+        DependencyCache.recordClangDependencies(
             headerScanResult->ModuleGraph, ScanASTContext.Diags,
             [this](auto &clangDep) {
               return bridgeClangModuleDependency(clangDep);
@@ -1871,7 +1875,7 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
         ClangImporter::getBridgingHeaderOptions(
             ScanASTContext, *headerScanResult, bridgingHeaderCommandLine);
 
-        cache.setHeaderClangDependencies(
+        DependencyCache.setHeaderClangDependencies(
             rootModuleID, headerClangModuleDependencies.getArrayRef());
         // Record include Tree ID
         if (includeTreeID) {
@@ -1911,15 +1915,15 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
         mainModuleDeps.addVisibleClangModules(headerScanResult->VisibleModules);
 
         // Update the dependency in the cache
-        cache.updateDependency(rootModuleID, mainModuleDeps);
+        DependencyCache.updateDependency(rootModuleID, mainModuleDeps);
         return llvm::Error::success();
       });
 
   if (err)
     return err;
 
-  cache.setHeaderClangDependencies(rootModuleID,
-                                   headerClangModuleDependencies.getArrayRef());
+  DependencyCache.setHeaderClangDependencies(
+      rootModuleID, headerClangModuleDependencies.getArrayRef());
 
   llvm::for_each(
       headerClangModuleDependencies,
@@ -2194,15 +2198,14 @@ void ModuleDependencyIssueReporter::warnOnIncompatibleCandidates(
 
 std::optional<std::pair<ModuleDependencyID, std::string>>
 ModuleDependencyScanner::attemptToFindResolvingSerializedSearchPath(
-    const ScannerImportStatementInfo &moduleImport,
-    const ModuleDependenciesCache &cache) {
+    const ScannerImportStatementInfo &moduleImport) {
   std::set<ModuleDependencyID> binarySwiftModuleDepIDs =
-      collectBinarySwiftDeps(cache);
+      collectBinarySwiftDeps(DependencyCache);
 
   std::optional<std::pair<ModuleDependencyID, std::string>> result;
   for (const auto &binaryDepID : binarySwiftModuleDepIDs) {
-    auto binaryModInfo =
-        cache.findKnownDependency(binaryDepID).getAsSwiftBinaryModule();
+    auto binaryModInfo = DependencyCache.findKnownDependency(binaryDepID)
+                             .getAsSwiftBinaryModule();
     assert(binaryModInfo);
     if (binaryModInfo->serializedSearchPaths.empty())
       continue;

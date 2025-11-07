@@ -136,6 +136,11 @@ SILType SILType::getBuiltinImplicitActorType(const ASTContext &ctx) {
   return getPrimitiveObjectType(ctx.TheImplicitActorType->getCanonicalType());
 }
 
+SILType SILType::getUnsafeRawPointer(const ASTContext &ctx) {
+  return getPrimitiveObjectType(
+      ctx.getUnsafeRawPointerType()->getCanonicalType());
+}
+
 bool SILType::isTrivial(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
   
@@ -159,6 +164,11 @@ bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction *f) const {
 bool SILType::isOrContainsPack(const SILFunction &F) const {
   auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
   return F.getTypeProperties(contextType).isOrContainsPack();
+}
+
+bool SILType::isPackElementAddress() const {
+  SILPackType *packTy = castTo<SILPackType>();
+  return packTy->isElementAddress();
 }
 
 bool SILType::isEmpty(const SILFunction &F) const {

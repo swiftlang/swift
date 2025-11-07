@@ -714,7 +714,7 @@ public:
   }
 };
 
-/// Defines the @_section attribute.
+/// Defines the @section attribute.
 class SectionAttr : public DeclAttribute {
 public:
   SectionAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
@@ -2359,6 +2359,10 @@ public:
 
   ASTContext &getASTContext() const;
 
+  /// If \c true, we should prefer a property wrapper if one exists for the
+  /// given attribute over a macro.
+  bool shouldPreferPropertyWrapperOverMacro() const;
+
   /// Retrieve the NominalTypeDecl the CustomAttr refers to, or \c nullptr if
   /// it doesn't refer to one (which can be the case for e.g macro attrs).
   NominalTypeDecl *getNominalDecl() const;
@@ -3126,8 +3130,8 @@ public:
   }
 
   /// Returns the C name of the given declaration.
-  /// \p forDecl is the func decl that the attribute belongs to.
-  StringRef getCName(const FuncDecl *forDecl) const;
+  /// \p forDecl is the decl that the attribute belongs to.
+  StringRef getCName(const ValueDecl *forDecl) const;
 
   /// Find an ExternAttr with the given kind in the given DeclAttributes.
   static const ExternAttr *find(const DeclAttributes &attrs, ExternKind kind);

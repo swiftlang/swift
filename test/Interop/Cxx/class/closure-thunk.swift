@@ -14,7 +14,7 @@ import Closure
 // CHECK: %[[V6:.*]] = init_block_storage_header %[[V2]] : $*@block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> (), invoke %[[V7]] : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> (), @in_cxx NonTrivial) -> (), type $@convention(block) (@in_cxx NonTrivial) -> ()
 // CHECK: %[[V8:.*]] = copy_block %[[V6]] : $@convention(block) (@in_cxx NonTrivial) -> ()
 // CHECK: dealloc_stack %[[V2]] : $*@block_storage @callee_guaranteed (@in_guaranteed NonTrivial) -> ()
-// CHECK: %[[V11:.*]] = function_ref @_Z5cfuncU13block_pointerFv10NonTrivialE : $@convention(c) (@convention(block) (@in_cxx NonTrivial) -> ()) -> ()
+// CHECK: %[[V11:.*]] = function_ref @$sSo5cfuncyyySo10NonTrivialVcFTo : $@convention(c) (@convention(block) (@in_cxx NonTrivial) -> ()) -> ()
 // CHECK: apply %[[V11]](%[[V8]]) : $@convention(c) (@convention(block) (@in_cxx NonTrivial) -> ()) -> ()
 // CHECK: strong_release %[[V8]] : $@convention(block) (@in_cxx NonTrivial) -> ()
 // CHECK: %[[V12:.*]] = tuple ()
@@ -27,7 +27,6 @@ import Closure
 // CHECK: strong_retain %[[V3]] : $@callee_guaranteed (@in_guaranteed NonTrivial) -> ()
 // CHECK: apply %[[V3]](%[[V1]]) : $@callee_guaranteed (@in_guaranteed NonTrivial) -> ()
 // CHECK: %[[V6:.*]] = tuple ()
-// CHECK: strong_release %[[V3]] : $@callee_guaranteed (@in_guaranteed NonTrivial) -> ()
 // CHECK: return %[[V6]] : $()
 
 // NonTrivial is destroyed by the caller.
@@ -37,7 +36,7 @@ public func testClosureToBlock() {
 
 // CHECK: sil @$s4main20testClosureToFuncPtryyF : $@convention(thin) () -> () {
 // CHECK: %[[V0:.*]] = function_ref @$s4main20testClosureToFuncPtryyFySo10NonTrivialVcfU_To : $@convention(c) (@in_cxx NonTrivial) -> ()
-// CHECK: %[[V1:.*]] = function_ref @_Z6cfunc2PFv10NonTrivialE : $@convention(c) (@convention(c) (@in_cxx NonTrivial) -> ()) -> ()
+// CHECK: %[[V1:.*]] = function_ref @$sSo6cfunc2yyySo10NonTrivialVXCFTo : $@convention(c) (@convention(c) (@in_cxx NonTrivial) -> ()) -> ()
 // CHECK: apply %[[V1]](%[[V0]]) : $@convention(c) (@convention(c) (@in_cxx NonTrivial) -> ()) -> ()
 // CHECK: %[[V3:.*]] = tuple ()
 // CHECK: return %[[V3]] : $()
@@ -53,7 +52,7 @@ public func testClosureToFuncPtr() {
 }
 
 // CHECK: sil @$s4main13returnFuncPtrySo10NonTrivialVcyF : $@convention(thin) () -> @owned @callee_guaranteed (@in_guaranteed NonTrivial) -> () {
-// CHECK: %[[V0:.*]] = function_ref @_Z8getFnPtrv : $@convention(c) () -> @convention(c) (@in_cxx NonTrivial) -> ()
+// CHECK: %[[V0:.*]] = function_ref @$sSo8getFnPtrySo10NonTrivialVXCyFTo : $@convention(c) () -> @convention(c) (@in_cxx NonTrivial) -> ()
 // CHECK: %[[V1:.*]] = apply %[[V0]]() : $@convention(c) () -> @convention(c) (@in_cxx NonTrivial) -> ()
 // CHECK: %[[V2:.*]] = function_ref @$sSo10NonTrivialVIetCX_ABIegn_TR : $@convention(thin) (@in_guaranteed NonTrivial, @convention(c) (@in_cxx NonTrivial) -> ()) -> ()
 // CHECK: %[[V3:.*]] = partial_apply [callee_guaranteed] %[[V2]](%[[V1]]) : $@convention(thin) (@in_guaranteed NonTrivial, @convention(c) (@in_cxx NonTrivial) -> ()) -> ()

@@ -52,18 +52,18 @@ func testFunction() {
 // CHECK-NEXT: apply [[FN4]]
 // CHECK-SAME: : $@convention(objc_method) (@in_guaranteed OptionsStruct, @objc_metatype OptionsConsumerObjC.Type) -> Int32
 
-// CHECK: [[FN5:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxxC1ERK13OptionsStruct : $@convention(c) (@in_guaranteed OptionsStruct) -> @out OptionsConsumerCxx
+// CHECK: [[FN5:%[0-9]+]] = function_ref @$sSo18OptionsConsumerCxxVyABSo0A6StructVcfCTo : $@convention(c) (@in_guaranteed OptionsStruct) -> @out OptionsConsumerCxx
 // CHECK-NEXT: apply [[FN5]]
 // CHECK-SAME: : $@convention(c) (@in_guaranteed OptionsStruct) -> @out OptionsConsumerCxx
 
-// CHECK: [[FN6:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxx12doOtherThingERK13OptionsStruct : $@convention(cxx_method) (@in_guaranteed OptionsStruct, @inout OptionsConsumerCxx) -> Float
+// CHECK: [[FN6:%[0-9]+]] = function_ref @$sSo18OptionsConsumerCxxV12doOtherThingySfSo0A6StructVFTo : $@convention(cxx_method) (@in_guaranteed OptionsStruct, @inout OptionsConsumerCxx) -> Float
 // CHECK-NEXT: apply [[FN6]]
 // CHECK-SAME: : $@convention(cxx_method) (@in_guaranteed OptionsStruct, @inout OptionsConsumerCxx) -> Float
 
-// CHECK: [[FN6:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxx5buildERK13OptionsStruct : $@convention(c) (@in_guaranteed OptionsStruct) -> OptionsConsumerCxx
+// CHECK: [[FN6:%[0-9]+]] = function_ref @$sSo18OptionsConsumerCxxV5buildyABSo0A6StructVFZTo : $@convention(c) (@in_guaranteed OptionsStruct) -> OptionsConsumerCxx
 // CHECK-NEXT: apply [[FN6]]
 // CHECK-SAME: : $@convention(c) (@in_guaranteed OptionsStruct) -> OptionsConsumerCxx
 
-// CHECK: [[FN7:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxx7doThingERK13OptionsStruct : $@convention(c) (@in_guaranteed OptionsStruct) -> Int32
+// CHECK: [[FN7:%[0-9]+]] = function_ref @$sSo18OptionsConsumerCxxV7doThingys5Int32VSo0A6StructVFZTo : $@convention(c) (@in_guaranteed OptionsStruct) -> Int32
 // CHECK-NEXT: apply [[FN7]]
 // CHECK-SAME: : $@convention(c) (@in_guaranteed OptionsStruct) -> Int32

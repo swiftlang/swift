@@ -1828,9 +1828,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     // Since inference now happens during constraint generation,
     // this hack should be allowed in both `Solving`
     // (during non-diagnostic mode) and `ConstraintGeneration` phases.
-    if (isGenericParameter(TypeVar) &&
-        (!CS.shouldAttemptFixes() ||
-         CS.getPhase() == ConstraintSystemPhase::ConstraintGeneration)) {
+    if (isGenericParameter(TypeVar) && !CS.inSalvageMode()) {
       type = fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape(false));
     }
   }

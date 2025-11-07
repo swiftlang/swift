@@ -1889,9 +1889,10 @@ SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
     assert(base);
 
     SILValue capturedBase;
-    unsigned argIdx = setterConv.getNumSILArguments() - 1;
+    unsigned argIdx = setterConv.getSILArgIndexOfSelf();
+    auto paramInfo = setterConv.getParamInfoForSILArg(argIdx);
 
-    if (setterConv.getSILArgumentConvention(argIdx).isInoutConvention()) {
+    if (paramInfo.isIndirectMutating()) {
       capturedBase = base.getValue();
     } else if (base.getType().isAddress() &&
                base.getType().getObjectType() ==
@@ -1981,9 +1982,9 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
     SILFunctionConventions initConv(initTy, SGM.M);
 
     auto newValueArgIdx = initConv.getSILArgIndexOfFirstParam();
+    auto newValueParamInfo = initConv.getParamInfoForSILArg(newValueArgIdx);
     // If we need the argument in memory, materialize an address.
-    if (initConv.getSILArgumentConvention(newValueArgIdx)
-            .isIndirectConvention() &&
+    if (initConv.isSILIndirect(newValueParamInfo) &&
         !newValue.getType().isAddress()) {
       newValue = newValue.materialize(*this, loc);
     }

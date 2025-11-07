@@ -331,8 +331,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     OptionalTy = OptionalType::get(Dest->getType().getASTType())
                      ->getImplementationType()
                      ->getCanonicalType();
-    Tmp = Builder.createAllocStack(Loc,
-                                   SILType::getPrimitiveObjectType(OptionalTy));
+    Tmp = Builder.createAllocStack(Loc, F->getLoweredType(OptionalTy));
     outOptionalParam = Tmp;
   } else {
     outOptionalParam = Dest;
@@ -446,10 +445,11 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
 
 static bool canOptimizeCast(const swift::Type &BridgedTargetTy,
                             swift::SILFunctionConventions &substConv,
-                            TypeExpansionContext context) {
+                            const SILFunction *F) {
+  auto context = F->getTypeExpansionContext();
+
   // DestTy is the type which we want to convert to
-  SILType DestTy =
-      SILType::getPrimitiveObjectType(BridgedTargetTy->getCanonicalType());
+  SILType DestTy = F->getLoweredType(BridgedTargetTy->getCanonicalType());
   // ConvTy  is the return type of the _bridgeToObjectiveCImpl()
   auto ConvTy = substConv.getSILResultType(context).getObjectType();
   if (ConvTy == DestTy) {
@@ -652,8 +652,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
 
   // Check that this is a case that the authors of this code thought it could
   // handle.
-  if (!canOptimizeCast(BridgedTargetTy, substConv,
-                       F->getTypeExpansionContext())) {
+  if (!canOptimizeCast(BridgedTargetTy, substConv, F)) {
     return nullptr;
   }
 

@@ -1021,7 +1021,9 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
 
   // Note: Reusing the file manager is safe; this is a component that's already
   // reused when building PCM files for the module cache.
-  CI.createSourceManager(Impl.Instance->getFileManager());
+  CI.setVirtualFileSystem(Impl.Instance->getVirtualFileSystemPtr());
+  CI.setFileManager(Impl.Instance->getFileManagerPtr());
+  CI.createSourceManager();
   auto &clangSrcMgr = CI.getSourceManager();
   auto FID = clangSrcMgr.createFileID(
                         std::make_unique<ZeroFilledMemoryBuffer>(1, "<main>"));
@@ -1402,21 +1404,14 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   if (tracker)
     instance.addDependencyCollector(tracker->getClangCollector());
 
-  {
-    // Now set up the real client for Clang diagnostics---configured with proper
-    // options---as opposed to the temporary one we made above.
-    auto actualDiagClient = std::make_unique<ClangDiagnosticConsumer>(
-        importer->Impl, instance.getDiagnosticOpts(),
-        importerOpts.DumpClangDiagnostics);
-    instance.createDiagnostics(*VFS, actualDiagClient.release());
-  }
-
-  // Set up the file manager.
-  {
-    VFS = clang::createVFSFromCompilerInvocation(
-        instance.getInvocation(), instance.getDiagnostics(), std::move(VFS));
-    instance.createFileManager(VFS);
-  }
+  // Now set up the real client for Clang diagnostics---configured with proper
+  // options---as opposed to the temporary one we made above.
+  auto actualDiagClient = std::make_unique<ClangDiagnosticConsumer>(
+      importer->Impl, instance.getDiagnosticOpts(),
+      importerOpts.DumpClangDiagnostics);
+  instance.createVirtualFileSystem(std::move(VFS), actualDiagClient.get());
+  instance.createFileManager();
+  instance.createDiagnostics(actualDiagClient.release());
 
   // Don't stop emitting messages if we ever can't load a module.
   // FIXME: This is actually a general problem: any "fatal" error could mess up
@@ -1435,11 +1430,13 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   if (ctx.LangOpts.ClangTarget.has_value()) {
     // If '-clang-target' is set, create a mock invocation with the Swift triple
     // to configure CodeGen and Target options for Swift compilation.
-    auto swiftTargetClangArgs = importer->getClangCC1Arguments(ctx, VFS, true);
+    auto swiftTargetClangArgs = importer->getClangCC1Arguments(
+        ctx, instance.getVirtualFileSystemPtr(), true);
     if (!swiftTargetClangArgs)
       return nullptr;
     auto swiftTargetClangInvocation = createClangInvocation(
-        importer.get(), importerOpts, VFS, *swiftTargetClangArgs);
+        importer.get(), importerOpts, instance.getVirtualFileSystemPtr(),
+        *swiftTargetClangArgs);
     if (!swiftTargetClangInvocation)
       return nullptr;
 
@@ -1566,9 +1563,20 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   importer->Impl.setObjectForKeyedSubscript
     = clangContext.Selectors.getSelector(2, setObjectForKeyedSubscriptIdents);
 
+  // Can't inherit implicit modules from main module, because it isn't loaded yet.
+  // Add the Swift module, because it is important for safe interop wrappers.
+  Identifier stdlibName =
+      importer->Impl.SwiftContext.getIdentifier(STDLIB_NAME);
+  ImportPath::Raw path =
+      importer->Impl.SwiftContext.AllocateCopy<Located<Identifier>>(
+          Located<Identifier>(stdlibName, SourceLoc()));
+  ImplicitImportInfo implicitImportInfo;
+  implicitImportInfo.AdditionalUnloadedImports.emplace_back(
+      UnloadedImportedModule(ImportPath(path), ImportKind::Module));
+
   // Set up the imported header module.
   auto *importedHeaderModule = ModuleDecl::create(
-      ctx.getIdentifier(CLANG_HEADER_MODULE_NAME), ctx,
+      ctx.getIdentifier(CLANG_HEADER_MODULE_NAME), ctx, implicitImportInfo,
       [&](ModuleDecl *importedHeaderModule, auto addFile) {
         importer->Impl.ImportedHeaderUnit = new (ctx)
             ClangModuleUnit(*importedHeaderModule, importer->Impl, nullptr);
@@ -1924,15 +1932,14 @@ std::string ClangImporter::getBridgingHeaderContents(
 
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
-  clang::FileManager &fileManager = Impl.Instance->getFileManager();
-
   clang::CompilerInstance rewriteInstance(
       std::move(invocation), Impl.Instance->getPCHContainerOperations(),
       &Impl.Instance->getModuleCache());
-  rewriteInstance.createDiagnostics(fileManager.getVirtualFileSystem(),
-                                    new clang::IgnoringDiagConsumer);
-  rewriteInstance.setFileManager(&fileManager);
-  rewriteInstance.createSourceManager(fileManager);
+  rewriteInstance.setVirtualFileSystem(
+      Impl.Instance->getVirtualFileSystemPtr());
+  rewriteInstance.setFileManager(Impl.Instance->getFileManagerPtr());
+  rewriteInstance.createDiagnostics(new clang::IgnoringDiagConsumer);
+  rewriteInstance.createSourceManager();
   rewriteInstance.setTarget(&Impl.Instance->getTarget());
 
   std::string result;
@@ -1980,7 +1987,7 @@ std::string ClangImporter::getBridgingHeaderContents(
     return "";
   }
 
-  if (auto fileInfo = fileManager.getOptionalFileRef(headerPath)) {
+  if (auto fileInfo = rewriteInstance.getFileManager().getOptionalFileRef(headerPath)) {
     fileSize = fileInfo->getSize();
     fileModTime = fileInfo->getModificationTime();
   }
@@ -2029,16 +2036,15 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
   // Share the CASOption and the underlying CAS.
   invocation->setCASOption(Impl.Invocation->getCASOptsPtr());
 
-  clang::FileManager &fileManager = Impl.Instance->getFileManager();
-
   auto clonedInstance = std::make_unique<clang::CompilerInstance>(
       std::move(invocation), Impl.Instance->getPCHContainerOperations(),
       &Impl.Instance->getModuleCache());
-  clonedInstance->createDiagnostics(fileManager.getVirtualFileSystem(),
-                                    &Impl.Instance->getDiagnosticClient(),
+  clonedInstance->setVirtualFileSystem(
+      Impl.Instance->getVirtualFileSystemPtr());
+  clonedInstance->setFileManager(Impl.Instance->getFileManagerPtr());
+  clonedInstance->createDiagnostics(&Impl.Instance->getDiagnosticClient(),
                                     /*ShouldOwnClient=*/false);
-  clonedInstance->setFileManager(&fileManager);
-  clonedInstance->createSourceManager(fileManager);
+  clonedInstance->createSourceManager();
   clonedInstance->setTarget(&Impl.Instance->getTarget());
   clonedInstance->setOutputBackend(Impl.SwiftContext.OutputBackend);
 
@@ -2423,10 +2429,6 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
   ModuleDecl *MD = nullptr;
   ASTContext &ctx = getNameImporter().getContext();
 
-  // `CxxStdlib` is the only accepted spelling of the C++ stdlib module name.
-  if (path.front().Item.is("std") ||
-      path.front().Item.str().starts_with("std_"))
-    return nullptr;
   if (path.front().Item == ctx.Id_CxxStdlib) {
     ImportPath::Builder adjustedPath(ctx.getIdentifier("std"), importLoc);
     adjustedPath.append(path.getSubmodulePath());
@@ -2564,6 +2566,14 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
   case PlatformKind::visionOSApplicationExtension:
     break;
 
+  case PlatformKind::DriverKit:
+    deprecatedAsUnavailableMessage = "";
+    break;
+
+  case PlatformKind::Swift:
+  case PlatformKind::anyAppleOS:
+    llvm_unreachable("Unexpected platform");
+
   case PlatformKind::FreeBSD:
     deprecatedAsUnavailableMessage = "";
     break;
@@ -2618,6 +2628,13 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
   case PlatformKind::visionOSApplicationExtension:
     return name == "xros" || name == "xros_app_extension" ||
            name == "visionos" || name == "visionos_app_extension";
+
+  case PlatformKind::DriverKit:
+    return name == "driverkit";
+
+  case PlatformKind::Swift:
+  case PlatformKind::anyAppleOS:
+    break; // Unexpected
 
   case PlatformKind::FreeBSD:
     return name == "freebsd";
@@ -2695,6 +2712,15 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::visionOSApplicationExtension:
     // No deprecation filter on xrOS
     return false;
+
+  case PlatformKind::DriverKit:
+    // No deprecation filter on DriverKit
+    // FIXME: [availability] This should probably have a value.
+    return false;
+
+  case PlatformKind::Swift:
+  case PlatformKind::anyAppleOS:
+    break; // Unexpected
 
   case PlatformKind::FreeBSD:
     // No deprecation filter on FreeBSD
@@ -8130,9 +8156,10 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
     // There is no Clang module for this declaration, so perform lookup from
     // the main module. This will find declarations from the bridging header.
     namelookup::lookupInModule(
-        ctx.MainModule, ctx.getIdentifier(name), results,
-        NLKind::UnqualifiedLookup, namelookup::ResolutionKind::Overloadable,
-        ctx.MainModule, SourceLoc(), NL_UnqualifiedDefault);
+        ctx.MainModule, ctx.getIdentifier(name), /*hasModuleSelector=*/false,
+        results, NLKind::UnqualifiedLookup,
+        namelookup::ResolutionKind::Overloadable, ctx.MainModule, SourceLoc(),
+        NL_UnqualifiedDefault);
 
     // Filter out any declarations that didn't come from Clang.
     auto newEnd =
@@ -8674,51 +8701,6 @@ SourceLoc swift::extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc) {
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           ClangTypeExplicitSafetyDescriptor desc) {
-  auto qt = static_cast<clang::QualType>(desc.type);
-  out << "Checking if type '" << qt.getAsString() << "' is explicitly safe.\n";
-}
-
-SourceLoc swift::extractNearestSourceLoc(ClangTypeExplicitSafetyDescriptor desc) {
-  return SourceLoc();
-}
-
-ExplicitSafety ClangTypeExplicitSafety::evaluate(
-    Evaluator &evaluator, ClangTypeExplicitSafetyDescriptor desc) const {
-  auto clangType = static_cast<clang::QualType>(desc.type);
-
-  // Handle pointers.
-  auto pointeeType = clangType->getPointeeType();
-  if (!pointeeType.isNull()) {
-    // Function pointers are okay.
-    if (pointeeType->isFunctionType())
-      return ExplicitSafety::Safe;
-
-    // Pointers to record types are okay if they come in as foreign reference
-    // types.
-    if (auto *recordDecl = pointeeType->getAsRecordDecl()) {
-      if (hasImportAsRefAttr(recordDecl))
-        return ExplicitSafety::Safe;
-    }
-
-    // All other pointers are considered unsafe.
-    return ExplicitSafety::Unsafe;
-  }
-
-  // Handle records recursively.
-  if (auto recordDecl = clangType->getAsTagDecl()) {
-    // If we reached this point the types is not imported as a shared reference,
-    // so we don't need to check the bases whether they are shared references.
-    return evaluateOrDefault(evaluator,
-                             ClangDeclExplicitSafety({recordDecl, false}),
-                             ExplicitSafety::Unspecified);
-  }
-
-  // Everything else is safe.
-  return ExplicitSafety::Safe;
-}
-
-void swift::simple_display(llvm::raw_ostream &out,
                            CxxDeclExplicitSafetyDescriptor desc) {
   out << "Checking if '";
   if (auto namedDecl = dyn_cast<clang::NamedDecl>(desc.decl))
@@ -8789,11 +8771,43 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
 
 /// Check whether the given Clang type involves an unsafe type.
 static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
+  // Handle pointers.
+  auto pointeeType = clangType->getPointeeType();
+  if (!pointeeType.isNull()) {
+    // Function pointers are okay.
+    if (pointeeType->isFunctionType())
+      return false;
+    
+    // Pointers to record types are okay if they come in as foreign reference
+    // types.
+    if (auto recordDecl = pointeeType->getAsRecordDecl()) {
+      if (hasImportAsRefAttr(recordDecl))
+        return false;
+    }
+    
+    // All other pointers are considered unsafe.
+    return true;
+  }
 
-  auto safety =
-      evaluateOrDefault(evaluator, ClangTypeExplicitSafety({clangType}),
-                        ExplicitSafety::Unspecified);
-  return safety == ExplicitSafety::Unsafe;
+  // Handle records recursively.
+  if (auto recordDecl = clangType->getAsTagDecl()) {
+    // If we reached this point the types is not imported as a shared reference,
+    // so we don't need to check the bases whether they are shared references.
+    auto safety = evaluateOrDefault(
+        evaluator, ClangDeclExplicitSafety({recordDecl, false}),
+        ExplicitSafety::Unspecified);
+    switch (safety) {
+      case ExplicitSafety::Unsafe:
+        return true;
+        
+      case ExplicitSafety::Safe:
+      case ExplicitSafety::Unspecified:
+        return false;        
+    }
+  }
+    
+  // Everything else is safe.
+  return false;
 }
 
 ExplicitSafety
@@ -8936,7 +8950,7 @@ bool importer::isCxxStdModule(StringRef moduleName, bool IsSystem) {
 ImportPath::Builder ClangImporter::Implementation::getSwiftModulePath(const clang::Module *M) {
   ImportPath::Builder builder;
   while (M) {
-    if (!M->isSubModule() && isCxxStdModule(M))
+    if (!M->isSubModule() && M->Name == "std")
       builder.push_back(SwiftContext.Id_CxxStdlib);
     else
       builder.push_back(SwiftContext.getIdentifier(M->Name));

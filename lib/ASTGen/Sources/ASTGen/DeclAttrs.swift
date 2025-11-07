@@ -265,7 +265,6 @@ extension ASTGenVisitor {
         .LexicalLifetimes,
         .LLDBDebuggerFunction,
         .MainType,
-        .ManualOwnership,
         .Marker,
         .MoveOnly,
         .NeverEmitIntoClient,
@@ -276,6 +275,7 @@ extension ASTGenVisitor {
         .NoRuntime,
         .NoImplicitCopy,
         .NoLocks,
+        .NoManualOwnership,
         .NoMetadata,
         .NoObjCBridging,
         .NonEphemeral,
@@ -1024,7 +1024,7 @@ extension ASTGenVisitor {
 
   /// E.g.
   ///   ```
-  ///   @_section("__TEXT,__mysection")
+  ///   @section("__TEXT,__mysection")
   ///   ```
   func generateSectionAttr(attribute node: AttributeSyntax) -> BridgedSectionAttr? {
     return self.generateWithLabeledExprListArguments(attribute: node) { args in

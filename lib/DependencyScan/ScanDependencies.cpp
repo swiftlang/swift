@@ -143,11 +143,12 @@ public:
         auto &dep = cache.findKnownDependency(bridgingDep);
         auto *clangDep = dep.getAsClangModule();
         assert(clangDep && "wrong module dependency kind");
+        auto pcmPath = llvm::sys::path::filename(clangDep->mappedPCMPath).str();
         if (!clangDep->moduleCacheKey.empty()) {
           bridgingHeaderBuildCmd.push_back("-Xcc");
           bridgingHeaderBuildCmd.push_back("-fmodule-file-cache-key");
           bridgingHeaderBuildCmd.push_back("-Xcc");
-          bridgingHeaderBuildCmd.push_back(clangDep->mappedPCMPath);
+          bridgingHeaderBuildCmd.push_back(pcmPath);
           bridgingHeaderBuildCmd.push_back("-Xcc");
           bridgingHeaderBuildCmd.push_back(clangDep->moduleCacheKey);
         }
@@ -277,17 +278,21 @@ private:
   bool handleClangModuleDependency(
       ModuleDependencyID depModuleID,
       const ClangModuleDependencyStorage &clangDepDetails) {
+    auto pcmPath =
+        clangDepDetails.moduleCacheKey.empty()
+            ? clangDepDetails.mappedPCMPath
+            : llvm::sys::path::filename(clangDepDetails.mappedPCMPath).str();
     if (!resolvingDepInfo.isSwiftSourceModule()) {
       if (!resolvingDepInfo.isClangModule()) {
         commandline.push_back("-Xcc");
         commandline.push_back("-fmodule-file=" + depModuleID.ModuleName + "=" +
-                              clangDepDetails.mappedPCMPath);
+                              pcmPath);
       }
       if (!clangDepDetails.moduleCacheKey.empty()) {
         commandline.push_back("-Xcc");
         commandline.push_back("-fmodule-file-cache-key");
         commandline.push_back("-Xcc");
-        commandline.push_back(clangDepDetails.mappedPCMPath);
+        commandline.push_back(pcmPath);
         commandline.push_back("-Xcc");
         commandline.push_back(clangDepDetails.moduleCacheKey);
       }
@@ -1401,7 +1406,7 @@ performModuleScanImpl(
   }
 
   auto scanner = ModuleDependencyScanner(
-      service, instance->getInvocation(), instance->getSILOptions(),
+      service, cache, instance->getInvocation(), instance->getSILOptions(),
       instance->getASTContext(), *instance->getDependencyTracker(),
       instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
       instance->getDiags(),
@@ -1417,7 +1422,7 @@ performModuleScanImpl(
                                                instance->getMainModule()));
 
   // Perform the full module scan starting at the main module.
-  auto allModules = scanner.performDependencyScan(mainModuleID, cache);
+  auto allModules = scanner.performDependencyScan(mainModuleID);
   if (diagnoseCycle(*instance, cache, mainModuleID))
     return std::make_error_code(std::errc::not_supported);
 
@@ -1453,7 +1458,7 @@ static llvm::ErrorOr<swiftscan_import_set_t> performModulePrescanImpl(
     DepScanInMemoryDiagnosticCollector *diagnosticCollector) {
   // Setup the scanner
   auto scanner = ModuleDependencyScanner(
-      service, instance->getInvocation(), instance->getSILOptions(),
+      service, cache, instance->getInvocation(), instance->getSILOptions(),
       instance->getASTContext(), *instance->getDependencyTracker(),
       instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
       instance->getDiags(),

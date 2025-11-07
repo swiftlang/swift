@@ -4309,6 +4309,33 @@ public:
   }
 };
 
+inline BuiltinInst *isBuiltinInst(SILValue value,
+                                  BuiltinValueKind kind) {
+  if (auto bi = dyn_cast<BuiltinInst>(value)) {
+    if (bi->getBuiltinKind() == kind)
+      return bi;
+  }
+  return nullptr;
+}
+
+inline BuiltinInst *isBuiltinInst(SILInstruction *inst,
+                                  BuiltinValueKind kind) {
+  if (auto bi = dyn_cast<BuiltinInst>(inst)) {
+    if (bi->getBuiltinKind() == kind)
+      return bi;
+  }
+  return nullptr;
+}
+
+inline const BuiltinInst *isBuiltinInst(const SILInstruction *inst,
+                                        BuiltinValueKind kind) {
+  if (auto bi = dyn_cast<BuiltinInst>(inst)) {
+    if (bi->getBuiltinKind() == kind)
+      return bi;
+  }
+  return nullptr;
+}
+
 /// Increments a given profiler counter for a given PGO function name. This is
 /// lowered to the \c llvm.instrprof.increment LLVM intrinsic.
 class IncrementProfilerCounterInst final

@@ -2205,6 +2205,22 @@ ImportedType findOptionSetEnum(clang::QualType type,
 llvm::SmallVector<ValueDecl *, 1>
 getValueDeclsForName(NominalTypeDecl* decl, StringRef name);
 
+template <typename T>
+const T *
+getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
+  const clang::TypeSourceInfo *TSI = FD->getTypeSourceInfo();
+  if (!TSI)
+    return nullptr;
+  clang::AttributedTypeLoc ATL;
+  for (clang::TypeLoc TL = TSI->getTypeLoc();
+       (ATL = TL.getAsAdjusted<clang::AttributedTypeLoc>());
+       TL = ATL.getModifiedLoc()) {
+    if (auto attr = ATL.getAttrAs<T>())
+      return attr;
+  }
+  return nullptr;
+}
+
 } // end namespace importer
 } // end namespace swift
 

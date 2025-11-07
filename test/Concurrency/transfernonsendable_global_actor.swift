@@ -12,7 +12,9 @@
 class NonSendableKlass {}
 final class SendableKlass : Sendable {}
 
-actor CustomActorInstance {}
+actor CustomActorInstance {
+  func acceptValue(_ x: NonSendableKlass) {}
+}
 
 @globalActor
 struct CustomActor {
@@ -357,5 +359,39 @@ func inferLocationOfCapturedActorIsolatedSelfCorrectly() {
 
     @MainActor
     func c() {}
+  }
+}
+
+// We shouldn't emit any diagnostic here and shouldn't emit a compiler doesn't
+// know how to process error.
+actor PreferIsolationOfFieldToIsolationOfActor {
+  final class C {
+    func foo(_ block: () -> Void) {}
+  }
+
+  @MainActor let c: C = C()
+  private var data: UInt8 = 0
+
+  @MainActor
+  func bar() async {
+    let data = await self.data
+    c.foo {
+      let data = data
+      _ = data
+    }
+  }
+}
+
+// We need to error on this below since ns becomes main actor isolated and then
+// we send it into a different actor.
+@MainActor
+class SetterAssignmentMustInferGlobalIsolationTest {
+  var nsField = NonSendableKlass()
+
+  func send() async {
+    let ns = NonSendableKlass()
+    nsField = ns
+    await CustomActor.shared.acceptValue(ns) // expected-warning {{sending 'ns' risks causing data races}}
+    // expected-note @-1 {{sending main actor-isolated 'ns' to actor-isolated instance method 'acceptValue' risks causing data races between actor-isolated and main actor-isolated uses}}
   }
 }

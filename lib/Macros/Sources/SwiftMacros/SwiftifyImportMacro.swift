@@ -1758,7 +1758,7 @@ func parseProtocolMacroParam(
     if let methodSyntax = DeclSyntax("\(raw: methodSignature)").as(FunctionDeclSyntax.self) {
       name = methodSyntax.name.trimmed.text
     }
-    for (tmp, method) in methods where method.name.trimmed.text == name {
+    for (_, method) in methods where method.name.trimmed.text == name {
       notes.append(Note(node: Syntax(method.name), message: MacroExpansionNoteMessage("did you mean '\(method.trimmed.description)'?")))
     }
     throw DiagnosticError(

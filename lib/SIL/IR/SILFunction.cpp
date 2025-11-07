@@ -442,6 +442,16 @@ bool SILFunction::hasForeignBody() const {
   return SILDeclRef::isClangGenerated(getClangNode());
 }
 
+void SILFunction::setAsmName(StringRef value) {
+  ASSERT((AsmName.empty() || value == AsmName) && "Cannot change asmname");
+  AsmName = value;
+
+  if (!value.empty()) {
+    // Update the function-by-asm-name-table.
+    getModule().FunctionByAsmNameTable.insert({AsmName, this});
+  }
+}
+
 const SILFunction *SILFunction::getOriginOfSpecialization() const {
   if (!isSpecialization())
     return nullptr;
@@ -1049,7 +1059,8 @@ bool SILFunction::isSwiftRuntimeFunction(
 }
 
 bool SILFunction::isSwiftRuntimeFunction() const {
-  return isSwiftRuntimeFunction(getName(), getParentModule());
+  return isSwiftRuntimeFunction(asmName(), getParentModule()) ||
+    isSwiftRuntimeFunction(getName(), getParentModule());
 }
 
 bool

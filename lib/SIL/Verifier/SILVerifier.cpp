@@ -2539,8 +2539,40 @@ public:
     if (builtinKind == BuiltinValueKind::ExtractFunctionIsolation) {
       require(false, "this builtin is pre-SIL-only");
     }
+
+    if (builtinKind == BuiltinValueKind::FinishAsyncLet) {
+      requireType(BI->getType(), _object(_tuple()),
+                  "result of finishAsyncLet");
+      require(arguments.size() == 2, "finishAsyncLet requires two arguments");
+      requireType(arguments[0]->getType(), _object(_rawPointer),
+                  "first argument of finishAsyncLet");
+      requireType(arguments[1]->getType(), _object(_rawPointer),
+                  "second argument of finishAsyncLet");
+
+      require((bool)isBuiltinInst(arguments[0],
+                              BuiltinValueKind::StartAsyncLetWithLocalBuffer),
+              "first argument of finishAsyncLet must be a startAsyncLet");
+    }
+
+    // Validate all "SIL builtins" never show up as BuiltinInst since they
+    // should just result in sequences of non-builtin inst SIL instructions
+    // being emitted and should never show up as a BuiltinInst.
+    switch (*builtinKind) {
+    case BuiltinValueKind::None:
+      break;
+#define BUILTIN_SIL_OPERATION(id, name, overload)                              \
+  case BuiltinValueKind::id:                                                   \
+    require(false,                                                             \
+            "this builtin should never show up as builtin inst. It should "    \
+            "only result in other SIL instructions being emitted by SILGen");  \
+    break;
+#define BUILTIN(ID, Name, Attrs)                                               \
+  case BuiltinValueKind::ID:                                                   \
+    break;
+#include "swift/AST/Builtins.def"
+    }
   }
-  
+
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
@@ -3191,9 +3223,9 @@ public:
       CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
       SILFunctionConventions initConv(initTy, AI->getModule());
 
-      require(initConv.getNumIndirectSILResults() ==
+      require(initConv.getResults().size() ==
                   AI->getNumInitializedProperties(),
-              "init function has invalid number of indirect results");
+              "init function has invalid number of results");
       checkAssigOrInitInstAccessorArgs(Src->getType(), initConv);
     }
 
@@ -6984,6 +7016,44 @@ public:
     };
   };
 
+  static bool isScopeInst(SILInstruction *i) {
+    if (isa<BeginAccessInst>(i) ||
+        isa<BeginApplyInst>(i) ||
+        isa<StoreBorrowInst>(i)) {
+      return true;
+    } else if (auto bi = dyn_cast<BuiltinInst>(i)) {
+      if (auto bk = bi->getBuiltinKind()) {
+        switch (*bk) {
+        case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
+          return true;
+
+        default:
+          return false;
+        }
+      }
+    }
+    return false;
+  }
+
+  static bool isScopeEndingInst(SILInstruction *i) {
+    if (isa<EndAccessInst>(i) ||
+        isa<AbortApplyInst>(i) ||
+        isa<EndApplyInst>(i)) {
+      return true;
+    } else if (auto bi = dyn_cast<BuiltinInst>(i)) {
+      if (auto bk = bi->getBuiltinKind()) {
+        switch (*bk) {
+        case BuiltinValueKind::FinishAsyncLet:
+          return true;
+
+        default:
+          return false;
+        }
+      }
+    }
+    return false;
+  }
+
   /// Verify the various control-flow-sensitive rules of SIL:
   ///
   /// - stack allocations and deallocations must obey a stack discipline
@@ -7060,14 +7130,11 @@ public:
               // The deallocation is printed out as the focus of the failure.
             });
           }
-        } else if (isa<BeginAccessInst>(i) || isa<BeginApplyInst>(i) ||
-                   isa<StoreBorrowInst>(i)) {
+        } else if (isScopeInst(&i)) {
           bool notAlreadyPresent = state.ActiveOps.insert(&i).second;
           require(notAlreadyPresent,
                   "operation was not ended before re-beginning it");
-
-        } else if (isa<EndAccessInst>(i) || isa<AbortApplyInst>(i) ||
-                   isa<EndApplyInst>(i)) {
+        } else if (isScopeEndingInst(&i)) {
           if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
             bool present = state.ActiveOps.erase(beginOp);
             require(present, "operation has already been ended");

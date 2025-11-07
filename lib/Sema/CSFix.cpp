@@ -1210,6 +1210,21 @@ AllowInaccessibleMember::create(ConstraintSystem &cs, Type baseType,
       AllowInaccessibleMember(cs, baseType, member, name, locator);
 }
 
+bool AllowMemberFromWrongModule::diagnose(const Solution &solution,
+                                          bool asNote) const {
+  MemberFromWrongModuleFailure failure(solution, getMemberName(), getMember(),
+                                       getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowMemberFromWrongModule *
+AllowMemberFromWrongModule::create(ConstraintSystem &cs, Type baseType,
+                                   ValueDecl *member, DeclNameRef name,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowMemberFromWrongModule(cs, baseType, member, name, locator);
+}
+
 bool AllowAnyObjectKeyPathRoot::diagnose(const Solution &solution,
                                          bool asNote) const {
   AnyObjectKeyPathRootFailure failure(solution, getLocator());

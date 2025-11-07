@@ -1244,72 +1244,63 @@ TypeVariableType *ConstraintSystem::isRepresentativeFor(
   return *member;
 }
 
-static std::optional<std::pair<VarDecl *, Type>>
-getPropertyWrapperInformationFromOverload(
-    SelectedOverload resolvedOverload, DeclContext *DC,
-    llvm::function_ref<std::optional<std::pair<VarDecl *, Type>>(VarDecl *)>
-        getInformation) {
-  if (auto *decl =
-          dyn_cast_or_null<VarDecl>(resolvedOverload.choice.getDeclOrNull())) {
-    if (auto declInformation = getInformation(decl)) {
-      Type type;
-      VarDecl *memberDecl;
-      std::tie(memberDecl, type) = *declInformation;
-      if (Type baseType = resolvedOverload.choice.getBaseType()) {
-        type = baseType->getRValueType()->getTypeOfMember(memberDecl, type);
-      }
-      return std::make_pair(decl, type);
-    }
+static Type getPropertyWrapperTypeFromOverload(
+    ConstraintSystem &cs, SelectedOverload resolvedOverload,
+    llvm::function_ref<VarDecl *(VarDecl *)> getWrapperVar) {
+  auto *D = dyn_cast_or_null<VarDecl>(resolvedOverload.choice.getDeclOrNull());
+  if (!D)
+    return Type();
+
+  auto *wrapperVar = getWrapperVar(D);
+  if (!wrapperVar)
+    return Type();
+
+  // First check to see if we have a type for this wrapper variable, which will
+  // the case for e.g local wrappers in closures.
+  if (auto ty = cs.getTypeIfAvailable(wrapperVar))
+    return ty;
+
+  // If we don't have a type for the wrapper variable this shouldn't be a
+  // VarDecl we're solving for.
+  ASSERT(!cs.hasType(D) && "Should have recorded type for wrapper var");
+
+  // For the backing property we need to query the request to ensure it kicks
+  // type-checking if necessary. Otherwise we can query the interface type.
+  auto ty = wrapperVar == D->getPropertyWrapperBackingProperty()
+                ? D->getPropertyWrapperBackingPropertyType()
+                : wrapperVar->getInterfaceType();
+  if (!ty)
+    return Type();
+
+  // If this is a for a property, substitute the base type. Otherwise we have
+  // a local property wrapper and need to map the resulting type into context.
+  if (auto baseType = resolvedOverload.choice.getBaseType()) {
+    ty = baseType->getRValueType()->getTypeOfMember(wrapperVar, ty);
+  } else {
+    ty = cs.DC->mapTypeIntoContext(ty);
   }
-  return std::nullopt;
+  return ty;
 }
 
-std::optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getPropertyWrapperProjectionInfo(
+Type ConstraintSystem::getPropertyWrapperProjectionType(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrapperInformationFromOverload(
-      resolvedOverload, DC,
-      [](VarDecl *decl) -> std::optional<std::pair<VarDecl *, Type>> {
-        if (!decl->hasAttachedPropertyWrapper())
-          return std::nullopt;
-
-        auto projectionVar = decl->getPropertyWrapperProjectionVar();
-        if (!projectionVar)
-          return std::nullopt;
-
-        return std::make_pair(projectionVar,
-                              projectionVar->getInterfaceType());
-      });
+  return getPropertyWrapperTypeFromOverload(
+      *this, resolvedOverload,
+      [&](VarDecl *decl) { return decl->getPropertyWrapperProjectionVar(); });
 }
 
-std::optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getPropertyWrapperInformation(
+Type ConstraintSystem::getPropertyWrapperBackingType(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrapperInformationFromOverload(
-      resolvedOverload, DC,
-      [](VarDecl *decl) -> std::optional<std::pair<VarDecl *, Type>> {
-        if (!decl->hasAttachedPropertyWrapper())
-          return std::nullopt;
-
-        auto backingTy = decl->getPropertyWrapperBackingPropertyType();
-        if (!backingTy)
-          return std::nullopt;
-
-        return std::make_pair(decl, backingTy);
-      });
+  return getPropertyWrapperTypeFromOverload(
+      *this, resolvedOverload,
+      [](VarDecl *decl) { return decl->getPropertyWrapperBackingProperty(); });
 }
 
-std::optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getWrappedPropertyInformation(
+Type ConstraintSystem::getWrappedPropertyType(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrapperInformationFromOverload(
-      resolvedOverload, DC,
-      [](VarDecl *decl) -> std::optional<std::pair<VarDecl *, Type>> {
-        if (auto wrapped = decl->getOriginalWrappedProperty())
-          return std::make_pair(decl, wrapped->getInterfaceType());
-
-        return std::nullopt;
-      });
+  return getPropertyWrapperTypeFromOverload(
+      *this, resolvedOverload,
+      [](VarDecl *decl) { return decl->getOriginalWrappedProperty(); });
 }
 
 void ConstraintSystem::addOverloadSet(Type boundType,
@@ -1808,10 +1799,8 @@ struct TypeSimplifier {
           // so the concrete dependent member type is considered a "hole" in
           // order to continue solving.
           auto memberTy = DependentMemberType::get(lookupBaseType, assocType);
-          if (CS.shouldAttemptFixes() &&
-              CS.getPhase() == ConstraintSystemPhase::Solving) {
+          if (CS.inSalvageMode())
             return PlaceholderType::get(CS.getASTContext(), memberTy);
-          }
 
           return memberTy;
         }
@@ -2861,14 +2850,8 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
     return false;
 
   auto contextualFix = contextualFixes.front();
-  if (!std::all_of(contextualFixes.begin() + 1, contextualFixes.end(),
-                   [&contextualFix](FixInContext fix) {
-                     return fix.second->getLocator() ==
-                            contextualFix.second->getLocator();
-                   }))
-    return false;
-
   auto fixLocator = contextualFix.second->getLocator();
+
   auto contextualAnchor = fixLocator->getAnchor();
   auto *AE = getAsExpr<ApplyExpr>(contextualAnchor);
   // All contextual failures anchored on the same function call.
@@ -2876,17 +2859,39 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
     return false;
 
   auto fnLocator = cs.getConstraintLocator(AE->getSemanticFn());
-  auto overload = contextualFix.first->getOverloadChoiceIfAvailable(fnLocator);
-  if (!overload)
-    return false;
 
-  auto applyFnType = overload->adjustedOpenedType->castTo<FunctionType>();
-  auto resultTypeVar = applyFnType->getResult()->getAs<TypeVariableType>();
+  auto getResultTypeVar = [&](FixInContext contextualFix) -> TypeVariableType * {
+    auto overload = contextualFix.first->getOverloadChoiceIfAvailable(fnLocator);
+    if (!overload)
+      return nullptr;
+
+    auto applyFnType = overload->adjustedOpenedType->castTo<FunctionType>();
+    return applyFnType->getResult()->getAs<TypeVariableType>();
+  };
+
+  auto resultTypeVar = getResultTypeVar(contextualFix);
   if (!resultTypeVar)
     return false;
 
   auto *GP = resultTypeVar->getImpl().getGenericParameter();
   if (!GP)
+    return false;
+
+  if (!std::all_of(contextualFixes.begin() + 1, contextualFixes.end(),
+                   [&](FixInContext fix) {
+                     if (fix.second->getLocator() != fixLocator)
+                       return false;
+
+                     auto resultTypeVar = getResultTypeVar(fix);
+
+                     if (!resultTypeVar)
+                       return false;
+
+                     if (resultTypeVar->getImpl().getGenericParameter() != GP)
+                       return false;
+
+                     return true;
+                   }))
     return false;
 
   auto applyLoc =
@@ -2905,6 +2910,11 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
       continue;
 
     auto argParamMatch = argMatching->second.parameterBindings[i];
+
+    // FIXME: We're just looking at the first solution's overload here,
+    // is that correct?
+    auto overload = contextualFix.first->getOverloadChoiceIfAvailable(fnLocator);
+    auto applyFnType = overload->adjustedOpenedType->castTo<FunctionType>();
     auto param = applyFnType->getParams()[argParamMatch.front()];
     auto paramFnType = param.getPlainType()->getAs<FunctionType>();
     if (!paramFnType)
@@ -2924,8 +2934,15 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
   // from all the closure contextual fix/solutions and if there are more than
   // one fixed type diagnose it.
   swift::SmallSetVector<Type, 4> genericParamInferredTypes;
-  for (auto &fix : contextualFixes)
+  for (auto &fix : contextualFixes) {
+    auto resultTypeVar = getResultTypeVar(fix);
     genericParamInferredTypes.insert(fix.first->getFixedType(resultTypeVar));
+  }
+
+  for (auto &fix : allFixes) {
+    auto resultTypeVar = getResultTypeVar(fix);
+    genericParamInferredTypes.insert(fix.first->getFixedType(resultTypeVar));
+  }
 
   if (llvm::all_of(allFixes, [&](FixInContext fix) {
         auto fixLocator = fix.second->getLocator();

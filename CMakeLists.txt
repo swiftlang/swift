@@ -271,6 +271,19 @@ option(SWIFT_BUILD_STDLIB_CXX_MODULE
   "If not building stdlib, controls whether to build the Cxx module"
   TRUE)
 
+# The swiftClientRetainRelease library is currently only available for Darwin
+# platforms.
+if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+  # Off by default everywhere for now.
+  option(SWIFT_BUILD_CLIENT_RETAIN_RELEASE
+    "Build the swiftClientRetainRelease library"
+    FALSE)
+else()
+  option(SWIFT_BUILD_CLIENT_RETAIN_RELEASE
+    "Build the swiftClientRetainRelease library"
+    FALSE)
+endif()
+
 # In many cases, the CMake build system needs to determine whether to include
 # a directory, or perform other actions, based on whether the stdlib or SDK is
 # being built at all -- statically or dynamically. Please note that these
@@ -538,8 +551,8 @@ set(SWIFT_SDK_LINUX_ARCHITECTURES "" CACHE STRING
 # User-configurable Android specific options.
 #
 
-set(SWIFT_ANDROID_API_LEVEL "" CACHE STRING
-  "Version number for the Android API")
+set(SWIFT_ANDROID_API_LEVEL "28" CACHE STRING
+  "Version number for the Android API (default: 28)")
 
 set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
@@ -1673,7 +1686,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
-          -DSwiftCore_ENABLE_CONCURRENCY=${build_concurrency})
+          -DSwiftCore_ENABLE_CONCURRENCY=${build_concurrency}
+          -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
       if(NOT ${CMAKE_CROSSCOMPILING})
         add_dependencies("${stdlib_target}-core" swift-frontend)
       endif()
@@ -1701,7 +1715,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=TRUE
-          -DSwiftOverlay_ENABLE_CXX_INTEROP=TRUE)
+          -DSwiftOverlay_ENABLE_CXX_INTEROP=TRUE
+          -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
 
       ExternalProject_Add("${stdlib_target}-Supplemental"
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Supplemental"
@@ -1726,7 +1741,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_ASM_COMPILER_TARGET:STRING=${stdlib_target_triple}
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
-          -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=TRUE)
+          -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=TRUE
+          -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
     endforeach()
   endforeach()
 endif()

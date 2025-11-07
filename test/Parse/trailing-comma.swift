@@ -74,7 +74,7 @@ if #available(iOS 15,) { }  // expected-error {{expected platform name}}
 
 // Built-in Attributes
 
-@attached(extension, conformances: OptionSet,)  // expected-error {{unexpected ',' separator}}
+@attached(extension, conformances: OptionSet,)  // expected-error {{unexpected ',' separator}} {{45-46=}}
 macro OptionSet<RawType>() = #externalMacro(module: "SwiftMacros", type: "OptionSetMacro")
 
 @inline(never,) // expected-error {{expected declaration}} expected-error {{expected ')' in 'inline' attribute}} 
@@ -83,7 +83,7 @@ func foo() { }
 @available(iOS 15,) // expected-error {{expected platform name}} expected-error {{expected declaration}} 
 func foo() { }
 
-@backDeployed(before: SwiftStdlib 6.0,) // expected-error {{unexpected ',' separator}}
+@backDeployed(before: SwiftStdlib 6.0,) // expected-error {{unexpected ',' separator}} {{38-39=}}
 func foo() { }
 
 struct Foo {
@@ -104,10 +104,10 @@ struct Foo {
 
 func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-error {{expected ',' separator}} expected-error {{unnamed parameters must be written with the empty name '_'}}
 
-@derivative(of: Self.other,) // expected-error {{unexpected ',' separator}}
+@derivative(of: Self.other,) // expected-error {{unexpected ',' separator}} {{27-28=}}
 func foo() {}
 
-@transpose(of: S.instanceMethod,) // expected-error {{unexpected ',' separator}}
+@transpose(of: S.instanceMethod,) // expected-error {{unexpected ',' separator}} {{32-33=}}
 func transposeInstanceMethodWrtSelf(_ other: S, t: S) -> S {
     other + t
 }
@@ -145,6 +145,6 @@ if #available(OSX 51,) { // expected-error {{expected platform name}}
 }
 
 @available(OSX 10.7, iOS 7.0, *,) // expected-error {{expected platform name}} expected-error {{expected declaration}}
-@_originallyDefinedIn(module: "HighLevel", OSX 10.9, iOS 13.0,) // expected-error {{unexpected ',' separator}}
-@backDeployed(before: OSX 10.9,) // expected-error {{unexpected ',' separator}}
+@_originallyDefinedIn(module: "HighLevel", OSX 10.9, iOS 13.0,) // expected-error {{unexpected ',' separator}} {{62-63=}}
+@backDeployed(before: OSX 10.9,) // expected-error {{unexpected ',' separator}} {{31-32=}}
 public struct StructWithAvailability {}

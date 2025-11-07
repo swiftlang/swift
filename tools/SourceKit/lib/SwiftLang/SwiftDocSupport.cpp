@@ -693,6 +693,9 @@ static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
   static UIdent PlatformOSXAppExt("source.availability.platform.osx_app_extension");
   static UIdent PlatformtvOSAppExt("source.availability.platform.tvos_app_extension");
   static UIdent PlatformWatchOSAppExt("source.availability.platform.watchos_app_extension");
+  static UIdent PlatformDriverKit("source.availability.platform.driverkit");
+  static UIdent PlatformSwift("source.availability.platform.swift");
+  static UIdent PlatformAnyAppleOS("source.availability.platform.any_apple_os");
   static UIdent PlatformFreeBSD("source.availability.platform.freebsd");
   static UIdent PlatformOpenBSD("source.availability.platform.openbsd");
   static UIdent PlatformWindows("source.availability.platform.windows");
@@ -743,6 +746,15 @@ static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
       // FIXME: Formal platform support in SourceKit is needed.
       PlatformUID = UIdent();
       break;
+    case PlatformKind::DriverKit:
+      PlatformUID = PlatformDriverKit;
+      break;
+    case PlatformKind::Swift:
+      PlatformUID = PlatformSwift;
+      break;
+    case PlatformKind::anyAppleOS:
+      PlatformUID = PlatformAnyAppleOS;
+      break;
     case PlatformKind::OpenBSD:
       PlatformUID = PlatformOpenBSD;
       break;
@@ -756,7 +768,7 @@ static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
       PlatformUID = PlatformAndroid;
       break;
     }
-    // FIXME: [availability] Handle other availability domains?
+    // FIXME: [availability] Handle non-platform availability domains?
 
     AvailableAttrInfo Info;
     Info.AttrKind = AvailableAttrKind;

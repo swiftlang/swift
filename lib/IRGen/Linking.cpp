@@ -591,6 +591,8 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
       return "_swift_coro_async_allocator";
     case CoroAllocatorKind::Malloc:
       return "_swift_coro_malloc_allocator";
+    case CoroAllocatorKind::TypedMalloc:
+      return "_swift_coro_typed_malloc_allocator";
     }
   }
   }

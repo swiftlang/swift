@@ -263,6 +263,7 @@ private:
 };
 
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
+                                                   bool useModuleSelectors,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
                                                    InterfaceMode interfaceMode,
@@ -276,6 +277,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
   result.CurrentModule = ModuleToPrint;
+  result.UseModuleSelectors = useModuleSelectors;
   result.FullyQualifiedTypes = true;
   result.FullyQualifiedTypesIfAmbiguous = true;
   result.FullyQualifiedExtendedTypesIfAmbiguous = true;
@@ -2726,8 +2728,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   bool needsDisambiguationAttr = false;
   if (auto *VD = dyn_cast<VarDecl>(ASD)) {
     if (auto *PBD = VD->getParentPatternBinding()) {
-      AccessorDecl *firstAccessor = *accessorsToPrint.begin();
-      if (!firstAccessor->isObservingAccessor()) {
+      if (accessorsToPrint.empty() ||
+          !accessorsToPrint.front()->isObservingAccessor()) {
         const auto i = PBD->getPatternEntryIndexForVarDecl(VD);
         if (Options.PrintExprs) {
           needsDisambiguationAttr |= bool(PBD->getInit(i));
@@ -6058,9 +6060,8 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
-  template <typename T>
-  void printModuleContext(T *Ty) {
-    FileUnit *File = cast<FileUnit>(Ty->getDecl()->getModuleScopeContext());
+  void printModuleContext(GenericTypeDecl *TyDecl) {
+    FileUnit *File = cast<FileUnit>(TyDecl->getModuleScopeContext());
     ModuleDecl *Mod = File->getParentModule();
     StringRef ExportedModuleName = File->getExportedModuleName();
 
@@ -6069,7 +6070,7 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     // all of these modules may be visible. We therefore need to make sure we
     // choose a module that is visible from the current module. This is possible
     // only if we know what the current module is.
-    const clang::Decl *ClangDecl = Ty->getDecl()->getClangDecl();
+    const clang::Decl *ClangDecl = TyDecl->getClangDecl();
     if (ClangDecl && Options.CurrentModule) {
       for (auto *Redecl : ClangDecl->redecls()) {
         auto *owningModule = Redecl->getOwningModule();
@@ -6106,12 +6107,10 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     }
 
     if (Options.UseOriginallyDefinedInModuleNames) {
-      Decl *D = Ty->getDecl();
-      for (auto attr: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
+      if (auto attr =
+            TyDecl->getAttrs().getAttribute<OriginallyDefinedInAttr>()) {
         Name = Mod->getASTContext().getIdentifier(
-            const_cast<OriginallyDefinedInAttr *>(attr)
-                ->getManglingModuleName());
-        break;
+            attr->getManglingModuleName());
       }
     }
 
@@ -6122,7 +6121,6 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     }
 
     Printer.printModuleRef(Mod, Name);
-    Printer << ".";
   }
 
   template <typename T>
@@ -6140,7 +6138,42 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return M->getRealName().str().starts_with(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX);
   }
 
+  bool isMemberOfGenericParameter(TypeBase *T) {
+    Type parent = nullptr;
+    if (auto alias = dyn_cast<TypeAliasType>(T))
+      parent = alias->getParent();
+    else if (auto generic = T->getAs<AnyGenericType>())
+      parent = generic->getParent();
+    return parent && parent->isTypeParameter();
+  }
+
+  bool shouldPrintModuleSelector(TypeBase *T) {
+    if (!Options.UseModuleSelectors)
+      return false;
+
+    GenericTypeDecl *GTD = T->getAnyGeneric();
+    if (!GTD && isa<TypeAliasType>(T))
+      GTD = cast<TypeAliasType>(T)->getDecl();
+    if (!GTD)
+      return false;
+
+    // Builtin types must always be qualified somehow.
+    ModuleDecl *M = GTD->getDeclContext()->getParentModule();
+    if (M->isBuiltinModule())
+      return true;
+
+    // A member of a generic parameter can't be qualified by a module selector.
+    if (isMemberOfGenericParameter(T))
+      return false;
+
+    // Module selectors skip over local types, so don't add one.
+    return GTD->getLocalContext() == nullptr;
+  }
+
   bool shouldPrintFullyQualified(TypeBase *T) {
+    if (Options.UseModuleSelectors)
+      return false;
+
     if (Options.FullyQualifiedTypes)
       return true;
 
@@ -6197,7 +6230,15 @@ public:
       printParentType(parent);
       NameContext = PrintNameContext::TypeMember;
     } else if (shouldPrintFullyQualified(Ty)) {
-      printModuleContext(Ty);
+      printModuleContext(Ty->getDecl());
+      Printer << ".";
+      NameContext = PrintNameContext::TypeMember;
+    }
+
+    // We print module selectors whether or not we printed a parent type.
+    if (shouldPrintModuleSelector(Ty)) {
+      printModuleContext(Ty->getDecl());
+      Printer << "::";
       NameContext = PrintNameContext::TypeMember;
     }
 
@@ -6619,7 +6660,18 @@ public:
 
     auto isolation = info.getIsolation();
     switch (isolation.getKind()) {
-    case FunctionTypeIsolation::Kind::NonIsolated:
+    case FunctionTypeIsolation::Kind::NonIsolated: {
+      // When `NonisolatedNonsendingByDefault` is enabled and async
+      // function type is nonisolated it could only mean that it is
+      // either explicitly `@concurrent` or inferred to be one and
+      // it should be printed accordingly.
+      if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
+          fnType->isAsync()) {
+        Printer << "@concurrent ";
+      }
+      break;
+    }
+
     case FunctionTypeIsolation::Kind::Parameter:
       break;
 
