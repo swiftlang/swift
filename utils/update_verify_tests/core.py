@@ -159,7 +159,11 @@ class Diag:
             standard single space, let it be to avoid disrupting manual formatting.
             """
             whitespace2_s = ""
-        col_s = f":{self.col}" if self.col and (self.category == "expansion" or self.is_from_source_file) else ""
+        col_s = (
+            f":{self.col}"
+            if self.col and (self.category == "expansion" or self.is_from_source_file)
+            else ""
+        )
         base_s = f"//{whitespace1_s}expected-{self.prefix}{self.category}{re_s}{line_location_s}{col_s}{whitespace2_s}{count_s}"
         if self.category == "expansion":
             return base_s + "{{"
@@ -175,7 +179,7 @@ class ExpansionDiagClose:
         self.category = "closing"
 
     def render(self):
-        return "//"+self.whitespace+"}}"
+        return "//" + self.whitespace + "}}"
 
 
 expected_diag_re = re.compile(
@@ -184,9 +188,7 @@ expected_diag_re = re.compile(
 expected_expansion_diag_re = re.compile(
     r"//(\s*)expected-([a-zA-Z-]*)(expansion)(-re)?(@[+-]?\d+)(:\d+)(\s*)(\d+)?\{\{(.*)"
 )
-expected_expansion_close_re = re.compile(
-    r"//(\s*)\}\}"
-)
+expected_expansion_close_re = re.compile(r"//(\s*)\}\}")
 
 
 def parse_diag(line, filename, prefix):
@@ -317,7 +319,16 @@ def infer_line_context(target, line_n):
     return (prev_line, total_offset, new_line_n)
 
 
-def add_diag(orig_target_line_n, col, diag_s, diag_category, lines, orig_lines, prefix, nested_context):
+def add_diag(
+    orig_target_line_n,
+    col,
+    diag_s,
+    diag_category,
+    lines,
+    orig_lines,
+    prefix,
+    nested_context,
+):
     if nested_context:
         prev_line = None
         for line in lines:
@@ -339,7 +350,11 @@ def add_diag(orig_target_line_n, col, diag_s, diag_category, lines, orig_lines, 
 
     whitespace_strings = None
     if prev_line.diag:
-        whitespace_strings = prev_line.diag.whitespace_strings.copy() if prev_line.diag.whitespace_strings else None
+        whitespace_strings = (
+            prev_line.diag.whitespace_strings.copy()
+            if prev_line.diag.whitespace_strings
+            else None
+        )
         if prev_line.diag == nested_context:
             if not whitespace_strings:
                 whitespace_strings = [" ", "", ""]
@@ -425,12 +440,21 @@ def expand_expansions(lines):
 def error_refers_to_diag(diag_error, diag, target_line_n):
     if diag_error.col and diag.col and diag_error.col != diag.col:
         return False
-    return target_line_n == diag.absolute_target() and diag_error.category == diag.category and (diag.category == "expansion" or diag_error.content == diag.diag_content)
+    return (
+        target_line_n == diag.absolute_target()
+        and diag_error.category == diag.category
+        and (diag.category == "expansion" or diag_error.content == diag.diag_content)
+    )
 
 
 def find_other_targeting(lines, orig_lines, is_nested, diag_error):
     if is_nested:
-        other_diags = [line.diag for line in lines if line.diag and error_refers_to_diag(diag_error, line.diag, diag_error.line)]
+        other_diags = [
+            line.diag
+            for line in lines
+            if line.diag
+            and error_refers_to_diag(diag_error, line.diag, diag_error.line)
+        ]
     else:
         target = orig_lines[diag_error.line - 1]
         other_diags = [
@@ -460,19 +484,43 @@ def update_lines(diag_errors, lines, orig_lines, prefix, filename, nested_contex
 
     diag_errors.sort(reverse=True, key=lambda diag_error: diag_error.line)
     for diag_error in diag_errors:
-        if not isinstance(diag_error, ExtraDiag) and not isinstance(diag_error, NestedDiag):
+        if not isinstance(diag_error, ExtraDiag) and not isinstance(
+            diag_error, NestedDiag
+        ):
             continue
-        other_diags = find_other_targeting(lines, orig_lines, bool(nested_context), diag_error)
+        other_diags = find_other_targeting(
+            lines, orig_lines, bool(nested_context), diag_error
+        )
         diag = other_diags[0] if other_diags else None
         if diag:
             diag.increment_count()
         else:
-            diag = add_diag(diag_error.line, diag_error.col, diag_error.content, diag_error.category, lines, orig_lines, diag_error.prefix, nested_context)
+            diag = add_diag(
+                diag_error.line,
+                diag_error.col,
+                diag_error.content,
+                diag_error.category,
+                lines,
+                orig_lines,
+                diag_error.prefix,
+                nested_context,
+            )
         if isinstance(diag_error, NestedDiag):
             if not diag.closer:
-                whitespace = diag.whitespace_strings[0] if diag.whitespace_strings else " "
-                diag.closer = Line(get_indent(diag.line.content) + "//" + whitespace + "}}\n", None)
-            update_lines([diag_error.nested], diag.nested_lines, orig_lines, prefix, diag_error.file, diag)
+                whitespace = (
+                    diag.whitespace_strings[0] if diag.whitespace_strings else " "
+                )
+                diag.closer = Line(
+                    get_indent(diag.line.content) + "//" + whitespace + "}}\n", None
+                )
+            update_lines(
+                [diag_error.nested],
+                diag.nested_lines,
+                orig_lines,
+                prefix,
+                diag_error.file,
+                diag,
+            )
 
 
 def update_test_file(filename, diag_errors, prefix, updated_test_files):
@@ -482,7 +530,7 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
     else:
         updated_test_files.add(filename)
     with open(filename, "r") as f:
-        lines = [Line(line, i + 1) for i, line in enumerate(f.readlines() + [''])]
+        lines = [Line(line, i + 1) for i, line in enumerate(f.readlines() + [""])]
     orig_lines = list(lines)
 
     expansion_context = []
@@ -544,7 +592,9 @@ test.swift:2:3: error: unexpected error produced: cannot find 'a' in scope
   a = 2
   ^
 """
-diag_error_re2 = re.compile(r"(\S+):(\d+):(\d+): error: unexpected (\S+) produced: (.*)")
+diag_error_re2 = re.compile(
+    r"(\S+):(\d+):(\d+): error: unexpected (\S+) produced: (.*)"
+)
 
 
 """
@@ -634,35 +684,102 @@ def check_expectations(tool_output, prefix):
             if not "error:" in line:
                 pass
             elif m := diag_error_re.match(line):
-                diag = parse_diag(Line(tool_output[i+1], int(m.group(2))), m.group(1), prefix)
+                diag = parse_diag(
+                    Line(tool_output[i + 1], int(m.group(2))), m.group(1), prefix
+                )
                 i += 2
-                curr.append(NotFoundDiag(m.group(1), int(m.group(2)), int(m.group(3)), m.group(4), diag.diag_content, diag.prefix))
+                curr.append(
+                    NotFoundDiag(
+                        m.group(1),
+                        int(m.group(2)),
+                        int(m.group(3)),
+                        m.group(4),
+                        diag.diag_content,
+                        diag.prefix,
+                    )
+                )
             elif m := diag_error_re2.match(line):
-                curr.append(ExtraDiag(m.group(1), int(m.group(2)), int(m.group(3)), m.group(4), m.group(5), prefix))
+                curr.append(
+                    ExtraDiag(
+                        m.group(1),
+                        int(m.group(2)),
+                        int(m.group(3)),
+                        m.group(4),
+                        m.group(5),
+                        prefix,
+                    )
+                )
                 i += 2
             # Create two mirroring mismatches when the compiler reports that the category or diagnostic is incorrect.
             # This makes it easier to handle cases where the same diagnostic is mentioned both in an incorrect message/category
             # diagnostic, as well as in an error not produced diagnostic. This can happen for things like 'expected-error 2{{foo}}'
             # if only one diagnostic is emitted on that line, and the content of that diagnostic is actually 'bar'.
             elif m := diag_error_re3.match(line):
-                diag = parse_diag(Line(tool_output[i+1], int(m.group(2))), m.group(1), prefix)
-                curr.append(NotFoundDiag(m.group(1), int(m.group(2)), int(m.group(3)), diag.category, diag.diag_content, diag.prefix))
-                curr.append(ExtraDiag(m.group(1), diag.absolute_target(), int(m.group(3)), diag.category, tool_output[i+3].strip(), diag.prefix))
+                diag = parse_diag(
+                    Line(tool_output[i + 1], int(m.group(2))), m.group(1), prefix
+                )
+                curr.append(
+                    NotFoundDiag(
+                        m.group(1),
+                        int(m.group(2)),
+                        int(m.group(3)),
+                        diag.category,
+                        diag.diag_content,
+                        diag.prefix,
+                    )
+                )
+                curr.append(
+                    ExtraDiag(
+                        m.group(1),
+                        diag.absolute_target(),
+                        int(m.group(3)),
+                        diag.category,
+                        tool_output[i + 3].strip(),
+                        diag.prefix,
+                    )
+                )
                 i += 3
             elif m := diag_error_re4.match(line):
-                diag = parse_diag(Line(tool_output[i+1], int(m.group(2))), m.group(1), prefix)
+                diag = parse_diag(
+                    Line(tool_output[i + 1], int(m.group(2))), m.group(1), prefix
+                )
                 assert diag.category == m.group(4)
-                assert tool_output[i+3].strip() == m.group(5)
-                curr.append(NotFoundDiag(m.group(1), int(m.group(2)), int(m.group(3)), diag.category, diag.diag_content, diag.prefix))
-                curr.append(ExtraDiag(m.group(1), diag.absolute_target(), int(m.group(3)), m.group(5), diag.diag_content, diag.prefix))
+                assert tool_output[i + 3].strip() == m.group(5)
+                curr.append(
+                    NotFoundDiag(
+                        m.group(1),
+                        int(m.group(2)),
+                        int(m.group(3)),
+                        diag.category,
+                        diag.diag_content,
+                        diag.prefix,
+                    )
+                )
+                curr.append(
+                    ExtraDiag(
+                        m.group(1),
+                        diag.absolute_target(),
+                        int(m.group(3)),
+                        m.group(5),
+                        diag.diag_content,
+                        diag.prefix,
+                    )
+                )
                 i += 3
             else:
                 dprint("no match")
                 dprint(line.strip())
             i += 1
 
-            while curr and i < len(tool_output) and (m := diag_expansion_note_re.match(tool_output[i].strip())):
-                curr = [NestedDiag(m.group(1), int(m.group(2)), int(m.group(3)), e) for e in curr]
+            while (
+                curr
+                and i < len(tool_output)
+                and (m := diag_expansion_note_re.match(tool_output[i].strip()))
+            ):
+                curr = [
+                    NestedDiag(m.group(1), int(m.group(2)), int(m.group(3)), e)
+                    for e in curr
+                ]
                 i += 3
             top_level.extend(curr)
 
@@ -672,4 +789,3 @@ def check_expectations(tool_output, prefix):
         return (0, update_test_files(top_level, prefix))
     else:
         return (1, "no mismatching diagnostics found")
-

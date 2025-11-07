@@ -30,9 +30,7 @@ Example usage:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--prefix", default="", help="The prefix passed to -verify"
-    )
+    parser.add_argument("--prefix", default="", help="The prefix passed to -verify")
     args = parser.parse_args()
     (ret_code, output) = check_expectations(sys.stdin.readlines(), args.prefix)
     print(output)
@@ -41,4 +39,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
