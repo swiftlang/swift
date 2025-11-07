@@ -8892,6 +8892,11 @@ ClangDeclExplicitSafety::evaluate(Evaluator &evaluator,
         return ExplicitSafety::Unsafe;
     }
   }
+
+  // desc.decl isn't explicitly marked unsafe, and none of the types/decls
+  // reachable from desc.decl are considered unsafe either. Cases where we would
+  // consider desc.decl's safety unspecified should have returned early from the
+  // loop. Thus, we can conclude that desc.decl is safe.
   return ExplicitSafety::Safe;
 }
 
