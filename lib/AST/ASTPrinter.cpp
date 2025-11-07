@@ -8322,6 +8322,7 @@ swift::getInheritedForPrinting(
   // Collect synthesized conformances.
   llvm::SetVector<ProtocolDecl *> protocols;
   llvm::TinyPtrVector<ProtocolDecl *> uncheckedProtocols;
+  llvm::TinyPtrVector<ProtocolDecl *> suppressedProtocols;
   for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     if (auto *proto = attr->getProtocol()) {
       // FIXME: Reconstitute inverses here
@@ -8341,12 +8342,15 @@ swift::getInheritedForPrinting(
       protocols.insert(proto);
       if (attr->isUnchecked())
         uncheckedProtocols.push_back(proto);
+      if (attr->isSuppressed())
+        suppressedProtocols.push_back(proto);
     }
   }
 
   for (size_t i = 0; i < protocols.size(); i++) {
     auto proto = protocols[i];
     bool isUnchecked = llvm::is_contained(uncheckedProtocols, proto);
+    bool isSuppressed = llvm::is_contained(suppressedProtocols, proto);
 
     if (!options.shouldPrint(proto)) {
       // If private stdlib protocols are skipped and this is a private stdlib
@@ -8371,7 +8375,7 @@ swift::getInheritedForPrinting(
     if (isUnchecked)
       options |= ProtocolConformanceFlags::Unchecked;
     Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-                       options});
+                       options, isSuppressed});
   }
 }
 

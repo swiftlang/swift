@@ -26,6 +26,8 @@ internal func localInternalFunc() {} // expected-note {{global function 'localIn
 
 @_spi(S) public func localSPI() {}
 
+typealias AliasToDirect = StructFromDirect
+
 @inlinable
 public func explicitlyInlinable(arg: StructFromDirect = StructFromDirect()) {
 // expected-error @-1 {{initializer 'init()' cannot be used in a default argument value because 'directs' was imported implementation-only}}
@@ -82,6 +84,8 @@ public func implicitlyInlinablePublic(arg: StructFromDirect = StructFromDirect()
 
   localSPI()
   spiFunctionFromDirect()
+
+  let _: AliasToDirect // expected-error {{AliasToDirect' aliases 'directs.StructFromDirect' and cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' has been imported as implementation-only}}
 }
 
 private func implicitlyInlinablePrivate(arg: StructFromDirect = StructFromDirect()) {
