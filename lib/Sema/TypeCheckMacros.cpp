@@ -2242,8 +2242,12 @@ ResolveMacroRequest::evaluate(Evaluator &evaluator,
   // So bail out to prevent diagnostics from the contraint system.
   if (auto *attr = macroRef.getAttr()) {
     // If we already resolved this CustomAttr to a nominal, this isn't for a
-    // macro.
-    if (attr->getNominalDecl())
+    // macro. This can only currently be the case for property wrappers, so
+    // limit the check here to avoid request cycles for member attribute macros
+    // in cases where the attribute refers to a nested type in the type it's
+    // attached to, since the qualified lookup there needs to expand member
+    // attributes.
+    if (attr->shouldPreferPropertyWrapperOverMacro() && attr->getNominalDecl())
       return ConcreteDeclRef();
 
     auto foundMacros = namelookup::lookupMacros(dc, macroRef.getModuleName(),

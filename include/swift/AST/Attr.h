@@ -2359,6 +2359,10 @@ public:
 
   ASTContext &getASTContext() const;
 
+  /// If \c true, we should prefer a property wrapper if one exists for the
+  /// given attribute over a macro.
+  bool shouldPreferPropertyWrapperOverMacro() const;
+
   /// Retrieve the NominalTypeDecl the CustomAttr refers to, or \c nullptr if
   /// it doesn't refer to one (which can be the case for e.g macro attrs).
   NominalTypeDecl *getNominalDecl() const;
