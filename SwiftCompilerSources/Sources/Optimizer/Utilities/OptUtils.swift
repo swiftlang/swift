@@ -72,10 +72,10 @@ extension Value {
       switch v {
       case let fw as ForwardingInstruction:
         worklist.pushIfNotVisited(contentsOf: fw.definedOperands.values)
+      case let ot as OwnershipTransitionInstruction where !(ot is CopyingInstruction):
+        worklist.pushIfNotVisited(ot.operand.value)
       case let bf as BorrowedFromInst:
         worklist.pushIfNotVisited(bf.borrowedValue)
-      case let bb as BeginBorrowInst:
-        worklist.pushIfNotVisited(bb.borrowedValue)
       case let arg as Argument:
         if let phi = Phi(arg) {
           worklist.pushIfNotVisited(contentsOf: phi.incomingValues)
