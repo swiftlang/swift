@@ -72,6 +72,36 @@ private struct ExposedLayoutPrivate {
   init() { fatalError() } // expected-note {{initializer 'init()' is not '@usableFromInline' or public}}
 }
 
+public class ExposedClassPublic {
+  public init() { fatalError() }
+}
+
+internal class ExposedClassInternal {
+// expected-note @-1 {{type declared here}}
+}
+
+private class ExposedClassPrivate {
+// expected-note @-1 2 {{class 'ExposedClassPrivate' is not '@usableFromInline' or public}}
+// expected-note @-2 2 {{type declared here}}
+  init() { fatalError() } // expected-note {{initializer 'init()' is not '@usableFromInline' or public}}
+}
+
+#if UseImplementationOnly
+@_implementationOnly
+private class HiddenClass {
+// expected-opt-in-note @-1 2 {{class 'HiddenClass' is not '@usableFromInline' or public}}
+// expected-opt-in-note @-2 1 {{initializer 'init()' is not '@usableFromInline' or public}}
+// expected-opt-in-note @-3 6 {{class declared here}}
+// expected-opt-in-note @-4 2 {{type declared here}}
+}
+#else
+private class HiddenClass {
+// expected-not-opt-in-note @-1 2 {{class 'HiddenClass' is not '@usableFromInline' or public}}
+// expected-not-opt-in-note @-2 1 {{initializer 'init()' is not '@usableFromInline' or public}}
+// expected-not-opt-in-note @-3 2 {{type declared here}}
+}
+#endif
+
 #if UseImplementationOnly
 @_implementationOnly
 private struct HiddenLayout {
@@ -158,6 +188,15 @@ public func explicitlyInlinable() {
   // expected-error @-1 2 {{struct 'HiddenLayout' is private and cannot be referenced from an '@inlinable' function}}
   // expected-error @-2 {{initializer 'init()' is private and cannot be referenced from an '@inlinable' function}}
 
+  let _: ExposedClassPublic = ExposedClassPublic()
+  let _: ExposedClassPrivate = ExposedClassPrivate()
+  // expected-error @-1 2 {{class 'ExposedClassPrivate' is private and cannot be referenced from an '@inlinable' function}}
+  // expected-error @-2 {{initializer 'init()' is private and cannot be referenced from an '@inlinable' function}}
+
+  let _: HiddenClass = HiddenClass()
+  // expected-error @-1 2 {{class 'HiddenClass' is private and cannot be referenced from an '@inlinable' function}}
+  // expected-error @-2 {{initializer 'init()' is private and cannot be referenced from an '@inlinable' function}}
+
   let _: ExposedEnumPublic = ExposedEnumPublic.A
   let _: ExposedEnumPrivate = ExposedEnumPrivate.A
   // expected-error @-1 2 {{enum 'ExposedEnumPrivate' is private and cannot be referenced from an '@inlinable' function}}
@@ -181,6 +220,11 @@ public func implicitlyInlinablePublic() {
   let _: HiddenLayout = HiddenLayout()
   // expected-embedded-opt-in-error @-1 2 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 
+  let _: ExposedClassPublic = ExposedClassPublic()
+  let _: ExposedClassPrivate = ExposedClassPrivate()
+  let _: HiddenClass = HiddenClass()
+  // expected-embedded-opt-in-error @-1 2 {{class 'HiddenClass' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenClass' is marked '@_implementationOnly'}}
+
   let _: ExposedEnumPublic = ExposedEnumPublic.A
   let _: ExposedEnumPrivate = ExposedEnumPrivate.A
   let _: HiddenEnum = HiddenEnum.A
@@ -199,6 +243,11 @@ private func implicitlyInlinablePrivate() {
   let _: HiddenLayout = HiddenLayout()
   // expected-embedded-opt-in-error @-1 2 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 
+  let _: ExposedClassPublic = ExposedClassPublic()
+  let _: ExposedClassPrivate = ExposedClassPrivate()
+  let _: HiddenClass = HiddenClass()
+  // expected-embedded-opt-in-error @-1 2 {{class 'HiddenClass' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenClass' is marked '@_implementationOnly'}}
+
   let _: ExposedEnumPublic = ExposedEnumPublic.A
   let _: ExposedEnumPrivate = ExposedEnumPrivate.A
   let _: HiddenEnum = HiddenEnum.A
@@ -216,6 +265,11 @@ public func explicitNonInliable() {
   let _: ExposedLayoutPublic = ExposedLayoutPublic()
   let _: ExposedLayoutPrivate = ExposedLayoutPrivate()
   let _: HiddenLayout = HiddenLayout()
+
+  let _: ExposedClassPublic = ExposedClassPublic()
+  let _: ExposedClassPrivate = ExposedClassPrivate()
+  let _: HiddenClass = HiddenClass()
+
   let _: ExposedEnumPublic = ExposedEnumPublic.A
   let _: ExposedEnumPrivate = ExposedEnumPrivate.A
   let _: HiddenEnum = HiddenEnum.A
@@ -231,6 +285,11 @@ internal func explicitNonInliableInternal() {
   let _: ExposedLayoutPublic = ExposedLayoutPublic()
   let _: ExposedLayoutPrivate = ExposedLayoutPrivate()
   let _: HiddenLayout = HiddenLayout()
+
+  let _: ExposedClassPublic = ExposedClassPublic()
+  let _: ExposedClassPrivate = ExposedClassPrivate()
+  let _: HiddenClass = HiddenClass()
+
   let _: ExposedEnumPublic = ExposedEnumPublic.A
   let _: ExposedEnumPrivate = ExposedEnumPrivate.A
   let _: HiddenEnum = HiddenEnum.A
@@ -258,6 +317,12 @@ public struct ExposedLayoutPublicUser: ProtocolFromDirect {
   private var c: HiddenLayout
   // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenLayout' is marked '@_implementationOnly'}}
 
+  private var ca: ExposedClassPublic
+  private var cb: ExposedClassInternal
+  private var cc: ExposedClassPrivate
+  private var cd: HiddenClass
+  // expected-opt-in-error @-1 {{cannot use class 'HiddenClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenClass' is marked '@_implementationOnly'}}
+
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
@@ -274,6 +339,8 @@ public struct ExposedLayoutPublicUser: ProtocolFromDirect {
 
   private func privateFunc(h: HiddenLayout) {}
   // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+  private func privateFuncClass(h: HiddenClass) {}
+  // expected-embedded-opt-in-error @-1 {{class 'HiddenClass' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenClass' is marked '@_implementationOnly'}}
 }
 
 internal struct ExposedLayoutInternalUser: ProtocolFromDirect {
@@ -288,6 +355,12 @@ internal struct ExposedLayoutInternalUser: ProtocolFromDirect {
   private var c: HiddenLayout
   // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenLayout' is marked '@_implementationOnly'}}
 
+  private var ca: ExposedClassPublic
+  private var cb: ExposedClassInternal
+  private var cc: ExposedClassPrivate
+  private var cd: HiddenClass
+  // expected-opt-in-error @-1 {{cannot use class 'HiddenClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenClass' is marked '@_implementationOnly'}}
+
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
@@ -301,6 +374,8 @@ internal struct ExposedLayoutInternalUser: ProtocolFromDirect {
 
   private func privateFunc(h: HiddenLayout) {}
   // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+  private func privateFuncClass(h: HiddenClass) {}
+  // expected-embedded-opt-in-error @-1 {{class 'HiddenClass' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenClass' is marked '@_implementationOnly'}}
 }
 
 private struct ExposedLayoutPrivateUser: ProtocolFromDirect {
@@ -315,6 +390,12 @@ private struct ExposedLayoutPrivateUser: ProtocolFromDirect {
   private var c: HiddenLayout
   // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenLayout' is marked '@_implementationOnly'}}
 
+  private var ca: ExposedClassPublic
+  private var cb: ExposedClassInternal
+  private var cc: ExposedClassPrivate
+  private var cd: HiddenClass
+  // expected-opt-in-error @-1 {{cannot use class 'HiddenClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenClass' is marked '@_implementationOnly'}}
+
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
@@ -328,6 +409,8 @@ private struct ExposedLayoutPrivateUser: ProtocolFromDirect {
 
   private func privateFunc(h: HiddenLayout) {}
   // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
+  private func privateFuncClass(h: HiddenClass) {}
+  // expected-embedded-opt-in-error @-1 {{class 'HiddenClass' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenClass' is marked '@_implementationOnly'}}
 }
 
 #if UseImplementationOnly
@@ -339,7 +422,13 @@ private struct HiddenLayoutUser {
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
 
+  private var ca: ExposedClassPublic
+  private var cb: ExposedClassInternal
+  private var cc: ExposedClassPrivate
+
   private var c: HiddenLayout
+  private var cd: HiddenClass
+
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
@@ -351,6 +440,8 @@ private struct HiddenLayoutUser {
 
   @export(interface)
   private func privateFunc(h: HiddenLayout) {}
+  @export(interface)
+  private func privateFuncClass(h: HiddenClass) {}
 }
 
 @_implementationOnly // expected-opt-in-error {{'@_implementationOnly' may not be used on public declarations}}
@@ -370,6 +461,12 @@ public enum PublicEnumUser: ProtocolFromDirect {
     case b(HiddenLayout) // expected-error {{enum case in a public enum uses a private type}}
     // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' here; 'HiddenLayout' is marked '@_implementationOnly'}}
 
+    case ce(ExposedClassPublic)
+    case cc(ExposedClassInternal) // expected-error {{enum case in a public enum uses an internal type}}
+    case cd(ExposedClassPrivate) // expected-error {{enum case in a public enum uses a private type}}
+    case cb(HiddenClass) // expected-error {{enum case in a public enum uses a private type}}
+    // expected-opt-in-error @-1 {{cannot use class 'HiddenClass' here; 'HiddenClass' is marked '@_implementationOnly'}}
+
     case f(ExposedProtocolPublic)
     case g(ExposedProtocolInternal) // expected-error {{enum case in a public enum uses an internal type}}
     case h(ExposedProtocolPrivate) // expected-error {{enum case in a public enum uses a private type}}
@@ -387,6 +484,12 @@ internal enum InternalEnumUser: ProtocolFromDirect {
     case b(HiddenLayout) // expected-opt-in-error {{cannot use struct 'HiddenLayout' here; 'HiddenLayout' is marked '@_implementationOnly'}}
     // expected-error @-1 {{enum case in an internal enum uses a private type}}
 
+    case ce(ExposedClassPublic)
+    case cc(ExposedClassInternal)
+    case cd(ExposedClassPrivate) // expected-error {{enum case in an internal enum uses a private type}}
+    case cb(HiddenClass) // expected-opt-in-error {{cannot use class 'HiddenClass' here; 'HiddenClass' is marked '@_implementationOnly'}}
+    // expected-error @-1 {{enum case in an internal enum uses a private type}}
+
     case f(ExposedProtocolPublic)
     case g(ExposedProtocolInternal)
     case h(ExposedProtocolPrivate) // expected-error {{enum case in an internal enum uses a private type}}
@@ -402,6 +505,11 @@ private enum PrivateEnumUser: ProtocolFromDirect {
     case c(ExposedLayoutInternal)
     case d(ExposedLayoutPrivate)
     case b(HiddenLayout) // expected-opt-in-error {{cannot use struct 'HiddenLayout' here; 'HiddenLayout' is marked '@_implementationOnly'}}
+
+    case ce(ExposedClassPublic)
+    case cc(ExposedClassInternal)
+    case cd(ExposedClassPrivate)
+    case cb(HiddenClass) // expected-opt-in-error {{cannot use class 'HiddenClass' here; 'HiddenClass' is marked '@_implementationOnly'}}
 
     case f(ExposedProtocolPublic)
     case g(ExposedProtocolInternal)
@@ -424,6 +532,11 @@ private enum PrivateHiddenEnumUser: ProtocolFromDirect {
     case d(ExposedLayoutPrivate)
     case b(HiddenLayout)
 
+    case ce(ExposedClassPublic)
+    case cc(ExposedClassInternal)
+    case cd(ExposedClassPrivate)
+    case cb(HiddenClass)
+
     case f(ExposedProtocolPublic)
     case g(ExposedProtocolInternal)
     case h(ExposedProtocolPrivate)
@@ -443,7 +556,7 @@ internal enum InternalEnumWithRawTypeIO : RawTypeFromDirect {
 
 /// Classes use sites
 
-public class PublicClass: ProtocolFromDirect {
+public class PublicClassUser: ProtocolFromDirect {
 // expected-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
 
   public init() { fatalError() }
@@ -474,7 +587,7 @@ public class PublicClass: ProtocolFromDirect {
   private func privateFunc(h: HiddenLayout) {}
 }
 
-internal class InternalClass: ProtocolFromDirect {
+internal class InternalClassUser: ProtocolFromDirect {
 // expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
 
   public init() { fatalError() }
@@ -504,7 +617,7 @@ internal class InternalClass: ProtocolFromDirect {
   private func privateFunc(h: HiddenLayout) {} // expected-embedded-opt-in-error {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 }
 
-private class PrivateClass: ProtocolFromDirect {
+private class PrivateClassUser: ProtocolFromDirect {
 // expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
 
   public init() { fatalError() }
@@ -536,7 +649,7 @@ private class PrivateClass: ProtocolFromDirect {
 
 #if UseImplementationOnly
 @_implementationOnly
-internal class HiddenClass: ProtocolFromDirect {
+internal class HiddenClassUser: ProtocolFromDirect {
   public init() { fatalError() }
 
   public var publicField: StructFromDirect
@@ -546,6 +659,11 @@ internal class HiddenClass: ProtocolFromDirect {
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
+
+  private var ca: ExposedClassPublic
+  private var cb: ExposedClassInternal
+  private var cc: ExposedClassPrivate
+  private var cd: HiddenClass
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
