@@ -4363,6 +4363,9 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
   FEOpts.IncludeTimestamps = false;
   FEOpts.ModuleMapFiles.clear();
 
+  // APINotesOptions.
+  instance.getAPINotesOpts().ModuleSearchPaths.clear();
+
   // IndexStorePath is forwarded from swift.
   FEOpts.IndexStorePath.clear();
 
