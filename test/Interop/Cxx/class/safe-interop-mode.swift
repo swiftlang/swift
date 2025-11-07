@@ -101,6 +101,12 @@ struct HoldsShared {
                                SWIFT_RETURNS_UNRETAINED;
 };
 
+template <typename, typename> struct TTake2 {};
+template <typename T> struct PassThru {};
+struct IsUnsafe { int *p; };
+struct HasUnsafe : TTake2<PassThru<HasUnsafe>, IsUnsafe> {};
+using AlsoUnsafe = PassThru<HasUnsafe>;
+
 //--- test.swift
 
 import Test
@@ -210,6 +216,16 @@ func useTTakeSafeTuple(x: TTakeSafeTuple) {
 }
 
 func useTTakeUnsafeTuple(x: TTakeUnsafeTuple) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func useTTakeUnsafeTuple(x: HasUnsafe) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func useTTakeUnsafeTuple(x: AlsoUnsafe) {
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
   _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
 }
