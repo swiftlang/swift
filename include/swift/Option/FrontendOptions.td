@@ -1477,12 +1477,12 @@ def mergeable_traps :
   Flag<["-"], "mergeable-traps">,
   HelpText<"Emit mergeable traps even in optimized builds">;
 
-def enable_client_retain_release :
-  Flag<["-"], "enable-client-retain-release">,
-  HelpText<"Enable use of swift_retain/releaseClient functions">;
-def disable_client_retain_release :
-  Flag<["-"], "disable-client-retain-release">,
-  HelpText<"Disable use of swift_retain/releaseClient functions">;
+def enable_direct_retain_release :
+  Flag<["-"], "enable-direct-retain-release">,
+  HelpText<"Enable use of swift_retain/releaseDirect functions">;
+def disable_direct_retain_release :
+  Flag<["-"], "disable-direct-retain-release">,
+  HelpText<"Disable use of swift_retain/releaseDirect functions">;
 
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,

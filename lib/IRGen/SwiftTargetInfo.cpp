@@ -71,13 +71,13 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
   // half for the kernel.
   target.SwiftRetainIgnoresNegativeValues = true;
 
-  // ARM64 Darwin has swiftClientRetainRelease, but not in Embedded mode. JIT
+  // ARM64 Darwin has swiftSwiftDirectRuntime, but not in Embedded mode. JIT
   // mode can't load the static library, so disable it there as well.
   if (triple.isOSDarwin() &&
       !IGM.getSwiftModule()->getASTContext().LangOpts.hasFeature(
           Feature::Embedded) &&
       !IGM.getOptions().UseJIT)
-    target.HasSwiftClientRRLibrary = true;
+    target.HasSwiftSwiftDirectRuntimeLibrary = true;
 
   target.UsableSwiftAsyncContextAddrIntrinsic = true;
 }

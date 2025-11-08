@@ -271,16 +271,16 @@ option(SWIFT_BUILD_STDLIB_CXX_MODULE
   "If not building stdlib, controls whether to build the Cxx module"
   TRUE)
 
-# The swiftClientRetainRelease library is currently only available for Darwin
+# The swiftSwiftDirectRuntime library is currently only available for Darwin
 # platforms.
 if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
   # Off by default everywhere for now.
-  option(SWIFT_BUILD_CLIENT_RETAIN_RELEASE
-    "Build the swiftClientRetainRelease library"
+  option(SWIFT_BUILD_SWIFT_DIRECT_RUNTIME
+    "Build the swiftSwiftDirectRuntime library"
     FALSE)
 else()
-  option(SWIFT_BUILD_CLIENT_RETAIN_RELEASE
-    "Build the swiftClientRetainRelease library"
+  option(SWIFT_BUILD_SWIFT_DIRECT_RUNTIME
+    "Build the swiftSwiftDirectRuntime library"
     FALSE)
 endif()
 
