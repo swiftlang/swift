@@ -43,7 +43,7 @@ func internalConformanceInTypealias() {
   _ = NormalProtoAssoc<NormalStruct>() // expected-ioi-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary'}}}
 }
 
-@_neverEmitIntoClient
+@export(interface)
 func internalConformanceInTypealiasNEIC() {
   let x: NormalProtoAssoc<NormalStruct>? = nil // okay
   _ = x
@@ -70,7 +70,7 @@ func internalConformanceInBoundGeneric() {
   _ = NormalProtoAssocHolder(nil as NormalStruct?) // expected-ioi-error 2 {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary'}}}
 }
 
-@_neverEmitIntoClient
+@export(interface)
 func internalConformanceInBoundGenericNEIC() {
   let x: NormalProtoAssocHolder<NormalStruct>? = nil // okay
   _ = x
@@ -90,7 +90,7 @@ func internalDowncast(_ x: Any) -> Bool {
   return normal || alias
 }
 
-@_neverEmitIntoClient
+@export(interface)
 func internalDowncastNEIC(_ x: Any) -> Bool {
   let normal = x is NormalProtoAssocHolder<NormalStruct> // okay
   let alias = x is NormalProtoAssoc<NormalStruct> // okay
@@ -121,7 +121,7 @@ func internalSwitch(_ x: Any) {
   }
 }
 
-@_neverEmitIntoClient
+@export(interface)
 func internalSwitchNEIC(_ x: Any) {
   switch x {
   case let holder as NormalProtoAssocHolder<NormalStruct>: // okay
@@ -152,7 +152,7 @@ func internalEnum() {
   _ = NormalProtoEnumUser<NormalStruct>.a // expected-ioi-error 2 {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
-@_neverEmitIntoClient
+@export(interface)
 func internalEnumNEIC() {
   let x: NormalProtoEnumUser<NormalStruct> = .a // okay
   _ = x
@@ -169,7 +169,7 @@ func internalFunc() {
   testFuncImpl(NormalStruct.self)  // expected-ioi-error {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
-@_neverEmitIntoClient
+@export(interface)
 func internalFuncNEIC() {
   testFuncImpl(NormalStruct.self) // okay
 }
