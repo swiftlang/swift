@@ -262,6 +262,7 @@ public:
     return MayHaveCustomDeinit_t((Flags & CustomDeinitFlag) != 0);
   }
 
+  void setTrivial() { Flags &= ~NonTrivialFlag; }
   void setNonTrivial() { Flags |= NonTrivialFlag; }
   void setIsOrContainsRawPointer() { Flags |= HasRawPointerFlag; }
 
