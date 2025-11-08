@@ -35,19 +35,19 @@ func foobar() {
 func foo() {
   // expected-note@+1{{'a' declared here}}
   let a = 2 // expected-error@+1{{cannot find 'b' in scope; did you mean 'a'?}}
-  b = a   
+  b = a
 }
 
 func bar() {
   // expected-error@+1{{cannot find 'a' in scope}}
-  a = 2   
+  a = 2
 }
 
 func baz() {
   // expected-error@+3{{cannot find 'a' in scope}}
   // expected-error@+2{{cannot find 'a'}}
   // expected-note@+1{{'b' declared here}}
-  let b = a; let c = a; 
+  let b = a; let c = a;
 }
 
 func qux() {

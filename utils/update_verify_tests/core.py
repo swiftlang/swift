@@ -51,7 +51,7 @@ class Line:
         res = self.content.replace("{{DIAG}}", self.diag.render())
         if not res.strip():
             return ""
-        return res
+        return res.rstrip() + "\n"
 
 
 class Diag:
