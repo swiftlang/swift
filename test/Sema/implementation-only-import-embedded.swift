@@ -85,7 +85,7 @@ public func implicitlyInlinablePublic(arg: StructFromDirect = StructFromDirect()
   localSPI()
   spiFunctionFromDirect()
 
-  let _: AliasToDirect // expected-error {{AliasToDirect' aliases 'directs.StructFromDirect' and cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' has been imported as implementation-only}}
+  let _: AliasToDirect // expected-error {{AliasToDirect' aliases 'directs.StructFromDirect' and cannot be used in an embedded function not marked '@export(interface)' because 'directs' has been imported as implementation-only}}
 }
 
 private func implicitlyInlinablePrivate(arg: StructFromDirect = StructFromDirect()) {
