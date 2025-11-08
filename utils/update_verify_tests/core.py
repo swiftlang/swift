@@ -185,7 +185,7 @@ class ExpansionDiagClose:
 
 
 expected_diag_re = re.compile(
-    r"//(\s*)expected-([a-zA-Z-]*)(note|warning|error)(-re)?(@[+-]?\d+)?(:\d+)?(\s*)(\d+)?\{\{(.*)\}\}"
+    r"//(\s*)expected-([a-zA-Z-]*)(note|warning|error|remark)(-re)?(@[+-]?\d+)?(:\d+)?(\s*)(\d+)?\{\{(.*)\}\}"
 )
 expected_expansion_diag_re = re.compile(
     r"//(\s*)expected-([a-zA-Z-]*)(expansion)(-re)?(@[+-]?\d+)(:\d+)(\s*)(\d+)?\{\{(.*)"
