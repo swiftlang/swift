@@ -842,9 +842,9 @@ def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
   Alias<emit_objc_header_path>;
 
 def emit_clang_header_min_access : Separate<["-"], "emit-clang-header-min-access">,
-  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath, CacheInvariant]>,
+  Flags<[FrontendOption, NoInteractiveOption, CacheInvariant]>,
   MetaVarName<"<access-level>">,
-  HelpText<"The minimum access level of declarations to include in the emitted header.>">;
+  HelpText<"The minimum access level of declarations to include in the emitted header">;
 
 def static : Flag<["-"], "static">,
   Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,
