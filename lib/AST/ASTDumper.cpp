@@ -590,6 +590,15 @@ static StringRef getDumpString(InlineKind kind) {
   }
   llvm_unreachable("unhandled InlineKind");
 }
+static StringRef getDumpString(ExportKind kind) {
+  switch (kind) {
+  case ExportKind::Interface:
+    return "interface";
+  case ExportKind::Implementation:
+    return "implementation";
+  }
+  llvm_unreachable("unhandled ExportKind");
+}
 static StringRef getDumpString(MacroRole role) {
   return getMacroRoleString(role);
 }
@@ -5304,6 +5313,11 @@ public:
   void visitInlineAttr(InlineAttr *Attr, Label label) {
     printCommon(Attr, "inline_attr", label);
     printField(Attr->getKind(), Label::always("kind"));
+    printFoot();
+  }
+  void visitExportAttr(ExportAttr *Attr, Label label) {
+    printCommon(Attr, "export_attr", label);
+    printField(Attr->exportKind, Label::always("kind"));
     printFoot();
   }
   void visitLifetimeAttr(LifetimeAttr *Attr, Label label) {

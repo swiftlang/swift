@@ -1129,6 +1129,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::AccessControl:
   case DeclAttrKind::ReferenceOwnership:
   case DeclAttrKind::Effects:
+  case DeclAttrKind::Export:
   case DeclAttrKind::Optimize:
   case DeclAttrKind::Exclusivity:
   case DeclAttrKind::NonSendable:
@@ -1932,6 +1933,15 @@ StringRef DeclAttribute::getAttrName() const {
       case EffectsKind::Custom:
         return "_effects";
     }
+  case DeclAttrKind::Export: {
+    switch (cast<ExportAttr>(this)->exportKind) {
+    case ExportKind::Interface:
+      return "export(interface)";
+    case ExportKind::Implementation:
+      return "export(implementation)";
+    }
+    llvm_unreachable("Invalid export kind");
+  }
   case DeclAttrKind::AccessControl:
   case DeclAttrKind::SetterAccess: {
     AccessLevel access = cast<AbstractAccessControlAttr>(this)->getAccess();

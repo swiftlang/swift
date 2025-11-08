@@ -815,14 +815,14 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
     // With conditionally available substitutions, the opaque result type
     // descriptor has to be emitted into a client module when associated with
-    // `@_alwaysEmitIntoClient` declaration which means it's linkage
+    // always-emitted-into-client declaration which means it's linkage
     // has to be "shared".
     //
     // If we don't have conditionally available substitutions, we won't emit
     // the descriptor at all, but still make sure we report "shared" linkage
     // so that TBD files don't include a bogus symbol.
     auto *srcDecl = opaqueType->getNamingDecl();
-    if (srcDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    if (srcDecl->isAlwaysEmittedIntoClient())
       return SILLinkage::Shared;
 
     return getSILLinkage(getDeclLinkage(opaqueType), forDefinition);
