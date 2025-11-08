@@ -285,8 +285,6 @@ Protocol StringInterpolationProtocol has added inherited protocol Copyable
 Protocol StringInterpolationProtocol has added inherited protocol Escapable
 Protocol StringProtocol has added inherited protocol Copyable
 Protocol StringProtocol has added inherited protocol Escapable
-Protocol TextOutputStream has added inherited protocol Copyable
-Protocol TextOutputStream has added inherited protocol Escapable
 Protocol UnicodeCodec has added inherited protocol Copyable
 Protocol UnicodeCodec has added inherited protocol Escapable
 Protocol UnkeyedDecodingContainer has added inherited protocol Copyable
@@ -625,6 +623,16 @@ Func Result.==(_:_:) has mangled name changing from 'static (extension in Swift)
 Func Result.==(_:_:) has parameter 0 changing from Default to Shared
 Func Result.==(_:_:) has parameter 1 changing from Default to Shared
 Func Result.==(_:_:) is now with @_preInverseGenerics
+Func TextOutputStream._lock() has generic signature change from <Self where Self : Swift.TextOutputStream> to <Self where Self : Swift.TextOutputStream, Self : ~Copyable, Self : ~Escapable>
+Func TextOutputStream._lock() has mangled name changing from '(extension in Swift):Swift.TextOutputStream._lock() -> ()' to '(extension in Swift):Swift.TextOutputStream< where A: ~Swift.Copyable, A: ~Swift.Escapable>._lock() -> ()'
+Func TextOutputStream._lock() is now with @_preInverseGenerics
+Func TextOutputStream._unlock() has generic signature change from <Self where Self : Swift.TextOutputStream> to <Self where Self : Swift.TextOutputStream, Self : ~Copyable, Self : ~Escapable>
+Func TextOutputStream._unlock() has mangled name changing from '(extension in Swift):Swift.TextOutputStream._unlock() -> ()' to '(extension in Swift):Swift.TextOutputStream< where A: ~Swift.Copyable, A: ~Swift.Escapable>._unlock() -> ()'
+Func TextOutputStream._unlock() is now with @_preInverseGenerics
+Func TextOutputStream._writeASCII(_:) has generic signature change from <Self where Self : Swift.TextOutputStream> to <Self where Self : Swift.TextOutputStream, Self : ~Copyable, Self : ~Escapable>
+Func TextOutputStream._writeASCII(_:) has mangled name changing from '(extension in Swift):Swift.TextOutputStream._writeASCII(Swift.UnsafeBufferPointer<Swift.UInt8>) -> ()' to '(extension in Swift):Swift.TextOutputStream< where A: ~Swift.Copyable, A: ~Swift.Escapable>._writeASCII(Swift.UnsafeBufferPointer<Swift.UInt8>) -> ()'
+Func TextOutputStream._writeASCII(_:) is now with @_preInverseGenerics
+Func TextOutputStream.write(_:) has generic signature change from <Self where Self : Swift.TextOutputStream> to <Self where Self : Swift.TextOutputStream, Self : ~Copyable, Self : ~Escapable>
 Func TextOutputStreamable.write(to:) has generic signature change from <Self, Target where Self : Swift.TextOutputStreamable, Target : Swift.TextOutputStream> to <Self, Target where Self : Swift.TextOutputStreamable, Target : Swift.TextOutputStream, Self : ~Copyable, Self : ~Escapable>
 Func UnsafeBufferPointer.deallocate() has generic signature change from <Element> to <Element where Element : ~Copyable>
 Func UnsafeBufferPointer.deallocate() has mangled name changing from 'Swift.UnsafeBufferPointer.deallocate() -> ()' to '(extension in Swift):Swift.UnsafeBufferPointer< where A: ~Swift.Copyable>.deallocate() -> ()'

@@ -66,7 +66,7 @@ import SwiftShims
 ///     var asciiLogger = ASCIILogger()
 ///     print(s, to: &asciiLogger)
 ///     // Prints "Hearts \u{2661} and Diamonds \u{2662}"
-public protocol TextOutputStream {
+public protocol TextOutputStream: ~Copyable & ~Escapable {
   mutating func _lock()
   mutating func _unlock()
 
@@ -76,10 +76,13 @@ public protocol TextOutputStream {
   mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>)
 }
 
-extension TextOutputStream {
+extension TextOutputStream where Self: ~Copyable & ~Escapable {
+  @_preInverseGenerics
   public mutating func _lock() {}
+  @_preInverseGenerics
   public mutating func _unlock() {}
 
+  @_preInverseGenerics
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
     unsafe write(String._fromASCII(buffer))
   }

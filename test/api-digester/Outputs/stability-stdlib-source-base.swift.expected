@@ -168,8 +168,6 @@ Protocol StringInterpolationProtocol has added inherited protocol Copyable
 Protocol StringInterpolationProtocol has added inherited protocol Escapable
 Protocol StringProtocol has added inherited protocol Copyable
 Protocol StringProtocol has added inherited protocol Escapable
-Protocol TextOutputStream has added inherited protocol Copyable
-Protocol TextOutputStream has added inherited protocol Escapable
 Protocol UnicodeCodec has added inherited protocol Copyable
 Protocol UnicodeCodec has added inherited protocol Escapable
 Protocol UnkeyedDecodingContainer has added inherited protocol Copyable
@@ -366,6 +364,7 @@ Func Result.flatMapError(_:) has generic signature change from <Success, Failure
 Func Result.flatMapError(_:) has self access kind changing from NonMutating to Consuming
 Func Result.map(_:) has generic signature change from <Success, Failure, NewSuccess where Failure : Swift.Error> to <Success, Failure, NewSuccess where Failure : Swift.Error, NewSuccess : ~Copyable>
 Func Result.mapError(_:) has generic signature change from <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error> to <Success, Failure, NewFailure where Failure : Swift.Error, NewFailure : Swift.Error, Success : ~Copyable, Success : ~Escapable>
+Func TextOutputStream.write(_:) has generic signature change from <Self where Self : Swift.TextOutputStream> to <Self where Self : Swift.TextOutputStream, Self : ~Copyable, Self : ~Escapable>
 Func TextOutputStreamable.write(to:) has generic signature change from <Self, Target where Self : Swift.TextOutputStreamable, Target : Swift.TextOutputStream> to <Self, Target where Self : Swift.TextOutputStreamable, Target : Swift.TextOutputStream, Self : ~Copyable, Self : ~Escapable>
 Func UnsafeBufferPointer.withMemoryRebound(to:_:) has generic signature change from <Element, T, Result> to <Element, T, E, Result where E : Swift.Error, Element : ~Copyable, T : ~Copyable, Result : ~Copyable>
 Func UnsafeBufferPointer.withMemoryRebound(to:_:) is now without rethrows
