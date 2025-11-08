@@ -3508,6 +3508,12 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
 }
 
 void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
+  if (Options.SkipImplementationOnlyDecls &&
+      wt.getConformingNominal()->getAttrs().hasAttribute<
+        ImplementationOnlyAttr>()) {
+    return;
+  }
+
   WitnessTableList[wt.getName()] = NextWitnessTableID++;
   WitnessTableOffset.push_back(Out.GetCurrentBitNo());
 
