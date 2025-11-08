@@ -5,6 +5,39 @@
 
 ## Swift (next)
 
+* [SE-0491][]:
+  You can now use a module selector to specify which module Swift should look inside to find a named declaration. A
+  module selector is written before the name it qualifies and consists of the module name and two colons (`::`):
+  
+  ```swift
+  // This type conforms to the `View` protocol from `SwiftUI`, even if other
+  // modules have also declared a type named `View`:
+  struct MyView: SwiftUI::View { ... }
+  ```
+  
+  A module selector can also be applied to the name of a member; this is helpful if extensions in other modules have
+  added an ambiguous overload:
+  
+  ```swift
+  // Calls the `data(using:)` method added by `Foundation`, even if other
+  // modules have added identical overloads of `data(using:)`.
+  let data = "a little bit of text".Foundation::data(using: .utf8)
+  ```
+  
+  When a module selector is used, Swift skips past any enclosing scopes and starts its search at the top level of the
+  module; this means that certain declarations, such as local variables and generic parameter types, cannot be found
+  with a module selector. Constraints in `where` clauses also cannot use a module selector to refer to an associated
+  type.
+  
+  Module selectors are primarily intended to be used when working around unavoidable conflicts, such as when two
+  modules you don't control both use the same name. API designs which force clients to use a module selector are not
+  recommended; it is usually better to rename a declaration instead. (19481048)
+
+* If you maintain a module built with Library Evolution, you can now configure Swift to use module selectors to improve
+  the robustness of its module interface file. This is especially helpful if your module declares a type with the same
+  name as the module itself. To opt in to this behavior, add the `-enable-module-selectors-in-module-interface` flag to
+  the `OTHER_SWIFT_FLAGS` build setting.
+
 * Concurrency-related APIs like `Task` and string-processing-related APIs like `Regex` can now be qualified by the name
   `Swift`, just like other standard library APIs:
   
@@ -10925,6 +10958,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
 [SE-0471]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
+[SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
