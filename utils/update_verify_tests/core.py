@@ -398,7 +398,7 @@ def remove_dead_diags(lines):
             remove_line(line, lines)
         else:
             assert line.diag.is_from_source_file
-            for other_diag in line.targeting_diags:
+            for other_diag in line.diag.target.targeting_diags:
                 if (
                     other_diag.is_from_source_file
                     or other_diag.count == 0
