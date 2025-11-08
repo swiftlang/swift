@@ -82,7 +82,7 @@ class Diag:
         self.absolute_target()
         self.whitespace_strings = whitespace_strings
         self.is_from_source_file = is_from_source_file
-        self.col = col
+        self._col = col
         self.nested_lines = nested_lines
         self.parent = None
         self.closer = None
@@ -115,6 +115,12 @@ class Diag:
 
     def relative_target(self):
         return self.absolute_target() - self.line.line_n
+
+    def col(self):
+        # expected-expansion requires column. Otherwise only retain column info if it's already there.
+        if self._col and (self.category == "expansion" or self.is_from_source_file):
+            return self._col
+        return None
 
     def take(self, other_diag):
         assert self.count == 0
@@ -159,11 +165,7 @@ class Diag:
             standard single space, let it be to avoid disrupting manual formatting.
             """
             whitespace2_s = ""
-        col_s = (
-            f":{self.col}"
-            if self.col and (self.category == "expansion" or self.is_from_source_file)
-            else ""
-        )
+        col_s = f":{self.col()}" if self.col() else ""
         base_s = f"//{whitespace1_s}expected-{self.prefix}{self.category}{re_s}{line_location_s}{col_s}{whitespace2_s}{count_s}"
         if self.category == "expansion":
             return base_s + "{{"
@@ -438,7 +440,7 @@ def expand_expansions(lines):
 
 
 def error_refers_to_diag(diag_error, diag, target_line_n):
-    if diag_error.col and diag.col and diag_error.col != diag.col:
+    if diag_error.col and diag.col() and diag_error.col != diag.col():
         return False
     return (
         target_line_n == diag.absolute_target()
