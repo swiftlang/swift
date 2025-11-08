@@ -808,7 +808,13 @@ public struct UnownedSerialExecutor: Sendable {
 
   @available(StdlibDeploymentTarget 6.2, *)
   public func asSerialExecutor() -> (any SerialExecutor)? {
-    return unsafe unsafeBitCast(executor, to: (any SerialExecutor)?.self)
+    // The low bits of the witness table are used to encode the executor kind.
+    // any SerialExecutor needs a raw witness table pointer, so mask off the low
+    // bits, knowing the witness table pointer is aligned to the pointer size.
+    let rawExecutorData = unsafe unsafeBitCast(executor, to: (UInt, UInt).self)
+    let mask = ~(UInt(MemoryLayout<UnsafeRawPointer>.alignment) - 1)
+    let alignedExecutor = unsafe (rawExecutorData.0, rawExecutorData.1 & mask)
+    return unsafe unsafeBitCast(alignedExecutor, to: (any SerialExecutor)?.self)
   }
 }
 
