@@ -1148,3 +1148,6 @@ Added: __swift_debug_metadataAllocatorPageSize
 Added: __swift_retainRelease_slowpath_mask_v1
 Added: _swift_release_preservemost
 Added: _swift_retain_preservemost
+
+// New debug environment variable for the concurrency runtime.
+Added: _concurrencyEnableTaskSlabAllocator
