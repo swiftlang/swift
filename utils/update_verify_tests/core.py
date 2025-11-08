@@ -409,6 +409,7 @@ def remove_dead_diags(lines):
                     continue
                 line.diag.take(other_diag)
                 remove_line(other_diag.line, lines)
+                break
 
 
 def fold_expansions(lines):
