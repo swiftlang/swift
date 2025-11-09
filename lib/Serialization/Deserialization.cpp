@@ -6177,6 +6177,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Export_DECL_ATTR: {
+        unsigned kind;
+        serialization::decls_block::ExportDeclAttrLayout::readRecord(
+            scratch, kind);
+        Attr = new (ctx) ExportAttr((ExportKind)kind);
+        break;
+      }
+
       case decls_block::NonSendable_DECL_ATTR: {
         unsigned kind;
         serialization::decls_block::NonSendableDeclAttrLayout::readRecord(

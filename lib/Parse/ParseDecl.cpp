@@ -2788,6 +2788,21 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::Export: {
+    auto kind = parseSingleAttrOption<ExportKind>(
+        *this, Loc, AttrRange, AttrName, DK, {
+          { Context.Id_interface,       ExportKind::Interface },
+          { Context.Id_implementation,  ExportKind::Implementation },
+        });
+    if (!kind)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) ExportAttr(AtLoc, AttrRange, *kind));
+
+    break;
+  }
+
   case DeclAttrKind::Inline: {
     auto kind = parseSingleAttrOption<InlineKind>(
         *this, Loc, AttrRange, AttrName, DK, {

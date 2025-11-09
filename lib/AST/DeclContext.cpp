@@ -593,7 +593,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         return {FragileFunctionKind::Inlinable};
       }
 
-      if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+      if (AFD->isAlwaysEmittedIntoClient()) {
         return {FragileFunctionKind::AlwaysEmitIntoClient};
       }
 
@@ -608,7 +608,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         if (storage->hasAttributeWithInlinableSemantics()) {
           return {FragileFunctionKind::Inlinable};
         }
-        if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+        if (storage->isAlwaysEmittedIntoClient()) {
           return {FragileFunctionKind::AlwaysEmitIntoClient};
         }
         if (storage->isBackDeployed()) {

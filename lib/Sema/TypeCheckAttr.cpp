@@ -161,7 +161,6 @@ public:
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(AlwaysEmitIntoClient)
-  IGNORED_ATTR(NeverEmitIntoClient)
   IGNORED_ATTR(HasInitialValue)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
@@ -408,6 +407,8 @@ public:
   void visitInlineAttr(InlineAttr *attr);
   void visitOptimizeAttr(OptimizeAttr *attr);
   void visitExclusivityAttr(ExclusivityAttr *attr);
+  void visitNeverEmitIntoClientAttr(NeverEmitIntoClientAttr *attr);
+  void visitExportAttr(ExportAttr *attr);
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
@@ -3836,6 +3837,27 @@ void AttributeChecker::visitExclusivityAttr(ExclusivityAttr *attr) {
   attr->setInvalid();
 }
 
+void AttributeChecker::visitExportAttr(ExportAttr *attr) {
+  // @export cannot be combined with any of @inlinable, @usableFromInline,
+  // @_alwaysEmitIntoClient, or @_neverEmitIntoClient
+  if (auto other = D->getAttrs().getAttribute<InlinableAttr>())
+    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
+  if (auto other = D->getAttrs().getAttribute<UsableFromInlineAttr>())
+    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
+  if (auto other = D->getAttrs().getAttribute<AlwaysEmitIntoClientAttr>())
+    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
+  if (auto other = D->getAttrs().getAttribute<NeverEmitIntoClientAttr>())
+    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
+  if (auto other = D->getAttrs().getAttribute<ExternAttr>())
+    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
+}
+
+void AttributeChecker::visitNeverEmitIntoClientAttr(NeverEmitIntoClientAttr *attr) {
+  Ctx.Diags.diagnose(attr->getStartLoc(), diag::attr_renamed_warning,
+                     "_neverEmitIntoClient", "export(interface)")
+    .fixItReplace(attr->getRangeWithAt(), "@export(interface)");
+}
+
 void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
   if (auto *FD = dyn_cast<FuncDecl>(D)) {
     if (auto result = FD->getResultInterfaceType()) {
@@ -5343,6 +5365,11 @@ void AttributeChecker::checkBackDeployedAttrs(
   if (auto *AEICA = D->getAttrs().getAttribute<AlwaysEmitIntoClientAttr>()) {
     diagnoseAndRemoveAttr(AEICA, diag::attr_incompatible_with_back_deployed,
                           AEICA, D);
+  }
+
+  if (auto *EA = D->getAttrs().getAttribute<ExportAttr>()) {
+    diagnoseAndRemoveAttr(EA, diag::attr_incompatible_with_back_deployed,
+                          EA, D);
   }
 
   if (auto *TA = D->getAttrs().getAttribute<TransparentAttr>()) {
@@ -7265,8 +7292,8 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     return true;
   }
 
-  if (originalAFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() !=
-      derivative->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+  if (originalAFD->isAlwaysEmittedIntoClient() !=
+      derivative->isAlwaysEmittedIntoClient()) {
     diags.diagnose(derivative->getLoc(),
                    diag::derivative_attr_always_emit_into_client_mismatch);
     return true;

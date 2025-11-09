@@ -1421,7 +1421,7 @@ public:
       return false;
 
     auto *V = getLocation().getAsASTNode<ValueDecl>();
-    return V && V->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
+    return V && V->isAlwaysEmittedIntoClient();
   }
 
   /// Return whether this function has attribute @used on it

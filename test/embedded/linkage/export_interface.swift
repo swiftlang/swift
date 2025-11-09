@@ -21,7 +21,7 @@
 //--- Library.swift
 
 // LIBRARY-IR: define {{(protected |dllexport )?}}swiftcc ptr @"$e7Library5helloSaySiGyF"()
-@_neverEmitIntoClient
+@export(interface)
 public func hello() -> [Int] {
   getArray()
 }
@@ -52,7 +52,7 @@ public func unnecessary() -> Int { 5 }
 //--- Application.swift
 import Library
 
-@_neverEmitIntoClient
+@export(interface)
 public func testMe() {
   _ = hello()
   _ = getArray()
@@ -64,8 +64,8 @@ public func testMe() {
 // APPLICATION-SIL: sil @$e7Library5helloSaySiGyF : $@convention(thin) () -> @owned Array<Int>{{$}}
 // APPLICATION-IR: declare swiftcc ptr @"$e7Library5helloSaySiGyF"()
 
-// Note: "getArray" is not @_neverEmitIntoClient, so it's definition is
-// available.
+// Note: "getArray" is not prohibited from being emitted into the client, so
+// its definition is available.
 
 // APPLICATION-SIL: sil public_external @$e7Library8getArraySaySiGyF : $@convention(thin) () -> @owned Array<Int> {
 // APPLICATION-IR: define linkonce_odr hidden swiftcc ptr @"$e7Library8getArraySaySiGyF"()

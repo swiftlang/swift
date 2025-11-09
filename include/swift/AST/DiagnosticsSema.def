@@ -4170,6 +4170,10 @@ ERROR(final_not_allowed_here,none,
       "'final' may only be applied to classes, properties, methods, and "
       "subscripts", ())
 
+ERROR(attr_incompatible_with_attr,none,
+      "'%0' cannot be used with '%1'",
+      (DeclAttribute, DeclAttribute))
+
 ERROR(attr_incompatible_with_non_final,none,
       "'%0' cannot be applied to a non-final %kindonly1",
       (DeclAttribute, const ValueDecl *))
@@ -5369,7 +5373,7 @@ GROUPED_ERROR(opaque_type_unsupported_availability,OpaqueTypeInference,none,
   "a default argument value|" \
   "a property initializer in a '@frozen' type|" \
   "a '@backDeployed' function|" \
-  "an embedded function not marked '@_neverEmitIntoClient'}"
+  "an embedded function not marked '@export(interface)'}"
 
 ERROR(discard_wrong_context_decl,none,
       "'discard' statement cannot appear in %kindonly0",

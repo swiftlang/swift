@@ -301,9 +301,8 @@ swift::cxx_translation::getDeclRepresentation(
   if (isa<MacroDecl>(VD))
     return {Unsupported, UnrepresentableMacro};
   GenericSignature genericSignature;
-  // Don't expose @_alwaysEmitIntoClient decls as they require their
-  // bodies to be emitted into client.
-  if (VD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+  // Don't expose decls with definitions that are emitted into the client.
+  if (VD->isAlwaysEmittedIntoClient())
     return {Unsupported, UnrepresentableRequiresClientEmission};
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (AFD->hasAsync())

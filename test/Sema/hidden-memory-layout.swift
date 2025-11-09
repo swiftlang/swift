@@ -22,7 +22,7 @@
 // RUN:   -enable-experimental-feature CheckImplementationOnly
 
 /// Embedded
-/// Will also show errors in non-@_neverEmitIntoClient functions.
+/// Will also show errors in non-never-emit-into-client functions.
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/indirects.swiftmodule \
@@ -144,27 +144,27 @@ public func implicitlyInlinablePublic() {
   let _: ExposedLayoutPublic = ExposedLayoutPublic()
   let _: ExposedLayoutPrivate = ExposedLayoutPrivate()
   let _: HiddenLayout = HiddenLayout()
-  // expected-embedded-opt-in-error @-1 2 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-embedded-opt-in-error @-1 2 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 
   let _: ExposedEnumPublic = ExposedEnumPublic.A
   let _: ExposedEnumPrivate = ExposedEnumPrivate.A
   let _: HiddenEnum = HiddenEnum.A
-  // expected-embedded-opt-in-error @-1 2 {{enum 'HiddenEnum' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-embedded-opt-in-error @-1 2 {{enum 'HiddenEnum' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenEnum' is marked '@_implementationOnly'}}
 }
 
 private func implicitlyInlinablePrivate() {
   let _: ExposedLayoutPublic = ExposedLayoutPublic()
   let _: ExposedLayoutPrivate = ExposedLayoutPrivate()
   let _: HiddenLayout = HiddenLayout()
-  // expected-embedded-opt-in-error @-1 2 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-embedded-opt-in-error @-1 2 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 
   let _: ExposedEnumPublic = ExposedEnumPublic.A
   let _: ExposedEnumPrivate = ExposedEnumPrivate.A
   let _: HiddenEnum = HiddenEnum.A
-  // expected-embedded-opt-in-error @-1 2 {{enum 'HiddenEnum' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-embedded-opt-in-error @-1 2 {{enum 'HiddenEnum' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenEnum' is marked '@_implementationOnly'}}
 }
 
-@_neverEmitIntoClient
+@export(interface)
 public func explicitNonInliable() {
   let _: ExposedLayoutPublic = ExposedLayoutPublic()
   let _: ExposedLayoutPrivate = ExposedLayoutPrivate()
@@ -174,7 +174,7 @@ public func explicitNonInliable() {
   let _: HiddenEnum = HiddenEnum.A
 }
 
-@_neverEmitIntoClient
+@export(interface)
 internal func explicitNonInliableInternal() {
   let _: ExposedLayoutPublic = ExposedLayoutPublic()
   let _: ExposedLayoutPrivate = ExposedLayoutPrivate()
@@ -208,7 +208,7 @@ public struct ExposedLayoutPublicUser: ProtocolFromDirect {
   // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {}
-  // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 }
 
 internal struct ExposedLayoutInternalUser: ProtocolFromDirect {
@@ -229,7 +229,7 @@ internal struct ExposedLayoutInternalUser: ProtocolFromDirect {
   // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {}
-  // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 }
 
 private struct ExposedLayoutPrivateUser: ProtocolFromDirect {
@@ -250,7 +250,7 @@ private struct ExposedLayoutPrivateUser: ProtocolFromDirect {
   // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {}
-  // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 }
 
 #if UseImplementationOnly
@@ -266,7 +266,7 @@ private struct HiddenLayoutUser {
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
 
-  @_neverEmitIntoClient
+  @export(interface)
   private func privateFunc(h: HiddenLayout) {}
 }
 
@@ -356,7 +356,7 @@ public class PublicClass: ProtocolFromDirect {
   private var f: HiddenEnum
   // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenEnum' is marked '@_implementationOnly'}}
 
-  @_neverEmitIntoClient
+  @export(interface)
   private func privateFunc(h: HiddenLayout) {}
 }
 
@@ -381,7 +381,7 @@ internal class InternalClass: ProtocolFromDirect {
   private var f: HiddenEnum
   // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenEnum' is marked '@_implementationOnly'}}
 
-  private func privateFunc(h: HiddenLayout) {} // expected-embedded-opt-in-error {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'HiddenLayout' is marked '@_implementationOnly'}}
+  private func privateFunc(h: HiddenLayout) {} // expected-embedded-opt-in-error {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 }
 
 private class PrivateClass: ProtocolFromDirect {
@@ -405,7 +405,7 @@ private class PrivateClass: ProtocolFromDirect {
   private var f: HiddenEnum
   // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenEnum' is marked '@_implementationOnly'}}
 
-  private func privateFunc(h: HiddenLayout) {} // expected-embedded-opt-in-error {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'HiddenLayout' is marked '@_implementationOnly'}}
+  private func privateFunc(h: HiddenLayout) {} // expected-embedded-opt-in-error {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 }
 
 #if UseImplementationOnly
