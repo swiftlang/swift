@@ -4734,7 +4734,7 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
       // descriptor that may not exist in older versions of their home dylib.
       // Their definition is also always entirely visible to clients so it isn't
       // needed.
-      if (baseDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+      if (baseDecl->isAlwaysEmittedIntoClient()) {
         return false;
       }
 

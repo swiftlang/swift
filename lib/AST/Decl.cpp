@@ -2276,8 +2276,32 @@ bool Decl::isObjCImplementation() const {
   return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
 }
 
+bool Decl::isAlwaysEmittedIntoClient() const {
+  // @export(implementation)
+  if (auto exportAttr = getAttrs().getAttribute<ExportAttr>()) {
+    if (exportAttr->exportKind == ExportKind::Implementation)
+      return true;
+  }
+
+  // @_alwaysEmitIntoClient
+  if (getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    return true;
+
+  return false;
+}
+
 bool Decl::isNeverEmittedIntoClient() const {
-  return getAttrs().hasAttribute<NeverEmitIntoClientAttr>();
+  // @export(interface)
+  if (auto exportAttr = getAttrs().getAttribute<ExportAttr>()) {
+    if (exportAttr->exportKind == ExportKind::Interface)
+      return true;
+  }
+
+  // @_neverEmitIntoClient
+  if (getAttrs().hasAttribute<NeverEmitIntoClientAttr>())
+    return true;
+
+  return false;
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
@@ -4962,14 +4986,14 @@ bool ValueDecl::isUsableFromInline() const {
     return abiRole.getCounterpart()->isUsableFromInline();
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
-      getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+      isAlwaysEmittedIntoClient() ||
       hasAttributeWithInlinableSemantics())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
     auto *storage = accessor->getStorage();
     if (storage->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
-        storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+        storage->isAlwaysEmittedIntoClient() ||
         storage->hasAttributeWithInlinableSemantics())
       return true;
   }
@@ -4977,7 +5001,7 @@ bool ValueDecl::isUsableFromInline() const {
   if (auto *opaqueType = dyn_cast<OpaqueTypeDecl>(this)) {
     if (auto *namingDecl = opaqueType->getNamingDecl()) {
       if (namingDecl->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
-          namingDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+          namingDecl->isAlwaysEmittedIntoClient() ||
           namingDecl->hasAttributeWithInlinableSemantics())
         return true;
     }

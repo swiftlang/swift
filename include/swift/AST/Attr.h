@@ -23,6 +23,7 @@
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclNameLoc.h"
+#include "swift/AST/ExportKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LifetimeDependence.h"
@@ -2953,6 +2954,35 @@ enum class NonSendableKind : uint8_t {
   /// A '@_nonSendable(_assumed)' attribute. Should be applied to large swaths
   /// of declarations; does not override explicit 'Sendable' conformances.
   Assumed
+};
+
+/// Specify whether the declaration should be exported as an interface or
+/// an implementation.
+class ExportAttr : public DeclAttribute {
+public:
+  /// How this declaration is exported.
+  const ExportKind exportKind;
+
+  ExportAttr(SourceLoc atLoc, SourceRange range, ExportKind exportKind,
+             bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Export, atLoc, range, implicit),
+        exportKind(exportKind) {}
+
+  ExportAttr(ExportKind exportKind, bool implicit = false)
+    : ExportAttr(SourceLoc(), SourceRange(), exportKind, implicit) { }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Export;
+  }
+
+  /// Create a copy of this attribute.
+  ExportAttr *clone(ASTContext &ctx) const {
+    return new (ctx) ExportAttr(AtLoc, Range, exportKind, isImplicit());
+  }
+
+  bool isEquivalent(const ExportAttr *other, Decl *attachedTo) const {
+    return exportKind == other->exportKind;
+  }
 };
 
 /// Marks a declaration as explicitly non-Sendable.

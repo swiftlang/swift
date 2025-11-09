@@ -19,7 +19,7 @@
     }
 
     @inline(__always)
-    @_alwaysEmitIntoClient
+    @export(implementation)
     deinit {
         buffer.deinitialize().deallocate()
     }

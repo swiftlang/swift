@@ -558,7 +558,10 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
   100)
 
-// Unused '101'
+DECL_ATTR(export, Export,
+    OnVar | OnSubscript | OnAbstractFunction,
+    ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+    101)
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
   OnClass,

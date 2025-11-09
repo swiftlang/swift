@@ -2632,8 +2632,8 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
       ImporterImpl.ImportedHeaderUnit);
   funcDecl->setBodySynthesizer(synthesizeDefaultArgumentBody, (void *)param);
   funcDecl->setAccess(AccessLevel::Public);
-  funcDecl->addAttribute(new (ctx)
-                             AlwaysEmitIntoClientAttr(/*IsImplicit=*/true));
+  funcDecl->addAttribute(
+      new (ctx) ExportAttr(ExportKind::Implementation, /*IsImplicit=*/true));
   // At this point, the parameter/return types of funcDecl might not be imported
   // into Swift completely, meaning that their protocol conformances might not
   // be populated yet. Prevent LifetimeDependenceInfoRequest from prematurely
@@ -3184,8 +3184,8 @@ FuncDecl *SwiftDeclSynthesizer::makeAvailabilityDomainPredicate(
   funcDecl->setBodySynthesizer(synthesizeAvailabilityDomainPredicateBody,
                                (void *)var);
   funcDecl->setAccess(AccessLevel::Public);
-  funcDecl->addAttribute(new (ctx)
-                             AlwaysEmitIntoClientAttr(/*IsImplicit=*/true));
+  funcDecl->addAttribute(
+      new (ctx) ExportAttr(ExportKind::Implementation, /*IsImplicit=*/true));
 
   ImporterImpl.availabilityDomainPredicates[var] = funcDecl;
 

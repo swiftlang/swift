@@ -102,7 +102,7 @@ internal func implicitlyInlinablePrivate(arg: StructFromDirect = StructFromDirec
   explicitNonInliable()
 }
 
-@_neverEmitIntoClient
+@export(interface)
 public func explicitNonInliable(arg: StructFromDirect = StructFromDirect()) {
 // expected-error @-1 {{initializer 'init()' is internal and cannot be referenced from a default argument value}}
 // expected-error @-2 {{struct 'StructFromDirect' is internal and cannot be referenced from a default argument value}}
@@ -114,7 +114,7 @@ public func explicitNonInliable(arg: StructFromDirect = StructFromDirect()) {
     _ = StructFromDirect()
   }
 
-  @_neverEmitIntoClient
+  @export(interface)
   func nested() {
     _ = StructFromDirect()
   }
@@ -128,7 +128,7 @@ public func explicitNonInliable(arg: StructFromDirect = StructFromDirect()) {
   explicitNonInliable()
 }
 
-@_neverEmitIntoClient
+@export(interface)
 internal func explicitNonInliableInternal(arg: StructFromDirect = StructFromDirect()) {
   _ = StructFromDirect()
 
@@ -136,7 +136,7 @@ internal func explicitNonInliableInternal(arg: StructFromDirect = StructFromDire
     _ = StructFromDirect()
   }
 
-  @_neverEmitIntoClient
+  @export(interface)
   func nested() {
     _ = StructFromDirect()
   }
