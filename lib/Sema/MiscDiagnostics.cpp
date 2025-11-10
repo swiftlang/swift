@@ -2700,9 +2700,9 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
     /// Strong capture item Decls from escaping closures.
     llvm::SmallSetVector<ValueDecl *, 8> EscapingStrongCaptureDecls;
 
-    // We're looking for captures like [weak a], [unowned a = b]
-    // here, where the bound Decl has strong ownership. We'll also
-    // keep track of capture list items formed for escaping closures.
+    // We're looking for captures like [weak a], [unowned b] here,
+    // where the bound Decl has strong ownership. We'll also keep
+    // track of capture list items formed for escaping closures.
     void recordOrDiagnoseDeclIfNeeded(Decl *D) {
 
       // We only care about pattern bindings
@@ -2750,6 +2750,19 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
           Util::isLessThanStrongOwnership(Util::getDeclOwnership(itemReferent)))
         return;
 
+      // As a policy choice, don't diagnose if the capture is explicitly
+      // assigned within the capture list item. E.g. we will treat things like
+      //
+      // { [weak self = self] in }
+      //
+      // as an indication that the programmer is aware of any consequences of
+      // the ownership change.
+      // TODO: is there a better way to check this state?
+      // TODO: should such PDBs have their implicit bit set?
+      auto srcRange = PBD->getSourceRange();
+      if (srcRange.isValid() && srcRange.Start != srcRange.End)
+        return;
+
       WeakToStrongCaptureItemInfo captureInfo = {VD, itemReferent, itemInit,
                                                  ownership};
       diagnoseCaptureIfNeeded(captureInfo);
@@ -2759,7 +2772,11 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
       // If an escaping closure contains the 'weakified' referent, as an
       // explicit strong capture list item then we don't need to diagnose
       // anything. We rely on the AST walk visiting ancestor DCs before
-      // their children here.
+      // their children here. i.e. we don't want to diagnose cases like:
+      //
+      //  outer { [self] in
+      //    inner { [weak self] in ... }
+      //  }
       if (EscapingStrongCaptureDecls.contains(captureItem.itemReferent))
         return;
 
@@ -2784,21 +2801,37 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
       if (!outermostCapturingClosure)
         return;
 
-      if (captureItem.itemDecl->getName() !=
-          captureItem.itemReferent->getBaseIdentifier()) {
-        Ctx.Diags.diagnose(captureItem.itemDecl->getLoc(),
-                           diag::implicit_weak_to_strong_capture_new_name,
-                           captureItem.itemDeclOwnership, captureItem.itemDecl,
-                           captureItem.itemReferent);
-      } else {
-        Ctx.Diags.diagnose(captureItem.itemDecl->getLoc(),
-                           diag::implicit_weak_to_strong_capture,
-                           captureItem.itemDeclOwnership, captureItem.itemDecl);
-      }
+      // We found something to diagnose.
+      Ctx.Diags.diagnose(captureItem.itemDecl->getLoc(),
+                         diag::implicit_weak_to_strong_capture,
+                         captureItem.itemDeclOwnership, captureItem.itemDecl);
 
-      Ctx.Diags.diagnose(outermostCapturingClosure.value()->getLoc(),
+      const auto initialCaptureLoc =
+          outermostCapturingClosure.value()->getLoc();
+
+      // Point to the implicit capture location
+      Ctx.Diags.diagnose(initialCaptureLoc,
                          diag::implicit_weak_to_strong_capture_loc,
                          captureItem.itemReferent);
+
+      // Suggest adding a capture list item there
+      // FIXME: this should have a fixit
+      Ctx.Diags.diagnose(
+          initialCaptureLoc,
+          diag::implicit_weak_to_strong_capture_add_capture_list_item,
+          captureItem.itemReferent);
+
+      // Suggest a fixit to silence the diagnostic by adding an assignment in
+      // the capture list item. i.e. turning:
+      //  `{ [weak xyz] in ...}`
+      //  into
+      //  `{ [weak xyz = xyz] in ... }`
+      Ctx.Diags
+          .diagnose(captureItem.itemDecl->getLoc(),
+                    diag::implicit_weak_to_strong_capture_assign_to_silence)
+          .fixItInsertAfter(captureItem.itemDecl->getLoc(),
+                            (" = " + captureItem.itemDecl->getNameStr()).str());
+      // TODO: should/could we ensure that the names explicitly match?
     }
 
     // MARK: ASTWalker
