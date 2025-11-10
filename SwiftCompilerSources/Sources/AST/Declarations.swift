@@ -29,15 +29,45 @@ public class Decl: CustomStringConvertible, Hashable {
   // True if this declaration is imported from C/C++/ObjC.
   public var hasClangNode: Bool { bridged.hasClangNode() }
 
-  public var declContext: DeclContext { bridgedDecl.declContext }
+  public var declContext: DeclContext {
+    if let decl = parent {
+      return decl as! DeclContext
+    }
+    return DeclContextObj(bridged: bridged.getDeclContext())
+  }
 
-  var bridgedDecl: BridgedDecl { BridgedDecl(raw: bridged.obj) }
+  public var bridgedDecl: BridgedDecl { BridgedDecl(raw: bridged.obj) }
 
   public static func ==(lhs: Decl, rhs: Decl) -> Bool { lhs === rhs }
 
   public func hash(into hasher: inout Hasher) {
     hasher.combine(ObjectIdentifier(self))
   }
+
+  public func setImplicit() { bridged.setImplicit() }
+}
+
+public protocol DeclContext {
+  var bridgedDeclContext: BridgedDeclContext { get }
+}
+
+extension DeclContext {
+  public var astContext: ASTContext { bridgedDeclContext.astContext }
+}
+
+fileprivate class DeclContextObj : DeclContext {
+  public var bridgedDeclContext: BridgedDeclContext
+  public init(bridged: BridgedDeclContext) { bridgedDeclContext = bridged }
+}
+
+public protocol GenericContext: Decl, DeclContext {}
+
+extension GenericContext {
+  public func setGenericSignature(_ genericSignature: GenericSignature) {
+    bridged.GenericContext_setGenericSignature(genericSignature.bridged)
+  }
+
+  public var bridgedDeclContext: BridgedDeclContext { bridged.asGenericContext() }
 }
 
 public class ValueDecl: Decl {
@@ -45,13 +75,16 @@ public class ValueDecl: Decl {
   final public var userFacingName: StringRef { StringRef(bridged: bridged.Value_getUserFacingName()) }
   final public var baseIdentifier: Identifier { bridged.Value_getBaseIdentifier() }
   final public var isObjC: Bool { bridged.Value_isObjC() }
+  final public func setAccess(_ accessLevel : AccessLevel) {
+    bridged.ValueDecl_setAccess(accessLevel)
+  }
 }
 
 public class TypeDecl: ValueDecl {
   final public var name: StringRef { StringRef(bridged: bridged.Type_getName()) }
 }
 
-public class GenericTypeDecl: TypeDecl {
+public class GenericTypeDecl: TypeDecl, GenericContext {
   final public var isGenericAtAnyLevel: Bool { bridged.GenericType_isGenericAtAnyLevel() }
 }
 
@@ -65,10 +98,34 @@ public class NominalTypeDecl: GenericTypeDecl {
   public var declaredInterfaceType: Type {
     Type(bridged: bridged.NominalType_getDeclaredInterfaceType())
   }
+
+  public func add(member: Decl) {
+    bridged.NominalTypeDecl_addMember(member.bridged)
+  }
 }
 
 final public class EnumDecl: NominalTypeDecl {
   public var hasRawType: Bool { bridged.Enum_hasRawType() }
+
+  public static func create(
+    _ astContext: ASTContext, declContext: DeclContext, enumKeywordLoc: SourceLoc?, name: String,
+    nameLoc: SourceLoc?, genericParamList: GenericParamList?, inheritedTypes: [Type],
+    genericWhereClause: TrailingWhereClause?, braceRange: SourceRange
+  ) -> EnumDecl {
+    name.withCString { strPtr in
+      inheritedTypes.withBridgedArrayRef { types in
+        ASTBridging.BridgedEnumDecl.createParsed(
+          astContext, declContext: declContext.bridgedDeclContext,
+          enumKeywordLoc: enumKeywordLoc.bridgedLocation,
+          name: astContext.getIdentifier(BridgedStringRef(data: strPtr, count: name.count)),
+          nameLoc: nameLoc.bridgedLocation,
+          genericParamList: genericParamList.bridged,
+          inheritedTypes: types,
+          genericWhereClause: genericWhereClause.bridged,
+          braceRange: braceRange.bridged)
+      }
+    }.asDecl.declObj.getAs(EnumDecl.self)
+  }
 }
 
 final public class StructDecl: NominalTypeDecl {
@@ -93,7 +150,19 @@ final public class OpaqueTypeDecl: GenericTypeDecl {}
 
 final public class TypeAliasDecl: GenericTypeDecl {}
 
-final public class GenericTypeParamDecl: TypeDecl {}
+final public class GenericTypeParamDecl: TypeDecl {
+  public static func create(
+    declContext: DeclContext,
+    name: Identifier,
+    depth: Int,
+    index: Int,
+    paramKind: GenericTypeParameterKind) -> GenericTypeParamDecl {
+    ASTBridging.BridgedGenericTypeParamDecl.createImplicit(
+      declContext: declContext.bridgedDeclContext,
+      name: name, depth: depth, index: index,
+      paramKind: paramKind).asDecl.declObj.getAs(GenericTypeParamDecl.self)
+  }
+}
 
 final public class AssociatedTypeDecl: TypeDecl {}
 
@@ -105,7 +174,15 @@ public class AbstractStorageDecl: ValueDecl {
 
 public class VarDecl: AbstractStorageDecl {}
 
-final public class ParamDecl: VarDecl {}
+final public class ParamDecl: VarDecl {
+  public func cloneWithoutType() -> ParamDecl {
+    BridgedParamDecl(raw: bridged.obj).cloneWithoutType().asDecl.declObj.getAs(ParamDecl.self)
+  }
+
+  public func setInterfaceType(type: Type) {
+    BridgedParamDecl(raw: bridged.obj).setInterfaceType(type.bridged)
+  }
+}
 
 final public class SubscriptDecl: AbstractStorageDecl {}
 
@@ -127,8 +204,22 @@ final public class MacroDecl: ValueDecl {}
 
 final public class EnumElementDecl: ValueDecl {
   public var hasAssociatedValues: Bool { bridged.EnumElementDecl_hasAssociatedValues() }
-  public var parameterList: ParameterList { bridged.EnumElementDecl_getParameterList() }
+  public var parameterList: ParameterList { ParameterList(bridged: bridged.EnumElementDecl_getParameterList()) }
   public var name: StringRef { StringRef(bridged: bridged.EnumElementDecl_getNameStr()) }
+
+  public static func create(
+    _ astContext: ASTContext, declContext: DeclContext,
+    name: Identifier, nameLoc: SourceLoc?,
+    parameterList: ParameterList?,
+    equalsLoc: SourceLoc?, rawValue: Expr?
+  ) -> EnumElementDecl {
+    BridgedEnumElementDecl.createParsed(
+      astContext, declContext: declContext.bridgedDeclContext,
+      name: name, nameLoc: nameLoc.bridgedLocation,
+      parameterList: parameterList.bridged.bridged,
+      equalsLoc: equalsLoc.bridgedLocation,
+      rawValue: rawValue.bridged).asDecl.declObj.getAs(EnumElementDecl.self)
+  }
 }
 
 final public class ExtensionDecl: Decl {}
@@ -177,62 +268,83 @@ extension Optional where Wrapped == Decl {
   }
 }
 
+public typealias AccessLevel = swift.AccessLevel
+
 public typealias Identifier = swift.Identifier
 
 public typealias GenericTypeParamKind = swift.GenericTypeParamKind
 
 public typealias ASTContext = BridgedASTContext
 
-public typealias DeclContext = BridgedDeclContext
-
 public typealias Expr = BridgedExpr
-
-public typealias ParameterList = BridgedParameterList
 
 public typealias SourceFile = BridgedSourceFile
 
 public typealias FileUnit = BridgedFileUnit
 
-public typealias GenericParamList = BridgedGenericParamList
+public class GenericParamList {
+  public var bridged: BridgedGenericParamList
+  public init(bridged: BridgedGenericParamList) { self.bridged = bridged }
+}
 
 public typealias TrailingWhereClause = BridgedTrailingWhereClause
 
-public typealias BridgedParamDecl = ASTBridging.BridgedParamDecl
+public class ParameterList : RandomAccessCollection {
+  public class Iterator : IteratorProtocol {
+    public typealias Element = ParamDecl
+    private var index : Int = 0
+    private let parameterList : ParameterList
+    init(parameterList : ParameterList) { self.parameterList = parameterList }
+    public func next() -> Element? {
+      if index < parameterList.bridged.size {
+        return parameterList.bridged.get(index).asDecl.declObj.getAs(ParamDecl.self)
+      }
+      return nil
+    }
+  }
+  public typealias Index = Int
+  public var startIndex: Index { 0 }
+  public var endIndex: Index { bridged.size }
+  public func index(after i: Index) -> Index { i + 1 }
 
-public typealias BridgedGenericTypeParamDecl = ASTBridging.BridgedGenericTypeParamDecl
-
-public typealias BridgedEnumDecl = ASTBridging.BridgedEnumDecl
-
-public typealias BridgedEnumElementDecl = ASTBridging.BridgedEnumElementDecl
-
-extension ParameterList {
-  public subscript(_ index: Int) -> BridgedParamDecl {
-    return get(index)
+  public func makeIterator() -> Iterator {
+    Self.Iterator(parameterList: self)
   }
 
-  public static func createParsed(
-    _ astContext: ASTContext, leftParenLoc: SourceLoc?, parameters: [BridgedParamDecl],
+  public var bridged: BridgedParameterList
+
+  public init(bridged: BridgedParameterList) {
+    self.bridged = bridged
+  }
+
+  public subscript(_ index: Index) -> ParamDecl {
+    return bridged.get(index).asDecl.declObj.getAs(ParamDecl.self)
+  }
+
+  public static func create(
+    _ astContext: ASTContext, leftParenLoc: SourceLoc?, parameters: [ParamDecl],
     rightParenLoc: SourceLoc?
   ) -> ParameterList {
-    parameters.withBridgedArrayRef {
-      ParameterList.createParsed(
+    ParameterList(bridged: parameters.map{BridgedParamDecl(raw: $0.bridged.obj)}.withBridgedArrayRef {
+      BridgedParameterList.createParsed(
         astContext, leftParenLoc: leftParenLoc.bridgedLocation, parameters: $0,
         rightParenLoc: rightParenLoc.bridgedLocation)
-    }
+    })
   }
 }
 
 extension GenericParamList {
-  public static func createParsed(
-    _ astContext: ASTContext, leftAngleLoc: SourceLoc?, parameters: [BridgedGenericTypeParamDecl],
+  public static func create(
+    _ astContext: ASTContext, leftAngleLoc: SourceLoc?, parameters: [GenericTypeParamDecl],
     genericWhereClause: TrailingWhereClause?,
     rightAngleLoc: SourceLoc?
   ) -> GenericParamList {
-    return parameters.withBridgedArrayRef {
-      GenericParamList.createParsed(
+    let paramsNew = parameters.map{ ASTBridging.BridgedGenericTypeParamDecl(raw: $0.bridged.obj) }
+    return paramsNew.withBridgedArrayRef {
+      GenericParamList(bridged: BridgedGenericParamList.createParsed(
         astContext, leftAngleLoc: leftAngleLoc.bridgedLocation, parameters: $0,
         genericWhereClause: genericWhereClause.bridged, rightAngleLoc: rightAngleLoc.bridgedLocation
-      )
+      ))
     }
   }
 }
@@ -242,43 +354,6 @@ extension BridgedDecl {
     BridgedDeclObj(SwiftObject(raw.bindMemory(to: BridgedSwiftObject.self, capacity: 1)))
   }
   public var decl: Decl { declObj.decl }
-}
-
-extension BridgedEnumDecl {
-  public static func createParsed(
-    _ astContext: ASTContext, declContext: DeclContext, enumKeywordLoc: SourceLoc?, name: String,
-    nameLoc: SourceLoc?, genericParamList: GenericParamList?, inheritedTypes: [Type],
-    genericWhereClause: TrailingWhereClause?, braceRange: SourceRange
-  ) -> BridgedEnumDecl {
-    return name.withCString { strPtr in
-      inheritedTypes.withBridgedArrayRef { types in
-        BridgedEnumDecl.createParsed(
-          astContext, declContext: declContext,
-          enumKeywordLoc: enumKeywordLoc.bridgedLocation,
-          name: astContext.getIdentifier(BridgedStringRef(data: strPtr, count: name.count)),
-          nameLoc: nameLoc.bridgedLocation,
-          genericParamList: genericParamList.bridged,
-          inheritedTypes: types,
-          genericWhereClause: genericWhereClause.bridged,
-          braceRange: braceRange.bridged)
-      }
-    }
-  }
-}
-
-extension BridgedEnumElementDecl {
-  public static func createParsed(
-    _ astContext: ASTContext, declContext: DeclContext,
-    name: Identifier, nameLoc: SourceLoc?,
-    parameterList: ParameterList?,
-    equalsLoc: SourceLoc?, rawValue: Expr?
-  ) -> BridgedEnumElementDecl {
-    BridgedEnumElementDecl.createParsed(
-      astContext, declContext: declContext,
-      name: name, nameLoc: nameLoc.bridgedLocation,
-      parameterList: parameterList.bridged,
-      equalsLoc: equalsLoc.bridgedLocation, rawValue: rawValue.bridged)
-  }
 }
 
 extension SourceFile {
@@ -294,13 +369,16 @@ extension FileUnit {
   public var asSourceFile: SourceFile? { SourceFile(bridged: self.castToSourceFile()) }
 }
 
-extension BridgedParamDecl {
-  public func setInterfaceType(type: Type) {
-    self.setInterfaceType(type.bridged)
+extension ParameterList? {
+  public var bridged: BridgedParameterList? {
+    if self == nil {
+      return nil
+    }
+    return self!.bridged
   }
 }
 
-extension ParameterList? {
+extension BridgedParameterList? {
   public var bridged: BridgedNullableParameterList {
     BridgedNullableParameterList(raw: self?.raw)
   }
@@ -308,7 +386,7 @@ extension ParameterList? {
 
 extension GenericParamList? {
   public var bridged: BridgedNullableGenericParamList {
-    BridgedNullableGenericParamList(raw: self?.raw)
+    BridgedNullableGenericParamList(raw: self?.bridged.raw)
   }
 }
 

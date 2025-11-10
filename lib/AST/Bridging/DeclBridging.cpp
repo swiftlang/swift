@@ -95,15 +95,6 @@ BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(BridgedASTContext cContext,
 #define ABSTRACT_DECL(Id, Parent) DECL(Id, Parent)
 #include "swift/AST/DeclNodes.def"
 
-// Define `.asValueDecl` on each BridgedXXXDecl type that's also a
-// ValueDecl.
-#define DECL(Id, Parent)
-#define VALUE_DECL(Id, Parent)                                                 \
-  BridgedValueDecl Bridged##Id##Decl_asValueDecl(Bridged##Id##Decl decl) {     \
-    return static_cast<ValueDecl *>(decl.unbridged());                         \
-  }
-#include "swift/AST/DeclNodes.def"
-
 // Define `.asNominalTypeDecl` on each BridgedXXXDecl type that's also a
 // NominalTypeDecl.
 #define DECL(Id, Parent)
@@ -124,17 +115,6 @@ BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(BridgedASTContext cContext,
 #define ABSTRACT_CONTEXT_DECL(Id, Parent) CONTEXT_DECL(Id, Parent)
 #include "swift/AST/DeclNodes.def"
 
-// Define `.asGenericContext` on each BridgedXXXDecl type that's also a
-// GenericContext.
-#define DECL(Id, Parent)
-#define GENERIC_DECL(Id, Parent)                                               \
-  BridgedGenericContext Bridged##Id##Decl_asGenericContext(                    \
-      Bridged##Id##Decl decl) {                                                \
-    return static_cast<GenericContext *>(decl.unbridged());                    \
-  }
-#define ITERABLE_GENERIC_DECL(Id, Parent) GENERIC_DECL(Id, Parent)
-#include "swift/AST/DeclNodes.def"
-
 static StaticSpellingKind unbridged(BridgedStaticSpelling kind) {
   return static_cast<StaticSpellingKind>(kind);
 }
@@ -150,15 +130,6 @@ void BridgedDecl_forEachDeclToHoist(BridgedDecl cDecl,
     BridgedDecl bridged(D);
     closure(&bridged);
   });
-}
-
-BridgedDeclContext BridgedDecl_getDeclContext(BridgedDecl decl) {
-  return decl.unbridged()->getDeclContext();
-}
-
-void BridgedValueDecl_setAccess(BridgedValueDecl decl,
-                                swift::AccessLevel accessLevel) {
-  decl.unbridged()->setAccess(accessLevel);
 }
 
 BridgedAccessorDecl BridgedAccessorDecl_createParsed(

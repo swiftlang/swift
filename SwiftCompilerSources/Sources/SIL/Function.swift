@@ -26,7 +26,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return Location(bridged: bridged.getLocation())
   }
 
-  public var sourceFile: SourceFile? { SourceFile(bridged: bridged.getSourceFile()) }
+  public var declRef: DeclRef { DeclRef(bridged: bridged.getDeclRef()) }
+
+  public var sourceFile: SourceFile? { declRef.sourceFile }
 
   final public var description: String {
     return String(taking: bridged.getDebugDescription())

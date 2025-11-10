@@ -177,6 +177,18 @@ OptionalBridgedDeclObj BridgedDeclObj::getParent() const {
   return {unbridged()->getDeclContext()->getAsDecl()};
 }
 
+BridgedDeclContext BridgedDeclObj::getDeclContext() const {
+  return {unbridged()->getDeclContext()};
+}
+
+BridgedDeclContext BridgedDeclObj::asGenericContext() const {
+  return {static_cast<swift::DeclContext *>(getAs<swift::GenericContext>())};
+}
+
+void BridgedDeclObj::setImplicit() const {
+  unbridged()->setImplicit();
+}
+
 BridgedStringRef BridgedDeclObj::Type_getName() const {
   return getAs<swift::TypeDecl>()->getName().str();
 }
@@ -262,6 +274,18 @@ BridgedStringRef BridgedDeclObj::EnumElementDecl_getNameStr() const {
 BridgedASTType BridgedDeclObj::NominalType_getDeclaredInterfaceType() const {
   return {
       getAs<swift::NominalTypeDecl>()->getDeclaredInterfaceType().getPointer()};
+}
+
+void BridgedDeclObj::GenericContext_setGenericSignature(BridgedGenericSignature genericSignature) const {
+  getAs<swift::GenericContext>()->setGenericSignature(genericSignature.unbridged());
+}
+
+void BridgedDeclObj::ValueDecl_setAccess(swift::AccessLevel accessLevel) const {
+  getAs<swift::ValueDecl>()->setAccess(accessLevel);
+}
+
+void BridgedDeclObj::NominalTypeDecl_addMember(BridgedDeclObj member) const {
+  getAs<swift::NominalTypeDecl>()->addMember(member.unbridged());
 }
 
 //===----------------------------------------------------------------------===//
@@ -387,22 +411,8 @@ void BridgedParamDecl_setSpecifier(BridgedParamDecl cDecl,
   cDecl.unbridged()->setSpecifier(unbridge(cSpecifier));
 }
 
-void BridgedDecl_setImplicit(BridgedDecl cDecl) {
+void BridgedParamDecl_setImplicit(BridgedParamDecl cDecl) {
   cDecl.unbridged()->setImplicit();
-}
-
-void BridgedGenericContext_setGenericSignature(
-    BridgedGenericContext cDecl, BridgedGenericSignature cGenSig) {
-  cDecl.unbridged()->setGenericSignature(cGenSig.unbridged());
-}
-
-//===----------------------------------------------------------------------===//
-// MARK: BridgedNominalTypeDecl
-//===----------------------------------------------------------------------===//
-
-void BridgedNominalTypeDecl_addMember(BridgedNominalTypeDecl cDecl,
-                                      BridgedDecl member) {
-  cDecl.unbridged()->addMember(member.unbridged());
 }
 
 //===----------------------------------------------------------------------===//

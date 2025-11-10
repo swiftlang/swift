@@ -67,7 +67,7 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
     return Type(bridged: bridged.subst(substitutionMap.bridged))
   }
 
-  public func mapTypeOutOfContext() -> Type {
+  public func mapOutOfContext() -> Type {
     return Type(bridged: bridged.mapTypeOutOfContext())
   }
 

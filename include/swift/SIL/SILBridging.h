@@ -258,6 +258,7 @@ BridgedYieldInfoArray SILFunctionType_getYields(BridgedCanType);
 SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLifetimeDependenceInfoArray
 SILFunctionType_getLifetimeDependencies(BridgedCanType);
 
+
 struct BridgedType {
   void * _Nullable opaqueValue;
 
@@ -532,8 +533,6 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation getLocation() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableSourceFile
-  getSourceFile() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedArrayRef getFilesForModule() const;
   BRIDGED_INLINE bool isAccessor() const;
   BRIDGED_INLINE bool isInitializer() const;
@@ -586,7 +585,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool isResilientNominalDecl(BridgedDeclObj decl) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getLoweredType(BridgedASTType type, bool maximallyAbstracted) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType
-  getLoweredType(BridgedCanType type) const;
+  getLoweredTypeWithAbstractionPattern(BridgedCanType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getLoweredType(BridgedType type) const;
   BRIDGED_INLINE BridgedLinkage getLinkage() const;
   BRIDGED_INLINE void setLinkage(BridgedLinkage linkage) const;
@@ -845,8 +844,6 @@ struct BridgedInstruction {
   BRIDGED_INLINE void RefElementAddrInst_setImmutable(bool isImmutable) const;
   BRIDGED_INLINE bool RefTailAddrInst_isImmutable() const;
   BRIDGED_INLINE SwiftInt PartialApplyInst_numArguments() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap
-  PartialApplyInst_getSubstitutionMap() const;
   BRIDGED_INLINE SwiftInt ApplyInst_numArguments() const;
   BRIDGED_INLINE bool ApplyInst_getNonThrowing() const;
   BRIDGED_INLINE bool ApplyInst_getNonAsync() const;
@@ -1002,7 +999,6 @@ struct BridgedArgument {
   BRIDGED_INLINE void setReborrow(bool reborrow) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getDecl() const;
   BRIDGED_INLINE void copyFlags(BridgedArgument fromArgument) const;
-  BRIDGED_INLINE BridgedValue::Ownership getOwnership() const;
 };
 
 struct OptionalBridgedArgument {
@@ -1080,6 +1076,7 @@ struct BridgedDeclRef {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation getLocation() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDiagnosticArgument asDiagnosticArgument() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableSourceFile getSourceFile() const;
 };
 
 struct BridgedVTableEntry {

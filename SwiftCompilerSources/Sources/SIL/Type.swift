@@ -195,22 +195,6 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return EnumCases(enumType: self, function: function)
   }
 
-  public func getEnumCase(in function: Function, at index: Int) -> EnumCase? {
-    guard let enumCases = getEnumCases(in: function) else {
-      return nil
-    }
-
-    var enumCaseIndex = 0
-    for enumCase in enumCases {
-      if index == enumCaseIndex {
-        return enumCase
-      }
-      enumCaseIndex += 1
-    }
-
-    return nil
-  }
-
   public func getIndexOfEnumCase(withName name: String) -> Int? {
     let idx = name._withBridgedStringRef {
       bridged.getCaseIdxOfEnumType($0)
@@ -241,8 +225,8 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return false
   }
 
-  public func mapTypeOutOfContext(in function: Function) -> Type {
-    rawType.mapTypeOutOfContext().canonical.loweredType(in: function)
+  public func mapOutOfContext(in function: Function) -> Type {
+    rawType.mapOutOfContext().canonical.loweredType(in: function)
   }
 }
 
@@ -321,6 +305,22 @@ public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
       }
       return EnumCase(enumElementDecl: enumType.bridged.getEnumElementDecl(caseIterator).getAs(EnumElementDecl.self),
                       payload: enumType.bridged.getEnumCasePayload(caseIterator, function.bridged).typeOrNil,
+                      index: caseIndex)
+    }
+    return nil
+  }
+
+  // Note: this has O(n) complexity where n is number of enum cases
+  public subscript(_ index: Int) -> EnumCase? {
+    var iterator = enumType.bridged.getFirstEnumCaseIterator()
+    var currentIndex = 0
+    while currentIndex != index && !enumType.bridged.isEndCaseIterator(iterator) {
+      iterator = iterator.getNext()
+      currentIndex += 1
+    }
+    if currentIndex == index && !enumType.bridged.isEndCaseIterator(iterator) {
+      return EnumCase(enumElementDecl: enumType.bridged.getEnumElementDecl(iterator).getAs(EnumElementDecl.self),
+                      payload: enumType.bridged.getEnumCasePayload(iterator, function.bridged).typeOrNil,
                       index: caseIndex)
     }
     return nil

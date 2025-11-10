@@ -675,11 +675,6 @@ void BridgedArgument::copyFlags(BridgedArgument fromArgument) const {
   fArg->copyFlags(static_cast<swift::SILFunctionArgument *>(fromArgument.getArgument()));
 }
 
-BridgedValue::Ownership BridgedArgument::getOwnership() const {
-  swift::ValueBase *val = getArgument();
-  return BridgedValue{SwiftObject{val}}.getOwnership();
-}
-
 swift::SILArgument * _Nullable OptionalBridgedArgument::unbridged() const {
   if (!obj)
     return nullptr;
@@ -756,10 +751,6 @@ BridgedStringRef BridgedFunction::getName() const {
 
 BridgedLocation BridgedFunction::getLocation() const {
   return {swift::SILDebugLocation(getFunction()->getLocation(), getFunction()->getDebugScope())};
-}
-
-BridgedNullableSourceFile BridgedFunction::getSourceFile() const {
-  return {getFunction()->getSourceFile()};
 }
 
 BridgedArrayRef BridgedFunction::getFilesForModule() const {
@@ -1000,7 +991,7 @@ BridgedType BridgedFunction::getLoweredType(BridgedASTType type, bool maximallyA
   return BridgedType(getFunction()->getLoweredType(type.type));
 }
 
-BridgedType BridgedFunction::getLoweredType(BridgedCanType type) const {
+BridgedType BridgedFunction::getLoweredTypeWithAbstractionPattern(BridgedCanType type) const {
   swift::Lowering::AbstractionPattern pattern(
       getFunction()->getLoweredFunctionType()->getSubstGenericSignature(),
       type.unbridged());
@@ -1181,12 +1172,6 @@ bool BridgedInstruction::shouldBeForwarding() const {
 
 bool BridgedInstruction::isIdenticalTo(BridgedInstruction inst) const {
   return unbridged()->isIdenticalTo(inst.unbridged());
-}
-
-BridgedSubstitutionMap
-BridgedInstruction::PartialApplyInst_getSubstitutionMap() const {
-  auto *pai = llvm::cast<swift::PartialApplyInst>(unbridged());
-  return {pai->getSubstitutionMap()};
 }
 
 SwiftInt BridgedInstruction::MultipleValueInstruction_getNumResults() const {
@@ -2111,6 +2096,14 @@ BridgedDeclObj BridgedDeclRef::getDecl() const {
 
 BridgedDiagnosticArgument BridgedDeclRef::asDiagnosticArgument() const {
   return swift::DiagnosticArgument(unbridged().getDecl()->getName());
+}
+
+BridgedNullableSourceFile BridgedDeclRef::getSourceFile() const {
+  swift::SILDeclRef declRef = unbridged();
+  if (!declRef)
+    return nullptr;
+
+  return {declRef.getInnermostDeclContext()->getParentSourceFile()};
 }
 
 //===----------------------------------------------------------------------===//

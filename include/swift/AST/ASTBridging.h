@@ -321,6 +321,9 @@ struct BridgedDeclObj {
   BRIDGED_INLINE swift::SourceLoc getLoc() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getModuleContext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getParent() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclContext getDeclContext() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclContext asGenericContext() const;
+  BRIDGED_INLINE void setImplicit() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Type_getName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Value_getUserFacingName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SourceLoc Value_getNameLoc() const;
@@ -347,6 +350,9 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef
   EnumElementDecl_getNameStr() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef AccessorDecl_getKindName() const;
+  BRIDGED_INLINE void GenericContext_setGenericSignature(BridgedGenericSignature genericSignature) const;
+  BRIDGED_INLINE void ValueDecl_setAccess(swift::AccessLevel accessLevel) const;
+  BRIDGED_INLINE void NominalTypeDecl_addMember(BridgedDeclObj member) const;
 };
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedASTNodeKind : uint8_t {
@@ -399,14 +405,6 @@ public:
 #define ABSTRACT_DECL(Id, Parent) DECL(Id, Parent)
 #include "swift/AST/DeclNodes.def"
 
-// Declare `.asValueDecl` on each BridgedXXXDecl type that's also a
-// ValueDecl.
-#define DECL(Id, Parent)
-#define VALUE_DECL(Id, Parent)                                                 \
-  SWIFT_NAME("getter:Bridged" #Id "Decl.asValueDecl(self:)")                   \
-  BridgedValueDecl Bridged##Id##Decl_asValueDecl(Bridged##Id##Decl decl);
-#include "swift/AST/DeclNodes.def"
-
 // Declare `.asNominalTypeDecl` on each BridgedXXXDecl type that's also a
 // NominalTypeDecl.
 #define DECL(Id, Parent)
@@ -423,16 +421,6 @@ public:
   SWIFT_NAME("getter:Bridged" #Id "Decl.asDeclContext(self:)")                 \
   BridgedDeclContext Bridged##Id##Decl_asDeclContext(Bridged##Id##Decl decl);
 #define ABSTRACT_CONTEXT_DECL(Id, Parent) CONTEXT_DECL(Id, Parent)
-#include "swift/AST/DeclNodes.def"
-
-// Declare `.asGenericContext` on each BridgedXXXDecl type that's also a
-// GenericContext.
-#define DECL(Id, Parent)
-#define GENERIC_DECL(Id, Parent)                                               \
-  SWIFT_NAME("getter:Bridged" #Id "Decl.asGenericContext(self:)")              \
-  BridgedGenericContext Bridged##Id##Decl_asGenericContext(                    \
-      Bridged##Id##Decl decl);
-#define ITERABLE_GENERIC_DECL(Id, Parent) GENERIC_DECL(Id, Parent)
 #include "swift/AST/DeclNodes.def"
 
 // Declare `.asStmt` on each BridgedXXXStmt type, which upcasts a wrapper for
@@ -1348,9 +1336,6 @@ SWIFT_NAME("BridgedDecl.forEachDeclToHoist(self:_:)")
 void BridgedDecl_forEachDeclToHoist(BridgedDecl decl,
                                     BridgedSwiftClosure closure);
 
-SWIFT_NAME("getter:BridgedDecl.declContext(self:)")
-BridgedDeclContext BridgedDecl_getDeclContext(BridgedDecl decl);
-
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedStaticSpelling {
   BridgedStaticSpellingNone,
   BridgedStaticSpellingStatic,
@@ -1428,13 +1413,8 @@ BRIDGED_INLINE void
 BridgedParamDecl_setSpecifier(BridgedParamDecl cDecl,
                               BridgedParamSpecifier cSpecifier);
 
-SWIFT_NAME("BridgedDecl.setImplicit(self:)")
-BRIDGED_INLINE void BridgedDecl_setImplicit(BridgedDecl cDecl);
-
-SWIFT_NAME("BridgedGenericContext.setGenericSignature(self:_:)")
-BRIDGED_INLINE void
-BridgedGenericContext_setGenericSignature(BridgedGenericContext cDecl,
-                                          BridgedGenericSignature cGenSig);
+SWIFT_NAME("BridgedParamDecl.setImplicit(self:)")
+BRIDGED_INLINE void BridgedParamDecl_setImplicit(BridgedParamDecl cDecl);
 
 SWIFT_NAME("BridgedConstructorDecl.setParsedBody(self:_:)")
 void BridgedConstructorDecl_setParsedBody(BridgedConstructorDecl decl,
@@ -1689,10 +1669,6 @@ void BridgedTopLevelCodeDecl_dump(BridgedTopLevelCodeDecl decl);
 SWIFT_NAME("BridgedDecl.dump(self:)")
 void BridgedDecl_dump(BridgedDecl decl);
 
-SWIFT_NAME("BridgedValueDecl.setAccess(self:_:)")
-void BridgedValueDecl_setAccess(BridgedValueDecl decl,
-                                swift::AccessLevel accessLevel);
-
 //===----------------------------------------------------------------------===//
 // MARK: AbstractStorageDecl
 //===----------------------------------------------------------------------===//
@@ -1741,11 +1717,6 @@ void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl decl,
 SWIFT_NAME("BridgedNominalTypeDecl.getSourceLocation(self:)")
 BRIDGED_INLINE swift::SourceLoc
 BridgedNominalTypeDecl_getSourceLocation(BridgedNominalTypeDecl decl);
-
-SWIFT_NAME("BridgedNominalTypeDecl.addMember(self:_:)")
-BRIDGED_INLINE void
-BridgedNominalTypeDecl_addMember(BridgedNominalTypeDecl cDecl,
-                                 BridgedDecl member);
 
 //===----------------------------------------------------------------------===//
 // MARK: SubscriptDecl
