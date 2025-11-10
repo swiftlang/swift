@@ -17,6 +17,7 @@
 #include "OpenedExistentials.h"
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
@@ -777,7 +778,7 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
   SmallVector<Constraint *, 2> favoredChoices;
   forEachDisjunctionChoice(
       cs, disjunction,
-      [&argumentType, &favoredChoices, &argument](
+      [&cs, &argumentType, &favoredChoices, &argument](
           Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
         if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
           return;
@@ -793,8 +794,15 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
             (isa<LiteralExpr>(argument) || isa<BinaryExpr>(argument)))
           return;
 
-        if (argumentType->isEqual(param.getPlainType()))
+        if (argumentType->isEqual(param.getPlainType())) {
+          if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
+            if (func->isAsyncContext() !=
+                cs.isAsynchronousContext(choice->getDeclContext()))
+              return;
+          }
+
           favoredChoices.push_back(choice);
+        }
       });
 
   return DisjunctionInfoBuilder(/*score=*/favoredChoices.empty() ? 0 : 1,
