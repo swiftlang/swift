@@ -40,6 +40,11 @@ public struct InferenceTest {
   public func testNested(callback: @escaping (@Sendable () async -> Void) -> Void) {}
   // CHECK: public func testNested(dict: [Swift.String : (nonisolated(nonsending) () async -> Swift.Void)?])
   public func testNested(dict: [String: (() async -> Void)?]) {}
+
+  // CHECK: nonisolated(nonsending) public func testAutoclosure(value1 fn: nonisolated(nonsending) @autoclosure () async -> Swift.Int) async
+  public func testAutoclosure(value1 fn: @autoclosure () async -> Int) async { await fn() }
+  // CHECK: nonisolated(nonsending) public func testAutoclosure(value2 fn: nonisolated(nonsending) @autoclosure () async -> Swift.Int) async
+  public func testAutoclosure(value2 fn: nonisolated(nonsending) @autoclosure () async -> Int) async { await fn() }
 }
 
 //--- Client.swift
@@ -77,4 +82,13 @@ func testInference(t: InferenceTest) async {
 
     t.testNested { _ in }
     t.testNested(dict: [:])
+}
+
+// CHECK-LABEL: sil hidden @$s6Client15testAutoclosure1ty1A13InferenceTestV_tYaF : $@convention(thin) @async (@in_guaranteed InferenceTest) -> ()
+// CHECK: function_ref @$s1A13InferenceTestV15testAutoclosure6value1ySiyYaYCXK_tYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> Int, @in_guaranteed InferenceTest) -> ()
+// CHECK: function_ref @$s1A13InferenceTestV15testAutoclosure6value2ySiyYaYCXK_tYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> Int, @in_guaranteed InferenceTest) -> ()
+// CHECK: } // end sil function '$s6Client15testAutoclosure1ty1A13InferenceTestV_tYaF'
+func testAutoclosure(t: InferenceTest) async {
+    await t.testAutoclosure(value1: 42)
+    await t.testAutoclosure(value2: 42)
 }

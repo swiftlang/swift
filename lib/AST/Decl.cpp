@@ -9206,6 +9206,7 @@ void ParamDecl::setTypeRepr(TypeRepr *repr) {
               dyn_cast<CallerIsolatedTypeRepr>(unwrappedType)) {
         setCallerIsolated(true);
         unwrappedType = callerIsolated->getBase();
+        continue;
       }
 
       break;
