@@ -176,6 +176,16 @@ checkSupportedWithSectionAttribute(const Expr *expr,
       // Non-InlineArray arrays are not allowed
       return std::make_pair(expr, TypeNotSupported);
     }
+    
+    // Coerce expressions to UInt8 are allowed (to support @DebugDescription)
+    if (const CoerceExpr *coerceExpr = dyn_cast<CoerceExpr>(expr)) {
+      auto coerceType = coerceExpr->getType();
+      if (coerceType && coerceType->isUInt8()) {
+        expressionsToCheck.push_back(coerceExpr->getSubExpr());
+        continue;
+      }
+      return std::make_pair(expr, TypeNotSupported);
+    }
 
     // Operators are not allowed in @section expressions
     if (isa<BinaryExpr>(expr)) {
