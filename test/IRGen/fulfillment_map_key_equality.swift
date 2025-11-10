@@ -2,7 +2,11 @@
 
 // FIXME: We just need to adjust the check line below, there's no inherent
 // reason for this not to be tested on wasm.
+
 // UNSUPPORTED: CPU=wasm32
+
+// This test does not support 32 bit right now.
+// UNSUPPORTED: PTRSIZE=32
 
 // rdar://160649141
 
