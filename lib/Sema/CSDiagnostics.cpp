@@ -2142,6 +2142,8 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
       return false;
 
     const ParameterList *paramList = callee->getParameters();
+    if (paramList->getArray().empty())
+      return false;
     const ParamDecl *param = paramList->getArray().back();
 
     // Soundness-check that the trailing closure corresponds to this parameter.
