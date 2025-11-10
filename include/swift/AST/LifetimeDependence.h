@@ -31,8 +31,10 @@
 namespace swift {
 
 class AbstractFunctionDecl;
+class AnyFunctionType;
 class FunctionTypeRepr;
 class LifetimeDependentTypeRepr;
+class LifetimeTypeAttr;
 class SILParameterInfo;
 class SILResultInfo;
 
@@ -350,6 +352,12 @@ public:
   static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   getFromSIL(FunctionTypeRepr *funcRepr, ArrayRef<SILParameterInfo> params,
              ArrayRef<SILResultInfo> results, DeclContext *dc);
+
+  /// Builds LifetimeDependenceInfo from a function type.
+  static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+  getFromAST(FunctionTypeRepr *funcRepr, AnyFunctionType *funcType,
+             ArrayRef<LifetimeTypeAttr *> lifetimeAttributes, DeclContext *dc,
+             GenericEnvironment *env);
 
   bool operator==(const LifetimeDependenceInfo &other) const {
     return this->isImmortal() == other.isImmortal() &&

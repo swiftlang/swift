@@ -4394,6 +4394,19 @@ public:
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
 
+class LifetimeTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Lifetime> {
+  LifetimeEntry *entry;
+
+public:
+  LifetimeTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parens,
+                   LifetimeEntry *entry)
+      : SimpleTypeAttr(atLoc, kwLoc, parens), entry(entry) {}
+
+  LifetimeEntry *getLifetimeEntry() const { return entry; }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
 class OpaqueReturnTypeOfTypeAttr
     : public SimpleTypeAttrWithArgs<TypeAttrKind::OpaqueReturnTypeOf> {
   Located<StringRef> MangledName;

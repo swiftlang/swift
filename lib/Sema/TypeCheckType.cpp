@@ -4572,21 +4572,50 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                      .build();
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
+  AnyFunctionType *aft;
   if (auto genericSig = repr->getGenericSignature()) {
-    return GenericFunctionType::get(genericSig, params, outputTy, extInfo);
+    aft = GenericFunctionType::get(genericSig, params, outputTy, extInfo);
+  } else {
+
+    auto fnTy = FunctionType::get(params, outputTy, extInfo);
+    if (fnTy->hasError())
+      return fnTy;
+
+    if (TypeChecker::diagnoseInvalidFunctionType(fnTy, repr->getLoc(), repr,
+                                                 getDeclContext(),
+                                                 resolution.getStage()))
+      return ErrorType::get(fnTy);
+
+    aft = fnTy;
   }
 
-  auto fnTy = FunctionType::get(params, outputTy, extInfo);
-  
-  if (fnTy->hasError())
-    return fnTy;
+  auto const lifetimeAttributes = claim<LifetimeTypeAttr>(attrs);
 
-  if (TypeChecker::diagnoseInvalidFunctionType(fnTy, repr->getLoc(), repr,
-                                               getDeclContext(),
-                                               resolution.getStage()))
-    return ErrorType::get(fnTy);
+  // Lifetime dependence inference has to map parameter and result types into
+  // the generic environment of the DeclContext, so it must request the generic
+  // signature of the type. In order to prevent cycles in request evaluation, we
+  // defer lifetime dependence checking until the Interface type resolution
+  // stage. Since the analysis depends on the type's generic environment, it can
+  // only run after a type has already been produced.
+  if (!ctx.LangOpts.hasFeature(Feature::Lifetimes) &&
+      !lifetimeAttributes.empty()) {
+    diagnose(lifetimeAttributes[0]->getAttrLoc(),
+             diag::requires_experimental_feature, "@_lifetime", false,
+             Feature::Lifetimes.getName());
+    return ErrorType::get(getASTContext());
+  }
 
-  return fnTy;
+  if (inStage(TypeResolutionStage::Interface)) {
+    if (auto const resolvedLifetimeDependence =
+            LifetimeDependenceInfo::getFromAST(
+                repr, aft, lifetimeAttributes, getDeclContext(),
+                resolution.getGenericSignature().getGenericEnvironment())) {
+      aft = aft->withExtInfo(aft->getExtInfo().withLifetimeDependencies(
+          *resolvedLifetimeDependence));
+    }
+  }
+
+  return aft;
 }
 
 NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,

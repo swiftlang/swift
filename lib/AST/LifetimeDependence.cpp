@@ -17,6 +17,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
@@ -31,6 +32,20 @@
 #define DEBUG_TYPE "LifetimeDependence"
 
 using namespace swift;
+
+/// Determine whether Type t is "unknown", meaning we cannot safely determine
+/// whether it is Escapable by calling TypeBase::isEscapable.
+static bool isTypeUnknown(Type t) {
+  // These types would hit an assertion in
+  // TypeBase::computeInvertibleConformances.
+  if (t->hasUnboundGenericType() || t->hasTypeParameter())
+    return true;
+  // This type would hit an assertion in checkRequirements.
+  if (t->hasTypeVariable())
+    return true;
+
+  return false;
+}
 
 std::string LifetimeDescriptor::getString() const {
   switch (kind) {
@@ -576,11 +591,90 @@ public:
         hasUnsafeNonEscapableResult(
             afd->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {}
 
+  LifetimeDependenceChecker(FunctionTypeRepr *funcRepr,
+                            AnyFunctionType *funcType,
+                            ArrayRef<LifetimeTypeAttr *> lifetimeAttrs,
+                            DeclContext *dc, GenericEnvironment *env)
+      : afd(nullptr), ctx(funcType->getASTContext()),
+        sourceFile(dc->getParentSourceFile()),
+        resultIndex(funcType->getParams().size()),
+        returnLoc(funcRepr->getResultTypeRepr()->getLoc()),
+        implicitSelfParamInfo(std::nullopt), depBuilder(resultIndex),
+        isImplicit(false), isInit(false), hasUnsafeNonEscapableResult(false) {
+    for (auto functionLifetimeEntry : lifetimeAttrs)
+      lifetimeEntries.push_back(functionLifetimeEntry->getLifetimeEntry());
+
+    // We only ever use the second names of function type parameters for
+    // lifetimes.
+    auto const params = funcType->getParams();
+    auto const argReprs = funcRepr->getArgsTypeRepr()->getElements();
+
+    resultTy =
+        GenericEnvironment::mapTypeIntoEnvironment(env, funcType->getResult());
+
+    assert(params.size() == argReprs.size());
+    for (unsigned paramIndex = 0; paramIndex < params.size(); ++paramIndex) {
+      auto const &parameter = params[paramIndex];
+      auto const &arg = argReprs[paramIndex];
+      parameterInfos.push_back(
+          {parameter, paramIndex,
+           // If an argument has no second name, use the location of its type.
+           arg.SecondNameLoc.isValid() ? arg.SecondNameLoc : arg.Type->getLoc(),
+           GenericEnvironment::mapTypeIntoEnvironment(
+               env, parameter.getPlainType())});
+    }
+  }
+
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   currentDependencies() const {
     return depBuilder.initializeDependenceInfoArray(ctx);
   }
 
+  /// Perform lifetime dependence checks for a function type.
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkFuncType() {
+    // Check if the function type contains any types for which we cannot
+    // determine Escapability. We cannot perform lifetime inference for such
+    // types, or check the correctness of lifetime annotations on them, so bail
+    // out. Emit diagnostics if there are any lifetime attributes.
+    //
+    // We could make this more granular, only bailing out if a lifetime source
+    // or target contains an unbound generic, but these cases seem too niche to
+    // be worth the effort.
+    //
+    // Even if there were no explicit lifetime entries, we still need to
+    // diagnose failed inference if a parameter or the result was ~Escapable.
+    const auto isNonEscapableSafe = [](Type t) {
+      return !isTypeUnknown(t) && isDiagnosedNonEscapable(t);
+    };
+    const bool shouldDiagnose =
+        !lifetimeEntries.empty() ||
+        llvm::any_of(parameterInfos,
+                     [&](const ParamInfo &paramInfo) {
+                       return isNonEscapableSafe(paramInfo.typeInContext);
+                     }) ||
+        isNonEscapableSafe(resultTy);
+    bool unknownTypeFound = false;
+    for (const auto &paramInfo : parameterInfos) {
+      if (isTypeUnknown(paramInfo.typeInContext)) {
+        unknownTypeFound = true;
+        if (shouldDiagnose)
+          diagnose(paramInfo.loc, diag::lifetime_dependence_unknown_type,
+                   "parameter");
+      }
+    }
+    if (isTypeUnknown(resultTy)) {
+      unknownTypeFound = true;
+      if (shouldDiagnose)
+        diagnose(returnLoc, diag::lifetime_dependence_unknown_type, "result");
+    }
+
+    if (unknownTypeFound)
+      return std::nullopt;
+
+    return checkCommon();
+  }
+
+  /// Perform lifetime dependence checks for a function declaration.
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkFuncDecl() {
     assert(nullptr != afd && (isa<FuncDecl>(afd) || isa<ConstructorDecl>(afd)));
     assert(depBuilder.empty());
@@ -593,6 +687,10 @@ public:
       return currentDependencies();
     }
 
+    return checkCommon();
+  }
+
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkCommon() {
     if (!ctx.LangOpts.hasFeature(Feature::LifetimeDependence)
         && !ctx.LangOpts.hasFeature(Feature::Lifetimes)
         && !ctx.SourceMgr.isImportMacroGeneratedLoc(returnLoc)) {
@@ -1714,6 +1812,16 @@ LifetimeDependenceInfo::get(ValueDecl *decl) {
   }
   auto *eed = cast<EnumElementDecl>(decl);
   return LifetimeDependenceChecker::checkEnumElementDecl(eed);
+}
+
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+LifetimeDependenceInfo::getFromAST(
+    FunctionTypeRepr *funcRepr, AnyFunctionType *funcType,
+    ArrayRef<LifetimeTypeAttr *> lifetimeAttributes, DeclContext *dc,
+    GenericEnvironment *env) {
+  return LifetimeDependenceChecker(funcRepr, funcType, lifetimeAttributes, dc,
+                                   env)
+      .checkFuncType();
 }
 
 void LifetimeDependenceInfo::dump() const {
