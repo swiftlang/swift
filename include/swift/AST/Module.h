@@ -481,6 +481,11 @@ public:
   void getDeclaredCrossImportBystanders(
       SmallVectorImpl<Identifier> &bystanderNames);
 
+  /// Returns the name that should be used for this module in a module
+  /// selector. For separately-imported overlays, this will be the declaring
+  /// module's name.
+  Identifier getNameForModuleSelector();
+
   /// Retrieve the ABI name of the module, which is used for metadata and
   /// mangling.
   Identifier getABIName() const;
@@ -857,6 +862,13 @@ public:
   /// `Foo.Bar.Baz`, and the given module is either `Foo` or `Foo.Bar`, this
   /// returns true.
   bool isSubmoduleOf(const ModuleDecl *M) const;
+
+private:
+  std::string CacheKey;
+
+public:
+  void setCacheKey(const std::string &key) { CacheKey = key; }
+  StringRef getCacheKey() const { return CacheKey; }
 
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;

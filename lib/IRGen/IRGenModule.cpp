@@ -564,8 +564,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   InvariantMetadataID = getLLVMContext().getMDKindID("invariant.load");
   InvariantNode = llvm::MDNode::get(getLLVMContext(), {});
   DereferenceableID = getLLVMContext().getMDKindID("dereferenceable");
-  
+
   C_CC = getOptions().PlatformCCallingConvention;
+  SwiftClientRR_CC = llvm::CallingConv::PreserveMost;
   // TODO: use "tinycc" on platforms that support it
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
 
@@ -770,20 +771,30 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 
-  CoroFunctionPointerTy = createStructType(*this, "swift.coro_func_pointer",
-                                           {RelativeAddressTy, Int32Ty}, true);
-  CoroAllocateFnTy =
-      llvm::FunctionType::get(CoroAllocationTy, SizeTy, /*isVarArg*/ false);
-  CoroDeallocateFnTy =
-      llvm::FunctionType::get(VoidTy, CoroAllocationTy, /*isVarArg*/ false);
+  CoroFunctionPointerTy =
+      createStructType(*this, "swift.coro_func_pointer",
+                       {RelativeAddressTy, Int32Ty, Int64Ty}, true);
+  CoroAllocateFnTy = llvm::FunctionType::get(
+      CoroAllocationTy, {CoroAllocationTy, CoroAllocatorPtrTy, SizeTy, Int64Ty},
+      /*isVarArg*/ false);
+  CoroDeallocateFnTy = llvm::FunctionType::get(
+      VoidTy, {CoroAllocationTy, CoroAllocatorPtrTy, CoroAllocationTy}, /*isVarArg*/ false);
   CoroAllocatorFlagsTy = Int32Ty;
   // swift/ABI/Coro.h : CoroAllocator
   CoroAllocatorTy = createStructType(*this, "swift.coro_allocator",
                                      {
                                          Int32Ty, // CoroAllocator.Flags
-                                         PtrTy,
-                                         PtrTy,
+                                         PtrTy, // allocate
+                                         PtrTy, // deallocate
+                                         PtrTy, // allocateFrame
+                                         PtrTy, // deallocateFrame
                                      });
+  SwiftImplicitActorType =
+      createStructType(*this, "swift.implicit_isolated_actor_type",
+                       {
+                           IntPtrTy, // ref counted pointer
+                           IntPtrTy, // witness table pointer
+                       });
 }
 
 IRGenModule::~IRGenModule() {
@@ -1723,6 +1734,11 @@ void IRGenModule::addLinkLibraries() {
   if (ObjCInterop)
     registerLinkLibrary(
         LinkLibrary{"objc", LibraryKind::Library, /*static=*/false});
+
+  if (TargetInfo.HasSwiftClientRRLibrary &&
+      getOptions().EnableClientRetainRelease)
+    registerLinkLibrary(LinkLibrary{"swiftClientRetainRelease",
+                                    LibraryKind::Library, /*static=*/true});
 
   // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
   // Also link with C++ bridging utility module (Cxx) and C++ stdlib overlay

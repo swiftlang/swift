@@ -123,6 +123,7 @@ public:
   public:
     const StringRef RawPath;
     const StringRef RawSPIs;
+    const StringRef BinaryModulePath;
 
   private:
     using ImportFilterKind = ModuleDecl::ImportFilterKind;
@@ -137,27 +138,26 @@ public:
       return static_cast<ImportFilterKind>(1 << RawImportControl);
     }
 
-    Dependency(StringRef path, StringRef spiGroups, bool isHeader,
-               ImportFilterKind importControl, bool isScoped)
-        : RawPath(path),
-          RawSPIs(spiGroups),
+    Dependency(StringRef path, StringRef spiGroups, StringRef binaryModulePath,
+               bool isHeader, ImportFilterKind importControl, bool isScoped)
+        : RawPath(path), RawSPIs(spiGroups), BinaryModulePath(binaryModulePath),
           RawImportControl(rawControlFromKind(importControl)),
-          IsHeader(isHeader),
-          IsScoped(isScoped) {
+          IsHeader(isHeader), IsScoped(isScoped) {
       assert(llvm::popcount(static_cast<unsigned>(importControl)) == 1 &&
              "must be a particular filter option, not a bitset");
       assert(getImportControl() == importControl && "not enough bits");
     }
 
   public:
-   Dependency(StringRef path, StringRef spiGroups,
-              ImportFilterKind importControl, bool isScoped)
-       : Dependency(path, spiGroups, false, importControl, isScoped) {}
+    Dependency(StringRef path, StringRef spiGroups, StringRef binaryModulePath,
+               ImportFilterKind importControl, bool isScoped)
+        : Dependency(path, spiGroups, binaryModulePath, false, importControl,
+                     isScoped) {}
 
-   static Dependency forHeader(StringRef headerPath, bool exported) {
-     auto importControl =
-         exported ? ImportFilterKind::Exported : ImportFilterKind::Default;
-     return Dependency(headerPath, StringRef(), true, importControl, false);
+    static Dependency forHeader(StringRef headerPath, bool exported) {
+      auto importControl =
+          exported ? ImportFilterKind::Exported : ImportFilterKind::Default;
+      return Dependency(headerPath, {}, {}, true, importControl, false);
     }
 
     bool isExported() const {

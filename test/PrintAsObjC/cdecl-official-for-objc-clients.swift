@@ -6,8 +6,7 @@
 /// Generate cdecl.h
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   %t/Lib.swift -emit-module -verify -o %t -emit-module-doc \
-// RUN:   -emit-clang-header-path %t/cdecl.h \
-// RUN:   -enable-experimental-feature CDecl
+// RUN:   -emit-clang-header-path %t/cdecl.h
 
 /// Check cdecl.h directly
 // RUN: %check-in-clang %t/cdecl.h
@@ -19,5 +18,4 @@
 // RUN:   -I %clang-include-dir -Werror \
 // RUN:   -isysroot %S/../Inputs/clang-importer-sdk
 
-// REQUIRES: swift_feature_CDecl
 // REQUIRES: objc_interop

@@ -443,7 +443,7 @@ void ExistentialTransform::populateThunkBody() {
       switch (ExistentialRepr) {
       case ExistentialRepresentation::Opaque: {
         archetypeValue = Builder.createOpenExistentialAddr(
-            Loc, OrigOperand, OpenedSILType, it->second.AccessType);
+            Loc, OrigOperand, OpenedSILType.getAddressType(), it->second.AccessType);
         SILValue calleeArg = archetypeValue;
         if (OriginallyConsumed) {
           // open_existential_addr projects a borrowed address into the

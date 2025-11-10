@@ -1977,8 +1977,8 @@ private:
 
     // Check to see if the sequence expr is throwing (in async context),
     // if so require the stmt to have a `try`.
-    hadError |= diagnoseUnhandledThrowsInAsyncContext(
-        context.getAsDeclContext(), forEachStmt);
+    diagnoseUnhandledThrowsInAsyncContext(context.getAsDeclContext(),
+                                          forEachStmt);
 
     return forEachStmt;
   }
@@ -2597,7 +2597,7 @@ static void applySolutionToClosurePropertyWrappers(ClosureExpr *closure,
       auto *attr =
           CustomAttr::create(context, SourceLoc(), typeExpr,
                              /*owner*/ wrappedValueVar, /*implicit=*/true);
-      wrappedValueVar->getAttrs().add(attr);
+      wrappedValueVar->addAttribute(attr);
     }
   }
 }

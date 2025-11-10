@@ -17,6 +17,7 @@
 #include "SwiftToClangInteropContext.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Assertions.h"
@@ -219,20 +220,18 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
               "need to add SIMD typedefs here if max elements is increased");
 
-  if (ctx.LangOpts.hasFeature(Feature::CDecl)) {
-    // For C compilers which don’t support nullability attributes, ignore them;
-    // for ones which do, suppress warnings about them being an extension.
-    out << "#if !__has_feature(nullability)\n"
-           "# define _Nonnull\n"
-           "# define _Nullable\n"
-           "# define _Null_unspecified\n"
-           "#elif !defined(__OBJC__)\n"
-           "# pragma clang diagnostic ignored \"-Wnullability-extension\"\n"
-           "#endif\n"
-           "#if !__has_feature(nullability_nullable_result)\n"
-           "# define _Nullable_result _Nullable\n"
-           "#endif\n";
-  }
+  // For C compilers which don’t support nullability attributes, ignore them;
+  // for ones which do, suppress warnings about them being an extension.
+  out << "#if !__has_feature(nullability)\n"
+         "# define _Nonnull\n"
+         "# define _Nullable\n"
+         "# define _Null_unspecified\n"
+         "#elif !defined(__OBJC__)\n"
+         "# pragma clang diagnostic ignored \"-Wnullability-extension\"\n"
+         "#endif\n"
+         "#if !__has_feature(nullability_nullable_result)\n"
+         "# define _Nullable_result _Nullable\n"
+         "#endif\n";
 }
 
 static int compareImportModulesByName(const ImportModuleTy *left,
@@ -617,10 +616,11 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
 
   // C content (@c)
   std::string moduleContentsScratch;
-  if (M->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
+  {
     SmallPtrSet<ImportModuleTy, 8> imports;
     llvm::raw_string_ostream cModuleContents{moduleContentsScratch};
-    printModuleContentsAsC(cModuleContents, imports, *M, interopContext);
+    printModuleContentsAsC(cModuleContents, imports, *M, interopContext,
+                           frontendOpts.ClangHeaderMinAccess);
 
     llvm::StringMap<StringRef> exposedModuleHeaderNames;
     writeImports(os, imports, *M, bridgingHeader, frontendOpts,
@@ -634,7 +634,8 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   // Objective-C content
   SmallPtrSet<ImportModuleTy, 8> imports;
   llvm::raw_string_ostream objcModuleContents{moduleContentsScratch};
-  printModuleContentsAsObjC(objcModuleContents, imports, *M, interopContext);
+  printModuleContentsAsObjC(objcModuleContents, imports, *M, interopContext,
+                            frontendOpts.ClangHeaderMinAccess);
   emitObjCConditional(os, [&] {
     llvm::StringMap<StringRef> exposedModuleHeaderNames;
     writeImports(os, imports, *M, bridgingHeader, frontendOpts,
@@ -685,6 +686,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
     llvm::raw_string_ostream moduleContents{moduleContentsBuf};
     auto deps = printModuleContentsAsCxx(
         moduleContents, *M, interopContext,
+        frontendOpts.ClangHeaderMinAccess.value_or(AccessLevel::Public),
         /*requiresExposedAttribute=*/requiresExplicitExpose, exposedModules);
     // FIXME: In ObjC++ mode, we do not need to reimport duplicate modules.
     llvm::StringMap<StringRef> exposedModuleHeaderNames;
@@ -701,9 +703,10 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
       auto macroGuard = computeMacroGuard(M->getASTContext().getStdlibModule());
       os << "#ifndef " << macroGuard << "\n";
       os << "#define " << macroGuard << "\n";
-      printModuleContentsAsCxx(
-          os, *M->getASTContext().getStdlibModule(), interopContext,
-          /*requiresExposedAttribute=*/true, exposedModules);
+      printModuleContentsAsCxx(os, *M->getASTContext().getStdlibModule(),
+                               interopContext, AccessLevel::Public,
+                               /*requiresExposedAttribute=*/true,
+                               exposedModules);
       os << "#endif // " << macroGuard << "\n";
     }
 

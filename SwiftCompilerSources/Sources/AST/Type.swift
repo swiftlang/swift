@@ -172,6 +172,8 @@ extension TypeProperties {
   public var isExistentialMetatype: Bool { rawType.bridged.isExistentialMetatypeType() }
   public var isDynamicSelf: Bool { rawType.bridged.isDynamicSelf()}
   public var isBox: Bool { rawType.bridged.isBox() }
+  public var isPack: Bool { rawType.bridged.isPack() }
+  public var isSILPack: Bool { rawType.bridged.isSILPack() }
 
   public var canBeClass: Type.TraitResult { rawType.bridged.canBeClass().result }
 
@@ -294,6 +296,14 @@ extension TypeProperties {
   public var substitutedGenericSignatureOfFunctionType: CanonicalGenericSignature {
     CanonicalGenericSignature(
       bridged: rawType.canonical.bridged.SILFunctionType_getSubstGenericSignature())
+  }
+
+  public var containsSILPackExpansionType: Bool {
+    return rawType.bridged.containsSILPackExpansionType()
+  }
+
+  public var isSILPackElementAddress: Bool {
+    return rawType.bridged.isSILPackElementAddress()
   }
 }
 

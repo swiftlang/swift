@@ -506,6 +506,10 @@ public:
   /// walk into the body of it (unless it is single-expression).
   void forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback);
 
+  /// Apply the specified function to all variables referenced in any
+  /// child UnresolvedPatternExprs.
+  void forEachUnresolvedVariable(llvm::function_ref<void(VarDecl *)> f) const;
+
   /// Determine whether this expression refers to a type by name.
   ///
   /// This distinguishes static references to types, like Int, from metatype
@@ -4470,10 +4474,6 @@ public:
     assert(hasExplicitResultType() && "No explicit result type");
     return ExplicitResultTypeAndBodyState.getPointer()->getTypeRepr();
   }
-
-  /// Returns the resolved macro for the given custom attribute
-  /// attached to this closure expression.
-  MacroDecl *getResolvedMacro(CustomAttr *customAttr);
 
   /// Determine whether the closure has a single expression for its
   /// body.

@@ -193,10 +193,20 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
 Type TypeResolution::resolveDependentMemberType(
     Type baseTy, DeclContext *DC, SourceRange baseRange,
     QualifiedIdentTypeRepr *repr) const {
-  // FIXME(ModQual): Reject qualified names immediately; they cannot be
-  // dependent member types.
   Identifier refIdentifier = repr->getNameRef().getBaseIdentifier();
   ASTContext &ctx = DC->getASTContext();
+
+  if (repr->getNameRef().hasModuleSelector()) {
+    if (!this->getOptions().contains(TypeResolutionFlags::SilenceErrors)) {
+      ctx.Diags.diagnose(repr->getNameLoc().getModuleSelectorLoc(),
+                         diag::module_selector_dependent_member_type_not_allowed)
+          .fixItRemoveChars(repr->getNameLoc().getModuleSelectorLoc(),
+                            repr->getNameLoc().getBaseNameLoc());
+      // If we can check if `refIdentifier` is a protocol ext's concrete type:
+      // FIXME: Conditionally emit fix-it replacing base type with protocol
+    }
+    return ErrorType::get(baseTy);
+  }
 
   switch (stage) {
   case TypeResolutionStage::Structural:
@@ -1493,15 +1503,8 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
 
   // Unqualified lookup case.
   if (parentType.isNull()) {
-    // Tailored diagnostic for custom attributes.
-    if (resolution.getOptions().is(TypeResolverContext::CustomAttr)) {
-      diags.diagnose(repr->getNameLoc(), diag::unknown_attr_name,
-                     repr->getNameRef().getBaseIdentifier().str());
-
-      return ErrorType::get(ctx);
-    }
-
-    if (repr->isSimpleUnqualifiedIdentifier(ctx.Id_Self)) {
+    if (!resolution.getOptions().is(TypeResolverContext::CustomAttr)
+          && repr->isSimpleUnqualifiedIdentifier(ctx.Id_Self)) {
       DeclContext *nominalDC = nullptr;
       NominalTypeDecl *nominal = nullptr;
       if ((nominalDC = dc->getInnermostTypeContext()) &&
@@ -1531,6 +1534,18 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
       return ErrorType::get(ctx);
     }
 
+    // Is there an incorrect module selector?
+    if (repr->getNameRef().hasModuleSelector()) {
+      auto anyModuleName = DeclNameRef(repr->getNameRef().getFullName());
+      ModuleSelectorCorrection correction(
+        TypeChecker::lookupUnqualifiedType(dc, anyModuleName, repr->getLoc(),
+                                           lookupOptions));
+      if (correction.diagnose(ctx, repr->getNameLoc(), repr->getNameRef())) {
+        // FIXME: Can we recover by assuming the first/best result is correct?
+        return ErrorType::get(ctx);
+      }
+    }
+
     // Try ignoring access control.
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
@@ -1552,6 +1567,17 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
 
       // Don't try to recover here; we'll get more access-related diagnostics
       // downstream if we do.
+      return ErrorType::get(ctx);
+    }
+
+    // Tailored diagnostic for custom attributes.
+    if (resolution.getOptions().is(TypeResolverContext::CustomAttr)) {
+      SmallString<64> scratch;
+      llvm::raw_svector_ostream scratchOS(scratch);
+      repr->getNameRef().printPretty(scratchOS);
+
+      diags.diagnose(repr->getNameLoc(), diag::unknown_attr_name, scratch);
+
       return ErrorType::get(ctx);
     }
 
@@ -1620,6 +1646,19 @@ static Type diagnoseUnknownType(const TypeResolution &resolution,
     }
 
     return ErrorType::get(ctx);
+  }
+
+  // Is there an incorrect module selector?
+  if (repr->getNameRef().hasModuleSelector()) {
+    auto anyModuleName = DeclNameRef(repr->getNameRef().getFullName());
+    ModuleSelectorCorrection correction(
+      TypeChecker::lookupMemberType(dc, parentType, anyModuleName,
+                                    repr->getLoc(), lookupOptions));
+    
+    if (correction.diagnose(ctx, repr->getNameLoc(), repr->getNameRef())) {
+      // FIXME: Can we recover by assuming the first/best result is correct?
+      return ErrorType::get(ctx);
+    }
   }
 
   // Try ignoring access control.
@@ -3982,8 +4021,9 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     }
 
     // Validate the presence of ownership for a noncopyable parameter.
+    // FIXME: This won't diagnose if the type contains unbound generics.
     if (inStage(TypeResolutionStage::Interface)
-        && !ty->hasUnboundGenericType()) {
+        && !ty->hasUnboundGenericType() && !ty->hasTypeVariable()) {
       diagnoseMissingOwnership(ownership, eltTypeRepr, ty, resolution);
 
       // @_staticExclusiveOnly types cannot be passed as 'inout' in function
@@ -5009,6 +5049,7 @@ bool TypeResolver::resolveSingleSILResult(
         NORMAL(Owned, Owned)
         NORMAL(Guaranteed, Guaranteed)
         NORMAL(GuaranteedAddress, GuaranteedAddress)
+        NORMAL(Inout, Inout)
         NORMAL(UnownedInnerPointer, UnownedInnerPointer)
         NORMAL(Autoreleased, Autoreleased)
         NORMAL(PackOut, Pack)
@@ -5169,9 +5210,13 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       // Tailored diagnostic for custom attributes.
       if (options.is(TypeResolverContext::CustomAttr)) {
+        SmallString<64> scratch;
+        llvm::raw_svector_ostream scratchOS(scratch);
+        repr->getNameRef().printPretty(scratchOS);
+
         auto &ctx = resolution.getASTContext();
         ctx.Diags.diagnose(repr->getNameLoc(), diag::unknown_attr_name,
-                           repr->getNameRef().getBaseIdentifier().str());
+                           scratch);
 
         return ErrorType::get(ctx);
       }
@@ -5804,6 +5849,7 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
   }
 
   // do not allow move-only types as the element of a vararg
+  // FIXME: This does not correctly handle type variables and unbound generics.
   if (inStage(TypeResolutionStage::Interface)) {
     auto contextTy = GenericEnvironment::mapTypeIntoContext(
         resolution.getGenericSignature().getGenericEnvironment(), element);
@@ -5990,6 +6036,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     // Track the presence of a noncopyable field for diagnostic purposes only.
     // We don't need to re-diagnose if a tuple contains another tuple, though,
     // since we should've diagnosed the inner tuple already.
+    // FIXME: This won't diagnose if the type contains unbound generics
     if (!ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples) &&
         !options.contains(TypeResolutionFlags::SILMode) &&
         inStage(TypeResolutionStage::Interface) &&
@@ -6937,12 +6984,7 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
   // Property delegates allow their type to be an unbound generic.
   if (typeKind == CustomAttrTypeKind::PropertyWrapper) {
-    unboundTyOpener = [](auto unboundTy) {
-      // FIXME: Don't let unbound generic types
-      // escape type resolution. For now, just
-      // return the unbound generic type.
-      return unboundTy;
-    };
+    unboundTyOpener = TypeResolution::defaultUnboundTypeOpener;
   }
 
   const auto type = TypeResolution::resolveContextualType(

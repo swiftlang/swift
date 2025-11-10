@@ -88,7 +88,9 @@ private struct FunctionChecker {
          is InitExistentialAddrInst,
          is InitExistentialValueInst,
          is ExistentialMetatypeInst:
-      throw Diagnostic(.embedded_swift_existential_type, instruction.operands[0].value.type, at: instruction.location)
+      if !context.options.enableEmbeddedSwiftExistentials {
+        throw Diagnostic(.embedded_swift_existential_type, instruction.operands[0].value.type, at: instruction.location)
+      }
 
     case let aeb as AllocExistentialBoxInst:
       throw Diagnostic(.embedded_swift_existential_type, aeb.type, at: instruction.location)

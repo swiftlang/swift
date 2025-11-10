@@ -601,3 +601,18 @@ struct TestIssue56837 {
         _ = value[type: Int8.max]
     }
 }
+
+@dynamicMemberLookup
+class TestDynamicSelf {
+  struct S {
+    subscript() -> Int { 0 }
+  }
+  func foo() -> Self {
+    // Make sure we can do dynamic member lookup on a dynamic self.
+    _ = self[]
+    return self
+  }
+  subscript<T>(dynamicMember dynamicMember: KeyPath<S, T>) -> T {
+    fatalError()
+  }
+}

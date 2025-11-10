@@ -182,11 +182,12 @@ SILFunctionType::getDirectFormalResultsType(SILModule &M,
                                             TypeExpansionContext context) {
   CanType type;
 
-  if (hasGuaranteedAddressResult()) {
+  if (hasAddressResult(SILModuleConventions(M).useLoweredAddresses())) {
     assert(getNumDirectFormalResults() == 1);
-      return SILType::getPrimitiveAddressType(
-          getSingleDirectFormalResult().getReturnValueType(M, this, context));
+    return SILType::getPrimitiveAddressType(
+        getSingleDirectFormalResult().getReturnValueType(M, this, context));
   }
+
   if (getNumDirectFormalResults() == 0) {
     type = getASTContext().TheEmptyTupleType;
   } else if (getNumDirectFormalResults() == 1) {
@@ -729,6 +730,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
       break;
     case ResultConvention::GuaranteedAddress:
     case ResultConvention::Guaranteed:
+    case ResultConvention::Inout:
       llvm_unreachable("borrow/mutate accessor not yet implemented");
     }
     return conv;
@@ -1079,7 +1081,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
       break;
     case ResultConvention::GuaranteedAddress:
     case ResultConvention::Guaranteed:
-      llvm_unreachable("borrow accessor is not yet implemented");
+    case ResultConvention::Inout:
+      llvm_unreachable("borrow/mutate accessor is not yet implemented");
     }
     return {result.getInterfaceType(), newConv};
   };
@@ -1473,7 +1476,7 @@ public:
         convention = ResultConvention::Guaranteed;
       }
     } else if (isMutateAccessor(constant)) {
-      convention = ResultConvention::GuaranteedAddress;
+      convention = ResultConvention::Inout;
     } else if (isFormallyReturnedIndirectly(origType, substType,
                                             substResultTLForConvention)) {
       convention = ResultConvention::Indirect;
@@ -1494,7 +1497,8 @@ public:
         case ResultConvention::GuaranteedAddress:
           llvm_unreachable(
               "Invalid case of ResultConvention::GuaranteedAddress");
-
+        case ResultConvention::Inout:
+          llvm_unreachable("Invalid case of ResultConvention::Inout");
         case ResultConvention::Autoreleased:
         case ResultConvention::Owned:
         case ResultConvention::Guaranteed:
@@ -1763,11 +1767,7 @@ private:
     // implicit isolation parameter.
     if (IsolationInfo && IsolationInfo->isCallerIsolationInheriting() &&
         Convs.hasCallerIsolationParameter()) {
-      auto actorProtocol = TC.Context.getProtocol(KnownProtocolKind::Actor);
-      auto actorType =
-          ExistentialType::get(actorProtocol->getDeclaredInterfaceType());
-      addParameter(-1,
-                   CanType(actorType).wrapInOptionalType(),
+      addParameter(-1, CanType(TC.Context.TheImplicitActorType),
                    ParameterConvention::Direct_Guaranteed,
                    ParameterTypeFlags().withIsolated(true),
                    true /*implicit leading parameter*/);
@@ -4474,8 +4474,6 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::Func:
       if (c.getDecl()->getDeclContext()->isTypeContext())
         return SILFunctionTypeRepresentation::Method;
-      if (ExternAttr::find(c.getDecl()->getAttrs(), ExternKind::C))
-        return SILFunctionTypeRepresentation::CFunctionPointer;
       return SILFunctionTypeRepresentation::Thin;
 
     case SILDeclRef::Kind::Destroyer:
@@ -4901,8 +4899,18 @@ getAbstractionPatternForConstant(TypeConverter &converter, ASTContext &ctx,
     return AbstractionPattern(fnType);
 
   const clang::Decl *clangDecl = bridgedFn->getClangDecl();
-  if (!clangDecl)
+  if (!clangDecl) {
+    // If this function only has a C entrypoint, create a Clang type to
+    // use when referencing it.
+    if (bridgedFn->hasOnlyCEntryPoint()) {
+      auto clangType = ctx.getClangFunctionType(
+          fnType->getParams(), fnType->getResult(),
+          FunctionTypeRepresentation::CFunctionPointer);
+      return AbstractionPattern(fnType, clangType);
+    }
+
     return AbstractionPattern(fnType);
+  }
 
   // Don't implicitly turn non-optional results to optional if
   // we're going to apply a foreign error convention that checks

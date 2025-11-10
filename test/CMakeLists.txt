@@ -104,7 +104,9 @@ function(get_test_dependencies SDK result_var_name)
     endif()
 
     if(SWIFT_BUILD_SWIFT_SYNTAX)
-      list(APPEND deps_binaries swift-plugin-server)
+      list(APPEND deps_binaries
+        swift-plugin-server
+        swift-function-caller-generator)
     endif()
   endif()
 

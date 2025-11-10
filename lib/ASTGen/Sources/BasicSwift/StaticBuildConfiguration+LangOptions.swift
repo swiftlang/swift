@@ -35,27 +35,29 @@ extension StaticBuildConfiguration {
   init(langOptions: BridgedLangOptions) {
     var entries = ConfigurationEntries()
 
-    langOptions.enumerateBuildConfigurationEntries(callbackContext: &entries) { cContext, entries, key, value in
-      let entries = entries.assumingMemoryBound(to: ConfigurationEntries.self)
-      switch key {
-      case .BCKAttribute:
-        entries.pointee.attributes.insert(String(bridged: value))
-      case .BCKCustomCondition:
-        entries.pointee.customConditions.insert(String(bridged: value))
-      case .BCKFeature:
-        entries.pointee.features.insert(String(bridged: value))
-      case .BCKTargetOSName:
-        entries.pointee.targetOSNames.insert(String(bridged: value))
-      case .BCKTargetArchitecture:
-        entries.pointee.targetArchitectures.insert(String(bridged: value))
-      case .BCKTargetEnvironment:
-        entries.pointee.targetEnvironments.insert(String(bridged: value))
-      case .BCKTargetRuntime:
-        entries.pointee.targetRuntimes.insert(String(bridged: value))
-      case .BCKTargetPointerAuthenticationScheme:
-        entries.pointee.targetPointerAuthenticationSchemes.insert(String(bridged: value))
-      case .BCKTargetObjectFileFormat:
-        entries.pointee.targetObjectFileFormats.insert(String(bridged: value))
+    withUnsafeMutablePointer(to: &entries) {
+      langOptions.enumerateBuildConfigurationEntries(callbackContext: $0) { cContext, entries, key, value in
+        let entries = entries.assumingMemoryBound(to: ConfigurationEntries.self)
+        switch key {
+        case .BCKAttribute:
+          entries.pointee.attributes.insert(String(bridged: value))
+        case .BCKCustomCondition:
+          entries.pointee.customConditions.insert(String(bridged: value))
+        case .BCKFeature:
+          entries.pointee.features.insert(String(bridged: value))
+        case .BCKTargetOSName:
+          entries.pointee.targetOSNames.insert(String(bridged: value))
+        case .BCKTargetArchitecture:
+          entries.pointee.targetArchitectures.insert(String(bridged: value))
+        case .BCKTargetEnvironment:
+          entries.pointee.targetEnvironments.insert(String(bridged: value))
+        case .BCKTargetRuntime:
+          entries.pointee.targetRuntimes.insert(String(bridged: value))
+        case .BCKTargetPointerAuthenticationScheme:
+          entries.pointee.targetPointerAuthenticationSchemes.insert(String(bridged: value))
+        case .BCKTargetObjectFileFormat:
+          entries.pointee.targetObjectFileFormats.insert(String(bridged: value))
+        }
       }
     }
 

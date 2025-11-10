@@ -474,12 +474,12 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
     return false;
 
   const auto &Opts = getInvocation().getCASOptions();
-  if (Opts.CASOpts.CASPath.empty() && Opts.CASOpts.PluginPath.empty()) {
+  if (Opts.Config.CASPath.empty() && Opts.Config.PluginPath.empty()) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
                          "no CAS options provided");
     return true;
   }
-  auto MaybeDB = Opts.CASOpts.getOrCreateDatabases();
+  auto MaybeDB = Opts.Config.createDatabases();
   if (!MaybeDB) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
                          toString(MaybeDB.takeError()));
@@ -870,7 +870,7 @@ bool CompilerInstance::setUpModuleLoaders() {
   // Install an explicit module loader if it was created earlier.
   if (ESML) {
     this->DefaultSerializedLoader = ESML.get();
-    Context->addModuleLoader(std::move(ESML));
+    Context->addModuleLoader(std::move(ESML), false, false, false, true);
   }
 
   if (!ExplicitModuleBuild) {
@@ -1464,6 +1464,21 @@ static void configureAvailabilityDomains(const ASTContext &ctx,
     createAndInsertDomain(disabled, CustomAvailabilityDomain::Kind::Disabled);
   for (auto dynamic : opts.AvailabilityDomains.DynamicDomains)
     createAndInsertDomain(dynamic, CustomAvailabilityDomain::Kind::Dynamic);
+
+  // If we didn't see the UnicodeNormalization availability domain, set it
+  // appropriately.
+  if (domainMap.count(ctx.getIdentifier("UnicodeNormalization")) == 0) {
+    if (ctx.LangOpts.hasFeature(Feature::Embedded)) {
+      // Embedded Swift disables this domain by default.
+      createAndInsertDomain("UnicodeNormalization",
+                            CustomAvailabilityDomain::Kind::Enabled);
+    } else {
+      // Non-Embedded Swift always enables the Unicode tables.
+      createAndInsertDomain("UnicodeNormalization",
+                            CustomAvailabilityDomain::Kind::AlwaysEnabled);
+    }
+  }
+
 
   mainModule->setAvailabilityDomains(std::move(domainMap));
 }

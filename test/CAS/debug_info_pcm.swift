@@ -17,7 +17,7 @@
 // RUN: dwarfdump --debug-info @%t/A.path | %FileCheck %s
 
 // CHECK: DW_AT_GNU_dwo_name
-// CHECK-SAME: BUILD_DIR
+// CHECK-SAME: TMP_DIR
 
 //--- test.swift
 import A

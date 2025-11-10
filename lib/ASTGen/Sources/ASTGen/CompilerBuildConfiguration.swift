@@ -120,6 +120,10 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     staticBuildConfiguration.targetPointerBitWidth
   }
 
+  func isActiveTargetObjectFormat(name: String) throws -> Bool {
+    staticBuildConfiguration.isActiveTargetObjectFormat(name: name)
+  }
+
   var targetAtomicBitWidths: [Int] {
     staticBuildConfiguration.targetAtomicBitWidths
   }

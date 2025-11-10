@@ -235,6 +235,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     return;
 
   case SILInstructionKind::ReturnInst:
+  case SILInstructionKind::ReturnBorrowInst:
   case SILInstructionKind::ThrowInst:
   case SILInstructionKind::ThrowAddrInst:
   case SILInstructionKind::UnwindInst:

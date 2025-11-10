@@ -25,6 +25,7 @@
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -152,7 +153,7 @@ namespace {
 
       // Auxiliary decls need to have their contexts adjusted too.
       if (auto *VD = dyn_cast<VarDecl>(D)) {
-        VD->visitAuxiliaryDecls([&](VarDecl *D) {
+        VD->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *D) {
           D->setDeclContext(ParentDC);
         });
       }
@@ -1325,6 +1326,22 @@ public:
                            nominalType)
             .fixItRemove(DS->getSourceRange());
         diagnosed = true;
+      // if the type is public and not frozen, then the method must not be
+      // inlinable.
+      } else if (auto fragileKind = fn->getFragileFunctionKind();
+                 !nominalDecl->getAttrs().hasAttribute<FrozenAttr>()
+                 && fragileKind != FragileFunctionKind{FragileFunctionKind::None}) {
+        ctx.Diags.diagnose(DS->getDiscardLoc(),
+                           // Code in ABI stable SDKs has already used the `@inlinable`
+                           // attribute on functions using `discard self`.
+                           // Phase this in as a warning until those APIs
+                           // can be updated.
+                           fragileKind == FragileFunctionKind{FragileFunctionKind::Inlinable}
+                             ? diag::discard_in_inlinable_method_warning
+                             : diag::discard_in_inlinable_method,
+                           fragileKind.getSelector(), nominalType)
+            .fixItRemove(DS->getSourceRange());
+        diagnosed = true;
       } else {
         // Set the contextual type for the sub-expression before we typecheck.
         contextualInfo = {nominalType, CTP_DiscardStmt};
@@ -1685,10 +1702,11 @@ public:
     // Type-check the subject expression.
     Expr *subjectExpr = switchStmt->getSubjectExpr();
     auto resultTy = TypeChecker::typeCheckExpression(subjectExpr, DC);
+
     auto limitExhaustivityChecks = !resultTy;
-    if (Expr *newSubjectExpr =
-            TypeChecker::coerceToRValue(getASTContext(), subjectExpr))
-      subjectExpr = newSubjectExpr;
+    if (resultTy)
+      subjectExpr = TypeChecker::coerceToRValue(getASTContext(), subjectExpr);
+
     switchStmt->setSubjectExpr(subjectExpr);
     Type subjectType = switchStmt->getSubjectExpr()->getType();
 
@@ -1823,9 +1841,14 @@ static bool isDiscardableType(Type type) {
   if (auto *expansion = type->getAs<PackExpansionType>())
     return isDiscardableType(expansion->getPatternType());
 
-  return (type->hasError() ||
-          type->isUninhabited() ||
-          type->lookThroughAllOptionalTypes()->isVoid());
+  if (type->hasError())
+    return true;
+
+  // Look through optionality and check if the type is either `Void` or
+  // 'structurally uninhabited'. Treat either as discardable.
+  auto nonOptionalType = type->lookThroughAllOptionalTypes();
+  return (nonOptionalType->isStructurallyUninhabited() ||
+          nonOptionalType->isVoid());
 }
 
 static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
@@ -1972,9 +1995,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     }
   }
 
-  // If the result of this expression is of type "Never" or "()"
-  // (the latter potentially wrapped in optionals) then it is
-  // safe to ignore.
+  // If the result of this expression is either "structurally uninhabited" or
+  // `Void`, (potentially wrapped in optionals) then it is safe to ignore.
   if (isDiscardableType(valueE->getType()))
     return;
   

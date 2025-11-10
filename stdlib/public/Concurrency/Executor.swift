@@ -591,7 +591,7 @@ public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
 
 /// An ExecutorFactory is used to create the default main and task
 /// executors.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.2, *)
 public protocol ExecutorFactory {
   #if os(WASI) || !$Embedded
   /// Constructs and returns the main executor, which is started implicitly
@@ -616,7 +616,7 @@ public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
   Task._defaultExecutor = factory.defaultExecutor
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftStdlib 6.3, *)
 @_silgen_name("swift_createDefaultExecutors")
 func _createDefaultExecutors() {
   if Task._defaultExecutor == nil {

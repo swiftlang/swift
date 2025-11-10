@@ -1192,10 +1192,7 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
                             llvm::function_ref<Type(Expr *)> getType,
                             llvm::function_ref<void(Expr *, Type)> setType) {
   Type exprTy = getType(expr);
-
-  // If expr has no type, just assume it's the right expr.
-  if (!exprTy)
-    return expr;
+  ASSERT(exprTy);
 
   // If the type is already materializable, then we're already done.
   if (!exprTy->hasLValueType())

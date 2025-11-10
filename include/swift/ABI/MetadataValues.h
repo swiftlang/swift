@@ -1797,6 +1797,8 @@ namespace SpecialPointerAuthDiscriminators {
   /// Function pointers stored in the coro allocator struct.
   const uint16_t CoroAllocationFunction = 0x5f95;   // = 24469
   const uint16_t CoroDeallocationFunction = 0x9faf; // = 40879
+  const uint16_t CoroFrameAllocationFunction = 0xd251;   // = 53841
+  const uint16_t CoroFrameDeallocationFunction = 0x5ba8; // = 23464
 }
 
 /// The number of arguments that will be passed directly to a generic

@@ -4,9 +4,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   -emit-module %t/Lib.swift -o %t -I %t \
 // RUN:   -swift-version 6 -enable-library-evolution \
-// RUN:   -emit-module-interface-path %t/Lib.swiftinterface \
-// RUN:   -enable-experimental-feature CDecl \
-// RUN:   -enable-experimental-feature CImplementation
+// RUN:   -emit-module-interface-path %t/Lib.swiftinterface
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t \
 // RUN:   -typecheck-module-from-interface %t/Lib.swiftinterface
@@ -14,8 +12,6 @@
 // RUN: %FileCheck %s --input-file %t/Lib.swiftinterface
 
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_CDecl
-// REQUIRES: swift_feature_CImplementation
 
 //--- module.modulemap
 module Lib {

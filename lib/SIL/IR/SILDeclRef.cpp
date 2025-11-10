@@ -89,6 +89,11 @@ bool swift::requiresForeignToNativeThunk(ValueDecl *vd) {
     if (proto->isObjC())
       return true;
 
+  // If there is only a C entrypoint from a Swift function, we will need
+  // foreign-to-native thunks to deal with them.
+  if (vd->hasOnlyCEntryPoint())
+    return true;
+
   if (auto fd = dyn_cast<FuncDecl>(vd))
     return fd->hasClangNode();
 
@@ -111,6 +116,9 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   if (vd->hasClangNode())
     return true;
 
+  if (vd->hasOnlyCEntryPoint())
+    return true;
+
   if (auto *accessor = dyn_cast<AccessorDecl>(vd)) {
     // Property accessors should be generated alongside the property.
     if (accessor->isGetterOrSetter()) {
@@ -128,7 +136,9 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
                        bool isRuntimeAccessible,
                        SILDeclRef::BackDeploymentKind backDeploymentKind,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
-    : loc(vd), kind(kind), isForeign(isForeign), distributedThunk(isDistributedThunk),
+    : loc(vd), kind(kind),
+      isForeign(isForeign),
+      distributedThunk(isDistributedThunk),
       isKnownToBeLocal(isKnownToBeLocal),
       isRuntimeAccessible(isRuntimeAccessible),
       backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
@@ -467,7 +477,8 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     // Native-to-foreign thunks for methods are always just private, since
     // they're anchored by Objective-C metadata.
     auto &attrs = fn->getAttrs();
-    if (constant.isNativeToForeignThunk() && !attrs.hasAttribute<CDeclAttr>()) {
+    if (constant.isNativeToForeignThunk() &&
+        !(attrs.hasAttribute<CDeclAttr>() && !fn->hasOnlyCEntryPoint())) {
       auto isTopLevel = fn->getDeclContext()->isModuleScopeContext();
       return isTopLevel ? Limit::OnDemand : Limit::Private;
     }
@@ -1206,7 +1217,7 @@ bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
     return false;
   }
 
-  // - @_section and @_used imply that external tools will look for this symbol.
+  // - @section and @used imply that external tools will look for this symbol.
   if (decl->getAttrs().hasAttribute<SectionAttr>() ||
       decl->getAttrs().hasAttribute<UsedAttr>()) {
     return false;
@@ -1263,6 +1274,10 @@ bool SILDeclRef::isNativeToForeignThunk() const {
       return false;
     // No thunk is required if the decl directly references an external decl.
     if (getDecl()->getAttrs().hasAttribute<ExternAttr>())
+      return false;
+
+    // No thunk is required if the decl directly exposes a C entry point.
+    if (getDecl()->hasOnlyCEntryPoint())
       return false;
 
     // Only certain kinds of SILDeclRef can expose native-to-foreign thunks.
@@ -1371,18 +1386,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         silConfig);
   }
 
-  // As a special case, Clang functions and globals don't get mangled at all
-  // - except \c objc_direct decls.
-  if (hasDecl() && !isDefaultArgGenerator()) {
-    if (getDecl()->getClangDecl()) {
-      if (!isForeignToNativeThunk() && !isNativeToForeignThunk()) {
-        auto clangMangling = mangleClangDecl(getDecl(), isForeign);
-        if (!clangMangling.empty())
-          return clangMangling;
-      }
-    }
-  }
-
   // Mangle prespecializations.
   if (getSpecializedSignature()) {
     SILDeclRef nonSpecializedDeclRef = *this;
@@ -1426,24 +1429,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
       if (!NameA->Name.empty() && !isThunk()) {
         return NameA->Name.str();
-      }
-
-    if (auto *ExternA = ExternAttr::find(getDecl()->getAttrs(), ExternKind::C)) {
-      assert(isa<FuncDecl>(getDecl()) && "non-FuncDecl with @_extern should be rejected by typechecker");
-      return ExternA->getCName(cast<FuncDecl>(getDecl())).str();
-    }
-
-    // Use a given cdecl name for native-to-foreign thunks.
-    if (getDecl()->getAttrs().hasAttribute<CDeclAttr>())
-      if (isNativeToForeignThunk()) {
-        // If this is an @implementation @_cdecl, mangle it like the clang
-        // function it implements.
-        if (auto objcInterface = getDecl()->getImplementedObjCDecl()) {
-          auto clangMangling = mangleClangDecl(objcInterface, isForeign);
-          if (!clangMangling.empty())
-            return clangMangling;
-        }
-        return getDecl()->getCDeclName().str();
       }
 
     if (SKind == ASTMangler::SymbolKind::DistributedThunk) {
@@ -1532,6 +1517,39 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   llvm_unreachable("bad entity kind!");
 }
+
+std::optional<std::string> SILDeclRef::getAsmName() const {
+  if (isAutoDiffDerivativeFunction())
+    return std::nullopt;
+
+  if (hasDecl() && !isDefaultArgGenerator() &&
+      (getDecl()->getClangDecl() || getDecl()->getImplementedObjCDecl())) {
+    // If there is a Clang declaration, use its mangled name.
+    if (isNativeToForeignThunk() || isForeign) {
+      auto decl = getDecl();
+      auto hasClangDecl = decl->getClangDecl()
+          ? decl : decl->getImplementedObjCDecl();
+      auto clangMangling = mangleClangDecl(hasClangDecl, isForeign);
+      if (!clangMangling.empty())
+        return clangMangling;
+    }
+  }
+
+  if (isForeign && hasDecl()) {
+    // @_extern(c)
+    auto decl = getDecl();
+    if (auto *EA = ExternAttr::find(decl->getAttrs(), ExternKind::C))
+      if (auto VD = dyn_cast<ValueDecl>(decl))
+        return std::string(EA->getCName(VD));
+
+    // @c/@_cdecl
+    if (decl->getAttrs().hasAttribute<CDeclAttr>())
+      return std::string(decl->getCDeclName());
+  }
+
+  return std::nullopt;
+}
+
 
 // Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
 // FIXME(https://github.com/apple/swift/issues/54833): Also consider derived declaration `@derivative` attributes.

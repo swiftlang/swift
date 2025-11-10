@@ -2267,14 +2267,14 @@ public:
   }
 
   void checkAttachedMacros(const Decl *D) {
-    for (auto customAttrC : D->getExpandedAttrs().getAttributes<CustomAttr>()) {
-      auto customAttr = const_cast<CustomAttr *>(customAttrC);
-      auto *macroDecl = D->getResolvedMacro(customAttr);
-      if (macroDecl) {
-        diagnoseDeclAvailability(macroDecl,
-                                 customAttr->getTypeRepr()->getSourceRange(),
-                                 nullptr, Where, std::nullopt);
-      }
+    for (auto *customAttr : D->getExpandedAttrs().getAttributes<CustomAttr>()) {
+      auto *macroDecl = customAttr->getResolvedMacro();
+      if (!macroDecl)
+        continue;
+
+      diagnoseDeclAvailability(macroDecl,
+                               customAttr->getTypeRepr()->getSourceRange(),
+                               nullptr, Where, std::nullopt);
     }
   }
 
@@ -2376,7 +2376,8 @@ public:
     if (seenVars.count(theVar))
       return;
 
-    checkType(theVar->getValueInterfaceType(), /*typeRepr*/nullptr, theVar);
+    checkType(theVar->getValueInterfaceType(), /*typeRepr*/nullptr, theVar,
+              ExportabilityReason::PublicVarDecl);
 
     for (auto attr : theVar->getAttachedPropertyWrappers()) {
       checkType(attr->getType(), attr->getTypeRepr(), theVar,
@@ -2398,7 +2399,8 @@ public:
     });
 
     checkType(TP->hasType() ? TP->getType() : Type(),
-              TP->getTypeRepr(), anyVar ? (Decl *)anyVar : (Decl *)PBD);
+              TP->getTypeRepr(), anyVar ? (Decl *)anyVar : (Decl *)PBD,
+              ExportabilityReason::PublicVarDecl);
 
     // Check the property wrapper types.
     if (anyVar) {
@@ -2768,7 +2770,7 @@ void swift::recordRequiredImportAccessLevelForDecl(const ValueDecl *decl,
                    *sourceModule = decl->getModuleContext();
         dc->getASTContext().Diags.diagnose(
             diagLoc, diag::module_api_import, decl, importedVia, sourceModule,
-            importedVia == sourceModule, loc.isInvalid());
+            importedVia->getTopLevelModule() == sourceModule, loc.isInvalid());
       });
 }
 

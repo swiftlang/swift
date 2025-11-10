@@ -76,6 +76,7 @@ CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, BorrowedFrom)
 CONSTANT_OWNERSHIP_INST(Guaranteed, LoadBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, FunctionExtractIsolation)
+CONSTANT_OWNERSHIP_INST(Guaranteed, ImplicitActorToOpaqueIsolationCast)
 CONSTANT_OWNERSHIP_INST(None, GlobalValue)
 CONSTANT_OWNERSHIP_INST(Owned, AllocBox)
 CONSTANT_OWNERSHIP_INST(Owned, AllocExistentialBox)
@@ -322,6 +323,7 @@ FORWARDING_OWNERSHIP_INST(MarkUnresolvedReferenceBinding)
 FORWARDING_OWNERSHIP_INST(MoveOnlyWrapperToCopyableValue)
 FORWARDING_OWNERSHIP_INST(CopyableToMoveOnlyWrapperValue)
 FORWARDING_OWNERSHIP_INST(MoveOnlyWrapperToCopyableBox)
+FORWARDING_OWNERSHIP_INST(UncheckedOwnership)
 #undef FORWARDING_OWNERSHIP_INST
 
 ValueOwnershipKind

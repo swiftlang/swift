@@ -99,6 +99,7 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
     case PartitionOpError::InOutSendingNotDisconnectedAtExit:
     case PartitionOpError::NonSendableIsolationCrossingResult:
     case PartitionOpError::InOutSendingReturned:
+    case PartitionOpError::InOutSendingParametersInSameRegion:
       llvm_unreachable("Unsupported");
     case PartitionOpError::LocalUseAfterSend: {
       auto state = std::move(error).getLocalUseAfterSendError();

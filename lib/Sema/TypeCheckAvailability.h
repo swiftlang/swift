@@ -69,7 +69,8 @@ enum class DeclAvailabilityFlag : uint8_t {
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 
 // This enum must be kept in sync with
-// diag::decl_from_hidden_module and
+// diag::decl_from_hidden_module,
+// diag::typealias_desugars_to_type_from_hidden_module, and
 // diag::conformance_from_implementation_only_module.
 enum class ExportabilityReason : unsigned {
   General,
@@ -79,6 +80,7 @@ enum class ExportabilityReason : unsigned {
   ExtensionWithConditionalConformances,
   Inheritance,
   AvailableAttribute,
+  PublicVarDecl,
 };
 
 /// A description of the restrictions on what declarations can be referenced

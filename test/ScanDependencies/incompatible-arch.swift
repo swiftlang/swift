@@ -6,7 +6,8 @@
 
 // RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/module-cache %s -o %t/deps.json -I %t/inputs -diagnostic-style llvm -scanner-module-validation 2>&1 | %FileCheck %s
 
-// CHECK: error: unable to resolve Swift module dependency to a compatible module: 'Foo'
-// CHECK-DAG: note: found incompatible module '{{.*}}Foo.swiftmodule{{/|\\}}ppc65.swiftmodule': invalid architecture
-// CHECK-DAG: note: found incompatible module '{{.*}}Foo.swiftmodule{{/|\\}}i387.swiftmodule': invalid architecture
+// CHECK-DAG: warning: module file '{{.*}}Foo.swiftmodule{{/|\\}}ppc65.swiftmodule' is incompatible with this Swift compiler: built for incompatible target
+// CHECK-DAG: warning: module file '{{.*}}Foo.swiftmodule{{/|\\}}i387.swiftmodule' is incompatible with this Swift compiler: built for incompatible target
+// CHECK: error: unable to resolve module dependency: 'Foo'
+
 import Foo

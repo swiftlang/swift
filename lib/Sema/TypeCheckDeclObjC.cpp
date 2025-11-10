@@ -222,17 +222,11 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for enums.
   if (T->is<EnumType>()) {
-    if (DC->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
-      // New dialog mentioning @c.
-      diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
-                     language)
-          .highlight(TypeRange)
-          .limitBehavior(behavior);
-    } else {
-      diags.diagnose(TypeRange.Start, diag::not_objc_swift_enum)
-          .highlight(TypeRange)
-          .limitBehavior(behavior);
-    }
+    // New dialog mentioning @c.
+    diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
+                   language)
+        .highlight(TypeRange)
+        .limitBehavior(behavior);
     return;
   }
 
@@ -846,7 +840,7 @@ bool swift::isRepresentableInLanguage(
   }
 
   // Check that @objc functions can't have typed throw.
-  if (AFD->hasThrows()) {
+  if (!AFD->getDeclContext()->isInSwiftinterface() && AFD->hasThrows()) {
     Type thrownType = AFD->getThrownInterfaceType();
     // TODO: only `throws(Error)` is allowed.
     // Throwing `any MyError` that confronts `Error` is not implemented yet.
@@ -1405,8 +1399,8 @@ static std::optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
       if (attr->hasName() && !CD->isGenericContext()) {
         // @objc with a name on a non-generic subclass of a generic class is
         // just controlling the runtime name. Don't diagnose this case.
-        const_cast<ClassDecl *>(CD)->getAttrs().add(
-          new (ctx) ObjCRuntimeNameAttr(*attr));
+        const_cast<ClassDecl *>(CD)->addAttribute(
+            new (ctx) ObjCRuntimeNameAttr(*attr));
         return std::nullopt;
       }
 
@@ -1421,8 +1415,8 @@ static std::optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
     if (ancestry.contains(AncestryFlags::ResilientOther) &&
         !checkObjCClassStubAvailability(ctx, CD)) {
       if (attr->hasName()) {
-        const_cast<ClassDecl *>(CD)->getAttrs().add(
-          new (ctx) ObjCRuntimeNameAttr(*attr));
+        const_cast<ClassDecl *>(CD)->addAttribute(
+            new (ctx) ObjCRuntimeNameAttr(*attr));
         return std::nullopt;
       }
 
@@ -1964,7 +1958,7 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
 
     // Create an @objc attribute with the implicit name.
     attr = ObjCAttr::create(ctx, selector, /*implicitName=*/true);
-    decl->getAttrs().add(attr);
+    decl->addAttribute(attr);
   };
 
   // If this declaration overrides an @objc declaration, use its name.
@@ -4191,15 +4185,6 @@ public:
     // Only encourage adoption if the corresponding language feature is enabled.
     if (isa<ExtensionDecl>(decl) &&
         !decl->getASTContext().LangOpts.hasFeature(Feature::ObjCImplementation))
-      return;
-
-    if (isa<AbstractFunctionDecl>(decl) &&
-        !decl->getASTContext().LangOpts.hasFeature(Feature::CImplementation))
-      return;
-
-    // Only encourage @_objcImplementation *extension* adopters to adopt
-    // @implementation; @_objcImplementation @_cdecl hasn't been stabilized yet.
-    if (!isa<ExtensionDecl>(decl))
       return;
 
     auto diag = diagnose(getAttr()->getLocation(),

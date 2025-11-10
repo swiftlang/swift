@@ -192,7 +192,7 @@ public:
   /// Collect the set of variables referenced in the given pattern.
   void collectVariables(SmallVectorImpl<VarDecl *> &variables) const;
 
-  /// apply the specified function to all variables referenced in this
+  /// Apply the specified function to all variables referenced in this
   /// pattern.
   void forEachVariable(llvm::function_ref<void(VarDecl *)> f) const;
 

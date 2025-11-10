@@ -1598,27 +1598,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Find out if a distributed method is implementing a distributed protocol
-/// requirement.
-class GetDistributedMethodWitnessedProtocolRequirements :
-    public SimpleRequest<GetDistributedMethodWitnessedProtocolRequirements,
-                         llvm::ArrayRef<ValueDecl *> (AbstractFunctionDecl *),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  llvm::ArrayRef<ValueDecl *> evaluate(
-      Evaluator &evaluator,
-      AbstractFunctionDecl *nominal) const;
-
-public:
-  // Caching
-  bool isCached() const { return true; }
-};
-
 /// Retrieve the static "shared" property within a global actor that provides
 /// the actor instance representing the global actor.
 ///
@@ -2999,9 +2978,6 @@ enum class ImplicitMemberAction : uint8_t {
   ResolveCodingKeys,
   ResolveEncodable,
   ResolveDecodable,
-  ResolveDistributedActor,
-  ResolveDistributedActorID,
-  ResolveDistributedActorSystem,
 };
 
 class ResolveImplicitMemberRequest
@@ -3728,6 +3704,8 @@ public:
   ArrayRef<TypeRepr *> getGenericArgs() const;
   ArgumentList *getArgs() const;
 
+  DeclContext *getDeclContext() const;
+
   /// Returns the macro roles corresponding to this macro reference.
   MacroRoles getMacroRoles() const;
 
@@ -3753,8 +3731,7 @@ void simple_display(llvm::raw_ostream &out,
 /// Resolve a given custom attribute to an attached macro declaration.
 class ResolveMacroRequest
     : public SimpleRequest<ResolveMacroRequest,
-                           ConcreteDeclRef(UnresolvedMacroReference,
-                                           DeclContext *),
+                           ConcreteDeclRef(UnresolvedMacroReference),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3763,8 +3740,7 @@ private:
   friend SimpleRequest;
 
   ConcreteDeclRef evaluate(Evaluator &evaluator,
-                           UnresolvedMacroReference macroRef,
-                           DeclContext *decl) const;
+                           UnresolvedMacroReference macroRef) const;
 
 public:
   bool isCached() const { return true; }

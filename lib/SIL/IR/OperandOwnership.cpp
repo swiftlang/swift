@@ -332,6 +332,7 @@ OPERAND_OWNERSHIP(GuaranteedForwarding, LinearFunctionExtract)
 OPERAND_OWNERSHIP(GuaranteedForwarding, OpenExistentialValue)
 OPERAND_OWNERSHIP(GuaranteedForwarding, OpenExistentialBoxValue)
 OPERAND_OWNERSHIP(GuaranteedForwarding, FunctionExtractIsolation)
+OPERAND_OWNERSHIP(GuaranteedForwarding, ImplicitActorToOpaqueIsolationCast)
 
 OPERAND_OWNERSHIP(EndBorrow, EndBorrow)
 
@@ -420,6 +421,7 @@ AGGREGATE_OWNERSHIP(DestructureTuple)
 AGGREGATE_OWNERSHIP(Enum)
 AGGREGATE_OWNERSHIP(UncheckedEnumData)
 AGGREGATE_OWNERSHIP(SwitchEnum)
+AGGREGATE_OWNERSHIP(UncheckedOwnership)
 #undef AGGREGATE_OWNERSHIP
 
 // A begin_borrow is conditionally nested.
@@ -633,6 +635,12 @@ OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
     return OperandOwnership::ForwardingConsume;
   }
   llvm_unreachable("covered switch");
+}
+
+OperandOwnership
+OperandOwnershipClassifier::visitReturnBorrowInst(ReturnBorrowInst *rbi) {
+  return getOperandIndex() == 0 ? OperandOwnership::GuaranteedForwarding
+                                : OperandOwnership::EndBorrow;
 }
 
 OperandOwnership OperandOwnershipClassifier::visitAssignInst(AssignInst *i) {

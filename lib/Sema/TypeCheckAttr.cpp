@@ -27,7 +27,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
-#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -183,6 +182,7 @@ public:
   IGNORED_ATTR(NoAllocation)
   IGNORED_ATTR(NoRuntime)
   IGNORED_ATTR(NoExistentials)
+  IGNORED_ATTR(NoManualOwnership)
   IGNORED_ATTR(NoObjCBridging)
   IGNORED_ATTR(EmitAssemblyVisionRemarks)
   IGNORED_ATTR(ShowInInterface)
@@ -476,7 +476,6 @@ public:
   void visitUnsafeNonEscapableResultAttr(UnsafeNonEscapableResultAttr *attr);
 
   void visitStaticExclusiveOnlyAttr(StaticExclusiveOnlyAttr *attr);
-  void visitManualOwnershipAttr(ManualOwnershipAttr *attr);
   void visitWeakLinkedAttr(WeakLinkedAttr *attr);
   void visitSILGenNameAttr(SILGenNameAttr *attr);
   void visitLifetimeAttr(LifetimeAttr *attr);
@@ -708,6 +707,31 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
   // Verify that we don't have a static function.
   if (FD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating);
+
+  auto *accessor = dyn_cast<AccessorDecl>(FD);
+  if (accessor &&
+      (accessor->isBorrowAccessor() || accessor->isMutateAccessor())) {
+    if (attrModifier == SelfAccessKind::Consuming ||
+        attrModifier == SelfAccessKind::LegacyConsuming) {
+      diagnoseAndRemoveAttr(
+          attr, diag::consuming_invalid_borrow_mutate_accessor,
+          getAccessorNameForDiagnostic(accessor, /*article*/ true));
+    }
+    if (attrModifier == SelfAccessKind::NonMutating &&
+        accessor->isMutateAccessor()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::ownership_modifier_unsupported_borrow_mutate_accessor,
+          attr->getAttrName(),
+          getAccessorNameForDiagnostic(accessor, /*article*/ true));
+    }
+    if (attrModifier == SelfAccessKind::Mutating &&
+        accessor->isBorrowAccessor()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::ownership_modifier_unsupported_borrow_mutate_accessor,
+          attr->getAttrName(),
+          getAccessorNameForDiagnostic(accessor, /*article*/ true));
+    }
+  }
 }
 
 void AttributeChecker::visitDynamicAttr(DynamicAttr *attr) {
@@ -1531,7 +1555,7 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
     newAttr->setImplicit(attr->isImplicit());
     newAttr->setNameImplicit(attr->isNameImplicit());
     newAttr->setAddedByAccessNote(attr->getAddedByAccessNote());
-    D->getAttrs().add(newAttr);
+    D->addAttribute(newAttr);
 
     D->getAttrs().removeAttribute(attr);
     attr->setInvalid();
@@ -1817,9 +1841,6 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     }
   }
   else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    if (!hasObjCImplementationFeature(D, attr, Feature::CImplementation))
-      return;
-
     if (!attr->CategoryName.empty()) {
       auto diagnostic =
           diagnose(attr->getLocation(),
@@ -2462,12 +2483,6 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   if (D->getAttrs().getAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(), diag::cdecl_incompatible_with_objc, D);
   }
-
-  // @c needs to be enabled via a feature flag.
-  if (!attr->Underscored &&
-      !Ctx.LangOpts.hasFeature(Feature::CDecl)) {
-    diagnose(attr->getLocation(), diag::cdecl_feature_required);
-  }
 }
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
@@ -2632,36 +2647,6 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
   }
 }
 
-static bool allowSymbolLinkageMarkers(ASTContext &ctx, Decl *D) {
-  if (ctx.LangOpts.hasFeature(Feature::SymbolLinkageMarkers))
-    return true;
-
-  auto *sourceFile = D->getDeclContext()->getParentModule()
-      ->getSourceFileContainingLocation(D->getStartLoc());
-  if (!sourceFile)
-    return false;
-
-  auto expansion = sourceFile->getMacroExpansion();
-  auto *macroAttr = sourceFile->getAttachedMacroAttribute();
-  if (!expansion || !macroAttr)
-    return false;
-
-  auto *decl = expansion.dyn_cast<Decl *>();
-  if (!decl)
-    return false;
-
-  auto *macroDecl = decl->getResolvedMacro(macroAttr);
-  if (!macroDecl)
-    return false;
-
-  if (macroDecl->getParentModule()->isStdlibModule() &&
-      macroDecl->getName().getBaseIdentifier()
-          .str() == "_DebugDescriptionProperty")
-    return true;
-
-  return false;
-}
-
 void AttributeChecker::visitSILGenNameAttr(SILGenNameAttr *A) {
   if (!canDeclareSymbolName(A->Name, D->getModuleContext())) {
     diagnose(A->getLocation(), diag::reserved_runtime_symbol_name,
@@ -2674,11 +2659,6 @@ void AttributeChecker::visitSILGenNameAttr(SILGenNameAttr *A) {
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
-  if (!allowSymbolLinkageMarkers(Ctx, D)) {
-    diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
-    return;
-  }
-
   if (D->getDeclContext()->isLocalContext())
     diagnose(attr->getLocation(), diag::attr_only_at_non_local_scope, attr);
   else if (D->getDeclContext()->isGenericContext() &&
@@ -2697,11 +2677,6 @@ void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
 }
 
 void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
-  if (!allowSymbolLinkageMarkers(Ctx, D)) {
-    diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
-    return;
-  }
-
   // The name must not be empty.
   if (attr->Name.empty())
     diagnose(attr->getLocation(), diag::section_empty_name);
@@ -3006,6 +2981,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   if (KitModule) {
     SmallVector<ValueDecl *, 1> decls;
     namelookup::lookupInModule(KitModule, Id_ApplicationDelegate,
+                               /*hasModuleSelector=*/false,
                                decls, NLKind::QualifiedLookup,
                                namelookup::ResolutionKind::TypesOnly,
                                SF, attr->getLocation(),
@@ -3270,10 +3246,11 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
     }
 
     CS.addDisjunctionConstraint(typeEqualityConstraints, locator);
-    CS.addValueMemberConstraint(
-        nominal->getInterfaceType(), DeclNameRef(context.Id_main),
-        Type(mainType), declContext, FunctionRefInfo::singleBaseNameApply(), {},
-        locator);
+    CS.addValueMemberConstraint(nominal->getInterfaceType(),
+                                DeclNameRef(context.Id_main), // OK: Generated
+                                Type(mainType), declContext,
+                                FunctionRefInfo::singleBaseNameApply(), {},
+                                locator);
   }
 
   FuncDecl *mainFunction = nullptr;
@@ -3887,6 +3864,23 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
                                      results);
 }
 
+static bool
+diagnoseCandidatesEliminatedByModuleSelector(ASTContext &ctx,
+                                             DeclNameRefWithLoc replacedDeclName,
+                                             DeclAttribute *attr,
+                                             const ValueDecl *replacement) {
+  if (!replacedDeclName.Name.hasModuleSelector())
+    return false;
+
+  // Look up without the module selector
+  SmallVector<ValueDecl *, 4> results;
+  lookupReplacedDecl(DeclNameRef(replacedDeclName.Name.getFullName()),
+                     attr, replacement, results);
+
+  ModuleSelectorCorrection correction(results);
+  return correction.diagnose(ctx, replacedDeclName.Loc, replacedDeclName.Name);
+}
+
 /// Remove any argument labels from the interface type of the given value that
 /// are extraneous from the type system's point of view, producing the
 /// type to compare against for the purposes of dynamic replacement.
@@ -3906,14 +3900,14 @@ static Type getDynamicComparisonType(ValueDecl *value) {
   return interfaceType->removeArgumentLabels(numArgumentLabels);
 }
 
-static FuncDecl *findSimilarAccessor(DeclNameRef replacedVarName,
+static FuncDecl *findSimilarAccessor(DeclNameRefWithLoc replacedVarName,
                                      const AccessorDecl *replacement,
                                      DeclAttribute *attr, ASTContext &ctx,
                                      bool forDynamicReplacement) {
 
   // Retrieve the replaced abstract storage decl.
   SmallVector<ValueDecl *, 4> results;
-  lookupReplacedDecl(replacedVarName, attr, replacement, results);
+  lookupReplacedDecl(replacedVarName.Name, attr, replacement, results);
 
   // Filter out any accessors that won't work.
   if (!results.empty()) {
@@ -3944,17 +3938,21 @@ static FuncDecl *findSimilarAccessor(DeclNameRef replacedVarName,
 
   auto &Diags = ctx.Diags;
   if (results.empty()) {
-    Diags.diagnose(attr->getLocation(),
-                   diag::dynamic_replacement_accessor_not_found,
-                   replacedVarName);
+    if (!diagnoseCandidatesEliminatedByModuleSelector(ctx, replacedVarName,
+                                                      attr, replacement)) {
+      Diags.diagnose(attr->getLocation(),
+                     diag::dynamic_replacement_accessor_not_found,
+                     replacedVarName.Name);
+    }
     attr->setInvalid();
+
     return nullptr;
   }
 
   if (results.size() > 1) {
     Diags.diagnose(attr->getLocation(),
                    diag::dynamic_replacement_accessor_ambiguous,
-                   replacedVarName);
+                   replacedVarName.Name);
     for (auto result : results) {
       Diags.diagnose(result,
                      diag::dynamic_replacement_accessor_ambiguous_candidate,
@@ -3996,7 +3994,7 @@ static FuncDecl *findSimilarAccessor(DeclNameRef replacedVarName,
   return origAccessor;
 }
 
-static FuncDecl *findReplacedAccessor(DeclNameRef replacedVarName,
+static FuncDecl *findReplacedAccessor(DeclNameRefWithLoc replacedVarName,
                                       const AccessorDecl *replacement,
                                       DeclAttribute *attr,
                                       ASTContext &ctx) {
@@ -4004,7 +4002,7 @@ static FuncDecl *findReplacedAccessor(DeclNameRef replacedVarName,
                              /*forDynamicReplacement*/ true);
 }
 
-static FuncDecl *findTargetAccessor(DeclNameRef replacedVarName,
+static FuncDecl *findTargetAccessor(DeclNameRefWithLoc replacedVarName,
                                       const AccessorDecl *replacement,
                                       DeclAttribute *attr,
                                       ASTContext &ctx) {
@@ -4013,7 +4011,7 @@ static FuncDecl *findTargetAccessor(DeclNameRef replacedVarName,
 }
 
 static AbstractFunctionDecl *
-findSimilarFunction(DeclNameRef replacedFunctionName,
+findSimilarFunction(DeclNameRefWithLoc replacedFunctionName,
                     const AbstractFunctionDecl *base, DeclAttribute *attr,
                     DiagnosticEngine *Diags, bool forDynamicReplacement) {
 
@@ -4021,7 +4019,7 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
   // Any modification to attr must be guarded by a null check on TC.
   //
   SmallVector<ValueDecl *, 4> lookupResults;
-  lookupReplacedDecl(replacedFunctionName, attr, base, lookupResults);
+  lookupReplacedDecl(replacedFunctionName.Name, attr, base, lookupResults);
 
   SmallVector<AbstractFunctionDecl *, 4> candidates;
   for (auto *result : lookupResults) {
@@ -4038,11 +4036,15 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
 
   if (candidates.empty()) {
     if (Diags) {
-      Diags->diagnose(attr->getLocation(),
-                      forDynamicReplacement
-                          ? diag::dynamic_replacement_function_not_found
-                          : diag::specialize_target_function_not_found,
-                      replacedFunctionName);
+      if (!diagnoseCandidatesEliminatedByModuleSelector(base->getASTContext(),
+                                                        replacedFunctionName,
+                                                        attr, base)) {
+        Diags->diagnose(attr->getLocation(),
+                        forDynamicReplacement
+                        ? diag::dynamic_replacement_function_not_found
+                        : diag::specialize_target_function_not_found,
+                        replacedFunctionName.Name);
+      }
     }
 
     attr->setInvalid();
@@ -4108,7 +4110,7 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
                   forDynamicReplacement
                       ? diag::dynamic_replacement_function_of_type_not_found
                       : diag::specialize_target_function_of_type_not_found,
-                  replacedFunctionName,
+                  replacedFunctionName.Name,
                   base->getInterfaceType()->getCanonicalType());
 
   for (auto *result : matches) {
@@ -4124,7 +4126,7 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
 }
 
 static AbstractFunctionDecl *
-findReplacedFunction(DeclNameRef replacedFunctionName,
+findReplacedFunction(DeclNameRefWithLoc replacedFunctionName,
                      const AbstractFunctionDecl *replacement,
                      DynamicReplacementAttr *attr, DiagnosticEngine *Diags) {
   return findSimilarFunction(replacedFunctionName, replacement, attr, Diags,
@@ -4132,7 +4134,7 @@ findReplacedFunction(DeclNameRef replacedFunctionName,
 }
 
 static AbstractFunctionDecl *
-findTargetFunction(DeclNameRef targetFunctionName,
+findTargetFunction(DeclNameRefWithLoc targetFunctionName,
                    const AbstractFunctionDecl *base,
                    AbstractSpecializeAttr * attr, DiagnosticEngine *diags) {
   return findSimilarFunction(targetFunctionName, base, attr, diags,
@@ -4625,7 +4627,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       return;
 
     // Try resolving an attached macro attribute.
-    if (auto *macro = D->getResolvedMacro(attr)) {
+    if (auto *macro = attr->getResolvedMacro()) {
       for (auto *roleAttr : macro->getAttrs().getAttributes<MacroRoleAttr>()) {
         auto role = roleAttr->getMacroRole();
         if (isInvalidAttachedMacro(role, D)) {
@@ -5306,7 +5308,7 @@ void AttributeChecker::checkBackDeployedAttrs(
   std::map<PlatformKind, SourceLoc> seenPlatforms;
 
   const BackDeployedAttr *ActiveAttr = nullptr;
-  if (auto AttrAndRange = D->getBackDeployedAttrAndRange(Ctx))
+  if (auto AttrAndRange = D->getBackDeployedAttrAndRange())
     ActiveAttr = AttrAndRange->first;
 
   for (auto *Attr : Attrs) {
@@ -5406,14 +5408,8 @@ void AttributeChecker::checkBackDeployedAttrs(
 
     // Unavailable decls cannot be back deployed.
     if (availability.containsUnavailableDomain(Domain)) {
-      auto domainForDiagnostics = Domain;
-      llvm::VersionTuple ignoredVersion;
-
-      AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
-          Attr, Ctx, domainForDiagnostics, ignoredVersion);
-
       diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
-               domainForDiagnostics);
+               Domain.getRemappedDomain(Ctx));
 
       // Find the attribute that makes the declaration unavailable.
       const Decl *attrDecl = D;
@@ -5436,23 +5432,22 @@ void AttributeChecker::checkBackDeployedAttrs(
     // fallback could never be executed at runtime.
     if (auto availableRangeAttrPair =
             getSemanticAvailableRangeDeclAndAttr(VD, Domain)) {
-      auto beforeDomain = Domain;
-      auto beforeVersion = Attr->getVersion();
-      auto availableAttr = availableRangeAttrPair.value().first;
-      auto introVersion = availableAttr.getIntroduced().value();
-      AvailabilityDomain introDomain = availableAttr.getDomain();
+      auto availableAttr = availableRangeAttrPair->first;
+      auto introDomainAndRange = availableAttr.getIntroducedDomainAndRange(Ctx);
+      if (!introDomainAndRange)
+        continue;
 
-      AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
-          Attr, Ctx, beforeDomain, beforeVersion);
-      AvailabilityInference::updateIntroducedAvailabilityDomainForFallback(
-          availableAttr, Ctx, introDomain, introVersion);
+      auto beforeDomainAndRange = Domain.getRemappedDomainAndRange(
+          Attr->getVersion(), AvailabilityVersionKind::Introduced, Ctx);
 
-      if (beforeVersion <= introVersion) {
+      auto introRange = introDomainAndRange->getRange();
+      auto beforeRange = beforeDomainAndRange.getRange();
+      if (introRange.isContainedIn(beforeRange)) {
         diagnose(AtLoc, diag::attr_has_no_effect_decl_not_available_before,
-                 Attr, VD, beforeDomain, AvailabilityRange(beforeVersion));
+                 Attr, VD, beforeDomainAndRange.getDomain(), beforeRange);
         diagnose(availableAttr.getParsedAttr()->AtLoc,
-                 diag::availability_introduced_in_version, VD, introDomain,
-                 AvailabilityRange(introVersion))
+                 diag::availability_introduced_in_version, VD,
+                 introDomainAndRange->getDomain(), introRange)
             .highlight(availableAttr.getParsedAttr()->getRange());
         continue;
       }
@@ -5762,7 +5757,7 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
   if (!D->getAttrs().hasAttribute<DynamicAttr>() &&
       !D->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
     auto attr = new (D->getASTContext()) DynamicAttr(/*implicit=*/true);
-    D->getAttrs().add(attr);
+    D->addAttribute(attr);
   }
 }
 
@@ -5800,13 +5795,15 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
   }
 
   auto &Ctx = VD->getASTContext();
+  DeclNameRefWithLoc nameWithLoc{attr->getReplacedFunctionName(),
+                                 attr->getReplacedFunctionNameLoc(),
+                                 std::nullopt};
   if (auto *AD = dyn_cast<AccessorDecl>(VD)) {
-    return findReplacedAccessor(attr->getReplacedFunctionName(), AD, attr, Ctx);
+    return findReplacedAccessor(nameWithLoc, AD, attr, Ctx);
   }
 
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return findReplacedFunction(attr->getReplacedFunctionName(), AFD,
-                                attr, &Ctx.Diags);
+    return findReplacedFunction(nameWithLoc, AFD, attr, &Ctx.Diags);
   }
 
   if (auto *SD = dyn_cast<AbstractStorageDecl>(VD)) {
@@ -5829,8 +5826,10 @@ SpecializeAttrTargetDeclRequest::evaluate(Evaluator &evaluator,
 
   auto &ctx = vd->getASTContext();
 
-  auto targetFunctionName = attr->getTargetFunctionName();
-  if (!targetFunctionName)
+  DeclNameRefWithLoc targetFunctionName{attr->getTargetFunctionName(),
+                                        attr->getTargetFunctionNameLoc(),
+                                        std::nullopt};
+  if (!targetFunctionName.Name)
     return nullptr;
 
   if (auto *ad = dyn_cast<AccessorDecl>(vd)) {
@@ -6835,7 +6834,7 @@ resolveDifferentiableAccessors(DifferentiableAttr *attr,
       ad, /*implicit*/ true, attr->AtLoc, attr->getRange(),
       attr->getDifferentiabilityKind(), resolvedDiffParamIndices,
       attr->getDerivativeGenericSignature());
-    ad->getAttrs().add(newAttr);
+    ad->addAttribute(newAttr);
 
     if (!typecheckDifferentiableAttrforDecl(ad, attr,
                                             resolvedDiffParamIndices))
@@ -7400,10 +7399,11 @@ computeLinearityParameters(ArrayRef<ParsedAutoDiffParameter> parsedLinearParams,
   if (isCurried)
     transposeResultType =
         transposeResultType->castTo<AnyFunctionType>()->getResult();
+  TupleTypeElt elementType(transposeResultType);
   if (auto resultTupleType = transposeResultType->getAs<TupleType>()) {
     transposeResultTypes = resultTupleType->getElements();
   } else {
-    transposeResultTypes = ArrayRef<TupleTypeElt>(transposeResultType);
+    transposeResultTypes = ArrayRef<TupleTypeElt>(elementType);
   }
 
   // If `self` is a linearity parameter, the transpose function must be static.
@@ -7852,8 +7852,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         // The synthesized "id" and "actorSystem" are the only exceptions,
         // because the implementation mirrors them.
         if (nominal->isDistributedActor() &&
-            !(var->getName() == Ctx.Id_id ||
-              var->getName() == Ctx.Id_actorSystem)) {
+            !var->isSpecialDistributedActorProperty()) {
           diagnoseAndRemoveAttr(attr,
                                 diag::nonisolated_distributed_actor_storage);
           return;
@@ -7978,6 +7977,14 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         }
       }
     }
+  }
+
+  // `nonisolated` on an actor declaration is contradictory.
+  if (auto *classDecl = dyn_cast<ClassDecl>(D);
+      classDecl && classDecl->isExplicitActor()) {
+    diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr)
+        .fixItRemove(attr->getRange());
+    return;
   }
 
   if (auto VD = dyn_cast<ValueDecl>(D)) {
@@ -8422,13 +8429,6 @@ void AttributeChecker::visitStaticExclusiveOnlyAttr(
   }
 }
 
-void AttributeChecker::visitManualOwnershipAttr(ManualOwnershipAttr *attr) {
-  if (Ctx.LangOpts.hasFeature(Feature::ManualOwnership))
-    return;
-
-  diagnoseAndRemoveAttr(attr, diag::attr_manual_ownership_experimental);
-}
-
 void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
   if (!Ctx.LangOpts.Target.isOSBinFormatCOFF())
     return;
@@ -8583,13 +8583,7 @@ public:
       return; // it's OK
     }
 
-    auto declRef = evaluateOrDefault(
-      ctx.evaluator,
-      ResolveMacroRequest{attr, closure},
-      ConcreteDeclRef());
-
-    auto *decl = declRef.getDecl();
-    if (auto *macro = dyn_cast_or_null<MacroDecl>(decl)) {
+    if (auto *macro = attr->getResolvedMacro()) {
       if (macro->getMacroRoles().contains(MacroRole::Body)) {
         if (!ctx.LangOpts.hasFeature(Feature::ClosureBodyMacro)) {
           ctx.Diags.diagnose(

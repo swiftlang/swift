@@ -845,11 +845,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
     OpenPackElementFn packElementOpener = nullptr;
     if (pattern.allowsInference()) {
-      unboundTyOpener = [](auto unboundTy) {
-        // FIXME: Don't let unbound generic types escape type resolution.
-        // For now, just return the unbound generic type.
-        return unboundTy;
-      };
+      unboundTyOpener = TypeResolution::defaultUnboundTypeOpener;
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
       placeholderHandler = PlaceholderType::get;
@@ -913,11 +909,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
       HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
       OpenPackElementFn packElementOpener = nullptr;
       if (pattern.allowsInference()) {
-        unboundTyOpener = [](auto unboundTy) {
-          // FIXME: Don't let unbound generic types escape type resolution.
-          // For now, just return the unbound generic type.
-          return unboundTy;
-        };
+        unboundTyOpener = TypeResolution::defaultUnboundTypeOpener;
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
         placeholderHandler = PlaceholderType::get;
@@ -1591,8 +1583,9 @@ Pattern *TypeChecker::coercePatternToType(
             parentTy->getAnyNominal() == type->getAnyNominal()) {
           enumTy = type;
         } else {
-          diags.diagnose(EEP->getLoc(), diag::ambiguous_enum_pattern_type,
-                         parentTy, type);
+          if (!type->hasError())
+            diags.diagnose(EEP->getLoc(), diag::ambiguous_enum_pattern_type,
+                           parentTy, type);
           return nullptr;
         }
       }
@@ -1698,15 +1691,17 @@ Pattern *TypeChecker::coercePatternToType(
     Type elementType = type->getOptionalObjectType();
 
     if (elementType.isNull()) {
-      auto diagID = diag::optional_element_pattern_not_valid_type;
-      SourceLoc loc = OP->getQuestionLoc();
-      // Produce tailored diagnostic for if/let and other conditions.
-      if (OP->isImplicit()) {
-        diagID = diag::condition_optional_element_pattern_not_valid_type;
-        loc = OP->getLoc();
-      }
+      if (!type->hasError()) {
+        auto diagID = diag::optional_element_pattern_not_valid_type;
+        SourceLoc loc = OP->getQuestionLoc();
+        // Produce tailored diagnostic for if/let and other conditions.
+        if (OP->isImplicit()) {
+          diagID = diag::condition_optional_element_pattern_not_valid_type;
+          loc = OP->getLoc();
+        }
 
-      diags.diagnose(loc, diagID, type);
+        diags.diagnose(loc, diagID, type);
+      }
       return nullptr;
     }
 

@@ -1922,3 +1922,17 @@ bb0(%0 : $MyInt, %1 : @guaranteed $Foo, %2 : @guaranteed $Baz):
   dealloc_stack %3 : $*MyInt
   return %38 : $MyInt
 } // end sil function '$s27capture_promotion_ownership05test_a1_B0SiycyFSiycfU_Tf2iii_n'
+
+sil_global @gi : $Int
+
+// CHECK:     sil [ossa] @test_global :
+// CHECK-NOT:   load
+// CHECK:       return %0
+// CHECK:     } // end sil function 'test_global'
+sil [ossa] @test_global : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = global_addr @gi : $*Int
+  store %0 to [trivial] %1
+  %3 = load [trivial] %1
+  return %3
+}

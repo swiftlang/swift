@@ -228,8 +228,8 @@ extension NonPublicExtendedType {
 }
 
 public struct Struct { // expected-remark {{implicitly used struct 'Int' is imported via 'Swift'}}
-  public var propWithInferredIntType = 42
-  public var propWithExplicitType: String = "Text" // expected-remark {{struct 'String' is imported via 'Swift'}}
+  public var propWithInferredIntType = 42 // expected-remark {{struct 'Int' is imported via 'Swift'}}
+  public var propWithExplicitType: String = "Text" // expected-remark 3 {{struct 'String' is imported via 'Swift'}}
 }
 
 public func publicFunction() {
@@ -246,7 +246,7 @@ package func packageFunc(a: PackageType = packageFunc()) {} // expected-remark {
 public func spiFunc(a: ToUseFromSPI) {} // expected-remark {{struct 'ToUseFromSPI' is imported via 'SPIOnlyUsedInSPI'}}
 
 public protocol Countable {
-  var count: Int { get } // expected-remark {{struct 'Int' is imported via 'Swift'}}
+  var count: Int { get } // expected-remark 3 {{struct 'Int' is imported via 'Swift'}}
 }
 
 extension Extended: Countable { // expected-remark {{struct 'Extended' is imported via 'RetroactiveConformance'}}
@@ -337,8 +337,8 @@ public import ClangSubmoduleUnused.ClangSubmoduleUnsuedSubmodule // expected-war
 public import ClangTopModule.ClangTopModuleSubmodule
 
 public func clangUser(a: ClangSimpleType) {} // expected-remark {{struct 'ClangSimpleType' is imported via 'ClangSimple'}}
-public func clangUser(a: ClangSubmoduleSubmoduleType) {} // expected-remark {{struct 'ClangSubmoduleSubmoduleType' is imported via 'ClangSubmodule'}}
-public func clangUser(a: ClangTopModuleType) {} // expected-remark {{struct 'ClangTopModuleType' is imported via 'ClangTopModule'}}
+public func clangUser(a: ClangSubmoduleSubmoduleType) {} // expected-remark {{struct 'ClangSubmoduleSubmoduleType' is imported via 'ClangSubmoduleSubmodule'}}
+public func clangUser(a: ClangTopModuleType) {} // expected-remark {{struct 'ClangTopModuleType' is imported via 'ClangTopModuleSubmodule'}}
 
 //--- ClientOfClangReexportedSubmodules.swift
 public import ClangReexportedSubmodulePublic.ClangReexportedSubmodulePublicSub

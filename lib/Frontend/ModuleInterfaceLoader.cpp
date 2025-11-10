@@ -1609,27 +1609,6 @@ bool ModuleInterfaceLoader::buildExplicitSwiftModuleFromSwiftInterface(
     StringRef outputPath, bool ShouldSerializeDeps,
     ArrayRef<std::string> CompiledCandidates,
     DependencyTracker *tracker) {
-
-  if (!Instance.getInvocation().getIRGenOptions().AlwaysCompile) {
-    // First, check if the expected output already exists and possibly
-    // up-to-date w.r.t. all of the dependencies it was built with. If so, early
-    // exit.
-    UpToDateModuleCheker checker(
-        Instance.getASTContext());
-    ModuleRebuildInfo rebuildInfo;
-    SmallVector<FileDependency, 3> allDeps;
-    std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
-    if (checker.swiftModuleIsUpToDate(outputPath, rebuildInfo, allDeps,
-                                      moduleBuffer)) {
-      if (Instance.getASTContext()
-              .LangOpts.EnableSkipExplicitInterfaceModuleBuildRemarks) {
-        Instance.getDiags().diagnose(
-            SourceLoc(), diag::explicit_interface_build_skipped, outputPath);
-      }
-      return false;
-    }
-  }
-
   // Read out the compiler version.
   llvm::BumpPtrAllocator alloc;
   llvm::StringSaver ArgSaver(alloc);
@@ -1663,7 +1642,8 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     FrontendOptions::ActionType requestedAction,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
-    bool suppressNotes, bool suppressRemarks) {
+    bool suppressNotes, bool suppressRemarks,
+    PrintDiagnosticNamesMode printDiagnosticNames) {
   GenericArgs.push_back("-frontend");
   // Start with a genericSubInvocation that copies various state from our
   // invoking ASTContext.
@@ -1764,6 +1744,20 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back("-suppress-remarks");
   }
 
+  // Inherit the parent invocation's setting for printing diagnostic IDs.
+  genericSubInvocation.getDiagnosticOptions().PrintDiagnosticNames =
+      printDiagnosticNames;
+  switch (printDiagnosticNames) {
+  case PrintDiagnosticNamesMode::None:
+    break;
+  case PrintDiagnosticNamesMode::Identifier:
+    GenericArgs.push_back("-debug-diagnostic-names");
+    break;
+  case PrintDiagnosticNamesMode::Group:
+    // FIXME: Currently no flag for Group mode
+    break;
+  }
+
   // Inherit this setting down so that it can affect error diagnostics (mostly
   // by making them non-fatal).
   genericSubInvocation.getLangOptions().DebuggerSupport = LangOpts.DebuggerSupport;
@@ -1811,7 +1805,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
 
   if (casOpts.EnableCaching) {
     genericSubInvocation.getCASOptions().EnableCaching = casOpts.EnableCaching;
-    genericSubInvocation.getCASOptions().CASOpts = casOpts.CASOpts;
+    genericSubInvocation.getCASOptions().Config = casOpts.Config;
     genericSubInvocation.getCASOptions().HasImmutableFileSystem =
         casOpts.HasImmutableFileSystem;
     casOpts.enumerateCASConfigurationFlags(
@@ -1870,7 +1864,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   inheritOptionsForBuildingInterface(LoaderOpts.requestedAction, searchPathOpts,
                                      langOpts, clangImporterOpts, casOpts,
                                      Diags->getSuppressNotes(),
-                                     Diags->getSuppressRemarks());
+                                     Diags->getSuppressRemarks(),
+                                     Diags->getPrintDiagnosticNamesMode());
   // Configure front-end input.
   auto &SubFEOpts = genericSubInvocation.getFrontendOptions();
   SubFEOpts.RequestedAction = LoaderOpts.requestedAction;
@@ -2304,8 +2299,8 @@ bool ExplicitSwiftModuleLoader::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool IsCanImportLookup, bool isTestableDependencyLookup,
-    bool &IsFramework, bool &IsSystemModule) {
+    std::string *cacheKey, bool IsCanImportLookup,
+    bool isTestableDependencyLookup, bool &IsFramework, bool &IsSystemModule) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -2471,6 +2466,12 @@ ExplicitSwiftModuleLoader::create(ASTContext &ctx,
   }
 
   return result;
+}
+
+void ExplicitSwiftModuleLoader::addExplicitModulePath(StringRef name,
+                                                      std::string path) {
+  ExplicitSwiftModuleInputInfo entry(path, {}, {}, {});
+  Impl.ExplicitModuleMap.try_emplace(name, std::move(entry));
 }
 
 struct ExplicitCASModuleLoader::Implementation {
@@ -2660,8 +2661,8 @@ bool ExplicitCASModuleLoader::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
-    bool IsCanImportLookup, bool IsTestableDependencyLookup,
-    bool &IsFramework, bool &IsSystemModule) {
+    std::string *CacheKey, bool IsCanImportLookup,
+    bool IsTestableDependencyLookup, bool &IsFramework, bool &IsSystemModule) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -2681,6 +2682,8 @@ bool ExplicitCASModuleLoader::findModule(
   // Set IsFramework bit according to the moduleInfo
   IsFramework = moduleInfo.isFramework;
   IsSystemModule = moduleInfo.isSystem;
+  if (CacheKey && moduleInfo.moduleCacheKey)
+    *CacheKey = *moduleInfo.moduleCacheKey;
 
   // Fallback check for module cache key passed on command-line as module path.
   std::string moduleCASID = moduleInfo.moduleCacheKey

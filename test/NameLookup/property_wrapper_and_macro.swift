@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -emit-ir -primary-file %t/valid.swift %t/definitions.swift
+// RUN: %target-swift-frontend -emit-ir -primary-file %t/valid.swift %t/definitions.swift > /dev/null
 // RUN: %target-swift-frontend -typecheck -verify -verify-additional-prefix main- -primary-file %t/main.swift %t/definitions.swift
 // RUN: %target-swift-frontend -typecheck -verify -verify-additional-prefix other- -parse-as-library -primary-file %t/other.swift %t/definitions.swift
 

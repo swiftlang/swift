@@ -257,6 +257,14 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
 
   /// Stored in a coro allocator struct, the function used to deallocate memory.
   PointerAuthSchema CoroDeallocationFunction;
+
+  /// Stored in a coro allocator struct, the function used to allocate a callee
+  /// coroutine's fixed-size frame.
+  PointerAuthSchema CoroFrameAllocationFunction;
+
+  /// Stored in a coro allocator struct, the function used to deallocate a
+  /// callee coroutine's fixed-size frame.
+  PointerAuthSchema CoroFrameDeallocationFunction;
 };
 
 enum class JITDebugArtifact : unsigned {
@@ -269,6 +277,9 @@ enum class JITDebugArtifact : unsigned {
 class IRGenOptions {
 public:
   std::string ModuleName;
+
+  /// The path to the main binary swiftmodule for the debug info.
+  std::string DebugModulePath;
 
   /// The compilation directory for the debug info.
   std::string DebugCompilationDir;
@@ -548,6 +559,9 @@ public:
   // Whether to emit mergeable or non-mergeable traps.
   unsigned MergeableTraps : 1;
 
+  /// Enable the use of swift_retain/releaseClient functions.
+  unsigned EnableClientRetainRelease : 1;
+
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
 
@@ -627,6 +641,9 @@ public:
   /// Set to true if we support AArch64TBI.
   bool HasAArch64TBI = false;
 
+  /// Generate verbose assembly output with comments.
+  bool VerboseAsm = true;
+
   IRGenOptions()
       : OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
         Verify(true), VerifyEach(false), OptMode(OptimizationMode::NotSet),
@@ -672,11 +689,13 @@ public:
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(true),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
         UseCoroCCX8664(false), UseCoroCCArm64(false), MergeableTraps(false),
+        EnableClientRetainRelease(false),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
         PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
-        CASObjMode(llvm::CASBackendMode::Native), HasAArch64TBI(false) {
+        CASObjMode(llvm::CASBackendMode::Native), HasAArch64TBI(false),
+        VerboseAsm(true) {
     DisableRoundTripDebugTypes = !CONDITIONAL_ASSERT_enabled();
   }
 

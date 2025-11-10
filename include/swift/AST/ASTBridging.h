@@ -149,21 +149,29 @@ public:
   BRIDGED_INLINE swift::DeclNameRef unbridged() const;
 };
 
-SWIFT_NAME("BridgedDeclNameRef.createParsed(_:baseName:argumentLabels:)")
-BridgedDeclNameRef BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
-                                                   swift::DeclBaseName baseName,
-                                                   BridgedArrayRef cLabels);
-
-SWIFT_NAME("BridgedDeclNameRef.createParsed(_:)")
+SWIFT_NAME("BridgedDeclNameRef.createParsed(_:moduleSelector:baseName:"
+           "argumentLabels:)")
 BridgedDeclNameRef
-BridgedDeclNameRef_createParsed(swift::DeclBaseName baseName);
+BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
+                                swift::Identifier cModuleSelector,
+                                swift::DeclBaseName cBaseName,
+                                BridgedArrayRef cLabels);
+
+SWIFT_NAME("BridgedDeclNameRef.createParsed(_:moduleSelector:baseName:)")
+BridgedDeclNameRef
+BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
+                                swift::Identifier cModuleSelector,
+                                swift::DeclBaseName cBaseName);
 
 class BridgedDeclNameLoc {
   const void *_Nullable LocationInfo;
-  size_t NumArgumentLabels;
+  uint32_t NumArgumentLabels;
+  bool HasModuleSelectorLoc;
 
 public:
-  BridgedDeclNameLoc() : LocationInfo(nullptr), NumArgumentLabels(0) {}
+  BridgedDeclNameLoc()
+    : LocationInfo(nullptr), NumArgumentLabels(0), HasModuleSelectorLoc(false)
+  {}
 
   BRIDGED_INLINE BridgedDeclNameLoc(swift::DeclNameLoc loc);
 
@@ -816,6 +824,10 @@ SWIFT_NAME("BridgedDeclAttributes.add(self:_:)")
 void BridgedDeclAttributes_add(BridgedDeclAttributes *_Nonnull attrs,
                                BridgedDeclAttribute add);
 
+SWIFT_NAME("BridgedDeclAttributes.hasAttribute(self:_:)")
+bool BridgedDeclAttributes_hasAttribute(
+    const BridgedDeclAttributes *_Nonnull attrs, swift::DeclAttrKind kind);
+
 SWIFT_NAME("BridgedDeclAttribute.createSimple(_:kind:atLoc:nameLoc:)")
 BridgedDeclAttribute BridgedDeclAttribute_createSimple(
     BridgedASTContext cContext, swift::DeclAttrKind kind,
@@ -937,11 +949,12 @@ BridgedDocumentationAttr BridgedDocumentationAttr_createParsed(
 
 SWIFT_NAME(
     "BridgedDynamicReplacementAttr.createParsed(_:atLoc:attrNameLoc:lParenLoc:"
-    "replacedFunction:rParenLoc:)")
+    "replacedFunction:replacedFunctionLoc:rParenLoc:)")
 BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
-    BridgedASTContext cContext, swift::SourceLoc atLoc,
-    swift::SourceLoc attrNameLoc, swift::SourceLoc lParenLoc,
-    BridgedDeclNameRef cReplacedFunction, swift::SourceLoc rParenLoc);
+    BridgedASTContext cContext, swift::SourceLoc cAtLoc,
+    swift::SourceLoc cAttrNameLoc, swift::SourceLoc cLParenLoc,
+    BridgedDeclNameRef cReplacedFunction,
+    BridgedDeclNameLoc cReplacedFunctionLoc, swift::SourceLoc cRParenLoc);
 
 SWIFT_NAME("BridgedEffectsAttr.createParsed(_:atLoc:range:effectKind:)")
 BridgedEffectsAttr BridgedEffectsAttr_createParsed(
@@ -1272,22 +1285,24 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedSpecializationKind : uint8_t {
 };
 
 SWIFT_NAME("BridgedSpecializeAttr.createParsed(_:atLoc:range:whereClause:"
-           "exported:kind:taretFunction:spiGroups:availableAttrs:)")
+           "exported:kind:targetFunction:targetFunctionLoc:spiGroups:"
+           "availableAttrs:)")
 BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedNullableTrailingWhereClause cWhereClause,
     bool exported, BridgedSpecializationKind cKind,
-    BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
-    BridgedArrayRef cAvailableAttrs);
+    BridgedDeclNameRef cTargetFunction, BridgedDeclNameLoc cTargetFunctionLoc,
+    BridgedArrayRef cSPIGroups, BridgedArrayRef cAvailableAttrs);
 
 SWIFT_NAME("BridgedSpecializedAttr.createParsed(_:atLoc:range:whereClause:"
-           "exported:kind:taretFunction:spiGroups:availableAttrs:)")
+           "exported:kind:targetFunction:targetFunctionLoc:spiGroups:"
+           "availableAttrs:)")
 BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedNullableTrailingWhereClause cWhereClause,
     bool exported, BridgedSpecializationKind cKind,
-    BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
-    BridgedArrayRef cAvailableAttrs);
+    BridgedDeclNameRef cTargetFunction, BridgedDeclNameLoc cTargetFunctionLoc,
+    BridgedArrayRef cSPIGroups, BridgedArrayRef cAvailableAttrs);
 
 SWIFT_NAME(
     "BridgedSPIAccessControlAttr.createParsed(_:atLoc:range:spiGroupName:)")
@@ -2565,9 +2580,10 @@ BridgedOpaqueReturnTypeOfTypeAttr_createParsed(
 // MARK: TypeReprs
 //===----------------------------------------------------------------------===//
 
-SWIFT_NAME("BridgedUnqualifiedIdentTypeRepr.createParsed(_:loc:name:)")
+SWIFT_NAME("BridgedUnqualifiedIdentTypeRepr.createParsed(_:name:loc:)")
 BridgedUnqualifiedIdentTypeRepr BridgedUnqualifiedIdentTypeRepr_createParsed(
-    BridgedASTContext cContext, swift::SourceLoc loc, swift::Identifier id);
+    BridgedASTContext cContext, BridgedDeclNameRef cName,
+    BridgedDeclNameLoc cLoc);
 
 SWIFT_NAME(
     "BridgedArrayTypeRepr.createParsed(_:base:leftSquareLoc:rightSquareLoc:)")
@@ -2601,8 +2617,8 @@ BridgedCompileTimeLiteralTypeRepr_createParsed(BridgedASTContext cContext,
 SWIFT_NAME("BridgedDeclRefTypeRepr.createParsed(_:base:name:nameLoc:"
            "genericArguments:angleRange:)")
 BridgedDeclRefTypeRepr BridgedDeclRefTypeRepr_createParsed(
-    BridgedASTContext cContext, BridgedTypeRepr cBase, swift::Identifier name,
-    swift::SourceLoc loc, BridgedArrayRef cGenericArguments,
+    BridgedASTContext cContext, BridgedTypeRepr cBase, BridgedDeclNameRef cName,
+    BridgedDeclNameLoc cLoc, BridgedArrayRef cGenericArguments,
     swift::SourceRange angleRange);
 
 SWIFT_NAME("BridgedDictionaryTypeRepr.createParsed(_:leftSquareLoc:keyType:"
@@ -2627,8 +2643,8 @@ BridgedFunctionTypeRepr BridgedFunctionTypeRepr_createParsed(
 SWIFT_NAME("BridgedUnqualifiedIdentTypeRepr.createParsed(_:name:nameLoc:"
            "genericArgs:leftAngleLoc:rightAngleLoc:)")
 BridgedUnqualifiedIdentTypeRepr BridgedUnqualifiedIdentTypeRepr_createParsed(
-    BridgedASTContext cContext, swift::Identifier name,
-    swift::SourceLoc nameLoc, BridgedArrayRef genericArgs,
+    BridgedASTContext cContext, BridgedDeclNameRef cName,
+    BridgedDeclNameLoc cNameLoc, BridgedArrayRef genericArgs,
     swift::SourceLoc lAngleLoc, swift::SourceLoc rAngleLoc);
 
 SWIFT_NAME("BridgedOptionalTypeRepr.createParsed(_:base:questionLoc:)")
@@ -3025,6 +3041,8 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isBuiltinVector() const;
   BRIDGED_INLINE bool isBuiltinFixedArray() const;
   BRIDGED_INLINE bool isBox() const;
+  BRIDGED_INLINE bool isPack() const;
+  BRIDGED_INLINE bool isSILPack() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getBuiltinVectorElementType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArrayElementType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArraySizeType() const;
@@ -3048,7 +3066,6 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getInvocationGenericSignatureOfFunctionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeOutOfContext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType
   getReducedType(BridgedGenericSignature sig) const;
@@ -3058,6 +3075,9 @@ struct BridgedASTType {
   BRIDGED_INLINE SwiftInt GenericTypeParam_getIndex() const;
   BRIDGED_INLINE swift::GenericTypeParamKind
   GenericTypeParam_getParamKind() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;
+  BRIDGED_INLINE bool containsSILPackExpansionType() const;
+  BRIDGED_INLINE bool isSILPackElementAddress() const;
 };
 
 class BridgedCanType {

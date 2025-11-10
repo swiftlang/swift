@@ -2,6 +2,11 @@ module script {
   header "script.h"
 }
 
+module AndroidVersioning {
+  header "AndroidVersioning.h"
+  export *
+}
+
 module AvailabilityExtras {
   header "AvailabilityExtras.h"
   export *

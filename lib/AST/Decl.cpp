@@ -436,15 +436,6 @@ DeclAttributes Decl::getSemanticAttrs() const {
 void Decl::attachParsedAttrs(DeclAttributes attrs) {
   ASSERT(getAttrs().isEmpty() && "attaching when there are already attrs?");
 
-  for (auto *attr : attrs.getAttributes<DifferentiableAttr>())
-    attr->setOriginalDeclaration(this);
-  for (auto *attr : attrs.getAttributes<DerivativeAttr>())
-    attr->setOriginalDeclaration(this);
-  for (auto attr : attrs.getAttributes<ABIAttr, /*AllowInvalid=*/true>())
-    recordABIAttr(attr);
-  for (auto *attr : attrs.getAttributes<CustomAttr>())
-    attr->setOwner(this);
-
   // @implementation requires an explicit @objc attribute, but
   // @_objcImplementation didn't. Insert one if necessary.
   auto implAttr = attrs.getAttribute<ObjCImplementationAttr>();
@@ -457,6 +448,9 @@ void Decl::attachParsedAttrs(DeclAttributes attrs) {
                                       /*isNameImplicit=*/false);
     attrs.add(objcAttr);
   }
+
+  for (auto attr : attrs)
+    attr->attachToDecl(this);
 
   getAttrs() = attrs;
 }
@@ -513,31 +507,18 @@ void Decl::visitAuxiliaryDecls(
     }
   }
 
-  // FIXME: fold VarDecl::visitAuxiliaryDecls into this.
+  // FIXME: fold VarDecl::visitAuxiliaryVars into this.
 }
 
 void Decl::forEachAttachedMacro(MacroRole role,
                                 MacroCallback macroCallback) const {
-  for (auto customAttrConst : getExpandedAttrs().getAttributes<CustomAttr>()) {
-    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
-    auto *macroDecl = getResolvedMacro(customAttr);
-
-    if (!macroDecl)
-      continue;
-
-    if (!macroDecl->getMacroRoles().contains(role))
+  for (auto *customAttr : getExpandedAttrs().getAttributes<CustomAttr>()) {
+    auto *macroDecl = customAttr->getResolvedMacro();
+    if (!macroDecl || !macroDecl->getMacroRoles().contains(role))
       continue;
 
     macroCallback(customAttr, macroDecl);
   }
-}
-
-MacroDecl *Decl::getResolvedMacro(CustomAttr *customAttr) const {
-  auto declRef = evaluateOrDefault(
-      getASTContext().evaluator,
-      ResolveMacroRequest{customAttr, getDeclContext()}, ConcreteDeclRef());
-
-  return dyn_cast_or_null<MacroDecl>(declRef.getDecl());
 }
 
 unsigned Decl::getAttachedMacroDiscriminator(DeclBaseName macroName,
@@ -616,32 +597,31 @@ Decl::getIntroducedOSVersion(PlatformKind Kind) const {
 }
 
 std::optional<std::pair<const BackDeployedAttr *, AvailabilityRange>>
-Decl::getBackDeployedAttrAndRange(ASTContext &Ctx,
-                                  bool forTargetVariant) const {
-  if (auto *attr = getAttrs().getBackDeployed(Ctx, forTargetVariant)) {
-    auto version = attr->getVersion();
-    AvailabilityDomain ignoredDomain;
-    AvailabilityInference::updateBeforeAvailabilityDomainForFallback(
-        attr, getASTContext(), ignoredDomain, version);
+Decl::getBackDeployedAttrAndRange(bool forTargetVariant) const {
+  auto &ctx = getASTContext();
+  if (auto *attr = getAttrs().getBackDeployed(ctx, forTargetVariant)) {
+    auto remappedDomainAndRange =
+        attr->getAvailabilityDomain().getRemappedDomainAndRange(
+            attr->getVersion(), AvailabilityVersionKind::Introduced, ctx);
 
-    // If the remap for fallback resulted in 1.0, then the
-    // backdeployment prior to that is not meaningful.
-    if (version == llvm::VersionTuple(1, 0, 0, 0))
+    // If the before version was remapped to '1.0', then this decl has
+    // effectively always been available on the current platform and does not
+    // qualify as back deployed.
+    if (remappedDomainAndRange.getRange().getRawMinimumVersion() ==
+        llvm::VersionTuple(1, 0, 0, 0))
       return std::nullopt;
 
-    return std::make_pair(attr, AvailabilityRange(version));
+    return std::make_pair(attr, remappedDomainAndRange.getRange());
   }
 
   // Accessors may inherit `@backDeployed`.
   if (auto *AD = dyn_cast<AccessorDecl>(this))
-    return AD->getStorage()->getBackDeployedAttrAndRange(Ctx, forTargetVariant);
+    return AD->getStorage()->getBackDeployedAttrAndRange(forTargetVariant);
 
   return std::nullopt;
 }
 
 bool Decl::isBackDeployed() const {
-  auto &Ctx = getASTContext();
-
   // A function declared in a local context can never be back-deployed.
   if (getDeclContext()->isLocalContext())
     return false;
@@ -655,11 +635,11 @@ bool Decl::isBackDeployed() const {
       return false;
   }
 
-  if (getBackDeployedAttrAndRange(Ctx))
+  if (getBackDeployedAttrAndRange())
     return true;
 
-  if (Ctx.LangOpts.TargetVariant) {
-    if (getBackDeployedAttrAndRange(Ctx, /*forTargetVariant=*/true))
+  if (getASTContext().LangOpts.TargetVariant) {
+    if (getBackDeployedAttrAndRange(/*forTargetVariant=*/true))
       return true;
   }
 
@@ -1361,7 +1341,7 @@ bool AbstractStorageDecl::isCompileTimeLiteral() const {
 }
 
 bool AbstractStorageDecl::isConstValue() const {
-  return getAttrs().hasAttribute<ConstValAttr>();
+  return getAttrs().hasAttribute<ConstValAttr>() || getAttrs().hasAttribute<SectionAttr>();
 }
 
 bool AbstractStorageDecl::isTransparent() const {
@@ -1501,7 +1481,7 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
 
   // When computing availability for linkage, use the "before" version from
   // the @backDeployed attribute, if present.
-  if (auto backDeployedAttrAndRange = getBackDeployedAttrAndRange(ctx))
+  if (auto backDeployedAttrAndRange = getBackDeployedAttrAndRange())
     return backDeployedAttrAndRange->second;
 
   auto containingContext = AvailabilityInference::annotatedAvailableRange(this);
@@ -1544,12 +1524,15 @@ bool Decl::isAlwaysWeakImported() const {
     return clangDecl->isWeakImported(
         getASTContext().LangOpts.getMinPlatformVersion());
 
+  // FIXME: Weak linking on Windows is not yet supported
+  // https://github.com/apple/swift/issues/53303
+  if (getASTContext().LangOpts.Target.isOSWindows())
+    return false;
+
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
 
-  // FIXME: Weak linking on Windows is not yet supported
-  // https://github.com/apple/swift/issues/53303
-  if (isUnavailable() && !getASTContext().LangOpts.Target.isOSWindows())
+  if (isUnavailable())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
@@ -2275,6 +2258,20 @@ ExtensionDecl::isAddingConformanceToInvertible() const {
   return std::nullopt;
 }
 
+bool Decl::hasOnlyCEntryPoint() const {
+  if (ExternAttr::find(getAttrs(), ExternKind::C))
+    return true;
+
+  if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>()) {
+    // The @c syntax only provides C entrypoints, not Swift ones. The historical
+    // @_cdecl introduces both Swift and C entrypoints.
+    if (!cdeclAttr->Underscored)
+      return true;
+  }
+
+  return false;
+}
+
 bool Decl::isObjCImplementation() const {
   return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
 }
@@ -2937,6 +2934,14 @@ SourceRange TopLevelCodeDecl::getSourceRange() const {
   return Body? Body->getSourceRange() : SourceRange();
 }
 
+DeclNameRef ValueDecl::createNameRef(bool moduleSelector) const {
+  if (moduleSelector)
+    return DeclNameRef(getASTContext(), getModuleContext()->getName(),
+                       getName());
+
+  return DeclNameRef(getName());
+}
+
 static bool isPolymorphic(const AbstractStorageDecl *storage) {
   if (storage->shouldUseObjCDispatch())
     return true;
@@ -3266,6 +3271,10 @@ static AccessStrategy getOpaqueReadAccessStrategy(
     return AccessStrategy::getAccessor(AccessorKind::Read2, dispatch);
   if (storage->requiresOpaqueReadCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
+
+  if (storage->getParsedAccessor(AccessorKind::Borrow)) {
+    return AccessStrategy::getAccessor(AccessorKind::Borrow, dispatch);
+  }
   return AccessStrategy::getAccessor(AccessorKind::Get, dispatch);
 }
 
@@ -3437,11 +3446,6 @@ bool AbstractStorageDecl::requiresOpaqueSetter() const {
   if (!supportsMutation()) {
     return false;
   }
-
-  // If a mutate accessor is present, we don't need a setter.
-  if (getAccessor(AccessorKind::Mutate)) {
-    return false;
-  }
   return true;
 }
 
@@ -3452,7 +3456,7 @@ bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
         AccessorKind::Read2);
 
   // If a borrow accessor is present, we don't need a read coroutine.
-  if (getAccessor(AccessorKind::Borrow)) {
+  if (getParsedAccessor(AccessorKind::Borrow)) {
     return false;
   }
   return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
@@ -3464,7 +3468,7 @@ bool AbstractStorageDecl::requiresOpaqueRead2Coroutine() const {
     return false;
 
   // If a borrow accessor is present, we don't need a read coroutine.
-  if (getAccessor(AccessorKind::Borrow)) {
+  if (getParsedAccessor(AccessorKind::Borrow)) {
     return false;
   }
   return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
@@ -4740,33 +4744,6 @@ void ValueDecl::setRenamedDecl(const AvailableAttr *attr,
                                                 std::move(renameDecl));
 }
 
-void Decl::recordABIAttr(ABIAttr *attr) {
-  Decl *owner = this;
-
-  // The ABIAttr on a VarDecl ought to point to its PBD.
-  if (auto VD = dyn_cast<VarDecl>(owner)) {
-    if (auto PBD = VD->getParentPatternBinding()) {
-      owner = PBD;
-    }
-  }
-
-  auto record = [&](Decl *decl) {
-    auto &evaluator = owner->getASTContext().evaluator;
-    DeclABIRoleInfoRequest(decl).recordABIOnly(evaluator, owner);
-  };
-
-  if (auto abiPBD = dyn_cast<PatternBindingDecl>(attr->abiDecl)) {
-    // Add to *every* VarDecl in the ABI PBD, even ones that don't properly
-    // match anything in the API PBD.
-    for (auto i : range(abiPBD->getNumPatternEntries())) {
-      abiPBD->getPattern(i)->forEachVariable(record);
-    }
-    return;
-  }
-
-  record(attr->abiDecl);
-}
-
 void DeclABIRoleInfoRequest::recordABIOnly(Evaluator &evaluator,
                                            Decl *counterpart) {
   if (evaluator.hasCachedResult(*this))
@@ -5596,10 +5573,18 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
     access = AccessLevel::FilePrivate;
 
   // Only certain declarations can be 'open'.
-  if (access == AccessLevel::Open && !isSyntacticallyOverridable()) {
-    assert(!isa<ClassDecl>(this) &&
-           "copying 'open' onto a class has complications");
-    access = AccessLevel::Public;
+  if (access == AccessLevel::Open) {
+    auto classDecl = dyn_cast<ClassDecl>(source);
+    if (classDecl && classDecl->isDistributedActor()) {
+      // don't copy 'public'; an 'open distributed actor' is illegal to begin with
+      return;
+    }
+
+    if (!isSyntacticallyOverridable()) {
+      assert(!isa<ClassDecl>(this) &&
+             "copying 'open' onto a class has complications");
+      access = AccessLevel::Public;
+    }
   }
 
   setAccess(access);
@@ -5612,7 +5597,7 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
                                               this)) {
     auto &ctx = getASTContext();
     auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-    getAttrs().add(clonedAttr);
+    addAttribute(clonedAttr);
   }
 }
 
@@ -6464,6 +6449,16 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   if (isa<ProtocolDecl>(this))
     return;
 
+  auto baseName = member.getBaseName();
+  auto &Context = getASTContext();
+
+  // For a distributed actor `id` and `actorSystem` can be synthesized without
+  // causing cycles so do them above the cycle guard.
+  if (member.isSimpleName(Context.Id_id))
+    (void)getDistributedActorIDProperty();
+  if (member.isSimpleName(Context.Id_actorSystem))
+    (void)getDistributedActorSystemProperty();
+
   // Silently break cycles here because we can't be sure when and where a
   // request to synthesize will come from yet.
   // FIXME: rdar://56844567
@@ -6473,14 +6468,12 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   Bits.NominalTypeDecl.IsComputingSemanticMembers = true;
   SWIFT_DEFER { Bits.NominalTypeDecl.IsComputingSemanticMembers = false; };
 
-  auto baseName = member.getBaseName();
-  auto &Context = getASTContext();
   std::optional<ImplicitMemberAction> action = std::nullopt;
   if (baseName.isConstructor())
     action.emplace(ImplicitMemberAction::ResolveImplicitInit);
 
   if (member.isSimpleName() && !baseName.isSpecial()) {
-    if (baseName.getIdentifier() == getASTContext().Id_CodingKeys) {
+    if (baseName.getIdentifier() == Context.Id_CodingKeys) {
       action.emplace(ImplicitMemberAction::ResolveCodingKeys);
     }
   } else {
@@ -6489,21 +6482,12 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
       if (baseName.isConstructor()) {
         if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
           action.emplace(ImplicitMemberAction::ResolveDecodable);
-        } else if (argumentNames.front() == Context.Id_system) {
-          action.emplace(ImplicitMemberAction::ResolveDistributedActorSystem);
         }
       } else if (!baseName.isSpecial() &&
                  baseName.getIdentifier() == Context.Id_encode &&
                  (member.isSimpleName() ||
                   argumentNames.front() == Context.Id_to)) {
         action.emplace(ImplicitMemberAction::ResolveEncodable);
-      }
-    } else if (member.isSimpleName() || argumentNames.size() == 2) {
-      if (baseName.isConstructor()) {
-        if (argumentNames[0] == Context.Id_resolve &&
-            argumentNames[1] == Context.Id_using) {
-          action.emplace(ImplicitMemberAction::ResolveDistributedActor);
-        }
       }
     }
   }
@@ -7569,8 +7553,6 @@ ProtocolDecl::getKnownDerivableProtocolKind() const {
     return KnownDerivableProtocolKind::AdditiveArithmetic;
   case KnownProtocolKind::Differentiable:
     return KnownDerivableProtocolKind::Differentiable;
-  case KnownProtocolKind::Identifiable:
-    return KnownDerivableProtocolKind::Identifiable;
   case KnownProtocolKind::Actor:
     return KnownDerivableProtocolKind::Actor;
   case KnownProtocolKind::DistributedActor:
@@ -7624,7 +7606,7 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
   case AccessorKind::Init:
     return article ? "an init accessor" : "init accessor";
   case AccessorKind::Borrow:
-    return article ? " a 'borrow' accessor" : "borrow accessor";
+    return article ? "a 'borrow' accessor" : "borrow accessor";
   case AccessorKind::Mutate:
     return article ? "a 'mutate' accessor" : "mutate accessor";
   }
@@ -8798,14 +8780,22 @@ bool VarDecl::hasStorageOrWrapsStorage() const {
   return false;
 }
 
-void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) const {
+void VarDecl::visitAuxiliaryVars(
+    bool forNameLookup, llvm::function_ref<void(VarDecl *)> visit) const {
   if (getDeclContext()->isTypeContext() ||
       (isImplicit() && !isa<ParamDecl>(this)))
     return;
 
-  if (getAttrs().hasAttribute<LazyAttr>()) {
-    if (auto *backingVar = getLazyStorageProperty())
-      visit(backingVar);
+  // The backing storage for a lazy property is not accessible to name lookup.
+  // This is not only a matter of hiding implementation details, but also
+  // correctness since triggering LazyStoragePropertyRequest currently eagerly
+  // requests the interface type for the var, which could result in incorrectly
+  // type-checking a lazy local independently of its surrounding closure.
+  if (!forNameLookup) {
+    if (getAttrs().hasAttribute<LazyAttr>()) {
+      if (auto *backingVar = getLazyStorageProperty())
+        visit(backingVar);
+    }
   }
 
   if (getAttrs().hasAttribute<CustomAttr>() || hasImplicitPropertyWrapper()) {
@@ -9297,7 +9287,7 @@ void ParamDecl::setNonEphemeralIfPossible() {
 
   if (!getAttrs().hasAttribute<NonEphemeralAttr>()) {
     auto &ctx = getASTContext();
-    getAttrs().add(new (ctx) NonEphemeralAttr(/*IsImplicit*/ true));
+    addAttribute(new (ctx) NonEphemeralAttr(/*IsImplicit*/ true));
   }
 }
 
@@ -12541,27 +12531,22 @@ void MissingDecl::forEachMacroExpandedDecl(MacroExpandedDeclCallback callback) {
   auto macroRef = unexpandedMacro.macroRef;
   auto *baseDecl = unexpandedMacro.baseDecl;
 
-  // If the macro itself is a macro expansion expression, it should come with
-  // a top-level code declaration that we can use for resolution. For such
-  // cases, resolve the macro to determine whether it is a declaration or
-  // code-item macro, meaning that it can produce declarations. In such cases,
-  // expand the macro and use its substituted declaration (a MacroExpansionDecl)
-  // instead.
+  // If the macro itself is a macro expansion expression, resolve it to
+  // determine whether it is a declaration or code-item macro, meaning that it
+  // can produce declarations. In such cases, expand the macro and use its
+  // substituted declaration (a MacroExpansionDecl) instead.
   if (auto freestanding = macroRef.dyn_cast<FreestandingMacroExpansion *>()) {
     if (auto expr = dyn_cast<MacroExpansionExpr>(freestanding)) {
       bool replacedWithDecl = false;
-      if (auto tlcd = dyn_cast_or_null<TopLevelCodeDecl>(baseDecl)) {
-        ASTContext &ctx = tlcd->getASTContext();
-        if (auto macro = evaluateOrDefault(
-                ctx.evaluator,
-                ResolveMacroRequest{macroRef, tlcd->getDeclContext()},
-                nullptr)) {
+      if (isa_and_nonnull<TopLevelCodeDecl>(baseDecl)) {
+        auto &eval = getASTContext().evaluator;
+        if (auto macro = evaluateOrDefault(eval, ResolveMacroRequest{macroRef},
+                                           nullptr)) {
           auto macroDecl = cast<MacroDecl>(macro.getDecl());
           auto roles = macroDecl->getMacroRoles();
           if (roles.contains(MacroRole::Declaration) ||
               roles.contains(MacroRole::CodeItem)) {
-            (void)evaluateOrDefault(ctx.evaluator,
-                                    ExpandMacroExpansionExprRequest{expr},
+            (void)evaluateOrDefault(eval, ExpandMacroExpansionExprRequest{expr},
                                     std::nullopt);
             if (auto substituted = expr->getSubstituteDecl()) {
               macroRef = substituted;

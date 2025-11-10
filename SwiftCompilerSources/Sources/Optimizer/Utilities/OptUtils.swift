@@ -432,7 +432,7 @@ extension Instruction {
       case .USubOver:
         // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
         // This pattern appears in UTF8 String literal construction.
-        if let tei = bi.uses.getSingleUser(ofType: TupleExtractInst.self),
+        if let tei = bi.uses.singleUser(ofType: TupleExtractInst.self),
            tei.isResultOfOffsetSubtract {
           return true
         }
@@ -446,7 +446,7 @@ extension Instruction {
       // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
       // This pattern appears in UTF8 String literal construction.
       if tei.isResultOfOffsetSubtract,
-         let bi = tei.uses.getSingleUser(ofType: BuiltinInst.self),
+         let bi = tei.uses.singleUser(ofType: BuiltinInst.self),
          bi.id == .StringObjectOr {
         return true
       }
@@ -546,6 +546,54 @@ extension Instruction {
     // Eventually we want to replace the SILCombine implementation with this one.
     return nil
   }
+
+  /// Returns true if a destroy of `type` must not be moved across this instruction.
+  func isBarrierForDestroy(of type: Type, _ context: some Context) -> Bool {
+    let instEffects = memoryEffects
+    if instEffects == .noEffects || type.isTrivial(in: parentFunction) {
+      return false
+    }
+    guard type.isMoveOnly else {
+      // Non-trivial copyable types only have to consider deinit-barriers for classes.
+      return isDeinitBarrier(context.calleeAnalysis)
+    }
+
+    // Check side-effects of non-copyable deinits.
+
+    guard let nominal = type.nominal else {
+      return true
+    }
+    if nominal.valueTypeDestructor != nil {
+      guard let deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
+        return true
+      }
+      let destructorEffects = deinitFunc.getSideEffects().memory
+      if instEffects.write || destructorEffects.write {
+        return true
+      }
+    }
+
+    switch nominal {
+    case is StructDecl:
+      guard let fields = type.getNominalFields(in: parentFunction) else {
+        return true
+      }
+      return fields.contains { isBarrierForDestroy(of: $0, context) }
+    case is EnumDecl:
+      guard let enumCases = type.getEnumCases(in: parentFunction) else {
+        return true
+      }
+      return enumCases.contains {
+        if let payload = $0.payload {
+          return isBarrierForDestroy(of: payload, context)
+        }
+        return false
+      }
+    default:
+      return true
+    }
+  }
+
 }
 
 // Match the pattern:
@@ -1132,4 +1180,15 @@ func cloneAndSpecializeFunction(from originalFunction: Function,
                                       substitutions: substitutions, context)
   defer { cloner.deinitialize() }
   cloner.cloneFunctionBody()
+}
+
+let destroyBarrierTest = FunctionTest("destroy_barrier") { function, arguments, context in
+  let type = arguments.takeValue().type
+  for inst in function.instructions {
+    if inst.isBarrierForDestroy(of: type, context) {
+      print("barrier: \(inst)")
+    } else {
+      print("transparent: \(inst)")
+    }
+  }
 }

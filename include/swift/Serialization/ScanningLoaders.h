@@ -22,6 +22,11 @@ namespace swift {
 /// Result of looking up a Swift module on the current filesystem
 /// search paths.
 struct SwiftModuleScannerQueryResult {
+  // Checked for by the scanner as a special case
+  // for downgrading imcompatible-candidate-only lookup result
+  // to a warning.
+  static constexpr const char *BUILT_FOR_INCOMPATIBLE_TARGET =
+      "built for incompatible target";
   struct IncompatibleCandidate {
     std::string path;
     std::string incompatibilityReason;

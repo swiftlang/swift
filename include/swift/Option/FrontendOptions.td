@@ -703,6 +703,12 @@ def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-valid
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
 
+def verbose_asm : Flag<["-"], "verbose-asm">,
+  HelpText<"Generate verbose assembly output with comments">;
+
+def no_verbose_asm : Flag<["-"], "no-verbose-asm">,
+  HelpText<"Disable verbose assembly output (default is enabled)">;
+
 def emit_pch : Flag<["-"], "emit-pch">,
   HelpText<"Emit PCH for imported Objective-C header file">, ModeOpt;
 
@@ -1470,6 +1476,13 @@ def disable_split_cold_code :
 def mergeable_traps :
   Flag<["-"], "mergeable-traps">,
   HelpText<"Emit mergeable traps even in optimized builds">;
+
+def enable_client_retain_release :
+  Flag<["-"], "enable-client-retain-release">,
+  HelpText<"Enable use of swift_retain/releaseClient functions">;
+def disable_client_retain_release :
+  Flag<["-"], "disable-client-retain-release">,
+  HelpText<"Disable use of swift_retain/releaseClient functions">;
 
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,

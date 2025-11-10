@@ -16,7 +16,7 @@ def _update_arguments_with_fake_path(repo_name: str, path: str) -> UpdateArgumen
         reset_to_remote=False,
         clean=False,
         stash=False,
-        cross_repos_pr=False,
+        cross_repos_pr={},
         output_prefix="",
         verbose=False,
     )

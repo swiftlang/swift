@@ -7,7 +7,6 @@
 
 class C {}
 
-@_manualOwnership
 func hello() -> (C, C) {
   @_noImplicitCopy let x = C() // expected-error {{'@_noImplicitCopy' cannot be used with ManualOwnership}}
   return (x, x)

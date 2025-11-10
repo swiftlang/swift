@@ -210,7 +210,7 @@ private extension LoadingInstruction {
         return false
       }
       switch address.accessBase {
-      case .box, .stack:
+      case .box, .stack, .global:
         break
       default:
         return false

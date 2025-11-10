@@ -34,8 +34,9 @@ import A
 // CHECK: bb0([[SELF:%.*]] : $Test):
 // CHECK:  [[MAIN_ACTOR_EXISTENTIAL:%.*]] = init_existential_ref %4 : $MainActor : $MainActor, $any Actor
 // CHECK:  [[ANY_ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[MAIN_ACTOR_EXISTENTIAL]]
-// CHECK:  [[TEST_METHOD:%.*]] = function_ref @$s1A4TestC4testyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed Test) -> ()
-// CHECK:  apply [[TEST_METHOD]]([[ANY_ACTOR]], [[SELF]])
+// CHECK:  [[ANY_ACTOR_CAST:%.*]] = unchecked_bitwise_cast [[ANY_ACTOR]] to $Builtin.ImplicitActor
+// CHECK:  [[TEST_METHOD:%.*]] = function_ref @$s1A4TestC4testyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed Test) -> ()
+// CHECK:  apply [[TEST_METHOD]]([[ANY_ACTOR_CAST]], [[SELF]])
 // CHECK: } // end sil function '$s6Client4test1ty1A4TestC_tYaF'
 @MainActor
 func test(t: Test) async {

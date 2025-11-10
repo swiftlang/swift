@@ -6,8 +6,7 @@
 /// Generate the compatibility header cdecl.h
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %t/Lib.swift \
 // RUN:   -emit-module -o %t -verify -F %t \
-// RUN:   -emit-clang-header-path %t/cdecl.h \
-// RUN:   -enable-experimental-feature CDecl
+// RUN:   -emit-clang-header-path %t/cdecl.h
 
 /// Check compatibility header directly
 // RUN: %FileCheck %s --input-file %t/cdecl.h
@@ -15,7 +14,6 @@
 // RUN: %check-in-clang-c %t/cdecl.h -F %t
 // RUN: %check-in-clang-cxx %t/cdecl.h -F %t
 
-// REQUIRES: swift_feature_CDecl
 // REQUIRES: objc_interop
 
 //--- CFramework.framework/Modules/module.modulemap
@@ -53,11 +51,11 @@ import Foundation
 // CHECK: extern "C" {
 // CHECK: #endif
 
-@c("get_int_alias")
+@c(get_int_alias)
 public func getIntAlias() -> IntFromCFramework { 42 }
 // CHECK: SWIFT_EXTERN IntFromCFramework get_int_alias(void) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
-@c("imports_cgpoint")
+@c(imports_cgpoint)
 public func importsCGPoint(pt: CGPoint) {  }
 // CHECK: SWIFT_EXTERN void imports_cgpoint(CGPoint pt) SWIFT_NOEXCEPT;
 

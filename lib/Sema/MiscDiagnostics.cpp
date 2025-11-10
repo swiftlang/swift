@@ -5223,7 +5223,8 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
   // restriction, macros would need to either be expanded when printed in
   // swiftinterfaces or be parsable as macros by module clients.
   auto fragileKind = DC->getFragileFunctionKind();
-  if (fragileKind.kind != FragileFunctionKind::None) {
+  if (fragileKind.kind != FragileFunctionKind::None &&
+      fragileKind.kind != FragileFunctionKind::EmbeddedAlwaysEmitIntoClient) {
     for (auto availSpec : info->getQueries()) {
       if (availSpec->getMacroLoc().isValid()) {
         diags.diagnose(availSpec->getMacroLoc(),
@@ -6374,8 +6375,6 @@ static bool isReturningFRT(const clang::NamedDecl *ND,
 static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
                                                  clang::QualType retType,
                                                  ASTContext &Ctx) {
-  if (!Ctx.LangOpts.hasFeature(Feature::WarnUnannotatedReturnOfCxxFrt))
-    return false;
 
   auto attrInfo = importer::ReturnOwnershipInfo(ND);
   if (attrInfo.hasRetainAttr())
@@ -6453,7 +6452,7 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
       if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx)) {
         SourceLoc diagnosticLoc = func->getLoc();
         if (diagnosticLoc.isInvalid() && func->getClangDecl()) {
-          // Fixme: Remove the diagnosticLoc once the source locations of the
+          // FIXME: Remove the diagnosticLoc once the source locations of the
           // objc method declarations are imported correctly.
           diagnosticLoc = Ctx.getClangModuleLoader()->importSourceLocation(
               ND->getLocation());
@@ -6499,9 +6498,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
-  if (ctx.LangOpts.hasFeature(Feature::CompileTimeValues) &&
-      !ctx.LangOpts.hasFeature(Feature::CompileTimeValuesPreview))
-    diagnoseInvalidConstExpressions(E, DC, isConstInitExpr);
+  diagnoseInvalidConstExpressions(E, DC, isConstInitExpr);
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
   diagnoseMissingMemberImports(E, DC);

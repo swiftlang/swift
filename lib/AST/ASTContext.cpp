@@ -19,8 +19,8 @@
 #include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
-#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -67,6 +67,8 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
@@ -425,6 +427,13 @@ struct ASTContext::Implementation {
   ///  -> Builtin.Int1
   FuncDecl *IsOSVersionAtLeastOrVariantVersionAtLeastDecl = nullptr;
 
+  /// func _isSwiftRuntimeVersionAtLeast(
+  ///   Builtin.Word,
+  ///   Builtin.Word,
+  ///   Builtin.word)
+  ///  -> Builtin.Int1
+  FuncDecl *IsSwiftRuntimeVersionAtLeastDecl = nullptr;
+
   /// The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
@@ -437,6 +446,9 @@ struct ASTContext::Implementation {
 
   /// Singleton used to cache the import graph.
   swift::namelookup::ImportCache TheImportCache;
+
+  /// The module loader used to load explicit Swift modules.
+  SerializedModuleLoaderBase *TheExplicitSwiftModuleLoader = nullptr;
 
   /// The module loader used to load Clang modules.
   ClangModuleLoader *TheClangModuleLoader = nullptr;
@@ -525,6 +537,13 @@ struct ASTContext::Implementation {
 
   /// Local and closure discriminators per context.
   llvm::DenseMap<const DeclContext *, unsigned> NextDiscriminator;
+
+  /// Cached generic signatures for generic builtin types.
+  static const unsigned NumBuiltinGenericTypes
+    = unsigned(TypeKind::Last_BuiltinGenericType)
+        - unsigned(TypeKind::First_BuiltinGenericType) + 1;
+  std::array<GenericSignature, NumBuiltinGenericTypes>
+  BuiltinGenericTypeSignatures = {};
 
   /// Structure that captures data that is segregated into different
   /// arenas.
@@ -634,6 +653,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
+  llvm::FoldingSet<DeclNameRef::SelectiveDeclNameRef> SelectiveNameRefs;
   llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
@@ -1416,7 +1436,7 @@ ASTContext::synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const {
   protocol->setImplicit(true);
 
   // @_marker
-  protocol->getAttrs().add(new (*this) MarkerAttr(/*implicit=*/true));
+  protocol->addAttribute(new (*this) MarkerAttr(/*implicit=*/true));
 
   // public
   protocol->setAccess(AccessLevel::Public);
@@ -1934,7 +1954,7 @@ FuncDecl *ASTContext::getIsVariantOSVersionAtLeastDecl() const {
 }
 
 FuncDecl *ASTContext::getIsOSVersionAtLeastOrVariantVersionAtLeast() const {
-if (getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl)
+  if (getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl)
     return getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl;
 
   auto decl = findLibraryIntrinsic(*this,
@@ -1943,6 +1963,18 @@ if (getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl)
     return nullptr;
 
   getImpl().IsOSVersionAtLeastOrVariantVersionAtLeastDecl = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getIsSwiftRuntimeVersionAtLeast() const {
+  if (getImpl().IsSwiftRuntimeVersionAtLeastDecl)
+    return getImpl().IsSwiftRuntimeVersionAtLeastDecl;
+
+  auto decl = findLibraryIntrinsic(*this, "_isSwiftRuntimeVersionAtLeast");
+  if (!decl)
+    return nullptr;
+
+  getImpl().IsSwiftRuntimeVersionAtLeastDecl = decl;
   return decl;
 }
 
@@ -2140,14 +2172,23 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
     clangLoader->addSearchPath(searchPath, isFramework, isSystem);
 }
 
+void ASTContext::addExplicitModulePath(StringRef name, std::string path) {
+  if (getImpl().TheExplicitSwiftModuleLoader)
+    getImpl().TheExplicitSwiftModuleLoader->addExplicitModulePath(name, path);
+}
+
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
-                                 bool IsClang, bool IsDwarf, bool IsInterface) {
+                                 bool IsClang, bool IsDwarf, bool IsInterface,
+                                 bool IsExplicit) {
   if (IsClang && !IsDwarf && !getImpl().TheClangModuleLoader)
     getImpl().TheClangModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
   if (IsClang && IsDwarf && !getImpl().TheDWARFModuleLoader)
     getImpl().TheDWARFModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
+  if (IsExplicit && !getImpl().TheExplicitSwiftModuleLoader)
+    getImpl().TheExplicitSwiftModuleLoader =
+        static_cast<SerializedModuleLoaderBase *>(loader.get());
   getImpl().ModuleLoaders.push_back(std::move(loader));
 }
 
@@ -6214,6 +6255,39 @@ DeclName::DeclName(ASTContext &C, DeclBaseName baseName,
   initialize(C, baseName, names);
 }
 
+void DeclNameRef::SelectiveDeclNameRef::Profile(llvm::FoldingSetNodeID &id,
+                                                Identifier moduleSelector,
+                                                DeclName fullName) {
+  ASSERT(!moduleSelector.empty() &&
+         "Looking up SelectiveDeclNameRef with empty module?");
+  id.AddPointer(moduleSelector.getAsOpaquePointer());
+  id.AddPointer(fullName.getOpaqueValue());
+}
+
+void DeclNameRef::initialize(ASTContext &C, Identifier moduleSelector,
+                             DeclName fullName) {
+  if (moduleSelector.empty()) {
+    storage = fullName;
+    return;
+  }
+
+  llvm::FoldingSetNodeID id;
+  SelectiveDeclNameRef::Profile(id, moduleSelector, fullName);
+
+  void *insert = nullptr;
+  if (SelectiveDeclNameRef *selectiveRef
+        = C.getImpl().SelectiveNameRefs.FindNodeOrInsertPos(id, insert)) {
+    storage = selectiveRef;
+    return;
+  }
+
+  auto buf = C.Allocate(sizeof(SelectiveDeclNameRef),
+                        alignof(SelectiveDeclNameRef));
+  auto selectiveRef = new (buf) SelectiveDeclNameRef(moduleSelector, fullName);
+  storage = selectiveRef;
+  C.getImpl().SelectiveNameRefs.InsertNode(selectiveRef, insert);
+}
+
 /// Find the implementation of the named type in the given module.
 static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx, 
                                                    Identifier name,
@@ -7289,4 +7363,14 @@ AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
 
   // Fall back to the universal domain for triples without a platform.
   return AvailabilityDomain::forUniversal();
+}
+
+GenericSignature &
+ASTContext::getCachedBuiltinGenericTypeSignature(TypeKind kind) {
+  ASSERT(kind >= TypeKind::First_BuiltinGenericType
+         && kind <= TypeKind::Last_BuiltinGenericType
+         && "not a builtin generic type kind");
+
+  return getImpl().BuiltinGenericTypeSignatures
+    [unsigned(kind) - unsigned(TypeKind::First_BuiltinGenericType)];
 }

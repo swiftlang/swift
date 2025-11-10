@@ -51,7 +51,8 @@ public func registerOptimizerTests() {
     localVariableReachableUsesTest,
     localVariableReachingAssignmentsTest,
     rangeOverlapsPathTest,
-    variableIntroducerTest
+    variableIntroducerTest,
+    destroyBarrierTest
   )
 
   // Finally register the thunk they all call through.

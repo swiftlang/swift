@@ -98,6 +98,11 @@ void BridgedDeclAttributes_add(BridgedDeclAttributes *cAttrs,
   *cAttrs = attrs;
 }
 
+bool BridgedDeclAttributes_hasAttribute(
+    const BridgedDeclAttributes *_Nonnull attrs, swift::DeclAttrKind kind) {
+  return attrs->unbridged().getAttribute(kind) != nullptr;
+}
+
 static AvailableAttr::Kind unbridge(BridgedAvailableAttrKind value) {
   switch (value) {
   case BridgedAvailableAttrKindDefault:
@@ -261,10 +266,11 @@ BridgedDifferentiableAttr BridgedDifferentiableAttr_createParsed(
 BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceLoc attrNameLoc,
     SourceLoc lParenLoc, BridgedDeclNameRef cReplacedFunction,
-    SourceLoc rParenLoc) {
+    BridgedDeclNameLoc cReplacedFunctionLoc, swift::SourceLoc rParenLoc) {
   return DynamicReplacementAttr::create(
       cContext.unbridged(), atLoc, attrNameLoc, lParenLoc,
-      cReplacedFunction.unbridged(), rParenLoc);
+      cReplacedFunction.unbridged(), cReplacedFunctionLoc.unbridged(),
+      rParenLoc);
 }
 
 BridgedDocumentationAttr BridgedDocumentationAttr_createParsed(
@@ -689,7 +695,8 @@ BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedNullableTrailingWhereClause cWhereClause, bool exported,
     BridgedSpecializationKind cKind, BridgedDeclNameRef cTargetFunction,
-    BridgedArrayRef cSPIGroups, BridgedArrayRef cAvailableAttrs) {
+    BridgedDeclNameLoc cTargetFunctionLoc, BridgedArrayRef cSPIGroups,
+    BridgedArrayRef cAvailableAttrs) {
   auto spiGroups = cSPIGroups.unbridged<Identifier>();
   SmallVector<AvailableAttr *, 2> availableAttrs;
   for (auto bridging : cAvailableAttrs.unbridged<BridgedAvailableAttr>())
@@ -697,14 +704,16 @@ BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
 
   return SpecializeAttr::create(
       cContext.unbridged(), atLoc, range, cWhereClause.unbridged(), exported,
-      unbridge(cKind), cTargetFunction.unbridged(), spiGroups, availableAttrs);
+      unbridge(cKind), cTargetFunction.unbridged(),
+      cTargetFunctionLoc.unbridged(), spiGroups, availableAttrs);
 }
 
 BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedNullableTrailingWhereClause cWhereClause, bool exported,
     BridgedSpecializationKind cKind, BridgedDeclNameRef cTargetFunction,
-    BridgedArrayRef cSPIGroups, BridgedArrayRef cAvailableAttrs) {
+    BridgedDeclNameLoc cTargetFunctionLoc, BridgedArrayRef cSPIGroups,
+    BridgedArrayRef cAvailableAttrs) {
   auto spiGroups = cSPIGroups.unbridged<Identifier>();
   SmallVector<AvailableAttr *, 2> availableAttrs;
   for (auto bridging : cAvailableAttrs.unbridged<BridgedAvailableAttr>())
@@ -712,7 +721,8 @@ BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
 
   return SpecializedAttr::create(
       cContext.unbridged(), atLoc, range, cWhereClause.unbridged(), exported,
-      unbridge(cKind), cTargetFunction.unbridged(), spiGroups, availableAttrs);
+      unbridge(cKind), cTargetFunction.unbridged(),
+      cTargetFunctionLoc.unbridged(), spiGroups, availableAttrs);
 }
 
 BridgedSPIAccessControlAttr

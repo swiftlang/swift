@@ -66,6 +66,11 @@ namespace irgen {
   class TypeInfo;
   enum class ValueWitness : unsigned;
 
+enum AllowsTaskAlloc_t : bool {
+  DoesNotAllowTaskAlloc = false,
+  AllowsTaskAlloc = true,
+};
+
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
 class IRGenFunction {
@@ -302,12 +307,15 @@ public:
                        const llvm::Twine &name = "");
 
   StackAddress emitDynamicAlloca(SILType type, const llvm::Twine &name = "");
-  StackAddress emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize,
-                                 Alignment align, bool allowTaskAlloc = true,
-                                 const llvm::Twine &name = "");
+  StackAddress
+  emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize, Alignment align,
+                    AllowsTaskAlloc_t allowTaskAlloc = AllowsTaskAlloc,
+                    llvm::Value *mallocTypeId = nullptr,
+                    const llvm::Twine &name = "");
   void emitDeallocateDynamicAlloca(StackAddress address,
                                    bool allowTaskDealloc = true,
-                                   bool useTaskDeallocThrough = false);
+                                   bool useTaskDeallocThrough = false,
+                                   bool forCalleeCoroutineFrame = false);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);

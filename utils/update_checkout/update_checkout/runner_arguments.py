@@ -1,5 +1,8 @@
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
+
+from .cli_arguments import CliArguments
+
 
 @dataclass
 class RunnerArguments:
@@ -8,26 +11,24 @@ class RunnerArguments:
     output_prefix: str
     verbose: bool
 
+
 @dataclass
 class UpdateArguments(RunnerArguments):
     source_root: str
     config: Dict[str, Any]
     scheme_map: Any
-    tag: str
+    tag: Optional[str]
     timestamp: Any
     reset_to_remote: bool
     clean: bool
     stash: bool
-    cross_repos_pr: bool
+    cross_repos_pr: Dict[str, str]
+
 
 @dataclass
 class AdditionalSwiftSourcesArguments(RunnerArguments):
-    args: RunnerArguments
+    args: CliArguments
     repo_info: str
     repo_branch: str
     remote: str
-    with_ssh: bool
-    skip_history: bool
-    skip_tags: bool
-    skip_repository_list: bool
-    use_submodules: bool
+    skip_repository_list: List[str]

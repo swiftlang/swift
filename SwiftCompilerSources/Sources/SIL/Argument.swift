@@ -290,7 +290,7 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
   }
 
   public subscript(_ argumentIndex: Int) -> ArgumentConvention {
-    if let paramIdx = parameterIndex(for: argumentIndex) {
+    if let paramIdx = parameterIndex(ofArgumentIndex: argumentIndex) {
       return convention.parameters[paramIdx].convention
     }
     let resultInfo = convention.indirectSILResult(at: argumentIndex)
@@ -298,35 +298,34 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
   }
 
   public subscript(result argumentIndex: Int) -> ResultInfo? {
-    if parameterIndex(for: argumentIndex) != nil {
+    if parameterIndex(ofArgumentIndex: argumentIndex) != nil {
       return nil
     }
     return convention.indirectSILResult(at: argumentIndex)
   }
 
   public subscript(parameter argumentIndex: Int) -> ParameterInfo? {
-    guard let paramIdx = parameterIndex(for: argumentIndex) else {
+    guard let paramIdx = parameterIndex(ofArgumentIndex: argumentIndex) else {
       return nil
     }
     return convention.parameters[paramIdx]
   }
 
   public subscript(parameterDependencies targetArgumentIndex: Int) -> FunctionConvention.LifetimeDependencies? {
-    guard let targetParamIdx = parameterIndex(for: targetArgumentIndex) else {
+    guard let targetParamIdx = parameterIndex(ofArgumentIndex: targetArgumentIndex) else {
       return nil
     }
     return convention.parameterDependencies(for: targetParamIdx)
   }
 
+  /// Return a parameter dependence of the target argument on the source argument.
+  public func parameterDependence(targetArgumentIndex: Int, sourceArgumentIndex: Int) -> LifetimeDependenceConvention? {
+    findDependence(source: sourceArgumentIndex, in: self[parameterDependencies: targetArgumentIndex])
+  }
+
   /// Return a dependence of the function results on the indexed parameter.
   public subscript(resultDependsOn argumentIndex: Int) -> LifetimeDependenceConvention? {
     findDependence(source: argumentIndex, in: convention.resultDependencies)
-  }
-
-  /// Return a dependence of the target argument on the source argument.
-  public func getDependence(target targetArgumentIndex: Int, source sourceArgumentIndex: Int)
-    -> LifetimeDependenceConvention? {
-    findDependence(source: sourceArgumentIndex, in: self[parameterDependencies: targetArgumentIndex])
   }
 
   /// Number of SIL arguments for the function type's results
@@ -365,14 +364,14 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
 }
 
 extension ArgumentConventions {
-  private func parameterIndex(for argIdx: Int) -> Int? {
+  private func parameterIndex(ofArgumentIndex argIdx: Int) -> Int? {
     let firstParamIdx = firstParameterIndex  // bridging call
     return argIdx < firstParamIdx ? nil : argIdx - firstParamIdx
   }
 
   private func findDependence(source argumentIndex: Int, in dependencies: FunctionConvention.LifetimeDependencies?)
     -> LifetimeDependenceConvention? {
-    guard let paramIdx = parameterIndex(for: argumentIndex) else {
+    guard let paramIdx = parameterIndex(ofArgumentIndex: argumentIndex) else {
       return nil
     }
     return dependencies?[paramIdx]
@@ -488,8 +487,8 @@ public enum ArgumentConvention : CustomStringConvertible {
       self = .directUnowned
     case .pack:
       self = .packOut
-    case .guaranteed, .guaranteedAddress:
-      fatalError("Result conventions @guaranteed and @guaranteed_addr are always returned directly")
+    case .guaranteed, .guaranteedAddress, .inout:
+      fatalError("Result conventions @guaranteed, @guaranteed_address and @inout are always returned directly")
     }
   }
 

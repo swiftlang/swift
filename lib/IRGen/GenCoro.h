@@ -16,7 +16,9 @@ namespace irgen {
 class IRGenModule;
 
 llvm::Constant *getCoroAllocFn(IRGenModule &IGM);
+llvm::Constant *getCoroAllocFrameFn(IRGenModule &IGM);
 llvm::Constant *getCoroDeallocFn(IRGenModule &IGM);
+llvm::Constant *getCoroDeallocFrameFn(IRGenModule &IGM);
 
 llvm::Value *
 emitYieldOnce2CoroutineAllocator(IRGenFunction &IGF,

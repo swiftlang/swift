@@ -1855,7 +1855,6 @@ public:
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
-  NullablePtr<AbstractClosureExpr> parentClosureIfAny() const; // public??
   BraceStmt *getStmt() const override { return stmt; }
 
 protected:

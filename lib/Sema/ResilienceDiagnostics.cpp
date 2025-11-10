@@ -97,6 +97,11 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     return false;
   }
 
+  // Embedded functions can reference non-public decls as they are visible
+  // to clients.
+  if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient)
+    return false;
+
   DowngradeToWarning downgradeToWarning = DowngradeToWarning::No;
 
   // Swift 4.2 did not perform any checks for type aliases.
@@ -162,7 +167,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
         ModuleDecl *importedVia = attributedImport.module.importedModule,
                    *sourceModule = D->getModuleContext();
         ctx.Diags.diagnose(loc, diag::module_api_import_aliases, D, importedVia,
-                           sourceModule, importedVia == sourceModule);
+                           sourceModule,
+                           importedVia->getTopLevelModule() == sourceModule);
       });
 
   auto ignoredDowngradeToWarning = DowngradeToWarning::No;
@@ -255,6 +261,7 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
   case ExportabilityReason::General:
   case ExportabilityReason::ResultBuilder:
   case ExportabilityReason::PropertyWrapper:
+  case ExportabilityReason::PublicVarDecl:
     return false;
   }
 }
@@ -283,11 +290,13 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
           ModuleDecl *importedVia = attributedImport.module.importedModule,
                      *sourceModule = D->getModuleContext();
           ctx.Diags.diagnose(loc, diag::module_api_import, D, importedVia,
-                             sourceModule, importedVia == sourceModule,
+                             sourceModule,
+                             importedVia->getTopLevelModule() == sourceModule,
                              /*isImplicit*/ false);
         }
       });
 
+  auto fragileKind = where.getFragileFunctionKind();
   switch (originKind) {
   case DisallowedOriginKind::None:
     // The decl does not come from a source that needs to be checked for
@@ -319,11 +328,15 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
     if (reason && reason == ExportabilityReason::AvailableAttribute &&
         ctx.LangOpts.LibraryLevel == LibraryLevel::API)
       return false;
+    LLVM_FALLTHROUGH;
+
+  case DisallowedOriginKind::SPIImported:
+  case DisallowedOriginKind::SPILocal:
+    if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient)
+      return false;
     break;
 
   case DisallowedOriginKind::ImplementationOnly:
-  case DisallowedOriginKind::SPIImported:
-  case DisallowedOriginKind::SPILocal:
   case DisallowedOriginKind::FragileCxxAPI:
     break;
   }
@@ -335,7 +348,6 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
       return false;
   }
 
-  auto fragileKind = where.getFragileFunctionKind();
   if (fragileKind.kind == FragileFunctionKind::None) {
     DiagnosticBehavior limit = downgradeToWarning == DowngradeToWarning::Yes
                              ? DiagnosticBehavior::Warning
@@ -426,7 +438,7 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
         ctx.Diags.diagnose(loc, diag::module_api_import_conformance,
                            rootConf->getType(), rootConf->getProtocol(),
                            importedVia, sourceModule,
-                           importedVia == sourceModule);
+                           importedVia->getTopLevelModule() == sourceModule);
       });
 
   auto originKind = getDisallowedOriginKind(ext, where);

@@ -5,6 +5,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: std_span
 
 //--- Inputs/module.modulemap
 module Test {
@@ -80,6 +81,13 @@ struct DerivedFromSharedObject : SharedObject {};
 struct OwnedData {
   SpanOfInt getView() const [[clang::lifetimebound]];
   void takeSharedObject(SharedObject *) const;
+};
+
+struct HoldsShared {
+  SharedObject* obj;
+
+  SharedObject* getObj() const SWIFT_RETURNS_INDEPENDENT_VALUE
+                               SWIFT_RETURNS_UNRETAINED;
 };
 
 //--- test.swift
@@ -172,6 +180,7 @@ func useSharedReference(frt: SharedObject, x: OwnedData) {
 }
 
 @available(SwiftStdlib 5.8, *)
-func useSharedReference(frt: DerivedFromSharedObject) {
+func useSharedReference(frt: DerivedFromSharedObject, h: HoldsShared) {
   let _ = frt
+  let _ = h.getObj()
 }

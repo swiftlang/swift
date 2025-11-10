@@ -116,7 +116,7 @@ public distributed actor MyOtherActor {
 // CHECK: missing-witness1:
 // CHECK-NEXT: call void @llvm.trap()
 // CHECK-NEXT: unreachable
-// CHECK: call swiftcc void @"$s27FakeDistributedActorSystems0A17InvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"(ptr noalias sret(%swift.opaque) [[ARG_0_VALUE_BUF]], ptr %arg_type, ptr [[ENCODABLE_WITNESS]], ptr [[DECODABLE_WITNESS]], ptr swiftself [[DECODER]], ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK: call swiftcc void @"$s27FakeDistributedActorSystems0A17InvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"(ptr noalias sret(%swift.opaque) [[ARG_0_VALUE_BUF]], ptr %arg_type, ptr [[ENCODABLE_WITNESS]], ptr [[DECODABLE_WITNESS]], ptr swiftself [[DECODER]], ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 
 // CHECK: store ptr null, ptr %swifterror
 // CHECK-NEXT: %._value = getelementptr inbounds{{.*}} %TSi, ptr [[ARG_0_VALUE_BUF]], i32 0, i32 0

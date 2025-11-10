@@ -16,9 +16,7 @@ Some upcoming features have an additional "migration" mode, where the compiler w
 with fix-its to help migrate to that mode. This can be enabled with `-enable-upcoming-feature
 <feature>:migrate`.
 
-
 ## Topics
-
 - <doc:existential-any>
 - <doc:member-import-visibility>
 - <doc:nonisolated-nonsending-by-default>

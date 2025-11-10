@@ -2248,6 +2248,19 @@ void SILCloner<ImplClass>::visitCopyableToMoveOnlyWrapperValueInst(
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitUncheckedOwnershipInst(
+    UncheckedOwnershipInst *uoi) {
+  getBuilder().setCurrentDebugScope(getOpScope(uoi->getDebugScope()));
+  if (!getBuilder().hasOwnership()) {
+    return recordFoldedValue(uoi, getOpValue(uoi->getOperand()));
+  }
+
+  recordClonedInstruction(
+      uoi, getBuilder().createUncheckedOwnership(
+               getOpLocation(uoi->getLoc()), getOpValue(uoi->getOperand())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitReleaseValueInst(ReleaseValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
@@ -3154,6 +3167,16 @@ void SILCloner<ImplClass>::visitUncheckedOwnershipConversionInst(
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitImplicitActorToOpaqueIsolationCastInst(
+    ImplicitActorToOpaqueIsolationCastInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+
+  recordClonedInstruction(
+      Inst, getBuilder().createImplicitActorToOpaqueIsolationCast(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getValue())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitMarkDependenceInst(MarkDependenceInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
@@ -3405,6 +3428,22 @@ SILCloner<ImplClass>::visitReturnInst(ReturnInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createReturn(getOpLocation(Inst->getLoc()),
                                       getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitReturnBorrowInst(ReturnBorrowInst *rbi) {
+  getBuilder().setCurrentDebugScope(getOpScope(rbi->getDebugScope()));
+  if (!getBuilder().hasOwnership()) {
+    return recordClonedInstruction(
+        rbi, getBuilder().createReturn(getOpLocation(rbi->getLoc()),
+                                       getOpValue(rbi->getReturnValue())));
+  }
+
+  auto enclosingValues = getOpValueArray<8>(rbi->getEnclosingValues());
+  recordClonedInstruction(
+      rbi, getBuilder().createReturnBorrow(getOpLocation(rbi->getLoc()),
+                                           getOpValue(rbi->getReturnValue()),
+                                           enclosingValues));
 }
 
 template<typename ImplClass>

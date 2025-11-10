@@ -9,8 +9,8 @@ import SPIContainer
 @_spi(a) public let a: SPIInterface1 = .init()
 @_spi(a) public let b: SPIInterface2 = .init()
 
-public let c: SPIInterface1 = .init() // expected-error{{cannot use class 'SPIInterface1' here; it is an SPI imported from 'SPIContainer'}}
-public let d: SPIInterface2 = .init() // expected-error{{cannot use class 'SPIInterface2' here; it is an SPI imported from 'SPIContainer'}}
+public let c: SPIInterface1 = .init() // expected-error{{cannot use class 'SPIInterface1' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is an SPI imported from 'SPIContainer'}}
+public let d: SPIInterface2 = .init() // expected-error{{cannot use class 'SPIInterface2' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is an SPI imported from 'SPIContainer'}}
 
 @inlinable
 public func inlinableUsingSPI() {
@@ -21,7 +21,7 @@ public func inlinableUsingSPI() {
 public let e: SPIInterface2 = .init()
 
 @available(iOS, unavailable)
-public let f: SPIInterface2 = .init() // expected-error{{cannot use class 'SPIInterface2' here; it is an SPI imported from 'SPIContainer'}}
+public let f: SPIInterface2 = .init() // expected-error{{cannot use class 'SPIInterface2' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is an SPI imported from 'SPIContainer'}}
 
 @inlinable
 @available(macOS, unavailable)

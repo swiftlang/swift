@@ -372,6 +372,8 @@ enum class TypeMatchFlags {
   IgnoreSendability = 1 << 7,
   /// Ignore global actor isolation attributes on functions when matching types.
   IgnoreFunctionGlobalActorIsolation = 1 << 8,
+  /// Require parameter labels to match.
+  RequireMatchingParameterLabels = 1 << 9,
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
@@ -1002,6 +1004,13 @@ public:
 
   /// Determines whether this type is an any actor type.
   bool isAnyActorType();
+
+  /// Is this a type whose value is a value that a function can use in an
+  /// isolated parameter position. This could be a type that actually conforms
+  /// to AnyActor or it could be a type like any Actor, Optional<any Actor> or
+  /// Builtin.ImplicitActor that do not conform to Actor but from which we can
+  /// derive a value that conforms to the Actor protocol.
+  bool canBeIsolatedTo();
 
   /// Returns true if this type conforms to Sendable, or if its a function type
   /// that is @Sendable.
@@ -1773,12 +1782,45 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnboundGenericType, BuiltinType)
 
+/// BuiltinGenericType - Base class for builtins that are parameterized by
+/// a generic signature.
+class BuiltinGenericType : public BuiltinType {
+protected:
+
+  BuiltinGenericType(TypeKind kind, ASTContext &context,
+                     RecursiveTypeProperties properties)
+    : BuiltinType(kind, context, properties)
+  {}
+
+  /// The substitution map is cached here once requested.
+  mutable std::optional<SubstitutionMap> CachedSubstitutionMap = std::nullopt;
+  
+public:  
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_BuiltinGenericType
+      && T->getKind() <= TypeKind::Last_BuiltinGenericType;
+  }
+
+  // Get the generic signature describing the parameterization of types of
+  // this class.
+  GenericSignature getGenericSignature() const;
+
+  // Get the substitution map for this particular type.
+  SubstitutionMap getSubstitutions() const;
+
+  // Produce another type of the same class but with different arguments.
+  CanTypeWrapper<BuiltinGenericType>
+  getWithSubstitutions(SubstitutionMap newSubs) const;
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinGenericType, BuiltinType)
+
 /// BuiltinFixedArrayType - The builtin type representing N values stored
 /// inline contiguously.
 ///
 /// All elements of a value of this type must be fully initialized any time the
 /// value may be copied, moved, or destroyed.
-class BuiltinFixedArrayType : public BuiltinType, public llvm::FoldingSetNode {
+class BuiltinFixedArrayType : public BuiltinGenericType,
+                              public llvm::FoldingSetNode {
   friend class ASTContext;
   
   CanType Size;
@@ -1786,11 +1828,16 @@ class BuiltinFixedArrayType : public BuiltinType, public llvm::FoldingSetNode {
   
   BuiltinFixedArrayType(CanType Size, CanType ElementType,
                         RecursiveTypeProperties properties)
-    : BuiltinType(TypeKind::BuiltinFixedArray, ElementType->getASTContext(),
-                  properties),
+    : BuiltinGenericType(TypeKind::BuiltinFixedArray,
+                         ElementType->getASTContext(),
+                         properties),
         Size(Size),
         ElementType(ElementType)
   {}
+  
+  friend BuiltinGenericType;
+  /// Get the generic arguments as a substitution map.
+  SubstitutionMap buildSubstitutions() const;
   
 public:
   /// Arrays with more elements than this are always treated as in-memory values.
@@ -1819,7 +1866,7 @@ public:
   
   /// Get the element type.
   CanType getElementType() const { return ElementType; }
-  
+
   void Profile(llvm::FoldingSetNodeID &ID) const {
     Profile(ID, getSize(), getElementType());
   }
@@ -1829,7 +1876,7 @@ public:
     ID.AddPointer(ElementType.getPointer());
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFixedArrayType, BuiltinType)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFixedArrayType, BuiltinGenericType)
 
 /// BuiltinRawPointerType - The builtin raw (and dangling) pointer type.  This
 /// pointer is completely unmanaged and is equivalent to i8* in LLVM IR.
@@ -2018,6 +2065,19 @@ public:
 BEGIN_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getElementType)
 END_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
+
+class BuiltinImplicitActorType : public BuiltinType {
+  friend class ASTContext;
+
+  BuiltinImplicitActorType(const ASTContext &context)
+      : BuiltinType(TypeKind::BuiltinImplicitActor, context) {}
+
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinImplicitActor;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinImplicitActorType, BuiltinType)
 
 /// Size descriptor for a builtin integer type. This is either a fixed bit
 /// width or an abstract target-dependent value such as "size of a pointer".
@@ -4794,12 +4854,16 @@ enum class ResultConvention : uint8_t {
   Pack,
 
   /// The caller is responsible for using the returned address within a valid
-  /// scope. This is valid only for borrow and mutate accessors.
+  /// scope. This is valid only for borrow accessors.
   GuaranteedAddress,
 
   /// The caller is responsible for using the returned value within a valid
   /// scope. This is valid only for borrow accessors.
   Guaranteed,
+
+  /// The caller is responsible for mutating the returned address within a valid
+  /// scope. This is valid only for mutate accessors.
+  Inout,
 };
 
 // Does this result require indirect storage for the purpose of reabstraction?
@@ -4811,6 +4875,7 @@ inline bool isIndirectFormalResult(ResultConvention convention) {
 /// A result type and the rules for returning it.
 class SILResultInfo {
 public:
+  // Must be kept consistent with `ResultInfo.Flag` in `FunctionConvention.swift`
   enum Flag : uint8_t {
     /// Not differentiable: a `@noDerivative` result.
     ///
@@ -4956,12 +5021,20 @@ public:
     return getConvention() == ResultConvention::Pack;
   }
 
-  bool isGuaranteedAddressResult() const {
-    return getConvention() == ResultConvention::GuaranteedAddress;
+  bool isAddressResult(bool loweredAddresses) const {
+    if (loweredAddresses) {
+      return getConvention() == ResultConvention::GuaranteedAddress ||
+             getConvention() == ResultConvention::Inout;
+    }
+    return getConvention() == ResultConvention::Inout;
   }
 
-  bool isGuaranteedResult() const {
-    return getConvention() == ResultConvention::Guaranteed;
+  bool isGuaranteedResult(bool loweredAddresses) const {
+    if (loweredAddresses) {
+      return getConvention() == ResultConvention::Guaranteed;
+    }
+    return getConvention() == ResultConvention::Guaranteed ||
+           getConvention() == ResultConvention::GuaranteedAddress;
   }
 
   /// Transform this SILResultInfo by applying the user-provided
@@ -5404,18 +5477,18 @@ public:
     return hasErrorResult() && getErrorResult().isFormalIndirect();
   }
 
-  bool hasGuaranteedResult() const {
+  bool hasGuaranteedResult(bool loweredAddresses) const {
     if (getNumResults() != 1) {
       return false;
     }
-    return getResults()[0].isGuaranteedResult();
+    return getResults()[0].isGuaranteedResult(loweredAddresses);
   }
 
-  bool hasGuaranteedAddressResult() const {
+  bool hasAddressResult(bool loweredAddresses) const {
     if (getNumResults() != 1) {
       return false;
     }
-    return getResults()[0].isGuaranteedAddressResult();
+    return getResults()[0].isAddressResult(loweredAddresses);
   }
 
   struct IndirectFormalResultFilter {

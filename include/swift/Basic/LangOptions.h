@@ -273,9 +273,6 @@ namespace swift {
     /// Emit a remark when indexing a system module.
     bool EnableIndexingSystemModuleRemarks = false;
 
-    /// Emit a remark on early exit in explicit interface build
-    bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
-
     ///
     /// Support for alternate usage modes
     ///
@@ -458,6 +455,9 @@ namespace swift {
     /// unsafe to read.
     bool EnableDeserializationSafety =
       ::getenv("SWIFT_ENABLE_DESERIALIZATION_SAFETY");
+
+    /// Disable injecting deserializes module paths into the explict module map.
+    bool DisableDeserializationOfExplicitPaths = false;
 
     /// Attempt to recover for imported modules with broken modularization
     /// in an unsafe way. Currently applies only to xrefs where the target

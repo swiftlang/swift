@@ -864,7 +864,7 @@ private:
   llvm::DIModule *getOrCreateModule(const void *Key, llvm::DIScope *Parent,
                                     StringRef Name, StringRef IncludePath,
                                     uint64_t Signature = ~1ULL,
-                                    StringRef ASTFile = StringRef()) {
+                                    StringRef ASTFile = {}) {
     // Look in the cache first.
     auto Val = DIModuleCache.find(Key);
     if (Val != DIModuleCache.end())
@@ -1075,12 +1075,11 @@ private:
         CanonicalName.clear();
     }
 
-    bool IsTypeOriginallyDefinedIn =
-        containsOriginallyDefinedIn(DbgTy.getType());
-    // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
+    bool IsTypeOriginallyDefinedIn = containsOriginallyDefinedIn(DbgTy.getType());
+    bool IsCxxType = containsCxxType(DbgTy.getType());
     // There's no way to round trip when respecting @_originallyDefinedIn for a type.
-    if (!Opts.DisableRoundTripDebugTypes &&
-        !Ty->getASTContext().LangOpts.EnableCXXInterop && !IsTypeOriginallyDefinedIn) {
+    // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
+    if (!Opts.DisableRoundTripDebugTypes && !IsTypeOriginallyDefinedIn && !IsCxxType) {
       // Make sure we can reconstruct mangled types for the debugger.
       auto &Ctx = Ty->getASTContext();
       Type Reconstructed = Demangle::getTypeForMangling(Ctx, SugaredName, Sig);
@@ -1190,22 +1189,24 @@ private:
         Name);
     // Collect the members.
     SmallVector<MemberDIType, 16> MemberTypes;
-    for (VarDecl *VD : Decl->getStoredProperties()) {
-      auto memberTy = Type->getTypeOfMember(VD);
-      if (auto DbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
-              memberTy,
-              IGM.getTypeInfoForUnlowered(
-                  IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
-              IGM))
-        MemberTypes.emplace_back(VD->getName().str(),
-                                 getByteSize() *
-                                     DbgTy->getAlignment().getValue(),
-                                 getOrCreateType(*DbgTy));
-      else
-        // Without complete type info we can only create a forward decl.
-        return DBuilder.createForwardDecl(
-            llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
-            llvm::dwarf::DW_LANG_Swift, SizeInBits, 0);
+    if (!IGM.isResilient(Decl, ResilienceExpansion::Maximal)) {
+      for (VarDecl *VD : Decl->getStoredProperties()) {
+        auto memberTy = Type->getTypeOfMember(VD);
+        if (auto DbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
+                memberTy,
+                IGM.getTypeInfoForUnlowered(
+                    IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
+                IGM))
+          MemberTypes.emplace_back(VD->getName().str(),
+                                   getByteSize() *
+                                       DbgTy->getAlignment().getValue(),
+                                   getOrCreateType(*DbgTy));
+        else
+          // Without complete type info we can only create a forward decl.
+          return DBuilder.createForwardDecl(
+              llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
+              llvm::dwarf::DW_LANG_Swift, SizeInBits, 0);
+      }
     }
 
     SmallVector<llvm::Metadata *, 16> Members;
@@ -1245,17 +1246,21 @@ private:
         UniqueID, Name);
     // Collect the members.
     SmallVector<MemberDIType, 16> MemberTypes;
-    for (VarDecl *VD : Decl->getStoredProperties()) {
-      Type memberTy = UnsubstitutedType->getTypeOfMember(VD);
-      auto DbgTy = DebugTypeInfo::getFromTypeInfo(
-          memberTy,
-          IGM.getTypeInfoForUnlowered(
-              IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
-          IGM);
-      MemberTypes.emplace_back(VD->getName().str(),
-                               getByteSize() * DbgTy.getAlignment().getValue(),
-                               getOrCreateType(DbgTy));
+
+    if (!IGM.isResilient(Decl, ResilienceExpansion::Maximal)) {
+      for (VarDecl *VD : Decl->getStoredProperties()) {
+        Type memberTy = UnsubstitutedType->getTypeOfMember(VD);
+        auto DbgTy = DebugTypeInfo::getFromTypeInfo(
+            memberTy,
+            IGM.getTypeInfoForUnlowered(
+                IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
+            IGM);
+        MemberTypes.emplace_back(VD->getName().str(),
+                                 getByteSize() * DbgTy.getAlignment().getValue(),
+                                 getOrCreateType(DbgTy));
+      }
     }
+
     SmallVector<llvm::Metadata *, 16> Members;
     for (auto &Member : MemberTypes) {
       unsigned OffsetInBits = 0;
@@ -1971,6 +1976,12 @@ private:
           llvm::DINode::FlagArtificial, MangledName);
     }
 
+    case TypeKind::BuiltinImplicitActor: {
+      return createDoublePointerSizedStruct(
+          Scope, "Builtin.ImplicitActor", nullptr, MainFile, 0,
+          llvm::DINode::FlagArtificial, MangledName);
+    }
+
     case TypeKind::DynamicSelf: {
       // Self. We don't have a way to represent instancetype in DWARF,
       // so we emit the static type instead. This is similar to what we
@@ -2492,6 +2503,42 @@ private:
     return Walker.visitedOriginallyDefinedIn;
   }
 
+  /// Returns true if the type contains an imported C++ type. Due to
+  /// various unimplemented features these cannot round-trip through
+  /// the ASTDemangler.
+  ///
+  /// FIXME: Get these cases working with the ASTDemangler instead.
+  bool containsCxxType(Type T) {
+    return T.findIf([&](Type t) -> bool {
+      if (auto *decl = t->getAnyNominal()) {
+        if (auto *clangDecl = decl->getClangDecl()) {
+          // Lookup of template instantiations is not implemented.
+          if (isa<clang::ClassTemplateSpecializationDecl>(clangDecl))
+            return true;
+
+          // Lookup of types in weird contexts is not implemented.
+          if (isa<clang::EnumDecl>(clangDecl) ||
+              isa<clang::CXXRecordDecl>(clangDecl)) {
+            auto *dc = clangDecl->getDeclContext();
+            while (!isa<clang::TranslationUnitDecl>(dc)) {
+              // ... in namespaces,
+              if (isa<clang::NamespaceDecl>(dc))
+                return true;
+
+              // ... or inside other types.
+              if (isa<clang::CXXRecordDecl>(dc))
+                return true;
+
+              dc = dc->getParent();
+            }
+          }
+        }
+      }
+
+      return false;
+    });
+  }
+
   /// Returns the decl of the type's parent chain annotated by
   /// @_originallyDefinedIn. Returns null if no type is annotated.
   NominalTypeDecl *getDeclAnnotatedByOriginallyDefinedIn(DebugTypeInfo DbgTy) {
@@ -2811,8 +2858,12 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
 
   // Create a module for the current compile unit.
   auto *MDecl = IGM.getSwiftModule();
-  llvm::sys::path::remove_filename(SourcePath);
-  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, SourcePath);
+  StringRef Path = Opts.DebugModulePath;
+  if (Path.empty()) {
+    llvm::sys::path::remove_filename(SourcePath);
+    Path = SourcePath;
+  }
+  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, Path);
   DBuilder.createImportedModule(MainFile, MainModule, MainFile, 0);
 
   // Macro definitions that were defined by the user with "-Xcc -D" on the

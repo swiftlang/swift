@@ -478,7 +478,7 @@ private struct InitValueBuilder: AddressDefUseWalker {
       case .PrepareInitialization:
         return .continueWalk
       case .AddressOfRawLayout:
-        if let addr2Ptr = bi.uses.getSingleUser(ofType: PointerToAddressInst.self) {
+        if let addr2Ptr = bi.uses.singleUser(ofType: PointerToAddressInst.self) {
           return walkDownUses(ofAddress: addr2Ptr, path: path)
         }
         return .abortWalk

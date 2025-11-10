@@ -2229,6 +2229,14 @@ checkInvertibleRequirementsStructural(const Metadata *type,
   case MetadataKind::ExtendedExistential: {
     auto existential = cast<ExtendedExistentialTypeMetadata>(type);
     auto &shape = *existential->Shape;
+
+    // If this is an extended existential metatype, then just allow it. Metatypes
+    // are always copyable and escapable so there can't possibly be a
+    // suppression issue.
+    if (shape.Flags.isMetatypeConstrained()) {
+      return std::nullopt;
+    }
+
     llvm::ArrayRef<GenericRequirementDescriptor> reqs(
         shape.getReqSigRequirements(), shape.getNumReqSigRequirements());
     // Look for any suppressed protocol requirements. If the existential

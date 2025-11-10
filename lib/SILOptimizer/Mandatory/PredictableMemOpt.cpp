@@ -102,6 +102,11 @@ static unsigned getNumSubElements(SILType T, SILFunction &F,
   }
   
   if (auto *SD = getFullyReferenceableStruct(T)) {
+    if (SD->isResilient(F.getModule().getSwiftModule(),
+                        F.getResilienceExpansion())) {
+      return false;
+    }
+
     unsigned NumElements = 0;
     for (auto *D : SD->getStoredProperties())
       NumElements +=

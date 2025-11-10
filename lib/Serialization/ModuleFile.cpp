@@ -210,6 +210,10 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     auto importPath = builder.copyTo(ctx);
     auto modulePath = importPath.getModulePath(dependency.isScoped());
     auto accessPath = importPath.getAccessPath(dependency.isScoped());
+    if (!getContext().LangOpts.DisableDeserializationOfExplicitPaths &&
+        !dependency.Core.BinaryModulePath.empty())
+      ctx.addExplicitModulePath(modulePath.front().Item.str(),
+                                dependency.Core.BinaryModulePath.str());
 
     auto module = getModule(modulePath, /*allowLoading*/true);
     if (!module || module->failedToLoad()) {
@@ -609,11 +613,10 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
                                     SourceLoc(), importPath.get());
       ID->setModule(M);
       if (Dep.isExported())
-        ID->getAttrs().add(
-            new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+        ID->addAttribute(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
       if (Dep.isImplementationOnly())
-        ID->getAttrs().add(
-            new (Ctx) ImplementationOnlyAttr(/*IsImplicit=*/false));
+        ID->addAttribute(new (Ctx)
+                             ImplementationOnlyAttr(/*IsImplicit=*/false));
 
       ImportDecls.push_back(ID);
     }
@@ -754,7 +757,7 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
     return;
   auto &ctx = originalAFD->getASTContext();
   Mangle::ASTMangler Mangler(ctx);
-  auto mangledName = Mangler.mangleDeclAsUSR(originalAFD, "");
+  auto mangledName = Mangler.mangleDeclWithPrefix(originalAFD, "");
   auto configs = Core->DerivativeFunctionConfigurations->find(mangledName);
   if (configs == Core->DerivativeFunctionConfigurations->end())
     return;

@@ -947,3 +947,28 @@ bb0(%nc : @owned $NC):
   %11 = tuple ()
   return %11 : $()
 }
+
+sil @closure_with_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+
+// Just make sure the pass is not crashing.
+sil [ossa] @test_recursion : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@callee_guaranteed () -> ()):
+  %2 = apply %0() : $@callee_guaranteed () -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = function_ref @closure_with_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %6 = copy_value %0
+  %7 = partial_apply [callee_guaranteed] %5(%6) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %8 = function_ref @test_recursion : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  destroy_value %7
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %13 = tuple ()
+  return %13
+}

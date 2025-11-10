@@ -461,13 +461,6 @@ static void installCodingKeysIfNecessary(NominalTypeDecl *NTD) {
   (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
 }
 
-// TODO(distributed): same ugly hack as Codable does...
-static void installDistributedActorIfNecessary(NominalTypeDecl *NTD) {
-  auto req =
-    ResolveImplicitMemberRequest{NTD, ImplicitMemberAction::ResolveDistributedActor};
-  (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
-}
-
 // Check for static properties that produce empty option sets
 // using a rawValue initializer with a value of '0'
 static void checkForEmptyOptionSet(const VarDecl *VD) {
@@ -757,7 +750,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       else
         roleFilter = currentIsABIOnly ? ABIRole::ProvidesABI
                                       : ABIRole::ProvidesAPI;
-      ASTScope::lookupLocalDecls(currentFile, current->getBaseName(),
+      ASTScope::lookupLocalDecls(currentFile,
+                                 DeclNameRef(current->getBaseName()),
                                  current->getLoc(),
                                  /*stopAfterInnermostBraceStmt=*/true,
                                  roleFilter, otherDefinitions);
@@ -873,65 +867,37 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
           continue;
       }
 
-      // Signatures are the same, but interface types are not. We must
-      // have a type that we've massaged as part of signature
-      // interface type generation.
-      if (current->getInterfaceType()->isEqual(other->getInterfaceType())) {
-        if (currentDC->isTypeContext() == other->getDeclContext()->isTypeContext()) {
-          auto currFnTy = current->getInterfaceType()->getAs<AnyFunctionType>();
-          auto otherFnTy = other->getInterfaceType()->getAs<AnyFunctionType>();
-          if (currFnTy && otherFnTy && currentDC->isTypeContext()) {
-            currFnTy = currFnTy->getResult()->getAs<AnyFunctionType>();
-            otherFnTy = otherFnTy->getResult()->getAs<AnyFunctionType>();
-          }
-          
-          if (currFnTy && otherFnTy) {
-            ArrayRef<AnyFunctionType::Param> currParams = currFnTy->getParams();
-            ArrayRef<AnyFunctionType::Param> otherParams = otherFnTy->getParams();
-            
-            if (currParams.size() == otherParams.size()) {
-              auto diagnosed = false;
-              for (unsigned i : indices(currParams)) {
-                  
-                bool currIsIUO = false;
-                bool otherIsIUO = false;
-                bool optionalRedecl = false;
-                
-                if (currParams[i].getPlainType()->getOptionalObjectType()) {
-                  optionalRedecl = true;
-                  auto *param = swift::getParameterAt(current, i);
-                  assert(param);
-                  if (param->isImplicitlyUnwrappedOptional())
-                    currIsIUO = true;
-                }
-                
-                if (otherParams[i].getPlainType()->getOptionalObjectType()) {
-                  auto *param = swift::getParameterAt(other, i);
-                  assert(param);
-                  if (param->isImplicitlyUnwrappedOptional())
-                    otherIsIUO = true;
-                }
-                else {
-                  optionalRedecl = false;
-                }
-                
-                if (optionalRedecl && currIsIUO != otherIsIUO) {
-                  ctx.Diags.diagnoseWithNotes(
-                    current->diagnose(diag::invalid_redecl, current), [&]() {
-                    other->diagnose(diag::invalid_redecl_prev, other);
-                  });
-                  current->diagnose(diag::invalid_redecl_by_optionality_note,
-                                    otherIsIUO, currIsIUO);
-                  
-                  current->setInvalid();
-                  diagnosed = true;
-                  break;
-                }
-              }
+      // Emit a custom diagnostic if the interface types match but one of the
+      // parameters differ in IUO-ness.
+      if (current->getInterfaceType()->isEqual(other->getInterfaceType()) &&
+          currentDC->isTypeContext() == otherDC->isTypeContext()) {
+        auto currParams = current->getParameterList();
+        auto otherParams = other->getParameterList();
 
-              if (diagnosed)
-                break;
+        if (currParams && otherParams &&
+            currParams->size() == otherParams->size()) {
+          for (unsigned i : indices(*currParams)) {
+            auto *currParam = currParams->get(i);
+            auto *otherParam = otherParams->get(i);
+
+            if (!currParam->getInterfaceType()->isOptional() ||
+                !otherParam->getInterfaceType()->isOptional()) {
+              continue;
             }
+
+            auto currIsIUO = currParam->isImplicitlyUnwrappedOptional();
+            auto otherIsIUO = otherParam->isImplicitlyUnwrappedOptional();
+            if (currIsIUO == otherIsIUO)
+              continue;
+
+            ctx.Diags.diagnoseWithNotes(
+                current->diagnose(diag::invalid_redecl, current),
+                [&]() { other->diagnose(diag::invalid_redecl_prev, other); });
+            current->diagnose(diag::invalid_redecl_by_optionality_note,
+                              otherIsIUO, currIsIUO);
+
+            current->setInvalid();
+            return std::make_tuple();
           }
         }
       }
@@ -1098,8 +1064,15 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
                     return req->getName() == VD->getName();
                   });
             }
-            declToDiagnose->diagnose(diag::invalid_redecl_implicit, current,
-                                     isProtocolRequirement, other);
+            auto *conflictDecl = current == declToDiagnose ? other : current;
+            if (conflictDecl->isSpecialDistributedActorProperty()) {
+              declToDiagnose->diagnose(
+                  diag::distributed_actor_user_defined_special_property,
+                  other->getName());
+            } else {
+              declToDiagnose->diagnose(diag::invalid_redecl_implicit, current,
+                                       isProtocolRequirement, other);
+            }
 
             // Emit a specialized note if the one of the declarations is
             // the backing storage property ('_foo') or projected value
@@ -1748,11 +1721,16 @@ static TypeRepr *unwrapAttributedRepr(TypeRepr *repr) {
   return repr;
 }
 
+struct ProtocolAndRetroactiveStatus {
+  ProtocolDecl *proto = nullptr;
+  bool isMarkedRetroactive = false;
+};
+
 static void collectProtocolsFromInheritedEntry(
-    const InheritedEntry &entry,
-    Type inheritedTy,
-    llvm::SmallPtrSetImpl<ProtocolDecl *> &protocolsWithRetroactiveAttr,
-    SmallVectorImpl<ProtocolDecl *> &protos) {
+    const InheritedEntry &entry, Type inheritedTy,
+    SmallVectorImpl<ProtocolAndRetroactiveStatus> &protos) {
+
+  bool isMarkedRetroactive = entry.isRetroactive();
 
   if (auto *protoTy = inheritedTy->getAs<ProtocolType>()) {
     auto *proto = protoTy->getDecl();
@@ -1760,18 +1738,18 @@ static void collectProtocolsFromInheritedEntry(
     // As a fallback, to support previous language versions, also allow
     // this through if the protocol has been explicitly module-qualified.
     TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
-    if (isModuleQualified(repr, proto->getParentModule())) {
-      protocolsWithRetroactiveAttr.insert(proto);
-    }
+    if (isModuleQualified(repr, proto->getParentModule()))
+      isMarkedRetroactive = true;
 
-    protos.push_back(proto);
+    protos.push_back({proto, isMarkedRetroactive});
   } else if (auto *pct = inheritedTy->getAs<ProtocolCompositionType>()) {
     for (auto member : pct->getMembers()) {
-      collectProtocolsFromInheritedEntry(entry, member,
-                                         protocolsWithRetroactiveAttr, protos);
+      // FIXME: Check for module qualification on each composed protocol.
+      collectProtocolsFromInheritedEntry(entry, member, protos);
     }
   } else if (auto *ppt = inheritedTy->getAs<ParameterizedProtocolType>()) {
-    protos.push_back(ppt->getProtocol());
+    // FIXME: Check for module qualification.
+    protos.push_back({ppt->getProtocol(), isMarkedRetroactive});
   }
 }
 
@@ -1838,11 +1816,12 @@ static void diagnoseRetroactiveConformances(
       continue;
     }
 
-    SmallVector<ProtocolDecl *, 2> protos;
-    collectProtocolsFromInheritedEntry(entry, inheritedTy,
-                                       protocolsWithRetroactiveAttr, protos);
+    SmallVector<ProtocolAndRetroactiveStatus, 2> protosAndStatuses;
+    collectProtocolsFromInheritedEntry(entry, inheritedTy, protosAndStatuses);
 
-    for (auto *proto : protos) {
+    for (auto protoAndStatus : protosAndStatuses) {
+      auto proto = protoAndStatus.proto;
+
       proto->walkInheritedProtocols([&](ProtocolDecl *decl) {
         // If this isn't a retroactive conformance, skip it.
         auto found = protocols.find(proto);
@@ -1874,8 +1853,7 @@ static void diagnoseRetroactiveConformances(
           return TypeWalker::Action::Continue;
         }
 
-        // If it's marked @retroactive, no need to warn.
-        if (entry.isRetroactive()) {
+        if (protoAndStatus.isMarkedRetroactive) {
           // Note that we encountered this protocol through a conformance marked
           // @retroactive in case multiple clauses cause the protocol to be
           // inherited.
@@ -2410,7 +2388,7 @@ public:
     checkGlobalIsolation(VD);
 
     // Visit auxiliary decls first
-    VD->visitAuxiliaryDecls([&](VarDecl *var) {
+    VD->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *var) {
       this->visitBoundVariable(var);
     });
 
@@ -2588,8 +2566,8 @@ public:
           // across module generation, as required for TBDGen.
           if (var->supportsInitialization() &&
               !var->getAttrs().hasAttribute<HasInitialValueAttr>()) {
-            var->getAttrs().add(new (Ctx)
-                                    HasInitialValueAttr(/*IsImplicit=*/true));
+            var->addAttribute(new (Ctx)
+                                  HasInitialValueAttr(/*IsImplicit=*/true));
           }
 
           // If we fail to check the bound inout introducer, mark the variable
@@ -2946,7 +2924,8 @@ public:
 
     // We don't allow nested types inside inlinable contexts.
     auto kind = DC->getFragileFunctionKind();
-    if (kind.kind != FragileFunctionKind::None) {
+    if (kind.kind != FragileFunctionKind::None &&
+        kind.kind != FragileFunctionKind::EmbeddedAlwaysEmitIntoClient) {
       NTD->diagnose(diag::local_type_in_inlinable_function, NTD->getName(),
                     kind.getSelector());
     }
@@ -3103,7 +3082,6 @@ public:
     TypeChecker::addImplicitConstructors(SD);
 
     installCodingKeysIfNecessary(SD);
-    installDistributedActorIfNecessary(SD);
 
     TypeChecker::checkDeclAttributes(SD);
 
@@ -3930,7 +3908,7 @@ public:
             } else {
               CD->diagnose(diag::required_initializer_override_wrong_keyword)
                   .fixItReplace(attr->getLocation(), "required");
-              CD->getAttrs().add(new (Ctx) RequiredAttr(/*IsImplicit=*/true));
+              CD->addAttribute(new (Ctx) RequiredAttr(/*IsImplicit=*/true));
             }
 
             auto *reqInit =
@@ -3972,7 +3950,7 @@ public:
         auto *reqInit = findNonImplicitRequiredInit(CD->getOverriddenDecl());
         reqInit->diagnose(diag::overridden_required_initializer_here);
 
-        CD->getAttrs().add(new (Ctx) RequiredAttr(/*IsImplicit=*/true));
+        CD->addAttribute(new (Ctx) RequiredAttr(/*IsImplicit=*/true));
       }
     }
 
@@ -4146,9 +4124,10 @@ void TypeChecker::checkParameterList(ParameterList *params,
 
     if (!param->isInvalid()) {
       auto *SF = owner->getParentSourceFile();
-      param->visitAuxiliaryDecls([&](VarDecl *auxiliaryDecl) {
-        if (!isa<ParamDecl>(auxiliaryDecl))
-          DeclChecker(SF->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
+      auto &ctx = SF->getASTContext();
+      param->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *auxVar) {
+        if (!isa<ParamDecl>(auxVar))
+          DeclChecker(ctx, SF).visitBoundVariable(auxVar);
       });
     }
 
@@ -4193,12 +4172,9 @@ void TypeChecker::checkParameterList(ParameterList *params,
 std::optional<unsigned>
 ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
                                           MacroExpansionDecl *MED) const {
-  auto &ctx = MED->getASTContext();
-  auto *dc = MED->getDeclContext();
-
   // Resolve macro candidates.
-  auto macro = evaluateOrDefault(ctx.evaluator, ResolveMacroRequest{MED, dc},
-                                 ConcreteDeclRef());
+  auto macro =
+      evaluateOrDefault(evaluator, ResolveMacroRequest{MED}, ConcreteDeclRef());
   if (!macro)
     return std::nullopt;
   MED->setMacroRef(macro);

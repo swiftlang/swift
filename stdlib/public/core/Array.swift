@@ -1549,8 +1549,9 @@ extension Array {
     defer {
       // Update self.count even if initializer throws an error.
       _precondition(
-        initializedCount <= _unsafeUninitializedCapacity,
-        "Initialized count set to greater than specified capacity."
+        UInt(truncatingIfNeeded: initializedCount) <=
+        UInt(truncatingIfNeeded: _unsafeUninitializedCapacity),
+        "Initialized count must be in 0 ... _unsafeUninitializedCapacity."
       )
       unsafe _precondition(
         buffer.baseAddress == firstElementAddress,

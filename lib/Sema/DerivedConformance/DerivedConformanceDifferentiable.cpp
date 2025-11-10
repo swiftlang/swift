@@ -467,8 +467,8 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
 
   // If nominal type is `@frozen`, also mark `TangentVector` struct.
   if (nominal->getAttrs().hasAttribute<FrozenAttr>())
-    structDecl->getAttrs().add(new (C) FrozenAttr(/*implicit*/ true));
-  
+    structDecl->addAttribute(new (C) FrozenAttr(/*implicit*/ true));
+
   // Add `typealias TangentVector = Self` so that the `TangentVector` itself
   // won't need its own conformance derivation.
   auto *tangentEqualsSelfAlias = new (C) TypeAliasDecl(
@@ -537,8 +537,8 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
                 nominalCanDeriveAdditiveArithmetic)
             .fixItInsert(loc, "@noDerivative ");
         // Add an implicit `@noDerivative` attribute.
-        originalProperty->getAttrs().add(
-            new (Context) NoDerivativeAttr(/*Implicit*/ true));
+        originalProperty->addAttribute(new (Context)
+                                           NoDerivativeAttr(/*Implicit*/ true));
         continue;
       }
       // Use the original wrapped property.
@@ -557,7 +557,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
         canInvokeMoveByOnProperty(vd, diffableConformance))
       continue;
     // Otherwise, add an implicit `@noDerivative` attribute.
-    vd->getAttrs().add(new (Context) NoDerivativeAttr(/*Implicit*/ true));
+    vd->addAttribute(new (Context) NoDerivativeAttr(/*Implicit*/ true));
     auto loc = vd->getAttributeInsertionLoc(/*forModifier*/ false);
     assert(loc.isValid() && "Expected valid source location");
     // Diagnose properties that do not conform to `Differentiable`.

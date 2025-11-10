@@ -1821,6 +1821,14 @@ public:
       case PlatformKind::visionOSApplicationExtension:
         plat = "visionos_app_extension";
         break;
+      case PlatformKind::DriverKit:
+        plat = "driverkit";
+        break;
+      case PlatformKind::Swift:
+      case PlatformKind::anyAppleOS:
+        // FIXME: [runtime availability] Figure out how to support this.
+        ASSERT(0);
+        break;
       case PlatformKind::FreeBSD:
         plat = "freebsd";
         break;
@@ -1829,6 +1837,9 @@ public:
         break;
       case PlatformKind::Windows:
         plat = "windows";
+        break;
+      case PlatformKind::Android:
+        plat = "android";
         break;
       case PlatformKind::none:
         llvm_unreachable("handled above");

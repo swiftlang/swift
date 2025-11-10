@@ -1561,9 +1561,9 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           unsigned rawImportControl;
           bool scoped;
           bool hasSPI;
-          input_block::ImportedModuleLayout::readRecord(scratch,
-                                                        rawImportControl,
-                                                        scoped, hasSPI);
+          bool hasPath;
+          input_block::ImportedModuleLayout::readRecord(
+              scratch, rawImportControl, scoped, hasSPI, hasPath);
           auto importKind = getActualImportControl(rawImportControl);
           if (!importKind) {
             // We don't know how to import this dependency.
@@ -1580,14 +1580,25 @@ ModuleFileSharedCore::ModuleFileSharedCore(
             unsigned recordID = fatalIfUnexpected(
                 cursor.readRecord(entry.ID, scratch, &spiBlob));
             assert(recordID == input_block::IMPORTED_MODULE_SPIS);
-            input_block::ImportedModuleLayoutSPI::readRecord(scratch);
-            (void) recordID;
-          } else {
-            spiBlob = StringRef();
+            input_block::ImportedModuleSPILayout::readRecord(scratch);
+            (void)recordID;
+          }
+
+          StringRef pathBlob;
+          if (hasPath) {
+            scratch.clear();
+
+            llvm::BitstreamEntry entry =
+                fatalIfUnexpected(cursor.advance(AF_DontPopBlockAtEnd));
+            unsigned recordID = fatalIfUnexpected(
+                cursor.readRecord(entry.ID, scratch, &pathBlob));
+            assert(recordID == input_block::IMPORTED_MODULE_PATH);
+            input_block::ImportedModulePathLayout::readRecord(scratch);
+            (void)recordID;
           }
 
           Dependencies.push_back(
-              {blobData, spiBlob, importKind.value(), scoped});
+              {blobData, spiBlob, pathBlob, importKind.value(), scoped});
           break;
         }
         case input_block::LINK_LIBRARY: {

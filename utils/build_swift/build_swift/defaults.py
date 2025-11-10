@@ -43,7 +43,7 @@ __all__ = [
 
 # Options that can be "configured" by command line options
 
-BUILD_VARIANT = 'Debug'
+BUILD_VARIANT = 'RelWithDebInfo'
 CMAKE_GENERATOR = 'Ninja'
 
 COMPILER_VENDOR = 'none'

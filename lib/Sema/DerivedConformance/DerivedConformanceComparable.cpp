@@ -240,9 +240,8 @@ deriveComparable_lt(
     SmallVector<Identifier, 2> argumentLabels = { Identifier(), Identifier() };
     auto comparableDeclName = DeclName(C, DeclBaseName(C.Id_LessThanOperator),
                                    argumentLabels);
-    comparableDecl->getAttrs().add(ImplementsAttr::create(parentDC,
-                                                          comparable,
-                                                          comparableDeclName));
+    comparableDecl->addAttribute(
+        ImplementsAttr::create(parentDC, comparable, comparableDeclName));
   }
 
   if (!C.getLessThanIntDecl()) {

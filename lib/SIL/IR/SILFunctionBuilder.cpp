@@ -126,6 +126,10 @@ void SILFunctionBuilder::addFunctionAttributes(
         F->setEffectsKind(effectsAttr->getKind());
       }
     }
+
+    if (auto asmName = constant.getAsmName()) {
+      F->setAsmName(M.getASTContext().AllocateCopy(*asmName));
+    }
   }
 
   if (!customEffects.empty()) {
@@ -173,16 +177,18 @@ void SILFunctionBuilder::addFunctionAttributes(
     if (Attrs.hasAttribute<CDeclAttr>()) {
       // If the function is marked with @c, expose only C compatible
       // thunk function.
-      shouldExportDecl = constant.isNativeToForeignThunk();
+      shouldExportDecl = constant.isNativeToForeignThunk() || constant.isForeign;
     }
     if (EA->getExposureKind() == ExposureKind::Wasm && shouldExportDecl) {
       // A wasm-level exported function must be retained if it appears in a
       // compilation unit.
       F->setMarkedAsUsed(true);
-      if (EA->Name.empty())
-        F->setWasmExportName(F->getName());
-      else
+      if (!EA->Name.empty())
         F->setWasmExportName(EA->Name);
+      else if (!F->asmName().empty())
+        F->setWasmExportName(F->asmName());
+      else
+        F->setWasmExportName(F->getName());
     }
   }
 
@@ -204,7 +210,9 @@ void SILFunctionBuilder::addFunctionAttributes(
     F->setPerfConstraints(PerformanceConstraints::NoExistentials);
   } else if (Attrs.hasAttribute<NoObjCBridgingAttr>()) {
     F->setPerfConstraints(PerformanceConstraints::NoObjCBridging);
-  } else if (Attrs.hasAttribute<ManualOwnershipAttr>()) {
+  } else if (M.getASTContext().LangOpts.hasFeature(Feature::ManualOwnership) &&
+             constant && constant.hasDecl() && !constant.isImplicit() &&
+             !Attrs.hasAttribute<NoManualOwnershipAttr>()) {
     F->setPerfConstraints(PerformanceConstraints::ManualOwnership);
   }
 

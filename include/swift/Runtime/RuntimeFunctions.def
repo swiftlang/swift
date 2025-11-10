@@ -220,6 +220,22 @@ FUNCTION(NativeStrongRelease, Swift, swift_release, C_CC, AlwaysAvailable,
          EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
          UNKNOWN_MEMEFFECTS)
 
+// void *swift_retain(void *ptr);
+FUNCTION(NativeStrongRetainClient, Swift, swift_retainClient, SwiftClientRR_CC, AlwaysAvailable,
+         RETURNS(RefCountedPtrTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind, FirstParamReturned, WillReturn),
+         EFFECT(RuntimeEffect::RefCounting),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_release(void *ptr);
+FUNCTION(NativeStrongReleaseClient, Swift, swift_releaseClient, SwiftClientRR_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
 // void *swift_retain_n(void *ptr, int32_t n);
 FUNCTION(NativeStrongRetainN, Swift, swift_retain_n, C_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),
@@ -414,6 +430,24 @@ FUNCTION(BridgeObjectStrongRetain, Swift, swift_bridgeObjectRetain,
 // void swift_bridgeRelease(void *ptr);
 FUNCTION(BridgeObjectStrongRelease, Swift, swift_bridgeObjectRelease,
          C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(BridgeObjectPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
+// void *swift_bridgeObjectRetainClient(void *ptr);
+FUNCTION(BridgeObjectStrongRetainClient, Swift, swift_bridgeObjectRetainClient,
+         SwiftClientRR_CC, AlwaysAvailable,
+         RETURNS(BridgeObjectPtrTy),
+         ARGS(BridgeObjectPtrTy),
+         ATTRS(NoUnwind, FirstParamReturned),
+         EFFECT(RuntimeEffect::RefCounting),
+         UNKNOWN_MEMEFFECTS)
+
+// void *swift_bridgeObjectReleaseClient(void *ptr);
+FUNCTION(BridgeObjectStrongReleaseClient, Swift, swift_bridgeObjectReleaseClient,
+         SwiftClientRR_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(BridgeObjectPtrTy),
          ATTRS(NoUnwind),
@@ -2066,12 +2100,6 @@ FUNCTION(CoroFrameAlloc, Swift, swift_coroFrameAlloc, C_CC,
          NO_ATTRS,
          EFFECT(RuntimeEffect::Allocating),
          UNKNOWN_MEMEFFECTS)
-FUNCTION(coroFrameAllocStub, Swift, swift_coroFrameAllocStub, C_CC,
-         AlwaysAvailable, RETURNS(Int8PtrTy),
-         ARGS(SizeTy, Int64Ty),
-         ATTRS(NoUnwind),
-         EFFECT(RuntimeEffect::Allocating),
-         UNKNOWN_MEMEFFECTS)
 
 // void *_Block_copy(void *block);
 FUNCTION(BlockCopy, BlocksRuntime, _Block_copy, C_CC, AlwaysAvailable,
@@ -2129,6 +2157,16 @@ FUNCTION(GetErrorValue, Swift, swift_getErrorValue, C_CC, AlwaysAvailable,
 FUNCTION(TSanInoutAccess, tsan, __tsan_external_write, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::NoEffect),
+         UNKNOWN_MEMEFFECTS)
+
+// int32 __isOSVersionAtLeast(uint32_t major, uint32_t minor, uint32_t patch);
+// This a C builtin provided by compiler-rt.
+FUNCTION(OSVersionAtLeast, libgcc, __isOSVersionAtLeast,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int32Ty),
+         ARGS(Int32Ty, Int32Ty, Int32Ty),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::NoEffect),
          UNKNOWN_MEMEFFECTS)

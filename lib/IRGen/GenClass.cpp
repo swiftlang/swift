@@ -2832,8 +2832,9 @@ ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name,
                                            Context.TheBuiltinModule,
                                            /*isActor*/false);
   SwiftRootClass->setIsObjC(Context.LangOpts.EnableObjCInterop);
-  SwiftRootClass->getAttrs().add(ObjCAttr::createNullary(Context, objcName,
-    /*isNameImplicit=*/true));
+  SwiftRootClass->addAttribute(
+      ObjCAttr::createNullary(Context, objcName,
+                              /*isNameImplicit=*/true));
   SwiftRootClass->setImplicit();
   SwiftRootClass->setAccess(AccessLevel::Open);
   

@@ -1,4 +1,6 @@
-# Overlapping accesses, but operation requires exclusive access
+# Overlapping accesses, but operation requires exclusive access (ExclusivityViolation)
+
+## Overview
 
 Swift requires exclusive access to a variable in order to modify that variable. An error is reported if a program attempts to access a variable while it is already in the process of being accessed via another name. These issues can often be resolved by making a local copy of a variable before modifying it.
 
@@ -58,4 +60,10 @@ var toAppend = numbers
 numbers.append(removingFrom: &toAppend)
 ```
 
-Exclusivity checks play an important role in enforcing memory safety and enabling compiler optimizations. To learn more, see [Swift 5 Exclusivity Enforcement](https://www.swift.org/blog/swift-5-exclusivity/) on the Swift.org blog.
+Exclusivity checks play an important role in enforcing memory safety and enabling compiler optimizations. See the Swift.org [blog][exclusivity-enforcement] to learn more.
+
+## See Also
+
+- [Swift 5 exclusivity enforcement][exclusivity-enforcement]
+
+[exclusivity-enforcement]: https://www.swift.org/blog/swift-5-exclusivity/

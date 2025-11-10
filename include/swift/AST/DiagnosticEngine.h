@@ -57,7 +57,7 @@ namespace swift {
   /// this enumeration type that uniquely identifies it.
   enum class DiagID : uint32_t;
 
-  enum class DiagGroupID : uint16_t;
+  enum class DiagGroupID : uint32_t;
 
   /// Describes a diagnostic along with its argument types.
   ///
@@ -633,6 +633,14 @@ namespace swift {
     /// escalated to errors.
     llvm::BitVector warningsAsErrors;
 
+    /// Track which diagnostic group (`DiagGroupID`) warnings should be ignored.
+    llvm::BitVector ignoredDiagnosticGroups;
+
+    /// For compiler-internal purposes only, track which diagnostics should
+    /// be ignored completely. For example, this is used by LLDB to
+    /// suppress certain errors in expression evaluation.
+    llvm::BitVector compilerIgnoredDiagnostics;
+
     /// Whether a fatal error has occurred
     bool fatalErrorOccurred = false;
 
@@ -641,9 +649,6 @@ namespace swift {
 
     /// Track the previous emitted Behavior, useful for notes
     DiagnosticBehavior previousBehavior = DiagnosticBehavior::Unspecified;
-
-    /// Track which diagnostics should be ignored.
-    llvm::BitVector ignoredDiagnostics;
 
     friend class DiagnosticStateRAII;
 
@@ -708,17 +713,28 @@ namespace swift {
       fatalErrorOccurred = false;
     }
 
-    /// Set whether a diagnostic should be ignored.
-    void setIgnoredDiagnostic(DiagID id, bool ignored) {
-      ignoredDiagnostics[(unsigned)id] = ignored;
+    /// Set whether a diagnostic group should be ignored.
+    void setIgnoredDiagnosticGroup(DiagGroupID id, bool ignored) {
+      ignoredDiagnosticGroups[(unsigned)id] = ignored;
     }
 
-    bool isIgnoredDiagnostic(DiagID id) const {
-      return ignoredDiagnostics[(unsigned)id];
+    /// Query whether a specific diagnostic group is ignored.
+    bool isIgnoredDiagnosticGroup(DiagGroupID id) const {
+      return ignoredDiagnosticGroups[(unsigned)id];
     }
+
+    /// Set a specific diagnostic to be ignored by the compiler.
+    void compilerInternalIgnoreDiagnostic(DiagID id) {
+      compilerIgnoredDiagnostics[(unsigned)id] = true;
+    }
+
+    /// Query whether a specific diagnostic group and *all*
+    /// of its subgroups are ignored.
+    bool isIgnoredDiagnosticGroupTree(DiagGroupID id) const;
 
     void swap(DiagnosticState &other) {
-      std::swap(showDiagnosticsAfterFatalError, other.showDiagnosticsAfterFatalError);
+      std::swap(showDiagnosticsAfterFatalError,
+                other.showDiagnosticsAfterFatalError);
       std::swap(suppressWarnings, other.suppressWarnings);
       std::swap(suppressNotes, other.suppressNotes);
       std::swap(suppressRemarks, other.suppressRemarks);
@@ -726,7 +742,7 @@ namespace swift {
       std::swap(fatalErrorOccurred, other.fatalErrorOccurred);
       std::swap(anyErrorOccurred, other.anyErrorOccurred);
       std::swap(previousBehavior, other.previousBehavior);
-      std::swap(ignoredDiagnostics, other.ignoredDiagnostics);
+      std::swap(ignoredDiagnosticGroups, other.ignoredDiagnosticGroups);
     }
 
   private:
@@ -966,12 +982,16 @@ namespace swift {
       localization = diag::LocalizationProducer::producerFor(locale, path);
     }
 
-    void ignoreDiagnostic(DiagID id) {
-      state.setIgnoredDiagnostic(id, true);
+    bool isIgnoredDiagnosticGroup(DiagGroupID id) const {
+      return state.isIgnoredDiagnosticGroup(id);
+    }
+    
+    bool isIgnoredDiagnosticGroupTree(DiagGroupID id) const {
+      return state.isIgnoredDiagnosticGroupTree(id);
     }
 
-    bool isIgnoredDiagnostic(DiagID id) const {
-      return state.isIgnoredDiagnostic(id);
+    void ignoreDiagnostic(DiagID id) {
+      state.compilerInternalIgnoreDiagnostic(id);
     }
 
     void resetHadAnyError() {
