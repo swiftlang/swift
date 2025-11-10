@@ -188,27 +188,21 @@ func castAsQuestionDiamondGEP(x: KlassPair) -> SubKlass? {
 
 // We don't handle this test case as well.
 func castAsQuestionDiamondGEP2(x: KlassPair) {
-    switch (x.lhs as? SubKlass, x.rhs as? SubKlass) { // expected-remark @:39 {{retain of type 'Klass'}}
+    switch (x.lhs as? SubKlass, x.rhs as? SubKlass) { // expected-note @-1 {{of 'x.lhs'}}
                                                       // expected-note @-2 {{of 'x.lhs'}}
-                                                      // expected-remark @-2:19 {{retain of type 'Klass'}}
-                                                      // expected-note @-4 {{of 'x.rhs'}}
     case let (.some(x1), .some(x2)):
         print(x1, x2) // expected-remark @:15 {{heap allocated ref of type}}
                       // expected-remark @-1 {{retain of type}}
                       // expected-remark @-2 {{retain of type}}
                       // expected-remark @-3 {{release of type}}
-                      // expected-remark @-4 {{release of type}}
-                      // expected-remark @-5 {{release of type}}
     case let (.some(x1), nil):
         print(x1) // expected-remark @:15 {{heap allocated ref of type}}
                   // expected-remark @-1 {{retain of type}}
                   // expected-remark @-2 {{release of type}}
-                  // expected-remark @-3 {{release of type}}
     case let (nil, .some(x2)):
         print(x2) // expected-remark @:15 {{heap allocated ref of type}}
                   // expected-remark @-1 {{retain of type}}
                   // expected-remark @-2 {{release of type}}
-                  // expected-remark @-3 {{release of type}}
     case (nil, nil):
         break
     }
