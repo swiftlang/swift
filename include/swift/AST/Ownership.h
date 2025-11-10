@@ -153,7 +153,13 @@ ValueOwnership asValueOwnership(ParameterOwnership o);
 static inline llvm::StringRef getOwnershipSpelling(ValueOwnership ownership) {
   switch (ownership) {
   case ValueOwnership::Default:
-    return "";
+    // TODO: Determine a better value than "" from usage (currently only in LifetimeDependence.cpp).
+    // This function is not used in serialization, so we should pick something human-friendly.
+    // Short-list:
+    // - unspecified
+    // - implicit
+    // - context-dependent
+    return "context-dependent";
   case ValueOwnership::InOut:
     return "inout";
   case ValueOwnership::Shared:
