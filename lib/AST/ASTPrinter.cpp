@@ -229,6 +229,8 @@ static NonRecursivePrintOptions getNonRecursiveOptions(const ValueDecl *D) {
   NonRecursivePrintOptions options;
   if (D->isImplicitlyUnwrappedOptional())
     options |= NonRecursivePrintOption::ImplicitlyUnwrappedOptional;
+  if (isa<ParamDecl>(D))
+    options |= NonRecursivePrintOption::SkipNonisolatedNonsending;
   return options;
 }
 
@@ -3895,6 +3897,12 @@ static bool isEscaping(Type type) {
   return false;
 }
 
+static bool isNonisolatedCaller(Type type) {
+  if (auto *funcTy = type->getAs<AnyFunctionType>())
+    return funcTy->getIsolation().isNonIsolatedCaller();
+  return false;
+}
+
 static void printParameterFlags(ASTPrinter &printer,
                                 const PrintOptions &options,
                                 const ParamDecl *param,
@@ -4077,17 +4085,6 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
   auto interfaceTy = param->getInterfaceType();
 
-  // If type of this parameter is isolated to a caller, let's
-  // strip the isolation from the type to avoid printing it as
-  // part of the function type because that would break ordering
-  // between specifiers and attributes.
-  if (param->isCallerIsolated()) {
-    if (auto *funcTy = dyn_cast<AnyFunctionType>(interfaceTy.getPointer())) {
-      interfaceTy =
-          funcTy->withIsolation(FunctionTypeIsolation::forNonIsolated());
-    }
-  }
-
   TypeLoc TheTypeLoc;
   if (auto *repr = param->getTypeRepr()) {
     TheTypeLoc = TypeLoc(repr, interfaceTy);
@@ -4108,7 +4105,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       // be written explicitly in this position.
       printParameterFlags(Printer, Options, param, paramFlags,
                           isEscaping(type) && !isEnumElement,
-                          param->isCallerIsolated());
+                          isNonisolatedCaller(interfaceTy));
     }
 
     printTypeLoc(TheTypeLoc, getNonRecursiveOptions(param));
@@ -6629,7 +6626,8 @@ public:
     visit(staticSelfT);
   }
 
-  void printFunctionExtInfo(AnyFunctionType *fnType) {
+  void printFunctionExtInfo(AnyFunctionType *fnType,
+                            NonRecursivePrintOptions nrOptions) {
     if (!fnType->hasExtInfo()) {
       Printer << "@_NO_EXTINFO ";
       return;
@@ -6686,6 +6684,9 @@ public:
       break;
 
     case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
+      if (nrOptions & NonRecursivePrintOption::SkipNonisolatedNonsending)
+        break;
+
       Printer << "nonisolated(nonsending) ";
       break;
     }
@@ -6938,7 +6939,7 @@ public:
       Printer.printStructurePost(PrintStructureKind::FunctionType);
     };
 
-    printFunctionExtInfo(T);
+    printFunctionExtInfo(T, nrOptions);
 
     // If we're stripping argument labels from types, do it when printing.
     visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/ false,
@@ -6996,7 +6997,7 @@ public:
       Printer.printStructurePost(PrintStructureKind::FunctionType);
     };
 
-    printFunctionExtInfo(T);
+    printFunctionExtInfo(T, nrOptions);
     printGenericSignature(T->getGenericSignature(),
                           PrintAST::PrintParams |
                           PrintAST::defaultGenericRequirementFlags(Options));
