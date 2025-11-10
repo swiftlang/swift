@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift
 
 func escape(_ closure: @escaping () -> Void) {}
 func noescape(_ closure: () -> Void) {}
@@ -7,9 +7,13 @@ func autoescape<T>(_ e: @autoclosure @escaping () -> T) {}
 class SomeClass {}
 
 class TestImplicitWeakToStrongCaptures {
+  let field: AnyObject = 0 as AnyObject
+
   func test_self() {
-    escape { // expected-note {{'self' implicitly captured here}}
-      escape { [weak self] in  // expected-warning {{'weak' capture implicitly captures 'self' as strong reference in outer scope}}
+    escape {  // expected-note {{'self' implicitly captured here}}
+              // expected-note @-1 {{add 'self' as a capture list item to silence}}
+      escape { [weak self] in  // expected-warning {{'weak' ownership of capture 'self' differs from implicitly-captured strong reference in outer scope}}
+      // expected-note @-1 {{explicitly assign the capture list item to silence}}
         _ = self
       }
     }
@@ -17,10 +21,12 @@ class TestImplicitWeakToStrongCaptures {
 
   func test_locals() {
     let a = SomeClass()
-    escape { // expected-note {{'a' implicitly captured here}}
+    escape {  // expected-note {{'a' implicitly captured here}}
+              // expected-note @-1 {{add 'a' as a capture list item to silence}}
       let b = SomeClass()
       escape { [
-        weak a, // expected-warning {{'weak' capture implicitly captures 'a' as strong reference in outer scope}}
+        weak a, // expected-warning {{'weak' ownership of capture 'a' differs from implicitly-captured strong reference in outer scope}}
+        // expected-note @-1 {{explicitly assign the capture list item to silence}}
         weak b
       ] in
         _ = a
@@ -31,22 +37,28 @@ class TestImplicitWeakToStrongCaptures {
 
   func test_flavors_of_weak() {
     escape {  // expected-note 3 {{'self' implicitly captured here}}
-      escape { [weak self] in _ = self }    // expected-warning {{'weak' capture implicitly captures 'self' as strong reference in outer scope}}
-      escape { [unowned self] in _ = self } // expected-warning {{'unowned' capture implicitly captures 'self' as strong reference in outer scope}}
-      escape { [unowned(unsafe) self] in _ = self } // expected-warning {{'unowned(unsafe)' capture implicitly captures 'self' as strong reference in outer scope}}
+              // expected-note @-1 3 {{add 'self' as a capture list item to silence}}
+      escape { [weak self] in _ = self }    // expected-warning {{'weak' ownership of capture 'self' differs from implicitly-captured strong reference in outer scope}}
+      // expected-note @-1 {{explicitly assign the capture list item to silence}}
+      escape { [unowned self] in _ = self } // expected-warning {{'unowned' ownership of capture 'self' differs from implicitly-captured strong reference in outer scope}}
+      // expected-note @-1 {{explicitly assign the capture list item to silence}}
+      escape { [unowned(unsafe) self] in _ = self } // expected-warning {{'unowned(unsafe)' ownership of capture 'self' differs from implicitly-captured strong reference in outer scope}}
+      // expected-note @-1 {{explicitly assign the capture list item to silence}}
     }
   }
 
   func test_binding_new_name() {
-    escape {  // expected-note {{'self' implicitly captured here}}
-      escape { [weak welf = self] in _ = welf }    // expected-warning {{'weak' capture 'welf' implicitly captures 'self' as strong reference in outer scope}}
+    escape {
+      escape { [weak welf = self] in _ = welf }
     }
   }
 
   func test_nonescaping() {
     escape {  // expected-note {{'self' implicitly captured here}}
+              // expected-note @-1 {{add 'self' as a capture list item to silence}}
       noescape {
-        escape { [weak self] in _ = self }  // expected-warning {{'weak' capture implicitly captures 'self' as strong reference in outer scope}}
+        escape { [weak self] in _ = self }  // expected-warning {{'weak' ownership of capture 'self' differs from implicitly-captured strong reference in outer scope}}
+      // expected-note @-1 {{explicitly assign the capture list item to silence}}
       }
     }
   }
@@ -56,8 +68,10 @@ class TestImplicitWeakToStrongCaptures {
       func f() {
         let obj = SomeClass()
 
-        escape { // expected-note {{'obj' implicitly captured here}}
-          escape { [weak obj] in _ = obj } // expected-warning {{'weak' capture implicitly captures 'obj' as strong reference in outer scope}}
+        escape {  // expected-note {{'obj' implicitly captured here}}
+                  // expected-note @-1 {{add 'obj' as a capture list item to silence}}
+          escape { [weak obj] in _ = obj } // expected-warning {{'weak' ownership of capture 'obj' differs from implicitly-captured strong reference in outer scope}}
+          // expected-note @-1 {{explicitly assign the capture list item to silence}}
         }
       }
     }
@@ -66,16 +80,20 @@ class TestImplicitWeakToStrongCaptures {
   static func test_static_method() {
     let obj = SomeClass()
 
-    escape { // expected-note {{'obj' implicitly captured here}}
-      escape { [weak obj] in _ = obj } // expected-warning {{'weak' capture implicitly captures 'obj' as strong reference in outer scope}}
+    escape {  // expected-note {{'obj' implicitly captured here}}
+              // expected-note @-1 {{add 'obj' as a capture list item to silence}}
+      escape { [weak obj] in _ = obj } // expected-warning {{'weak' ownership of capture 'obj' differs from implicitly-captured strong reference in outer scope}}
+      // expected-note @-1 {{explicitly assign the capture list item to silence}}
     }
   }
 
   func test_multiple_nesting_levels() {
-    escape { // expected-note {{'self' implicitly captured here}}
+    escape {  // expected-note {{'self' implicitly captured here}}
+              // expected-note @-1 {{add 'self' as a capture list item to silence}}
       escape {
         escape {
-          escape { [weak self] in _ = self } // expected-warning {{'weak' capture implicitly captures 'self' as strong reference in outer scope}}
+          escape { [weak self] in _ = self } // expected-warning {{'weak' ownership of capture 'self' differs from implicitly-captured strong reference in outer scope}}
+          // expected-note @-1 {{explicitly assign the capture list item to silence}}
         }
       }
     }
@@ -88,10 +106,14 @@ class TestImplicitWeakToStrongCaptures {
     // expected-note @+2 {{'obj1' implicitly captured here}}
     // expected-note @+1 {{'obj2' implicitly captured here}}
     escape {
+      // expected-note @-1 {{add 'obj1' as a capture list item to silence}}
+      // expected-note @-2 {{add 'obj2' as a capture list item to silence}}
       _ = obj2
-      // expected-warning @+2 {{'weak' capture implicitly captures 'obj1' as strong reference in outer scope}}
-      // expected-warning @+1 {{'weak' capture implicitly captures 'obj2' as strong reference in outer scope}}
+      // expected-warning @+2 {{'weak' ownership of capture 'obj1' differs from implicitly-captured strong reference in outer scope}}
+      // expected-warning @+1 {{'weak' ownership of capture 'obj2' differs from implicitly-captured strong reference in outer scope}}
       escape { [weak obj1, weak obj2] in
+      // expected-note @-1 {{explicitly assign the capture list item to silence}}
+      // expected-note @-2 {{explicitly assign the capture list item to silence}}
         _ = obj1
         _ = obj2
       }
@@ -100,8 +122,10 @@ class TestImplicitWeakToStrongCaptures {
 
   func test_capture_with_parameters() {
     func innerFunc(param: SomeClass) {
-      escape { // expected-note {{'param' implicitly captured here}}
-        escape { [weak param] in _ = param } // expected-warning {{'weak' capture implicitly captures 'param' as strong reference in outer scope}}
+      escape {  // expected-note {{'param' implicitly captured here}}
+                // expected-note @-1 {{add 'param' as a capture list item to silence}}
+        escape { [weak param] in _ = param } // expected-warning {{'weak' ownership of capture 'param' differs from implicitly-captured strong reference in outer scope}}
+        // expected-note @-1 {{explicitly assign the capture list item to silence}}
       }
     }
   }
@@ -111,8 +135,10 @@ class TestImplicitWeakToStrongCaptures {
 
     var computed: (() -> Void)? {
       get {
-        escape { // expected-note {{'obj' implicitly captured here}}
-          escape { [weak obj] in _ = obj } // expected-warning {{'weak' capture implicitly captures 'obj' as strong reference in outer scope}}
+        escape {  // expected-note {{'obj' implicitly captured here}}
+                  // expected-note @-1 {{add 'obj' as a capture list item to silence}}
+          escape { [weak obj] in _ = obj } // expected-warning {{'weak' ownership of capture 'obj' differs from implicitly-captured strong reference in outer scope}}
+          // expected-note @-1 {{explicitly assign the capture list item to silence}}
         }
         return nil
       }
@@ -120,13 +146,25 @@ class TestImplicitWeakToStrongCaptures {
   }
 
   func test_cases_that_should_not_be_diagnosed() {
+    func test_explicit_binding_new_name() {
+      escape {
+        escape { [weak welf = self] in _ = welf }
+      }
+    }
+
+    func test_explicit_binding_same_name() {
+      escape {
+        escape { [unowned self = self] in _ = self }
+      }
+    }
+
     // Explicit capture item in outer escaping closure
     escape { [self] in
       escape { [weak self] in _ = self }
     }
 
     // Explicit capture item in non-escaping intermediate closure
-    // TODO: this case seems odd... should it be treated differently?
+    // This case seems a bit odd... should it be treated differently?
     escape {
       noescape { [self] in // no warning since the capture's Decl is local to the parent closure
         escape { [weak self] in _ = self }
@@ -142,7 +180,7 @@ class TestImplicitWeakToStrongCaptures {
     noescape {
       let obj = SomeClass()
 
-      weak var thing1 = obj
+      weak var thing1 = obj; thing1 = obj
       unowned let thing2 = obj
       unowned(unsafe) let thing3 = obj
 
@@ -181,8 +219,10 @@ class TestImplicitWeakToStrongCaptures {
 
     // Capture in lazy property
     lazy var lazyProp: Int? = {
-      escape { // expected-note {{'self' implicitly captured here}}
-        escape { [weak self] in _ = self } // expected-warning {{'weak' capture implicitly captures 'self' as strong reference in outer scope}}
+      escape {  // expected-note {{'self' implicitly captured here}}
+                // expected-note @-1 {{add 'self' as a capture list item to silence}}
+        escape { [weak self] in _ = self } // expected-warning {{'weak' ownership of capture 'self' differs from implicitly-captured strong reference in outer scope}}
+        // expected-note @-1 {{explicitly assign the capture list item to silence}}
       }
       return nil
     }()
@@ -192,29 +232,22 @@ class TestImplicitWeakToStrongCaptures {
 
     func setupClosure() {
       closureProp = { // expected-note {{'self' implicitly captured here}}
+                      // expected-note @-1 {{add 'self' as a capture list item to silence}}
         escape {
-          escape { [weak self] in _ = self } // expected-warning {{'weak' capture implicitly captures 'self' as strong reference in outer scope}}
+          escape { [weak self] in _ = self } // expected-warning {{'weak' ownership of capture 'self' differs from implicitly-captured strong reference in outer scope}}
+          // expected-note @-1 {{explicitly assign the capture list item to silence}}
         }
       }
       _ = closureProp
     }
   }
 
-  // TODO: how to deal with @_implicitSelfCapture and isolated captures?
   func test_async_context() async {
-    Task { // expected-note {{'self' implicitly captured here}}
-      Task { [weak self] in _ = self } // expected-warning {{'weak' capture implicitly captures 'self' as strong reference in outer scope}}
+    Task {  // expected-note {{'self' implicitly captured here}}
+            // expected-note @-1 {{add 'self' as a capture list item to silence}}
+      Task { [weak self] in _ = self } // expected-warning {{'weak' ownership of capture 'self' differs from implicitly-captured strong reference in outer scope}}
+      // expected-note @-1 {{explicitly assign the capture list item to silence}}{{24-24= = self}}
     }
-  }
-
-  func test_async_let() async {
-    final class S: Sendable {}
-    let s = S()
-    // TODO: why doesn't this trigger the diagnostic?
-    async let b: Bool = { [weak s] in
-      s != nil
-    }()
-    _ = await b
   }
 
   func test_autoclosure() {
@@ -230,6 +263,8 @@ func testGlobalFunction() {
   let obj = SomeClass()
 
   escape { // expected-note {{'obj' implicitly captured here}}
-    escape { [weak obj] in _ = obj } // expected-warning {{'weak' capture implicitly captures 'obj' as strong reference in outer scope}}
+    // expected-note @-1 {{add 'obj' as a capture list item to silence}}
+    escape { [weak obj] in _ = obj } // expected-warning {{'weak' ownership of capture 'obj' differs from implicitly-captured strong reference in outer scope}}
+    // expected-note @-1 {{explicitly assign the capture list item to silence}}{{23-23= = obj}}
   }
 }
