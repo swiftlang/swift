@@ -574,8 +574,10 @@ do {
 
   class C {
     init() {
+      // expected-note@+5{{add 'self' as a capture list item to silence}}
+      // expected-note@+4{{explicitly assign the capture list item to silence}}
       // expected-note@+3{{'self' implicitly captured here}}
-      // expected-warning@+2{{'unowned' capture implicitly captures 'self' as strong reference in outer scope}}
+      // expected-warning@+2{{'unowned' ownership of capture 'self' differs from implicitly-captured strong reference in outer scope}}
       // expected-warning@+1{{capture 'self' was never used}}
       let _ = f { fn in { [unowned self, fn] x in x != 1000 ? fn(x + 1) : "success" } }(0)
     }
