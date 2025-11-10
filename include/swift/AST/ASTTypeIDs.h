@@ -83,6 +83,7 @@ struct FingerprintAndMembers;
 class Identifier;
 class BodyAndFingerprint;
 struct ConstValueTypeInfo;
+struct LifetimeDependenceInfoFunctionTypeRequestData;
 
 // Define the AST type zone (zone 1)
 #define SWIFT_TYPEID_ZONE AST

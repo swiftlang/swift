@@ -2769,9 +2769,32 @@ void LifetimeDependenceInfoRequest::cacheResult(
     }
     auto *eed = cast<EnumElementDecl>(decl);
     eed->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
+    return;
   }
 
   decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
+//----------------------------------------------------------------------------//
+// LifetimeDependenceInfoFunctionTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+SourceLoc swift::extractNearestSourceLoc(
+    const LifetimeDependenceInfoFunctionTypeRequestData &data) {
+  return extractNearestSourceLoc(data.funcRepr);
+}
+
+void swift::simple_display(
+    llvm::raw_ostream &out,
+    const LifetimeDependenceInfoFunctionTypeRequestData &data) {
+  out << data.funcRepr;
+}
+
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+LifetimeDependenceInfoFunctionTypeRequest::evaluate(
+    Evaluator &evaluator,
+    LifetimeDependenceInfoFunctionTypeRequestData data) const {
+  return LifetimeDependenceInfo::get(data);
 }
 
 //----------------------------------------------------------------------------//
