@@ -3155,9 +3155,15 @@ public:
     return getSubstCalleeConv().hasGuaranteedResult();
   }
 
+  bool hasGuaranteedAddressResult() const {
+    return getSubstCalleeConv().hasGuaranteedAddressResult();
+  }
+
   bool hasAddressResult() const {
     return getSubstCalleeConv().hasAddressResult();
   }
+
+  bool hasInoutResult() const { return getSubstCalleeConv().hasInoutResult(); }
 };
 
 /// PartialApplyInst - Represents the creation of a closure object by partial
