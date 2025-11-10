@@ -30,9 +30,11 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PackExpansionMatcher.h"
@@ -46,6 +48,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/EnumMap.h"
 #include "swift/Basic/FixedBitSet.h"
@@ -4465,6 +4468,30 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     return ErrorType::get(ctx);
   }
 
+  auto const lifetimeAttributes = claim<LifetimeTypeAttr>(attrs);
+  llvm::ArrayRef<LifetimeDependenceInfo> lifetimeDependence = {};
+  if (ctx.LangOpts.hasFeature(Feature::ClosureLifetimes)) {
+    // Lifetime dependence inference has to map parameter and result types into
+    // the generic environment of the DeclContext, so it must request the generic
+    // signature of the type. In order to prevent cycles in request evaluation, we
+    // defer lifetime dependence checking until the Interface type resolution
+    // stage.
+    if (inStage(TypeResolutionStage::Interface)) {
+      if (auto const resolvedLifetimeDependence =
+              evaluateOrDefault(getASTContext().evaluator,
+                                LifetimeDependenceInfoFunctionTypeRequest{
+                                    {repr, params, outputTy, lifetimeAttributes,
+                                     getDeclContext()}},
+                                std::nullopt)) {
+        lifetimeDependence = *resolvedLifetimeDependence;
+      }
+    }
+  } else if (!lifetimeAttributes.empty()) {
+    diagnose(lifetimeAttributes.front()->getStartLoc(),
+             diag::requires_experimental_feature, "@_lifetime", false,
+             Feature::ClosureLifetimes.getName());
+  }
+
   // If this is a function type without parens around the parameter list,
   // diagnose this and produce a fixit to add them.
   if (!repr->isWarnedAbout()) {
@@ -4510,8 +4537,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
-      diffKind, /*clangFunctionType*/ nullptr, isolation,
-      /*LifetimeDependenceInfo*/ {}, hasSendingResult);
+      diffKind, /*clangFunctionType*/ nullptr, isolation, lifetimeDependence,
+      hasSendingResult);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)

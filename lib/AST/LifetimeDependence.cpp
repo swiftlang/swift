@@ -21,7 +21,9 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
@@ -519,11 +521,47 @@ public:
     returnLoc = resultTypeRepr ? resultTypeRepr->getLoc() : afd->getLoc();
   }
 
+  LifetimeDependenceChecker(FunctionTypeRepr *funcRepr,
+                            ArrayRef<AnyFunctionType::Param> params,
+                            Type resultTy,
+                            ArrayRef<LifetimeTypeAttr *> lifetimeAttrs,
+                            DeclContext *dc)
+      : afd(nullptr), ctx(dc->getASTContext()),
+        sourceFile(dc->getParentSourceFile()),
+        resultTy(dc->mapTypeIntoEnvironment(resultTy)),
+        returnLoc(funcRepr->getResultTypeRepr()->getLoc()),
+        resultIndex(params.size()), depBuilder(resultIndex), isImplicit(false),
+        isInit(false), hasUnsafeNonEscapableResult(false),
+        implicitSelfParamInfo(std::nullopt) {
+    for (auto functionLifetimeEntry : lifetimeAttrs)
+      lifetimeEntries.push_back(functionLifetimeEntry->getLifetimeEntry());
+
+    // We only ever use the second names of function type parameters for
+    // lifetimes.
+    auto const argReprs = funcRepr->getArgsTypeRepr()->getElements();
+    assert(params.size() == argReprs.size());
+    for (unsigned paramIndex = 0; paramIndex < params.size(); ++paramIndex) {
+      auto const &parameter = params[paramIndex];
+      auto const &arg = argReprs[paramIndex];
+      parameterInfos.emplace_back(
+          parameter,
+          // If an argument has no second name, use the location of its type.
+          arg.SecondNameLoc.isValid() ? arg.SecondNameLoc : arg.Type->getLoc(),
+          dc->mapTypeIntoEnvironment(parameter.getPlainType()));
+    }
+  }
+
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   currentDependencies() const {
     return depBuilder.initializeDependenceInfoArray(ctx);
   }
 
+  /// Perform lifetime dependence checks for a function type.
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkFuncType() {
+    return checkCommon();
+  }
+
+  /// Perform lifetime dependence checks for a function declaration.
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkFuncDecl() {
     assert(nullptr != afd && (isa<FuncDecl>(afd) || isa<ConstructorDecl>(afd)));
     assert(depBuilder.empty());
@@ -536,6 +574,10 @@ public:
       return currentDependencies();
     }
 
+    return checkCommon();
+  }
+
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkCommon() {
     if (!ctx.LangOpts.hasFeature(Feature::LifetimeDependence)
         && !ctx.LangOpts.hasFeature(Feature::Lifetimes)
         && !ctx.SourceMgr.isImportMacroGeneratedLoc(returnLoc)) {
@@ -1004,7 +1046,8 @@ protected:
                                 TargetDeps &deps,
                                 LifetimeDescriptor source) {
     if (source.isImmortal()) {
-      // Record the immortal dependency even if it is invalid to suppress other diagnostics.
+      // Record the immortal dependency even if it is invalid to suppress other
+      // diagnostics.
       deps.isImmortal = true;
       auto immortalParam =
           llvm::find_if(parameterInfos, [](auto const &paramInfo) {
@@ -1629,6 +1672,15 @@ LifetimeDependenceInfo::get(ValueDecl *decl) {
   }
   auto *eed = cast<EnumElementDecl>(decl);
   return LifetimeDependenceChecker::checkEnumElementDecl(eed);
+}
+
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+LifetimeDependenceInfo::get(
+    LifetimeDependenceInfoFunctionTypeRequestData &data) {
+  auto [funcRepr, params, resultType, lifetimeAttributes, dc] = data;
+  return LifetimeDependenceChecker(funcRepr, params, resultType,
+                                   lifetimeAttributes, dc)
+      .checkFuncType();
 }
 
 void LifetimeDependenceInfo::dump() const {

@@ -79,6 +79,12 @@ protected:
     Warned : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(FunctionTypeRepr, TypeRepr, 1,
+    /// Whether this closure has lifetime dependence information. Used for
+    /// LifetimeDependenceInfoRequest result caching.
+    NoLifetimeDependenceInfo : 1
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(TupleTypeRepr, TypeRepr, 32,
     /// The number of elements contained.
     NumElements : 32
@@ -559,6 +565,7 @@ public:
       PatternSubs(patternSubs),
       ArgsTy(argsTy), RetTy(retTy), ThrownTy(thrownTy),
       AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc) {
+    Bits.FunctionTypeRepr.NoLifetimeDependenceInfo = false;
   }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
@@ -591,6 +598,12 @@ public:
   TypeRepr *getResultTypeRepr() const { return RetTy; }
   bool isAsync() const { return AsyncLoc.isValid(); }
   bool isThrowing() const { return ThrowsLoc.isValid(); }
+  bool noLifetimeDependenceInfo() const {
+    return Bits.FunctionTypeRepr.NoLifetimeDependenceInfo;
+  }
+  void setNoLifetimeDependenceInfo(bool value = true) {
+    Bits.FunctionTypeRepr.NoLifetimeDependenceInfo = true;
+  }
 
   SourceLoc getAsyncLoc() const { return AsyncLoc; }
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }

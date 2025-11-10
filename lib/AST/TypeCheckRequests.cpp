@@ -2776,6 +2776,28 @@ void LifetimeDependenceInfoRequest::cacheResult(
 }
 
 //----------------------------------------------------------------------------//
+// LifetimeDependenceInfoFunctionTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+SourceLoc swift::extractNearestSourceLoc(
+    const LifetimeDependenceInfoFunctionTypeRequestData &data) {
+  return extractNearestSourceLoc(data.funcRepr);
+}
+
+void swift::simple_display(
+    llvm::raw_ostream &out,
+    const LifetimeDependenceInfoFunctionTypeRequestData &data) {
+  out << data.funcRepr;
+}
+
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+LifetimeDependenceInfoFunctionTypeRequest::evaluate(
+    Evaluator &evaluator,
+    LifetimeDependenceInfoFunctionTypeRequestData data) const {
+  return LifetimeDependenceInfo::get(data);
+}
+
+//----------------------------------------------------------------------------//
 // CaptureInfoRequest computation.
 //----------------------------------------------------------------------------//
 
