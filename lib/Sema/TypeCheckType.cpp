@@ -30,9 +30,11 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PackExpansionMatcher.h"
@@ -46,6 +48,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/EnumMap.h"
 #include "swift/Basic/FixedBitSet.h"
@@ -69,17 +72,6 @@
 using namespace swift;
 
 #define DEBUG_TYPE "TypeCheckType"
-
-static constexpr inline bool canHaveMultipleOfTypeAttribute(TypeAttrKind kind) {
-  switch (kind) {
-#define MULTIPLE_TYPE_ATTR(SPELLING, CLASS)                                    \
-  case TypeAttrKind::CLASS:                                                    \
-    return true;
-#include "swift/AST/TypeAttr.def"
-  default:
-    return false;
-  }
-}
 
 /// Type resolution.
 
@@ -2602,7 +2594,7 @@ namespace {
   template <TypeAttrKind Kind>
   auto claim(TypeAttrSet &attrs) {
     auto attrVector = attrs.claim(Kind);
-    if constexpr (!canHaveMultipleOfTypeAttribute(Kind)) {
+    if constexpr (!TypeAttribute::allowMultipleAttributes(Kind)) {
       return attrVector.empty() ? nullptr : attrVector.front();
     } else {
       return attrVector;
@@ -3332,7 +3324,7 @@ void TypeAttrSet::accumulate(ArrayRef<TypeOrCustomAttr> attrs) {
 
     // If an attribute with the same kind already exists, only add this one if
     // there can be more than one.
-    if (canHaveMultipleOfTypeAttribute(representativeKind)) {
+    if (TypeAttribute::allowMultipleAttributes(representativeKind)) {
       insertResult.first->push_back(typeAttr);
       continue;
     }
@@ -4476,6 +4468,30 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     return ErrorType::get(ctx);
   }
 
+  auto const lifetimeAttributes = claim<LifetimeTypeAttr>(attrs);
+  llvm::ArrayRef<LifetimeDependenceInfo> lifetimeDependence = {};
+  if (ctx.LangOpts.hasFeature(Feature::ClosureLifetimes)) {
+    // Lifetime dependence inference has to map parameter and result types into
+    // the generic environment of the DeclContext, so it must request the generic
+    // signature of the type. In order to prevent cycles in request evaluation, we
+    // defer lifetime dependence checking until the Interface type resolution
+    // stage.
+    if (inStage(TypeResolutionStage::Interface)) {
+      if (auto const resolvedLifetimeDependence =
+              evaluateOrDefault(getASTContext().evaluator,
+                                LifetimeDependenceInfoFunctionTypeRequest{
+                                    {repr, params, outputTy, lifetimeAttributes,
+                                     getDeclContext()}},
+                                std::nullopt)) {
+        lifetimeDependence = *resolvedLifetimeDependence;
+      }
+    }
+  } else if (!lifetimeAttributes.empty()) {
+    diagnose(lifetimeAttributes.front()->getStartLoc(),
+             diag::requires_experimental_feature, "@_lifetime", false,
+             Feature::ClosureLifetimes.getName());
+  }
+
   // If this is a function type without parens around the parameter list,
   // diagnose this and produce a fixit to add them.
   if (!repr->isWarnedAbout()) {
@@ -4521,8 +4537,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
-      diffKind, /*clangFunctionType*/ nullptr, isolation,
-      /*LifetimeDependenceInfo*/ {}, hasSendingResult);
+      diffKind, /*clangFunctionType*/ nullptr, isolation, lifetimeDependence,
+      hasSendingResult);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)

@@ -53,6 +53,7 @@ class DefaultArgumentExpr;
 class DefaultArgumentType;
 class DoCatchStmt;
 class ExternalMacroDefinition;
+class FunctionTypeRepr;
 class ClosureExpr;
 class GenericParamList;
 class InverseTypeRepr;
@@ -5268,7 +5269,97 @@ private:
   friend SimpleRequest;
 
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
-  evaluate(Evaluator &evaluator, ValueDecl *AFD) const;
+  evaluate(Evaluator &evaluator, ValueDecl *data) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>>
+  getCachedResult() const;
+  void cacheResult(
+      std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> value) const;
+};
+
+/// The information needed to compute the LifetimeDependenceInfo of a function
+/// type. All relevant information is derived from funcRepr, so this is the only
+/// thing we need to consider for hashing etc.
+struct LifetimeDependenceInfoFunctionTypeRequestData {
+  FunctionTypeRepr *funcRepr;
+  ArrayRef<AnyFunctionType::Param> param;
+  Type resultType;
+  ArrayRef<LifetimeTypeAttr *> lifetimeAttributes;
+  DeclContext *dc;
+  bool
+  operator==(LifetimeDependenceInfoFunctionTypeRequestData const &other) const {
+    return funcRepr == other.funcRepr;
+  }
+  friend llvm::hash_code
+  hash_value(const LifetimeDependenceInfoFunctionTypeRequestData &data) {
+    return hash_value(data.funcRepr);
+  }
+};
+
+SourceLoc extractNearestSourceLoc(
+    const LifetimeDependenceInfoFunctionTypeRequestData &data);
+void simple_display(llvm::raw_ostream &out,
+                    const LifetimeDependenceInfoFunctionTypeRequestData &data);
+
+class LifetimeDependenceInfoFunctionTypeRequest
+    : public SimpleRequest<
+          LifetimeDependenceInfoFunctionTypeRequest,
+          std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>(
+              LifetimeDependenceInfoFunctionTypeRequestData),
+          RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+  evaluate(Evaluator &evaluator,
+           LifetimeDependenceInfoFunctionTypeRequestData data) const;
+};
+
+/// The information needed to compute the LifetimeDependenceInfo of a closure
+/// expression. The type must be passed separately from the closure expression
+/// because it is only inferred immediately before lifetime information is
+/// computed, so it will not be part of the expression yet. Since the type is
+/// derived from the expression, it is not considered for equality, hashing and
+/// printing.
+struct LifetimeDependenceInfoClosureExprRequestData {
+  ClosureExpr *expr;
+  Type resultType;
+  bool
+  operator==(LifetimeDependenceInfoClosureExprRequestData const &other) const {
+    return expr == other.expr;
+  }
+  friend llvm::hash_code
+  hash_value(const LifetimeDependenceInfoClosureExprRequestData &data) {
+    return hash_value(data.expr);
+  }
+};
+
+SourceLoc extractNearestSourceLoc(
+    const LifetimeDependenceInfoClosureExprRequestData &data);
+void simple_display(llvm::raw_ostream &out,
+                    const LifetimeDependenceInfoClosureExprRequestData &data);
+
+class LifetimeDependenceInfoClosureExprRequest
+    : public SimpleRequest<
+          LifetimeDependenceInfoClosureExprRequest,
+          std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>(
+              LifetimeDependenceInfoClosureExprRequestData),
+          RequestFlags::SeparatelyCached | RequestFlags::SplitCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+  evaluate(Evaluator &evaluator,
+           LifetimeDependenceInfoClosureExprRequestData) const;
 
 public:
   // Separate caching.

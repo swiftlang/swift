@@ -3145,6 +3145,13 @@ LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
   return LifetimeDependenceInfo::get(decl);
 }
 
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+LifetimeDependenceInfoClosureExprRequest::evaluate(
+    Evaluator &evaluator,
+    LifetimeDependenceInfoClosureExprRequestData data) const {
+  return LifetimeDependenceInfo::get(data.expr, data.resultType);
+}
+
 ArrayRef<IfConfigClauseRangeInfo> SourceFile::getIfConfigClauseRanges() const {
 #if SWIFT_BUILD_SWIFT_SYNTAX
   if (!IfConfigClauseRanges.IsSorted) {

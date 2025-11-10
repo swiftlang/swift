@@ -267,7 +267,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -302,7 +302,11 @@ protected:
     /// Whether this closure was type-checked as an argument to a macro. This
     /// is only populated after type-checking, and only exists for diagnostic
     /// logic. Do not add more uses of this.
-    IsMacroArgument : 1
+    IsMacroArgument : 1,
+
+    /// Whether this closure has lifetime dependence information. Used for
+    /// LifetimeDependenceInfoRequest result caching.
+    NoLifetimeDependenceInfo : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -4314,6 +4318,7 @@ public:
     Bits.ClosureExpr.NoGlobalActorAttribute = false;
     Bits.ClosureExpr.RequiresDynamicIsolationChecking = false;
     Bits.ClosureExpr.IsMacroArgument = false;
+    Bits.ClosureExpr.NoLifetimeDependenceInfo = false;
   }
 
   SourceRange getSourceRange() const;
@@ -4422,6 +4427,16 @@ public:
 
   void setIsMacroArgument(bool value = true) {
     Bits.ClosureExpr.IsMacroArgument = value;
+  }
+
+  /// Whether this closure has lifetime dependence information. Used for
+  /// LifetimeDependenceInfoRequest result caching.
+  bool noLifetimeDependenceInfo() const {
+    return Bits.ClosureExpr.NoLifetimeDependenceInfo;
+  }
+
+  void setNoLifetimeDependenceInfo(bool value = true) {
+    Bits.ClosureExpr.NoLifetimeDependenceInfo = value;
   }
 
   /// Determine whether this closure expression has an

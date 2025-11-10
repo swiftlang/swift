@@ -9,10 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -20,7 +22,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RequirementSignature.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -2769,9 +2770,64 @@ void LifetimeDependenceInfoRequest::cacheResult(
     }
     auto *eed = cast<EnumElementDecl>(decl);
     eed->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
+    return;
   }
 
   decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
+}
+
+//----------------------------------------------------------------------------//
+// LifetimeDependenceInfoFunctionTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+SourceLoc swift::extractNearestSourceLoc(
+    const LifetimeDependenceInfoFunctionTypeRequestData &data) {
+  return extractNearestSourceLoc(data.funcRepr);
+}
+
+void swift::simple_display(
+    llvm::raw_ostream &out,
+    const LifetimeDependenceInfoFunctionTypeRequestData &data) {
+  out << data.funcRepr;
+}
+
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+LifetimeDependenceInfoFunctionTypeRequest::evaluate(
+    Evaluator &evaluator,
+    LifetimeDependenceInfoFunctionTypeRequestData data) const {
+  return LifetimeDependenceInfo::get(data);
+}
+
+//----------------------------------------------------------------------------//
+// LifetimeDependenceInfoClosureExprRequest computation.
+//----------------------------------------------------------------------------//
+SourceLoc swift::extractNearestSourceLoc(
+    const LifetimeDependenceInfoClosureExprRequestData &data) {
+  return extractNearestSourceLoc(data.expr);
+}
+void swift::simple_display(
+    llvm::raw_ostream &out,
+    const LifetimeDependenceInfoClosureExprRequestData &data) {
+  out << data.expr;
+}
+
+std::optional<std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>>
+LifetimeDependenceInfoClosureExprRequest::getCachedResult() const {
+  auto *expr = std::get<0>(getStorage()).expr;
+  if (expr->noLifetimeDependenceInfo())
+    return std::optional(std::optional<LifetimeDependenceInfo>());
+  // Closure exprs don't have cached state, delegate to evaluator
+  return expr->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void LifetimeDependenceInfoClosureExprRequest::cacheResult(
+    std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> result) const {
+  auto *expr = std::get<0>(getStorage()).expr;
+  if (!result) {
+    expr->setNoLifetimeDependenceInfo();
+    return;
+  }
+  expr->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
 }
 
 //----------------------------------------------------------------------------//

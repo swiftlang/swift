@@ -39,6 +39,7 @@
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Parse/ParserResult.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -5072,6 +5073,22 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     if (!justChecking) {
       result = new (Context) DifferentiableTypeAttr(AtLoc, attrLoc, parensRange,
                                                     {diffKind, diffKindLoc});
+    }
+    return makeParserSuccess();
+  }
+
+  case TypeAttrKind::Lifetime: {
+    const auto entryResult = parseLifetimeEntry(AtLoc);
+    if (entryResult.isNull()) {
+      return makeParserError();
+    }
+
+    auto *entry = entryResult.get();
+
+    if (!justChecking) {
+      result = new (Context) LifetimeTypeAttr(
+          AtLoc, attrLoc, SourceRange(entry->getStartLoc(), entry->getEndLoc()),
+          entryResult.get());
     }
     return makeParserSuccess();
   }

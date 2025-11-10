@@ -17,11 +17,14 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
@@ -120,7 +123,7 @@ filterEscapableLifetimeDependencies(GenericSignature sig,
         continue;
       }
     }
-    
+
     // Otherwise, keep the dependency.
     outputs.push_back(depInfo);
   }
@@ -146,7 +149,7 @@ std::string LifetimeDependenceInfo::getString() const {
   std::string lifetimeDependenceString = "@lifetime(";
   auto addressable = getAddressableIndices();
   auto condAddressable = getConditionallyAddressableIndices();
-  
+
   auto getSourceString = [&](IndexSubset *bitvector, StringRef kind) {
     std::string result;
     bool isFirstSetBit = true;
@@ -207,7 +210,7 @@ void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
         .getPointer()
         ->Profile(ID);
   } else {
-    ID.AddBoolean(false);  
+    ID.AddBoolean(false);
   }
 }
 
@@ -463,6 +466,10 @@ public:
                                       : afd->getParameters()->size();
   }
 
+  static int getResultIndex(AbstractClosureExpr *ace) {
+    return ace->getParameters()->size();
+  }
+
   static int getResultIndex(EnumElementDecl *eed) {
     auto *paramList = eed->getParameterList();
     return paramList ? paramList->size() + 1 : 1;
@@ -528,11 +535,70 @@ public:
     returnLoc = resultTypeRepr ? resultTypeRepr->getLoc() : afd->getLoc();
   }
 
+  LifetimeDependenceChecker(ClosureExpr *ce, Type resultType)
+      : parameterInfos(collectParameterInfo(ce->getParameters(), ce)),
+        afd(nullptr), ctx(ce->getParent()->getASTContext()),
+        sourceFile(ce->getParentSourceFile()), resultTy(resultType),
+        resultIndex(getResultIndex(ce)),
+        depBuilder(/*sourceIndexCap*/ resultIndex),
+        isImplicit(ce->isImplicit()), isInit(false),
+        hasUnsafeNonEscapableResult(
+            ce->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()),
+        implicitSelfParam(std::nullopt) {
+    collectLifetimeEntries(ce->getAttrs());
+    if (ce->hasExplicitResultType()) {
+      returnLoc = ce->getExplicitResultTypeRepr()->getLoc();
+    } else {
+      returnLoc = ce->getLoc();
+    }
+  }
+
+  LifetimeDependenceChecker(FunctionTypeRepr *funcRepr,
+                            ArrayRef<AnyFunctionType::Param> params,
+                            Type resultTy,
+                            ArrayRef<LifetimeTypeAttr *> lifetimeAttrs,
+                            DeclContext *dc)
+      : afd(nullptr), ctx(dc->getASTContext()),
+        sourceFile(dc->getParentSourceFile()),
+        resultTy(dc->mapTypeIntoEnvironment(resultTy)),
+        returnLoc(funcRepr->getResultTypeRepr()->getLoc()),
+        resultIndex(params.size()), depBuilder(resultIndex), isImplicit(false),
+        isInit(false), hasUnsafeNonEscapableResult(false),
+        implicitSelfParam(std::nullopt) {
+    for (auto functionLifetimeEntry : lifetimeAttrs)
+      lifetimeEntries.push_back(functionLifetimeEntry->getLifetimeEntry());
+
+    // We only ever use the second names of function type parameters for
+    // lifetimes.
+    auto const argReprs = funcRepr->getArgsTypeRepr()->getElements();
+    assert(params.size() == argReprs.size());
+    for (unsigned paramIndex = 0; paramIndex < params.size(); ++paramIndex) {
+      auto const &parameter = params[paramIndex];
+      auto const &arg = argReprs[paramIndex];
+      parameterInfos.emplace_back(
+          parameter,
+          // If an argument has no second name, use the location of its type.
+          arg.SecondNameLoc.isValid() ? arg.SecondNameLoc : arg.Type->getLoc(),
+          dc->mapTypeIntoEnvironment(parameter.getPlainType()));
+    }
+  }
+
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   currentDependencies() const {
     return depBuilder.initializeDependenceInfoArray(ctx);
   }
 
+  /// Perform lifetime dependence checks for a closure.
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkClosure() {
+    return checkCommon();
+  }
+
+  /// Perform lifetime dependence checks for a function type.
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkFuncType() {
+    return checkCommon();
+  }
+
+  /// Perform lifetime dependence checks for a function declaration.
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkFuncDecl() {
     assert(isa<FuncDecl>(afd) || isa<ConstructorDecl>(afd));
     assert(depBuilder.empty());
@@ -545,6 +611,10 @@ public:
       return currentDependencies();
     }
 
+    return checkCommon();
+  }
+
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkCommon() {
     if (!ctx.LangOpts.hasFeature(Feature::LifetimeDependence)
         && !ctx.LangOpts.hasFeature(Feature::Lifetimes)
         && !ctx.SourceMgr.isImportMacroGeneratedLoc(returnLoc)) {
@@ -712,7 +782,7 @@ protected:
     }
     return "a function";
   }
-  
+
   // Ensure that dependencies exist for any return value or inout parameter that
   // needs one. Always runs before the checker completes if no other diagnostics
   // were issued.
@@ -745,7 +815,7 @@ protected:
                          {StringRef(diagnosticQualifier())});
     }
   }
-  
+
   void diagnoseMissingInoutDependencies(DiagID diagID) {
     unsigned paramIndex = 0;
     for (auto &paramInfo : parameterInfos) {
@@ -856,8 +926,7 @@ protected:
                                     isInterfaceFile())) {
         return LifetimeDependenceKind::Scope;
       }
-      diagnose(loc,
-               diag::lifetime_dependence_parsed_borrow_with_ownership,
+      diagnose(loc, diag::lifetime_dependence_parsed_borrow_with_ownership,
                getNameForParsedLifetimeDependenceKind(parsedLifetimeKind),
                getOwnershipSpelling(loweredOwnership));
       switch (loweredOwnership) {
@@ -921,8 +990,7 @@ protected:
       auto paramIndex = descriptor.getIndex();
       if (paramIndex >= parameterInfos.size()) {
         diagnose(descriptor.getLoc(),
-                 diag::lifetime_dependence_invalid_param_index,
-                 paramIndex);
+                 diag::lifetime_dependence_invalid_param_index, paramIndex);
         return std::nullopt;
       }
       return std::make_pair(&parameterInfos[paramIndex], paramIndex);
@@ -1013,7 +1081,8 @@ protected:
                                 TargetDeps &deps,
                                 LifetimeDescriptor source) {
     if (source.isImmortal()) {
-      // Record the immortal dependency even if it is invalid to suppress other diagnostics.
+      // Record the immortal dependency even if it is invalid to suppress other
+      // diagnostics.
       deps.isImmortal = true;
       auto immortalParam =
           llvm::find_if(parameterInfos, [](auto const &paramInfo) {
@@ -1637,6 +1706,20 @@ LifetimeDependenceInfo::get(ValueDecl *decl) {
   }
   auto *eed = cast<EnumElementDecl>(decl);
   return LifetimeDependenceChecker::checkEnumElementDecl(eed);
+}
+
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+LifetimeDependenceInfo::get(ClosureExpr *ce, Type resultTy) {
+  return LifetimeDependenceChecker(ce, resultTy).checkClosure();
+}
+
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+LifetimeDependenceInfo::get(
+    LifetimeDependenceInfoFunctionTypeRequestData &data) {
+  auto [funcRepr, params, resultType, lifetimeAttributes, dc] = data;
+  return LifetimeDependenceChecker(funcRepr, params, resultType,
+                                   lifetimeAttributes, dc)
+      .checkFuncType();
 }
 
 void LifetimeDependenceInfo::dump() const {

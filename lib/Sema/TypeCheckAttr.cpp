@@ -8660,6 +8660,18 @@ public:
     attr->setInvalid();
   }
 
+  void visitLifetimeAttr(LifetimeAttr *attr) {
+    if (!attr->isUnderscored())
+      visitDeclAttribute(attr);
+
+    if (!ctx.LangOpts.hasFeature(Feature::ClosureLifetimes)) {
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::requires_experimental_feature, "@_lifetime",
+                         false, Feature::ClosureLifetimes.getName());
+      attr->setInvalid();
+    }
+  }
+
   void visitSendableAttr(SendableAttr *attr) {
     // Nothing else to check.
   }

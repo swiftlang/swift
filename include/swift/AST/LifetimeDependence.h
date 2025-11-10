@@ -33,6 +33,7 @@ namespace swift {
 class AbstractFunctionDecl;
 class FunctionTypeRepr;
 class LifetimeDependentTypeRepr;
+struct LifetimeDependenceInfoFunctionTypeRequestData;
 class SILParameterInfo;
 class SILResultInfo;
 
@@ -338,6 +339,21 @@ public:
   /// lifetime dependence specifiers or by inference based on types and
   /// ownership modifiers.
   static std::optional<ArrayRef<LifetimeDependenceInfo>> get(ValueDecl *decl);
+
+  /// Builds LifetimeDependenceInfo from a Swift closure expr, either from the
+  /// explicit lifetime dependence specifiers or by inference based on types and
+  /// ownership modifiers. Most closure expressions lack an explicit result
+  /// type, so one must also be supplied.
+  static std::optional<ArrayRef<LifetimeDependenceInfo>> get(ClosureExpr *ce,
+                                                             Type resultTy);
+
+  /// Builds LifetimeDependenceInfo from a function type.
+  ///
+  /// The information is passed indirectly because it contains
+  /// AnyFunctionType::Param, which is defined in Types.h. Including that header
+  /// in this one would create a cycle.
+  static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+  get(LifetimeDependenceInfoFunctionTypeRequestData &data);
 
   /// Builds LifetimeDependenceInfo from SIL
   static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>

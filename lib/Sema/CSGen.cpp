@@ -21,9 +21,11 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -2684,6 +2686,12 @@ namespace {
       if (isolation.isGlobalActor() &&
           CS.getASTContext().LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
         extInfo = extInfo.withSendable();
+      }
+
+      if (auto lifetimeDeps = evaluateOrFatal(
+              CS.getASTContext().evaluator,
+              LifetimeDependenceInfoClosureExprRequest{{closure, resultTy}})) {
+        extInfo = extInfo.withLifetimeDependencies(*lifetimeDeps);
       }
 
       auto *fnTy = FunctionType::get(closureParams, resultTy, extInfo);
