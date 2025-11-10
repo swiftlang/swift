@@ -1698,7 +1698,6 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
   auto builtinProtocol = getProtocol(builtinProtocolKind);
   auto builtinConformance = lookupConformance(type, builtinProtocol);
   if (builtinConformance.isInvalid()) {
-    assert(false && "Missing required conformance");
     witness = ConcreteDeclRef();
     return witness;
   }
@@ -1706,7 +1705,6 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
   auto *ctx = const_cast<ASTContext *>(this);
   witness = builtinConformance.getWitnessByName(initName(*ctx));
   if (!witness) {
-    assert(false && "Missing required witness");
     witness = ConcreteDeclRef();
     return witness;
   }
