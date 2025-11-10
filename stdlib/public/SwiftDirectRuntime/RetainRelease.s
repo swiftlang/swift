@@ -192,7 +192,8 @@ Lslowpath_release:
 // Save/restore the preservemost registers and call swift_retain.
 Lcall_swift_release:
   maybe_pacibsp
-  str   x9, [sp, #-0x50]!
+  sub   sp, sp, #0x50
+  str   x9, [sp]
   stp   x10, x11, [sp, #0x10]
   stp   x12, x13, [sp, #0x20]
   stp   x14, x15, [sp, #0x30]
@@ -207,12 +208,14 @@ Lcall_swift_release:
   ldp   x14, x15, [sp, #0x30]
   ldp   x12, x13, [sp, #0x20]
   ldp   x10, x11, [sp, #0x10]
-  ldr   x9, [sp], #0x50
+  ldr   x9, [sp]
+  add   sp, sp, #0x50
   ret_maybe_ab
 
 LbridgeObjectReleaseDirectObjC:
   maybe_pacibsp
-  stp   x0, x9, [sp, #-0x50]!
+  sub   sp, sp, #0x50
+  stp   x0, x9, [sp]
   stp   x10, x11, [sp, #0x10]
   stp   x12, x13, [sp, #0x20]
   stp   x14, x15, [sp, #0x30]
@@ -227,7 +230,8 @@ LbridgeObjectReleaseDirectObjC:
   ldp   x14, x15, [sp, #0x30]
   ldp   x12, x13, [sp, #0x20]
   ldp   x10, x11, [sp, #0x10]
-  ldp   x0, x9, [sp], #0x50
+  ldp   x0, x9, [sp]
+  add   sp, sp, #0x50
 LbridgeObjectReleaseObjCRet:
   ret_maybe_ab
 
@@ -330,7 +334,8 @@ Lslowpath_retain:
 // Save/restore the preservemost registers and call swift_retain.
 Lcall_swift_retain:
   maybe_pacibsp
-  stp   x0, x9, [sp, #-0x50]!
+  sub   sp, sp, #0x50
+  stp   x0, x9, [sp]
   stp   x10, x11, [sp, #0x10]
   stp   x12, x13, [sp, #0x20]
   stp   x14, x15, [sp, #0x30]
@@ -345,12 +350,14 @@ Lcall_swift_retain:
   ldp   x14, x15, [sp, #0x30]
   ldp   x12, x13, [sp, #0x20]
   ldp   x10, x11, [sp, #0x10]
-  ldp   x0, x9, [sp], #0x50
+  ldp   x0, x9, [sp]
+  add   sp, sp, #0x50
   ret_maybe_ab
 
 Lswift_bridgeObjectRetainDirectObjC:
   maybe_pacibsp
-  stp   x0, x9, [sp, #-0x50]!
+  sub   sp, sp, #0x50
+  stp   x0, x9, [sp]
   stp   x10, x11, [sp, #0x10]
   stp   x12, x13, [sp, #0x20]
   stp   x14, x15, [sp, #0x30]
@@ -365,7 +372,8 @@ Lswift_bridgeObjectRetainDirectObjC:
   ldp   x14, x15, [sp, #0x30]
   ldp   x12, x13, [sp, #0x20]
   ldp   x10, x11, [sp, #0x10]
-  ldp   x0, x9, [sp], #0x50
+  ldp   x0, x9, [sp]
+  add   sp, sp, #0x50
   ret_maybe_ab
 
 #else
