@@ -525,7 +525,9 @@ struct ASTContext::Implementation {
 
   /// The builtin initializer witness for a literal. Used when building
   /// LiteralExprs in fully-checked AST.
-  llvm::DenseMap<const NominalTypeDecl *, ConcreteDeclRef> BuiltinInitWitness;
+  llvm::DenseMap<std::pair<const NominalTypeDecl *, KnownProtocolKind>,
+                 ConcreteDeclRef>
+      BuiltinInitWitness;
 
   /// Mapping from the function decl to its original body's source range. This
   /// is populated if the body is reparsed from other source buffers.
@@ -1686,11 +1688,12 @@ ASTContext::getStringBuiltinInitDecl(NominalTypeDecl *stringDecl) const {
   return getBuiltinInitDecl(stringDecl, builtinProtocolKind, fn);
 }
 
-ConcreteDeclRef
-ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
-                               KnownProtocolKind builtinProtocolKind,
-               llvm::function_ref<DeclName (ASTContext &ctx)> initName) const {
-  auto &witness = getImpl().BuiltinInitWitness[decl];
+ConcreteDeclRef ASTContext::getBuiltinInitDecl(
+    NominalTypeDecl *decl, KnownProtocolKind builtinProtocolKind,
+    llvm::function_ref<DeclName(ASTContext &ctx)> initName) const {
+  // Note the initializer name is expected to be unique for each protocol kind
+  // so we don't need it to be part of the key.
+  auto &witness = getImpl().BuiltinInitWitness[{decl, builtinProtocolKind}];
   if (witness)
     return witness;
 
