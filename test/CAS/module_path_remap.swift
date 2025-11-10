@@ -31,4 +31,11 @@
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:F commandLine | %FileCheck %s -check-prefix CLANG-CMD
 // CLANG-CMD: /^src/test/ScanDependencies/Inputs/CHeaders/module.modulemap
 
+/// Check the legacy option.
+// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps2.json \
+// RUN:  -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -emit-dependencies \
+// RUN:  -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -cache-compile-job \
+// RUN:  -cas-path %t/cas -scanner-prefix-map %swift_src_root=/^src -scanner-prefix-map %t=/^tmp -scanner-output-dir %t -auto-bridging-header-chaining
 
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps2.json deps2 casFSRootID > %t/deps2.fs.casid
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/deps2.fs.casid | %FileCheck %s -check-prefix DEPS-FS

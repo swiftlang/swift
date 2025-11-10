@@ -2519,6 +2519,12 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.ScannerPrefixMapper.push_back({A->getValue(0), A->getValue(1)});
   }
 
+  // Handle legacy prefix map option.
+  for (StringRef Opt : Args.getAllArgValues(OPT_scanner_prefix_map)) {
+    if (auto Mapping = llvm::MappedPrefix::getFromJoined(Opt))
+      Opts.ScannerPrefixMapper.push_back({Mapping->Old, Mapping->New});
+  }
+
   Opts.ResolvedPluginVerification |=
       Args.hasArg(OPT_resolved_plugin_verification);
 
