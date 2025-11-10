@@ -329,8 +329,15 @@ public enum _DebuggerSupport {
     return target
   }
 
-  public static func stringForPrintObject(_ pointer: UnsafeRawPointer?, mangledTypeName: String) -> String {
-    guard let pointer else { return "invalid value pointer" }
+  // Print an object or value without the caller having a concrete type.
+  //
+  // For simplicity of data handling in LLDB avoids using an enum return type,
+  // using (Bool, String) instead of Optional<String>.
+  @available(SwiftStdlib 6.3, *)
+  public static func stringForPrintObject(_ pointer: UnsafeRawPointer?, mangledTypeName: String) -> (Bool, String) {
+    guard let pointer = unsafe pointer else {
+      return (false, "invalid pointer")
+    }
 
     guard let type =
       unsafe _getTypeByMangledNameInContext(
@@ -339,14 +346,14 @@ public enum _DebuggerSupport {
         genericContext: nil,
         genericArguments: nil)
       else {
-        return "invalid type \(mangledTypeName)"
+        return (false, "type not found for mangled name: \(mangledTypeName)")
       }
 
     func loadPointer<T>(type: T.Type) -> Any {
       unsafe pointer.load(as: T.self)
     }
     let anyValue = _openExistential(type, do: loadPointer)
-    return stringForPrintObject(anyValue)
+    return (true, stringForPrintObject(anyValue))
   }
 }
 

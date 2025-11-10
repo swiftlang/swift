@@ -10,6 +10,16 @@ struct StructWithMembers {
   var b = "Hello World"
 }
 
+struct StructWithMembersAndDescription: CustomStringConvertible {
+  var a = 1
+  var description: String { "Hello World" }
+}
+
+struct StructIsNonCopyable: ~Copyable {
+  var a = 1
+  var b = "Hello World"
+}
+
 class ClassWithMembers {
   var a = 1
   var b = "Hello World"
@@ -108,30 +118,49 @@ if #available(SwiftStdlib 6.1, *) {
   }
 }
 
+@available(SwiftStdlib 6.3, *)
 func _expectStringForPrintObject<T>(_ pointer: UnsafePointer<T>, output: String) {
-    let mangledTypeName = _mangledTypeName(T.self)
-    let printed = _DebuggerSupport.stringForPrintObject(UnsafeRawPointer(pointer), mangledTypeName: mangledTypeName!)
-    expectEqual(printed, output)
+  let mangledTypeName = _mangledTypeName(T.self)
+  let (success, printed) =
+    _DebuggerSupport.stringForPrintObject(UnsafeRawPointer(pointer), mangledTypeName: mangledTypeName!)
+  expectTrue(success)
+  expectEqual(printed, output)
 }
 
-StringForPrintObjectTests.test("PointerWithMangledTypeName") {
-  var num = 33
-  _expectStringForPrintObject(&num, output: "33\n")
+if #available(SwiftStdlib 6.3, *) {
+  StringForPrintObjectTests.test("PointerWithMangledTypeName") {
+    var num = 33
+    _expectStringForPrintObject(&num, output: "33\n")
 
-  var val1 = StructWithMembers()
-  _expectStringForPrintObject(&val1, output: "▿ StructWithMembers\n  - a : 1\n  - b : \"Hello World\"\n")
-  var val2 = StructWithMembersAndDescription()
-  _expectStringForPrintObject(&val2, output: "Hello World\n")
+    var val1 = StructWithMembers()
+    _expectStringForPrintObject(&val1, output: "▿ StructWithMembers\n  - a : 1\n  - b : \"Hello World\"\n")
+    var val2 = StructWithMembersAndDescription()
+    _expectStringForPrintObject(&val2, output: "Hello World\n")
 
-  var val3: StructWithMembers? = StructWithMembers()
-  _expectStringForPrintObject(&val3,
-    output: "▿ Optional<StructWithMembers>\n  ▿ some : StructWithMembers\n    - a : 1\n    - b : \"Hello World\"\n")
+    var val3: StructWithMembers? = StructWithMembers()
+    _expectStringForPrintObject(&val3,
+      output: "▿ Optional<StructWithMembers>\n  ▿ some : StructWithMembers\n    - a : 1\n    - b : \"Hello World\"\n")
 
-  let obj = ClassWithMembers()
-  let pointer = unsafeBitCast(obj, to: UnsafeRawPointer.self)
-  let mangledTypeName = _mangledTypeName(ClassWithMembers.self)
-  let printed = _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: mangledTypeName!)
-  expectTrue(printed.hasPrefix("<main.ClassWithMembers: 0x"))
+    do {
+      var val4 = StructIsNonCopyable()
+      withUnsafeBytes(of: &val4) { bytes in
+        let mangledTypeName = _mangledTypeName(StructIsNonCopyable.self)
+        let (success, printed) =
+          _DebuggerSupport.stringForPrintObject(bytes.baseAddress!, mangledTypeName: mangledTypeName!)
+        expectFalse(success)
+        expectEqual(printed, "type not found for mangled name: \(mangledTypeName!)")
+      }
+    }
+
+    do {
+      let obj = ClassWithMembers()
+      let pointer = unsafeBitCast(obj, to: UnsafeRawPointer.self)
+      let mangledTypeName = _mangledTypeName(ClassWithMembers.self)
+      let (success, printed) = _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: mangledTypeName!)
+      expectTrue(success)
+      expectEqual(printed.hasPrefix("<main.ClassWithMembers: 0x"), true)
+    }
+  }
 }
 
 class RefCountedObj {
