@@ -433,8 +433,7 @@ private:
                     const SpecificASTBlockRecordKeeper &entities);
 
   /// Serializes all transparent SIL functions in the SILModule.
-  void writeSIL(const SILModule *M, bool serializeAllSIL,
-                bool serializeDebugInfo);
+  void writeSIL(const SILModule *M);
 
   /// Top-level entry point for serializing a module.
   void writeAST(ModuleOrSourceFile DC);
