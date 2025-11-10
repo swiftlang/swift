@@ -296,6 +296,15 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
       workerCompilerInvocation->getSearchPathOptions().ExplicitSwiftModuleInputs);
 }
 
+llvm::Error ModuleDependencyScanningWorker::initializeClangScanningTool() {
+  return clangScanningTool.initializeCompilerInstanceWithContext(
+      clangScanningWorkingDirectoryPath, clangScanningModuleCommandLineArgs);
+}
+
+llvm::Error ModuleDependencyScanningWorker::finalizeClangScanningTool() {
+  return clangScanningTool.finalizeCompilerInstanceWithContext();
+}
+
 SwiftModuleScannerQueryResult
 ModuleDependencyScanningWorker::scanFilesystemForSwiftModuleDependency(
     Identifier moduleName, bool isTestableImport) {
@@ -309,18 +318,23 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     LookupModuleOutputCallback lookupModuleOutput,
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenModules) {
-  auto clangModuleDependencies = clangScanningTool.getModuleDependencies(
-      moduleName.str(), clangScanningModuleCommandLineArgs,
-      clangScanningWorkingDirectoryPath, alreadySeenModules,
-      lookupModuleOutput);
+  //  auto clangModuleDependencies = clangScanningTool.getModuleDependencies(
+  //      moduleName.str(), clangScanningModuleCommandLineArgs,
+  //      clangScanningWorkingDirectoryPath, alreadySeenModules,
+  //      lookupModuleOutput);
+  auto clangModuleDependencies =
+      clangScanningTool.computeDependenciesByNameWithContext(
+          moduleName.str(), alreadySeenModules, lookupModuleOutput);
   if (!clangModuleDependencies) {
-    llvm::handleAllErrors(clangModuleDependencies.takeError(), [this, &moduleName](
-                                                  const llvm::StringError &E) {
+    llvm::handleAllErrors(
+        clangModuleDependencies.takeError(),
+        [this, &moduleName](const llvm::StringError &E) {
           auto &message = E.getMessage();
           if (message.find("fatal error: module '" + moduleName.str().str() +
-                            "' not found") == std::string::npos)
-            workerDiagnosticEngine->diagnose(SourceLoc(), diag::clang_dependency_scan_error, message);
-      });
+                           "' not found") == std::string::npos)
+            workerDiagnosticEngine->diagnose(
+                SourceLoc(), diag::clang_dependency_scan_error, message);
+        });
     return std::nullopt;
   }
 
@@ -558,6 +572,22 @@ ModuleDependencyScanner::ModuleDependencyScanner(
     Workers.emplace_front(std::make_unique<ModuleDependencyScanningWorker>(
         ScanningService, ScanCompilerInvocation, SILOptions, ScanASTContext,
         DependencyTracker, CAS, ActionCache, PrefixMapper.get(), Diagnostics));
+}
+
+llvm::Error ModuleDependencyScanner::initializeWorkerClangScanningTool() {
+  for (auto &W : Workers) {
+    if (auto error = W->initializeClangScanningTool())
+      return error;
+  }
+  return llvm::Error::success();
+}
+
+llvm::Error ModuleDependencyScanner::finalizeWorkerClangScanningTool() {
+  for (auto &W : Workers) {
+    if (auto error = W->finalizeClangScanningTool())
+      return error;
+  }
+  return llvm::Error::success();
 }
 
 static std::set<ModuleDependencyID>

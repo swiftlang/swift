@@ -51,6 +51,9 @@ public:
       llvm::PrefixMapper *mapper, DiagnosticEngine &diags);
 
 private:
+  llvm::Error initializeClangScanningTool();
+  llvm::Error finalizeClangScanningTool();
+
   /// Query dependency information for a named Clang module
   ///
   /// \param moduleName moduel identifier for the query
@@ -228,6 +231,9 @@ public:
   /// Identify the scanner invocation's main module's dependencies
   llvm::ErrorOr<ModuleDependencyInfo>
   getMainModuleDependencyInfo(ModuleDecl *mainModule);
+
+  llvm::Error initializeWorkerClangScanningTool();
+  llvm::Error finalizeWorkerClangScanningTool();
 
   /// Resolve module dependencies of the given module, computing a full
   /// transitive closure dependency graph.

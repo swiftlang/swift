@@ -1412,6 +1412,11 @@ performModuleScanImpl(
       instance->getDiags(),
       instance->getInvocation().getFrontendOptions().ParallelDependencyScan);
 
+  auto initError = scanner.initializeWorkerClangScanningTool();
+  // TODO: fix error check!
+  if (initError)
+    llvm::consumeError(std::move(initError));
+
   // Identify imports of the main module and add an entry for it
   // to the dependency graph.
   auto mainModuleName = instance->getMainModule()->getNameStr();
@@ -1425,6 +1430,10 @@ performModuleScanImpl(
   auto allModules = scanner.performDependencyScan(mainModuleID);
   if (diagnoseCycle(*instance, cache, mainModuleID))
     return std::make_error_code(std::errc::not_supported);
+
+  auto finError = scanner.finalizeWorkerClangScanningTool();
+  if (finError)
+    llvm::consumeError(std::move(finError));
 
   auto topologicallySortedModuleList =
       computeTopologicalSortOfExplicitDependencies(allModules, cache);
