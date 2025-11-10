@@ -9248,6 +9248,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           req->is<LocatorPathElt::TypeParameterRequirement>()) {
         auto *memberLoc = getConstraintLocator(anchor, path.front());
 
+        if (hasFixFor(memberLoc))
+          return SolutionKind::Solved;
+
         auto signature = path[path.size() - 2]
                              .castTo<LocatorPathElt::OpenedGeneric>()
                              .getSignature();
@@ -10652,24 +10655,26 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         return;
       }
 
-      // Cannot instantiate a protocol or reference a member on
-      // protocol composition type.
-      if (isa<ConstructorDecl>(decl) ||
-          instanceTy->is<ProtocolCompositionType>()) {
-        result.addUnviable(candidate,
-                           MemberLookupResult::UR_TypeMemberOnInstance);
+      if (getConcreteReplacementForProtocolSelfType(decl)) {
+        result.addViable(candidate);
         return;
       }
 
-      if (getConcreteReplacementForProtocolSelfType(decl)) {
-        result.addViable(candidate);
-      } else {
-        result.addUnviable(
+      // Cannot instantiate a protocol or reference a member on
+      // protocol composition type.
+      if (!memberLocator->isLastElement<LocatorPathElt::UnresolvedMember>()) {
+        if (isa<ConstructorDecl>(decl) ||
+            instanceTy->is<ProtocolCompositionType>()) {
+          result.addUnviable(candidate,
+                             MemberLookupResult::UR_TypeMemberOnInstance);
+          return;
+        }
+      }
+      result.addUnviable(
             candidate,
             MemberLookupResult::UR_InvalidStaticMemberOnProtocolMetatype);
-      }
-
       return;
+
     } else {
       if (!hasStaticMembers) {
         result.addUnviable(candidate,
@@ -11616,8 +11621,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                                  alreadyDiagnosed, locator);
 
       auto instanceTy = baseObjTy->getMetatypeInstanceType();
-
-      auto impact = 4;
+      auto impact = 2;
       // Impact is higher if the base type is any function type
       // because function types can't have any members other than self
       if (instanceTy->is<AnyFunctionType>()) {
@@ -11645,10 +11649,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           }
         }
 
-        // Increasing the impact for missing member in any argument position so
-        // it doesn't affect situations where there are another fixes involved.
+        // Increasing the impact for missing member in any argument position
+        // which may be less likely than other potential mistakes
         if (getArgumentLocator(anchorExpr))
-          impact += 5;
+          impact += 1;
       }
 
       if (recordFix(fix, impact))
@@ -12097,7 +12101,7 @@ ConstraintSystem::simplifyUnresolvedMemberChainBaseConstraint(
     return SolutionKind::Unsolved;
   }
 
-  if (baseTy->is<ProtocolType>()) {
+  if (baseTy->is<ProtocolType, ProtocolCompositionType>()) {
     auto *baseExpr =
         castToExpr<UnresolvedMemberChainResultExpr>(locator.getAnchor())
             ->getChainBase();
@@ -12109,10 +12113,17 @@ ConstraintSystem::simplifyUnresolvedMemberChainBaseConstraint(
 
     auto *memberRef = findResolvedMemberRef(memberLoc);
     if (memberRef && (memberRef->isStatic() || isa<TypeAliasDecl>(memberRef))) {
-      return simplifyConformsToConstraint(
-          resultTy, baseTy, ConstraintKind::ConformsTo,
-          getConstraintLocator(memberLoc, ConstraintLocator::MemberRefBase),
-          flags);
+      auto layout = baseTy->getExistentialLayout();
+      for (auto *proto : layout.getProtocols()) {
+        if (simplifyConformsToConstraint(
+            resultTy, proto, ConstraintKind::ConformsTo,
+            getConstraintLocator(memberLoc,
+                                 ConstraintLocator::MemberRefBase),
+                                         flags) == SolutionKind::Error) {
+          return SolutionKind::Error;
+        }
+      }
+      return SolutionKind::Solved;
     }
   }
 

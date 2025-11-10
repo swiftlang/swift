@@ -1467,18 +1467,53 @@ TypeVariableType *ConstraintSystem::openGenericParameter(GenericTypeParamType *p
   return createTypeVariable(paramLocator, options, preparedOverload);
 }
 
+struct ProtocolMap {
+  SmallVector<Type, 2> keys;
+  SmallVector<SmallVector<Type>, 2>protocols;
+
+  void insert(Type key, Type protocol) {
+    for(unsigned p = 0, n = keys.size(); p < n; p++) {
+      if (key->isEqual(keys[p])) {
+        protocols[p].push_back(protocol);
+        return;
+      }
+    }
+    keys.push_back(key);
+    protocols.push_back({protocol});
+  }
+
+  SmallVector<std::pair<Type,SmallVector<Type>>> iterable() {
+    SmallVector<std::pair<Type,SmallVector<Type>>> iter;
+    for(unsigned p = 0, n = keys.size(); p < n; p++)
+      iter.push_back(std::pair(keys[p],protocols[p]));
+    return iter;
+  }
+};
+
 void ConstraintSystem::openGenericRequirements(
     DeclContext *outerDC, GenericSignature signature,
     bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn,
     PreparedOverloadBuilder *preparedOverload) {
+
   auto requirements = signature.getRequirements();
-  for (unsigned pos = 0, n = requirements.size(); pos != n; ++pos) {
-    auto openedGenericLoc =
-      locator.withPathElement(LocatorPathElt::OpenedGeneric(signature));
-    openGenericRequirement(outerDC, signature, pos, requirements[pos],
+  unsigned numReqs = requirements.size();
+  auto openedGenericLoc =
+    locator.withPathElement(LocatorPathElt::OpenedGeneric(signature));
+  auto openGeneric = [&](unsigned pos, Requirement req) {
+    openGenericRequirement(outerDC, signature, pos, req,
                            skipProtocolSelfConstraint, openedGenericLoc,
                            substFn, preparedOverload);
+  };
+
+  // Fast case with single requirement
+  if (numReqs == 1) {
+    openGeneric(0, requirements[0]);
+  } else {
+    for (unsigned pos = 0; pos != numReqs; ++pos) {
+      auto currentRequirement = requirements[pos];
+        openGeneric(pos, currentRequirement);
+    }
   }
 }
 
@@ -1495,12 +1530,14 @@ void ConstraintSystem::openGenericRequirement(
   auto kind = req.getKind();
   switch (kind) {
   case RequirementKind::Conformance: {
-    auto protoDecl = req.getProtocolDecl();
-    // Determine whether this is the protocol 'Self' constraint we should
-    // skip.
-    if (skipProtocolSelfConstraint && protoDecl == outerDC &&
-        protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
-      return;
+    if (req.getSecondType()->is<ProtocolType>()) {
+      auto protoDecl = req.getProtocolDecl();
+      // Determine whether this is the protocol 'Self' constraint we should
+      // skip.
+      if (skipProtocolSelfConstraint && protoDecl == outerDC &&
+          protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
+        return;
+      } 
 
     // Check whether the given type parameter has requirements that
     // prohibit it from using an isolated conformance.
