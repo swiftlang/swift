@@ -77,7 +77,8 @@ set_target_properties(swift_StringProcessing PROPERTIES
 
 target_link_libraries(swift_StringProcessing PRIVATE
     swift_RegexParser
-    swiftCore)
+    swiftCore
+    $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
 install(TARGETS swift_StringProcessing
   ARCHIVE DESTINATION "${SwiftStringProcessing_INSTALL_LIBDIR}"
