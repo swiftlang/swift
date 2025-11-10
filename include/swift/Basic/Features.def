@@ -536,7 +536,7 @@ EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, false)
 
 /// Allow use of @inline(always) attribute
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(InlineAlways, false)
+SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
 
 /// Allow use of 'Swift' (Swift runtime version) in @available attributes
 EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
