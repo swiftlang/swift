@@ -894,7 +894,7 @@ extension ExtendableScope {
         assert(end.parentBlock.singleSuccessor!.terminator is ReturnInst,
                "a phi only ends a use range if it is a returned value")
         fallthrough
-      case is ReturnInst:
+      case is ReturnInstruction:
         // End this inner scope just before the return. The mark_dependence base operand will be redirected to a
         // function argument.
         let builder = Builder(before: end, location: location, context)
