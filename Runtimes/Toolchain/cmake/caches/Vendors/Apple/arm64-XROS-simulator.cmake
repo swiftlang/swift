@@ -1,0 +1,10 @@
+
+set(CMAKE_OSX_DEPLOYMENT_TARGET "1.0" CACHE STRING "")
+set(CMAKE_C_COMPILER_TARGET "arm64-apple-xros${CMAKE_OSX_DEPLOYMENT_TARGET}-simulator" CACHE STRING "")
+set(CMAKE_CXX_COMPILER_TARGET "arm64-apple-xros${CMAKE_OSX_DEPLOYMENT_TARGET}-simulator" CACHE STRING "")
+set(CMAKE_Swift_COMPILER_TARGET "arm64-apple-xros${CMAKE_OSX_DEPLOYMENT_TARGET}-simulator" CACHE STRING "")
+
+set(SwiftToolchain_ARCH_SUBDIR arm64 CACHE STRING "")
+set(SwiftToolchain_PLATFORM_SUBDIR xrsimulator CACHE STRING "")
+
+include("${CMAKE_CURRENT_LIST_DIR}/apple-common.cmake")

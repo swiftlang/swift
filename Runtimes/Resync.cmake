@@ -57,6 +57,7 @@ function(copy_library_sources name from_prefix to_prefix)
     "${ARG_ROOT}/${from_prefix}/${name}/*.mm"
     "${ARG_ROOT}/${from_prefix}/${name}/*.m"
     "${ARG_ROOT}/${from_prefix}/${name}/*.S"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.s"
     "${ARG_ROOT}/${from_prefix}/${name}/*.asm"
     "${ARG_ROOT}/${from_prefix}/${name}/*.def"
     "${ARG_ROOT}/${from_prefix}/${name}/*.gyb"
@@ -219,3 +220,5 @@ copy_library_sources(RegexBuilder "Sources" "Supplemental/StringProcessing"
 
 copy_library_sources("linker-support" "" "Supplemental/Differentiation")
 copy_library_sources(include "" "Supplemental/Distributed")
+
+copy_library_sources("ClientRetainRelease" "public" "Toolchain")
