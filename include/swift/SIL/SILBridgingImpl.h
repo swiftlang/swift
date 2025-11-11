@@ -1252,6 +1252,11 @@ BridgedCanType BridgedInstruction::InitExistentialRefInst_getFormalConcreteType(
 BridgedConformanceArray BridgedInstruction::InitExistentialAddrInst_getConformances() const {
   return {getAs<swift::InitExistentialAddrInst>()->getConformances()};
 }
+
+BridgedCanType BridgedInstruction::InitExistentialAddrInst_getFormalConcreteType() const {
+  return getAs<swift::InitExistentialAddrInst>()->getFormalConcreteType();
+}
+
 bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {
   switch (getAs<swift::OpenExistentialAddrInst>()->getAccessKind()) {
     case swift::OpenedExistentialAccess::Immutable: return true;
