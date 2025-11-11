@@ -136,12 +136,12 @@ if #available(SwiftStdlib 6.3, *) {
     _expectStringForPrintObject(&val1, output: "▿ StructWithMembers\n  - a : 1\n  - b : \"Hello World\"\n")
 
     var val2: StructWithMembers? = StructWithMembers()
-    _expectStringForPrintObject(&val3,
+    _expectStringForPrintObject(&val2,
       output: "▿ Optional<StructWithMembers>\n  ▿ some : StructWithMembers\n    - a : 1\n    - b : \"Hello World\"\n")
 
     do {
       var val3 = StructIsNonCopyable()
-      withUnsafeBytes(of: &val4) { bytes in
+      withUnsafeBytes(of: &val3) { bytes in
         let mangledTypeName = _mangledTypeName(StructIsNonCopyable.self)
         let (success, printed) =
           _DebuggerSupport.stringForPrintObject(bytes.baseAddress!, mangledTypeName: mangledTypeName!)
