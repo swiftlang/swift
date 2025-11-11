@@ -423,10 +423,10 @@ extension SerialExecutor {
   }
 }
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension SerialExecutor {
 
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(StdlibDeploymentTarget 6.2, *)
   public func isIsolatingCurrentContext() -> Bool? {
     return nil
   }
