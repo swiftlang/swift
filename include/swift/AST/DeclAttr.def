@@ -474,7 +474,7 @@ SIMPLE_DECL_ATTR(_alwaysEmitIntoClient, AlwaysEmitIntoClient,
   83)
 
 SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
-  OnImport | OnFunc | OnConstructor | OnVar | OnSubscript | OnStruct | OnClass | OnEnum,
+  OnImport | OnFunc | OnConstructor | OnVar | OnSubscript | OnNominalType,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
   84)
 
