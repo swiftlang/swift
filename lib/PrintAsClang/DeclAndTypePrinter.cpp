@@ -2381,7 +2381,7 @@ private:
 
     if (auto *clangTypeDecl =
           dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
-      assert(!alias->isGeneric()
+      assert(!alias->hasGenericParamList()
              && "generic typealias backed by clang typedecl?");
 
       maybePrintTagKeyword(alias);
@@ -2391,7 +2391,7 @@ private:
         printNullability(optionalKind);
     } else if (auto *clangObjCClass
                = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
-      assert(!alias->isGeneric()
+      assert(!alias->hasGenericParamList()
              && "generic typealias backed by clang interface?");
 
       os << clangObjCClass->getName() << " *";
@@ -2713,7 +2713,7 @@ private:
 
     if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
       const ClassDecl *extendedClass = extension->getSelfClassDecl();
-      assert(extendedClass->isGeneric());
+      assert(extendedClass->hasGenericParamList());
       assert(extension->getGenericParams()->size() ==
              extendedClass->getGenericParams()->size() &&
              "extensions with custom generic parameters?");

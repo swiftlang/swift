@@ -544,7 +544,7 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
 
     // If the declaration has generic parameters, it cannot witness an
     // associated type.
-    if (genericDecl->isGeneric())
+    if (genericDecl->hasGenericParamList())
       continue;
 
     // Skip typealiases with an unbound generic type as their underlying type.

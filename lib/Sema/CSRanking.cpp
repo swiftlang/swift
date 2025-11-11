@@ -349,7 +349,7 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
   auto func1 = dyn_cast<FuncDecl>(decl1);
   auto func2 = dyn_cast<FuncDecl>(decl2);
   if (func1 && func2) {
-    bothGeneric = func1->isGeneric() && func2->isGeneric();
+    bothGeneric = func1->hasGenericParamList() && func2->hasGenericParamList();
 
     sig1 = func1->getGenericSignature();
     sig2 = func2->getGenericSignature();
@@ -358,7 +358,8 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
   auto subscript1 = dyn_cast<SubscriptDecl>(decl1);
   auto subscript2 = dyn_cast<SubscriptDecl>(decl2);
   if (subscript1 && subscript2) {
-    bothGeneric = subscript1->isGeneric() && subscript2->isGeneric();
+    bothGeneric =
+        subscript1->hasGenericParamList() && subscript2->hasGenericParamList();
 
     sig1 = subscript1->getGenericSignature();
     sig2 = subscript2->getGenericSignature();
@@ -518,14 +519,14 @@ bool CompareDeclSpecializationRequest::evaluate(
   // A non-generic declaration is more specialized than a generic declaration.
   if (auto func1 = dyn_cast<AbstractFunctionDecl>(decl1)) {
     auto func2 = cast<AbstractFunctionDecl>(decl2);
-    if (func1->isGeneric() != func2->isGeneric())
-      return completeResult(func2->isGeneric());
+    if (func1->hasGenericParamList() != func2->hasGenericParamList())
+      return completeResult(func2->hasGenericParamList());
   }
 
   if (auto subscript1 = dyn_cast<SubscriptDecl>(decl1)) {
     auto subscript2 = cast<SubscriptDecl>(decl2);
-    if (subscript1->isGeneric() != subscript2->isGeneric())
-      return completeResult(subscript2->isGeneric());
+    if (subscript1->hasGenericParamList() != subscript2->hasGenericParamList())
+      return completeResult(subscript2->hasGenericParamList());
   }
 
   // Members of protocol extensions have special overloading rules.

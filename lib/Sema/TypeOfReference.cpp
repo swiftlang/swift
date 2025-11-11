@@ -148,7 +148,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   // If this decl is generic, the constraints are handled when the generic
   // parameters are applied, so we don't have to handle them here (which makes
   // getting the right substitution maps easier).
-  if (!decl || decl->isGeneric())
+  if (!decl || decl->hasGenericParamList())
     return;
 
   // struct A<T> {

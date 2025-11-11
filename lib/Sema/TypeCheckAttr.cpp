@@ -4386,7 +4386,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
 
   bool foundMatch = llvm::any_of(lookupResult, [&](const LookupResultEntry &entry) {
     auto *init = cast<ConstructorDecl>(entry.getValueDecl());
-    if (!init->isGeneric() || init->getGenericParams()->size() != 1)
+    if (!init->hasGenericParamList() || init->getGenericParams()->size() != 1)
       return false;
 
     auto genericSignature = init->getGenericSignature();

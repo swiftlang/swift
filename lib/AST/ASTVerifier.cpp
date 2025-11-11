@@ -3239,7 +3239,7 @@ public:
     void verifyParsed(DestructorDecl *DD) {
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
-      if (DD->isGeneric()) {
+      if (DD->hasGenericParamList()) {
         Out << "DestructorDecl cannot be generic";
         abort();
       }

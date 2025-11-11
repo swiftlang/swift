@@ -2008,9 +2008,10 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
       // type declaration are not part of the mangling, so check whether the
       // naming declaration has generic parameters.
       auto namedGenericContext = opaque->getNamingDecl()->getAsGenericContext();
-      treatAsGeneric = namedGenericContext && namedGenericContext->isGeneric();
+      treatAsGeneric =
+          namedGenericContext && namedGenericContext->hasGenericParamList();
     } else {
-      treatAsGeneric = genericContext->isGeneric();
+      treatAsGeneric = genericContext->hasGenericParamList();
     }
     if (treatAsGeneric) {
       auto genericParams = subs.getGenericSignature().getGenericParams();
@@ -5430,7 +5431,7 @@ static std::optional<unsigned> getEnclosingTypeGenericDepth(const Decl *decl) {
   if (!typeDecl)
     return std::nullopt;
 
-  if (!typeDecl->isGeneric())
+  if (!typeDecl->hasGenericParamList())
     return std::nullopt;
 
   return typeDecl->getGenericSignature()->getMaxDepth();
