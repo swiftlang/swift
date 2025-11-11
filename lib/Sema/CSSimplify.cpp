@@ -15421,7 +15421,23 @@ static void increaseScoreForGenericParamPointerConversion(
     return;
 
   // Check to see if the parameter is a generic parameter, or dependent member.
-  auto paramTy = param->getInterfaceType()->lookThroughAllOptionalTypes();
+  // Look though optionals and pack expansions.
+  auto paramTy = param->getInterfaceType();
+  while (true) {
+    paramTy = paramTy->lookThroughAllOptionalTypes();
+    if (auto packExpansion = paramTy->getAs<PackExpansionType>()) {
+      paramTy = packExpansion->getPatternType();
+      continue;
+    }
+    // Also look through "vanishing" tuples.
+    if (auto *tupleTy = paramTy->getAs<TupleType>()) {
+      if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).hasName()) {
+        paramTy = tupleTy->getElement(0).getType();
+        continue;
+      }
+    }
+    break;
+  }
   if (!paramTy->isTypeParameter())
     return;
 
