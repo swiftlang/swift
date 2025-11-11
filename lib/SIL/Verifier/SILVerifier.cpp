@@ -1658,12 +1658,48 @@ public:
       require(lhs == rhs ||
               (lhs.isAddress() && lhs.getObjectType() == rhs) ||
               (DebugVarTy.isAddress() && lhs == rhs.getObjectType()) ||
-
               // When cloning SIL (e.g. in LoopUnroll) local archetypes are uniqued
               // and therefore distinct in cloned instructions.
               (lhs.hasLocalArchetype() && rhs.hasLocalArchetype()),
-              "Two variables with different type but same scope!");
+              "Two variables with different type but same scope");
     }
+
+    // Check that all inlined function arguments agree on their types.
+#ifdef EXPENSIVE_VERIFIER_CHECKS
+    if (unsigned ArgNo = varInfo->ArgNo)
+      if (varInfo->Scope)
+        if (SILFunction *Fn = varInfo->Scope->getInlinedFunction()) {
+          using ArgMap = llvm::StringMap<llvm::SmallVector<SILType, 8>>;
+          static ArgMap DebugArgs;
+          llvm::StringRef Key = Fn->getName();
+          if (!Key.empty()) {
+            auto [It, Inserted] = DebugArgs.insert({Key, {}});
+            auto &CachedArgs = It->second;
+            if (Inserted || (!Inserted && (CachedArgs.size() < ArgNo)) ||
+                (!Inserted && !CachedArgs[ArgNo - 1])) {
+              if (CachedArgs.size() < ArgNo)
+                CachedArgs.resize(ArgNo);
+              CachedArgs[ArgNo - 1] = DebugVarTy;
+            } else {
+              SILType CachedArg = CachedArgs[ArgNo - 1];
+              auto lhs = CachedArg.removingMoveOnlyWrapper();
+              auto rhs = DebugVarTy.removingMoveOnlyWrapper();
+              if (lhs != rhs) {
+                llvm::errs() << "***** " << varInfo->Name << "\n";
+                lhs.dump();
+                rhs.dump();
+                Fn->dump();
+              }
+              require(
+                  lhs == rhs ||
+                      (lhs.isAddress() && lhs.getObjectType() == rhs) ||
+                      (DebugVarTy.isAddress() && lhs == rhs.getObjectType()) ||
+                      (lhs.hasLocalArchetype() && rhs.hasLocalArchetype()),
+                  "Conflicting types for function argument!");
+            }
+          }
+        }
+#endif
 
     // Check debug info expression
     if (const auto &DIExpr = varInfo->DIExpr) {

@@ -312,6 +312,28 @@ bb0(%0 : $*T, %1 : @owned $T):
   return %r
 }
 
+// CHECK-LABEL: sil [ossa] @replace_existential_with_concrete_type3 :
+// CHECK:         [[S:%.*]] = alloc_stack $T
+// CHECK-NOT:     init_existential_addr
+// CHECK-NOT:     open_existential_addr
+// CHECK:         debug_value undef : $*any P, let, name "value1"
+// CHECK:         destroy_addr [[S]]
+// CHECK:       } // end sil function 'replace_existential_with_concrete_type3'
+sil_scope 1 { loc "a.swift":1:1 parent @replace_existential_with_concrete_type3 : $@convention(thin) (@owned T) -> () }
+sil_scope 2 { loc "inlined.swift":1:1 parent @$inlined :  $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () inlined_at 1 }
+sil [ossa] @replace_existential_with_concrete_type3 : $@convention(thin) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %5 = alloc_stack $any P
+  debug_value %5, let, name "value1", loc "inlined.swift":1:1, scope 2
+  %6 = init_existential_addr %5, $T
+  store %0 to [init] %6
+  %8 = open_existential_addr mutable_access %5 to $*@opened("83DE9694-7315-11E8-955C-ACDE48001122", P) Self
+  destroy_addr %8
+  dealloc_stack %5
+  %r = tuple ()
+  return %r
+}
+
 // CHECK-LABEL: sil [ossa] @replace_existential_with_archetype :
 // CHECK:         [[S:%.*]] = alloc_stack $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", any P) Self
 // CHECK-NOT:     init_existential_addr
