@@ -879,7 +879,15 @@ final public
 class OpenExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
+class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.InitExistentialAddrInst_getConformances())
+  }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.InitExistentialAddrInst_getFormalConcreteType())
+  }
+}
 
 final public
 class DeinitExistentialAddrInst : Instruction, UnaryInstruction {}
