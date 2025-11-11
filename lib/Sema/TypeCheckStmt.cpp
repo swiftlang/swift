@@ -1041,9 +1041,9 @@ public:
   /// DC - This is the current DeclContext.
   DeclContext *DC;
 
-  /// Skip type checking any elements inside 'BraceStmt', also this is
-  /// propagated to ConstraintSystem.
-  bool LeaveBraceStmtBodyUnchecked = false;
+  /// The BraceStmts that should be type-checked. This should always be `All`,
+  /// unless we're lazy type-checking for e.g completion.
+  BraceStmtChecking BraceChecking = BraceStmtChecking::All;
 
   ASTContext &getASTContext() const { return Ctx; };
 
@@ -1502,7 +1502,7 @@ public:
     // FIXME: This is a hack to avoid cycles through NamingPatternRequest when
     // doing lazy type-checking, we ought to fix the request to be granular in
     // the type-checking work it kicks.
-    bool skipWhere = LeaveBraceStmtBodyUnchecked &&
+    bool skipWhere = (BraceChecking != BraceStmtChecking::All) &&
       Ctx.SourceMgr.hasIDEInspectionTargetBuffer();
 
     TypeChecker::typeCheckForEachPreamble(DC, S, skipWhere);
@@ -1737,11 +1737,19 @@ public:
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, S);
 
-    // Type-check the 'do' body.  Type failures in here will generally
-    // not cause type failures in the 'catch' clauses.
-    Stmt *newBody = S->getBody();
-    typeCheckStmt(newBody);
-    S->setBody(newBody);
+    {
+      // If we have do-catch body checking enabled, make sure we visit the
+      // BraceStmt.
+      std::optional<llvm::SaveAndRestore<BraceStmtChecking>> braceChecking;
+      if (BraceChecking == BraceStmtChecking::OnlyDoCatchBody)
+        braceChecking.emplace(BraceChecking, BraceStmtChecking::All);
+
+      // Type-check the 'do' body.  Type failures in here will generally
+      // not cause type failures in the 'catch' clauses.
+      Stmt *newBody = S->getBody();
+      typeCheckStmt(newBody);
+      S->setBody(newBody);
+    }
 
     // Do-catch statements always limit exhaustivity checks.
     bool limitExhaustivityChecks = true;
@@ -2191,7 +2199,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
 }
 
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
-  if (LeaveBraceStmtBodyUnchecked)
+  if (BraceChecking != BraceStmtChecking::All)
     return BS;
 
   // Diagnose defer statement being last one in block (only if
@@ -2217,12 +2225,12 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 }
 
 void TypeChecker::typeCheckASTNode(ASTNode &node, DeclContext *DC,
-                                   bool LeaveBodyUnchecked) {
+                                   BraceStmtChecking braceChecking) {
   StmtChecker stmtChecker(DC);
   // FIXME: 'ActiveLabeledStmts', etc. in StmtChecker are not
   // populated. Since they don't affect "type checking", it's doesn't cause
   // any issue for now. But it should be populated nonetheless.
-  stmtChecker.LeaveBraceStmtBodyUnchecked = LeaveBodyUnchecked;
+  stmtChecker.BraceChecking = braceChecking;
   stmtChecker.typeCheckASTNode(node);
 }
 
@@ -2768,7 +2776,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
     }
   }
 
-  TypeChecker::typeCheckASTNode(finder.getRef(), DC, /*LeaveBodyUnchecked=*/false);
+  TypeChecker::typeCheckASTNode(finder.getRef(), DC);
   return false;
 }
 
