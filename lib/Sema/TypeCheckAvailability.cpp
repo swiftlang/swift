@@ -239,12 +239,27 @@ bool ExportContext::canReferenceOrigin(DisallowedOriginKind originKind) const {
   if (originKind == DisallowedOriginKind::None)
     return true;
 
-  // Non public imports aren't hidden dependencies in embedded  mode,
-  // don't enforce them on implicitly always emit into client code.
-  if (originKind == DisallowedOriginKind::NonPublicImport &&
-      getFragileFunctionKind().kind ==
-        FragileFunctionKind::EmbeddedAlwaysEmitIntoClient)
-    return true;
+  // Implicitly always emit into client code in embedded mode can still
+  // access many restricted origins as more dependencies are loaded
+  // in non-library-evolution mode and there isn't an enforced separation of
+  // public vs SPI.
+  if (getFragileFunctionKind().kind ==
+        FragileFunctionKind::EmbeddedAlwaysEmitIntoClient) {
+    switch (originKind) {
+    case DisallowedOriginKind::None:
+    case DisallowedOriginKind::NonPublicImport:
+    case DisallowedOriginKind::SPIOnly:
+    case DisallowedOriginKind::SPIImported:
+    case DisallowedOriginKind::SPILocal:
+      return true;
+    case DisallowedOriginKind::MissingImport:
+    case DisallowedOriginKind::InternalBridgingHeaderImport:
+    case DisallowedOriginKind::ImplementationOnly:
+    case DisallowedOriginKind::FragileCxxAPI:
+    case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
+      break;
+    }
+  }
 
   return false;
 }
