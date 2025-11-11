@@ -193,10 +193,10 @@ public func noAnnotations() -> View {
     // CHECK-NO-LIFETIMES: nonescapable.h:56:39: error: template parameter 'Missing' does not exist
     i2()
     // CHECK: nonescapable.h:62:33: error: template parameter 'S' expected to be a type parameter
-    // CHECK: nonescapable.h:80:41: error: a function with a ~Escapable result needs a parameter to depend on
-    // CHECK: note: '@_lifetime(immortal)' can be used to indicate that values produced
     // CHECK-NO-LIFETIMES: nonescapable.h:62:33: error: template parameter 'S' expected to be a type parameter
     j1()
+    // CHECK: nonescapable.h:80:41: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK: note: '@_lifetime(immortal)' can be used to indicate that values produced
     // CHECK-NO-LIFETIMES: nonescapable.h:80:41: error: a function cannot return a ~Escapable result
     j2()
     // CHECK: nonescapable.h:81:41: error: a function with a ~Escapable result needs a parameter to depend on
