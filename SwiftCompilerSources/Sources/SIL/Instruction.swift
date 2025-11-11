@@ -1813,7 +1813,11 @@ final public class AllocPackMetadataInst : SingleValueInstruction, Allocation {}
 final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
 final public class DeallocPackMetadataInst : Instruction, Deallocation {}
 
-final public class OpenPackElementInst : SingleValueInstruction {}
+final public class OpenPackElementInst : SingleValueInstruction {
+  public var genericSignature: GenericSignature {
+    GenericSignature(bridged: bridged.OpenPackElementInst_getGenericSignature())
+  }
+}
 final public class PackLengthInst : SingleValueInstruction {
   public var packType: CanonicalType {
     CanonicalType(bridged: bridged.PackLengthInst_getPackType())

@@ -224,6 +224,10 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     }
     return false
   }
+
+  public func isOrContainsPackType(_ function: Function) -> Bool {
+    return bridged.isOrContainsPackType(function.bridged)
+  }
 }
 
 extension Type: Equatable {

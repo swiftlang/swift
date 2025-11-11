@@ -174,6 +174,17 @@ public:
 
   }
 
+  TypeSubstCloner(SILFunction &F,
+                  SubstitutionMap ApplySubs,
+                  DominanceInfo *DT = nullptr,
+                  bool Inlining = false)
+    : SILClonerWithScopes<ImplClass>(F, DT, Inlining),
+      SwiftMod(F.getModule().getSwiftModule()),
+      SubsMap(ApplySubs),
+      Original(F),
+      Inlining(Inlining) {
+    }
+
 protected:
   bool shouldSubstOpaqueArchetypes() const { return true; }
 

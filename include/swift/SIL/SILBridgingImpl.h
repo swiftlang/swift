@@ -25,6 +25,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/BasicBridging.h"
 #include "swift/SIL/ApplySite.h"
@@ -488,6 +489,12 @@ BridgedType BridgedType::getPackElementType(SwiftInt idx) const {
 BridgedCanType BridgedType::getApproximateFormalPackType() const {
   return unbridged().castTo<swift::SILPackType>()->getApproximateFormalPackType();
 }
+
+bool BridgedType::isOrContainsPackType(BridgedFunction f) const {
+  // dereferencing here seems like something i shouldnt do
+  return unbridged().isOrContainsPack(*f.getFunction());
+}
+
 
 //===----------------------------------------------------------------------===//
 //                                BridgedValue
@@ -1823,6 +1830,10 @@ SwiftInt BridgedInstruction::ScalarPackIndexInst_getComponentIndex() const {
 
 BridgedCanType BridgedInstruction::AnyPackIndexInst_getIndexedPackType() const {
   return getAs<swift::AnyPackIndexInst>()->getIndexedPackType();
+}
+
+BridgedGenericSignature BridgedInstruction::OpenPackElementInst_getGenericSignature() const {
+  return {getAs<swift::OpenPackElementInst>()->getOpenedGenericEnvironment()->getGenericSignature().getPointer()};
 }
 
 //===----------------------------------------------------------------------===//

@@ -35,7 +35,7 @@ public struct SubstitutionMap: CustomStringConvertible, NoReflectionChildren {
       return BridgedSubstitutionMap.get(genericSignature.bridged, $0)
     }
   }
-
+  
   public var description: String {
     return String(taking: bridged.getDebugDescription())
   }

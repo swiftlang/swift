@@ -313,6 +313,7 @@ struct BridgedType {
   BRIDGED_INLINE SwiftInt getNumPackElements() const;
   BRIDGED_INLINE BridgedType getPackElementType(SwiftInt idx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getApproximateFormalPackType() const;
+  BRIDGED_INLINE bool isOrContainsPackType(BridgedFunction f) const;
 };
 
 // SIL Bridging
@@ -933,6 +934,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType PackLengthInst_getPackType() const;
   BRIDGED_INLINE SwiftInt ScalarPackIndexInst_getComponentIndex() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType AnyPackIndexInst_getIndexedPackType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature OpenPackElementInst_getGenericSignature() const;
 
   // =========================================================================//
   //                   VarDeclInst and DebugVariableInst
@@ -1594,10 +1596,15 @@ struct BridgedTypeSubstCloner {
 
   BridgedTypeSubstCloner(BridgedFunction fromFunction, BridgedFunction toFunction,
                          BridgedSubstitutionMap substitutions, BridgedContext context);
+  BridgedTypeSubstCloner(BridgedInstruction inst,
+                         BridgedSubstitutionMap substitutions, BridgedContext context);
   void destroy(BridgedContext context);
   void cloneFunctionBody() const;
   SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
   SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
+  void recordFoldedValue(BridgedValue orig, BridgedValue mapped) const;
+  bool isValueCloned(BridgedValue v) const;
+  BridgedInstruction clone(BridgedInstruction inst) const;
 };
 
 struct BridgedVerifier {

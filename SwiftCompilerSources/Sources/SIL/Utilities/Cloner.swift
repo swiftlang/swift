@@ -13,21 +13,101 @@
 import SILBridging
 import AST
 
+public enum GetClonedResult {
+  case defaultValue
+  case customValue(Value)
+  case stopCloning
+}
+
+public protocol ClonerCommonUtils {
+
+  func isCloned(value: Value) -> Bool
+
+  func recordFoldedValue(_ origValue: Value, mappedTo mappedValue: Value)
+
+  mutating func getClonedValue(of originalValue: Value) -> Value
+
+  mutating func clone(instruction: Instruction) -> Instruction
+
+  mutating func cloneRecursively(globalInitValue: Value) -> Value
+
+  /// Transitively clones `value` including its defining instruction's operands.
+  mutating func cloneRecursively(value: Value) -> Value
+
+  mutating func cloneRecursively(value: Value, customGetCloned: (Value, inout
+  Self) -> GetClonedResult) -> Value?
+
+}
+
+extension ClonerCommonUtils {
+
+  public mutating func cloneRecursively(globalInitValue: Value) -> Value {
+    guard let cloned = cloneRecursively(value: globalInitValue, customGetCloned: { value, cloner in
+      guard let beginAccess = value as? BeginAccessInst else {
+        return .defaultValue
+      }
+      
+      // Skip access instructions, which might be generated for UnsafePointer globals which point to other globals.
+      let clonedOperand = cloner.cloneRecursively(globalInitValue: beginAccess.address)
+      cloner.recordFoldedValue(beginAccess, mappedTo: clonedOperand)
+      return .customValue(clonedOperand)
+    }) else {
+      fatalError("Clone recursively to global shouldn't bail.")
+    }
+    
+    return cloned
+  }
+
+  /// Transitively clones `value` including its defining instruction's operands.
+  public mutating func cloneRecursively( value: Value) -> Value {
+    return cloneRecursively(value: value, customGetCloned: { _, _ in .defaultValue })!
+  }
+
+  /// Transitively clones `value` including its defining instruction's operands.
+  public mutating func cloneRecursively(value: Value, customGetCloned: (Value, inout Self) -> GetClonedResult) -> Value? {
+    if isCloned(value: value) {
+      return getClonedValue(of: value)
+    }
+
+    switch customGetCloned(value, &self) {
+    case .customValue(let base):
+     return base
+    case .stopCloning:
+      return nil
+    case .defaultValue:
+      break
+    }
+
+    guard let inst = value.definingInstruction else {
+      fatalError("expected instruction to clone or already cloned value")
+    }
+
+    for op in inst.operands {
+      if cloneRecursively(value: op.value, customGetCloned: customGetCloned) == nil {
+        return nil
+      }
+    }
+
+    let cloned = clone(instruction: inst)
+    if let svi = cloned as? SingleValueInstruction {
+      return svi
+    } else if let originalMvi = value as? MultipleValueInstructionResult {
+      return cloned.results[originalMvi.index]
+    }
+    fatalError("unexpected instruction kind")
+  }
+
+}
+
 /// Clones the initializer value of a GlobalVariable.
 ///
 /// Used to transitively clone "constant" instructions, including their operands,
 /// from or to the static initializer value of a GlobalVariable.
 ///
-public struct Cloner<Context: MutatingContext> {
+public struct Cloner<Context: MutatingContext>: ClonerCommonUtils {
   private var bridged: BridgedCloner
   public let context: Context
 
-  public enum GetClonedResult {
-    case defaultValue
-    case customValue(Value)
-    case stopCloning
-  }
-  
   public enum Target {
     case function(Function)
     case global(GlobalVariable)
@@ -91,62 +171,6 @@ public struct Cloner<Context: MutatingContext> {
     }
     return cloned
   }
-  
-  public mutating func cloneRecursively(globalInitValue: Value) -> Value {
-    guard let cloned = cloneRecursively(value: globalInitValue, customGetCloned: { value, cloner in
-      guard let beginAccess = value as? BeginAccessInst else {
-        return .defaultValue
-      }
-      
-      // Skip access instructions, which might be generated for UnsafePointer globals which point to other globals.
-      let clonedOperand = cloner.cloneRecursively(globalInitValue: beginAccess.address)
-      cloner.recordFoldedValue(beginAccess, mappedTo: clonedOperand)
-      return .customValue(clonedOperand)
-    }) else {
-      fatalError("Clone recursively to global shouldn't bail.")
-    }
-    
-    return cloned
-  }
-
-  /// Transitively clones `value` including its defining instruction's operands.
-  public mutating func cloneRecursively( value: Value) -> Value {
-    return cloneRecursively(value: value, customGetCloned: { _, _ in .defaultValue })!
-  }
-
-  /// Transitively clones `value` including its defining instruction's operands.
-  public mutating func cloneRecursively(value: Value, customGetCloned: (Value, inout Cloner) -> GetClonedResult) -> Value? {
-    if isCloned(value: value) {
-      return getClonedValue(of: value)
-    }
-    
-    switch customGetCloned(value, &self) {
-    case .customValue(let base):
-      return base
-    case .stopCloning:
-      return nil
-    case .defaultValue:
-      break
-    }
-
-    guard let inst = value.definingInstruction else {
-      fatalError("expected instruction to clone or already cloned value")
-    }
-
-    for op in inst.operands {
-      if cloneRecursively(value: op.value, customGetCloned: customGetCloned) == nil {
-        return nil
-      }
-    }
-
-    let cloned = clone(instruction: inst)
-    if let svi = cloned as? SingleValueInstruction {
-      return svi
-    } else if let originalMvi = value as? MultipleValueInstructionResult {
-      return cloned.results[originalMvi.index]
-    }
-    fatalError("unexpected instruction kind")
-  }
 
   public mutating func getClonedValue(of originalValue: Value) -> Value {
     bridged.getClonedValue(originalValue.bridged).value
@@ -165,9 +189,14 @@ public struct Cloner<Context: MutatingContext> {
   }
 }
 
-public struct TypeSubstitutionCloner<Context: MutatingContext> {
+public struct TypeSubstitutionCloner<Context: MutatingContext>: ClonerCommonUtils {
   public private(set) var bridged: BridgedTypeSubstCloner
   public let context: Context
+
+  public enum Target {
+    case function(Function)
+  }
+  public let target: Target
 
   public init(fromFunction: Function,
               toEmptyFunction: Function,
@@ -177,6 +206,15 @@ public struct TypeSubstitutionCloner<Context: MutatingContext> {
     self.bridged = BridgedTypeSubstCloner(fromFunction.bridged, toEmptyFunction.bridged,
                                           substitutions.bridged, context._bridged)
     self.context = context
+    self.target = .function(toEmptyFunction)
+  }
+
+  public init(cloneBefore inst: Instruction,
+              substitutions: SubstitutionMap, _ context: Context) {
+    self.bridged = BridgedTypeSubstCloner(inst.bridged,
+                                          substitutions.bridged, context._bridged)
+    self.context = context
+    self.target = .function(inst.parentFunction)
   }
 
   public mutating func deinitialize() {
@@ -193,5 +231,22 @@ public struct TypeSubstitutionCloner<Context: MutatingContext> {
 
   public func cloneFunctionBody() {
     bridged.cloneFunctionBody()
+  }
+
+  public func isCloned(value: Value) -> Bool {
+    bridged.isValueCloned(value.bridged)
+  }
+
+  public mutating func clone(instruction: Instruction) -> Instruction {
+    let cloned = bridged.clone(instruction.bridged).instruction
+    if case .function = target {
+      context.notifyInstructionChanged(cloned)
+      context.notifyInstructionsChanged()
+    }
+    return cloned
+  }
+
+  public func recordFoldedValue(_ origValue: Value, mappedTo mappedValue: Value) {
+    bridged.recordFoldedValue(origValue.bridged, mappedValue.bridged)
   }
 }

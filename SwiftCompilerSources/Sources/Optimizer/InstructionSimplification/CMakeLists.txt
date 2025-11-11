@@ -33,6 +33,7 @@ swift_compiler_sources(Optimizer
   SimplifyLoad.swift
   SimplifyMarkDependence.swift
   SimplifyMisc.swift
+  SimplifyOpenPackElement.swift
   SimplifyPartialApply.swift
   SimplifyPointerToAddress.swift
   SimplifyRefCasts.swift

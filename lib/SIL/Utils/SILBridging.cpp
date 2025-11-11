@@ -632,6 +632,11 @@ public:
   BridgedTypeSubstClonerImpl(SILFunction &from, SILFunction &toEmptyFunction, SubstitutionMap subs)
     : TypeSubstCloner<BridgedTypeSubstClonerImpl>(toEmptyFunction, from, subs) {}
 
+  BridgedTypeSubstClonerImpl(SILInstruction *insertionPoint,  SubstitutionMap subs)
+    : TypeSubstCloner<BridgedTypeSubstClonerImpl>(*insertionPoint->getFunction(), subs){
+    Builder.setInsertionPoint(insertionPoint);
+  }
+
   SILValue getClonedValue(SILValue v) {
     return getMappedValue(v);
   }
@@ -728,6 +733,14 @@ BridgedTypeSubstCloner::BridgedTypeSubstCloner(BridgedFunction fromFunction, Bri
   context.context->notifyNewCloner();
 }
 
+BridgedTypeSubstCloner::BridgedTypeSubstCloner(BridgedInstruction inst,
+                                               BridgedSubstitutionMap substitutions,
+                                               BridgedContext context)
+  : cloner(new BridgedTypeSubstClonerImpl(inst.unbridged(),
+                                          substitutions.unbridged())) {
+  context.context->notifyNewCloner();
+}
+
 void BridgedTypeSubstCloner::destroy(BridgedContext context) {
   delete cloner;
   cloner = nullptr;
@@ -744,6 +757,18 @@ BridgedBasicBlock BridgedTypeSubstCloner::getClonedBasicBlock(BridgedBasicBlock 
 
 BridgedValue BridgedTypeSubstCloner::getClonedValue(BridgedValue v) {
   return {cloner->getClonedValue(v.getSILValue())};
+}
+
+void BridgedTypeSubstCloner::recordFoldedValue(BridgedValue orig, BridgedValue mapped) const {
+  cloner->recordFoldedValue(orig.getSILValue(), mapped.getSILValue());
+}
+
+bool BridgedTypeSubstCloner::isValueCloned(BridgedValue v) const {
+  return cloner->isValueCloned(v.getSILValue());
+}
+
+BridgedInstruction BridgedTypeSubstCloner::clone(BridgedInstruction inst) const {
+  return {cloner->cloneInst(inst.unbridged())->asSILNode()};
 }
 
 //===----------------------------------------------------------------------===//
