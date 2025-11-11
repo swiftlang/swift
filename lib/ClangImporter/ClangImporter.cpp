@@ -8459,103 +8459,118 @@ CxxValueSemanticsKind
 CxxValueSemantics::evaluate(Evaluator &evaluator,
                             CxxValueSemanticsDescriptor desc) const {
 
-  const auto *type = desc.type;
+  // A C++ type can be imported to Swift as Copyable or ~Copyable.
+  // We assume a type can be imported as Copyable unless:
+  // - There's no copy constructor
+  // - The type has a SWIFT_NONCOPYABLE annotation
+  // - The type has a SWIFT_COPYABLE_IF(T...) annotation, where at least one of T is ~Copyable
+  // - It is one of the STL types in `STLConditionalParams`
+
+  const auto *type = desc.type->getUnqualifiedDesugaredType();
   auto *importerImpl = desc.importerImpl;
 
-  auto desugared = type->getUnqualifiedDesugaredType();
-  const auto *recordType = desugared->getAs<clang::RecordType>();
-  if (!recordType)
-    return CxxValueSemanticsKind::Copyable;
+  llvm::SmallVector<clang::RecordDecl *, 4> stack;
+  // Keep track of Decls we've seen to avoid cycles
+  llvm::SmallDenseSet<clang::RecordDecl *, 4> seen;
 
-  auto recordDecl = recordType->getDecl();
+  auto maybePushToStack = [&](const clang::Type *type) {
+    auto recordDecl = type->getAsRecordDecl();
+    if (!recordDecl)
+      return;
 
-  // When a reference type is copied, the pointer’s value is copied rather than
-  // the object’s storage. This means reference types can be imported as
-  // copyable to Swift, even when they are non-copyable in C++.
-  if (recordHasReferenceSemantics(recordDecl, importerImpl))
-    return CxxValueSemanticsKind::Copyable;
+    if (seen.insert(recordDecl).second) {
+      // When a reference type is copied, the pointer’s value is copied rather
+      // than the object’s storage. This means reference types can be imported
+      // as copyable to Swift, even when they are non-copyable in C++.
+      if (recordHasReferenceSemantics(recordDecl, importerImpl))
+        return;
 
-  if (recordDecl->isInStdNamespace()) {
-    // Hack for a base type of std::optional from the Microsoft standard
-    // library.
-    if (recordDecl->getIdentifier() &&
-        recordDecl->getName() == "_Optional_construct_base")
-      return CxxValueSemanticsKind::Copyable;
-  }
-
-  if (!hasNonCopyableAttr(recordDecl)) {
-    auto injectedStlAnnotation =
-        recordDecl->isInStdNamespace()
-            ? STLConditionalParams.find(recordDecl->getName())
-            : STLConditionalParams.end();
-    auto STLParams = injectedStlAnnotation != STLConditionalParams.end()
-                         ? injectedStlAnnotation->second
-                         : std::vector<int>();
-    auto conditionalParams = getConditionalCopyableAttrParams(recordDecl);
-
-    if (!STLParams.empty() || !conditionalParams.empty()) {
-      HeaderLoc loc{recordDecl->getLocation()};
-      std::function checkArgValueSemantics =
-          [&](clang::TemplateArgument &arg,
-              StringRef argToCheck) -> std::optional<CxxValueSemanticsKind> {
-        if (arg.getKind() != clang::TemplateArgument::Type && importerImpl) {
-          importerImpl->diagnose(loc, diag::type_template_parameter_expected,
-                                 argToCheck);
-          return CxxValueSemanticsKind::Unknown;
-        }
-
-        auto argValueSemantics = evaluateOrDefault(
-            evaluator,
-            CxxValueSemantics(
-                {arg.getAsType()->getUnqualifiedDesugaredType(), importerImpl}),
-            {});
-        if (argValueSemantics != CxxValueSemanticsKind::Copyable)
-          return argValueSemantics;
-        return std::nullopt;
-      };
-
-      auto result = checkConditionalParams<CxxValueSemanticsKind>(
-          recordDecl, STLParams, conditionalParams, checkArgValueSemantics);
-      if (result.has_value())
-        return result.value();
-
-      if (importerImpl)
-        for (auto name : conditionalParams)
-          importerImpl->diagnose(loc, diag::unknown_template_parameter, name);
-
-      return CxxValueSemanticsKind::Copyable;
+      if (recordDecl->isInStdNamespace()) {
+        // Hack for a base type of std::optional from the Microsoft standard
+        // library.
+        if (recordDecl->getIdentifier() &&
+            recordDecl->getName() == "_Optional_construct_base")
+          return;
+      }
+      stack.push_back(recordDecl);
     }
-  }
+  };
 
-  const auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
-  if (!cxxRecordDecl || !cxxRecordDecl->isCompleteDefinition()) {
-    if (hasNonCopyableAttr(recordDecl))
+  maybePushToStack(type);
+  while (!stack.empty()) {
+    clang::RecordDecl *recordDecl = stack.back();
+    stack.pop_back();
+
+    if (!hasNonCopyableAttr(recordDecl)) {
+      auto injectedStlAnnotation =
+          recordDecl->isInStdNamespace()
+              ? STLConditionalParams.find(recordDecl->getName())
+              : STLConditionalParams.end();
+      auto STLParams = injectedStlAnnotation != STLConditionalParams.end()
+                           ? injectedStlAnnotation->second
+                           : std::vector<int>();
+      auto conditionalParams = getConditionalCopyableAttrParams(recordDecl);
+
+      if (!STLParams.empty() || !conditionalParams.empty()) {
+        HeaderLoc loc{recordDecl->getLocation()};
+        std::function checkArgValueSemantics =
+            [&](clang::TemplateArgument &arg,
+                StringRef argToCheck) -> std::optional<CxxValueSemanticsKind> {
+          if (arg.getKind() != clang::TemplateArgument::Type) {
+            if (importerImpl)
+              importerImpl->diagnose(
+                  loc, diag::type_template_parameter_expected, argToCheck);
+            return CxxValueSemanticsKind::Unknown;
+          }
+          maybePushToStack(arg.getAsType()->getUnqualifiedDesugaredType());
+          // FIXME: return std::nullopt for now, while we don't refactor ClangTypeEscapability request
+          return std::nullopt;
+        };
+
+        checkConditionalParams<CxxValueSemanticsKind>(
+            recordDecl, STLParams, conditionalParams, checkArgValueSemantics);
+
+        if (importerImpl)
+          for (auto name : conditionalParams)
+            importerImpl->diagnose(loc, diag::unknown_template_parameter, name);
+
+        continue;
+      }
+    }
+
+    const auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
+    if (!cxxRecordDecl || !cxxRecordDecl->isCompleteDefinition()) {
+      if (hasNonCopyableAttr(recordDecl))
+        return CxxValueSemanticsKind::MoveOnly;
+      continue;
+    }
+
+    bool isCopyable = !hasNonCopyableAttr(cxxRecordDecl) &&
+                      hasCopyTypeOperations(cxxRecordDecl);
+    bool isMovable = hasMoveTypeOperations(cxxRecordDecl);
+
+    if (!hasDestroyTypeOperations(cxxRecordDecl) ||
+        (!isCopyable && !isMovable)) {
+
+      if (hasConstructorWithUnsupportedDefaultArgs(cxxRecordDecl))
+        return CxxValueSemanticsKind::UnavailableConstructors;
+
+      return CxxValueSemanticsKind::MissingLifetimeOperation;
+    }
+
+    if (hasNonCopyableAttr(cxxRecordDecl) && isMovable)
       return CxxValueSemanticsKind::MoveOnly;
-    return CxxValueSemanticsKind::Copyable;
+
+    if (isCopyable)
+      continue;
+
+    if (isMovable)
+      return CxxValueSemanticsKind::MoveOnly;
+
+    llvm_unreachable("Could not classify C++ type.");
   }
 
-  bool isCopyable = !hasNonCopyableAttr(cxxRecordDecl) && 
-                    hasCopyTypeOperations(cxxRecordDecl);
-  bool isMovable = hasMoveTypeOperations(cxxRecordDecl);
-
-  if (!hasDestroyTypeOperations(cxxRecordDecl) || (!isCopyable && !isMovable)) {
-
-    if (hasConstructorWithUnsupportedDefaultArgs(cxxRecordDecl))
-      return CxxValueSemanticsKind::UnavailableConstructors;
-
-    return CxxValueSemanticsKind::MissingLifetimeOperation;
-  }
-
-  if (hasNonCopyableAttr(cxxRecordDecl) && isMovable)
-    return CxxValueSemanticsKind::MoveOnly;
-
-  if (isCopyable)
-    return CxxValueSemanticsKind::Copyable;
-
-  if (isMovable)
-    return CxxValueSemanticsKind::MoveOnly;
-
-  llvm_unreachable("Could not classify C++ type.");
+  return CxxValueSemanticsKind::Copyable;
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
