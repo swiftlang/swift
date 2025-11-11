@@ -1,13 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir %s -enable-library-evolution | %FileCheck %s
 
-// FIXME: We just need to adjust the check line below, there's no inherent
-// reason for this not to be tested on wasm.
-
-// UNSUPPORTED: CPU=wasm32
-
-// This test does not support 32 bit right now.
-// UNSUPPORTED: PTRSIZE=32
-
 // rdar://160649141
 
 public protocol P1 {}
@@ -24,7 +16,7 @@ public protocol P3 where A4.A1 == A3.A2.A1 {
   associatedtype A3: P5
   associatedtype A4: P2
 
-  var x: Int { get }
+  var x: Int32 { get }
 }
 
 public protocol P6: P3 {}
@@ -43,6 +35,6 @@ public struct G3<T: P6 & P4>: P3 where T.A4.A1: P1 {
 
   // Make sure this witness thunk doesn't have any additional bogus parameters.
 
-  // CHECK-LABEL: define internal swiftcc i64 @"$s28fulfillment_map_key_equality2G3VyxGAA2P3A2aEP1xSivgTW"(ptr noalias swiftself captures(none) %0, ptr %Self, ptr %SelfWitnessTable) {{.*}} {
-  public var x: Int { fatalError() }
+  // CHECK-LABEL: define internal swiftcc i32 @"$s28fulfillment_map_key_equality2G3VyxGAA2P3A2aEP1xs5Int32VvgTW"(ptr noalias swiftself captures(none) %0, ptr %Self, ptr %SelfWitnessTable) {{.*}} {
+  public var x: Int32 { fatalError() }
 }
