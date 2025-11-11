@@ -597,9 +597,11 @@ public:
                                                 {&substEltType});
 
       SGF.emitDynamicPackLoop(loc, inducedPackType, packComponentIndex,
-                              openedEnv, [&](SILValue indexWithinComponent,
-                                             SILValue expansionPackIndex,
-                                             SILValue packIndex) {
+                              openedEnv,
+                              []() -> SILBasicBlock * { return nullptr; },
+                              [&](SILValue indexWithinComponent,
+                                  SILValue expansionPackIndex,
+                                  SILValue packIndex) {
         componentInit->performPackExpansionInitialization(SGF, loc,
                                             indexWithinComponent,
                                             [&](Initialization *eltInit) {

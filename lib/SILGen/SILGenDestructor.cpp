@@ -429,7 +429,8 @@ void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
         B.createIntegerLiteral(loc, wordTy, 0);
 
     // Schedule isolated execution
-    B.createApply(loc, swiftDeinitOnExecutorFunc, {},
+    B.createApply(loc, swiftDeinitOnExecutorFunc,
+                  getForwardingSubstitutionMap(),
                   {castedSelf, castedDeallocator, executor, flagsInst});
   });
 }
