@@ -279,7 +279,7 @@ $DefaultPinned = @{
   };
   ARM64 = @{
     PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2025-11-03-a/swift-DEVELOPMENT-SNAPSHOT-2025-11-03-a-windows10-arm64.exe"
-    PinnedSHA256 = "";
+    PinnedSHA256 = "A4394A53082BC0346A0D85C6B4A52F540A29517D594288707B8C1D6BAA0B9E55";
     PinnedVersion = "0.0.0";
   };
 }
