@@ -436,7 +436,7 @@ TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
     // Non-generic type aliases can only be accessed if the
     // underlying type is not dependent.
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      if (!aliasDecl->isGeneric() &&
+      if (!aliasDecl->hasGenericParamList() &&
           aliasDecl->getUnderlyingType()->hasTypeParameter() &&
           !doesTypeAliasFullyConstrainAllOuterGenericParams(aliasDecl)) {
         return UnsupportedMemberTypeAccessKind::TypeAliasOfUnboundGeneric;

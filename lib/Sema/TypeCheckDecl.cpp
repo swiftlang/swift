@@ -2989,7 +2989,7 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
   // Check that the nominal type and the typealias are either both generic
   // at this level or neither are.
-  if (nominal->isGeneric() != typealias->isGeneric())
+  if (nominal->hasGenericParamList() != typealias->hasGenericParamList())
     return false;
 
   // Make sure either both have generic signatures or neither do.
@@ -3014,7 +3014,8 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
     return false;
 
   // If neither is generic at this level, we have a pass-through typealias.
-  if (!typealias->isGeneric()) return true;
+  if (!typealias->hasGenericParamList())
+    return true;
 
   if (typealias->getUnderlyingType()->isEqual(
         nominal->getSelfInterfaceType())) {

@@ -638,9 +638,10 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
           return false;
         if (!classDecl->isTypeErasedGenericClass()) {
           softenIfAccessNote(value, reason.getAttr(),
-            value->diagnose(diag::objc_in_generic_extension,
-                            classDecl->isGeneric())
-                .limitBehavior(behavior));
+                             value
+                                 ->diagnose(diag::objc_in_generic_extension,
+                                            classDecl->hasGenericParamList())
+                                 .limitBehavior(behavior));
           reason.describe(value);
           return true;
         }

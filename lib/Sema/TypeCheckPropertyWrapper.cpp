@@ -148,7 +148,8 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
 
   for (const auto &decl : decls) {
     auto init = dyn_cast<ConstructorDecl>(decl);
-    if (!init || init->getDeclContext() != nominal || init->isGeneric())
+    if (!init || init->getDeclContext() != nominal ||
+        init->hasGenericParamList())
       continue;
 
     ParamDecl *argumentParam = nullptr;

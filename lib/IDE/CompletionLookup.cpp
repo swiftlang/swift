@@ -266,7 +266,7 @@ void CompletionLookup::foundFunction(const AnyFunctionType *AFT) {
 
 bool CompletionLookup::canBeUsedAsRequirementFirstType(Type selfTy,
                                                        TypeAliasDecl *TAD) {
-  if (TAD->isGeneric())
+  if (TAD->hasGenericParamList())
     return false;
 
   auto T = TAD->getDeclaredInterfaceType();

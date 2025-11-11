@@ -2080,7 +2080,7 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
     // See the call to getClassFieldOffsetOffset() inside
     // emitKeyPathComponent().
     if (auto *parentClass = dyn_cast<ClassDecl>(decl->getDeclContext())) {
-      if (parentClass->isGeneric()) {
+      if (parentClass->hasGenericParamList()) {
         auto ancestry = parentClass->checkAncestry();
         if (ancestry.contains(AncestryFlags::ResilientOther))
           return false;

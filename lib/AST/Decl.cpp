@@ -4250,7 +4250,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   }
 
   if (auto *extension = dyn_cast<ExtensionDecl>(getDeclContext()))
-    if (extension->isGeneric())
+    if (extension->hasGenericParamList())
       signature.InExtensionOfGenericType = true;
 
   return signature;
