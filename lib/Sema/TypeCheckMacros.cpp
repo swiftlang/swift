@@ -1374,8 +1374,8 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     dc = attachedTo->getDeclContext();
     if (!isa<ClangModuleUnit>(dc->getModuleScopeContext()))
       dc = dc->getParentSourceFile();
-    else // decls imported from clang do not have a SourceFile
-      ASSERT(isa<FileUnit>(dc) && !isa<SourceFile>(dc));
+    else
+      ASSERT(isa<FileUnit>(dc) && !isa<SourceFile>(dc) && "decls imported from Clang should not have a SourceFile");
   } else {
     dc = attachedTo->getInnermostDeclContext();
   }
