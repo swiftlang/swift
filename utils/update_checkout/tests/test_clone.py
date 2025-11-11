@@ -54,7 +54,7 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
         )
 
         # Test that we're actually checking out the 'extra' scheme based on the output
-        self.assertIn("git checkout refs/heads/main", output.decode("utf-8"))
+        self.assertIn("git checkout refs/heads/main", output)
 
 
 class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):
