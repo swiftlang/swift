@@ -1412,30 +1412,32 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
         PackType::get(SGF.getASTContext(), expansion->getType())
             ->getCanonicalType());
 
-    JumpDest continueDest = createJumpDest(S->getBody());
-    JumpDest breakDest = createJumpDest(S->getBody());
+    std::optional<JumpDest> continueDest;
+    std::optional<JumpDest> breakDest;
 
     SGF.emitDynamicPackLoop(
         SILLocation(expansion), formalPackType, 0,
         expansion->getGenericEnvironment(),
+        [&]() -> SILBasicBlock * {
+          breakDest = createJumpDest(S->getBody());
+          continueDest = createJumpDest(S->getBody());
+          return continueDest->getBlock();
+        },
         [&](SILValue indexWithinComponent, SILValue packExpansionIndex,
             SILValue packIndex) {
           Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getBody()));
           auto letValueInit =
-              SGF.emitPatternBindingInitialization(S->getPattern(), continueDest);
+              SGF.emitPatternBindingInitialization(S->getPattern(), *continueDest);
 
           SGF.emitExprInto(expansion->getPatternExpr(), letValueInit.get());
 
           // Set the destinations for 'break' and 'continue'.
-          SGF.BreakContinueDestStack.push_back({S, breakDest, continueDest});
+          SGF.BreakContinueDestStack.push_back({S, *breakDest, *continueDest});
           visit(S->getBody());
           SGF.BreakContinueDestStack.pop_back();
+        });
 
-          return;
-        },
-        continueDest.getBlock());
-
-    emitOrDeleteBlock(SGF, breakDest, S);
+    emitOrDeleteBlock(SGF, *breakDest, S);
 
     return;
   }

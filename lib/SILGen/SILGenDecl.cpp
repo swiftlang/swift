@@ -76,6 +76,7 @@ static void copyOrInitPackExpansionInto(SILGenFunction &SGF,
     SGF.Cleanups.forwardCleanup(componentCleanup);
 
   SGF.emitDynamicPackLoop(loc, formalPackType, componentIndex, openedEnv,
+                          []() -> SILBasicBlock * { return nullptr; },
                           [&](SILValue indexWithinComponent,
                               SILValue packExpansionIndex,
                               SILValue packIndex) {
