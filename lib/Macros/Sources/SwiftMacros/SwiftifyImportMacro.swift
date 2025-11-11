@@ -1808,10 +1808,11 @@ public struct SwiftifyImportProtocolMacro: ExtensionMacro {
       }
       let overloads = try arguments.map {
         let (method, args) = try parseProtocolMacroParam($0, methods: methods)
-        let hasVisibilityModifier = method.modifiers.contains { modifier in
-          let modName = modifier.name.trimmed.text
-          return modName == "public" || modName == "internal" || modName == "open"
-            || modName == "private" || modName == "filePrivate"
+        let hasVisibilityModifier = method.modifiers.contains {
+          return switch $0.name.trimmed.text {
+          case "open", "public", "package", "internal", "fileprivate", "private": true
+          default: false
+          }
         }
         let result = try constructOverloadFunction(
           forDecl: method, leadingTrivia: Trivia(), args: args,
