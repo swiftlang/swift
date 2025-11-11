@@ -243,6 +243,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
                                              IsNotSerialized,
                                              onceTokenBuffer, onceSILTy);
   onceToken->setDeclaration(false);
+  onceToken->setDeclContext(pd->getDeclContext());
 
   // Emit the initialization code into a function.
   Mangle::ASTMangler FuncMangler(pd->getASTContext());

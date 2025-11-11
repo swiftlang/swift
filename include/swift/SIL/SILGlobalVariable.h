@@ -52,9 +52,11 @@ private:
   /// The SIL module that the global variable belongs to.
   SILModule &Module;
 
-  /// The module that defines this global variable. This member should only be
-  /// when a global variable is deserialized to be emitted into another module.
-  ModuleDecl *ParentModule = nullptr;
+  /// Either the declaration context of the global variable or the parent
+  /// module in which the global variable resides.
+  ///
+  /// The latter is only used for a deserialized global variable.
+  llvm::PointerUnion<DeclContext *, ModuleDecl *> DeclCtxOrParentModule;
 
   /// The mangled name of the variable, which will be propagated to the
   /// binary.  A pointer into the module's lookup table.
@@ -131,13 +133,21 @@ public:
 
   SILModule &getModule() const { return Module; }
 
-  /// Returns the module that defines this function.
+  /// Returns the module that defines this global variable.
   ModuleDecl *getParentModule() const;
 
-  /// Sets \c ParentModule as fallback if \c DeclCtxt is not available to
-  /// provide the parent module.
+  /// Get the declaration context of this global variable, if it has one.
+  DeclContext *getDeclContext() const;
+
+  /// Sets the parent module for a deserialized global variable.
   void setParentModule(ModuleDecl *module) {
-    ParentModule = module;
+    DeclCtxOrParentModule = module;
+  }
+
+  /// Sets the declaration context for a global variable that's not anchored to
+  /// a declaration.
+  void setDeclContext(DeclContext *declCtx) {
+    DeclCtxOrParentModule = declCtx;
   }
 
   SILType getLoweredType() const { return LoweredType; }
