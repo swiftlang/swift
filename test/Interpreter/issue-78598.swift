@@ -2,6 +2,8 @@
 
 // https://github.com/swiftlang/swift/issues/78598
 
+// REQUIRES: executable_test
+
 var counter = 0
 
 final class Entry<Results> {
