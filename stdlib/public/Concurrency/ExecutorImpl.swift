@@ -55,14 +55,22 @@ internal func donateToGlobalExecutor(
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_getMainExecutorImpl")
 internal func getMainExecutor() -> UnownedSerialExecutor {
-  return unsafe _getMainExecutorAsSerialExecutor()
+  if #available(StdlibDeploymentTarget 6.3, *) {
+    return unsafe _getMainExecutorAsSerialExecutor()
+  } else {
+    fatalError("this should never happen")
+  }
 }
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueMainExecutorImpl")
 internal func enqueueOnMainExecutor(job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  MainActor.executor.enqueue(unownedJob)
+  if #available(StdlibDeploymentTarget 6.3, *) {
+    MainActor.executor.enqueue(unownedJob)
+  } else {
+    fatalError("this should never happen")
+  }
   #else
   fatalError("swift_task_enqueueMainExecutor() not supported for task-to-thread")
   #endif
