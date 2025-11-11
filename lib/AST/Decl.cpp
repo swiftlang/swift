@@ -5537,7 +5537,9 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   }
   case AccessLevel::Public:
   case AccessLevel::Open: {
-    if (VD->isOperator() && VD->isSPI()) {
+    if (VD->getASTContext().LangOpts.hasFeature(
+            Feature::EnforceSPIOperatorGroup) &&
+        VD->isOperator() && VD->isSPI()) {
       const DeclContext *useFile = useDC->getModuleScopeContext();
       if (useFile->getParentModule() == sourceDC->getParentModule())
         return true;

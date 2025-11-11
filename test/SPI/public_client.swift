@@ -6,16 +6,20 @@
 // RUN: %target-swift-frontend -emit-module %S/Inputs/spi_helper.swift -module-name SPIHelper -emit-module-path %t/SPIHelper.swiftmodule -emit-module-interface-path %t/SPIHelper.swiftinterface -emit-private-module-interface-path %t/SPIHelper.private.swiftinterface -enable-library-evolution -swift-version 5 -parse-as-library
 
 /// Reading from swiftmodule
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t -verify-ignore-unknown \
+// RUN:   -enable-experimental-feature EnforceSPIOperatorGroup
 
 /// Reading from .private.swiftinterface
 // RUN: rm %t/SPIHelper.swiftmodule
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t -verify-ignore-unknown \
+// RUN:   -enable-experimental-feature EnforceSPIOperatorGroup
 
 /// Reading from the public .swiftinterface should raise errors on missing
 /// declarations.
 // RUN: rm %t/SPIHelper.private.swiftinterface
 // RUN: not %target-swift-frontend -typecheck -I %t %s
+
+// REQUIRES: swift_feature_EnforceSPIOperatorGroup
 
 import SPIHelper
 
