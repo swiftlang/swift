@@ -60,7 +60,8 @@ void IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
 }
 
 StackAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
-                                          const Twine &name) const {
+                                          const Twine &name,
+                                          StackAllocationIsNested_t isNested) const {
   // If the type is known to be empty, don't actually allocate anything.
   if (isKnownEmpty(ResilienceExpansion::Maximal)) {
     auto addr = getUndefAddress();
@@ -81,7 +82,8 @@ void FixedTypeInfo::destroyStack(IRGenFunction &IGF, StackAddress addr,
 }
 
 void FixedTypeInfo::deallocateStack(IRGenFunction &IGF, StackAddress addr,
-                                    SILType T) const {
+                                    SILType T,
+                                    StackAllocationIsNested_t isNested) const {
   if (isKnownEmpty(ResilienceExpansion::Maximal))
     return;
   IGF.Builder.CreateLifetimeEnd(addr.getAddress(), getFixedSize());

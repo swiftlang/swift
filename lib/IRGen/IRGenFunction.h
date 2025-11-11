@@ -317,6 +317,12 @@ public:
                                    bool useTaskDeallocThrough = false,
                                    bool forCalleeCoroutineFrame = false);
 
+  StackAddress emitAllocStackDynamic(SILType type,
+                                     StackAllocationIsNested_t isNested,
+                                     const llvm::Twine &name = "");
+  void emitDeallocStackDynamic(StackAddress address,
+                               StackAllocationIsNested_t isNested);
+
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
   const TypeInfo &getTypeInfoForUnlowered(AbstractionPattern orig, Type subst);

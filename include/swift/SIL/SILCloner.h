@@ -1062,6 +1062,7 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
       true
 #endif
   );
+  NewInst->setStackAllocationIsNested(Inst->isStackAllocationNested());
   recordClonedInstruction(Inst, NewInst);
 }
 

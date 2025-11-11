@@ -579,7 +579,9 @@ StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
       // In the formal presentation, the state change is
       //   state = STATE_PUSH(state, alloc)
       if (I->isAllocatingStack()) {
-        state.allocations.push_back(I);
+        // Ignore non-nested allocations.
+        if (I->isStackAllocationNested())
+          state.allocations.push_back(I);
         continue;
       }
 
@@ -593,6 +595,10 @@ StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
       // [deallocation-preconditions] in the proof.
       SILInstruction *dealloc = I;
       SILInstruction *alloc = getAllocForDealloc(dealloc);
+
+      // Ignore deallocations for non-nested allocations.
+      if (!alloc->isStackAllocationNested())
+        continue;
 
 #ifndef NDEBUG
       if (state.allocations.empty()) {

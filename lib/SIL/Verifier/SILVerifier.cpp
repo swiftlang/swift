@@ -7005,6 +7005,22 @@ public:
           }
         }
       }
+
+      void handleScopeInst(SILInstruction &i) {
+        if (!ActiveOps.insert(&i).second) {
+          verificationFailure("operation was not ended before re-beginning it",
+                              &i, nullptr, nullptr);
+        }
+      }
+      
+      void handleScopeEndingInst(SILInstruction &i) {
+        if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
+          if (!ActiveOps.erase(beginOp)) {
+            verificationFailure("operation has already been ended",
+                                &i, nullptr, nullptr);
+          }
+        }
+      }
     };
 
     struct DeadEndRegionState {
@@ -7105,22 +7121,31 @@ public:
         }
 
         if (i.isAllocatingStack()) {
-          if (auto *BAI = dyn_cast<BeginApplyInst>(&i)) {
-            state.Stack.push_back(BAI->getCalleeAllocationResult());
+          // Nested stack allocations are pushed on the stack. Non-nested stack
+          // allocations are treated as active ops so that we can at least verify
+          // their joint post-dominance.
+          if (i.isStackAllocationNested()) {
+            state.Stack.push_back(i.getStackAllocation());
+
+            // Also track begin_apply as a scope instruction.
+            if (isa<BeginApplyInst>(i))
+              state.handleScopeInst(i);
           } else {
-            state.Stack.push_back(cast<SingleValueInstruction>(&i));
+            state.handleScopeInst(i);
           }
-          // Not "else if": begin_apply both allocates stack and begins an
-          // operation.
-        }
-        if (i.isDeallocatingStack()) {
+        } else if (i.isDeallocatingStack()) {
           SILValue op = i.getOperand(0);
           while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
             op = mvi->getOperand();
           }
 
-          if (!state.Stack.empty() && op == state.Stack.back()) {
+          auto beginInst = op->getDefiningInstruction();
+          if (beginInst && !beginInst->isStackAllocationNested()) {
+            state.handleScopeEndingInst(i);
+          } else if (!state.Stack.empty() && op == state.Stack.back()) {
             state.Stack.pop_back();
+            if (beginInst && isa<BeginApplyInst>(beginInst))
+              state.handleScopeEndingInst(i);
           } else {
             verificationFailure("deallocating allocation that is not the top of the stack",
                                 &i, nullptr,
@@ -7131,20 +7156,12 @@ public:
             });
           }
         } else if (isScopeInst(&i)) {
-          bool notAlreadyPresent = state.ActiveOps.insert(&i).second;
-          require(notAlreadyPresent,
-                  "operation was not ended before re-beginning it");
+          state.handleScopeInst(i);
         } else if (isScopeEndingInst(&i)) {
-          if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
-            bool present = state.ActiveOps.erase(beginOp);
-            require(present, "operation has already been ended");
-          }
+          state.handleScopeEndingInst(i);
         } else if (auto *endBorrow = dyn_cast<EndBorrowInst>(&i)) {
           if (isa<StoreBorrowInst>(endBorrow->getOperand())) {
-            if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
-              bool present = state.ActiveOps.erase(beginOp);
-              require(present, "operation has already been ended");
-            }
+            state.handleScopeEndingInst(i);
           }
         } else if (auto gaci = dyn_cast<GetAsyncContinuationInstBase>(&i)) {
           require(!state.GotAsyncContinuation,

@@ -6575,7 +6575,9 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   DebugTypeInfo DbgTy;
   emitDebugInfoBeforeAllocStack(i, type, DbgTy);
 
-  auto stackAddr = type.allocateStack(*this, i->getElementType(), dbgname);
+  auto stackAddr = type.allocateStack(*this, i->getElementType(),
+                                      i->isStackAllocationNested(),
+                                      dbgname);
   setLoweredStackAddress(i, stackAddr);
   Address addr = stackAddr.getAddress();
 
@@ -6668,23 +6670,27 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   if (auto *closure = dyn_cast<PartialApplyInst>(i->getOperand())) {
     assert(closure->isOnStack());
     auto stackAddr = LoweredPartialApplyAllocations[i->getOperand()];
-    emitDeallocateDynamicAlloca(stackAddr);
+    emitDeallocStackDynamic(stackAddr, closure->isStackAllocationNested());
     return;
   }
   if (isaResultOf<BeginApplyInst>(i->getOperand())) {
     auto *mvi = getAsResultOf<BeginApplyInst>(i->getOperand());
     auto *bai = cast<BeginApplyInst>(mvi->getParent());
+    // FIXME: [non_nested]
     const auto &coroutine = getLoweredCoroutine(bai->getTokenResult());
     emitDeallocYieldOnce2CoroutineFrame(*this,
                                         coroutine.getCalleeAllocatedFrame());
     return;
   }
 
-  auto allocatedType = i->getOperand()->getType();
-  const TypeInfo &allocatedTI = getTypeInfo(allocatedType);
-  StackAddress stackAddr = getLoweredStackAddress(i->getOperand());
+  auto *asi = cast<AllocStackInst>(i->getOperand());
 
-  allocatedTI.deallocateStack(*this, stackAddr, allocatedType);
+  auto allocatedType = asi->getType();
+  const TypeInfo &allocatedTI = getTypeInfo(allocatedType);
+  StackAddress stackAddr = getLoweredStackAddress(asi);
+  auto isNested = asi->isStackAllocationNested();
+
+  allocatedTI.deallocateStack(*this, stackAddr, allocatedType, isNested);
 }
 
 void IRGenSILFunction::visitDeallocStackRefInst(DeallocStackRefInst *i) {

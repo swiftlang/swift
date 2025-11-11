@@ -1568,7 +1568,17 @@ public:
       printDebugInfoExpression(Var->DIExpr);
   }
 
+  template <class T>
+  void printNonNested(T *inst) {
+    static_assert(&T::isStackAllocationNested !=
+                    &SILInstruction::isStackAllocationNested,
+                  "Type doesn't override isStackAllocationNested");
+    if (!inst->isStackAllocationNested())
+      *this << "[non_nested] ";
+  }
+
   void visitAllocStackInst(AllocStackInst *AVI) {
+    printNonNested(AVI);
     if (AVI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
     if (AVI->isLexical())

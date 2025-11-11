@@ -553,6 +553,27 @@ irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
   return call;
 }
 
+StackAddress
+IRGenFunction::emitDynamicStackAllocation(SILType T,
+                                          StackAllocationIsNested_t isNested,
+                                          const llvm::Twine &name) {
+  if (isNested) {
+    return emitDynamicAlloca(T, name);
+  }
+
+  FIXME: use malloc
+}
+
+void
+IRGenFunction::emitDynamicStackDeallocation(StackAddress address,
+                                            StackAllocationIsNested_t isNested) {
+  if (isNested) {
+    return emitDeallocateDynamicAlloca(address);
+  }
+
+  FIXME: use malloc
+}
+
 /// Emit a dynamic alloca call to allocate enough memory to hold an object of
 /// type 'T' and an optional llvm.stackrestore point if 'isInEntryBlock' is
 /// false.

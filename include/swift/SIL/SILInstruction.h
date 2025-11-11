@@ -141,6 +141,15 @@ class SILPrintContext;
 
 template <typename ImplClass> class SILClonerWithScopes;
 
+enum StackAllocationIsNested_t : bool {
+  /// The instruction may not obey the ABBA rule of stack allocation.
+  StackAllocationIsNotNested = false,
+
+  /// The instruction obeys the ABBA rule of stack allocation and can
+  /// allocate memory on the stack normally.
+  StackAllocationIsNested = true,
+};
+
 enum class MemoryBehavior {
   None,
   /// The instruction may read memory.
@@ -857,6 +866,15 @@ public:
 
   /// The stack allocation produced by the instruction, if any.
   SILValue getStackAllocation() const;
+
+  /// Returns the kind of stack memory that should be allocated. There are
+  /// certain (unfortunate) situations in which "stack" allocations may become
+  /// unnested and must use alternative allocation strategies. Rather than
+  /// requiring all of these to explicitly use heap allocation, which may be
+  /// to be significantly less efficient (e.g. )
+  StackAllocationIsNested_t isStackAllocationNested() const;
+
+  void setStackAllocationIsNested(StackAllocationIsNested_t isNested);
 
   /// Returns true if this is the deallocation of a stack allocating instruction.
   /// The first operand must be the allocating instruction.
@@ -2053,6 +2071,14 @@ public:
     for (unsigned i = 0; i < end; ++i) {
       Operands[i].~Operand();
     }
+  }
+
+  StackAllocationIsNested_t isStackAllocationNested() const {
+    return StackAllocationIsNested_t(!sharedUInt8().AllocStackInst.isNested);
+  }
+
+  void setStackAllocationIsNested(StackAllocationIsNested_t isNested) {
+    sharedUInt8().AllocStackInst.isNested = bool(isNested);
   }
 
   void markUsesMoveableValueDebugInfo() {
