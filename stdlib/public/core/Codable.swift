@@ -95,23 +95,23 @@ extension CodingKey {
   /// to form a path when printing debug information.
   /// - parameter isFirst: Whether this is the first key in a coding path, in
   ///   which case we will omit the prepended '.' delimiter from string keys.
-  func errorPresentationDescription(isFirstInCodingPath isFirst: Bool = true) -> String {
+  fileprivate func _errorPresentationDescription(isFirstInCodingPath isFirst: Bool = true) -> String {
     if let intValue {
       return "[\(intValue)]"
     } else {
       let delimiter = isFirst ? "" : "."
-      return "\(delimiter)\(stringValue.escapedForCodingKeyErrorPresentationDescription)"
+      return "\(delimiter)\(stringValue._escapedForCodingKeyErrorPresentationDescription)"
     }
   }
 }
 
-private extension [any CodingKey] {
+extension [any CodingKey] {
   /// Concatenates the elements of an array of coding keys and joins them with
   /// "/" separators to make them read like a path.
-  func errorPresentationDescription() -> String {
+  fileprivate func _errorPresentationDescription() -> String {
     return (
-      self.prefix(1).map { $0.errorPresentationDescription(isFirstInCodingPath: true) }
-      + self.dropFirst(1).map { $0.errorPresentationDescription(isFirstInCodingPath: false) }
+      self.prefix(1).map { $0._errorPresentationDescription(isFirstInCodingPath: true) }
+      + self.dropFirst(1).map { $0._errorPresentationDescription(isFirstInCodingPath: false) }
     ).joined(separator: "")
   }
 }
@@ -121,7 +121,7 @@ extension String {
   /// the key contains a period, escape it with backticks so that it can be
   /// distinguished from the delimiter. Also escape backslashes and backticks
   /// (but *not* periods) to avoid confusion with delimiters.
-  var escapedForCodingKeyErrorPresentationDescription: String {
+  internal var _escapedForCodingKeyErrorPresentationDescription: String {
     let charactersThatNeedBackticks: Set<Character> = [".", "`", "\\"]
     let charactersThatNeedEscaping: Set<Character> = ["`", "\\"]
     assert(
@@ -3797,7 +3797,7 @@ extension EncodingError: CustomDebugStringConvertible {
     let contextDebugDescription = context.debugDescription
 
     if !context.codingPath.isEmpty {
-      output.append(". Path: \(context.codingPath.errorPresentationDescription())")
+      output.append(". Path: \(context.codingPath._errorPresentationDescription())")
     }
 
     if !contextDebugDescription.isEmpty {
@@ -3826,7 +3826,7 @@ extension DecodingError: CustomDebugStringConvertible {
       case .valueNotFound(let expectedType, let context):
         ("DecodingError.valueNotFound: Expected value of type \(expectedType) but found null instead", context)
       case .keyNotFound(let expectedKey, let context):
-        ("DecodingError.keyNotFound: Key '\(expectedKey.errorPresentationDescription())' not found in keyed decoding container", context)
+        ("DecodingError.keyNotFound: Key '\(expectedKey._errorPresentationDescription())' not found in keyed decoding container", context)
       case .dataCorrupted(let context):
         ("DecodingError.dataCorrupted: Data was corrupted", context)
     }
@@ -3834,7 +3834,7 @@ extension DecodingError: CustomDebugStringConvertible {
     var output = message
 
     if !context.codingPath.isEmpty {
-      output.append(". Path: \(context.codingPath.errorPresentationDescription())")
+      output.append(". Path: \(context.codingPath._errorPresentationDescription())")
     }
 
     let contextDebugDescription = context.debugDescription
