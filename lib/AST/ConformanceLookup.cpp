@@ -202,7 +202,7 @@ ProtocolConformanceRef swift::lookupConformance(Type type,
   // If we are recursively checking for implicit conformance of a nominal
   // type to a KnownProtocol, fail without evaluating this request. This
   // squashes cycles.
-  LookupConformanceInModuleRequest request{{type, protocol}};
+  LookupConformanceRequest request{{type, protocol}};
   if (auto kp = protocol->getKnownProtocolKind()) {
     if (auto nominal = type->getAnyNominal()) {
       ImplicitKnownProtocolConformanceRequest icvRequest{nominal, *kp};
@@ -543,8 +543,8 @@ static ProtocolConformanceRef getPackTypeConformance(
 }
 
 ProtocolConformanceRef
-LookupConformanceInModuleRequest::evaluate(
-    Evaluator &evaluator, LookupConformanceDescriptor desc) const {
+LookupConformanceRequest::evaluate(Evaluator &evaluator,
+                                   LookupConformanceDescriptor desc) const {
   auto type = desc.Ty;
   auto *protocol = desc.PD;
   ASTContext &ctx = protocol->getASTContext();
