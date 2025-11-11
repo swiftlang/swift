@@ -46,6 +46,8 @@ func bar(x: Int) -> String { return "test" }
 // function references
 @section("mysection") let funcRef1 = foo // ok
 @section("mysection") let funcRef2 = bar // ok
+@section("mysection") let funcRef3: ()->Int = foo // ok
+@section("mysection") let funcRef4: @convention(c) ()->Int = foo // ok
 
 // invalid function references (should be rejected)
 @section("mysection") let invalidFuncRef1 = foo()

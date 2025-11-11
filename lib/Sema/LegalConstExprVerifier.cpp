@@ -226,9 +226,18 @@ checkSupportedWithSectionAttribute(const Expr *expr,
     if (isa<AbstractClosureExpr>(expr))
       return std::make_pair(expr, Closure);
 
-    // Function conversions are not allowed in constant expressions
-    if (isa<FunctionConversionExpr>(expr))
+    // Function conversions are allowed if the conversion is to '@convention(c)'
+    if (auto functionConvExpr = dyn_cast<FunctionConversionExpr>(expr)) {
+      if (auto targetFnTy =
+              functionConvExpr->getType()->getAs<AnyFunctionType>()) {
+        if (targetFnTy->getExtInfo().getRepresentation() ==
+            FunctionTypeRepresentation::CFunctionPointer) {
+          expressionsToCheck.push_back(functionConvExpr->getSubExpr());
+          continue;
+        }
+      }
       return std::make_pair(expr, Default);
+    }
 
     // Direct references to non-generic functions are allowed
     if (const DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(expr)) {
