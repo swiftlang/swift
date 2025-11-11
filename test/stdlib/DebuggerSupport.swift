@@ -10,11 +10,6 @@ struct StructWithMembers {
   var b = "Hello World"
 }
 
-struct StructWithMembersAndDescription: CustomStringConvertible {
-  var a = 1
-  var description: String { "Hello World" }
-}
-
 struct StructIsNonCopyable: ~Copyable {
   var a = 1
   var b = "Hello World"
