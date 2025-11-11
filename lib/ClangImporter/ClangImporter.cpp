@@ -5488,112 +5488,103 @@ getConditionalCopyableAttrParams(const clang::RecordDecl *decl) {
 CxxEscapability
 ClangTypeEscapability::evaluate(Evaluator &evaluator,
                                 EscapabilityLookupDescriptor desc) const {
-  bool hadUnknown = false;
-  auto evaluateEscapability = [&](const clang::Type *type) {
-    auto escapability = evaluateOrDefault(
-        evaluator,
-        ClangTypeEscapability({type, desc.impl, desc.annotationOnly}),
-        CxxEscapability::Unknown);
-    if (escapability == CxxEscapability::Unknown)
-      hadUnknown = true;
-    return escapability;
-  };
-
+  bool hasUnknown = false;
   auto desugared = desc.type->getUnqualifiedDesugaredType();
   if (const auto *recordType = desugared->getAs<clang::RecordType>()) {
     auto recordDecl = recordType->getDecl();
-    if (hasNonEscapableAttr(recordDecl))
-      return CxxEscapability::NonEscapable;
     if (hasEscapableAttr(recordDecl))
       return CxxEscapability::Escapable;
-    auto injectedStlAnnotation =
-        recordDecl->isInStdNamespace()
-            ? STLConditionalParams.find(recordDecl->getName())
-            : STLConditionalParams.end();
-    auto STLParams = injectedStlAnnotation != STLConditionalParams.end()
-                         ? injectedStlAnnotation->second
-                         : std::vector<int>();
-    auto conditionalParams = getConditionalEscapableAttrParams(recordDecl);
+  }
 
-    if (!STLParams.empty() || !conditionalParams.empty()) {
-      HeaderLoc loc{recordDecl->getLocation()};
-      std::function checkArgEscapability =
-          [&](clang::TemplateArgument &arg,
-              StringRef argToCheck) -> std::optional<CxxEscapability> {
-        if (arg.getKind() != clang::TemplateArgument::Type && desc.impl) {
-          desc.impl->diagnose(loc, diag::type_template_parameter_expected,
-                              argToCheck);
-          return CxxEscapability::Unknown;
+  llvm::SmallVector<const clang::Type *, 4> stack;
+  // Keep track of Decls we've seen to avoid cycles
+  llvm::SmallDenseSet<const clang::Type *, 4> seen;
+
+  auto maybePushToStack = [&](const clang::Type *type) {
+    auto desugared = type->getUnqualifiedDesugaredType();
+    if (seen.insert(desugared).second)
+      stack.push_back(desugared);
+  };
+
+  maybePushToStack(desc.type);
+  while (!stack.empty()) {
+    auto type = stack.back();
+    stack.pop_back();
+    if (const auto *recordType = type->getAs<clang::RecordType>()) {
+      auto recordDecl = recordType->getDecl();
+      if (hasNonEscapableAttr(recordDecl))
+        return CxxEscapability::NonEscapable;
+      if (hasEscapableAttr(recordDecl))
+        continue;
+      auto injectedStlAnnotation =
+          recordDecl->isInStdNamespace()
+              ? STLConditionalParams.find(recordDecl->getName())
+              : STLConditionalParams.end();
+      auto STLParams = injectedStlAnnotation != STLConditionalParams.end()
+                           ? injectedStlAnnotation->second
+                           : std::vector<int>();
+      auto conditionalParams = getConditionalEscapableAttrParams(recordDecl);
+
+      if (!STLParams.empty() || !conditionalParams.empty()) {
+        HeaderLoc loc{recordDecl->getLocation()};
+        std::function checkArgEscapability =
+            [&](clang::TemplateArgument &arg,
+                StringRef argToCheck) -> std::optional<CxxEscapability> {
+          if (arg.getKind() != clang::TemplateArgument::Type) {
+            if (desc.impl)
+              desc.impl->diagnose(loc, diag::type_template_parameter_expected,
+                                  argToCheck);
+            hasUnknown = true;
+            return std::nullopt;
+          }
+          maybePushToStack(arg.getAsType()->getUnqualifiedDesugaredType());
+          // FIXME don't return anything
+          return std::nullopt;
+        };
+
+        checkConditionalParams<CxxEscapability>(
+            recordDecl, STLParams, conditionalParams, checkArgEscapability);
+
+        if (desc.impl)
+          for (auto name : conditionalParams)
+            desc.impl->diagnose(loc, diag::unknown_template_parameter, name);
+
+        continue;
+      }
+      if (desc.annotationOnly) {
+        hasUnknown = true;
+        continue;
+      }
+      auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
+      if (recordDecl->getDefinition() &&
+          (!cxxRecordDecl || cxxRecordDecl->isAggregate())) {
+        if (cxxRecordDecl) {
+          // TODO llvm::foreach ?
+          for (auto base : cxxRecordDecl->bases())
+            maybePushToStack(base.getType()->getUnqualifiedDesugaredType());
         }
 
-        auto argEscapability = evaluateEscapability(
-            arg.getAsType()->getUnqualifiedDesugaredType());
-        if (argEscapability == CxxEscapability::NonEscapable)
-          return CxxEscapability::NonEscapable;
-        return std::nullopt;
-      };
-
-      auto result = checkConditionalParams<CxxEscapability>(
-          recordDecl, STLParams, conditionalParams, checkArgEscapability);
-      if (result.has_value())
-        return result.value();
-
-      if (desc.impl)
-        for (auto name : conditionalParams)
-          desc.impl->diagnose(loc, diag::unknown_template_parameter, name);
-
-      return hadUnknown ? CxxEscapability::Unknown : CxxEscapability::Escapable;
+        for (auto field : recordDecl->fields())
+          maybePushToStack(field->getType()->getUnqualifiedDesugaredType());
+        continue;
+      }
     }
-    if (desc.annotationOnly)
-      return CxxEscapability::Unknown;
-    auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
-    if (recordDecl->getDefinition() &&
-        (!cxxRecordDecl || cxxRecordDecl->isAggregate())) {
-      if (cxxRecordDecl) {
-        for (auto base : cxxRecordDecl->bases()) {
-          auto baseEscapability = evaluateEscapability(
-              base.getType()->getUnqualifiedDesugaredType());
-          if (baseEscapability == CxxEscapability::NonEscapable)
-            return CxxEscapability::NonEscapable;
-        }
-      }
-
-      for (auto field : recordDecl->fields()) {
-        auto fieldEscapability = evaluateEscapability(
-            field->getType()->getUnqualifiedDesugaredType());
-        if (fieldEscapability == CxxEscapability::NonEscapable)
-          return CxxEscapability::NonEscapable;
-      }
-
-      return hadUnknown ? CxxEscapability::Unknown : CxxEscapability::Escapable;
+    if (type->isArrayType()) {
+      auto elemTy = cast<clang::ArrayType>(type)
+                        ->getElementType()
+                        ->getUnqualifiedDesugaredType();
+      maybePushToStack(elemTy);
+    } else if (const auto *vecTy = type->getAs<clang::VectorType>()) {
+      maybePushToStack(vecTy->getElementType()->getUnqualifiedDesugaredType());
+    } else if (type->isAnyPointerType() || type->isBlockPointerType() ||
+               type->isMemberPointerType() || type->isReferenceType()) {
+      if (desc.annotationOnly)
+        hasUnknown = true;
+      else
+        return CxxEscapability::NonEscapable;
     }
   }
-  if (desugared->isArrayType()) {
-    auto elemTy = cast<clang::ArrayType>(desugared)
-                      ->getElementType()
-                      ->getUnqualifiedDesugaredType();
-    return evaluateOrDefault(
-        evaluator,
-        ClangTypeEscapability({elemTy, desc.impl, desc.annotationOnly}),
-        CxxEscapability::Unknown);
-  }
-  if (const auto *vecTy = desugared->getAs<clang::VectorType>()) {
-    return evaluateOrDefault(
-        evaluator,
-        ClangTypeEscapability(
-            {vecTy->getElementType()->getUnqualifiedDesugaredType(), desc.impl,
-             desc.annotationOnly}),
-        CxxEscapability::Unknown);
-  }
-
-  // Base cases
-  if (desugared->isAnyPointerType() || desugared->isBlockPointerType() ||
-      desugared->isMemberPointerType() || desugared->isReferenceType())
-    return desc.annotationOnly ? CxxEscapability::Unknown
-                               : CxxEscapability::NonEscapable;
-  if (desugared->isScalarType())
-    return CxxEscapability::Escapable;
-  return CxxEscapability::Unknown;
+  return hasUnknown ? CxxEscapability::Unknown : CxxEscapability::Escapable;
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
@@ -8541,7 +8532,7 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
             if (importerImpl)
               importerImpl->diagnose(
                   loc, diag::type_template_parameter_expected, argToCheck);
-            return CxxValueSemanticsKind::Unknown;
+            return std::nullopt;
           }
           maybePushToStack(arg.getAsType()->getUnqualifiedDesugaredType());
           // FIXME: return std::nullopt for now, while we don't refactor ClangTypeEscapability request
