@@ -117,6 +117,33 @@ func test2(_ p: any Derived) {
   p.b()
 }
 
+
+protocol ValuePrinter {
+    func printValue()
+}
+protocol WithAssoc {
+    associatedtype Assoc : ValuePrinter
+    func a() -> Assoc
+}
+
+extension Int : ValuePrinter {
+    func printValue() {
+        print("my value: \(self)")
+    }
+}
+
+struct ConformWithAssoc : WithAssoc {
+  var x = 1
+  func a() -> Int {
+    return x
+  }
+}
+
+func test3(_ p: any WithAssoc) {
+  let x = p.a()
+  x.printValue()
+}
+
 @main
 struct Main {
   static func main() {
@@ -131,9 +158,11 @@ struct Main {
 // OUTPUT: a MyEnum
 // OUTPUT: 5
 // OUTPUT: b MyEnum
+// OUTPUT: my value: 1
     test2(Implementor())
     test2(5)
     test2(MyStruct())
     test2(MyEnum.b(5))
+    test3(ConformWithAssoc())
   }
 }

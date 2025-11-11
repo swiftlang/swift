@@ -262,6 +262,34 @@ public func swift_allocEmptyBox() -> Builtin.RawPointer {
 }
 
 
+@_silgen_name("swift_allocBox")
+public func swift_allocBox(metadata: Builtin.RawPointer) -> (Builtin.RawPointer, Builtin.RawPointer) {
+  let alignMask = Int(unsafe _swift_embedded_metadata_get_align_mask(UnsafeMutableRawPointer(metadata)))
+  let size = Int(unsafe _swift_embedded_metadata_get_size(UnsafeMutableRawPointer(metadata)))
+  let headerSize = unsafe MemoryLayout<Int>.size + MemoryLayout<UnsafeRawPointer>.size
+  let headerAlignMask = unsafe MemoryLayout<UnsafeRawPointer>.alignment - 1
+  let startOfBoxedValue = ((headerSize + alignMask) & ~alignMask)
+  let requiredSize: Int = startOfBoxedValue + size
+  let requiredAlignmentMask: Int = alignMask | headerAlignMask
+
+  let p = unsafe swift_slowAlloc(requiredSize, requiredAlignmentMask)!
+  let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
+
+  unsafe _swift_embedded_set_heap_object_metadata_pointer(object, UnsafeMutableRawPointer(metadata))
+  unsafe object.pointee.refcount = 1
+
+  let boxedValueAddr = unsafe UnsafeMutableRawPointer(p).advanced(by: startOfBoxedValue)
+
+  return (object._rawValue, boxedValueAddr._rawValue)
+}
+
+@_cdecl("swift_deallocBox")
+public func swift_deallocBox(object: Builtin.RawPointer) {
+  unsafe free(UnsafeMutableRawPointer(object))
+}
+
+
+
 /// Refcounting
 
 func isValidPointerForNativeRetain(object: Builtin.RawPointer) -> Bool {

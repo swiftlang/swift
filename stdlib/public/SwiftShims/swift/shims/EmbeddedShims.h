@@ -83,6 +83,51 @@ static inline void _swift_embedded_set_heap_object_metadata_pointer(void *object
   ((EmbeddedHeapObject *)object)->metadata = metadata;
 }
 
+typedef struct {
+  void  *initializeBufferWithCopyOfBufferFn;
+#if __has_feature(ptrauth_calls)
+  void  (* __ptrauth(0, 1, 0x04f8)  destroyFn)(void *, void*);
+#else
+  void  (*destroyFn)(void *, void*);
+#endif
+#if __has_feature(ptrauth_calls)
+  void* (* __ptrauth(0, 1, 0xe3ba) initializeWithCopyFn)(void*, void*, void*);
+#else
+  void* (*initializeWithCopyFn)(void*, void*, void*);
+#endif
+  void  *assignWithCopyFn;
+  void  *initializeWithTakeFn;
+  void  *assignWithTakeFn;
+  void  *getEnumTagSinglePayloadFn;
+  void  *storeEnumTagSinglePayload;
+  __swift_size_t size;
+  __swift_size_t stride;
+  unsigned flags;
+} EmbeddedValueWitnessTable;
+
+typedef struct {
+#if __has_feature(ptrauth_calls)
+  EmbeddedValueWitnessTable * __ptrauth(2, 1, 0x2e3f) vwt;
+#else
+  EmbeddedValueWitnessTable *vwt;
+#endif
+} EmbeddedMetaDataPrefix;
+
+static inline __swift_size_t _swift_embedded_metadata_get_size(void *metadata) {
+  EmbeddedMetaDataPrefix *fullmeta = (EmbeddedMetaDataPrefix*)&((void **)metadata)[-1];
+  return fullmeta->vwt->size;
+}
+
+static inline __swift_size_t _swift_embedded_metadata_get_align_mask(void *metadata) {
+  EmbeddedMetaDataPrefix *fullmeta = (EmbeddedMetaDataPrefix*)&((void **)metadata)[-1];
+
+  unsigned flags =  fullmeta->vwt->flags;
+  unsigned embeddedValueWitnessTableFlagsMask = 0xFF;
+
+  return flags & embeddedValueWitnessTableFlagsMask;
+}
+
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
