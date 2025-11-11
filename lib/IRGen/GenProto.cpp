@@ -768,7 +768,7 @@ void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
   auto loc = Fn.getLocation();
 
   auto *funcDecl = dyn_cast_or_null<FuncDecl>(loc.getAsDeclContext());
-  if (!(funcDecl && funcDecl->isGeneric()))
+  if (!(funcDecl && funcDecl->hasGenericParamList()))
     return;
 
   if (!funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())

@@ -6892,10 +6892,10 @@ bool ASTContext::overrideGenericSignatureReqsSatisfied(
   auto *baseCtx = base->getAsGenericContext();
   auto *derivedCtx = derived->getAsGenericContext();
 
-  if (baseCtx->isGeneric() != derivedCtx->isGeneric())
+  if (baseCtx->hasGenericParamList() != derivedCtx->hasGenericParamList())
     return false;
 
-  if (baseCtx->isGeneric() &&
+  if (baseCtx->hasGenericParamList() &&
       (baseCtx->getGenericParams()->size() !=
        derivedCtx->getGenericParams()->size()))
     return false;

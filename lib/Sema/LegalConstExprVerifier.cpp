@@ -245,7 +245,7 @@ checkSupportedWithSectionAttribute(const Expr *expr,
 
       // Function references are allowed if they are non-generic
       if (auto *funcDecl = dyn_cast<FuncDecl>(decl)) {
-        if (!funcDecl->isGeneric() &&
+        if (!funcDecl->hasGenericParamList() &&
             !funcDecl->getDeclContext()->isGenericContext()) {
           continue;
         }
@@ -265,7 +265,7 @@ checkSupportedWithSectionAttribute(const Expr *expr,
           auto instanceType = baseType->getMetatypeInstanceType();
           if (auto nominal = instanceType->getNominalOrBoundGenericNominal()) {
             // Allow non-generic, non-resilient types
-            if (!nominal->isGeneric() && !nominal->isResilient()) {
+            if (!nominal->hasGenericParamList() && !nominal->isResilient()) {
               continue;
             }
           }

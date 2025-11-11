@@ -9032,7 +9032,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           return SolutionKind::Solved;
         };
 
-        if (witness->isGeneric()) {
+        if (witness->hasGenericParamList()) {
           // `DistributedActorSystem.remoteCall`
           if (witness->isDistributedActorSystemRemoteCall(/*isVoidReturn=*/false)) {
             if (GP->isEqual(cast<FuncDecl>(witness)->getResultInterfaceType()))

@@ -209,7 +209,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
 
   // The innermost generic parameters are mapped to error types.
   unsigned innerDepth = genericSig->getMaxDepth();
-  if (!genericDecl->isGeneric())
+  if (!genericDecl->hasGenericParamList())
     ++innerDepth;
 
   // We treat substitution failure as success, to ignore requirements

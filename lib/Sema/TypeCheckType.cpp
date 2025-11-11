@@ -593,7 +593,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
       } else if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
         if (isa<ProtocolDecl>(typeDecl->getDeclContext()) &&
             getStage() == TypeResolutionStage::Structural) {
-          if (aliasDecl && !aliasDecl->isGeneric()) {
+          if (aliasDecl && !aliasDecl->hasGenericParamList()) {
             return adjustAliasType(aliasDecl->getStructuralType());
           }
         }
@@ -1791,7 +1791,7 @@ static void diagnoseGenericArgumentsOnSelf(const TypeResolution &resolution,
 
   diags.diagnose(repr->getNameLoc(), diag::cannot_specialize_self);
 
-  if (selfNominal->isGeneric() && !isa<ProtocolDecl>(selfNominal)) {
+  if (selfNominal->hasGenericParamList() && !isa<ProtocolDecl>(selfNominal)) {
     diags
         .diagnose(repr->getNameLoc(), diag::specialize_explicit_type_instead,
                   declaredType)
@@ -6481,7 +6481,7 @@ Type TypeChecker::substMemberTypeWithBase(TypeDecl *member,
 
   auto *aliasDecl = dyn_cast<TypeAliasDecl>(member);
   if (aliasDecl) {
-    if (aliasDecl->isGeneric()) {
+    if (aliasDecl->hasGenericParamList()) {
       return UnboundGenericType::get(
           aliasDecl, baseTy,
           aliasDecl->getASTContext());

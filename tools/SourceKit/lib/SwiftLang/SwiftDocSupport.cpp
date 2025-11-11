@@ -273,8 +273,8 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
     return;
 
   // The declaration may not be generic itself, but instead carry additional
-  // generic requirements in a contextual where clause, so checking !isGeneric()
-  // is insufficient.
+  // generic requirements in a contextual where clause, so checking
+  // !hasGenericParamList() is insufficient.
   const auto ParentSig = GC->getParent()->getGenericSignatureOfContext();
   if (ParentSig && ParentSig->isEqual(GenericSig))
     return;
@@ -316,7 +316,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
   };
 
   // FIXME: Not right for extensions of nested generic types
-  if (GC->isGeneric()) {
+  if (GC->hasGenericParamList()) {
     for (auto *GP : GenericSig.getInnermostGenericParams()) {
       if (GP->getDecl()->isImplicit())
         continue;

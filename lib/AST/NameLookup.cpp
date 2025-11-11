@@ -3768,7 +3768,7 @@ createTupleExtensionGenericParams(ASTContext &ctx,
     return nullptr;
 
   auto *typeAlias = cast<TypeAliasDecl>(referenced.first[0]);
-  if (!typeAlias->isGeneric())
+  if (!typeAlias->hasGenericParamList())
     return nullptr;
 
   return createExtensionGenericParams(ctx, ext, typeAlias);

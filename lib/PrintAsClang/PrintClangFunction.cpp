@@ -794,7 +794,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     ClangSyntaxPrinter(FD->getASTContext(), functionSignatureOS)
         .printNominalTypeOutsideMemberDeclTemplateSpecifiers(typeDecl);
   }
-  if (FD->isGeneric()) {
+  if (FD->hasGenericParamList()) {
     auto Signature = FD->getGenericSignature().getCanonicalSignature();
     if (!cxx_translation::isExposableToCxx(Signature))
       return ClangRepresentation::unsupported;
@@ -1257,7 +1257,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   if (typeDeclContext)
     ClangSyntaxPrinter(FD->getASTContext(), os).printNominalTypeOutsideMemberDeclInnerStaticAssert(
         typeDeclContext);
-  if (FD->isGeneric()) {
+  if (FD->hasGenericParamList()) {
     auto Signature = FD->getGenericSignature().getCanonicalSignature();
     ClangSyntaxPrinter(FD->getASTContext(), os).printGenericSignatureInnerStaticAsserts(Signature);
   }

@@ -1051,7 +1051,7 @@ Subclass of \texttt{DeclContext}. Base class for declaration kinds which can hav
 \begin{itemize}
 \item \texttt{getParsedGenericParams()} returns the declaration's parsed generic parameter list, or \texttt{nullptr}.
 \item \texttt{getGenericParams()} returns the declaration's full generic parameter list, which includes any implicit generic parameters. Evaluates a \texttt{GenericParamListRequest}.
-\item \texttt{isGeneric()} answers if this declaration has a generic parameter list. This is equivalent to calling \texttt{DeclContext::isInnermostContextGeneric()}. Compare with \texttt{DeclContext::isGenericContext()}.
+\item \texttt{hasGenericParamList()} answers if this declaration has a generic parameter list. This is equivalent to calling \texttt{isInnermostContextGeneric()} on \texttt{DeclContext}. Compare with \texttt{DeclContext::isGenericContext()}.
 \item \texttt{getGenericContextDepth()} returns the \IndexSource{depth}depth of the declaration's generic parameter list, or \texttt{(unsigned)-1} if neither this declaration nor any outer declaration is generic.
 \item \texttt{getTrailingWhereClause()} returns the declaration's trailing \texttt{where} clause, or \texttt{nullptr}.
 \end{itemize}

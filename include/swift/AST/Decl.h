@@ -1696,15 +1696,15 @@ public:
   ///
   /// \code
   /// class C<T> {
-  ///   func f1() {}    // isGeneric == false
-  ///   func f2<T>() {} // isGeneric == true
+  ///   func f1() {}    // hasGenericParamList == false
+  ///   func f2<T>() {} // hasGenericParamList == true
   /// }
   ///
-  /// protocol P { // isGeneric == true due to implicit Self param
-  ///   func p()   // isGeneric == false
+  /// protocol P { // hasGenericParamList == true due to implicit Self param
+  ///   func p()   // hasGenericParamList == false
   /// }
   /// \endcode
-  bool isGeneric() const { return getGenericParams() != nullptr; }
+  bool hasGenericParamList() const { return getGenericParams() != nullptr; }
   bool hasComputedGenericSignature() const;
   bool isComputingGenericSignature() const;
   

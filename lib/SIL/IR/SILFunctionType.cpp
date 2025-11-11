@@ -3809,7 +3809,7 @@ public:
           if (!classDecl->isForeignReferenceType()) {
             assert(!classDecl->hasClangNode() &&
                    "unexpected imported class type in C function");
-            assert(!classDecl->isGeneric());
+            assert(!classDecl->hasGenericParamList());
             return ParameterConvention::Indirect_In_Guaranteed;
           }
         }
