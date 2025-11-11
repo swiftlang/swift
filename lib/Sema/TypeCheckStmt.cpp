@@ -865,7 +865,6 @@ static bool typeCheckHasSymbolStmtConditionElement(StmtConditionElement &elt,
 static bool typeCheckBooleanStmtConditionElement(StmtConditionElement &elt,
                                                  DeclContext *dc) {
   Expr *E = elt.getBoolean();
-  assert(!E->getType() && "the bool condition is already type checked");
   bool hadError = TypeChecker::typeCheckCondition(E, dc);
   elt.setBoolean(E);
   return hadError;
