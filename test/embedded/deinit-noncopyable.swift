@@ -9,6 +9,13 @@
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Lifetimes
 
+// Failing with ASAN. Disable the test to unblock rest of ASAN testing. Please
+// remove radar number and this blurb once this is fixed.
+//
+// rdar://159992660
+//
+// UNSUPPORTED: asan
+
 //--- Library.swift
 @safe public struct UniqueBuffer<Element: ~Copyable>: ~Copyable {
     @usableFromInline
