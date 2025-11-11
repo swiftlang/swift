@@ -6920,6 +6920,7 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
                                                       PreparedArguments &&args,
                                                       Type overriddenSelfType,
                                                       SGFContext C) {
+  ASSERT(init);
   ConstructorDecl *ctor = cast<ConstructorDecl>(init.getDecl());
 
   // Form the reference to the allocating initializer.
