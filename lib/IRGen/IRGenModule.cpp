@@ -2333,9 +2333,8 @@ IRGenModule *IRGenerator::getGenModule(SILGlobalVariable *v) {
   if (found != DefaultIGMForGlobalVariable.end())
     return found->second;
 
-  if (auto decl = v->getDecl()) {
-    return getGenModule(decl->getDeclContext());
-  }
+  if (auto *dc = v->getDeclContext())
+    return getGenModule(dc);
 
   return getPrimaryIGM();
 }

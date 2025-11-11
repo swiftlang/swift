@@ -1561,8 +1561,8 @@ void IRGenerator::addLazyGlobalVariable(SILGlobalVariable *v) {
   assert(!FinishedEmittingLazyDefinitions);
   LazyGlobalVariables.push_back(v);
 
-  if (auto decl = v->getDecl()) {
-    if (decl->getDeclContext()->getParentSourceFile())
+  if (auto dc = v->getDeclContext()) {
+    if (dc->getParentSourceFile())
       return;
   }
 
