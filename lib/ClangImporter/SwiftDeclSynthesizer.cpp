@@ -3183,9 +3183,7 @@ FuncDecl *SwiftDeclSynthesizer::makeAvailabilityDomainPredicate(
       BuiltinIntegerType::get(1, ctx), ImporterImpl.ImportedHeaderUnit);
   funcDecl->setBodySynthesizer(synthesizeAvailabilityDomainPredicateBody,
                                (void *)var);
-  funcDecl->setAccess(AccessLevel::Public);
-  funcDecl->addAttribute(
-      new (ctx) ExportAttr(ExportKind::Implementation, /*IsImplicit=*/true));
+  funcDecl->setAccess(AccessLevel::Internal);
 
   ImporterImpl.availabilityDomainPredicates[var] = funcDecl;
 
