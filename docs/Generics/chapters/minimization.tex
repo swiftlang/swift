@@ -2,7 +2,7 @@
 
 \begin{document}
 
-\chapter[]{Rule Minimization}\label{rqm minimization}
+\chapter[]{Minimization}\label{rqm minimization}
 
 \ifWIP
 TODO:
@@ -41,8 +41,6 @@ TODO:
 \item propagating explicit ID
 \end{itemize}
 \fi
-
-\section[]{Loop Normalization}
 
 \ifWIP
 \cite{homotopyreduction}
@@ -125,6 +123,25 @@ T.A == T.D
 \end{verbatim}
 \end{quote}
 
+\fi
+
+\section[]{Concrete Contraction}\label{concrete contraction}
+
+\IndexFlag{disable-requirement-machine-concrete-contraction}
+\IndexTwoFlag{debug-requirement-machine}{concrete-contraction}
+
+\IndexDefinition{concrete contraction}
+
+\ifWIP
+TODO:
+\begin{itemize}
+\item Doesn't actually appear in signature so should not impact minimization
+\item The problem: it might give you a smaller anchor
+\item Invariant violation without concrete contraction
+\item Concrete contraction substitutes superclass and concrete types
+\item Also GSB compatibility: T.A, T == C, C.A is a concrete typealias that's not an associated type. this doesn't add a rule
+\item Open question: can we do this in a more principled way
+\end{itemize}
 \fi
 
 \section[]{Source Code Reference}\label{rqm minimization source ref}
