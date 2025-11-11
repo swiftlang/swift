@@ -1686,7 +1686,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   if (!isDefinition) {
     os << ";\n";
     if (result.isObjCxxOnly())
-      os << "#endif\n";
+      os << "#endif // defined(__OBJC__)\n";
     return;
   }
 
@@ -1699,7 +1699,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
                     dispatchInfo);
   os << "  }\n";
   if (result.isObjCxxOnly())
-    os << "#endif\n";
+    os << "#endif // defined(__OBJC__)\n";
 }
 
 /// Returns true if the given property name like `isEmpty` can be remapped
