@@ -145,6 +145,7 @@ UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(SendingArgsAndResults)
 UNINTERESTING_FEATURE(CheckImplementationOnly)
+UNINTERESTING_FEATURE(CheckImplementationOnlyStrict)
 
 static bool findUnderscoredLifetimeAttr(Decl *decl) {
   auto hasUnderscoredLifetimeAttr = [](Decl *decl) {

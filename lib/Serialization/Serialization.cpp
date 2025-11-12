@@ -756,6 +756,16 @@ IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC,
   if (M->isClangHeaderImportModule())
     return OBJC_HEADER_MODULE_ID;
 
+  // Reject references to hidden dependencies.
+  if (getASTContext().LangOpts.hasFeature(
+          Feature::CheckImplementationOnlyStrict) &&
+      !allowCompilerErrors() &&
+      this->M->isImportedImplementationOnly(M, /*assumeImported=*/false)) {
+    getASTContext().Diags.diagnose(SourceLoc(),
+        diag::serialization_xref_to_hidden_dependency,
+        M, crossReferencedDecl);
+  }
+
   auto exportedModuleName = file->getExportedModuleName();
   assert(!exportedModuleName.empty());
   auto moduleID = M->getASTContext().getIdentifier(exportedModuleName);
@@ -2451,6 +2461,8 @@ void Serializer::writeCrossReference(const Decl *D) {
   using namespace decls_block;
 
   unsigned abbrCode;
+
+  llvm::SaveAndRestore<const Decl *> SaveDecl(crossReferencedDecl, D);
 
   if (auto op = dyn_cast<OperatorDecl>(D)) {
     writeCrossReference(op->getDeclContext(), 1);
@@ -5389,6 +5401,19 @@ bool Serializer::shouldSkipDecl(const Decl *D) const {
 void Serializer::writeASTBlockEntity(const Decl *D) {
   using namespace decls_block;
 
+  if (Options.SkipImplementationOnlyDecls) {
+    // Skip @_implementationOnly types.
+    if (D->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+      return;
+
+    // Skip non-public @export(interface) functions.
+    auto FD = dyn_cast<AbstractFunctionDecl>(D);
+    if (FD && FD->isNeverEmittedIntoClient() &&
+        !FD->getFormalAccessScope(/*useDC*/nullptr,
+          /*treatUsableFromInlineAsPublic*/true).isPublicOrPackage())
+      return;
+  }
+
   PrettyStackTraceDecl trace("serializing", D);
   assert(DeclsToSerialize.hasRef(D));
 
@@ -7301,7 +7326,7 @@ void Serializer::writeToStream(
     BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
     S.writeHeader();
     S.writeInputBlock();
-    S.writeSIL(SILMod, options.SerializeAllSIL, options.SerializeDebugInfoSIL);
+    S.writeSIL(SILMod);
     S.writeAST(DC);
 
     if (S.hadError)

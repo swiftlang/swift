@@ -5051,7 +5051,8 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
 
   // @_implementationOnly on types only applies to non-public types.
   if (isa<NominalTypeDecl>(D)) {
-    if (!Ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly)) {
+    if (!Ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
+        !Ctx.LangOpts.hasFeature(Feature::CheckImplementationOnlyStrict)) {
       diagnoseAndRemoveAttr(attr, diag::implementation_only_on_types_feature);
       return;
     }
