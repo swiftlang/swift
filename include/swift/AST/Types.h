@@ -5949,6 +5949,10 @@ public:
       bool isReabstractionThunk = false,
       CanType origTypeOfAbstraction = CanType());
 
+  /// If \p M is nullptr, the type is not substituted.
+  uint16_t getPointerAuthDiscriminator(SILModule *M);
+
+  uint16_t getCoroutineYieldTypesDiscriminator(SILModule &M);
 
   /// Returns the type of the transpose function for the given parameter
   /// indices, transpose function generic signature (optional), and other
