@@ -4,9 +4,6 @@
 // TODO: test failed in Windows PR testing: rdar://144384453
 // UNSUPPORTED: OS=windows-msvc
 
-// TODO: test failed in macOS PR testing but passes locally: rdar://163049442
-// UNSUPPORTED: OS_FAMILY=darwin && !CPU=arm64
-
 // REQUIRES: executable_test
 // REQUIRES: std_span
 
