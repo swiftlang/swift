@@ -3693,7 +3693,7 @@ public:
     // If we have one successful candidate, then save it as the underlying
     // substitutions of the opaque decl.
     OpaqueDecl->setUniqueUnderlyingTypeSubstitutions(
-        std::get<1>(candidate).mapReplacementTypesOutOfContext());
+        std::get<1>(candidate).mapReplacementTypesOutOfEnvironment());
   }
 
   // There is no clear winner here since there are candidates within
@@ -3759,14 +3759,14 @@ public:
       conditionalSubstitutions.push_back(
           OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
               Ctx, queries,
-              std::get<1>(candidate).mapReplacementTypesOutOfContext()));
+              std::get<1>(candidate).mapReplacementTypesOutOfEnvironment()));
     }
 
     // Add universally available choice as the last one.
     conditionalSubstitutions.push_back(
         OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
             Ctx, {AvailabilityQuery::universallyConstant(true)},
-            universalSubstMap.mapReplacementTypesOutOfContext()));
+            universalSubstMap.mapReplacementTypesOutOfEnvironment()));
 
     OpaqueDecl->setConditionallyAvailableSubstitutions(
         conditionalSubstitutions);

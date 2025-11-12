@@ -2509,7 +2509,7 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
           // Map the substitutions out of the pattern context so that they
           // use interface types.
           externalSubs =
-            externalSubs.mapReplacementTypesOutOfContext().getCanonical();
+            externalSubs.mapReplacementTypesOutOfEnvironment().getCanonical();
         }
 
       } else {

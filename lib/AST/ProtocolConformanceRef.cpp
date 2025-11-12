@@ -114,7 +114,7 @@ ProtocolConformanceRef::subst(InFlightSubstitution &IFS) const {
   return IFS.lookupConformance(origType, proto, /*level=*/0);
 }
 
-ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
+ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfEnvironment() const {
   if (isConcrete()) {
     return getConcrete()->subst(
         MapTypeOutOfContext(),
