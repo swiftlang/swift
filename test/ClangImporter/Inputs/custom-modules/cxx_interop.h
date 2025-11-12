@@ -39,6 +39,16 @@ int PrivateFunction() __attribute__((swift_private));
 
 class PrivateClass {} __attribute__((swift_private));
 
+class ClassWithImportedField {
+ public:
+  int field;
+};
+
+class ClassWithUnimportedField {
+ public:
+  int field __attribute__((swift_private));
+};
+
 class Methods2 {
 public:
   int SimpleMethod(int);
