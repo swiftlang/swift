@@ -1159,13 +1159,16 @@ void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
 
 namespace {
 
-std::optional<AccessorKind>
-originalAccessorKindForReplacementKind(AccessorKind kind) {
+bool originalAccessorKindsForReplacementKind(
+    AccessorKind kind, SmallVectorImpl<AccessorKind> &kinds) {
   switch (kind) {
   case AccessorKind::Read2:
-    return {AccessorKind::Read};
+    kinds.push_back(AccessorKind::Read);
+    kinds.push_back(AccessorKind::Get);
+    return true;
   case AccessorKind::Modify2:
-    return {AccessorKind::Modify};
+    kinds.push_back(AccessorKind::Modify);
+    return true;
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Set:
@@ -1178,7 +1181,7 @@ originalAccessorKindForReplacementKind(AccessorKind kind) {
   case AccessorKind::Init:
   case AccessorKind::Borrow:
   case AccessorKind::Mutate:
-    return std::nullopt;
+    return false;
   }
 }
 
@@ -1213,13 +1216,21 @@ public:
     if (!accessor) {
       return std::nullopt;
     }
-    // Specifically, read2 can replace _read and modify2 can replace _modify.
-    auto originalKind =
-        originalAccessorKindForReplacementKind(accessor->getAccessorKind());
-    if (!originalKind) {
+    // Specifically, read2 can replace _read or get and modify2 can replace
+    // _modify.
+    SmallVector<AccessorKind, 2> originalKinds;
+    if (!originalAccessorKindsForReplacementKind(accessor->getAccessorKind(),
+                                                 originalKinds)) {
       return std::nullopt;
     }
-    auto *originalDecl = accessor->getStorage()->getAccessor(*originalKind);
+    assert(originalKinds.size() > 0);
+    AccessorDecl *originalDecl = nullptr;
+    for (auto originalKind : originalKinds) {
+      originalDecl = accessor->getStorage()->getAccessor(originalKind);
+      if (originalDecl) {
+        break;
+      }
+    }
     if (!originalDecl) {
       return std::nullopt;
     }
@@ -1326,9 +1337,7 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
   assert(indirectErrors.size() == 0 &&
          "coroutine accessor with indirect error!?");
   SmallVector<SILValue> args;
-  for (auto result : indirectResults) {
-    args.push_back(result.forward(SGF));
-  }
+  ASSERT(indirectResults.empty());
   // Indirect errors would go here, but we don't currently support
   // throwing coroutines.
   if (implicitIsolationParam.isValid()) {
@@ -1337,15 +1346,68 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
   for (auto param : params) {
     args.push_back(param.forward(SGF));
   }
-  auto *bai = SGF.B.createBeginApply(loc, originalFn, subs, args);
-  auto *token = bai->getTokenResult();
-  auto yieldedValues = bai->getYieldedValues();
+  struct Get {
+    struct Direct {
+      SILValue value;
+    };
+    struct Indirect {
+      AllocStackInst *asi;
+    };
+    using Result = TaggedUnion<Direct, Indirect>;
+    SmallVector<Result, 2> results;
+  };
+  struct Read {
+    BeginApplyInst *bai;
+  };
+  SmallVector<SILValue> yields;
+  using Apply = TaggedUnion<Get, Read>;
+  Apply apply = [&] {
+    if (originalTy->getCoroutineKind() == SILCoroutineKind::None) {
+      auto get = Get{{}};
+      SmallVector<AllocStackInst *, 2> indirectResults;
+      auto indirectResultIterator = args.begin();
+      for (auto result : originalConvention.getIndirectSILResults()) {
+        auto ty = originalConvention.getSILType(
+            result, function->getTypeExpansionContext());
+        ty = function->mapTypeIntoContext(ty);
+        auto *asi = SGF.B.createAllocStack(loc, ty);
+        args.insert(indirectResultIterator, asi);
+        indirectResultIterator = std::next(indirectResultIterator);
+        indirectResults.push_back(asi);
+      }
+      auto *ai = SGF.B.createApply(loc, originalFn, subs, args);
+      auto directResults = ai->getResults();
+      size_t directIndex = 0;
+      size_t indirectIndex = 0;
+      for (auto result : originalConvention.getResults()) {
+        if (result.isFormalIndirect()) {
+          ASSERT(indirectIndex < indirectResults.size());
+          auto indirectResult = indirectResults[indirectIndex];
+          get.results.push_back(Get::Indirect{indirectResult});
+          yields.push_back(indirectResult);
+          indirectIndex += 1;
+          continue;
+        }
+        ASSERT(directIndex < directResults.size());
+        auto directResult = directResults[directIndex];
+        get.results.push_back(Get::Direct{directResult});
+        yields.push_back(directResult);
+        directIndex += 1;
+      }
+      return Apply{get};
+    }
+
+    assert(originalTy->getCoroutineKind() == SILCoroutineKind::YieldOnce);
+    auto *bai = SGF.B.createBeginApply(loc, originalFn, subs, args);
+    auto yieldedValues = bai->getYieldedValues();
+    for (auto yielded : yieldedValues) {
+      yields.push_back(yielded);
+    }
+    return Apply{Read{bai}};
+  }();
+
   auto *normalBlock = function->createBasicBlockAfter(SGF.B.getInsertionBB());
   auto *errorBlock = function->createBasicBlockAfter(normalBlock);
-  SmallVector<SILValue> yields;
-  for (auto yielded : yieldedValues) {
-    yields.push_back(yielded);
-  }
   SGF.B.createYield(loc, yields, normalBlock, errorBlock);
 
   SGF.B.setInsertionPoint(normalBlock);
@@ -1374,12 +1436,38 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
     break;
   }
   }
-  SGF.B.createEndApply(loc, token, resultTy);
+  if (auto *get = apply.dyn_cast<Get>()) {
+    for (auto result : llvm::reverse(get->results)) {
+      if (auto *direct = result.dyn_cast<Get::Direct>()) {
+        SGF.B.emitDestroyValueOperation(loc, direct->value);
+        continue;
+      }
+      auto indirect = result.get<Get::Indirect>();
+      SGF.B.emitDestroyAddr(loc, indirect.asi);
+      SGF.B.createDeallocStack(loc, indirect.asi);
+    }
+  } else {
+    auto read = apply.get<Read>();
+    SGF.B.createEndApply(loc, read.bai->getTokenResult(), resultTy);
+  }
   auto *retval = SGF.B.createTuple(loc, {});
   SGF.B.createReturn(loc, retval);
 
   SGF.B.setInsertionPoint(errorBlock);
-  SGF.B.createAbortApply(loc, token);
+  if (auto *get = apply.dyn_cast<Get>()) {
+    for (auto result : llvm::reverse(get->results)) {
+      if (auto *direct = result.dyn_cast<Get::Direct>()) {
+        SGF.B.emitDestroyValueOperation(loc, direct->value);
+        continue;
+      }
+      auto indirect = result.get<Get::Indirect>();
+      SGF.B.emitDestroyAddr(loc, indirect.asi);
+      SGF.B.createDeallocStack(loc, indirect.asi);
+    }
+  } else {
+    auto read = apply.get<Read>();
+    SGF.B.createAbortApply(loc, read.bai->getTokenResult());
+  }
   SGF.B.createUnwind(loc);
   return function;
 }

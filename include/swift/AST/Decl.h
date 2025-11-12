@@ -5927,7 +5927,7 @@ class AbstractStorageDecl : public ValueDecl {
   friend class SetterAccessLevelRequest;
   friend class IsGetterMutatingRequest;
   friend class IsSetterMutatingRequest;
-  friend class OpaqueReadOwnershipRequest;
+  friend class DirectOpaqueReadOwnershipRequest;
   friend class StorageImplInfoRequest;
   friend class RequiresOpaqueAccessorsRequest;
   friend class RequiresOpaqueModifyCoroutineRequest;
@@ -6271,9 +6271,7 @@ public:
   bool requiresOpaqueAccessor(AccessorKind kind) const;
 
   /// Does this storage require a 'get' accessor in its opaque-accessors set?
-  bool requiresOpaqueGetter() const {
-    return getOpaqueReadOwnership() != OpaqueReadOwnership::Borrowed;
-  }
+  bool requiresOpaqueGetter() const;
 
   /// Does this storage require a '_read' accessor in its opaque-accessors set?
   bool requiresOpaqueReadCoroutine() const;
@@ -6292,10 +6290,9 @@ public:
   /// set?
   bool requiresOpaqueModify2Coroutine() const;
 
-  /// Given that CoroutineAccessors is enabled, is _read/_modify required for
-  /// ABI stability?
-  bool requiresCorrespondingUnderscoredCoroutineAccessor(
-      AccessorKind kind, AccessorDecl const *decl = nullptr) const;
+  /// Given that CoroutineAccessors is enabled, are the accessors still
+  /// required that would have been emitted when its not?
+  bool requiresAccessorsForABICompatibilityWithPreCoroutineAccessors() const;
 
   /// Does this storage have any explicit observers (willSet or didSet) attached
   /// to it?

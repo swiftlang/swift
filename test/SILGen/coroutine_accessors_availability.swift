@@ -129,9 +129,9 @@ public func getOld() -> StructOld {
 public func readOldInlinableOld(_ n: StructOld) -> Int {
 // CHECK-LABEL: sil {{.*}}@readOldInlinableOld : {{.*}} {
 // Could be inlined into code that's running before CoroutineAccessors is
-// available--must use read.
-                  // function_ref StructOld.i.read
-// CHECK:         function_ref @$s7Library9StructOldV1iSivr
+// available--must use get.
+                  // function_ref StructOld.i.getter
+// CHECK:         function_ref @$s7Library9StructOldV1iSivg
 // CHECK-LABEL: } // end sil function 'readOldInlinableOld'
   return n.i
 }
@@ -238,6 +238,60 @@ open class BaseClassOld {
   }
 }
 
+public protocol ProtocolOld {
+  var i: Int { read set }
+}
+
+// CHECK-LABEL: sil {{.*}}@modifyProtocolOldInlinableOld : {{.*}} {
+// Binaries built with a deployment target earlier than the availability of the
+// feature must use the old accessor because conforming types may not have the
+// new accessor.
+// CHECK-NOT:     witness_method {{.*}}#ProtocolOld.i!modify2
+// CHECK:         witness_method {{.*}}#ProtocolOld.i!modify
+// CHECK-LABEL: } // end sil function 'modifyProtocolOldInlinableOld'
+@inlinable
+@_silgen_name("modifyProtocolOldInlinableOld")
+public func modifyProtocolOldInlinableOld(_ p: inout ProtocolOld) {
+  p.i.increment()
+}
+
+@_silgen_name("modifyProtocolOldNoninlinableOld")
+public func modifyProtocolOldNoninlinableOld(_ p: inout ProtocolOld) {
+// CHECK-LABEL: sil {{.*}}@modifyProtocolOldNoninlinableOld : {{.*}} {
+// In the case of old binaries running against this version, this is correct
+// because a default implementation of the accessor is provided by default
+// witness table.
+// CHECK:         witness_method {{.*}}#ProtocolOld.i!modify2
+// CHECK-LABEL: } // end sil function 'modifyProtocolOldNoninlinableOld'
+  p.i.increment()
+}
+
+@inlinable
+@available(SwiftStdlib 9999, *)
+@_silgen_name("modifyProtocolOldInlinableNew")
+public func modifyProtocolOldInlinableNew(_ p: inout ProtocolOld) {
+// CHECK-LABEL: sil {{.*}}@modifyProtocolOldInlinableNew : {{.*}} {
+// CHECK:         witness_method {{.*}}#ProtocolOld.i!modify2
+// CHECK-LABEL: } // end sil function 'modifyProtocolOldInlinableNew'
+  p.i.increment()
+}
+
+@available(SwiftStdlib 9999, *)
+public protocol ProtocolNew {
+  var i: Int { read set }
+}
+
+// CHECK-LABEL: sil_default_witness_table ProtocolOld {
+//                getter:
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    method #ProtocolOld.i!read2
+//                setter:
+// CHECK-NEXT:    no_default
+//                modify:
+// CHECK-NEXT:    no_default
+// CHECK-NEXT:    method #ProtocolOld.i!modify2
+// CHECK-NEXT:  }
+
 //--- Downstream.swift
 
 import Library
@@ -290,8 +344,8 @@ func readOldOld() {
 // This module could be back-deployed to before CoroutineAccessors were
 // available, and nothing ensures the function is available only after the
 // feature is available--must use read.
-                  // function_ref StructOld.i.read
-// CHECK-OLD:     function_ref @$s7Library9StructOldV1iSivr
+                  // function_ref StructOld.i.getter
+// CHECK-OLD:     function_ref @$s7Library9StructOldV1iSivg
 // This module cannot be back-deployed (the deployment target is
 // available, and nothing ensures the function is available only after the
 // feature is available--must use read.
@@ -382,7 +436,7 @@ public class DerivedOldFromBaseClassOld : BaseClassOld {
 
 // CHECK-LABEL: sil_vtable [serialized] DerivedOldFromBaseClassOld {
 // CHECK-NEXT:    #BaseClassOld.init!allocator
-// CHECK-NEXT:    #BaseClassOld.i!read
+// CHECK-NEXT:    #BaseClassOld.i!getter
 // CHECK-NEXT:    #BaseClassOld.i!read2
 // CHECK-NEXT:    #BaseClassOld.i!setter
 // CHECK-NEXT:    #BaseClassOld.i!modify

@@ -203,6 +203,7 @@ struct I : P {
 
 open class B {
   public init() {}
+  @_borrowed
   open var i: Int {
     read {
       fatalError()
@@ -211,6 +212,7 @@ open class B {
       fatalError()
     }
   }
+  @_borrowed
   open subscript(i : Int) -> Int {
     read {
       fatalError()
