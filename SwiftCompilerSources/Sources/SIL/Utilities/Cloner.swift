@@ -64,9 +64,6 @@ extension ClonerCommonUtils {
   }
 
   public mutating func cloneRecursively(inst: Instruction) -> Instruction? {
-    for op in inst.operands {
-      cloneRecursively(value: op.value)
-    }
 
     // change insertion point
     let cloned = clone(instruction: inst)

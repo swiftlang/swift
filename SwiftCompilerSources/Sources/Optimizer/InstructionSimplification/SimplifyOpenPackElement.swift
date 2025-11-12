@@ -53,12 +53,15 @@ private extension OpenPackElementInst {
           // apply %0(%1, %2)           // type-def: t
           for op in inst.operands {
               if
+                // FIXME should probably handle multiple value instructions here
                   let svi = op.value.definingInstructionOrTerminator as? SingleValueInstruction {
                     if !worklist.hasBeenPushed(svi)  && !cloner.isCloned(value: op.value){
                         cloner.recordFoldedValue(op.value, mappedTo: op.value)
                     }
                   }
-              // FIXME should probably handle multiple value instructions here
+            else {
+              cloner.cloneRecursively(value: op.value)
+            }
           }
           // update insertion point
           _ = cloner.cloneRecursively(inst: inst)
