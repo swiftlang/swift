@@ -214,8 +214,7 @@ public:
   std::vector<std::string>
   getClangDepScanningInvocationArguments(ASTContext &ctx);
 
-  static std::pair<std::unique_ptr<clang::CompilerInvocation>,
-                   std::unique_ptr<clang::DiagnosticOptions>>
+  static std::unique_ptr<clang::CompilerInvocation>
   createClangInvocation(ClangImporter *importer,
                         const ClangImporterOptions &importerOpts,
                         llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
