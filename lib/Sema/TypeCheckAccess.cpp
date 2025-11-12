@@ -2603,7 +2603,7 @@ public:
       auto *valueMember = dyn_cast<ValueDecl>(member);
       if (!valueMember)
         return false;
-      return isExported(valueMember);
+      return isExported(valueMember) == ExportedLevel::Exported;
     });
 
     Where = wasWhere.withExported(hasExportedMembers);

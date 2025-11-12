@@ -178,7 +178,7 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
     computeExportContextBits(Ctx, D, &spi, &implicit);
   });
 
-  bool exported = ::isExported(D);
+  bool exported = ::isExported(D) != ExportedLevel::None;
 
   return ExportContext(DC, availabilityContext, fragileKind, nullptr,
                        spi, exported, implicit);

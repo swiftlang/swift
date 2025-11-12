@@ -479,7 +479,7 @@ private:
     if (decl->isSPI())
       return true;
 
-    return !isExported(decl);
+    return isExported(decl) == ExportedLevel::None;
   }
 
   /// Returns the source range which should be refined by declaration. This
