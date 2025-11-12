@@ -1,4 +1,3 @@
-// XFAIL: *
 // RUN: %target-swift-frontend %s -emit-ir -O | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
