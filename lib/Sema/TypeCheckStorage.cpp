@@ -877,33 +877,34 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("bad storage kind");
 }
 
+namespace {
+enum class DirectOpaqueReadOwnershipRequestDiagKind {
+  BorrowedAttr,
+  NoncopyableType
+};
+
+void diagnoseEffectfulGetterOnBorrowingRead(
+    AbstractStorageDecl *storage,
+    DirectOpaqueReadOwnershipRequestDiagKind kind) {
+  auto *getter = storage->getEffectfulGetAccessor();
+  if (!getter)
+    return;
+  // Check for effects on the getter.
+  switch (kind) {
+  case DirectOpaqueReadOwnershipRequestDiagKind::NoncopyableType:
+    getter->diagnose(diag::noncopyable_effectful_getter, getter);
+    break;
+  case DirectOpaqueReadOwnershipRequestDiagKind::BorrowedAttr:
+    getter->diagnose(diag::borrowed_with_effect, getter);
+    break;
+  }
+}
+
+} // end anonymous namespace
+
 OpaqueReadOwnership
-OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
-                                     AbstractStorageDecl *storage) const {
-  auto abiRole = ABIRoleInfo(storage);
-  if (!abiRole.providesAPI() && abiRole.getCounterpart())
-    return abiRole.getCounterpart()->getOpaqueReadOwnership();
-
-  enum class DiagKind {
-    BorrowedAttr,
-    NoncopyableType
-  };
-
-  auto usesBorrowed = [&](DiagKind kind) -> OpaqueReadOwnership {
-    // Check for effects on the getter.
-    if (auto *getter = storage->getEffectfulGetAccessor()) {
-      switch (kind) {
-      case DiagKind::NoncopyableType:
-        getter->diagnose(diag::noncopyable_effectful_getter, getter);
-        break;
-      case DiagKind::BorrowedAttr:
-        getter->diagnose(diag::borrowed_with_effect, getter);
-        break;
-      }
-    }
-    return OpaqueReadOwnership::Borrowed;
-  };
-
+DirectOpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
+                                           AbstractStorageDecl *storage) const {
   if (auto *accessorDecl = storage->getAccessor(AccessorKind::Read)) {
     auto lifetimeDependencies = accessorDecl->getLifetimeDependencies();
     if (lifetimeDependencies.has_value() && !lifetimeDependencies->empty()) {
@@ -922,12 +923,19 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (storage->getAccessor(AccessorKind::Borrow))
     return OpaqueReadOwnership::Borrowed;
 
-  if (storage->getAttrs().hasAttribute<BorrowedAttr>())
-    return usesBorrowed(DiagKind::BorrowedAttr);
+  using DiagKind = DirectOpaqueReadOwnershipRequestDiagKind;
 
-  if (storage->getInnermostDeclContext()->mapTypeIntoContext(
-        storage->getValueInterfaceType())->isNoncopyable())
-    return usesBorrowed(DiagKind::NoncopyableType);
+  if (storage->getAttrs().hasAttribute<BorrowedAttr>()) {
+    diagnoseEffectfulGetterOnBorrowingRead(storage, DiagKind::BorrowedAttr);
+    return OpaqueReadOwnership::Borrowed;
+  }
+
+  if (storage->getInnermostDeclContext()
+          ->mapTypeIntoContext(storage->getValueInterfaceType())
+          ->isNoncopyable()) {
+    diagnoseEffectfulGetterOnBorrowingRead(storage, DiagKind::NoncopyableType);
+    return OpaqueReadOwnership::Borrowed;
+  }
 
   return OpaqueReadOwnership::Owned;
 }

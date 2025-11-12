@@ -5927,7 +5927,7 @@ class AbstractStorageDecl : public ValueDecl {
   friend class SetterAccessLevelRequest;
   friend class IsGetterMutatingRequest;
   friend class IsSetterMutatingRequest;
-  friend class OpaqueReadOwnershipRequest;
+  friend class DirectOpaqueReadOwnershipRequest;
   friend class StorageImplInfoRequest;
   friend class RequiresOpaqueAccessorsRequest;
   friend class RequiresOpaqueModifyCoroutineRequest;
