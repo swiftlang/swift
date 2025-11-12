@@ -141,8 +141,12 @@ if #available(SwiftStdlib 6.3, *) {
       var val3 = StructIsNonCopyable()
       if let mangledTypeName = _mangledTypeName(StructIsNonCopyable.self) {
         withUnsafeBytes(of: &val3) { bytes in
+          guard let pointer = bytes.baseAddress else {
+            expectTrue(false)
+            return
+          }
           let (success, printed) =
-            _DebuggerSupport.stringForPrintObject(bytes.baseAddress!, mangledTypeName: mangledTypeName)
+            _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: mangledTypeName)
           expectFalse(success)
           expectEqual(printed, "type not found for mangled name: \(mangledTypeName)")
         }
