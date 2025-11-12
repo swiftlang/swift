@@ -5402,11 +5402,12 @@ static const llvm::StringMap<std::vector<int>> STLConditionalParams{
 };
 
 template <typename Kind>
-static std::optional<Kind> checkConditionalParams(
-    clang::RecordDecl *recordDecl, const std::vector<int> &STLParams,
-    std::set<StringRef> &conditionalParams,
-    std::function<std::optional<Kind>(clang::TemplateArgument &, StringRef)>
-        &checkArg) {
+static bool checkConditionalParams(
+    clang::RecordDecl *recordDecl, ClangImporter::Implementation *impl,
+    const std::vector<int> &STLParams, std::set<StringRef> &conditionalParams,
+    std::function<void(const clang::Type *)> &maybePushToStack) {
+  HeaderLoc loc{recordDecl->getLocation()};
+  bool foundErrors = false;
   auto specDecl = cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
   SmallVector<std::pair<unsigned, StringRef>, 4> argumentsToCheck;
   bool hasInjectedSTLAnnotation = !STLParams.empty();
@@ -5434,9 +5435,15 @@ static std::optional<Kind> checkConditionalParams(
       } else
         nonPackArgs.push_back(arg);
       for (auto nonPackArg : nonPackArgs) {
-        auto result = checkArg(nonPackArg, argToCheck.second);
-        if (result.has_value())
-          return result.value();
+        if (nonPackArg.getKind() != clang::TemplateArgument::Type) {
+          if (impl)
+            impl->diagnose(loc, diag::type_template_parameter_expected,
+                           argToCheck.second);
+          foundErrors = true;
+        } else {
+          maybePushToStack(
+              nonPackArg.getAsType()->getUnqualifiedDesugaredType());
+        }
       }
     }
     if (hasInjectedSTLAnnotation)
@@ -5449,7 +5456,7 @@ static std::optional<Kind> checkConditionalParams(
         break;
     }
   }
-  return std::nullopt;
+  return foundErrors;
 }
 
 static std::set<StringRef>
@@ -5500,7 +5507,7 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
   // Keep track of Decls we've seen to avoid cycles
   llvm::SmallDenseSet<const clang::Type *, 4> seen;
 
-  auto maybePushToStack = [&](const clang::Type *type) {
+  std::function maybePushToStack = [&](const clang::Type *type) {
     auto desugared = type->getUnqualifiedDesugaredType();
     if (seen.insert(desugared).second)
       stack.push_back(desugared);
@@ -5526,28 +5533,15 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
       auto conditionalParams = getConditionalEscapableAttrParams(recordDecl);
 
       if (!STLParams.empty() || !conditionalParams.empty()) {
-        HeaderLoc loc{recordDecl->getLocation()};
-        std::function checkArgEscapability =
-            [&](clang::TemplateArgument &arg,
-                StringRef argToCheck) -> std::optional<CxxEscapability> {
-          if (arg.getKind() != clang::TemplateArgument::Type) {
-            if (desc.impl)
-              desc.impl->diagnose(loc, diag::type_template_parameter_expected,
-                                  argToCheck);
-            hasUnknown = true;
-            return std::nullopt;
-          }
-          maybePushToStack(arg.getAsType()->getUnqualifiedDesugaredType());
-          // FIXME don't return anything
-          return std::nullopt;
-        };
+        hasUnknown &= checkConditionalParams<CxxEscapability>(
+            recordDecl, desc.impl, STLParams, conditionalParams,
+            maybePushToStack);
 
-        checkConditionalParams<CxxEscapability>(
-            recordDecl, STLParams, conditionalParams, checkArgEscapability);
-
-        if (desc.impl)
+        if (desc.impl) {
+          HeaderLoc loc{recordDecl->getLocation()};
           for (auto name : conditionalParams)
             desc.impl->diagnose(loc, diag::unknown_template_parameter, name);
+        }
 
         continue;
       }
@@ -5559,11 +5553,9 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
       if (recordDecl->getDefinition() &&
           (!cxxRecordDecl || cxxRecordDecl->isAggregate())) {
         if (cxxRecordDecl) {
-          // TODO llvm::foreach ?
           for (auto base : cxxRecordDecl->bases())
             maybePushToStack(base.getType()->getUnqualifiedDesugaredType());
         }
-
         for (auto field : recordDecl->fields())
           maybePushToStack(field->getType()->getUnqualifiedDesugaredType());
         continue;
@@ -8485,7 +8477,7 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
   // Keep track of Decls we've seen to avoid cycles
   llvm::SmallDenseSet<clang::RecordDecl *, 4> seen;
 
-  auto maybePushToStack = [&](const clang::Type *type) {
+  std::function maybePushToStack = [&](const clang::Type *type) {
     auto recordDecl = type->getAsRecordDecl();
     if (!recordDecl)
       return;
@@ -8540,11 +8532,14 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
         };
 
         checkConditionalParams<CxxValueSemanticsKind>(
-            recordDecl, STLParams, conditionalParams, checkArgValueSemantics);
+            recordDecl, importerImpl, STLParams, conditionalParams,
+            maybePushToStack);
 
-        if (importerImpl)
+        if (importerImpl) {
+          HeaderLoc loc{recordDecl->getLocation()};
           for (auto name : conditionalParams)
             importerImpl->diagnose(loc, diag::unknown_template_parameter, name);
+        }
 
         continue;
       }
