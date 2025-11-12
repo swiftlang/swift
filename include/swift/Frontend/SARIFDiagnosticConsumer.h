@@ -29,14 +29,18 @@ class StringRef;
 namespace swift {
 
 class DiagnosticConsumer;
+class CompilerInvocation;
 
 namespace sarif_diagnostics {
 /// Create a DiagnosticConsumer that exports diagnostics to SARIF format.
 ///
 /// \param outputPath the file path to write the SARIF JSON to.
+/// \param invocation the compiler invocation containing parsed configuration.
 ///
 /// \returns A new diagnostic consumer that exports diagnostics to SARIF.
-std::unique_ptr<DiagnosticConsumer> createConsumer(llvm::StringRef outputPath);
+std::unique_ptr<DiagnosticConsumer>
+createConsumer(llvm::StringRef outputPath,
+               const CompilerInvocation &invocation);
 } // namespace sarif_diagnostics
 } // namespace swift
 

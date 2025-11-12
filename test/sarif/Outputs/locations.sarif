@@ -11,6 +11,19 @@
           "sourceLanguage": "swift"
         }
       ],
+      "invocations": [
+        {
+          "properties": {
+            "Frontend": {
+              "moduleName": "locations"
+            },
+            "Language": {
+              "activeConcurrencyModel": "Standard",
+              "strictConcurrencyLevel": "Minimal"
+            }
+          }
+        }
+      ],
       "results": [
         {
           "kind": "fail",

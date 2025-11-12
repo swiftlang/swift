@@ -601,6 +601,7 @@ public func renderQueuedDiagnosticsAsSARIF(
   queuedDiagnosticsPtr: UnsafeMutableRawPointer,
   bridgedCompilerVersion: BridgedStringRef,
   bridgedOutputPath: BridgedStringRef,
+  bridgedInvocationProperties: BridgedArrayRef,
   errorMessageOutPtr: UnsafeMutablePointer<BridgedStringRef>
 ) {
 
@@ -615,7 +616,18 @@ public func renderQueuedDiagnosticsAsSARIF(
     organization: "Swift Project"
   )
 
-  let sarifLog = convertToSARIFLog(toolInfo: toolInfo, diagnosticInfoArray: diagnosticInfoArray)
+  // Parse configuration properties from bridged array
+  let invocationPropertyBag = parseInvocationProperties(bridgedProps: bridgedInvocationProperties)
+
+  let invocation = Invocation(
+    properties: invocationPropertyBag /*.isEmpty ? nil : invocationPropertyBag */
+  )
+
+  let sarifLog = convertToSARIFLog(
+    toolInfo: toolInfo,
+    diagnosticInfoArray: diagnosticInfoArray,
+    invocation: invocation
+  )
 
   do {
     try sarifLog.toJSONFile(url: URL(fileURLWithPath: String(bridged: bridgedOutputPath)))
@@ -623,4 +635,53 @@ public func renderQueuedDiagnosticsAsSARIF(
     let errorMessage = "\(error)"
     errorMessageOutPtr.pointee = allocateBridgedString(errorMessage)
   }
+}
+
+/// Represents a configuration property key-value pair from C++
+fileprivate struct BridgedInvocationProperty {
+  let category: BridgedStringRef
+  let key: BridgedStringRef
+  let value: BridgedStringRef
+  let type: UInt8  // 0=string, 1=int, 2=bool
+}
+
+/// Parse configuration properties from the bridged array into a PropertyBag
+fileprivate func parseInvocationProperties(bridgedProps: BridgedArrayRef) -> PropertyBag {
+  var properties: [String: PropertyValue] = [:]
+
+  bridgedProps.withElements(ofType: BridgedInvocationProperty.self) { props in
+    for prop in props {
+      let category = String(bridged: prop.category)
+      let key = String(bridged: prop.key)
+      let valueStr = String(bridged: prop.value)
+
+      let value: PropertyValue
+      switch prop.type {
+      case 0:  // string
+        value = .string(valueStr)
+      case 1:  // int
+        if let intVal = Int(valueStr) {
+          value = .int(intVal)
+        } else {
+          value = .string(valueStr)
+        }
+      case 2:  // bool
+        value = .bool(valueStr == "true")
+      default:
+        value = .string(valueStr)
+      }
+
+      // Get or create the category object
+      if case .object(var categoryBag) = properties[category] {
+        categoryBag[key] = value
+        properties[category] = .object(categoryBag)
+      } else {
+        var categoryBag = PropertyBag()
+        categoryBag[key] = value
+        properties[category] = .object(categoryBag)
+      }
+    }
+  }
+
+  return PropertyBag(properties)
 }

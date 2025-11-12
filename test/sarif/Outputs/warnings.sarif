@@ -5,10 +5,23 @@
       "artifacts": [
         {
           "location": {
-            "uri": "/Volumes/avirals-external-drive-1/swift-personal/swift/test/sarif/warnings.swift"
+            "uri": "FILE[0]"
           },
           "mimeType": "text/x-swift",
           "sourceLanguage": "swift"
+        }
+      ],
+      "invocations": [
+        {
+          "properties": {
+            "Frontend": {
+              "moduleName": "warnings"
+            },
+            "Language": {
+              "activeConcurrencyModel": "Standard",
+              "strictConcurrencyLevel": "Minimal"
+            }
+          }
         }
       ],
       "results": [

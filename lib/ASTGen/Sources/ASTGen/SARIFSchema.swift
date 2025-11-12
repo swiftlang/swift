@@ -52,15 +52,18 @@ public struct SARIFLog: Codable, Sendable {
 /// Describes a single run of an analysis tool and contains the output of that run.
 public struct Run: Codable, Sendable {
   public let tool: Tool
+  public let invocations: [Invocation]
   public let results: [Result]
   public let artifacts: [Artifact]
 
   public init(
     tool: Tool,
+    invocations: [Invocation],
     results: [Result],
     artifacts: [Artifact]
   ) {
     self.tool = tool
+    self.invocations = invocations
     self.results = results
     self.artifacts = artifacts
   }
@@ -307,5 +310,179 @@ public struct Replacement: Codable, Sendable {
   public init(deletedRegion: Region, insertedContent: ArtifactContent? = nil) {
     self.deletedRegion = deletedRegion
     self.insertedContent = insertedContent
+  }
+}
+
+/// Describes the invocation of the analysis tool.
+public struct Invocation: Codable, Sendable {
+  public let executableLocation: ArtifactLocation?
+  public let arguments: [String]?
+  public let commandLine: String?
+  public let properties: PropertyBag?
+
+  public init(
+    executableLocation: ArtifactLocation? = nil,
+    arguments: [String]? = nil,
+    commandLine: String? = nil,
+    properties: PropertyBag? = nil
+  ) {
+    self.executableLocation = executableLocation
+    self.arguments = arguments
+    self.commandLine = commandLine
+    self.properties = properties
+  }
+}
+
+public struct PropertyBag: Codable, Sendable {
+  private var storage: [String: PropertyValue]
+
+  public init(_ values: [String: PropertyValue] = [:]) {
+    self.storage = values
+  }
+
+  public subscript(key: String) -> PropertyValue? {
+    get { storage[key] }
+    set { storage[key] = newValue }
+  }
+
+  public var isEmpty: Bool {
+    storage.isEmpty
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: DynamicCodingKey.self)
+    for (key, value) in storage.sorted(by: { $0.key < $1.key }) {
+      let codingKey = DynamicCodingKey(stringValue: key)
+      try value.encode(to: &container, forKey: codingKey)
+    }
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: DynamicCodingKey.self)
+    var result: [String: PropertyValue] = [:]
+    for key in container.allKeys {
+      if let value = try? PropertyValue(from: decoder, container: container, key: key) {
+        result[key.stringValue] = value
+      }
+    }
+    self.storage = result
+  }
+}
+
+public enum PropertyValue: Sendable {
+  case string(String)
+  case int(Int)
+  case bool(Bool)
+  case double(Double)
+  case null
+  case object(PropertyBag)
+  case array([PropertyValue])
+
+  fileprivate func encode(to container: inout KeyedEncodingContainer<DynamicCodingKey>, forKey key: DynamicCodingKey)
+    throws
+  {
+    switch self {
+    case .string(let value):
+      try container.encode(value, forKey: key)
+    case .int(let value):
+      try container.encode(value, forKey: key)
+    case .bool(let value):
+      try container.encode(value, forKey: key)
+    case .double(let value):
+      try container.encode(value, forKey: key)
+    case .null:
+      try container.encodeNil(forKey: key)
+    case .object(let value):
+      try container.encode(value, forKey: key)
+    case .array(let value):
+      try container.encode(value, forKey: key)
+    }
+  }
+
+  fileprivate init(from decoder: Decoder, container: KeyedDecodingContainer<DynamicCodingKey>, key: DynamicCodingKey)
+    throws
+  {
+    // Try decoding in order of specificity
+    if try container.decodeNil(forKey: key) {
+      self = .null
+    } else if let value = try? container.decode(Bool.self, forKey: key) {
+      // Try bool before int/double as bool can be coerced to numbers
+      self = .bool(value)
+    } else if let value = try? container.decode(Int.self, forKey: key) {
+      self = .int(value)
+    } else if let value = try? container.decode(Double.self, forKey: key) {
+      self = .double(value)
+    } else if let value = try? container.decode(String.self, forKey: key) {
+      self = .string(value)
+    } else if let value = try? container.decode(PropertyBag.self, forKey: key) {
+      self = .object(value)
+    } else if let value = try? container.decode([PropertyValue].self, forKey: key) {
+      self = .array(value)
+    } else {
+      throw DecodingError.dataCorruptedError(
+        forKey: key,
+        in: container,
+        debugDescription: "Unsupported property value type"
+      )
+    }
+  }
+}
+
+extension PropertyValue: Codable {
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    switch self {
+    case .string(let value):
+      try container.encode(value)
+    case .int(let value):
+      try container.encode(value)
+    case .bool(let value):
+      try container.encode(value)
+    case .double(let value):
+      try container.encode(value)
+    case .null:
+      try container.encodeNil()
+    case .object(let value):
+      try container.encode(value)
+    case .array(let value):
+      try container.encode(value)
+    }
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+
+    if container.decodeNil() {
+      self = .null
+    } else if let value = try? container.decode(Bool.self) {
+      self = .bool(value)
+    } else if let value = try? container.decode(Int.self) {
+      self = .int(value)
+    } else if let value = try? container.decode(Double.self) {
+      self = .double(value)
+    } else if let value = try? container.decode(String.self) {
+      self = .string(value)
+    } else if let value = try? container.decode(PropertyBag.self) {
+      self = .object(value)
+    } else if let value = try? container.decode([PropertyValue].self) {
+      self = .array(value)
+    } else {
+      throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unsupported property value type")
+    }
+  }
+}
+
+private struct DynamicCodingKey: CodingKey {
+  var stringValue: String
+  var intValue: Int?
+
+  init(stringValue: String) {
+    self.stringValue = stringValue
+    self.intValue = nil
+  }
+
+  init?(intValue: Int) {
+    self.stringValue = "\(intValue)"
+    self.intValue = intValue
   }
 }

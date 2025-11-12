@@ -183,10 +183,10 @@ createDispatchingDiagnosticConsumerIfNeeded(
 static std::unique_ptr<DiagnosticConsumer>
 createSerializedDiagnosticConsumerIfNeeded(
     const FrontendInputsAndOutputs &inputsAndOutputs,
-    bool emitMacroExpansionFiles) {
+    bool emitMacroExpansionFiles, const CompilerInvocation &invocation) {
   return createDispatchingDiagnosticConsumerIfNeeded(
       inputsAndOutputs,
-      [emitMacroExpansionFiles](
+      [emitMacroExpansionFiles, invocation](
           const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
         auto serializedDiagnosticsPath = input.getSerializedDiagnosticsPath();
         if (serializedDiagnosticsPath.empty())
@@ -196,7 +196,8 @@ createSerializedDiagnosticConsumerIfNeeded(
         // Check if SARIF format is requested
         llvm::StringRef path(serializedDiagnosticsPath);
         if (path.ends_with(".sarif") || path.ends_with(".sarif.json")) {
-          return sarif_diagnostics::createConsumer(serializedDiagnosticsPath);
+          return sarif_diagnostics::createConsumer(serializedDiagnosticsPath,
+                                                   invocation);
         }
 #endif
 
@@ -376,7 +377,7 @@ void DiagnosticHelper::Implementation::beginMessage() {
   // See https://github.com/apple/swift/issues/45288 for details.
   SerializedConsumerDispatcher = createSerializedDiagnosticConsumerIfNeeded(
       invocation.getFrontendOptions().InputsAndOutputs,
-      invocation.getDiagnosticOptions().EmitMacroExpansionFiles);
+      invocation.getDiagnosticOptions().EmitMacroExpansionFiles, invocation);
   if (SerializedConsumerDispatcher)
     instance.addDiagnosticConsumer(SerializedConsumerDispatcher.get());
 

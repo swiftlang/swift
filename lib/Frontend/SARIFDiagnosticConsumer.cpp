@@ -19,8 +19,10 @@
 
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Bridging/ASTGen.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -28,9 +30,61 @@ using namespace swift;
 
 namespace {
 
+std::string to_string(const swift::StrictConcurrency level) {
+  switch (level) {
+  case StrictConcurrency::Minimal:
+    return "Minimal";
+  case StrictConcurrency::Targeted:
+    return "Targeted";
+  case StrictConcurrency::Complete:
+    return "Complete";
+  }
+  llvm_unreachable("invalid StrictConcurrency");
+}
+
+std::string to_string(const ConcurrencyModel model) {
+  switch (model) {
+  case ConcurrencyModel::Standard:
+    return "Standard";
+  case ConcurrencyModel::TaskToThread:
+    return "TaskToThread";
+  };
+  llvm_unreachable("invalid ConcurrencyModel");
+}
+
 /// Diagnostic consumer that exports diagnostics to SARIF format.
 class SARIFDiagnosticConsumer : public DiagnosticConsumer {
+  struct InvocationProperty {
+    std::string category;
+    std::string key;
+    std::string value;
+    uint8_t type;
+
+    InvocationProperty(const std::string &category, const std::string &key,
+                       const std::string &value)
+        : category(category), key(key), value(value), type(0) {}
+
+    InvocationProperty(const std::string &category, const std::string &key,
+                       int value)
+        : category(category), key(key), value(std::to_string(value)), type(1) {}
+
+    InvocationProperty(const std::string &category, const std::string &key,
+                       bool value)
+        : category(category), key(key), value(value ? "true" : "false"),
+          type(2) {}
+  };
+
+  struct BridgedInvocationProperty {
+    BridgedStringRef category;
+    BridgedStringRef key;
+    BridgedStringRef value;
+    uint8_t type;
+  };
+
   std::string OutputPath;
+  std::string ExecutablePath;
+  std::vector<std::string> Arguments;
+  std::vector<InvocationProperty> InvocationProperties;
   void *queuedDiagnostics = nullptr;
   void *perFrontendState = nullptr;
   llvm::DenseMap<unsigned, void *> queuedBuffers;
@@ -38,7 +92,12 @@ class SARIFDiagnosticConsumer : public DiagnosticConsumer {
   bool CalledFinishProcessing = false;
 
 public:
-  SARIFDiagnosticConsumer(StringRef outputPath) : OutputPath(outputPath.str()) {
+  SARIFDiagnosticConsumer(StringRef outputPath,
+                          const CompilerInvocation &invocation)
+      : OutputPath(outputPath.str()) {
+
+    readInvocationProperties(invocation);
+
     queuedDiagnostics = swift_ASTGen_createQueuedDiagnostics();
     perFrontendState = swift_ASTGen_createPerFrontendDiagnosticState();
   }
@@ -66,11 +125,18 @@ public:
     if (!queuedDiagnostics)
       return false;
 
+    SmallVector<BridgedInvocationProperty, 32> bridgedInvocationProperties{
+        bridgeInvocationProperties(InvocationProperties)};
+
     BridgedStringRef bridgedErrorMessage{nullptr, 0};
+
     swift_ASTGen_renderQueuedDiagnosticsAsSARIF(
         queuedDiagnostics,
         llvm::StringRef(swift::version::getCompilerVersion()),
-        llvm::StringRef(OutputPath), &bridgedErrorMessage);
+        llvm::StringRef(OutputPath),
+        BridgedArrayRef(bridgedInvocationProperties.data(),
+                        bridgedInvocationProperties.size()),
+        &bridgedErrorMessage);
 
     // Clean up queued diagnostics
     swift_ASTGen_destroyQueuedDiagnostics(queuedDiagnostics);
@@ -195,6 +261,30 @@ private:
 
     queuedBuffers[bufferID] = sourceFile;
   }
+
+  void readInvocationProperties(const CompilerInvocation &invocation) {
+    const auto &langOpts = invocation.getLangOptions();
+    const auto &frontendOpts = invocation.getFrontendOptions();
+
+    InvocationProperties = {
+        {"Language", "strictConcurrencyLevel",
+         to_string(langOpts.StrictConcurrencyLevel)},
+        {"Language", "activeConcurrencyModel",
+         to_string(langOpts.ActiveConcurrencyModel)},
+        {"Frontend", "moduleName", frontendOpts.ModuleName}};
+  }
+
+  SmallVector<BridgedInvocationProperty, 32> bridgeInvocationProperties(
+      const std::vector<InvocationProperty> &InvocationProperties) {
+    SmallVector<BridgedInvocationProperty, 32> result;
+    for (const auto &prop : InvocationProperties) {
+      result.push_back(
+          {BridgedStringRef(prop.category.data(), prop.category.size()),
+           BridgedStringRef(prop.key.data(), prop.key.size()),
+           BridgedStringRef(prop.value.data(), prop.value.size()), prop.type});
+    }
+    return result;
+  }
 };
 
 } // anonymous namespace
@@ -202,8 +292,9 @@ private:
 namespace swift {
 namespace sarif_diagnostics {
 
-std::unique_ptr<DiagnosticConsumer> createConsumer(StringRef outputPath) {
-  return std::make_unique<SARIFDiagnosticConsumer>(outputPath);
+std::unique_ptr<DiagnosticConsumer>
+createConsumer(StringRef outputPath, const CompilerInvocation &invocation) {
+  return std::make_unique<SARIFDiagnosticConsumer>(outputPath, invocation);
 }
 
 } // namespace sarif_diagnostics

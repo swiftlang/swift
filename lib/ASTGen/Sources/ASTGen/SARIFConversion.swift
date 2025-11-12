@@ -301,7 +301,11 @@ public struct DiagnosticInfo {
 /// Converts diagnostics from multiple files to a single SARIF log.
 /// - Parameter diagnosticsByFile: An array of tuples containing file URLs, diagnostics, and syntax trees.
 /// - Returns: A SARIF log containing all converted diagnostics.
-public func convertToSARIFLog(toolInfo: ToolInfo, diagnosticInfoArray: [DiagnosticInfo]) -> SARIFLog {
+public func convertToSARIFLog(
+  toolInfo: ToolInfo,
+  diagnosticInfoArray: [DiagnosticInfo],
+  invocation: Invocation
+) -> SARIFLog {
 
   let tool = convertToSARIFTool(toolInfo: toolInfo)
   let (artifactArray, artifactMap) = buildSARIFArtifactCache(diagnosticInfoArray: diagnosticInfoArray)
@@ -312,6 +316,7 @@ public func convertToSARIFLog(toolInfo: ToolInfo, diagnosticInfoArray: [Diagnost
 
   let run = Run(
     tool: tool,
+    invocations: [invocation],
     results: results,
     artifacts: artifactArray
   )
