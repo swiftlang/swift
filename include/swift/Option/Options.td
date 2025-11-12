@@ -2358,6 +2358,11 @@ def cache_replay_prefix_map: MultiArg<["-"], "cache-replay-prefix-map", 2>,
   Flags<[FrontendOption, NoDriverOption, CacheInvariant]>,
   HelpText<"Remap paths when replaying outputs from cache">, MetaVarName<"<prefix> <replacement>">;
 
+def register_module_dependency : Separate<["-"], "register-module-dependency">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Register module for dependency scan without importing in the frontend">;
+
+
 // END ONLY SUPPORTED IN NEW DRIVER
 
 
