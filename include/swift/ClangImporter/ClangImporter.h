@@ -20,6 +20,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "clang/AST/Attr.h"
+#include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
@@ -213,7 +214,8 @@ public:
   std::vector<std::string>
   getClangDepScanningInvocationArguments(ASTContext &ctx);
 
-  static std::unique_ptr<clang::CompilerInvocation>
+  static std::pair<std::unique_ptr<clang::CompilerInvocation>,
+                   std::unique_ptr<clang::DiagnosticOptions>>
   createClangInvocation(ClangImporter *importer,
                         const ClangImporterOptions &importerOpts,
                         llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
@@ -223,8 +225,9 @@ public:
   ///
   /// \return a pair of the Clang Driver and the diagnostic engine, which needs
   /// to be alive during the use of the Driver.
-  static std::pair<clang::driver::Driver,
-                   llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine>>
+  static std::tuple<clang::driver::Driver,
+                    llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine>,
+                    std::unique_ptr<clang::DiagnosticOptions>>
   createClangDriver(
       const LangOptions &LangOpts,
       const ClangImporterOptions &ClangImporterOpts,
