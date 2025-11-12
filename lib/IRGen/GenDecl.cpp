@@ -25,11 +25,13 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/Linking.h"
@@ -2931,6 +2933,9 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 llvm::Constant *IRGenModule::getGlobalInitValue(SILGlobalVariable *var,
                                                 llvm::Type *storageType,
                                                 Alignment alignment) {
+  PrettyStackTraceStringAction trace(
+      "constant-folding init value for SIL global", var->getName());
+
   if (var->isInitializedObject()) {
     StructLayout *layout = StaticObjectLayouts[var].layout.get();
     ObjectInst *oi = cast<ObjectInst>(var->getStaticInitializerValue());

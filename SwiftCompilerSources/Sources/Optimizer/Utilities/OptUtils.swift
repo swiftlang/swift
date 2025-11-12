@@ -507,8 +507,9 @@ extension Instruction {
     // Metatypes (and upcasts of them to existentials) can be used as static initializers for SE-0492, as long as they
     // are not generic or resilient
     case let mti as MetatypeInst:
-      if !mti.type.hasTypeParameter,
+      if !mti.type.isGenericAtAnyLevel,
         let nominal = mti.type.canonicalType.instanceTypeOfMetatype.nominal,
+        !nominal.isGenericAtAnyLevel,
         !nominal.isResilient(in: mti.parentFunction) {
         return true
       }
@@ -517,7 +518,7 @@ extension Instruction {
       let isAnyConformanceResilient = iemi.conformances.contains { 
         !$0.protocol.isInvertible && $0.isResilientConformance(currentModule: context.currentModuleContext)
       }
-      return !iemi.type.hasTypeParameter && !isAnyConformanceResilient
+      return !iemi.type.isGenericAtAnyLevel && !isAnyConformanceResilient
 
     case is StructInst,
          is TupleInst,

@@ -24,6 +24,7 @@
 #include "GenIntegerLiteral.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
+#include "MetadataRequest.h"
 #include "TypeInfo.h"
 #include "StructLayout.h"
 #include "Callee.h"
@@ -420,6 +421,7 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
   } else if (auto *mti = dyn_cast<MetatypeInst>(operand)) {
     auto metaTy = mti->getType().castTo<MetatypeType>();
     auto type = metaTy.getInstanceType();
+    ASSERT(isCanonicalCompleteTypeMetadataStaticallyAddressable(IGM, type));
     return IGM.getAddrOfTypeMetadata(type);
   } else if (auto *iemi = dyn_cast<InitExistentialMetatypeInst>(operand)) {
     auto *mti =
@@ -428,10 +430,11 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
 
     auto metaTy = mti->getType().castTo<MetatypeType>();
     auto type = metaTy.getInstanceType();
-    llvm::Constant *metatype = IGM.getAddrOfTypeMetadata(type);
+    ASSERT(isCanonicalCompleteTypeMetadataStaticallyAddressable(IGM, type));
+    llvm::Constant *metadata = IGM.getAddrOfTypeMetadata(type);
 
     Explosion result;
-    emitExistentialMetatypeContainer(IGM, result, iemi->getType(), metatype,
+    emitExistentialMetatypeContainer(IGM, result, iemi->getType(), metadata,
                                      iemi->getOperand()->getType(),
                                      iemi->getConformances());
     return result;
