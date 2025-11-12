@@ -1897,6 +1897,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::NoExplicitNonIsolated);
   }
 
+  if (Opts.hasFeature(Feature::CheckImplementationOnlyStrict) &&
+      !::getenv("SWIFT_DISABLE_IMPLICIT_CHECK_IMPLEMENTATION_ONLY"))
+    Opts.enableFeature(Feature::CheckImplementationOnly);
+
 #if !defined(NDEBUG) && SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled
   /// explicitly. The new Swift parser can have mismatches with C++ parser -

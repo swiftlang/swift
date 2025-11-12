@@ -557,6 +557,10 @@ EXPERIMENTAL_FEATURE(AnyAppleOSAvailability, true)
 /// Check @_implementationOnly imports in non-library-evolution mode.
 EXPERIMENTAL_FEATURE(CheckImplementationOnly, true)
 
+/// Extends CheckImplementationOnly with an extra check at serialization to
+/// report references to implementation-only imported modules.
+EXPERIMENTAL_FEATURE(CheckImplementationOnlyStrict, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

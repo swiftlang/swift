@@ -284,6 +284,9 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.SkipNonExportableDecls =
       getLangOptions().SkipNonExportableDecls;
 
+  serializationOpts.SkipImplementationOnlyDecls =
+      getLangOptions().hasFeature(Feature::CheckImplementationOnly);
+
   serializationOpts.ExplicitModuleBuild = FrontendOpts.DisableImplicitModules;
 
   serializationOpts.EnableSerializationRemarks =

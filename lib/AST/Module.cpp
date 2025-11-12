@@ -3078,7 +3078,8 @@ void ModuleDecl::setPackageName(Identifier name) {
   Package = PackageUnit::create(name, *this, getASTContext());
 }
 
-bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
+bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module,
+    bool assumeImported) const {
   if (module == this) return false;
 
   auto &imports = getASTContext().getImportCache();
@@ -3099,7 +3100,17 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
       return false;
   }
 
-  return true;
+  if (assumeImported)
+    return true;
+
+  results.clear();
+  getImportedModules(results,
+      {ModuleDecl::ImportFilterKind::ImplementationOnly});
+  for (auto &desc : results)
+    if (imports.isImportedBy(module, desc.importedModule))
+      return true;
+
+  return false;
 }
 
 void SourceFile::lookupImportedSPIGroups(
