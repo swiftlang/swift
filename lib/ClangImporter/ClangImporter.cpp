@@ -8345,17 +8345,16 @@ bool importer::isViewType(const clang::CXXRecordDecl *decl) {
   return !hasOwnedValueAttr(decl) && hasPointerInSubobjects(decl);
 }
 
-static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
-  if (decl->hasSimpleCopyConstructor())
-    return true;
-
-  return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-    return ctor->isCopyConstructor() && !ctor->isDeleted() &&
-           !ctor->isIneligibleOrNotSelected() &&
-           // FIXME: Support default arguments (rdar://142414553)
-           ctor->getNumParams() == 1 &&
-           ctor->getAccess() == clang::AccessSpecifier::AS_public;
-  });
+const clang::CXXConstructorDecl *
+importer::findCopyConstructor(const clang::CXXRecordDecl *decl) {
+  for (auto ctor : decl->ctors()) {
+    if (ctor->isCopyConstructor() &&
+        // FIXME: Support default arguments (rdar://142414553)
+        ctor->getNumParams() == 1 && ctor->getAccess() == clang::AS_public &&
+        !ctor->isDeleted() && !ctor->isIneligibleOrNotSelected())
+      return ctor;
+  }
+  return nullptr;
 }
 
 static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
@@ -8523,8 +8522,8 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
   while (!stack.empty()) {
     const clang::RecordDecl *recordDecl = stack.back();
     stack.pop_back();
-
-    if (!hasNonCopyableAttr(recordDecl)) {
+    bool isExplicitlyNonCopyable = hasNonCopyableAttr(recordDecl);
+    if (!isExplicitlyNonCopyable) {
       auto injectedStlAnnotation =
           recordDecl->isInStdNamespace()
               ? STLConditionalParams.find(recordDecl->getName())
@@ -8551,13 +8550,28 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
 
     const auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
     if (!cxxRecordDecl || !recordDecl->isCompleteDefinition()) {
-      if (hasNonCopyableAttr(recordDecl))
+      if (isExplicitlyNonCopyable)
         return CxxValueSemanticsKind::MoveOnly;
       continue;
     }
 
-    bool isCopyable = !hasNonCopyableAttr(cxxRecordDecl) &&
-                      hasCopyTypeOperations(cxxRecordDecl);
+    bool isCopyable = !isExplicitlyNonCopyable;
+    if (!isExplicitlyNonCopyable) {
+      auto copyCtor = findCopyConstructor(cxxRecordDecl);
+      isCopyable = copyCtor || cxxRecordDecl->needsImplicitCopyConstructor();
+      if ((copyCtor && copyCtor->isDefaulted()) ||
+          cxxRecordDecl->needsImplicitCopyConstructor()) {
+        // If the copy constructor is implicit/defaulted, we ask Clang to
+        // generate its definition. The implicitly-defined copy constructor
+        // performs full member-wise copy. Thus, if any member of this type is
+        // ~Copyable, the type should also be ~Copyable.
+        for (auto field : cxxRecordDecl->fields())
+          maybePushToStack(field->getType()->getUnqualifiedDesugaredType());
+        for (auto base : cxxRecordDecl->bases())
+          maybePushToStack(base.getType()->getUnqualifiedDesugaredType());
+      }
+    }
+
     bool isMovable = hasMoveTypeOperations(cxxRecordDecl);
 
     if (!hasDestroyTypeOperations(cxxRecordDecl) ||
@@ -8571,7 +8585,7 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
       continue;
     }
 
-    if (hasNonCopyableAttr(cxxRecordDecl) && isMovable)
+    if (isExplicitlyNonCopyable && isMovable)
       return CxxValueSemanticsKind::MoveOnly;
 
     if (isCopyable)
