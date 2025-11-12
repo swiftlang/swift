@@ -115,9 +115,12 @@ if #available(SwiftStdlib 6.1, *) {
 
 @available(SwiftStdlib 6.3, *)
 func _expectStringForPrintObject<T>(_ pointer: UnsafePointer<T>, output: String) {
-  let mangledTypeName = _mangledTypeName(T.self)
+  guard let mangledTypeName = _mangledTypeName(T.self) else {
+    expectTrue(false)
+    return
+  }
   let (success, printed) =
-    _DebuggerSupport.stringForPrintObject(UnsafeRawPointer(pointer), mangledTypeName: mangledTypeName!)
+    _DebuggerSupport.stringForPrintObject(UnsafeRawPointer(pointer), mangledTypeName: mangledTypeName)
   expectTrue(success)
   expectEqual(printed, output)
 }
@@ -136,22 +139,28 @@ if #available(SwiftStdlib 6.3, *) {
 
     do {
       var val3 = StructIsNonCopyable()
-      withUnsafeBytes(of: &val3) { bytes in
-        let mangledTypeName = _mangledTypeName(StructIsNonCopyable.self)
-        let (success, printed) =
-          _DebuggerSupport.stringForPrintObject(bytes.baseAddress!, mangledTypeName: mangledTypeName!)
-        expectFalse(success)
-        expectEqual(printed, "type not found for mangled name: \(mangledTypeName!)")
+      if let mangledTypeName = _mangledTypeName(StructIsNonCopyable.self) {
+        withUnsafeBytes(of: &val3) { bytes in
+          let (success, printed) =
+            _DebuggerSupport.stringForPrintObject(bytes.baseAddress!, mangledTypeName: mangledTypeName)
+          expectFalse(success)
+          expectEqual(printed, "type not found for mangled name: \(mangledTypeName)")
+        }
+      } else {
+        expectTrue(false)
       }
     }
 
     do {
       let obj = ClassWithMembers()
       let pointer = unsafeBitCast(obj, to: UnsafeRawPointer.self)
-      let mangledTypeName = _mangledTypeName(ClassWithMembers.self)
-      let (success, printed) = _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: mangledTypeName!)
-      expectTrue(success)
-      expectEqual(printed.hasPrefix("<main.ClassWithMembers: 0x"), true)
+      if let mangledTypeName = _mangledTypeName(ClassWithMembers.self) {
+        let (success, printed) = _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: mangledTypeName)
+        expectTrue(success)
+        expectEqual(printed.hasPrefix("<main.ClassWithMembers: 0x"), true)
+      } else {
+        expectTrue(false)
+      }
     }
   }
 }
