@@ -94,4 +94,4 @@ To update the Branch/Tag requirements, please follow these steps:
 
   1. Create pull requests to update the branch/tag in the following repositories:
      - in `swiftlang/swift` modify [`update-checkout-config.json`](https://github.com/swiftlang/swift/blob/main/utils/update_checkout/update-checkout-config.json)
-  1. Notify @shahmishal after creating the pull requests, and @shahmishl to merge the PR once CI is updated.
+  1. Notify @shahmishal after creating the pull requests, and @shahmishal to merge the PR once CI is updated.
