@@ -656,7 +656,7 @@ bool BridgedASTType::isSILPackElementAddress() const {
   return unbridged()->castTo<swift::SILPackType>()->isElementAddress();
 }
 
-BRIDGED_INLINE BridgedASTTypeArray BridgedASTType::getPackElementTypes() const {
+BridgedASTTypeArray BridgedASTType::getPackElementTypes() const {
     return {unbridged()->castTo<swift::PackType>()->getElementTypes()};
 }
 
@@ -871,6 +871,10 @@ swift::GenericSignature BridgedGenericSignature::unbridged() const {
 
 BridgedASTTypeArray BridgedGenericSignature::getGenericParams() const {
   return {unbridged().getGenericParams()};
+}
+
+BridgedASTTypeArray BridgedGenericSignature::getInnermostGenericParams() const {
+  return {unbridged().getInnermostGenericParams()};
 }
 
 BridgedASTType BridgedGenericSignature::mapTypeIntoContext(BridgedASTType type) const {

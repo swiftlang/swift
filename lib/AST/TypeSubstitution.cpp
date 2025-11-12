@@ -41,6 +41,7 @@ Type QueryReplacementTypeArray::operator()(SubstitutableType *type) const {
   auto genericParams = sig.getGenericParams();
   auto replacementIndex =
     GenericParamKey(genericParam).findIndexIn(genericParams);
+  // FIXME: should we add an assertion here? it crashes in array anyway
   return types[replacementIndex];
 }
 

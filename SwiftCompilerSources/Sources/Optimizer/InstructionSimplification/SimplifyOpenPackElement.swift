@@ -23,29 +23,45 @@ private extension OpenPackElementInst {
   func replacePackElementTypes(_ context: SimplifyContext){
 
     if let dpi = operands.first?.value as? DynamicPackIndexInst,
-       let ili = dpi.operands.first?.value as? IntegerLiteralInst,
-       let index = ili.value
+        let _ = dpi.operands.first?.value as? IntegerLiteralInst // when this is commented, // replacementTypes is not correctly filled
     {
       var worklist = ValueWorklist(context)
 
       worklist.pushIfNotVisited(self)
-      let concreteType = dpi.indexedPackType.packElementTypes[index].canonical
+      let packElementTypes = dpi.indexedPackType.packElements
+
+      var replacementTypes = [AST.Type]()
+      for type in packElementTypes {
+          replacementTypes.append(type.canonical.rawType)
+      }
 
       let substitutionMap = SubstitutionMap(
         genericSignature: genericSignature,
-        replacementTypes:
-        [concreteType.rawType])
+        replacementTypes: replacementTypes)
 
       var cloner = TypeSubstitutionCloner(cloneBefore: self,
       substitutions: substitutionMap, context)
+      defer { cloner.deinitialize() }
 
+      // FIXME think about prefix of non-expansion element types
+      // FIXME think about terminator instructions and successor BBs (TermInst)
       while let v = worklist.pop() {
         for use in v.uses {
           let inst = use.instruction
           // %0
           // %t = open_pack_element
           // apply %0(%1, %2)           // type-def: t
-          let _ = cloner.clone(instruction: inst) // FIXME: what if it fails
+          for op in inst.operands {
+              if
+                  let svi = op.value.definingInstructionOrTerminator as? SingleValueInstruction {
+                    if !worklist.hasBeenPushed(svi)  && !cloner.isCloned(value: op.value){
+                        cloner.recordFoldedValue(op.value, mappedTo: op.value)
+                    }
+                  }
+              // FIXME should probably handle multiple value instructions here
+          }
+          // update insertion point
+          _ = cloner.cloneRecursively(inst: inst)
           for result in inst.results {
             if
               result.type.isOrContainsPackType(parentFunction) {

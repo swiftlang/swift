@@ -46,7 +46,7 @@ extension ClonerCommonUtils {
       guard let beginAccess = value as? BeginAccessInst else {
         return .defaultValue
       }
-      
+
       // Skip access instructions, which might be generated for UnsafePointer globals which point to other globals.
       let clonedOperand = cloner.cloneRecursively(globalInitValue: beginAccess.address)
       cloner.recordFoldedValue(beginAccess, mappedTo: clonedOperand)
@@ -54,13 +54,23 @@ extension ClonerCommonUtils {
     }) else {
       fatalError("Clone recursively to global shouldn't bail.")
     }
-    
+
     return cloned
   }
 
   /// Transitively clones `value` including its defining instruction's operands.
   public mutating func cloneRecursively( value: Value) -> Value {
     return cloneRecursively(value: value, customGetCloned: { _, _ in .defaultValue })!
+  }
+
+  public mutating func cloneRecursively(inst: Instruction) -> Instruction? {
+    for op in inst.operands {
+      cloneRecursively(value: op.value)
+    }
+
+    // change insertion point
+    let cloned = clone(instruction: inst)
+    return cloned
   }
 
   /// Transitively clones `value` including its defining instruction's operands.

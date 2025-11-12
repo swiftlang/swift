@@ -274,7 +274,7 @@ extension TypeProperties {
     return rawType.bridged.isSILPackElementAddress()
   }
 
-  public var packElementTypes: TypeArray {
+  public var packElements: TypeArray {
     return TypeArray(bridged: rawType.bridged.getPackElementTypes())
   }
 }

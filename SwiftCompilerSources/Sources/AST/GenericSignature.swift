@@ -30,6 +30,10 @@ public struct GenericSignature: CustomStringConvertible, NoReflectionChildren {
     TypeArray(bridged: bridged.getGenericParams())
   }
 
+  public var innermostGenericParameters: TypeArray {
+    TypeArray(bridged: bridged.getInnermostGenericParams())
+  }
+
   public func mapTypeIntoContext(_ type: Type) -> Type {
     Type(bridged: bridged.mapTypeIntoContext(type.bridged))
   }
