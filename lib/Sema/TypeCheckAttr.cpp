@@ -5957,9 +5957,9 @@ IndexSubset *TypeChecker::inferDifferentiabilityParameters(
       return false;
     auto paramType = allParamTypes[i];
     if (derivativeGenEnv)
-      paramType = derivativeGenEnv->mapTypeIntoContext(paramType);
+      paramType = derivativeGenEnv->mapTypeIntoEnvironment(paramType);
     else
-      paramType = AFD->mapTypeIntoContext(paramType);
+      paramType = AFD->mapTypeIntoEnvironment(paramType);
     // Return false for existential types.
     if (paramType->isExistentialType())
       return false;
@@ -6021,9 +6021,9 @@ static IndexSubset *computeDifferentiabilityParameters(
     else {
       auto selfType = function->getImplicitSelfDecl()->getInterfaceType();
       if (derivativeGenEnv)
-        selfType = derivativeGenEnv->mapTypeIntoContext(selfType);
+        selfType = derivativeGenEnv->mapTypeIntoEnvironment(selfType);
       else
-        selfType = function->mapTypeIntoContext(selfType);
+        selfType = function->mapTypeIntoEnvironment(selfType);
       if (!conformsToDifferentiable(selfType)) {
         diags
             .diagnose(attrLoc, diag::diff_function_no_parameters, function)
@@ -6765,7 +6765,7 @@ resolveDiffParamIndices(AbstractFunctionDecl *original,
   auto originalFnRemappedTy = original->getInterfaceType()->castTo<AnyFunctionType>();
   if (derivativeGenEnv)
     originalFnRemappedTy =
-        derivativeGenEnv->mapTypeIntoContext(originalFnRemappedTy)
+        derivativeGenEnv->mapTypeIntoEnvironment(originalFnRemappedTy)
             ->castTo<AnyFunctionType>();
 
   // Resolve and validate the differentiability parameters.
@@ -6861,7 +6861,7 @@ typecheckDifferentiableAttrforDecl(AbstractFunctionDecl *original,
   auto originalFnRemappedTy = original->getInterfaceType()->castTo<AnyFunctionType>();
   if (auto *derivativeGenEnv = derivativeGenSig.getGenericEnvironment())
     originalFnRemappedTy =
-        derivativeGenEnv->mapTypeIntoContext(originalFnRemappedTy)
+        derivativeGenEnv->mapTypeIntoEnvironment(originalFnRemappedTy)
             ->castTo<AnyFunctionType>();
   
   auto *resultIndices =
@@ -7370,9 +7370,9 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   Type expectedLinearMapType = expectedLinearMapTypeOrError.get();
   if (expectedLinearMapType->hasTypeParameter())
     expectedLinearMapType =
-        derivative->mapTypeIntoContext(expectedLinearMapType);
+        derivative->mapTypeIntoEnvironment(expectedLinearMapType);
   if (expectedLinearMapType->hasArchetype())
-    expectedLinearMapType = expectedLinearMapType->mapTypeOutOfContext();
+    expectedLinearMapType = expectedLinearMapType->mapTypeOutOfEnvironment();
 
   // Compute the actual differential/pullback type for comparison with the
   // expected type. We must canonicalize the derivative interface type before
@@ -7573,11 +7573,11 @@ static bool checkLinearityParameters(
   for (unsigned i : range(linearParams.size())) {
     auto linearParamType = linearParams[i].getPlainType();
     if (!linearParamType->hasTypeParameter())
-      linearParamType = linearParamType->mapTypeOutOfContext();
+      linearParamType = linearParamType->mapTypeOutOfEnvironment();
     if (derivativeGenEnv)
-      linearParamType = derivativeGenEnv->mapTypeIntoContext(linearParamType);
+      linearParamType = derivativeGenEnv->mapTypeIntoEnvironment(linearParamType);
     else
-      linearParamType = originalAFD->mapTypeIntoContext(linearParamType);
+      linearParamType = originalAFD->mapTypeIntoEnvironment(linearParamType);
     SourceLoc loc =
         parsedLinearParams.empty() ? attrLoc : parsedLinearParams[i].getLoc();
     // Parameter must conform to `Differentiable` and satisfy
@@ -7692,7 +7692,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     expectedOriginalResultType =
         expectedOriginalResultType->castTo<AnyFunctionType>()->getResult();
   if (expectedOriginalResultType->hasTypeParameter())
-    expectedOriginalResultType = transpose->mapTypeIntoContext(
+    expectedOriginalResultType = transpose->mapTypeIntoEnvironment(
         expectedOriginalResultType);
   if (!conformsToDifferentiable(expectedOriginalResultType,
                                 /*tangentVectorEqualsSelf*/ true)) {

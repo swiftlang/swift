@@ -1171,7 +1171,7 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   assert(rawTy && "Cannot compute value kind without raw type!");
   
   if (ED->getGenericEnvironmentOfContext() != nullptr)
-    rawTy = ED->mapTypeIntoContext(rawTy);
+    rawTy = ED->mapTypeIntoEnvironment(rawTy);
 
   // Swift enums require that the raw type is convertible from one of the
   // primitive literal protocols.
@@ -1218,7 +1218,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   }
 
   if (ED->getGenericEnvironmentOfContext() != nullptr)
-    rawTy = ED->mapTypeIntoContext(rawTy);
+    rawTy = ED->mapTypeIntoEnvironment(rawTy);
   if (rawTy->hasError())
     return std::make_tuple<>();
 
@@ -2480,7 +2480,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     Type interfaceType = namingPattern->getType();
     if (interfaceType->hasArchetype())
-      interfaceType = interfaceType->mapTypeOutOfContext();
+      interfaceType = interfaceType->mapTypeOutOfEnvironment();
 
     // In SIL mode, VarDecls are written as having reference storage types.
     if (!interfaceType->is<ReferenceStorageType>()) {
@@ -2516,7 +2516,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       thrownTy = AFD->getThrownInterfaceType();
       ProtocolDecl *errorProto = Context.getErrorDecl();
       if (thrownTy && !thrownTy->hasError() && errorProto) {
-        Type thrownTyInContext = AFD->mapTypeIntoContext(thrownTy);
+        Type thrownTyInContext = AFD->mapTypeIntoEnvironment(thrownTy);
         if (!checkConformance(thrownTyInContext, errorProto)) {
           SourceLoc loc;
           if (auto thrownTypeRepr = AFD->getThrownTypeRepr())

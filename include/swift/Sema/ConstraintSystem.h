@@ -951,7 +951,7 @@ public:
     if (!interfaceFnTy) {
       // If the interface type isn't a function, then just return the resolved
       // parameter type.
-      return getParamType(lookThroughAutoclosure)->mapTypeOutOfContext();
+      return getParamType(lookThroughAutoclosure)->mapTypeOutOfEnvironment();
     }
     return getParamTypeImpl(interfaceFnTy, lookThroughAutoclosure);
   }

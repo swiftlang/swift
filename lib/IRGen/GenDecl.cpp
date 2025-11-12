@@ -3600,7 +3600,7 @@ llvm::CallBase *swift::irgen::emitCXXConstructorCall(
 bool swift::irgen::hasValidSignatureForEmbedded(SILFunction *f) {
   auto s = f->getLoweredFunctionType()->getInvocationGenericSignature();
   for (auto genParam : s.getGenericParams()) {
-    auto mappedParam = f->getGenericEnvironment()->mapTypeIntoContext(genParam);
+    auto mappedParam = f->getGenericEnvironment()->mapTypeIntoEnvironment(genParam);
     if (auto archeTy = dyn_cast<ArchetypeType>(mappedParam)) {
       if (archeTy->requiresClass())
         continue;

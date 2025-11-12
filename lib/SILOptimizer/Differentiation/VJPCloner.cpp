@@ -277,7 +277,7 @@ public:
         ParameterConvention::Direct_Guaranteed);
     }
 
-    auto pullbackType = vjp->mapTypeIntoContext(getPullbackType());
+    auto pullbackType = vjp->mapTypeIntoEnvironment(getPullbackType());
     auto pullbackFnType = pullbackType.castTo<SILFunctionType>();
     auto pullbackSubstType =
         pullbackPartialApply->getType().castTo<SILFunctionType>();

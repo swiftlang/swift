@@ -317,7 +317,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
         }
         assert(typeDC->isTypeContext());
       }
-      foundInType = dc->mapTypeIntoContext(
+      foundInType = dc->mapTypeIntoEnvironment(
         typeDC->getDeclaredInterfaceType());
       assert(foundInType && "bogus base declaration?");
     }

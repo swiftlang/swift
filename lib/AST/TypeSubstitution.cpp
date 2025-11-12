@@ -87,7 +87,7 @@ operator()(InFlightSubstitution &IFS, Type dependentType,
            ProtocolDecl *conformedProtocol) const {
   if (dependentType->is<PrimaryArchetypeType>() ||
       dependentType->is<PackArchetypeType>())
-    dependentType = dependentType->mapTypeOutOfContext();
+    dependentType = dependentType->mapTypeOutOfEnvironment();
 
   auto result = Subs.lookupConformance(
       dependentType->getCanonicalType(),
@@ -760,7 +760,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     if (baseTy && baseTy->is<ErrorType>())
       substTy = ErrorType::get(baseTy->getASTContext());
     else if (genericEnv)
-      substTy = genericEnv->mapTypeIntoContext(gp);
+      substTy = genericEnv->mapTypeIntoEnvironment(gp);
 
     if (gp->isParameterPack() && !substTy->hasError())
       substTy = PackType::getSingletonPackExpansion(substTy);
@@ -819,7 +819,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
                 param);
           }
           if (genericEnv) {
-            substGenericParam = genericEnv->mapTypeIntoContext(
+            substGenericParam = genericEnv->mapTypeIntoEnvironment(
                 substGenericParam);
           }
 

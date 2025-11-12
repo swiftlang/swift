@@ -121,7 +121,7 @@ static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
   auto canType = t.getASTType();
   if (canType->hasTypeParameter()) {
     assert(GenericEnv && "Expected a GenericEnv");
-    canType = GenericEnv->mapTypeIntoContext(canType)->getCanonicalType();
+    canType = GenericEnv->mapTypeIntoEnvironment(canType)->getCanonicalType();
   }
 
   if (canType.getAnyGeneric() || t.is<BuiltinFixedArrayType>()) {
@@ -1424,7 +1424,7 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
   auto canType = resultStorageType.getASTType();
   if (canType->hasTypeParameter()) {
     assert(genEnv && "Expected a GenericEnv");
-    canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
+    canType = genEnv->mapTypeIntoEnvironment(canType)->getCanonicalType();
   }
   resultStorageType = SILType::getPrimitiveObjectType(canType);
   auto newResultStorageType =
@@ -3545,7 +3545,7 @@ private:
     auto canType = ty.getASTType();
     if (canType->hasTypeParameter()) {
       assert(genEnv && "Expected a GenericEnv");
-      canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
+      canType = genEnv->mapTypeIntoEnvironment(canType)->getCanonicalType();
     }
 
     if (canType.getAnyGeneric() || isa<TupleType>(canType) || ty.is<BuiltinFixedArrayType>()) {
@@ -3718,7 +3718,7 @@ bool LargeLoadableHeuristic::isPotentiallyCArray(SILType ty) {
   auto canType = ty.getASTType();
   if (canType->hasTypeParameter()) {
     assert(genEnv && "Expected a GenericEnv");
-    canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
+    canType = genEnv->mapTypeIntoEnvironment(canType)->getCanonicalType();
   }
 
   if (canType.getAnyGeneric() || isa<TupleType>(canType)) {
@@ -3742,7 +3742,7 @@ bool LargeLoadableHeuristic::isLargeLoadableTypeOld(SILType ty) {
   auto canType = ty.getASTType();
   if (canType->hasTypeParameter()) {
     assert(genEnv && "Expected a GenericEnv");
-    canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
+    canType = genEnv->mapTypeIntoEnvironment(canType)->getCanonicalType();
   }
 
   if (canType.getAnyGeneric() || isa<TupleType>(canType)) {

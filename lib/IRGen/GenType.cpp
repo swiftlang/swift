@@ -1993,7 +1993,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Map the archetype out of its own generic environment and into the
   // canonical generic environment.
   auto interfaceType = t->getInterfaceType();
-  auto exemplar = canGenericEnv->mapTypeIntoContext(interfaceType)
+  auto exemplar = canGenericEnv->mapTypeIntoEnvironment(interfaceType)
                     ->castTo<ArchetypeType>();
   assert(isExemplarArchetype(exemplar));
   return exemplar;
@@ -2051,7 +2051,7 @@ const TypeInfo *TypeConverter::getTypeEntry(CanType canonicalTy) {
   auto contextTy = canonicalTy;
   if (contextTy->hasTypeParameter()) {
     // The type we got should be lowered, so lower it like a SILType.
-    contextTy = getGenericEnvironment()->mapTypeIntoContext(
+    contextTy = getGenericEnvironment()->mapTypeIntoEnvironment(
                   IGM.getSILModule(),
                   SILType::getPrimitiveAddressType(contextTy)).getASTType();
   }

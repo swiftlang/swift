@@ -3985,7 +3985,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   Type resultTy;
 
   if (auto type = pd->getTypeOfDefaultExpr()) {
-    resultTy = type->mapTypeOutOfContext();
+    resultTy = type->mapTypeOutOfEnvironment();
   } else {
     resultTy = pd->getInterfaceType();
   }
@@ -4016,7 +4016,7 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
                                                      VarDecl *VD) {
   auto *DC = VD->getDeclContext();
   CanType resultTy =
-    VD->getParentPattern()->getType()->mapTypeOutOfContext()
+    VD->getParentPattern()->getType()->mapTypeOutOfEnvironment()
           ->getCanonicalType();
 
   // If this is the backing storage for a property with an attached

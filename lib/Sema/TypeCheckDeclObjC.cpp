@@ -820,7 +820,7 @@ bool swift::isRepresentableInLanguage(
   }
 
   if (auto FD = dyn_cast<FuncDecl>(AFD)) {
-    Type ResultType = FD->mapTypeIntoContext(FD->getResultInterfaceType());
+    Type ResultType = FD->mapTypeIntoEnvironment(FD->getResultInterfaceType());
     if (!FD->hasAsync() &&
         !ResultType->hasError() &&
         !ResultType->isVoid() &&
@@ -919,7 +919,7 @@ bool swift::isRepresentableInLanguage(
 
     // Translate the result type of the function into parameters for the
     // completion handler parameter, exploding one level of tuple if needed.
-    Type resultType = FD->mapTypeIntoContext(FD->getResultInterfaceType());
+    Type resultType = FD->mapTypeIntoEnvironment(FD->getResultInterfaceType());
     if (auto tupleType = resultType->getAs<TupleType>()) {
       for (const auto &tupleElt : tupleType->getElements()) {
         if (addCompletionHandlerParam(tupleElt.getType()))
@@ -1169,7 +1169,7 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
     return isRepresentableInObjC(abiRole.getCounterpart(), Reason);
 
-  Type T = VD->getDeclContext()->mapTypeIntoContext(VD->getInterfaceType());
+  Type T = VD->getDeclContext()->mapTypeIntoEnvironment(VD->getInterfaceType());
   if (auto *RST = T->getAs<ReferenceStorageType>()) {
     // In-memory layout of @weak and @unowned does not correspond to anything
     // in Objective-C, but this does not really matter here, since Objective-C

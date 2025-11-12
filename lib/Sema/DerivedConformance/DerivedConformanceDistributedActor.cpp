@@ -405,7 +405,7 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
       {
           ParamDecl::createImplicit(
               C, C.Id_handler, C.Id_handler,
-              system->mapTypeIntoContext(resultHandlerType), system),
+              system->mapTypeIntoEnvironment(resultHandlerType), system),
           ParamDecl::createImplicit(
               C, C.Id_resultBuffer, C.Id_resultBuffer,
               unsafeRawPointerType, system),

@@ -412,7 +412,7 @@ OverrideSubsInfo::OverrideSubsInfo(const NominalTypeDecl *baseNominal,
     // substitution map to store the concrete conformance C: P
     // and not the abstract conformance T: P.
     if (genericEnv) {
-      derivedNominalTy = genericEnv->mapTypeIntoContext(
+      derivedNominalTy = genericEnv->mapTypeIntoEnvironment(
           derivedNominalTy);
     }
 

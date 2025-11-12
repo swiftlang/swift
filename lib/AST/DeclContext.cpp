@@ -104,7 +104,7 @@ VarDecl *DeclContext::getNonLocalVarDecl() const {
 
 Type DeclContext::getDeclaredTypeInContext() const {
   if (auto declaredType = getDeclaredInterfaceType())
-    return mapTypeIntoContext(declaredType);
+    return mapTypeIntoEnvironment(declaredType);
   return Type();
 }
 
@@ -175,8 +175,8 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
   return nullptr;
 }
 
-Type DeclContext::mapTypeIntoContext(Type type) const {
-  return GenericEnvironment::mapTypeIntoContext(
+Type DeclContext::mapTypeIntoEnvironment(Type type) const {
+  return GenericEnvironment::mapTypeIntoEnvironment(
       getGenericEnvironmentOfContext(), type);
 }
 

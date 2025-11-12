@@ -3956,7 +3956,7 @@ private:
 
       // If we have a contextual type, map out to an interface type.
       if (type->hasArchetype())
-        type = type->mapTypeOutOfContext();
+        type = type->mapTypeOutOfEnvironment();
 
       return type;
     };

@@ -869,8 +869,8 @@ BridgedASTTypeArray BridgedGenericSignature::getGenericParams() const {
   return {unbridged().getGenericParams()};
 }
 
-BridgedASTType BridgedGenericSignature::mapTypeIntoContext(BridgedASTType type) const {
-  return {unbridged().getGenericEnvironment()->mapTypeIntoContext(type.unbridged()).getPointer()};
+BridgedASTType BridgedGenericSignature::mapTypeIntoEnvironment(BridgedASTType type) const {
+  return {unbridged().getGenericEnvironment()->mapTypeIntoEnvironment(type.unbridged()).getPointer()};
 }
 
 //===----------------------------------------------------------------------===//

@@ -67,7 +67,7 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
         isTypeResolution
             // Type resolution produces interface types, so we have to map
             // the parent type into context before binding type variables.
-            ? DC->mapTypeIntoContext(parentTy)
+            ? DC->mapTypeIntoEnvironment(parentTy)
             : parentTy;
 
     const auto subs =
@@ -115,7 +115,7 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
           [](auto, auto) { /*will be called, but we already handled reqs*/ })
           .applyUnboundGenericArguments(decl, parentTy, SourceLoc(), arguments);
   if (!parentTy && !isTypeResolution) {
-    result = DC->mapTypeIntoContext(result);
+    result = DC->mapTypeIntoEnvironment(result);
   }
 
   return result;
@@ -787,8 +787,8 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
   if (!wantInterfaceType && requestedType->hasArchetype()) {
     auto valueDC = value->getDeclContext();
     if (valueDC != UseDC) {
-      Type mapped = requestedType->mapTypeOutOfContext();
-      requestedType = UseDC->mapTypeIntoContext(mapped);
+      Type mapped = requestedType->mapTypeOutOfEnvironment();
+      requestedType = UseDC->mapTypeIntoEnvironment(mapped);
     }
   }
 
@@ -1168,7 +1168,7 @@ ConstraintSystem::getTypeOfReferencePre(OverloadChoice choice,
                                      /*packElementOpener*/ nullptr)
             .resolveTypeInContext(typeDecl, /*foundDC*/ nullptr,
                                   /*isSpecialized=*/false);
-    type = useDC->mapTypeIntoContext(type);
+    type = useDC->mapTypeIntoEnvironment(type);
 
     checkNestedTypeConstraints(*this, type, locator, preparedOverload);
 
@@ -1401,7 +1401,7 @@ static void bindArchetypesFromContext(
 
     auto genericSig = parentDC->getGenericSignatureOfContext();
     for (auto *paramTy : genericSig.getGenericParams()) {
-      Type contextTy = cs.DC->mapTypeIntoContext(paramTy);
+      Type contextTy = cs.DC->mapTypeIntoEnvironment(paramTy);
       if (paramTy->isParameterPack())
         contextTy = PackType::getSingletonPackExpansion(contextTy);
       bindPrimaryArchetype(paramTy, contextTy);
@@ -1688,7 +1688,7 @@ Type constraints::getDynamicSelfReplacementType(
   const auto *selfDecl = SuperExpr->getSelf();
   return selfDecl->getDeclContext()
       ->getInnermostTypeContext()
-      ->mapTypeIntoContext(selfDecl->getInterfaceType())
+      ->mapTypeIntoEnvironment(selfDecl->getInterfaceType())
       ->getMetatypeInstanceType();
 }
 
