@@ -32,9 +32,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prefix", default="", help="The prefix passed to -verify")
     args = parser.parse_args()
-    (ret_code, output) = check_expectations(sys.stdin.readlines(), args.prefix)
-    print(output)
-    sys.exit(ret_code)
+    (err, updated_files) = check_expectations(sys.stdin.readlines(), args.prefix)
+    if err:
+        print(err)
+        sys.exit(1)
+
+    if len(updated_files) > 1:
+        print("\n\t".join(["updated files:"] + updated_files))
+    print(f"updated file: {updated_files[0]}")
 
 
 if __name__ == "__main__":
