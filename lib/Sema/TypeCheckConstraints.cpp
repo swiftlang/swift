@@ -928,13 +928,7 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
-  // If this expression is already typechecked and has type Bool, then just
-  // re-typecheck it.
-  if (expr->getType() && expr->getType()->isBool()) {
-    auto resultTy =
-        TypeChecker::typeCheckExpression(expr, dc);
-    return !resultTy;
-  }
+  ASSERT(!expr->getType() && "the bool condition is already type checked");
 
   auto *boolDecl = dc->getASTContext().getBoolDecl();
   if (!boolDecl)
@@ -1129,6 +1123,16 @@ bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
   auto kind = TypeChecker::typeCheckCheckedCast(
       t1, t2, CheckedCastContextKind::None, dc);
   return (kind != CheckedCastKind::Unresolved);
+}
+
+Expr *
+TypeChecker::addImplicitBorrowExpr(ASTContext &Ctx, Expr *E,
+                                 std::function<Type(Expr *)> getType,
+                                 std::function<void(Expr *, Type)> setType) {
+  auto objectType = getType(E)->getRValueType();
+  auto *BE = BorrowExpr::createImplicit(Ctx, E->getLoc(), E, objectType);
+  setType(BE, objectType);
+  return BE;
 }
 
 Expr *
