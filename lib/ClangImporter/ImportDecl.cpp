@@ -9678,6 +9678,10 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
                                               bool &HadForwardDeclaration) {
   assert(ClangDecl);
 
+  // Don't import this decl if it has `__attribute__((swift_private))`
+  if (ClangDecl->hasAttr<clang::SwiftPrivateAttr>())
+    return nullptr;
+
   // If this decl isn't valid, don't import it. Bail now.
   if (ClangDecl->isInvalidDecl())
     return nullptr;
