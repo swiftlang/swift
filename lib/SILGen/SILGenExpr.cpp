@@ -4630,7 +4630,7 @@ static void lowerKeyPathMemberIndexPatterns(
     CanType formalTy;
     SILType loweredTy;
     std::tie(formalTy, loweredTy) = indexTypes[i];
-    auto hashable = indexHashables[i].mapConformanceOutOfContext();
+    auto hashable = indexHashables[i].mapConformanceOutOfEnvironment();
     assert(hashable.isAbstract() ||
            hashable.getConcrete()->getType()->isEqual(formalTy));
 
@@ -4814,7 +4814,7 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
         if (externalSubs.getRecursiveProperties().hasArchetype()) {
           needsGenericContext = true;
           // FIXME: This doesn't do anything for local archetypes!
-          externalSubs = externalSubs.mapReplacementTypesOutOfContext();
+          externalSubs = externalSubs.mapReplacementTypesOutOfEnvironment();
         }
       }
 

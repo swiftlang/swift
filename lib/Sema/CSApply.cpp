@@ -9334,7 +9334,7 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
         resultTarget.getAsExpr()->forEachChildExpr([&](Expr *expr) -> Expr * {
           if (auto coercionExpr = dyn_cast<UnderlyingToOpaqueExpr>(expr)) {
             auto newSubstitutions =
-                coercionExpr->substitutions.mapReplacementTypesOutOfContext();
+                coercionExpr->substitutions.mapReplacementTypesOutOfEnvironment();
             if (substitutions.empty()) {
               substitutions = newSubstitutions;
             } else {

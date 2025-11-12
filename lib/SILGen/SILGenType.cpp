@@ -787,7 +787,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   if (conformance.isConcrete()) {
     conformance = reqtSubMap.lookupConformance(M.getASTContext().TheSelfType,
                                                origConformance.getProtocol())
-        .mapConformanceOutOfContext();
+        .mapConformanceOutOfEnvironment();
     ASSERT(!conformance.isAbstract());
 
     manglingConformance = conformance.getConcrete();
@@ -821,7 +821,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   if (auto accessor = dyn_cast<AccessorDecl>(requirement.getDecl())) {
     if (accessor->isCoroutine()) {
       witnessSubsForTypeLowering =
-        witness.getSubstitutions().mapReplacementTypesOutOfContext();
+        witness.getSubstitutions().mapReplacementTypesOutOfEnvironment();
       if (accessor->isRequirementWithSynthesizedDefaultImplementation())
         allowDuplicateThunk = true;
     }

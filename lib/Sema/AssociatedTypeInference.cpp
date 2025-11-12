@@ -4588,7 +4588,7 @@ AssociatedConformanceRequest::evaluate(Evaluator &eval,
     substTy = conformance->getDeclContext()->mapTypeIntoEnvironment(substTy);
 
   return lookupConformance(substTy, reqProto, /*allowMissing=*/true)
-      .mapConformanceOutOfContext();
+      .mapConformanceOutOfEnvironment();
 }
 
 TinyPtrVector<AssociatedTypeDecl *>

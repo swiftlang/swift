@@ -7638,7 +7638,7 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
           proto, /*allowMissing=*/false);
       if (inheritedConformance) {
         inheritedConformance = inheritedConformance
-            .mapConformanceOutOfContext();
+            .mapConformanceOutOfEnvironment();
         if (inheritedConformance.isConcrete()) {
           return ctx.getInheritedConformance(
               nominal->getDeclaredInterfaceType(),

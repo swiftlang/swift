@@ -290,7 +290,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   return conformance;
 }
 
-SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfContext() const {
+SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfEnvironment() const {
   return subst(MapTypeOutOfContext(),
                LookUpConformanceInModule(),
                SubstFlags::PreservePackExpansionLevel |
@@ -419,7 +419,7 @@ OverrideSubsInfo::OverrideSubsInfo(const NominalTypeDecl *baseNominal,
     BaseSubMap = derivedNominalTy->getContextSubstitutionMap(
         baseNominal, genericEnv);
 
-    BaseSubMap = BaseSubMap.mapReplacementTypesOutOfContext();
+    BaseSubMap = BaseSubMap.mapReplacementTypesOutOfEnvironment();
   }
 
   if (auto derivedNominalSig = derivedNominal->getGenericSignature())

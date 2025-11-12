@@ -1957,7 +1957,7 @@ void Serializer::writeLocalNormalProtocolConformance(
       // in terms of interface types; hence the hasPrimaryArchetype() check is
       // necessary for correctness, not just as a fast path.
       if (subs.getRecursiveProperties().hasPrimaryArchetype())
-        subs = subs.mapReplacementTypesOutOfContext();
+        subs = subs.mapReplacementTypesOutOfEnvironment();
 
       data.push_back(addSubstitutionMapRef(subs));
       data.push_back(witness.getEnterIsolation().has_value() ? 1 : 0);
