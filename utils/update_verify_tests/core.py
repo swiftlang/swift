@@ -51,7 +51,7 @@ class Line:
         res = self.content.replace("{{DIAG}}", self.diag.render())
         if not res.strip():
             return ""
-        return res
+        return res.rstrip() + "\n"
 
 
 class Diag:
@@ -185,7 +185,7 @@ class ExpansionDiagClose:
 
 
 expected_diag_re = re.compile(
-    r"//(\s*)expected-([a-zA-Z-]*)(note|warning|error)(-re)?(@[+-]?\d+)?(:\d+)?(\s*)(\d+)?\{\{(.*)\}\}"
+    r"//(\s*)expected-([a-zA-Z-]*)(note|warning|error|remark)(-re)?(@[+-]?\d+)?(:\d+)?(\s*)(\d+)?\{\{(.*)\}\}"
 )
 expected_expansion_diag_re = re.compile(
     r"//(\s*)expected-([a-zA-Z-]*)(expansion)(-re)?(@[+-]?\d+)(:\d+)(\s*)(\d+)?\{\{(.*)"
@@ -398,7 +398,7 @@ def remove_dead_diags(lines):
             remove_line(line, lines)
         else:
             assert line.diag.is_from_source_file
-            for other_diag in line.targeting_diags:
+            for other_diag in line.diag.target.targeting_diags:
                 if (
                     other_diag.is_from_source_file
                     or other_diag.count == 0
@@ -409,6 +409,7 @@ def remove_dead_diags(lines):
                     continue
                 line.diag.take(other_diag)
                 remove_line(other_diag.line, lines)
+                break
 
 
 def fold_expansions(lines):
