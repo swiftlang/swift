@@ -263,7 +263,7 @@ public func swift_allocEmptyBox() -> Builtin.RawPointer {
 
 
 @_silgen_name("swift_allocBox")
-public func swift_allocBox(metadata: Builtin.RawPointer) -> (Builtin.RawPointer, Builtin.RawPointer) {
+public func swift_allocBox(_ metadata: Builtin.RawPointer) -> (Builtin.RawPointer, Builtin.RawPointer) {
   let alignMask = Int(unsafe _swift_embedded_metadata_get_align_mask(UnsafeMutableRawPointer(metadata)))
   let size = Int(unsafe _swift_embedded_metadata_get_size(UnsafeMutableRawPointer(metadata)))
   let headerSize = unsafe MemoryLayout<Int>.size + MemoryLayout<UnsafeRawPointer>.size
@@ -283,12 +283,29 @@ public func swift_allocBox(metadata: Builtin.RawPointer) -> (Builtin.RawPointer,
   return (object._rawValue, boxedValueAddr._rawValue)
 }
 
-@_cdecl("swift_deallocBox")
-public func swift_deallocBox(object: Builtin.RawPointer) {
+@c
+public func swift_deallocBox(_ object: Builtin.RawPointer) {
   unsafe free(UnsafeMutableRawPointer(object))
 }
 
+@_silgen_name("swift_makeBoxUnique")
+public func swifft_makeBoxUnique(buffer: Builtin.RawPointer, metadata: Builtin.RawPointer, alignMask: Int) -> (Builtin.RawPointer, Builtin.RawPointer){
+  let addrOfHeapObjectPtr = unsafe UnsafeMutablePointer<Builtin.RawPointer>(buffer)
+  let box = unsafe addrOfHeapObjectPtr.pointee
+  let headerSize = unsafe MemoryLayout<Int>.size + MemoryLayout<UnsafeRawPointer>.size
+  let startOfBoxedValue = ((headerSize + alignMask) & ~alignMask)
+  let oldObjectAddr = unsafe UnsafeMutableRawPointer(box) + startOfBoxedValue
 
+  if !swift_isUniquelyReferenced_native(object: box) {
+    let refAndObjectAddr = swift_allocBox(metadata)
+    unsafe _swift_embedded_initialize_box(UnsafeMutableRawPointer(metadata), UnsafeMutableRawPointer(refAndObjectAddr.1), oldObjectAddr)
+    swift_releaseBox(box)
+    unsafe addrOfHeapObjectPtr.pointee = refAndObjectAddr.0
+    return refAndObjectAddr
+  } else {
+    return (box, oldObjectAddr._rawValue)
+  }
+}
 
 /// Refcounting
 
@@ -416,7 +433,7 @@ public func swift_release_n(object: Builtin.RawPointer, n: UInt32) {
   unsafe swift_release_n_(object: o, n: n)
 }
 
-func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32) {
+func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32, isBoxRelease: Bool = false) {
   guard let object = unsafe object else {
     return
   }
@@ -441,10 +458,23 @@ func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32) {
     let doNotFree = unsafe (loadedRefcount & HeapObject.doNotFreeBit) != 0
     unsafe storeRelaxed(refcount, newValue: HeapObject.immortalRefCount | (doNotFree ? HeapObject.doNotFreeBit : 0))
 
-    unsafe _swift_embedded_invoke_heap_object_destroy(object)
+    if isBoxRelease {
+        unsafe _swift_embedded_invoke_box_destroy(object)
+    } else {
+        unsafe _swift_embedded_invoke_heap_object_destroy(object)
+    }
   } else if resultingRefcount < 0 {
     fatalError("negative refcount")
   }
+}
+
+@c
+public func swift_releaseBox(_ object: Builtin.RawPointer) {
+  if !isValidPointerForNativeRetain(object: object) {
+    fatalError("not a valid pointer for releaseBox")
+  }
+  let o = unsafe UnsafeMutablePointer<HeapObject>(object)
+  unsafe swift_release_n_(object: o, n: 1, isBoxRelease: true)
 }
 
 @c

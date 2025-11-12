@@ -1274,6 +1274,12 @@ void IRGenFunction::emitNativeStrongRelease(llvm::Value *value,
   emitUnaryRefCountCall(*this, function, value);
 }
 
+void IRGenFunction::emitReleaseBox(llvm::Value *value) {
+  if (doesNotRequireRefCounting(value))
+    return;
+  emitUnaryRefCountCall(*this, IGM.getReleaseBoxFn(), value);
+}
+
 void IRGenFunction::emitNativeSetDeallocating(llvm::Value *value) {
   if (doesNotRequireRefCounting(value)) return;
   emitUnaryRefCountCall(*this, IGM.getNativeSetDeallocatingFn(), value);
