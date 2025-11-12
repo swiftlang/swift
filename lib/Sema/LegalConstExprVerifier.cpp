@@ -329,7 +329,9 @@ checkSupportedWithSectionAttribute(const Expr *expr,
           auto instanceType = baseType->getMetatypeInstanceType();
           if (auto nominal = instanceType->getNominalOrBoundGenericNominal()) {
             // Allow non-generic, non-resilient types
-            if (!nominal->hasGenericParamList() && !nominal->isResilient()) {
+            if (!nominal->hasGenericParamList() &&
+                !nominal->getDeclContext()->isGenericContext() &&
+                !nominal->isResilient()) {
               continue;
             }
           }
@@ -383,7 +385,9 @@ checkSupportedWithSectionAttribute(const Expr *expr,
             if (auto nominal =
                     instanceType->getNominalOrBoundGenericNominal()) {
               // Allow non-generic, non-resilient types
-              if (!nominal->isGeneric() && !nominal->isResilient()) {
+              if (!nominal->hasGenericParamList() &&
+                  !nominal->getDeclContext()->isGenericContext() &&
+                  !nominal->isResilient()) {
                 continue;
               }
             }
