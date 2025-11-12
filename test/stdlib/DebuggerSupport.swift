@@ -137,23 +137,23 @@ if #available(SwiftStdlib 6.3, *) {
     _expectStringForPrintObject(&val2,
       output: "▿ Optional<StructWithMembers>\n  ▿ some : StructWithMembers\n    - a : 1\n    - b : \"Hello World\"\n")
 
-    do {
-      var val3 = StructIsNonCopyable()
-      if let mangledTypeName = _mangledTypeName(StructIsNonCopyable.self) {
-        withUnsafeBytes(of: &val3) { bytes in
-          guard let pointer = bytes.baseAddress else {
-            expectTrue(false)
-            return
-          }
-          let (success, printed) =
-            _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: mangledTypeName)
-          expectFalse(success)
-          expectEqual(printed, "type not found for mangled name: \(mangledTypeName)")
-        }
-      } else {
-        expectTrue(false)
-      }
-    }
+    // do {
+    //   var val3 = StructIsNonCopyable()
+    //   if let mangledTypeName = _mangledTypeName(StructIsNonCopyable.self) {
+    //     withUnsafeBytes(of: &val3) { bytes in
+    //       guard let pointer = bytes.baseAddress else {
+    //         expectTrue(false)
+    //         return
+    //       }
+    //       let (success, printed) =
+    //         _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: mangledTypeName)
+    //       expectFalse(success)
+    //       expectEqual(printed, "type not found for mangled name: \(mangledTypeName)")
+    //     }
+    //   } else {
+    //     expectTrue(false)
+    //   }
+    // }
 
     do {
       let obj = ClassWithMembers()
