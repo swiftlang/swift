@@ -2727,6 +2727,18 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
 
   if (!namingPattern) {
     if (auto parentStmt = VD->getRecursiveParentPatternStmt()) {
+      // We have a parent stmt. This should only ever be the case for completion
+      // or lazy type-checking, regular type-checking should go through the
+      // StmtChecker and assign types before querying this, otherwise we could
+      // end up double-type-checking.
+      //
+      // FIXME: We ought to be able to enable the following assert once we've
+      // fixed cases where we currently allow forward references to variables to
+      // kick interface type requests
+      // (https://github.com/swiftlang/swift/pull/85141).
+      // ASSERT(Context.SourceMgr.hasIDEInspectionTargetBuffer() ||
+      //        Context.TypeCheckerOpts.EnableLazyTypecheck);
+
       // Try type checking parent control statement.
       if (auto condStmt = dyn_cast<LabeledConditionalStmt>(parentStmt)) {
         // The VarDecl is defined inside a condition of a `if` or `while` stmt.
@@ -2752,18 +2764,20 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
         assert(foundVarDecl && "VarDecl not declared in its parent?");
         (void) foundVarDecl;
       } else {
-        // We have some other parent stmt. Type check it completely.
+        // We have some other statement, e.g a switch or some kind of loop. We
+        // need to type-check it to get the type of the bound variable. We
+        // generally want to skip type-checking any BraceStmts, the only
+        // exception being do-catch bodies since we need to compute the thrown
+        // error type for catch clauses.
+        // FIXME: Rather than going through `typeCheckASTNode` and trying to
+        // exclude type-checker work, we ought to do more granular requests.
+        auto braceCheck = BraceStmtChecking::OnlyDoCatchBody;
+
         if (auto CS = dyn_cast<CaseStmt>(parentStmt))
           parentStmt = CS->getParentStmt();
 
-        bool LeaveBodyUnchecked = true;
-        // type-checking 'catch' patterns depends on the type checked body.
-        if (isa<DoCatchStmt>(parentStmt))
-          LeaveBodyUnchecked = false;
-
         ASTNode node(parentStmt);
-        TypeChecker::typeCheckASTNode(node, VD->getDeclContext(),
-                                      LeaveBodyUnchecked);
+        TypeChecker::typeCheckASTNode(node, VD->getDeclContext(), braceCheck);
       }
       namingPattern = VD->getCanonicalVarDecl()->NamingPattern;
     }
