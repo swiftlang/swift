@@ -469,10 +469,6 @@ public:
   /// checking.
   bool isViable(PotentialBinding &binding, bool isTransitive);
 
-  explicit operator bool() const {
-    return hasViableBindings() || isDirectHole();
-  }
-
   /// Determine whether this set has any "viable" (or non-hole) bindings.
   ///
   /// A viable binding could be - a direct or transitive binding

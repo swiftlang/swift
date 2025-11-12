@@ -1171,7 +1171,7 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
     if (shouldAttemptFixes() && typeVar->getImpl().canBindToHole())
       return true;
 
-    return bool(bindings);
+    return bindings.hasViableBindings() || bindings.isDirectHole();
   };
 
   // Now let's see if we could infer something for related type
@@ -1198,7 +1198,10 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
     if (!bindings.finalize(true))
       continue;
 
-    if (!bindings || !isViable)
+    if (!bindings.hasViableBindings() && !bindings.isDirectHole())
+      continue;
+
+    if (!isViable)
       continue;
 
     onCandidate(bindings);

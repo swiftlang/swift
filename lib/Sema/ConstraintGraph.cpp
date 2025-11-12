@@ -921,7 +921,8 @@ bool ConstraintGraph::contractEdges() {
     // us enough information to decided on l-valueness.
     if (tyvar1->getImpl().canBindToInOut()) {
       bool isNotContractable = true;
-      if (auto bindings = CS.getBindingsFor(tyvar1)) {
+      auto bindings = CS.getBindingsFor(tyvar1);
+      if (bindings.hasViableBindings() || bindings.isDirectHole()) {
         // Holes can't be contracted.
         if (bindings.isHole())
           continue;

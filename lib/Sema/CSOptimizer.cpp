@@ -1105,7 +1105,9 @@ static void determineBestChoicesInContext(
       // Simply adding it as a binding won't work because if the second argument
       // is non-optional the overload that returns `T?` would still have a lower
       // score.
-      if (!bindingSet && isNilCoalescingOperator(disjunction)) {
+      if (!bindingSet.hasViableBindings() &&
+          !bindingSet.isDirectHole() &&
+          isNilCoalescingOperator(disjunction)) {
         auto &cg = cs.getConstraintGraph();
         if (llvm::any_of(cg[typeVar].getConstraints(),
                          [&typeVar](Constraint *constraint) {
