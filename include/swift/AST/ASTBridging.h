@@ -17,7 +17,6 @@
 /// include here and keep these includes minimal!
 ///
 /// See include guidelines and caveats in `BasicBridging.h`.
-#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/AccessorKind.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/DiagnosticKind.h"
