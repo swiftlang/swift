@@ -1316,27 +1316,20 @@ static void determineBestChoicesInContext(
               return 0.3;
           }
 
-          auto &ctx = cs.getASTContext();
-
           // Check if the other side conforms to `ExpressibleByArrayLiteral`
           // protocol (in some way). We want an overly optimistic result
           // here to avoid under-favoring.
           if (candidateType->isArray() &&
-              checkConformanceWithoutContext(
-                  paramType,
-                  ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral),
-                  /*allowMissing=*/true))
+              TypeChecker::conformsToKnownProtocol(
+                  paramType, KnownProtocolKind::ExpressibleByArrayLiteral))
             return 0.3;
 
           // Check if the other side conforms to
           // `ExpressibleByDictionaryLiteral` protocol (in some way).
           // We want an overly optimistic result here to avoid under-favoring.
           if (candidateType->isDictionary() &&
-              checkConformanceWithoutContext(
-                  paramType,
-                  ctx.getProtocol(
-                      KnownProtocolKind::ExpressibleByDictionaryLiteral),
-                  /*allowMissing=*/true))
+              TypeChecker::conformsToKnownProtocol(
+                  paramType, KnownProtocolKind::ExpressibleByDictionaryLiteral))
             return 0.3;
         }
 
