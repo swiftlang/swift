@@ -1132,6 +1132,16 @@ bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
 }
 
 Expr *
+TypeChecker::addImplicitBorrowExpr(ASTContext &Ctx, Expr *E,
+                                 std::function<Type(Expr *)> getType,
+                                 std::function<void(Expr *, Type)> setType) {
+  auto objectType = getType(E)->getRValueType();
+  auto *BE = BorrowExpr::createImplicit(Ctx, E->getLoc(), E, objectType);
+  setType(BE, objectType);
+  return BE;
+}
+
+Expr *
 TypeChecker::addImplicitLoadExpr(ASTContext &Context, Expr *expr,
                                  std::function<Type(Expr *)> getType,
                                  std::function<void(Expr *, Type)> setType) {
