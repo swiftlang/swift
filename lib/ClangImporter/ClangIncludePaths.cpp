@@ -122,22 +122,23 @@ parseClangDriverArgs(const clang::driver::Driver &clangDriver,
   return clangDriver.getOpts().ParseArgs(args, unused1, unused2);
 }
 
-std::pair<clang::driver::Driver,
-          llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine>>
+std::tuple<clang::driver::Driver,
+           llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine>,
+           std::unique_ptr<clang::DiagnosticOptions>>
 ClangImporter::createClangDriver(
     const LangOptions &LangOpts, const ClangImporterOptions &ClangImporterOpts,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs) {
 
   auto diagVFS = vfs ? vfs : llvm::vfs::getRealFileSystem();
 
-  clang::DiagnosticOptions diagOpts;
+  auto diagOpts = std::make_unique<clang::DiagnosticOptions>();
   auto *silentDiagConsumer = new clang::DiagnosticConsumer();
   auto clangDiags = clang::CompilerInstance::createDiagnostics(
-      *diagVFS, diagOpts, silentDiagConsumer);
+      *diagVFS, *diagOpts, silentDiagConsumer);
   clang::driver::Driver clangDriver(ClangImporterOpts.clangPath,
                                     LangOpts.Target.str(), *clangDiags,
                                     "clang LLVM compiler", vfs);
-  return {std::move(clangDriver), clangDiags};
+  return {std::move(clangDriver), clangDiags, std::move(diagOpts)};
 }
 
 /// Given a list of include paths and a list of file names, finds the first
@@ -208,8 +209,9 @@ getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
   const llvm::Triple &triple = ctx.LangOpts.Target;
 
   // Extract the libc path from Clang driver.
-  auto [clangDriver, clangDiagEngine] = ClangImporter::createClangDriver(
-      ctx.LangOpts, ctx.ClangImporterOpts, vfs);
+  auto [clangDriver, clangDiagEngine, clangDiagOpts] =
+      ClangImporter::createClangDriver(ctx.LangOpts, ctx.ClangImporterOpts,
+                                       vfs);
   auto clangDriverArgs = ClangImporter::createClangArgs(
       ctx.ClangImporterOpts, ctx.SearchPathOpts, clangDriver);
 
@@ -287,8 +289,9 @@ static void getLibStdCxxFileMapping(
     return;
 
   // Extract the libstdc++ installation path from Clang driver.
-  auto [clangDriver, clangDiagEngine] = ClangImporter::createClangDriver(
-      ctx.LangOpts, ctx.ClangImporterOpts, vfs);
+  auto [clangDriver, clangDiagEngine, clangDiagOpts] =
+      ClangImporter::createClangDriver(ctx.LangOpts, ctx.ClangImporterOpts,
+                                       vfs);
   auto clangDriverArgs = ClangImporter::createClangArgs(
       ctx.ClangImporterOpts, ctx.SearchPathOpts, clangDriver);
 
@@ -482,8 +485,9 @@ void GetWindowsFileMappings(
   if (!Triple.isWindowsMSVCEnvironment())
     return;
 
-  auto [Driver, clangDiagEngine] = ClangImporter::createClangDriver(
-      Context.LangOpts, Context.ClangImporterOpts, driverVFS);
+  auto [Driver, clangDiagEngine, clangDiagOpts] =
+      ClangImporter::createClangDriver(Context.LangOpts,
+                                       Context.ClangImporterOpts, driverVFS);
   const llvm::opt::InputArgList Args = ClangImporter::createClangArgs(
       Context.ClangImporterOpts, Context.SearchPathOpts, Driver);
   const clang::driver::ToolChain &ToolChain = Driver.getToolChain(Args, Triple);
