@@ -2086,11 +2086,11 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     if (baseThrownError && baseThrownError->hasTypeParameter()) {
       auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
       baseThrownError = baseThrownError.subst(subs);
-      baseThrownError = overrideFn->mapTypeIntoContext(baseThrownError);
+      baseThrownError = overrideFn->mapTypeIntoEnvironment(baseThrownError);
     }
 
     if (overrideThrownError)
-      overrideThrownError = overrideFn->mapTypeIntoContext(overrideThrownError);
+      overrideThrownError = overrideFn->mapTypeIntoEnvironment(overrideThrownError);
 
     // Check for a subtyping relationship.
     switch (compareThrownErrorsForSubtyping(

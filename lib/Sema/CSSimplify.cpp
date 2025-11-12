@@ -9969,13 +9969,13 @@ ConstraintSystem::matchPackElementType(Type elementType, Type patternType,
   }
 
   auto shapeParam = CanGenericTypeParamType(cast<GenericTypeParamType>(
-      shapeClass->mapTypeOutOfContext()->getCanonicalType()));
+      shapeClass->mapTypeOutOfEnvironment()->getCanonicalType()));
 
   auto *genericEnv = getPackExpansionEnvironment(packExpansion);
   if (genericEnv) {
     if (shapeParam != genericEnv->getOpenedElementShapeClass()) {
       return tryFix([&]() {
-        auto envShape = genericEnv->mapTypeIntoContext(
+        auto envShape = genericEnv->mapTypeIntoEnvironment(
             genericEnv->getOpenedElementShapeClass());
         if (auto *pack = dyn_cast<PackType>(envShape))
           envShape = pack->unwrapSingletonPackExpansion()->getPatternType();
@@ -11771,7 +11771,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     if (auto archetype =
             baseTy->getMetatypeInstanceType()->getAs<ArchetypeType>()) {
       if (auto genericTy =
-              archetype->mapTypeOutOfContext()->getAs<GenericTypeParamType>()) {
+              archetype->mapTypeOutOfEnvironment()->getAs<GenericTypeParamType>()) {
         for (auto param : DC->getGenericSignatureOfContext()
                               .getGenericParams()) {
           // Find a param at the same depth and one index past the type we're

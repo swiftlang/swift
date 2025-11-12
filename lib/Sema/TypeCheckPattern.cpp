@@ -714,7 +714,7 @@ validateTypedPattern(TypedPattern *TP, DeclContext *dc,
       return ErrorType::get(Context);
     }
 
-    return named->getDecl()->getDeclContext()->mapTypeIntoContext(opaqueTy);
+    return named->getDecl()->getDeclContext()->mapTypeIntoEnvironment(opaqueTy);
   }
 
   const auto ty = TypeResolution::resolveContextualType(
@@ -1743,6 +1743,6 @@ void TypeChecker::coerceParameterListToType(ParameterList *P,
       param->setSpecifier(ParamDecl::Specifier::InOut);
 
     param->setInterfaceType(
-        params[i].getParameterType()->mapTypeOutOfContext());
+        params[i].getParameterType()->mapTypeOutOfEnvironment());
   }
 }

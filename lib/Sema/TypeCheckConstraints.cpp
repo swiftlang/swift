@@ -535,7 +535,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       isAutoClosure ? CTP_AutoclosureDefaultParameter : CTP_DefaultParameter,
       paramType, /*isDiscarded=*/false);
 
-  auto paramInterfaceTy = paramType->mapTypeOutOfContext();
+  auto paramInterfaceTy = paramType->mapTypeOutOfEnvironment();
 
   // Attempt to pre-check expression first, if that fails - skip type-checking.
   // This would make sure that diagnostics about invalid AST are never dropped.
@@ -949,7 +949,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                   "typecheck-expr-pattern", EP);
   PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
 
-  EP->getMatchVar()->setInterfaceType(rhsType->mapTypeOutOfContext());
+  EP->getMatchVar()->setInterfaceType(rhsType->mapTypeOutOfEnvironment());
 
   // Check the expression as a condition.
   auto target = SyntacticElementTarget::forExprPattern(EP);
@@ -975,7 +975,7 @@ static Type openTypeParameter(ConstraintSystem &cs,
   }
 
   auto *paramTy = interfaceTy->castTo<GenericTypeParamType>();
-  auto archetypeTy = env->mapTypeIntoContext(paramTy)->castTo<ArchetypeType>();
+  auto archetypeTy = env->mapTypeIntoEnvironment(paramTy)->castTo<ArchetypeType>();
 
   auto found = types.find(archetypeTy);
   if (found != types.end())

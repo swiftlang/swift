@@ -771,7 +771,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // The type of the witness thunk.
   auto reqtSubstTy = cast<AnyFunctionType>(
     reqtOrigTy->substGenericArgs(reqtSubMap)
-              ->mapTypeOutOfContext()
+              ->mapTypeOutOfEnvironment()
               ->getCanonicalType());
 
   // Rewrite the conformance in terms of the requirement environment's Self
@@ -1122,7 +1122,7 @@ public:
     if (!witness)
       return addMissingDefault();
 
-    Type witnessInContext = Proto->mapTypeIntoContext(witness);
+    Type witnessInContext = Proto->mapTypeIntoEnvironment(witness);
     auto entry = SILWitnessTable::AssociatedTypeWitness{
                                           assocType,
                                           witnessInContext->getCanonicalType()};
@@ -1354,7 +1354,7 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
   for (auto result : originalConvention.getDirectSILResults()) {
     auto ty = originalConvention.getSILType(
         result, function->getTypeExpansionContext());
-    ty = function->mapTypeIntoContext(ty);
+    ty = function->mapTypeIntoEnvironment(ty);
     directResultTypes.push_back(ty.getASTType());
   }
   SILType resultTy;

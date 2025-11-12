@@ -1357,12 +1357,12 @@ public:
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
-  Type mapTypeIntoContext(Type type) const;
+  Type mapTypeIntoEnvironment(Type type) const;
 
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
-  SILType mapTypeIntoContext(SILType type) const;
+  SILType mapTypeIntoEnvironment(SILType type) const;
 
   /// Converts the given function definition to a declaration.
   void convertToDeclaration() {

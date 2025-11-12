@@ -240,7 +240,7 @@ private:
   /// Remap any archetypes into the current function's context.
   SILType remapType(SILType ty) {
     if (ty.hasArchetype())
-      ty = ty.mapTypeOutOfContext();
+      ty = ty.mapTypeOutOfEnvironment();
     auto remappedType = ty.getASTType()->getReducedType(
         getPullback().getLoweredFunctionType()->getSubstGenericSignature());
     auto remappedSILType =
@@ -248,7 +248,7 @@ private:
     // FIXME: Sometimes getPullback() doesn't have a generic environment, in which
     // case callers are apparently happy to receive an interface type.
     if (getPullback().getGenericEnvironment())
-      return getPullback().mapTypeIntoContext(remappedSILType);
+      return getPullback().mapTypeIntoEnvironment(remappedSILType);
     return remappedSILType;
   }
 
@@ -2914,7 +2914,7 @@ void PullbackCloner::Implementation::emitZeroDerivativesForNonvariedResult(
   auto indirectResultIt = pullback.getIndirectResults().begin();
   for (auto resultInfo : pullback.getLoweredFunctionType()->getResults()) {
     auto resultType =
-        pullback.mapTypeIntoContext(resultInfo.getInterfaceType())
+        pullback.mapTypeIntoEnvironment(resultInfo.getInterfaceType())
             ->getCanonicalType();
     if (resultInfo.isFormalDirect())
       directResults.push_back(builder.emitZero(pbLoc, resultType));

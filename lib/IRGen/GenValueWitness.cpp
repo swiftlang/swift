@@ -387,7 +387,7 @@ static Address getArgAsBuffer(IRGenFunction &IGF,
 static CanType getFormalTypeInPrimaryContext(CanType abstractType) {
   auto *nominal = abstractType.getAnyNominal();
   if (nominal && abstractType->isEqual(nominal->getDeclaredType())) {
-    return nominal->mapTypeIntoContext(nominal->getDeclaredInterfaceType())
+    return nominal->mapTypeIntoEnvironment(nominal->getDeclaredInterfaceType())
       ->getCanonicalType();
   }
 
@@ -397,7 +397,7 @@ static CanType getFormalTypeInPrimaryContext(CanType abstractType) {
 
 SILType irgen::getLoweredTypeInPrimaryContext(IRGenModule &IGM,
                                               NominalTypeDecl *type) {
-  CanType concreteFormalType = type->mapTypeIntoContext(
+  CanType concreteFormalType = type->mapTypeIntoEnvironment(
       type->getDeclaredInterfaceType())->getCanonicalType();
   return IGM.getLoweredType(concreteFormalType);
 }
@@ -1371,7 +1371,7 @@ addValueWitnesses(IRGenModule &IGM, ConstantStructBuilder &B,
 /// Currently, this is true if the size and/or alignment of the type is
 /// dependent on its generic parameters.
 bool irgen::hasDependentValueWitnessTable(IRGenModule &IGM, NominalTypeDecl *decl) {
-  auto ty = decl->mapTypeIntoContext(decl->getDeclaredInterfaceType());
+  auto ty = decl->mapTypeIntoEnvironment(decl->getDeclaredInterfaceType());
   return !IGM.getTypeInfoForUnlowered(ty).isFixedSize();
 }
 

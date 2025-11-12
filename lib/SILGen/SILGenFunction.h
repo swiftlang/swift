@@ -889,12 +889,12 @@ public:
   }
 
   SILType getSILTypeInContext(SILResultInfo result, CanSILFunctionType fnTy) {
-    auto t = F.mapTypeIntoContext(getSILType(result, fnTy));
+    auto t = F.mapTypeIntoEnvironment(getSILType(result, fnTy));
     return getTypeLowering(t).getLoweredType().getCategoryType(t.getCategory());
   }
 
   SILType getSILTypeInContext(SILParameterInfo param, CanSILFunctionType fnTy) {
-    auto t = F.mapTypeIntoContext(getSILType(param, fnTy));
+    auto t = F.mapTypeIntoEnvironment(getSILType(param, fnTy));
     return getTypeLowering(t).getLoweredType().getCategoryType(t.getCategory());
   }
 

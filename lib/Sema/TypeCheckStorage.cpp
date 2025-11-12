@@ -421,7 +421,7 @@ getLazilySynthesizedPattern(PatternBindingDecl *PBD, Pattern *P) {
 
   auto *DC = var->getDeclContext();
   auto &ctx = DC->getASTContext();
-  auto patternTy = DC->mapTypeIntoContext(interfaceTy);
+  auto patternTy = DC->mapTypeIntoEnvironment(interfaceTy);
   return TypedPattern::createImplicit(ctx, P, patternTy);
 }
 
@@ -925,7 +925,7 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
 
-  if (storage->getInnermostDeclContext()->mapTypeIntoContext(
+  if (storage->getInnermostDeclContext()->mapTypeIntoEnvironment(
         storage->getValueInterfaceType())->isNoncopyable())
     return usesBorrowed(DiagKind::NoncopyableType);
 
@@ -3460,7 +3460,7 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
   if (!wrapperType || wrapperType->hasError())
     return PropertyWrapperInitializerInfo();
 
-  Type storageType = dc->mapTypeIntoContext(wrapperType);
+  Type storageType = dc->mapTypeIntoEnvironment(wrapperType);
   Expr *initializer = nullptr;
   PropertyWrapperValuePlaceholderExpr *wrappedValue = nullptr;
 

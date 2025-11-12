@@ -6375,7 +6375,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
     // Convert to the outer error, if we need to.
     SILValue outerError;
     SILType innerErrorType = innerError->getType().getObjectType();
-    SILType outerErrorType = F.mapTypeIntoContext(
+    SILType outerErrorType = F.mapTypeIntoEnvironment(
         F.getConventions().getSILErrorType(getTypeExpansionContext()));
     if (IndirectErrorResult && IndirectErrorResult == innerError) {
       // Fast path: we aliased the indirect error result slot because both are
@@ -6506,7 +6506,7 @@ void SILGenFunction::emitYield(SILLocation loc,
   SmallVector<SILParameterInfo, 4> substYieldTys;
   for (auto origYield : fnType->getYields()) {
     substYieldTys.push_back(
-        {F.mapTypeIntoContext(origYield.getArgumentType(
+        {F.mapTypeIntoEnvironment(origYield.getArgumentType(
                                   SGM.M, fnType, getTypeExpansionContext()))
              ->getCanonicalType(),
          origYield.getConvention()});

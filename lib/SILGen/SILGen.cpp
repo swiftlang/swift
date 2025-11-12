@@ -2092,7 +2092,7 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
     auto componentObjTy = decl->getValueInterfaceType();
     if (auto genericEnv =
               decl->getInnermostDeclContext()->getGenericEnvironmentOfContext())
-      componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
+      componentObjTy = genericEnv->mapTypeIntoEnvironment(componentObjTy);
     auto storageTy = M.Types.getSubstitutedStorageType(
         TypeExpansionContext::minimal(), decl, componentObjTy);
     auto opaqueTy = M.Types.getLoweredRValueType(

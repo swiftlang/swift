@@ -358,7 +358,7 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
   ASTContext &ctx = afd->getASTContext();
   auto func = cast<AccessorDecl>(afd);
   VarDecl *constantVar = cast<VarDecl>(func->getStorage());
-  Type type = func->mapTypeIntoContext(constantVar->getValueInterfaceType());
+  Type type = func->mapTypeIntoEnvironment(constantVar->getValueInterfaceType());
 
   auto contextData =
       ConstantGetterBodyContextData::getFromOpaqueValue(voidContext);
@@ -1824,7 +1824,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
                              : rawElementTy;
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types that are returned indirectly.
-  bool isNoncopyable = dc->mapTypeIntoContext(elementTy)->isNoncopyable();
+  bool isNoncopyable = dc->mapTypeIntoEnvironment(elementTy)->isNoncopyable();
   bool isImplicit = !(isNoncopyable || resultDependsOnSelf);
   bool useAddress =
       rawElementTy->getAnyPointerElementType() && (isNoncopyable || resultDependsOnSelf);

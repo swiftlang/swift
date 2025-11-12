@@ -335,7 +335,7 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
     }
 
     // We have a property to map to. Ensure it's {En,De}codable.
-    auto target = derived.getConformanceContext()->mapTypeIntoContext(
+    auto target = derived.getConformanceContext()->mapTypeIntoEnvironment(
          it->second->getValueInterfaceType());
     if (checkConformance(target, derived.Protocol).isInvalid()) {
       TypeLoc typeLoc = {
@@ -632,7 +632,7 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
   // CodingKeys.self expr
   auto *codingKeysExpr = TypeExpr::createImplicitForDecl(
       DeclNameLoc(), param, param->getDeclContext(),
-      DC->mapTypeIntoContext(param->getInterfaceType()));
+      DC->mapTypeIntoEnvironment(param->getInterfaceType()));
   auto *codingKeysMetaTypeExpr = new (C) DotSelfExpr(codingKeysExpr,
                                                      SourceLoc(), SourceLoc());
 
@@ -652,13 +652,13 @@ static CallExpr *createNestedContainerKeyedByForKeyCall(
   // CodingKeys.self expr
   auto *codingKeysExpr = TypeExpr::createImplicitForDecl(
       DeclNameLoc(), codingKeysType, codingKeysType->getDeclContext(),
-      DC->mapTypeIntoContext(codingKeysType->getInterfaceType()));
+      DC->mapTypeIntoEnvironment(codingKeysType->getInterfaceType()));
   auto *codingKeysMetaTypeExpr =
       new (C) DotSelfExpr(codingKeysExpr, SourceLoc(), SourceLoc());
 
   // key expr
   auto *metaTyRef = TypeExpr::createImplicit(
-      DC->mapTypeIntoContext(key->getParentEnum()->getDeclaredInterfaceType()),
+      DC->mapTypeIntoEnvironment(key->getParentEnum()->getDeclaredInterfaceType()),
       C);
   auto *keyExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(), key,
                                         DeclNameLoc(), /*Implicit=*/true);
@@ -743,7 +743,7 @@ lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
         // This is the VarDecl we're looking for.
 
         auto varType =
-            conformanceDC->mapTypeIntoContext(vd->getValueInterfaceType());
+            conformanceDC->mapTypeIntoEnvironment(vd->getValueInterfaceType());
 
         bool useIfPresentVariant = false;
 
@@ -962,7 +962,7 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
 
     if (caseBody) {
       // generate: case .<Case>:
-      auto parentTy = DC->mapTypeIntoContext(
+      auto parentTy = DC->mapTypeIntoEnvironment(
           targetElt->getParentEnum()->getDeclaredInterfaceType());
       auto *pat = EnumElementPattern::createImplicit(parentTy, targetElt,
                                                      subpattern, DC);
@@ -1162,7 +1162,7 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
             if (!caseCodingKey)
               continue;
 
-            auto varType = conformanceDC->mapTypeIntoContext(
+            auto varType = conformanceDC->mapTypeIntoEnvironment(
                 payloadVar->getValueInterfaceType());
 
             bool useIfPresentVariant = false;
@@ -1674,7 +1674,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
     }
 
     auto *targetType = TypeExpr::createImplicit(
-        funcDC->mapTypeIntoContext(targetEnum->getDeclaredInterfaceType()), C);
+        funcDC->mapTypeIntoEnvironment(targetEnum->getDeclaredInterfaceType()), C);
     auto *targetTypeExpr =
         new (C) DotSelfExpr(targetType, SourceLoc(), SourceLoc());
 
@@ -1769,7 +1769,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
                 continue;
               }
 
-              auto varType = conformanceDC->mapTypeIntoContext(
+              auto varType = conformanceDC->mapTypeIntoEnvironment(
                   paramDecl->getValueInterfaceType());
 
               bool useIfPresentVariant = false;

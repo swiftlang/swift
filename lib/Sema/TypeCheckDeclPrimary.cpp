@@ -1967,7 +1967,7 @@ static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
                        diag::placeholder_type_not_allowed_in_pattern)
         .highlight(P->getSourceRange());
     if (init && !init->getType()->hasError()) {
-      auto initTy = init->getType()->mapTypeOutOfContext();
+      auto initTy = init->getType()->mapTypeOutOfEnvironment();
       Ctx.Diags
           .diagnose(PTR->getLoc(),
                     diag::replace_placeholder_with_inferred_type, initTy)
@@ -2830,7 +2830,7 @@ public:
 
     // Reject noncopyable typed subscripts with read/set accessors since we
     // cannot define modify operations upon them without copying the read.
-    if (SD->mapTypeIntoContext(SD->getElementInterfaceType())->isNoncopyable()) {
+    if (SD->mapTypeIntoEnvironment(SD->getElementInterfaceType())->isNoncopyable()) {
       if (auto *read = SD->getAccessor(AccessorKind::Read)) {
         if (!read->isImplicit()) {
           if (auto *set = SD->getAccessor(AccessorKind::Set)) {

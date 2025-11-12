@@ -842,7 +842,7 @@ public:
   Type addCurriedSelfType(const DeclContext *dc);
 
   /// Map a contextual type to an interface type.
-  Type mapTypeOutOfContext();
+  Type mapTypeOutOfEnvironment();
 
   /// Compute and return the set of type variables that occur within this
   /// type.
@@ -4774,8 +4774,8 @@ public:
     return getWithInterfaceType(fn(getInterfaceType()));
   }
 
-  SILParameterInfo mapTypeOutOfContext() const {
-    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
+  SILParameterInfo mapTypeOutOfEnvironment() const {
+    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfEnvironment()
                                                   ->getCanonicalType());
   }
 
@@ -5047,8 +5047,8 @@ public:
     return getWithInterfaceType(fn(getInterfaceType()));
   }
 
-  SILResultInfo mapTypeOutOfContext() const {
-    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
+  SILResultInfo mapTypeOutOfEnvironment() const {
+    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfEnvironment()
                                                   ->getCanonicalType());
   }
 
@@ -5114,8 +5114,8 @@ public:
     return getWithInterfaceType(fn(getInterfaceType()));
   }
 
-  SILYieldInfo mapTypeOutOfContext() const {
-    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
+  SILYieldInfo mapTypeOutOfEnvironment() const {
+    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfEnvironment()
                                                   ->getCanonicalType());
   }
 
