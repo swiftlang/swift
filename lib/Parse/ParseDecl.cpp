@@ -8131,9 +8131,8 @@ bool Parser::parseAccessorAfterIntroducer(
   }
 
   if (Kind == AccessorKind::Borrow || Kind == AccessorKind::Mutate) {
-    if (!Flags.contains(PD_InStruct) && !Flags.contains(PD_InEnum) &&
-        !Flags.contains(PD_InExtension)) {
-      diagnose(Tok, diag::accessor_not_supported_in_decl,
+    if (!Flags.contains(PD_InStruct) && !Flags.contains(PD_InExtension)) {
+      diagnose(Tok, diag::borrow_mutate_accessor_not_supported_in_decl,
                getAccessorNameForDiagnostic(Kind, /*article*/ true,
                                             /*underscored*/ false));
     }

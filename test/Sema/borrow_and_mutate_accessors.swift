@@ -41,10 +41,10 @@ struct Struct {
 
 extension Klass {
   var i: Int {
-    borrow { // expected-error{{a borrow accessor is supported only on a struct or enum}}
+    borrow { // expected-error{{a 'borrow' accessor is supported only on a struct}}
       return 0
     }
-    mutate { // expected-error{{a mutate accessor is supported only on a struct or enum}}
+    mutate { // expected-error{{a 'mutate' accessor is supported only on a struct}}
       return &_i
     }
   }
@@ -65,5 +65,21 @@ extension Struct {
 protocol P {
   var name: String { borrow } // expected-error{{property in protocol must have explicit { get } or { get set } specifier}} // expected-error{{expected get, read, or set in a protocol property}}
   var phone: String { mutate } // expected-error{{property in protocol must have explicit { get } or { get set } specifier}} // expected-error{{expected get, read, or set in a protocol property}}
+}
+
+enum OrderStatus: ~Copyable {
+  case processing(trackingNumber: String)
+  case cancelled(reason: String)
+  
+  var description: String {
+    borrow { // expected-error{{a 'borrow' accessor is supported only on a struct}}
+      switch self {
+        case .processing(let trackingNumber):
+          return trackingNumber
+        case .cancelled(let reason):
+          return reason
+      }
+    }
+  }
 }
 
