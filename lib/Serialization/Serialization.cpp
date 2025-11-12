@@ -4808,7 +4808,6 @@ public:
         param->isCompileTimeLiteral(),
         param->isConstVal(),
         param->isSending(),
-        param->isCallerIsolated(),
         param->isAddressable(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),

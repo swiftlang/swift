@@ -4222,7 +4222,6 @@ public:
     bool isIsolated;
     bool isCompileTimeLiteral, isConstValue;
     bool isSending;
-    bool isCallerIsolated;
     bool isAddressable;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
@@ -4236,7 +4235,6 @@ public:
                                          isCompileTimeLiteral,
                                          isConstValue,
                                          isSending,
-                                         isCallerIsolated,
                                          isAddressable,
                                          rawDefaultArg,
                                          defaultExprType,
@@ -4283,7 +4281,6 @@ public:
     param->setCompileTimeLiteral(isCompileTimeLiteral);
     param->setConstValue(isConstValue);
     param->setSending(isSending);
-    param->setCallerIsolated(isCallerIsolated);
     param->setAddressable(isAddressable);
 
     // Decode the default argument kind.
