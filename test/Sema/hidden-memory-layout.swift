@@ -413,6 +413,8 @@ public struct ExposedLayoutPublicUser: ProtocolFromDirect {
   // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
   private func privateFuncClass(h: HiddenClass) {}
   // expected-embedded-opt-in-error @-1 {{class 'HiddenClass' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenClass' is marked '@_implementationOnly'}}
+
+  @_spi(S) public var s: SPIStruct
 }
 
 internal struct ExposedLayoutInternalUser: ProtocolFromDirect {
@@ -448,6 +450,8 @@ internal struct ExposedLayoutInternalUser: ProtocolFromDirect {
   // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
   private func privateFuncClass(h: HiddenClass) {}
   // expected-embedded-opt-in-error @-1 {{class 'HiddenClass' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenClass' is marked '@_implementationOnly'}}
+
+  @_spi(S) public var s: SPIStruct
 }
 
 private struct ExposedLayoutPrivateUser: ProtocolFromDirect {
@@ -483,6 +487,8 @@ private struct ExposedLayoutPrivateUser: ProtocolFromDirect {
   // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
   private func privateFuncClass(h: HiddenClass) {}
   // expected-embedded-opt-in-error @-1 {{class 'HiddenClass' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenClass' is marked '@_implementationOnly'}}
+
+  @_spi(S) public var s: SPIStruct
 }
 
 #if UseImplementationOnly
