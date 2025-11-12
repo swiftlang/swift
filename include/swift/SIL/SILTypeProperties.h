@@ -116,6 +116,18 @@ enum HasRawLayout_t : bool {
   HasRawLayout = true
 };
 
+/// Does this type only have default deinitialization or might it invoke a
+/// custom deinitialer with side effects? This includes any recursive
+/// deinitializers that may be invoked by releasing a reference.
+///
+/// If a type only has default deinitialization, then the deinitializer cannot
+/// have any semantically-visible side effects. It cannot write to any memory
+/// reachable from another object that won't be freed during deinitialization.
+enum MayHaveCustomDeinit_t : bool {
+  HasOnlyDefaultDeinit = false,
+  MayHaveCustomDeinit = true,
+};
+
 class SILTypeProperties {
   // These are chosen so that bitwise-or merges the flags properly.
   //
@@ -132,6 +144,7 @@ class SILTypeProperties {
     HasPackFlag                    = 1 << 8,
     AddressableForDependenciesFlag = 1 << 9,
     HasRawLayoutFlag               = 1 << 10,
+    CustomDeinitFlag               = 1 << 11,
   };
   // clang-format on
 
@@ -150,7 +163,8 @@ public:
       HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer,
       IsLexical_t isLexical = IsNotLexical, HasPack_t hasPack = HasNoPack,
       IsAddressableForDependencies_t isAFD = IsNotAddressableForDependencies,
-      HasRawLayout_t hasRawLayout = DoesNotHaveRawLayout)
+      HasRawLayout_t hasRawLayout = DoesNotHaveRawLayout,
+      MayHaveCustomDeinit_t customDeinit = HasOnlyDefaultDeinit)
       : Flags((isTrivial ? 0U : NonTrivialFlag) |
               (isFixedABI ? 0U : NonFixedABIFlag) |
               (isAddressOnly ? AddressOnlyFlag : 0U) |
@@ -160,7 +174,8 @@ public:
               (isLexical ? LexicalFlag : 0U) |
               (hasPack ? HasPackFlag : 0U) |
               (isAFD ? AddressableForDependenciesFlag : 0U) |
-              (hasRawLayout ? HasRawLayoutFlag : 0U)) {}
+              (hasRawLayout ? HasRawLayoutFlag : 0U) |
+              (customDeinit ? CustomDeinitFlag : 0U)) {}
 
   constexpr bool operator==(SILTypeProperties p) const {
     return Flags == p.Flags;
@@ -183,13 +198,16 @@ public:
 
   static constexpr SILTypeProperties forReference() {
     return {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
-            IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical};
+            IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical,
+            HasNoPack, IsNotAddressableForDependencies, DoesNotHaveRawLayout,
+            MayHaveCustomDeinit};
   }
 
   static constexpr SILTypeProperties forOpaque() {
     return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsNotResilient,
             IsNotTypeExpansionSensitive, HasRawPointer, IsLexical,
-            HasNoPack, IsAddressableForDependencies, HasRawLayout};
+            HasNoPack, IsAddressableForDependencies, HasRawLayout,
+            MayHaveCustomDeinit};
   }
 
   static constexpr SILTypeProperties forResilient() {
@@ -240,6 +258,9 @@ public:
   HasRawLayout_t isOrContainsRawLayout() const {
     return HasRawLayout_t((Flags & HasRawLayoutFlag) != 0);
   }
+  MayHaveCustomDeinit_t mayHaveCustomDeinit() const {
+    return MayHaveCustomDeinit_t((Flags & CustomDeinitFlag) != 0);
+  }
 
   void setNonTrivial() { Flags |= NonTrivialFlag; }
   void setIsOrContainsRawPointer() { Flags |= HasRawPointerFlag; }
@@ -261,6 +282,10 @@ public:
   }
   void setHasRawLayout() {
     Flags |= HasRawLayoutFlag;
+  }
+  void setCustomDeinit(MayHaveCustomDeinit_t hasCustomDeinit) {
+    Flags = (Flags & ~CustomDeinitFlag)
+      | (hasCustomDeinit ? CustomDeinitFlag : 0);
   }
 };
 

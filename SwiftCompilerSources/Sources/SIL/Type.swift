@@ -118,6 +118,14 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return CanonicalType(bridged: bridged.getApproximateFormalPackType());
   }
 
+  /// True if destroying a value of this type might invoke a custom deinitialer
+  /// with side effects. This includes any recursive deinitializers that may be
+  /// invoked by releasing a reference. False if this only has default
+  /// deinitialization.
+  public func mayHaveCustomDeinit(in function: Function) -> Bool {
+    return bridged.mayHaveCustomDeinit(function.bridged)
+  }
+
   //===--------------------------------------------------------------------===//
   //                Properties of lowered `SILFunctionType`s
   //===--------------------------------------------------------------------===//

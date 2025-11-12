@@ -292,6 +292,7 @@ struct BridgedType {
   BRIDGED_INLINE bool isAddressableForDeps(BridgedFunction f) const;
   BRIDGED_INLINE SWIFT_IMPORT_UNSAFE BridgedASTType getRawLayoutSubstitutedLikeType() const;
   BRIDGED_INLINE SWIFT_IMPORT_UNSAFE BridgedASTType getRawLayoutSubstitutedCountType() const;
+  BRIDGED_INLINE bool mayHaveCustomDeinit(BridgedFunction f) const;
   BRIDGED_INLINE SwiftInt getCaseIdxOfEnumType(BridgedStringRef name) const;
   static BRIDGED_INLINE SwiftInt getNumBoxFields(BridgedCanType boxTy);
   static SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBoxFieldType(BridgedCanType boxTy,
