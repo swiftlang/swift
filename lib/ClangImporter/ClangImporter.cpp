@@ -8477,10 +8477,11 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
   llvm::SmallDenseSet<const clang::RecordDecl *, 4> seen;
 
   auto maybePushToStack = [&](const clang::Type *type) {
-    auto recordDecl = type->getAsRecordDecl();
-    if (!recordDecl)
+    const auto *recordType = type->getAs<clang::RecordType>();
+    if (!recordType)
       return;
 
+    auto recordDecl = recordType->getDecl();
     if (seen.insert(recordDecl).second) {
       // When a reference type is copied, the pointer’s value is copied rather
       // than the object’s storage. This means reference types can be imported
@@ -8503,7 +8504,6 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
   while (!stack.empty()) {
     const clang::RecordDecl *recordDecl = stack.back();
     stack.pop_back();
-
     if (!hasNonCopyableAttr(recordDecl)) {
       auto injectedStlAnnotation =
           recordDecl->isInStdNamespace()
