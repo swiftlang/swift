@@ -424,6 +424,10 @@ bool BridgedASTType::hasLocalArchetype() const {
   return unbridged()->hasLocalArchetype();
 }
 
+bool BridgedASTType::hasElementArchetype() const {
+  return unbridged()->hasElementArchetype();
+}
+
 bool BridgedASTType::hasDynamicSelf() const {
   return unbridged()->hasDynamicSelfType();
 }
