@@ -20,7 +20,9 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
   llvm::SmallString<64> buffer;
   llvm::raw_svector_ostream OS(buffer);
   OS << "\ninternal ";
-  printMemberwiseInit(nominal, OS);
+  // For the refactoring we want to include all private properties, since it's
+  // easier to delete code than add code, so print the compatibility overload.
+  printMemberwiseInit(nominal, MemberwiseInitKind::Compatibility, OS);
   OS << "\n";
 
   // Accept the entire edit.

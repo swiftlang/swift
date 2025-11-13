@@ -1970,10 +1970,11 @@ public:
 
 /// Request to obtain a list of properties that will be reflected in the parameters of a
 /// memberwise initializer.
-class MemberwiseInitPropertiesRequest :
-    public SimpleRequest<MemberwiseInitPropertiesRequest,
-                         ArrayRef<VarDecl *>(NominalTypeDecl *),
-                         RequestFlags::Cached> {
+class MemberwiseInitPropertiesRequest
+    : public SimpleRequest<MemberwiseInitPropertiesRequest,
+                           ArrayRef<VarDecl *>(NominalTypeDecl *,
+                                               MemberwiseInitKind),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1981,8 +1982,27 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ArrayRef<VarDecl *>
-  evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+  ArrayRef<VarDecl *> evaluate(Evaluator &evaluator, NominalTypeDecl *decl,
+                               MemberwiseInitKind initKind) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// The maximum access level the memberwise initializer can be for a given
+/// nominal decl.
+class MemberwiseInitMaxAccessLevel
+    : public SimpleRequest<MemberwiseInitMaxAccessLevel,
+                           AccessLevel(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  AccessLevel evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
 
 public:
   bool isCached() const { return true; }
@@ -2823,7 +2843,8 @@ public:
 
 /// Checks whether this type has a synthesized memberwise initializer.
 class HasMemberwiseInitRequest
-    : public SimpleRequest<HasMemberwiseInitRequest, bool(StructDecl *),
+    : public SimpleRequest<HasMemberwiseInitRequest,
+                           bool(StructDecl *, MemberwiseInitKind),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2832,7 +2853,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, StructDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, StructDecl *decl,
+                MemberwiseInitKind initKind) const;
 
 public:
   // Caching.
@@ -2842,7 +2864,8 @@ public:
 /// Synthesizes a memberwise initializer for a given type.
 class SynthesizeMemberwiseInitRequest
     : public SimpleRequest<SynthesizeMemberwiseInitRequest,
-                           ConstructorDecl *(NominalTypeDecl *),
+                           ConstructorDecl *(NominalTypeDecl *,
+                                             MemberwiseInitKind),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2851,7 +2874,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *decl,
+                            MemberwiseInitKind initKind) const;
 
 public:
   // Caching.

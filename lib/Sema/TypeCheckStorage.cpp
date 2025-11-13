@@ -39,6 +39,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/SourceFileExtras.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -374,18 +375,19 @@ InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
   return decl->getASTContext().AllocateCopy(results);
 }
 
-ArrayRef<VarDecl *>
-MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
-                                          NominalTypeDecl *decl) const {
-  auto initableVars =
-      evaluateOrDefault(evaluator, InitializablePropertiesRequest{decl}, {});
-  if (initableVars.empty())
-    return {};
+static void getMemberwiseInitProperties(NominalTypeDecl *decl,
+                                        MemberwiseInitKind initKind,
+                                        std::optional<AccessLevel> minAccess,
+                                        SmallVectorImpl<VarDecl *> &results) {
+  auto &ctx = decl->getASTContext();
+  auto vars = evaluateOrDefault(ctx.evaluator,
+                                InitializablePropertiesRequest{decl}, {});
+  if (vars.empty())
+    return;
 
-  SmallVector<VarDecl *, 4> results;
   SmallPtrSet<VarDecl *, 4> subsumedViaInitAccessor;
 
-  for (auto *var : initableVars) {
+  for (auto *var : vars) {
     // If this property has an init accessor, it subsumes all of the stored properties
     // that the accessor initializes. Mark those stored properties as being subsumed; we'll
     // get back to them later.
@@ -396,9 +398,10 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
     }
 
     // We only care about properties that are memberwise initialized.
-    if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+    if (!var->isMemberwiseInitialized(initKind, /*preferDeclared=*/true,
+                                      minAccess)) {
       continue;
-
+    }
     // Add this property.
     results.push_back(var);
   }
@@ -410,8 +413,127 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
                   }),
                   results.end());
   }
+}
 
+ArrayRef<VarDecl *>
+MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
+                                          NominalTypeDecl *decl,
+                                          MemberwiseInitKind initKind) const {
+  SmallVector<VarDecl *, 4> results;
+  getMemberwiseInitProperties(decl, initKind, /*minAccess*/ std::nullopt,
+                              results);
   return decl->getASTContext().AllocateCopy(results);
+}
+
+AccessLevel
+MemberwiseInitMaxAccessLevel::evaluate(Evaluator &evaluator,
+                                       NominalTypeDecl *nominal) const {
+  // Gather the memberwise initializer properties and take the most accessible.
+  // We pass `private` as the minimum access level since we want everything. The
+  // initializer kind doesn't actually matter since `private` will ensure
+  // `isMemberwiseInitExcludedVar` is always `false` for non-property-wrappers.
+  SmallVector<VarDecl *, 4> props;
+  getMemberwiseInitProperties(nominal, MemberwiseInitKind::Regular,
+                              /*minAccess*/ AccessLevel::Private, props);
+
+  // The memberwise initializer is only ever internal at most, and is limited
+  // by the access of the enclosing decl. A 'private' decl or a decl in a local
+  // context is implicitly 'fileprivate'.
+  auto nominalAccess = nominal->getFormalAccess();
+  if (nominal->getLocalContext() || nominalAccess == AccessLevel::Private)
+    nominalAccess = AccessLevel::FilePrivate;
+
+  auto maxAccess = std::min(nominalAccess, AccessLevel::Internal);
+  if (props.empty())
+    return maxAccess;
+
+  auto result = AccessLevel::Private;
+  for (auto *prop : props)
+    result = std::max(result, prop->getFormalAccess());
+
+  return std::min(maxAccess, result);
+}
+
+void
+TypeChecker::diagnoseCompatMemberwiseInitIfNeeded(const ConstructorDecl *init,
+                                                  SourceLoc loc) {
+  using Kind = MemberwiseInitKind;
+  ASSERT(init->isMemberwiseInitializer() == Kind::Compatibility);
+
+  auto *SF = init->getParentSourceFile();
+  if (!SF)
+    return;
+
+  // We only diagnose for the first reference, and complain on the nominal
+  // to see if we've already diagnosed this initializer. Since the
+  // compatibility initializer can only ever be \c fileprivate at most, the
+  // diagnostic emitted will always be in the same file as the reference.
+  if (!SF->getExtras().DiagnosedCompatMemberwiseInits.insert(init).second)
+    return;
+
+  auto *NTD = cast<NominalTypeDecl>(init->getDeclContext());
+  auto &ctx = NTD->getASTContext();
+
+  // Check to see what variables are missing from the memberwise initializer.
+  SmallSetVector<VarDecl *, 4> excludedVars;
+  for (auto *VD : NTD->getMemberwiseInitProperties(Kind::Compatibility))
+    excludedVars.insert(VD);
+  for (auto *VD : NTD->getMemberwiseInitProperties(Kind::Regular))
+    excludedVars.remove(VD);
+
+  ASSERT(!excludedVars.empty() &&
+         "Shouldn't have synthesized a compatibility memberwise init");
+
+  SmallString<64> excludedVarStr;
+  {
+    llvm::raw_svector_ostream OS(excludedVarStr);
+    for (auto idx : indices(excludedVars)) {
+      auto *VD = excludedVars[idx];
+      OS << "'" << VD->getName() << "'";
+      if (idx == excludedVars.size() - 1)
+        continue;
+      if (excludedVars.size() > 2)
+        OS << ",";
+      if (excludedVars.size() > 1 && idx == excludedVars.size() - 2) {
+        OS << " and ";
+      } else {
+        OS << " ";
+      }
+    }
+  }
+
+  NTD->diagnose(diag::warn_use_of_compat_memberwise_init,
+                /*printVars*/ excludedVarStr.size() <= 60, excludedVarStr);
+
+  // Emit a fix-it that inserts the initializer.
+  if (auto braceRange = NTD->getBraces()) {
+    // Insert after the last VarDecl.
+    SourceLoc insertLoc;
+    for (auto *member : NTD->getParsedMembers()) {
+      if (isa<VarDecl>(member) || isa<PatternBindingDecl>(member))
+        continue;
+
+      auto loc = member->getSourceRangeIncludingAttrs().Start;
+      if (!loc)
+        continue;
+
+      insertLoc = loc;
+      break;
+    }
+    if (!insertLoc)
+      insertLoc = braceRange.End;
+
+    llvm::SmallString<64> insertText;
+    llvm::raw_svector_ostream out(insertText);
+    out << getAccessLevelSpelling(init->getFormalAccess()) << " ";
+    printMemberwiseInit(NTD, Kind::Compatibility, out);
+    out << "\n";
+
+    NTD->diagnose(diag::insert_compat_memberwise_init)
+        .fixItInsert(insertLoc, insertText);
+  }
+  if (loc)
+    ctx.Diags.diagnose(loc, diag::compat_memberwise_init_used_here);
 }
 
 static Type getLazyInterfaceTypeForSynthesizedVar(VarDecl *var) {
