@@ -711,6 +711,25 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
         new llvm::vfs::OverlayFileSystem(MemFS);
     OverlayVFS->pushOverlay(SourceMgr.getFileSystem());
     SourceMgr.setFileSystem(std::move(OverlayVFS));
+  } else {
+    // For non-caching -direct-clang-cc1-module-build emit-pcm build,
+    // setup the clang VFS so it can find system modulemap files
+    // (like vcruntime.modulemap) as an input file.
+    if (Invocation.getClangImporterOptions().DirectClangCC1ModuleBuild &&
+        Invocation.getFrontendOptions().RequestedAction ==
+            FrontendOptions::ActionType::EmitPCM) {
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
+          SourceMgr.getFileSystem();
+      ClangInvocationFileMappingContext Context(
+          Invocation.getLangOptions(), Invocation.getSearchPathOptions(),
+          Invocation.getClangImporterOptions(), Invocation.getCASOptions(),
+          Diagnostics);
+      ClangInvocationFileMapping FileMapping = applyClangInvocationMapping(
+          Context, nullptr, VFS, /*suppressDiagnostic=*/false);
+      if (!FileMapping.redirectedFiles.empty()) {
+        SourceMgr.setFileSystem(std::move(VFS));
+      }
+    }
   }
 
   auto ExpectedOverlay =
