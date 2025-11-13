@@ -157,16 +157,16 @@ if #available(SwiftStdlib 6.3, *) {
 
     do {
       let obj = ClassWithMembers()
-      let retained = Unmanaged.passRetained(obj)
-      let pointer = retained.toOpaque()
       if let mangledTypeName = _mangledTypeName(ClassWithMembers.self) {
-        let (success, printed) = _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: mangledTypeName)
-        expectTrue(success)
-        expectEqual(printed.hasPrefix("<main.ClassWithMembers: 0x"), true)
+        withExtendedLifetime(obj) { obj in
+          let pointer = unsafeBitCast(obj, to: UnsafeRawPointer.self)
+          let (success, printed) = _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: mangledTypeName)
+          expectTrue(success)
+          expectEqual(printed.hasPrefix("<main.ClassWithMembers: 0x"), true)
+        }
       } else {
         expectTrue(false)
       }
-      retained.release()
     }
   }
 }
