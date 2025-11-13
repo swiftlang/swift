@@ -565,7 +565,7 @@ public:
   ///
   /// \returns true if finalization successful (which makes binding set viable),
   /// and false otherwise.
-  bool finalize(bool transitive);
+  bool finalize();
 
   static BindingScore formBindingScore(const BindingSet &b);
 

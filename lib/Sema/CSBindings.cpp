@@ -699,10 +699,7 @@ static Type getKeyPathType(ASTContext &ctx, KeyPathCapability capability,
   return keyPathTy;
 }
 
-bool BindingSet::finalize(bool transitive) {
-  if (transitive)
-    inferTransitiveBindings();
-
+bool BindingSet::finalize() {
   if (auto *locator = TypeVar->getImpl().getLocator()) {
     if (TypeVar->getImpl().isKeyPathType()) {
       auto &ctx = CS.getASTContext();
@@ -1195,7 +1192,9 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
     // produce a default type.
     bool isViable = isViableForRanking(bindings);
 
-    if (!bindings.finalize(true))
+    bindings.inferTransitiveBindings();
+
+    if (!bindings.finalize())
       continue;
 
     bindings.determineLiteralCoverage();
@@ -1596,7 +1595,7 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
 
   BindingSet bindings(*this, typeVar, CG[typeVar].getPotentialBindings());
-  bindings.finalize(false);
+  bindings.finalize();
   bindings.determineLiteralCoverage();
 
   return bindings;
