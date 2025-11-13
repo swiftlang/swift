@@ -1161,9 +1161,6 @@ namespace {
 
     Decl *VisitNamespaceDecl(const clang::NamespaceDecl *decl) {
       DeclContext *dc = nullptr;
-      // Do not import namespace declarations marked as 'swift_private'.
-      if (decl->hasAttr<clang::SwiftPrivateAttr>())
-        return nullptr;
       // Workaround for os module declaring `namespace os` on Darwin, causing
       // name lookup issues. That namespace only declares utility functions that
       // are not supposed to be used from Swift, so let's just not import the
