@@ -1162,7 +1162,7 @@ namespace {
           continue;
 
         auto witness =
-            entry.getAssociatedTypeWitness().Witness->mapTypeOutOfContext();
+            entry.getAssociatedTypeWitness().Witness->mapTypeOutOfEnvironment();
         return IGM.getAssociatedTypeWitness(witness,
                                             Proto->getGenericSignature(),
                                             /*inProtocolContext=*/true);
@@ -1243,7 +1243,7 @@ namespace {
 
       // For an abstract table, emit a reference to the witness table.
       CanType associatedTypeInContext
-        = Proto->mapTypeIntoContext(requirement.getAssociation())
+        = Proto->mapTypeIntoEnvironment(requirement.getAssociation())
             ->getCanonicalType();
       auto returnValue =
           emitArchetypeWitnessTableRef(
@@ -2836,7 +2836,7 @@ namespace {
                 ->getReducedType(O->getOpaqueInterfaceGenericSignature());
 
         type = genericEnv
-                   ? genericEnv->mapTypeIntoContext(type)->getCanonicalType()
+                   ? genericEnv->mapTypeIntoEnvironment(type)->getCanonicalType()
                    : type;
 
         return IGF.emitTypeMetadataRef(type);
@@ -2876,7 +2876,7 @@ namespace {
             substitutions.lookupConformance(underlyingDependentType, P);
 
         if (underlyingType->hasTypeParameter()) {
-          underlyingType = genericEnv->mapTypeIntoContext(
+          underlyingType = genericEnv->mapTypeIntoEnvironment(
               underlyingType);
           underlyingConformance = underlyingConformance.subst(
             genericEnv->getForwardingSubstitutionMap());
@@ -4316,7 +4316,7 @@ namespace {
 
     CanType getSuperclassTypeForMetadata() {
       if (auto superclass = getSuperclassForMetadata(IGM, Target))
-        return Target->mapTypeIntoContext(superclass)->getCanonicalType();
+        return Target->mapTypeIntoEnvironment(superclass)->getCanonicalType();
       return CanType();
     }
 
@@ -5248,7 +5248,7 @@ namespace {
     void addFieldOffset(VarDecl *var) {
       assert(!isPureObjC());
       addFixedFieldOffset(IGM, B, var, [&](DeclContext *dc) {
-        return dc->mapTypeIntoContext(type);
+        return dc->mapTypeIntoEnvironment(type);
       });
     }
 

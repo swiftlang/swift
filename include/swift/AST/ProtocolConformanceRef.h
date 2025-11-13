@@ -199,7 +199,7 @@ public:
   ProtocolConformanceRef subst(InFlightSubstitution &IFS) const;
 
   /// Map contextual types to interface types in the conformance.
-  ProtocolConformanceRef mapConformanceOutOfContext() const;
+  ProtocolConformanceRef mapConformanceOutOfEnvironment() const;
 
   /// Look up the type witness for an associated type declaration in this
   /// conformance.

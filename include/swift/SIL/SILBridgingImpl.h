@@ -781,8 +781,8 @@ BridgedSubstitutionMap BridgedFunction::getForwardingSubstitutionMap() const {
   return {getFunction()->getForwardingSubstitutionMap()};
 }
 
-BridgedASTType BridgedFunction::mapTypeIntoContext(BridgedASTType ty) const {
-  return {getFunction()->mapTypeIntoContext(ty.unbridged()).getPointer()};
+BridgedASTType BridgedFunction::mapTypeIntoEnvironment(BridgedASTType ty) const {
+  return {getFunction()->mapTypeIntoEnvironment(ty.unbridged()).getPointer()};
 }
 
 OptionalBridgedBasicBlock BridgedFunction::getFirstBlock() const {

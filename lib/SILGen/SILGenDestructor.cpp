@@ -48,7 +48,7 @@ void SILGenFunction::emitDistributedRemoteActorDeinit(
   auto finishBB = createBasicBlock("finishDeinitBB");
   auto localBB = createBasicBlock("localActorDeinitBB");
 
-  auto selfTy = F.mapTypeIntoContext(cd->getDeclaredInterfaceType());
+  auto selfTy = F.mapTypeIntoEnvironment(cd->getDeclaredInterfaceType());
   emitDistributedIfRemoteBranch(SILLocation(loc), selfValue, selfTy,
                                 /*if remote=*/remoteBB, /*if local=*/localBB);
 
@@ -160,7 +160,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   SILType classTy = selfValue->getType();
   if (cd->hasSuperclass() && !cd->isNativeNSObjectSubclass()) {
     Type superclassTy =
-      dd->mapTypeIntoContext(cd->getSuperclass());
+      dd->mapTypeIntoEnvironment(cd->getSuperclass());
     ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
     auto superclassDtorDecl = superclass->getDestructor();
     SILDeclRef dtorConstant =
@@ -527,7 +527,7 @@ void SILGenFunction::emitRecursiveChainDestruction(ManagedValue selfValue,
                                                    ClassDecl *cd,
                                                    VarDecl *recursiveLink,
                                                    CleanupLocation cleanupLoc) {
-  auto selfTy = F.mapTypeIntoContext(cd->getDeclaredInterfaceType());
+  auto selfTy = F.mapTypeIntoEnvironment(cd->getDeclaredInterfaceType());
 
   auto selfTyLowered = getTypeLowering(selfTy).getLoweredType();
 
@@ -540,7 +540,7 @@ void SILGenFunction::emitRecursiveChainDestruction(ManagedValue selfValue,
 
   // var iter = self.link
   // self.link = nil
-  auto Ty = getTypeLowering(F.mapTypeIntoContext(recursiveLink->getInterfaceType())).getLoweredType();
+  auto Ty = getTypeLowering(F.mapTypeIntoEnvironment(recursiveLink->getInterfaceType())).getLoweredType();
   auto optionalNone = B.createOptionalNone(cleanupLoc, Ty);
   SILValue varAddr =
     B.createRefElementAddr(cleanupLoc, selfValue.getValue(), recursiveLink,
@@ -766,7 +766,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // instance variables before the object is actually deallocated.
 
   // Form a reference to the superclass -dealloc.
-  Type superclassTy = dd->mapTypeIntoContext(cd->getSuperclass());
+  Type superclassTy = dd->mapTypeIntoEnvironment(cd->getSuperclass());
   assert(superclassTy && "Emitting Objective-C -dealloc without superclass?");
   ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
   auto superclassDtorDecl = superclass->getDestructor();

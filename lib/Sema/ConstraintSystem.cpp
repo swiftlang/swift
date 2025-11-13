@@ -549,7 +549,7 @@ Type ConstraintSystem::getExplicitCaughtErrorType(CatchNode catchNode) {
   // If there is an explicit caught type for this node, use it.
   if (Type explicitCaughtType = catchNode.getExplicitCaughtType(ctx)) {
     if (explicitCaughtType->hasTypeParameter())
-      explicitCaughtType = DC->mapTypeIntoContext(explicitCaughtType);
+      explicitCaughtType = DC->mapTypeIntoEnvironment(explicitCaughtType);
 
     return explicitCaughtType;
   }
@@ -1277,7 +1277,7 @@ static Type getPropertyWrapperTypeFromOverload(
   if (auto baseType = resolvedOverload.choice.getBaseType()) {
     ty = baseType->getRValueType()->getTypeOfMember(wrapperVar, ty);
   } else {
-    ty = cs.DC->mapTypeIntoContext(ty);
+    ty = cs.DC->mapTypeIntoEnvironment(ty);
   }
   return ty;
 }
@@ -1913,7 +1913,7 @@ static Type replacePlaceholderType(PlaceholderType *placeholder,
   // logic work with ErrorTypes instead.
   if (forCompletion) {
     if (auto *GP = replacement->getAs<GenericTypeParamType>())
-      return GP->getDecl()->getInnermostDeclContext()->mapTypeIntoContext(GP);
+      return GP->getDecl()->getInnermostDeclContext()->mapTypeIntoEnvironment(GP);
   }
   // Return an ErrorType with the replacement as the original type. Note that
   // if we failed to replace a type variable with a generic parameter,
@@ -1926,7 +1926,7 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType,
   // If we've been asked for an interface type, start by mapping any archetypes
   // out of context.
   if (wantInterfaceType)
-    type = type->mapTypeOutOfContext();
+    type = type->mapTypeOutOfEnvironment();
 
   if (!type->hasTypeVariableOrPlaceholder())
     return type;
@@ -1940,7 +1940,7 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType,
         if (wantInterfaceType) {
           if (auto *gp = tvt->getImpl().getGenericParameter())
             return gp;
-          return getFixedType(tvt)->mapTypeOutOfContext();
+          return getFixedType(tvt)->mapTypeOutOfEnvironment();
         }
         return getFixedType(tvt);
       });

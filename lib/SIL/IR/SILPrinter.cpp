@@ -610,7 +610,7 @@ static void printSILFunctionNameAndType(
       // defined).
       sugaredTypeNames[paramTy->getCanonicalType()] = name;
       if (auto *archetypeTy =
-              genEnv->mapTypeIntoContext(paramTy)->getAs<ArchetypeType>())
+              genEnv->mapTypeIntoEnvironment(paramTy)->getAs<ArchetypeType>())
         sugaredTypeNames[archetypeTy->getCanonicalType()] = name;
     }
   }

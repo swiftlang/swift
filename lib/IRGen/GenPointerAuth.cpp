@@ -533,7 +533,7 @@ static void hashStringForList(IRGenModule &IGM, const ArrayRef<T> &list,
       CanType Ty = paramOrRetVal.getArgumentType(
           IGM.getSILModule(), fnType, IGM.getMaximalTypeExpansionContext());
       if (Ty->hasTypeParameter())
-        Ty = genericEnv->mapTypeIntoContext(Ty)->getCanonicalType();
+        Ty = genericEnv->mapTypeIntoEnvironment(Ty)->getCanonicalType();
       hashStringForType(IGM, Ty, Out, genericEnv);
     }
     Out << ":";
@@ -552,7 +552,7 @@ static void hashStringForList(IRGenModule &IGM,
       CanType Ty = paramOrRetVal.getReturnValueType(
           IGM.getSILModule(), fnType, IGM.getMaximalTypeExpansionContext());
       if (Ty->hasTypeParameter())
-        Ty = genericEnv->mapTypeIntoContext(Ty)->getCanonicalType();
+        Ty = genericEnv->mapTypeIntoEnvironment(Ty)->getCanonicalType();
       hashStringForType(IGM, Ty, Out, genericEnv);
     }
     Out << ":";
@@ -628,7 +628,7 @@ getCoroutineYieldTypesDiscriminator(IRGenModule &IGM, CanSILFunctionType type) {
       CanType Ty = yield.getArgumentType(IGM.getSILModule(), type,
                                          IGM.getMaximalTypeExpansionContext());
       if (Ty->hasTypeParameter())
-        Ty = genericEnv->mapTypeIntoContext(Ty)->getCanonicalType();
+        Ty = genericEnv->mapTypeIntoEnvironment(Ty)->getCanonicalType();
       hashStringForType(IGM, Ty, out, genericEnv);
     }
     out << ":";

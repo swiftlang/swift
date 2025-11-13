@@ -7649,7 +7649,7 @@ Expected<Type> DESERIALIZE_TYPE(PRIMARY_ARCHETYPE_TYPE)(
     return interfaceTypeOrError.takeError();
 
   Type contextType =
-      sigOrError.get().getGenericEnvironment()->mapTypeIntoContext(
+      sigOrError.get().getGenericEnvironment()->mapTypeIntoEnvironment(
           interfaceTypeOrError.get());
 
   if (contextType->hasError())
@@ -7675,7 +7675,7 @@ Expected<Type> DESERIALIZE_TYPE(EXISTENTIAL_ARCHETYPE_TYPE)(
   if (!envOrError)
     return envOrError.takeError();
 
-  return envOrError.get()->mapTypeIntoContext(interfaceTypeOrError.get());
+  return envOrError.get()->mapTypeIntoEnvironment(interfaceTypeOrError.get());
 }
 
 Expected<Type> DESERIALIZE_TYPE(OPAQUE_ARCHETYPE_TYPE)(
@@ -7717,7 +7717,7 @@ Expected<Type> DESERIALIZE_TYPE(PACK_ARCHETYPE_TYPE)(
 
   Type interfaceType = MF.getType(interfaceTypeID);
   Type contextType =
-      sig.getGenericEnvironment()->mapTypeIntoContext(interfaceType);
+      sig.getGenericEnvironment()->mapTypeIntoEnvironment(interfaceType);
 
   if (contextType->hasError())
     return MF.diagnoseFatal();
@@ -7742,7 +7742,7 @@ Expected<Type> DESERIALIZE_TYPE(ELEMENT_ARCHETYPE_TYPE)(
   if (!envOrError)
     return envOrError.takeError();
 
-  return envOrError.get()->mapTypeIntoContext(interfaceTypeOrError.get());
+  return envOrError.get()->mapTypeIntoEnvironment(interfaceTypeOrError.get());
 }
 
 Expected<Type>

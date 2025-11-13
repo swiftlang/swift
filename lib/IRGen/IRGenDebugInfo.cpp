@@ -1042,7 +1042,7 @@ private:
         return false;
       });
 
-      Ty = Ty->mapTypeOutOfContext();
+      Ty = Ty->mapTypeOutOfEnvironment();
     } else {
       Sig = IGM.getCurGenericContext();
     }
@@ -1285,11 +1285,11 @@ private:
       return {false, {}};
     // Go from Pair<Int, Double> to Pair<T, U>.
     Type InterfaceTy = Decl->getDeclaredInterfaceType();
-    Type UnsubstitutedTy = Decl->mapTypeIntoContext(InterfaceTy);
+    Type UnsubstitutedTy = Decl->mapTypeIntoEnvironment(InterfaceTy);
 
     Mangle::ASTMangler Mangler(IGM.Context);
     std::string DeclTypeMangledName = Mangler.mangleTypeForDebugger(
-        UnsubstitutedTy->mapTypeOutOfContext(), {});
+        UnsubstitutedTy->mapTypeOutOfEnvironment(), {});
     bool IsUnsubstituted = (DeclTypeMangledName == MangledName);
     return {IsUnsubstituted, UnsubstitutedTy};
   }
@@ -1464,7 +1464,7 @@ private:
       std::optional<CompletedDebugTypeInfo> ElemDbgTy;
       if (auto PayloadTy = ElemDecl->getPayloadInterfaceType()) {
         // A variant case which carries a payload.
-        PayloadTy = ElemDecl->getParentEnum()->mapTypeIntoContext(PayloadTy);
+        PayloadTy = ElemDecl->getParentEnum()->mapTypeIntoEnvironment(PayloadTy);
         auto &TI = IGM.getTypeInfoForUnlowered(PayloadTy);
         ElemDbgTy = CompletedDebugTypeInfo::getFromTypeInfo(PayloadTy, TI, IGM);
         // FIXME: This is not correct, but seems to be the only way to emit
@@ -1532,7 +1532,7 @@ private:
       std::optional<DebugTypeInfo> ElemDbgTy;
       if (auto PayloadTy = ElemDecl->getPayloadInterfaceType()) {
         // A variant case which carries a payload.
-        PayloadTy = ElemDecl->getParentEnum()->mapTypeIntoContext(PayloadTy);
+        PayloadTy = ElemDecl->getParentEnum()->mapTypeIntoEnvironment(PayloadTy);
         ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
             PayloadTy, IGM.getTypeInfoForUnlowered(PayloadTy), IGM);
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(),
@@ -3341,9 +3341,9 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
       SILType SILTy = IGM.silConv.getSILType(
           *ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext());
 
-      errorResultTy = SILFn->mapTypeIntoContext(errorResultTy)
+      errorResultTy = SILFn->mapTypeIntoEnvironment(errorResultTy)
           ->getCanonicalType();
-      SILTy = SILFn->mapTypeIntoContext(SILTy);
+      SILTy = SILFn->mapTypeIntoEnvironment(SILTy);
 
       auto DTI = DebugTypeInfo::getFromTypeInfo(
           errorResultTy,

@@ -692,7 +692,7 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
     type = funcTy->getResult();
   superclassCallExpr->setType(type);
   if (auto thrownInterfaceType = ctor->getEffectiveThrownErrorType()) {
-    Type superThrownType = ctor->mapTypeIntoContext(*thrownInterfaceType);
+    Type superThrownType = ctor->mapTypeIntoEnvironment(*thrownInterfaceType);
     superclassCallExpr->setThrows(
         ThrownErrorDestination::forMatchingContextType(superThrownType));
   } else {
@@ -786,7 +786,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
         superclassCtorSig.getRequirements(),
         [&](Type type) -> Type {
           auto substType = type.subst(subMap);
-          return GenericEnvironment::mapTypeIntoContext(genericEnv, substType);
+          return GenericEnvironment::mapTypeIntoEnvironment(genericEnv, substType);
         });
     if (checkResult != CheckRequirementsResult::Success)
       return nullptr;

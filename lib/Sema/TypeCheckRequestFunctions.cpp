@@ -479,7 +479,7 @@ Type ResultBuilderTypeRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  return type->mapTypeOutOfContext();
+  return type->mapTypeOutOfEnvironment();
 }
 
 Type GenericTypeParamDeclGetValueTypeRequest::evaluate(

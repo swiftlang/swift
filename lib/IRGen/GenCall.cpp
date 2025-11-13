@@ -3878,7 +3878,7 @@ void CallEmission::emitToMemory(Address addr,
 
   if (origResultType->hasTypeParameter())
     origResultType = IGF.IGM.getGenericEnvironment()
-      ->mapTypeIntoContext(origResultType)
+      ->mapTypeIntoEnvironment(origResultType)
       ->getCanonicalType();
 
   if (origResultType != substResultType) {

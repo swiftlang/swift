@@ -168,7 +168,7 @@ void TypeBase::getTypeParameterPacks(
         auto *genericEnv = archetypeTy->getGenericEnvironment();
         auto paramTy = archetypeTy->getInterfaceType()->getRootGenericParam();
         rootParameterPacks.push_back(
-            genericEnv->mapTypeIntoContext(paramTy));
+            genericEnv->mapTypeIntoEnvironment(paramTy));
       }
     }
 

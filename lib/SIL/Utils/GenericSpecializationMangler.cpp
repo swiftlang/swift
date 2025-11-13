@@ -176,7 +176,7 @@ getSubstitutionMapForPrespecialization(GenericSignature genericSig,
       [&](SubstitutableType *type) -> Type {
         auto SpecializedInterfaceTy =
             Type(type).subst(CalleeInterfaceToSpecializedInterfaceMap);
-        return SpecializedGenericEnv->mapTypeIntoContext(
+        return SpecializedGenericEnv->mapTypeIntoEnvironment(
             SpecializedInterfaceTy);
       },
       LookUpConformanceInModule());

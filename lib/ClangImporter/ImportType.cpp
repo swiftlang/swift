@@ -1165,7 +1165,7 @@ namespace {
             auto *genericEnv = imported->getGenericEnvironment();
 
             for (auto typeParam : imported->getGenericParams()->getParams()) {
-              Type importedTypeArg = genericEnv->mapTypeIntoContext(
+              Type importedTypeArg = genericEnv->mapTypeIntoEnvironment(
                   typeParam->getDeclaredInterfaceType())
                   ->castTo<ArchetypeType>()
                   ->getExistentialType();

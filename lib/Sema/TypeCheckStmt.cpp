@@ -1310,7 +1310,7 @@ public:
     if (!diagnosed) {
       auto *nominalDecl = fn->getDeclContext()->getSelfNominalTypeDecl();
       Type nominalType =
-          fn->mapTypeIntoContext(nominalDecl->getDeclaredInterfaceType());
+          fn->mapTypeIntoEnvironment(nominalDecl->getDeclaredInterfaceType());
 
       // must be noncopyable
       if (nominalType->isCopyable()) {

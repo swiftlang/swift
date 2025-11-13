@@ -590,7 +590,7 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     if (!viableTypes.insert(memberType->getCanonicalType()).second)
       continue;
 
-    auto memberTypeInContext = dc->mapTypeIntoContext(memberType);
+    auto memberTypeInContext = dc->mapTypeIntoEnvironment(memberType);
 
     // Check this type against the protocol requirements.
     if (auto checkResult =
@@ -1441,7 +1441,7 @@ static bool isExtensionUsableForInference(const ExtensionDecl *extension,
   // because those have to be explicitly declared on the type somewhere
   // so won't be affected by whatever answer inference comes up with.
   auto checkConformance = [&](ProtocolDecl *proto) {
-    auto typeInContext = conformanceDC->mapTypeIntoContext(conformance->getType());
+    auto typeInContext = conformanceDC->mapTypeIntoEnvironment(conformance->getType());
     auto otherConf = swift::checkConformance(typeInContext, proto);
     return !otherConf.isInvalid();
   };
@@ -1790,7 +1790,7 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
       if (!allUnresolved.count(result.first)) {
         auto existingWitness =
           conformance->getTypeWitness(result.first);
-        existingWitness = dc->mapTypeIntoContext(existingWitness);
+        existingWitness = dc->mapTypeIntoEnvironment(existingWitness);
 
         // For now, only a fully-concrete binding can contradict an existing
         // type witness.
@@ -1969,7 +1969,7 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
 
   // Retrieve the set of substitutions to be applied to the witness.
   Type model =
-    conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
+    conformance->getDeclContext()->mapTypeIntoEnvironment(conformance->getType());
   TypeSubstitutionMap substitutions = model->getMemberSubstitutions(witness);
 
   type = getWithoutProtocolTypeAliases(type);
@@ -2566,7 +2566,7 @@ AssociatedTypeInference::computeFailureTypeWitness(
       // If it isn't 'rethrows', use the thrown error type;.
       if (!witnessFunc->getAttrs().hasAttribute<RethrowsAttr>()) {
         return AbstractTypeWitness(assocType,
-                                   dc->mapTypeIntoContext(*thrownError));
+                                   dc->mapTypeIntoEnvironment(*thrownError));
       }
 
       for (auto req : witnessFunc->getGenericSignature().getRequirements()) {
@@ -2576,7 +2576,7 @@ AssociatedTypeInference::computeFailureTypeWitness(
               proto->isSpecificProtocol(KnownProtocolKind::AsyncSequence)) {
             auto failureAssocType = proto->getAssociatedType(ctx.Id_Failure);
             auto failureType = DependentMemberType::get(req.getFirstType(), failureAssocType);
-            return AbstractTypeWitness(assocType, dc->mapTypeIntoContext(failureType));
+            return AbstractTypeWitness(assocType, dc->mapTypeIntoEnvironment(failureType));
           }
         }
       }
@@ -2679,7 +2679,7 @@ Type AssociatedTypeInference::computeGenericParamWitness(
           continue;
 
         if (gp->getName() == assocType->getName())
-          return dc->mapTypeIntoContext(gp);
+          return dc->mapTypeIntoEnvironment(gp);
       }
     }
   }
@@ -2781,7 +2781,7 @@ bool AssociatedTypeInference::simplifyCurrentTypeWitnesses() {
     }
 
     auto selfTy = proto->getSelfInterfaceType()->getCanonicalType();
-    auto substSelfTy = dc->mapTypeIntoContext(conformance->getType());
+    auto substSelfTy = dc->mapTypeIntoEnvironment(conformance->getType());
 
     for (auto assocType : proto->getAssociatedTypeMembers()) {
       if (conformance->hasTypeWitness(assocType))
@@ -2940,7 +2940,7 @@ AssociatedTypeInference::getSubstOptionsWithCurrentTypeWitnesses() {
         return ErrorType::get(thisProto->getASTContext()).getPointer();
       }
 
-      return type->mapTypeOutOfContext().getPointer();
+      return type->mapTypeOutOfEnvironment().getPointer();
     };
   return options;
 }
@@ -3009,7 +3009,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
 }
 
 bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
-  auto typeInContext = dc->mapTypeIntoContext(adoptee);
+  auto typeInContext = dc->mapTypeIntoEnvironment(adoptee);
   auto subs = typeInContext->getContextSubstitutionMap(ext->getExtendedNominal());
 
   SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
@@ -4024,7 +4024,7 @@ auto AssociatedTypeInference::solve() -> std::optional<InferredTypeWitnesses> {
     auto derivedType = computeDerivedTypeWitness(assocType);
     if (derivedType.first) {
       recordTypeWitness(conformance, assocType,
-                        derivedType.first->mapTypeOutOfContext(),
+                        derivedType.first->mapTypeOutOfEnvironment(),
                         derivedType.second);
       continue;
     }
@@ -4092,7 +4092,7 @@ auto AssociatedTypeInference::solve() -> std::optional<InferredTypeWitnesses> {
       assert(!replacement->hasTypeParameter());
 
       if (replacement->hasArchetype()) {
-        replacement = replacement->mapTypeOutOfContext();
+        replacement = replacement->mapTypeOutOfEnvironment();
       }
 
       LLVM_DEBUG(llvm::dbgs() << "Best witness for " << assocType->getName()
@@ -4585,10 +4585,10 @@ AssociatedConformanceRequest::evaluate(Evaluator &eval,
   // FIXME: Eliminate this, perhaps by adding a variant of
   // lookupConformance() taking a generic signature.
   if (substTy->hasTypeParameter())
-    substTy = conformance->getDeclContext()->mapTypeIntoContext(substTy);
+    substTy = conformance->getDeclContext()->mapTypeIntoEnvironment(substTy);
 
   return lookupConformance(substTy, reqProto, /*allowMissing=*/true)
-      .mapConformanceOutOfContext();
+      .mapConformanceOutOfEnvironment();
 }
 
 TinyPtrVector<AssociatedTypeDecl *>
