@@ -96,7 +96,7 @@ public:
   Type getBodyResultType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *FD = dyn_cast<FuncDecl>(AFD))
-        return FD->mapTypeIntoContext(FD->getResultInterfaceType());
+        return FD->mapTypeIntoEnvironment(FD->getResultInterfaceType());
       return TupleType::getEmpty(AFD->getASTContext());
     }
     return cast<AbstractClosureExpr *>(TheFunction)->getResultType();
@@ -308,7 +308,7 @@ private:
           auto valueTy = AD->getStorage()->getValueInterfaceType()
                                          ->getReferenceStorageReferent();
           if (mapIntoContext)
-            valueTy = AD->mapTypeIntoContext(valueTy);
+            valueTy = AD->mapTypeIntoEnvironment(valueTy);
           YieldTypeFlags flags(isYieldingMutableAccessor(AD->getAccessorKind())
                                    ? ParamSpecifier::InOut
                                    : ParamSpecifier::LegacyShared);

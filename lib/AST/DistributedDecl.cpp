@@ -588,7 +588,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   //            Act.ID == Self.ActorID
   GenericTypeParamDecl *ActParam = genericParams->getParams()[0];
   auto ActConformance = lookupConformance(
-      mapTypeIntoContext(ActParam->getDeclaredInterfaceType()),
+      mapTypeIntoEnvironment(ActParam->getDeclaredInterfaceType()),
       C.getProtocol(KnownProtocolKind::DistributedActor));
   if (ActConformance.isInvalid()) {
     return false;
@@ -597,7 +597,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   // --- Check: Err: Error
   GenericTypeParamDecl *ErrParam = genericParams->getParams()[1];
   auto ErrConformance = lookupConformance(
-      mapTypeIntoContext(ErrParam->getDeclaredInterfaceType()),
+      mapTypeIntoEnvironment(ErrParam->getDeclaredInterfaceType()),
       C.getProtocol(KnownProtocolKind::Error));
   if (ErrConformance.isInvalid()) {
     return false;
@@ -660,9 +660,9 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   } else if (ResParam) {
     assert(ResParam && "Non void function, yet no Res generic parameter found");
     if (auto func = dyn_cast<FuncDecl>(this)) {
-      auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType())
+      auto resultType = func->mapTypeIntoEnvironment(func->getResultInterfaceType())
                             ->getMetatypeInstanceType();
-      auto resultParamType = func->mapTypeIntoContext(
+      auto resultParamType = func->mapTypeIntoEnvironment(
           ResParam->getDeclaredInterfaceType());
       // The result of the function must be the `Res` generic argument.
       if (!resultType->isEqual(resultParamType)) {
@@ -853,7 +853,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
     }
 
     auto argumentTy = argumentParam->getInterfaceType();
-    auto argumentInContextTy = mapTypeIntoContext(argumentTy);
+    auto argumentInContextTy = mapTypeIntoEnvironment(argumentTy);
     if (argumentInContextTy->getAnyNominal() == C.getRemoteCallArgumentDecl()) {
       auto argGenericParams = argumentInContextTy->getStructOrBoundGenericStruct()
           ->getGenericParams()->getParams();
@@ -863,9 +863,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
 
       // the <Value> of the RemoteCallArgument<Value>
       auto remoteCallArgValueGenericTy =
-          mapTypeIntoContext(argGenericParams[0]->getDeclaredInterfaceType());
+          mapTypeIntoEnvironment(argGenericParams[0]->getDeclaredInterfaceType());
       // expected (the <Value> from the recordArgument<Value>)
-      auto expectedGenericParamTy = mapTypeIntoContext(
+      auto expectedGenericParamTy = mapTypeIntoEnvironment(
           ArgumentParam->getDeclaredInterfaceType());
 
       if (!remoteCallArgValueGenericTy->isEqual(expectedGenericParamTy)) {
@@ -1005,10 +1005,10 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   // conforms_to: Argument Encodable
   // ...
 
-  auto resultType = func->mapTypeIntoContext(argumentParam->getInterfaceType())
+  auto resultType = func->mapTypeIntoEnvironment(argumentParam->getInterfaceType())
                         ->getMetatypeInstanceType();
 
-  auto resultParamType = func->mapTypeIntoContext(
+  auto resultParamType = func->mapTypeIntoEnvironment(
       ArgumentParam->getDeclaredInterfaceType());
 
   // The result of the function must be the `Res` generic argument.
@@ -1118,7 +1118,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     // --- Check: Err: Error
     GenericTypeParamDecl *ErrParam = genericParams->getParams()[0];
     auto ErrConformance = lookupConformance(
-        mapTypeIntoContext(ErrParam->getDeclaredInterfaceType()),
+        mapTypeIntoEnvironment(ErrParam->getDeclaredInterfaceType()),
         C.getProtocol(KnownProtocolKind::Error));
     if (ErrConformance.isInvalid()) {
       return false;
@@ -1216,9 +1216,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
     // === Check generic parameters in detail
     // --- Check: Argument: SerializationRequirement
     GenericTypeParamDecl *ArgumentParam = genericParams->getParams()[0];
-    auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType())
+    auto resultType = func->mapTypeIntoEnvironment(func->getResultInterfaceType())
                           ->getMetatypeInstanceType();
-    auto resultParamType = func->mapTypeIntoContext(
+    auto resultParamType = func->mapTypeIntoEnvironment(
         ArgumentParam->getDeclaredInterfaceType());
     // The result of the function must be the `Res` generic argument.
     if (!resultType->isEqual(resultParamType)) {
@@ -1316,9 +1316,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
     // === Check generic parameters in detail
     // --- Check: Argument: SerializationRequirement
     GenericTypeParamDecl *ArgumentParam = genericParams->getParams()[0];
-    auto argumentType = func->mapTypeIntoContext(
+    auto argumentType = func->mapTypeIntoEnvironment(
         valueParam->getInterfaceType()->getMetatypeInstanceType());
-    auto resultParamType = func->mapTypeIntoContext(
+    auto resultParamType = func->mapTypeIntoEnvironment(
         ArgumentParam->getDeclaredInterfaceType());
     // The result of the function must be the `Res` generic argument.
     if (!argumentType->isEqual(resultParamType)) {

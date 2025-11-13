@@ -960,7 +960,7 @@ bool TypeBase::isEscapable() {
 bool TypeBase::isEscapable(GenericSignature sig) {
   Type contextTy = this;
   if (sig) {
-    contextTy = sig.getGenericEnvironment()->mapTypeIntoContext(contextTy);
+    contextTy = sig.getGenericEnvironment()->mapTypeIntoEnvironment(contextTy);
   }
   return contextTy->isEscapable();
 }
@@ -978,7 +978,7 @@ bool TypeBase::isBitwiseCopyable() {
 bool TypeBase::isBitwiseCopyable(GenericSignature sig) {
   Type contextTy = this;
   if (sig) {
-    contextTy = sig.getGenericEnvironment()->mapTypeIntoContext(contextTy);
+    contextTy = sig.getGenericEnvironment()->mapTypeIntoEnvironment(contextTy);
   }
   return contextTy->isBitwiseCopyable();
 }

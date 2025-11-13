@@ -415,12 +415,12 @@ static bool checkDistributedTargetResultType(
 
   Type resultType;
   if (auto func = dyn_cast<FuncDecl>(valueDecl)) {
-    resultType = func->mapTypeIntoContext(func->getResultInterfaceType());
+    resultType = func->mapTypeIntoEnvironment(func->getResultInterfaceType());
   } else if (auto var = dyn_cast<VarDecl>(valueDecl)) {
     // Distributed computed properties are always getters,
     // so get the get accessor for mapping the type into context:
     auto getter = var->getAccessor(swift::AccessorKind::Get);
-    resultType = getter->mapTypeIntoContext(var->getInterfaceType());
+    resultType = getter->mapTypeIntoEnvironment(var->getInterfaceType());
   } else {
     llvm_unreachable("Unsupported distributed target");
   }
@@ -551,7 +551,7 @@ bool CheckDistributedFunctionRequest::evaluate(
               C, serializationReqType);
 
       // --- Check parameters for 'SerializationRequirement' conformance
-      auto paramTy = func->mapTypeIntoContext(param->getInterfaceType());
+      auto paramTy = func->mapTypeIntoEnvironment(param->getInterfaceType());
 
       auto srl = serializationReqType->getExistentialLayout();
       for (auto req: srl.getProtocols()) {

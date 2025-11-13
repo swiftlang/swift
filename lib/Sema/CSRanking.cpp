@@ -436,7 +436,7 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
 
   cs.addConstraint(ConstraintKind::Bind,
                    replacements[0].second,
-                   dc1->mapTypeIntoContext(selfType1),
+                   dc1->mapTypeIntoEnvironment(selfType1),
                    nullptr);
 
   // Solve the system. If the first extension is at least as specialized as the
@@ -610,7 +610,7 @@ bool CompareDeclSpecializationRequest::evaluate(
   auto openedType1 = openType(cs, innerDC1, outerDC1, type1, replacements, locator);
 
   for (auto replacement : replacements) {
-    if (auto mapped = innerDC1->mapTypeIntoContext(replacement.first)) {
+    if (auto mapped = innerDC1->mapTypeIntoEnvironment(replacement.first)) {
       cs.addConstraint(ConstraintKind::Bind, replacement.second, mapped,
                        locator);
     }
@@ -1208,9 +1208,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
             
             // If both are convenience initializers, and the instance type of
             // one is a subtype of the other's, favor the subtype constructor.
-            auto resType1 = ctor1->mapTypeIntoContext(
+            auto resType1 = ctor1->mapTypeIntoEnvironment(
                 ctor1->getResultInterfaceType());
-            auto resType2 = ctor2->mapTypeIntoContext(
+            auto resType2 = ctor2->mapTypeIntoEnvironment(
                 ctor2->getResultInterfaceType());
             
             if (!resType1->isEqual(resType2)) {

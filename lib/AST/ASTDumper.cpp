@@ -261,7 +261,7 @@ std::string typeUSR(Type type) {
     return "";
 
   if (type->hasArchetype()) {
-    type = type->mapTypeOutOfContext();
+    type = type->mapTypeOutOfEnvironment();
   }
   if (type->hasLocalArchetype()) {
     type = replaceLocalArchetypesWithExistentials(type);
@@ -6821,7 +6821,7 @@ void GenericEnvironment::dump(raw_ostream &os) const {
   os << "Generic environment:\n";
   for (auto gp : getGenericParams()) {
     gp->dump(os);
-    mapTypeIntoContext(gp)->dump(os);
+    mapTypeIntoEnvironment(gp)->dump(os);
   }
   os << "Generic parameters:\n";
   for (auto paramTy : getGenericParams())

@@ -45,7 +45,7 @@ SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
   // Emit the implicit 'self' argument.
   SILType selfType = conventions.getSILArgumentType(
       conventions.getNumSILArguments() - 1, F.getTypeExpansionContext());
-  selfType = F.mapTypeIntoContext(selfType);
+  selfType = F.mapTypeIntoEnvironment(selfType);
   SILValue selfValue = F.begin()->createFunctionArgument(selfType, selfDecl);
 
   uint16_t ArgNo = 1; // Hardcoded for destructors.
@@ -127,7 +127,7 @@ struct LoweredParamGenerator {
     assert(!isFormalParameterPack || parameterInfo.isPack());
 
     auto paramType =
-        SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
+        SGF.F.mapTypeIntoEnvironment(SGF.getSILType(parameterInfo, fnTy));
     ManagedValue mv = SGF.B.createInputFunctionArgument(
         paramType, paramDecl, isNoImplicitCopy, lifetimeAnnotation,
         /*isClosureCapture*/ false, isFormalParameterPack, isImplicitParameter);
@@ -1155,9 +1155,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SILLocation Loc(expr);
     Loc.markAsPrologue();
 
-    auto interfaceType = expr->getType()->mapTypeOutOfContext();
+    auto interfaceType = expr->getType()->mapTypeOutOfEnvironment();
 
-    auto type = SGF.F.mapTypeIntoContext(interfaceType);
+    auto type = SGF.F.mapTypeIntoEnvironment(interfaceType);
     auto &lowering = SGF.getTypeLowering(type);
     SILType ty = lowering.getLoweredType();
 
@@ -1215,7 +1215,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     isPack = true;
   }
 
-  auto type = SGF.F.mapTypeIntoContext(interfaceType);
+  auto type = SGF.F.mapTypeIntoEnvironment(interfaceType);
   auto &lowering = SGF.getTypeLowering(type);
   SILType ty = lowering.getLoweredType();
 
@@ -1460,8 +1460,8 @@ void SILGenFunction::emitProlog(
 
     if (capture.isOpaqueValue()) {
       OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
-      Type type = opaqueValue->getType()->mapTypeOutOfContext();
-      type = F.mapTypeIntoContext(type);
+      Type type = opaqueValue->getType()->mapTypeOutOfEnvironment();
+      type = F.mapTypeIntoEnvironment(type);
       auto &lowering = getTypeLowering(type);
       SILType ty = lowering.getLoweredType();
       SILValue val = F.begin()->createFunctionArgument(ty);
@@ -1550,7 +1550,7 @@ static void emitIndirectResultParameters(SILGenFunction &SGF,
   }
 
   CanType resultTypeInContext =
-    DC->mapTypeIntoContext(resultType)->getCanonicalType();
+    DC->mapTypeIntoEnvironment(resultType)->getCanonicalType();
 
   // Tuples in the original result type are expanded.
   if (origResultType.isTuple()) {
@@ -1615,7 +1615,7 @@ static void emitIndirectErrorParameter(SILGenFunction &SGF,
                                        AbstractionPattern origErrorType,
                                        DeclContext *DC) {
   CanType errorTypeInContext =
-    DC->mapTypeIntoContext(errorType)->getCanonicalType();
+    DC->mapTypeIntoEnvironment(errorType)->getCanonicalType();
 
   // If the error type is address-only, emit the indirect error argument.
 
@@ -1718,7 +1718,7 @@ uint16_t SILGenFunction::emitBasicProlog(
   // Record the ArgNo of the artificial $error inout argument. 
   if (errorType && IndirectErrorResult == nullptr) {
     CanType errorTypeInContext =
-      DC->mapTypeIntoContext(*errorType)->getCanonicalType();
+      DC->mapTypeIntoEnvironment(*errorType)->getCanonicalType();
     auto loweredErrorTy = getLoweredType(*origErrorType, errorTypeInContext);
     ManagedValue undef = emitUndef(loweredErrorTy);
     SILDebugVariable dbgVar("$error", /*Constant*/ false, ++ArgNo);

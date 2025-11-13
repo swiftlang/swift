@@ -872,12 +872,12 @@ public:
   SILType removingAnyMoveOnlyWrapping(const SILFunction *fn);
 
   /// Returns a SILType with any archetypes mapped out of context.
-  SILType mapTypeOutOfContext() const;
+  SILType mapTypeOutOfEnvironment() const;
 
   /// Given a lowered type (but without any particular value category),
   /// map it out of its current context.  Equivalent to
-  /// SILType::getPrimitiveObjectType(type).mapTypeOutOfContext().getASTType().
-  static CanType mapTypeOutOfContext(CanType type);
+  /// SILType::getPrimitiveObjectType(type).mapTypeOutOfEnvironment().getASTType().
+  static CanType mapTypeOutOfEnvironment(CanType type);
 
   /// Given two SIL types which are representations of the same type,
   /// check whether they have an abstraction difference.

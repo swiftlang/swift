@@ -6237,7 +6237,7 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
                              AbstractStorageDecl *baseClassVar) {
   auto &ctx = declContext->getASTContext();
   auto computedType = computedVar->getInterfaceType();
-  auto contextTy = declContext->mapTypeIntoContext(computedType);
+  auto contextTy = declContext->mapTypeIntoEnvironment(computedType);
 
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types, unless the base accessor returns it by value.
@@ -6392,7 +6392,7 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
 
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
     auto contextTy =
-        newContext->mapTypeIntoContext(subscript->getElementInterfaceType());
+        newContext->mapTypeIntoEnvironment(subscript->getElementInterfaceType());
     // Subscripts that return non-copyable types are not yet supported.
     // See: https://github.com/apple/swift/issues/70047.
     if (contextTy->isNoncopyable())

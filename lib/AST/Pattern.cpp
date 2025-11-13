@@ -153,7 +153,7 @@ Type Pattern::getType() const {
 
     if (auto genericEnv = dc->getGenericEnvironmentOfContext()) {
       ctx.DelayedPatternContexts.erase(this);
-      Ty = genericEnv->mapTypeIntoContext(Ty);
+      Ty = genericEnv->mapTypeIntoEnvironment(Ty);
       const_cast<Pattern*>(this)->Bits.Pattern.hasInterfaceType = false;
     }
   }

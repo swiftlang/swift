@@ -188,7 +188,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   }
 
   // Type-check the macro expansion.
-  Type resultType = macro->mapTypeIntoContext(macro->getResultInterfaceType());
+  Type resultType = macro->mapTypeIntoEnvironment(macro->getResultInterfaceType());
 
   constraints::ContextualTypeInfo contextualType {
     TypeLoc::withoutLoc(resultType),

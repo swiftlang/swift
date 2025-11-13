@@ -144,7 +144,7 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   public var hasValidSignatureForEmbedded: Bool {
     let genericSignature = invocationGenericSignatureOfFunction
     for genParam in genericSignature.genericParameters {
-      let mappedParam = genericSignature.mapTypeIntoContext(genParam)
+      let mappedParam = genericSignature.mapTypeIntoEnvironment(genParam)
       if mappedParam.isArchetype && !mappedParam.archetypeRequiresClass {
         return false
       }

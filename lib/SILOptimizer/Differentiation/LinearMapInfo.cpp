@@ -67,8 +67,8 @@ LinearMapInfo::LinearMapInfo(ADContext &context, AutoDiffLinearMapKind kind,
 
 SILType LinearMapInfo::remapTypeInDerivative(SILType ty) {
   if (ty.hasArchetype())
-    return derivative->mapTypeIntoContext(ty.mapTypeOutOfContext());
-  return derivative->mapTypeIntoContext(ty);
+    return derivative->mapTypeIntoEnvironment(ty.mapTypeOutOfEnvironment());
+  return derivative->mapTypeIntoEnvironment(ty);
 }
 
 EnumDecl *
@@ -153,7 +153,7 @@ void LinearMapInfo::populateBranchingTraceDecl(SILBasicBlock *originalBB,
 
       auto canLinearMapTupleTy = linearMapTupleTy->getCanonicalType();
       decl->setInterfaceType(canLinearMapTupleTy->hasArchetype()
-                                 ? canLinearMapTupleTy->mapTypeOutOfContext()
+                                 ? canLinearMapTupleTy->mapTypeOutOfEnvironment()
                                  : canLinearMapTupleTy);
     }
     // Create enum element and enum case declarations.
@@ -316,7 +316,7 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
   }
 
   Type resultType =
-      astFnTy->hasArchetype() ? astFnTy->mapTypeOutOfContext() : astFnTy;
+      astFnTy->hasArchetype() ? astFnTy->mapTypeOutOfEnvironment() : astFnTy;
   if (fai.getKind() == FullApplySiteKind::TryApplyInst)
     resultType = resultType->wrapInOptionalType();
 

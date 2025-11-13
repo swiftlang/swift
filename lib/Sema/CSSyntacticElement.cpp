@@ -2046,7 +2046,7 @@ private:
     for (auto *expected : caseStmt->getCaseBodyVariables()) {
       assert(expected->hasName());
       auto prev = expected->getParentVarDecl();
-      auto type = solution.getResolvedType(prev)->mapTypeOutOfContext();
+      auto type = solution.getResolvedType(prev)->mapTypeOutOfEnvironment();
       expected->setInterfaceType(type);
     }
   }
@@ -2567,19 +2567,19 @@ static void applySolutionToClosurePropertyWrappers(ClosureExpr *closure,
     // Set the interface type of each property wrapper synthesized var
     auto *backingVar = param->getPropertyWrapperBackingProperty();
     auto backingType = solution.simplifyType(solution.getType(backingVar))
-                           ->mapTypeOutOfContext();
+                           ->mapTypeOutOfEnvironment();
     backingVar->setInterfaceType(backingType);
 
     if (auto *projectionVar = param->getPropertyWrapperProjectionVar()) {
       projectionVar->setInterfaceType(
           solution.simplifyType(solution.getType(projectionVar))
-              ->mapTypeOutOfContext());
+              ->mapTypeOutOfEnvironment());
     }
 
     auto *wrappedValueVar = param->getPropertyWrapperWrappedValueVar();
     auto wrappedValueType =
         solution.simplifyType(solution.getType(wrappedValueVar))
-            ->mapTypeOutOfContext();
+            ->mapTypeOutOfEnvironment();
     wrappedValueVar->setInterfaceType(
         wrappedValueType->getWithoutSpecifierType());
 

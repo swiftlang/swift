@@ -1594,7 +1594,7 @@ public:
     // Allocate a new object using the layout.
     auto boxedInterfaceType = boxedType;
     if (env) {
-      boxedInterfaceType = boxedType.mapTypeOutOfContext();
+      boxedInterfaceType = boxedType.mapTypeOutOfEnvironment();
     }
 
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(

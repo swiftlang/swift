@@ -1316,7 +1316,7 @@ void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
   // doing anything else.
   if (BaseTy->hasTypeParameter()) {
     assert(Sig);
-    BaseTy = Sig.getGenericEnvironment()->mapTypeIntoContext(BaseTy);
+    BaseTy = Sig.getGenericEnvironment()->mapTypeIntoEnvironment(BaseTy);
   }
 
   assert(CurrDC);

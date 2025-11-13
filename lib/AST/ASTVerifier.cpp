@@ -688,7 +688,7 @@ public:
           // Mapping the archetype out and back in should produce the
           // same archetype.
           auto interfaceType = archetype->getInterfaceType();
-          auto contextType = archetypeEnv->mapTypeIntoContext(interfaceType);
+          auto contextType = archetypeEnv->mapTypeIntoEnvironment(interfaceType);
 
           if (!contextType->isEqual(archetype)) {
             Out << "Archetype " << archetype->getString() << " does not appear"
@@ -1101,7 +1101,7 @@ public:
 
       if (auto *FD = dyn_cast<FuncDecl>(func)) {
         resultType = FD->getResultInterfaceType();
-        resultType = FD->mapTypeIntoContext(resultType);
+        resultType = FD->mapTypeIntoEnvironment(resultType);
         hasInOutResult = FD->getInterfaceType()
                              ->castTo<AnyFunctionType>()
                              ->getExtInfo()
