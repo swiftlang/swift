@@ -428,6 +428,18 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
                                   selfIfaceTy, selfTy, std::move(*elti));
           ++elti;
           continue;
+        } else {
+          // If the property isn't memberwise initialized, emit the initial
+          // value directly.
+          // TODO: This matches the logic below, but should we be calling
+          // the initializer generator instead to match what we do for
+          // `emitMemberInitializationViaInitAccessor`?
+          auto *init = field->getParentExecutableInitializer();
+          ASSERT(init);
+          FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
+          auto rvalue = SGF.emitRValue(init);
+          emitApplyOfInitAccessor(SGF, Loc, initAccessor, resultSlot,
+                                  selfIfaceTy, selfTy, std::move(rvalue));
         }
       }
 
