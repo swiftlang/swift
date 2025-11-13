@@ -386,10 +386,6 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
   SmallPtrSet<VarDecl *, 4> subsumedViaInitAccessor;
 
   for (auto *var : initableVars) {
-    // We only care about properties that are memberwise initialized.
-    if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
-      continue;
-
     // If this property has an init accessor, it subsumes all of the stored properties
     // that the accessor initializes. Mark those stored properties as being subsumed; we'll
     // get back to them later.
@@ -398,6 +394,10 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
         subsumedViaInitAccessor.insert(subsumed);
       }
     }
+
+    // We only care about properties that are memberwise initialized.
+    if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+      continue;
 
     // Add this property.
     results.push_back(var);
