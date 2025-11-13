@@ -625,6 +625,41 @@ void BindingSet::inferTransitiveBindings() {
                  /*isTransitive=*/true);
     }
   }
+
+  if (!hasViableBindings()) {
+    if (auto *locator = TypeVar->getImpl().getLocator()) {
+      if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
+        // If this is a base of an unresolved member chain, as a last
+        // resort effort let's infer base to be a protocol type based
+        // on contextual conformance requirements.
+        //
+        // This allows us to find solutions in cases like this:
+        //
+        // \code
+        // func foo<T: P>(_: T) {}
+        // foo(.bar) <- `.bar` should be a static member of `P`.
+        // \endcode
+        inferTransitiveProtocolRequirements();
+
+        if (TransitiveProtocols.has_value()) {
+          for (auto *constraint : *TransitiveProtocols) {
+            Type protocolTy = constraint->getSecondType();
+
+            // Compiler-known marker protocols cannot be extended with members,
+            // so do not consider them.
+            if (auto p = protocolTy->getAs<ProtocolType>()) {
+              if (ProtocolDecl *decl = p->getDecl())
+                if (decl->getKnownProtocolKind() && decl->isMarkerProtocol())
+                  continue;
+            }
+
+            addBinding({protocolTy, AllowedBindingKind::Exact, constraint},
+                       /*isTransitive=*/false);
+          }
+        }
+      }
+    }
+  }
 }
 
 static Type getKeyPathType(ASTContext &ctx, KeyPathCapability capability,
@@ -665,44 +700,8 @@ static Type getKeyPathType(ASTContext &ctx, KeyPathCapability capability,
 }
 
 bool BindingSet::finalize(bool transitive) {
-  if (transitive) {
+  if (transitive)
     inferTransitiveBindings();
-
-    if (!hasViableBindings()) {
-      if (auto *locator = TypeVar->getImpl().getLocator()) {
-        if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
-          // If this is a base of an unresolved member chain, as a last
-          // resort effort let's infer base to be a protocol type based
-          // on contextual conformance requirements.
-          //
-          // This allows us to find solutions in cases like this:
-          //
-          // \code
-          // func foo<T: P>(_: T) {}
-          // foo(.bar) <- `.bar` should be a static member of `P`.
-          // \endcode
-          inferTransitiveProtocolRequirements();
-
-          if (TransitiveProtocols.has_value()) {
-            for (auto *constraint : *TransitiveProtocols) {
-              Type protocolTy = constraint->getSecondType();
-
-              // Compiler-known marker protocols cannot be extended with members,
-              // so do not consider them.
-              if (auto p = protocolTy->getAs<ProtocolType>()) {
-                if (ProtocolDecl *decl = p->getDecl())
-                  if (decl->getKnownProtocolKind() && decl->isMarkerProtocol())
-                    continue;
-              }
-
-              addBinding({protocolTy, AllowedBindingKind::Exact, constraint},
-                         /*isTransitive=*/false);
-            }
-          }
-        }
-      }
-    }
-  }
 
   if (auto *locator = TypeVar->getImpl().getLocator()) {
     if (TypeVar->getImpl().isKeyPathType()) {
