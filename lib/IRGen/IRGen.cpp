@@ -1740,9 +1740,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
 
     (void)layoutStringsEnabled(*IGM, /*diagnose*/ true);
 
-    // Only need to do this once.
-    if (!IGMcreated)
-      IGM->addLinkLibraries();
+    IGM->addLinkLibraries();
     IGMcreated = true;
   }
 
