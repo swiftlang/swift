@@ -323,10 +323,50 @@ bool HasInitAccessorRequest::evaluate(Evaluator &evaluator,
 }
 
 ArrayRef<VarDecl *>
+InitializablePropertiesRequest::evaluate(Evaluator &evaluator,
+                                         NominalTypeDecl *decl) const {
+  IterableDeclContext *implDecl = decl->getImplementationContext();
+
+  if (!hasStoredProperties(decl, implDecl))
+    return ArrayRef<VarDecl *>();
+
+  SmallVector<VarDecl *, 4> results;
+  computeLoweredProperties(decl, implDecl, LoweredPropertiesReason::Memberwise);
+
+  auto maybeAddProperty = [&](VarDecl *var) {
+    if (!var->getDeclContext()->isTypeContext() || var->isStatic())
+      return;
+
+    if (var->getAttrs().hasAttribute<LazyAttr>() ||
+        var->hasAttachedPropertyWrapper() || var->hasStorage() ||
+        var->hasInitAccessor()) {
+      results.push_back(var);
+    }
+  };
+
+  for (auto *member : decl->getMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member))
+      maybeAddProperty(var);
+
+    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
+      if (auto auxVar = dyn_cast<VarDecl>(auxDecl))
+        maybeAddProperty(auxVar);
+    });
+  }
+
+  return decl->getASTContext().AllocateCopy(results);
+}
+
+ArrayRef<VarDecl *>
 InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
                                         NominalTypeDecl *decl) const {
+  auto initableVars =
+      evaluateOrDefault(evaluator, InitializablePropertiesRequest{decl}, {});
+  if (initableVars.empty())
+    return {};
+
   SmallVector<VarDecl *, 4> results;
-  for (auto var : decl->getMemberwiseInitProperties()) {
+  for (auto *var : initableVars) {
     if (var->hasInitAccessor())
       results.push_back(var);
   }
@@ -336,25 +376,19 @@ InitAccessorPropertiesRequest::evaluate(Evaluator &evaluator,
 
 ArrayRef<VarDecl *>
 MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
-                                        NominalTypeDecl *decl) const {
-  IterableDeclContext *implDecl = decl->getImplementationContext();
-
-  if (!hasStoredProperties(decl, implDecl))
-    return ArrayRef<VarDecl *>();
-
-  // Make sure we expand what we need to to get all of the properties.
-  computeLoweredProperties(decl, implDecl, LoweredPropertiesReason::Memberwise);
+                                          NominalTypeDecl *decl) const {
+  auto initableVars =
+      evaluateOrDefault(evaluator, InitializablePropertiesRequest{decl}, {});
+  if (initableVars.empty())
+    return {};
 
   SmallVector<VarDecl *, 4> results;
   SmallPtrSet<VarDecl *, 4> subsumedViaInitAccessor;
 
-  auto maybeAddProperty = [&](VarDecl *var) {
+  for (auto *var : initableVars) {
     // We only care about properties that are memberwise initialized.
     if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
-      return;
-
-    // Add this property.
-    results.push_back(var);
+      continue;
 
     // If this property has an init accessor, it subsumes all of the stored properties
     // that the accessor initializes. Mark those stored properties as being subsumed; we'll
@@ -364,16 +398,9 @@ MemberwiseInitPropertiesRequest::evaluate(Evaluator &evaluator,
         subsumedViaInitAccessor.insert(subsumed);
       }
     }
-  };
 
-  for (auto *member : decl->getCurrentMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member))
-      maybeAddProperty(var);
-
-    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
-      if (auto auxVar = dyn_cast<VarDecl>(auxDecl))
-        maybeAddProperty(auxVar);
-    });
+    // Add this property.
+    results.push_back(var);
   }
 
   // If any properties were subsumed via init accessors, drop them from the list.
