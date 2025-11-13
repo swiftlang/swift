@@ -22,7 +22,7 @@ internal func _swift_stdlib_getUnsafeArgvArgc(_: UnsafeMutablePointer<Int32>)
 private func _copyExecutablePath() -> UnsafeMutablePointer<CChar>
 
 @_silgen_name("_swift_stdlib_deallocExecutablePath")
-private func _deallocExecutablePath(UnsafeMutablePointer<CChar>)
+private func _deallocExecutablePath(_ path: UnsafeMutablePointer<CChar>)
 
 /// Command-line arguments for the current process.
 @frozen // namespace
