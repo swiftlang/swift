@@ -202,7 +202,8 @@ ClangImporter::createClangArgs(const ClangImporterOptions &ClangImporterOpts,
 }
 
 static SmallVector<std::pair<std::string, std::string>, 2>
-getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
+getLibcFileMapping(const ClangInvocationFileMappingContext &ctx,
+                   StringRef modulemapFileName,
                    std::optional<ArrayRef<StringRef>> maybeHeaderFileNames,
                    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs,
                    bool suppressDiagnostic) {
@@ -269,7 +270,8 @@ getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
 }
 
 static void getLibStdCxxFileMapping(
-    ClangInvocationFileMapping &fileMapping, const ASTContext &ctx,
+    ClangInvocationFileMapping &fileMapping,
+    const ClangInvocationFileMappingContext &ctx,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs,
     bool suppressDiagnostic) {
   assert(ctx.LangOpts.EnableCXXInterop &&
@@ -475,7 +477,8 @@ GetPlatformAuxiliaryFile(StringRef Platform, StringRef File,
 }
 
 void GetWindowsFileMappings(
-    ClangInvocationFileMapping &fileMapping, const ASTContext &Context,
+    ClangInvocationFileMapping &fileMapping,
+    const ClangInvocationFileMappingContext &Context,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &driverVFS,
     bool &requiresBuiltinHeadersInSystemModules) {
   const llvm::Triple &Triple = Context.LangOpts.Target;
@@ -615,8 +618,14 @@ void GetWindowsFileMappings(
 }
 } // namespace
 
+ClangInvocationFileMappingContext::ClangInvocationFileMappingContext(
+    const swift::ASTContext &Ctx)
+  : ClangInvocationFileMappingContext(Ctx.LangOpts, Ctx.SearchPathOpts,
+        Ctx.ClangImporterOpts, Ctx.CASOpts, Ctx.Diags) {}
+
 ClangInvocationFileMapping swift::getClangInvocationFileMapping(
-  const ASTContext &ctx, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs,
+  const ClangInvocationFileMappingContext &ctx,
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs,
   bool suppressDiagnostic) {
   ClangInvocationFileMapping result;
   if (!vfs)
@@ -687,10 +696,11 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
   return result;
 }
 
-ClangInvocationFileMapping swift::applyClangInvocationMapping(const ASTContext &ctx,
-                                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseVFS,
-                                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &fileSystem,
-                                        bool suppressDiagnostics) {
+ClangInvocationFileMapping swift::applyClangInvocationMapping(
+    const ClangInvocationFileMappingContext &ctx,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseVFS,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &fileSystem,
+    bool suppressDiagnostics) {
   if (ctx.CASOpts.HasImmutableFileSystem)
     return ClangInvocationFileMapping();
 
@@ -719,13 +729,9 @@ ClangInvocationFileMapping swift::applyClangInvocationMapping(const ASTContext &
                      << "' with the following contents:\n";
         llvm::errs() << file.second << "\n";
       }
-      auto contents = ctx.Allocate<char>(file.second.size() + 1);
-      std::copy(file.second.begin(), file.second.end(), contents.begin());
-      // null terminate the buffer.
-      contents[contents.size() - 1] = '\0';
+      // Note MemoryBuffer is guaranteeed to be null-terminated.
       overridenVFS->addFile(file.first, 0,
-                            llvm::MemoryBuffer::getMemBuffer(StringRef(
-                                contents.begin(), contents.size() - 1)));
+                            llvm::MemoryBuffer::getMemBufferCopy(file.second));
     }
     llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> overlayVFS =
         new llvm::vfs::OverlayFileSystem(fileSystem);

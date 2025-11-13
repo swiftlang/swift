@@ -75,6 +75,7 @@ namespace dependencies {
 namespace swift {
 enum class ResultConvention : uint8_t;
 class ASTContext;
+class CASOptions;
 class CompilerInvocation;
 class ClangImporterOptions;
 class ClangInheritanceInfo;
@@ -83,6 +84,7 @@ class ClangNode;
 class ConcreteDeclRef;
 class Decl;
 class DeclContext;
+class DiagnosticEngine;
 class EffectiveClangContext;
 class EnumDecl;
 class FuncDecl;
@@ -878,6 +880,25 @@ struct ClangInvocationFileMapping {
   bool requiresBuiltinHeadersInSystemModules;
 };
 
+class ClangInvocationFileMappingContext {
+public:
+  const LangOptions &LangOpts;
+  SearchPathOptions &SearchPathOpts;
+  ClangImporterOptions &ClangImporterOpts;
+  const CASOptions &CASOpts;
+  DiagnosticEngine &Diags;
+
+  ClangInvocationFileMappingContext(
+    const LangOptions &LangOpts, SearchPathOptions &SearchPathOpts,
+    ClangImporterOptions &ClangImporterOpts, const CASOptions &CASOpts,
+    DiagnosticEngine &Diags)
+    : LangOpts(LangOpts), SearchPathOpts(SearchPathOpts),
+      ClangImporterOpts(ClangImporterOpts), CASOpts(CASOpts),
+      Diags(Diags) {}
+
+  ClangInvocationFileMappingContext(const swift::ASTContext &Ctx);
+};
+
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
 /// We inject modulemaps for those libraries into their include directories
 /// to allow using them from Swift.
@@ -885,7 +906,7 @@ struct ClangInvocationFileMapping {
 /// `suppressDiagnostic` prevents us from emitting warning messages when we
 /// are unable to find headers.
 ClangInvocationFileMapping getClangInvocationFileMapping(
-    const ASTContext &ctx,
+    const ClangInvocationFileMappingContext &ctx,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
     bool suppressDiagnostic = false);
 
@@ -893,7 +914,7 @@ ClangInvocationFileMapping getClangInvocationFileMapping(
 /// primarily to inject modulemaps on platforms with non-modularized
 /// platform libraries.
 ClangInvocationFileMapping applyClangInvocationMapping(
-    const ASTContext &ctx,
+    const ClangInvocationFileMappingContext &ctx,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseVFS,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &fileSystem,
     bool suppressDiagnostics = false);
