@@ -1366,7 +1366,7 @@ function Get-Dependencies {
 
     # TODO(compnerd) stamp/validate that we need to re-extract
     New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
-    Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain.TrimStart("swift-").TrimEnd("-a-windows10")
+    Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain.TrimStart("swift-").TrimEnd("-arm64").TrimEnd("-a-windows10")
     Write-Success "Swift Toolchain $PinnedVersion"
 
     if ($Android) {
