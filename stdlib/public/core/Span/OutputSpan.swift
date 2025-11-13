@@ -83,7 +83,7 @@ extension OutputSpan where Element: ~Copyable {
   /// The number of initialized elements in this span.
   @_alwaysEmitIntoClient
   @_semantics("fixed_storage.get_count")
-  public var count: Int { _count }
+  public var count: Int { _assumeNonNegative(_count) }
 
   /// The number of additional elements that can be added to this span.
   @_alwaysEmitIntoClient
@@ -191,7 +191,7 @@ extension OutputSpan where Element: ~Copyable {
   /// The range of initialized positions for this `OutputSpan`.
   @_alwaysEmitIntoClient
   public var indices: Range<Index> {
-    unsafe Range(_uncheckedBounds: (0, _count))
+    unsafe Range(_uncheckedBounds: (0, count))
   }
 
   // SILOptimizer looks for fixed_storage.check_index semantics for bounds check optimizations.
