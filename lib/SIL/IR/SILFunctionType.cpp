@@ -4424,12 +4424,29 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     if (!c.hasDecl())
       return SILFunctionTypeRepresentation::CFunctionPointer;
 
-    if (auto method =
-            dyn_cast_or_null<clang::CXXMethodDecl>(c.getDecl()->getClangDecl()))
-      return isa<clang::CXXConstructorDecl>(method) || method->isStatic()
-                 ? SILFunctionTypeRepresentation::CFunctionPointer
-                 : SILFunctionTypeRepresentation::CXXMethod;
+    if (auto clangDecl = c.getDecl()->getClangDecl()) {
+      if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
+        return isa<clang::CXXConstructorDecl>(method) || method->isStatic()
+                   ? SILFunctionTypeRepresentation::CFunctionPointer
+                   : SILFunctionTypeRepresentation::CXXMethod;
+      }
 
+      if (auto function = dyn_cast<clang::FunctionDecl>(clangDecl)) {
+        if (auto fnType = function->getType()->getAs<clang::FunctionType>()) {
+          switch (fnType->getCallConv()) {
+            case clang::CC_Swift:
+              return SILFunctionTypeRepresentation::Thin;
+
+            case clang::CC_C:
+              return SILFunctionTypeRepresentation::CFunctionPointer;
+
+            default:
+              // Fall back to heuristics below.
+              break;
+          }
+        }
+      }
+    }
 
     // For example, if we have a function in a namespace:
     if (c.getDecl()->isImportAsMember())
