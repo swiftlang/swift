@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) %s -I %S/Inputs -import-bridging-header %S/../../../Inputs/clang-importer-sdk/usr/include/string.h -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) %s -I %S/Inputs -import-bridging-header %S/Inputs/my-memory.h -enable-experimental-cxx-interop | %FileCheck %s
 
 
 func zerome(ptr: UnsafeMutablePointer<Int>) {
