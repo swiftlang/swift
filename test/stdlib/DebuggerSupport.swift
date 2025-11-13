@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-g -Onone)
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: reflection
