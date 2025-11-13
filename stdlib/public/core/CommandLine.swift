@@ -140,7 +140,7 @@ extension CommandLine {
       _deallocExecutablePath(cString)
     }
     return String(cString: cString)
-  }
+  }()
 }
 
 #endif // SWIFT_STDLIB_HAS_COMMANDLINE
