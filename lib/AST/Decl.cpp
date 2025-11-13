@@ -13114,6 +13114,76 @@ MacroDiscriminatorContext::getParentOf(FreestandingMacroExpansion *expansion) {
       expansion->getPoundLoc(), expansion->getDeclContext());
 }
 
+void swift::printMemberwiseInit(NominalTypeDecl *nominal,
+                                llvm::raw_ostream &out) {
+  auto &ctx = nominal->getASTContext();
+  auto &SM = ctx.SourceMgr;
+
+  auto printMemberName = [](Identifier name, llvm::raw_ostream &OS) {
+    if (escapeIdentifierInContext(name, PrintNameContext::TypeMember)) {
+      OS << '`' << name << '`';
+    } else {
+      OS << name;
+    }
+  };
+
+  SmallVector<VarDecl *, 4> vars;
+  for (auto *var : nominal->getMemberwiseInitProperties()) {
+    // Skip printing lazy properties since we don't have a way of spelling
+    // their initialization in source (since we'd be initializing the backing
+    // variable).
+    if (var->getAttrs().hasAttribute<LazyAttr>())
+      continue;
+
+    vars.push_back(var);
+  }
+
+  out << "init(";
+
+  // Process the list of members, inserting commas as appropriate.
+  for (const auto &[idx, var] : llvm::enumerate(vars)) {
+    if (idx > 0)
+      out << ", ";
+
+    printMemberName(var->getName(), out);
+    out << ": ";
+
+    // Unconditionally print '@escaping' if we print out a function type -
+    // the assignments we generate below will escape this parameter.
+    auto ty = var->getTypeInContext();
+    if (ty->is<AnyFunctionType>())
+      out << "@" << TypeAttribute::getAttrName(TypeAttrKind::Escaping) << " ";
+
+    out << ty.getString();
+
+    bool hasAddedDefault = false;
+    if (auto *PBD = var->getParentPatternBinding()) {
+      auto idx = PBD->getPatternEntryIndexForVarDecl(var);
+      auto *init = PBD->getOriginalInit(idx);
+      if (auto range = init ? init->getSourceRange() : SourceRange()) {
+        auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
+        out << " = " << SM.extractText(charRange);
+        hasAddedDefault = true;
+      }
+    }
+    if (!hasAddedDefault && ty->isOptional())
+      out << " = nil";
+  }
+
+  // Print the body.
+  out << ") {\n";
+  for (auto *var : vars) {
+    // self.<property> = <property>
+    auto name = var->getName();
+    out << "self.";
+    printMemberName(name, out);
+    out << " = ";
+    printMemberName(name, out);
+    out << "\n";
+  }
+  out << "}";
+}
+
 std::optional<Type>
 CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
   if (auto func = dyn_cast<AbstractFunctionDecl *>()) {
