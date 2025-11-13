@@ -5536,8 +5536,18 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return srcPkg && usePkg && usePkg->isSamePackageAs(srcPkg);
   }
   case AccessLevel::Public:
-  case AccessLevel::Open:
+  case AccessLevel::Open: {
+    if (VD->getASTContext().LangOpts.hasFeature(
+            Feature::EnforceSPIOperatorGroup) &&
+        VD->isOperator() && VD->isSPI()) {
+      const DeclContext *useFile = useDC->getModuleScopeContext();
+      if (useFile->getParentModule() == sourceDC->getParentModule())
+        return true;
+      auto *useSF = dyn_cast<SourceFile>(useFile);
+      return !useSF || useSF->isImportedAsSPI(VD);
+    }
     return true;
+  }
   }
   llvm_unreachable("bad access level");
 }
