@@ -3828,8 +3828,8 @@ namespace {
       if (!dc)
         return nullptr;
 
-      // We may have already imported this function decl before we imported the
-      // parent record. In such a case it's important we don't re-import.
+      // We may have already imported this function decl while importing its
+      // decl context. Check decl cache to make sure we don't import twice.
       auto known = Impl.ImportedDecls.find({decl, getVersion()});
       if (known != Impl.ImportedDecls.end()) {
         return known->second;
@@ -4004,6 +4004,13 @@ namespace {
             decl, Diagnostic(diag::invoked_func_not_imported, decl),
             decl->getSourceRange().getBegin());
         return nullptr;
+      }
+
+      // We may have already imported this function decl while importing its
+      // type signature. Check decl cache to make sure we don't import twice.
+      auto known2 = Impl.ImportedDecls.find({decl, getVersion()});
+      if (known2 != Impl.ImportedDecls.end()) {
+        return known2->second;
       }
 
       if (name && name.isSimpleName()) {
