@@ -409,7 +409,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 16 };
+  enum { NumAFTExtInfoBits = 17 };
   enum { NumSILExtInfoBits = 14 };
 
   // clang-format off
@@ -1712,6 +1712,37 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorType, Type)
+
+class YieldResultType : public TypeBase {
+  Type ResultType;
+  bool InOut = false;
+
+  YieldResultType(Type objectTy, bool InOut, const ASTContext *canonicalContext,
+                  RecursiveTypeProperties properties)
+  : TypeBase(TypeKind::YieldResult, canonicalContext, properties),
+    ResultType(objectTy), InOut(InOut) {}
+
+public:
+  static YieldResultType *get(Type originalType, bool InOut);
+
+  Type getResultType() const { return ResultType; }
+  bool isInOut() const { return InOut; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::YieldResult;
+  }
+};
+
+BEGIN_CAN_TYPE_WRAPPER(YieldResultType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getResultType)
+  bool isInOut() const {
+    return getPointer()->isInOut();
+  }
+  static CanYieldResultType get(CanType type, bool InOut) {
+    return CanYieldResultType(YieldResultType::get(type, InOut));
+  }
+END_CAN_TYPE_WRAPPER(YieldResultType, Type)
   
 /// BuiltinType - An abstract class for all the builtin types.
 class BuiltinType : public TypeBase {
@@ -3938,6 +3969,9 @@ public:
   /// Return the function type setting sendable to \p newValue.
   AnyFunctionType *withSendable(bool newValue) const;
 
+  /// Return the function type without yields (and coroutine flag)
+  AnyFunctionType *getWithoutYields() const;
+
   /// True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
   bool isNoEscape() const {
@@ -3949,6 +3983,8 @@ public:
   bool isAsync() const { return getExtInfo().isAsync(); }
 
   bool isThrowing() const { return getExtInfo().isThrowing(); }
+
+  bool isCoroutine() const { return getExtInfo().isCoroutine(); }
 
   bool hasSendingResult() const { return getExtInfo().hasSendingResult(); }
 

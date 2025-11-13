@@ -1526,7 +1526,7 @@ public:
 
   /// Given that the value being abstracted is a function, return the
   /// abstraction pattern for its result type.
-  AbstractionPattern getFunctionResultType() const;
+  AbstractionPattern getFunctionResultType(bool withoutYields = false) const;
 
   /// Given that the value being abstracted is a function, return the
   /// abstraction pattern for its thrown error type.

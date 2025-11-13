@@ -30,17 +30,17 @@
 // CHECK-INPKG: sil_vtable Pub {
 // CHECK-INPKG: #Pub.pubVar!getter: (Pub) -> () -> Int : @$s3Lib3PubC6pubVarSivg  // Pub.pubVar.getter
 // CHECK-INPKG: #Pub.pubVar!setter: (Pub) -> (Int) -> () : @$s3Lib3PubC6pubVarSivs  // Pub.pubVar.setter
-// CHECK-INPKG: #Pub.pubVar!modify: (Pub) -> () -> () : @$s3Lib3PubC6pubVarSivM  // Pub.pubVar.modify
+// CHECK-INPKG: #Pub.pubVar!modify: (Pub) -> @yield_once () -> inout @yields Int : @$s3Lib3PubC6pubVarSivM  // Pub.pubVar.modify
 // CHECK-INPKG: #Pub.pkgVar!getter: (Pub) -> () -> Int : @$s3Lib3PubC6pkgVarSivg  // Pub.pkgVar.getter
 // CHECK-INPKG: #Pub.pkgVar!setter: (Pub) -> (Int) -> () : @$s3Lib3PubC6pkgVarSivs  // Pub.pkgVar.setter
-// CHECK-INPKG: #Pub.pkgVar!modify: (Pub) -> () -> () : @$s3Lib3PubC6pkgVarSivM  // Pub.pkgVar.modify
+// CHECK-INPKG: #Pub.pkgVar!modify: (Pub) -> @yield_once () -> inout @yields Int : @$s3Lib3PubC6pkgVarSivM  // Pub.pkgVar.modify
 // CHECK-INPKG: #Pub.init!allocator: (Pub.Type) -> (Int) -> Pub : @$s3Lib3PubCyACSicfC  // Pub.__allocating_init(_:)
 // CHECK-INPKG: #Pub.deinit!deallocator: @$s3Lib3PubCfD  // Pub.__deallocating_deinit
 
 // CHECK-INPKG: sil_witness_table public_external Pub: PubProto module Lib {
 // CHECK-INPKG:  method #PubProto.pubVar!getter: <Self where Self : PubProto> (Self) -> () -> Int : @$s3Lib3PubCAA0B5ProtoA2aDP6pubVarSivgTW  // protocol witness for PubProto.pubVar.getter in conformance Pub
 // CHECK-INPKG:  method #PubProto.pubVar!setter: <Self where Self : PubProto> (inout Self) -> (Int) -> () : @$s3Lib3PubCAA0B5ProtoA2aDP6pubVarSivsTW  // protocol witness for PubProto.pubVar.setter in conformance Pub
-// CHECK-INPKG:  method #PubProto.pubVar!modify: <Self where Self : PubProto> (inout Self) -> () -> () : @$s3Lib3PubCAA0B5ProtoA2aDP6pubVarSivMTW  // protocol witness for PubProto.pubVar.modify in conformance Pub
+// CHECK-INPKG:  method #PubProto.pubVar!modify: <Self where Self : PubProto> (inout Self) -> @yield_once () -> inout @yields Int : @$s3Lib3PubCAA0B5ProtoA2aDP6pubVarSivMTW  // protocol witness for PubProto.pubVar.modify in conformance Pub
 
 
 /// Test 2: They should NOT be deserialized into Client as Lib and Client are NOT in the same package;
@@ -78,17 +78,17 @@
 // CHECK-LIB: sil_vtable [serialized_for_package] Pub {
 // CHECK-LIB:    #Pub.pubVar!getter: (Pub) -> () -> Int : @$s3Lib3PubC6pubVarSivg  // Pub.pubVar.getter
 // CHECK-LIB:    #Pub.pubVar!setter: (Pub) -> (Int) -> () : @$s3Lib3PubC6pubVarSivs  // Pub.pubVar.setter
-// CHECK-LIB:    #Pub.pubVar!modify: (Pub) -> () -> () : @$s3Lib3PubC6pubVarSivM  // Pub.pubVar.modify
+// CHECK-LIB:    #Pub.pubVar!modify: (Pub) -> @yield_once () -> inout @yields Int : @$s3Lib3PubC6pubVarSivM  // Pub.pubVar.modify
 // CHECK-LIB:    #Pub.pkgVar!getter: (Pub) -> () -> Int : @$s3Lib3PubC6pkgVarSivg  // Pub.pkgVar.getter
 // CHECK-LIB:    #Pub.pkgVar!setter: (Pub) -> (Int) -> () : @$s3Lib3PubC6pkgVarSivs  // Pub.pkgVar.setter
-// CHECK-LIB:    #Pub.pkgVar!modify: (Pub) -> () -> () : @$s3Lib3PubC6pkgVarSivM  // Pub.pkgVar.modify
+// CHECK-LIB:    #Pub.pkgVar!modify: (Pub) -> @yield_once () -> inout @yields Int : @$s3Lib3PubC6pkgVarSivM  // Pub.pkgVar.modify
 // CHECK-LIB:    #Pub.init!allocator: (Pub.Type) -> (Int) -> Pub : @$s3Lib3PubCyACSicfC  // Pub.__allocating_init(_:)
 // CHECK-LIB:    #Pub.deinit!deallocator: @$s3Lib3PubCfD  // Pub.__deallocating_deinit
 
 // CHECK-LIB: sil_witness_table [serialized_for_package] Pub: PubProto module Lib {
 // CHECK-LIB:    method #PubProto.pubVar!getter: <Self where Self : PubProto> (Self) -> () -> Int : @$s3Lib3PubCAA0B5ProtoA2aDP6pubVarSivgTW  // protocol witness for PubProto.pubVar.getter in conformance Pub
 // CHECK-LIB:    method #PubProto.pubVar!setter: <Self where Self : PubProto> (inout Self) -> (Int) -> () : @$s3Lib3PubCAA0B5ProtoA2aDP6pubVarSivsTW  // protocol witness for PubProto.pubVar.setter in conformance Pub
-// CHECK-LIB:    method #PubProto.pubVar!modify: <Self where Self : PubProto> (inout Self) -> () -> () : @$s3Lib3PubCAA0B5ProtoA2aDP6pubVarSivMTW  // protocol witness for PubProto.pubVar.modify in conformance Pub
+// CHECK-LIB:    method #PubProto.pubVar!modify: <Self where Self : PubProto> (inout Self) -> @yield_once () -> inout @yields Int : @$s3Lib3PubCAA0B5ProtoA2aDP6pubVarSivMTW  // protocol witness for PubProto.pubVar.modify in conformance Pub
 
 
 //--- Lib.swift

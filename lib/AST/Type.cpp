@@ -277,6 +277,10 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
 #include "swift/AST/ReferenceStorage.def"
     return false;
 
+  case TypeKind::YieldResult:
+    return isReferenceTypeImpl(cast<YieldResultType>(type).getResultType(),
+                               sig, functionsCount);
+
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     assert(sig && "dependent types can't answer reference semantics query");
@@ -1856,6 +1860,13 @@ CanType TypeBase::computeCanonicalType() {
     auto *element = cast<PackElementType>(this);
     auto packType = element->getPackType()->getCanonicalType();
     Result = PackElementType::get(packType, element->getLevel());
+    break;
+  }
+
+  case TypeKind::YieldResult: {
+    auto *ty = cast<YieldResultType>(this);
+    auto wrappedType = ty->getResultType()->getCanonicalType();
+    Result = YieldResultType::get(wrappedType, ty->isInOut());
     break;
   }
 
@@ -4587,6 +4598,9 @@ ReferenceCounting TypeBase::getReferenceCounting() {
         ->getInnerType()
         ->getReferenceCounting();
 
+  case TypeKind::YieldResult:
+    return cast<YieldResultType>(type)->getResultType()->getReferenceCounting();
+
   case TypeKind::PrimaryArchetype:
   case TypeKind::ExistentialArchetype:
   case TypeKind::OpaqueTypeArchetype:
@@ -4736,6 +4750,39 @@ AnyFunctionType::withIsolation(FunctionTypeIsolation isolation) const {
 AnyFunctionType *AnyFunctionType::withSendable(bool newValue) const {
   auto info = getExtInfo().intoBuilder().withSendable(newValue).build();
   return withExtInfo(info);
+}
+
+AnyFunctionType *AnyFunctionType::getWithoutYields() const {
+  auto resultType = getResult();
+
+  if (auto *tupleResTy = resultType->getAs<TupleType>()) {
+    // Strip @yield results on the first level of tuple
+    SmallVector<TupleTypeElt, 4> elements;
+    for (const auto &elt : tupleResTy->getElements()) {
+      Type eltTy = elt.getType();
+      if (eltTy->is<YieldResultType>())
+        continue;
+      elements.push_back(elt);
+    }
+
+    // Handle vanishing tuples --  flatten to produce the
+    // normal coroutine result type
+    if (elements.size() == 1 && isCoroutine())
+      resultType = elements[0].getType();
+    else
+      resultType = TupleType::get(elements, getASTContext());
+  } else if (resultType->is<YieldResultType>()) {
+    resultType = TupleType::getEmpty(getASTContext());
+  }
+  
+  auto noCoroExtInfo = getExtInfo().intoBuilder()
+                           .withCoroutine(false)
+                           .build();
+  if (isa<FunctionType>(this))
+    return FunctionType::get(getParams(), resultType, noCoroExtInfo);
+  assert(isa<GenericFunctionType>(this));
+  return GenericFunctionType::get(getOptGenericSignature(), getParams(),
+                                  resultType, noCoroExtInfo);
 }
 
 std::optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {

@@ -6260,6 +6260,13 @@ public:
       Printer << "_";
     }
   }
+      
+  void visitYieldResultType(YieldResultType *T, NonRecursivePrintOptions nrOption) {
+    if (T->isInOut())
+      Printer << "inout ";
+    Printer << "@yields ";
+    visit(T->getResultType());
+  }
 
   void visitErrorUnionType(ErrorUnionType *T,
                            NonRecursivePrintOptions nrOptions) {
@@ -6693,6 +6700,10 @@ public:
 
     if (!Options.excludeAttrKind(TypeAttrKind::Sendable) && info.isSendable()) {
       Printer.printSimpleAttr("@Sendable") << " ";
+    }
+
+    if (!Options.excludeAttrKind(TypeAttrKind::YieldOnce) && info.isCoroutine()) {
+      Printer.printSimpleAttr("@yield_once") << " ";
     }
 
     SmallString<64> buf;
