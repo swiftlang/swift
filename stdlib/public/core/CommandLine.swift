@@ -18,6 +18,12 @@ import SwiftShims
 internal func _swift_stdlib_getUnsafeArgvArgc(_: UnsafeMutablePointer<Int32>)
   -> UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
 
+@_silgen_name("_swift_stdlib_copyExecutablePath")
+private func _copyExecutablePath() -> UnsafeMutablePointer<CChar>
+
+@_silgen_name("_swift_stdlib_deallocExecutablePath")
+private func _deallocExecutablePath(UnsafeMutablePointer<CChar>)
+
 /// Command-line arguments for the current process.
 @frozen // namespace
 public enum CommandLine: ~BitwiseCopyable {}
@@ -116,6 +122,24 @@ extension CommandLine {
     set {
       _arguments = newValue
     }
+  }
+
+  /// The path to the current executable.
+  ///
+  /// - Important: On some systems, it is possible to move an executable file on
+  ///   disk while it is running. If the current executable file is moved, the
+  ///   value of this property is not updated to its new path.
+  @_unavailableInEmbedded
+  #if os(WASI)
+  @available(*, unavailable, message: "Unavailable on WASI")
+  #endif
+  public static let executablePath: String = {
+    // FIXME: avoid needing to allocate and free a temp C string (if possible)
+    let cString = _copyExecutablePath()
+    defer {
+      _deallocExecutablePath(cString)
+    }
+    return String(cString: cString)
   }
 }
 
