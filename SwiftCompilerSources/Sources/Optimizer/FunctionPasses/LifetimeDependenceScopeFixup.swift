@@ -142,6 +142,10 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
 
 private extension Type {
   func mayHaveMutableSpan(in function: Function, _ context: FunctionPassContext) -> Bool {
+    // Escapable and Copyable types cannot have MutableSpan
+    if isEscapable || !isMoveOnly {
+      return false
+    }
     if hasArchetype {
       return true
     }
