@@ -1808,11 +1808,22 @@ public struct SwiftifyImportProtocolMacro: ExtensionMacro {
       }
       let overloads = try arguments.map {
         let (method, args) = try parseProtocolMacroParam($0, methods: methods)
-        let function = try constructOverloadFunction(
+        let hasVisibilityModifier = method.modifiers.contains {
+          return switch $0.name.trimmed.text {
+          case "open", "public", "package", "internal", "fileprivate", "private": true
+          default: false
+          }
+        }
+        let result = try constructOverloadFunction(
           forDecl: method, leadingTrivia: Trivia(), args: args,
           spanAvailability: spanAvailability,
           typeMappings: typeMappings)
-        return MemberBlockItemSyntax(decl: function)
+        guard let newMethod = result.as(FunctionDeclSyntax.self)?
+          .with(\.modifiers, method.modifiers
+              + (hasVisibilityModifier ? [] : [DeclModifierSyntax(name: .identifier("public"))])) else {
+          throw RuntimeError("expected FunctionDeclSyntax but got \(result.kind) for \(method.description)")
+        }
+        return MemberBlockItemSyntax(decl: newMethod)
       }
 
       return [ExtensionDeclSyntax(extensionKeyword: .identifier("extension"), extendedType: type,
