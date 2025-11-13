@@ -3,3 +3,16 @@
 // NOTE: Most differences from the baseline are common across all architectures
 // should go into stability-stdlib-source-base.swift.expected. Only capture
 // x86_64-specific differences from the baseline here.
+
+Accessor Float80._Representation._storage.Modify() has return type change from () to inout @yields (Swift.UInt64, Swift.UInt16, Swift.UInt16, Swift.UInt16, Swift.UInt16)
+Accessor Float80._value.Modify() has return type change from () to inout @yields Builtin.FPIEEE80
+Accessor __VaListBuilder.Header.fp_offset.Modify() has return type change from () to inout @yields Swift.UInt32
+Accessor __VaListBuilder.Header.gp_offset.Modify() has return type change from () to inout @yields Swift.UInt32
+Accessor __VaListBuilder.Header.overflow_arg_area.Modify() has return type change from () to inout @yields Swift.UnsafeMutablePointer<Swift.Int>?
+Accessor __VaListBuilder.Header.reg_save_area.Modify() has return type change from () to inout @yields Swift.UnsafeMutablePointer<Swift.Int>?
+Accessor __VaListBuilder.fpRegistersUsed.Modify() has return type change from () to inout @yields Swift.Int
+Accessor __VaListBuilder.gpRegistersUsed.Modify() has return type change from () to inout @yields Swift.Int
+Accessor __VaListBuilder.header.Modify() has return type change from () to inout @yields Swift.__VaListBuilder.Header
+Accessor __VaListBuilder.storage.Modify() has return type change from () to inout @yields Swift.ContiguousArray<Swift.Int>
+Accessor _fastEnumerationStorageMutationsTarget.Modify() has return type change from () to inout @yields Swift.UInt
+Accessor _playgroundPrintHook.Modify() has return type change from () to inout @yields ((Swift.String) -> ())?
