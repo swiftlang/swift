@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-g -Onone)
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: reflection
@@ -157,7 +157,8 @@ if #available(SwiftStdlib 6.3, *) {
 
     do {
       let obj = ClassWithMembers()
-      let pointer = Unmanaged.passUnretained(obj).toOpaque()
+      let retained = Unmanaged.passRetained(obj)
+      let pointer = retained.toOpaque()
       if let mangledTypeName = _mangledTypeName(ClassWithMembers.self) {
         let (success, printed) = _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: mangledTypeName)
         expectTrue(success)
@@ -165,6 +166,7 @@ if #available(SwiftStdlib 6.3, *) {
       } else {
         expectTrue(false)
       }
+      retained.release()
     }
   }
 }
