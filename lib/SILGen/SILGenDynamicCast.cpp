@@ -417,19 +417,15 @@ adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
   if (!hasAbstraction && (!requiresAddress || src.getType().isAddress()))
     return src;
   
-  TemporaryInitializationPtr init;
   if (requiresAddress) {
-    init = SGF.emitTemporary(loc, srcAbstractTL);
 
     if (hasAbstraction)
       src = SGF.emitSubstToOrigValue(loc, src, abstraction, sourceType);
 
-    // Okay, if all we need to do is drop the value in an address,
-    // this is easy.
-    SGF.B.emitStoreValueOperation(loc, src.forward(SGF), init->getAddress(),
-                                  StoreOwnershipQualifier::Init);
-    init->finishInitialization(SGF);
-    return init->getManagedAddress();
+    if (src.getType().isAddress())
+      return src;
+
+    return src.materialize(SGF, loc);
   }
   
   assert(hasAbstraction);

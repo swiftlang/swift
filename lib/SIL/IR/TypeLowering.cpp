@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -43,8 +44,8 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Test.h"
-#include "clang/AST/Type.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/Type.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
@@ -4911,6 +4912,17 @@ TypeConverter::checkForABIDifferences(SILModule &M,
       if (meta1->getRepresentation() == meta2->getRepresentation() &&
           meta1->getRepresentation() == MetatypeRepresentation::ObjC)
         return ABIDifference::CompatibleRepresentation;
+    }
+  }
+
+  // Existentials are ABI-compatible if their layouts are compatible.
+  if (!optionalityChange) {
+    auto ct1 = type1.getASTType();
+    auto ct2 = type2.getASTType();
+    if (ct1->isExistentialType() && ct2->isExistentialType() &&
+        ct1->getExistentialLayout().isABICompatibleWith(
+            ct2->getExistentialLayout())) {
+      return ABIDifference::CompatibleRepresentation;
     }
   }
 
