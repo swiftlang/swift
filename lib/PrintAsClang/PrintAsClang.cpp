@@ -56,7 +56,7 @@ static void emitObjCConditional(raw_ostream &out,
     out << "#else\n";
     nonObjCCase();
   }
-  out << "#endif\n";
+  out << "#endif // defined(__OBJC__)\n";
 }
 
 static void emitExternC(raw_ostream &out,
