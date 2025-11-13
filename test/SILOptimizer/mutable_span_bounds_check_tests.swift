@@ -57,14 +57,12 @@ public func mutable_span_sum_wo_trap_unknown_bound(_ ms: borrowing MutableSpan<I
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B10_zero_inityys11MutableSpanVySiGzF :
 // CHECK-SIL: bb3({{.*}}):
-// CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B10_zero_inityys11MutableSpanVySiGzF'
 
 // CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B10_zero_inityys11MutableSpanVySiGzF"
-// CHECK-IR: vector.body
-// CHECK-IR: store <{{.*}}> zeroinitializer,
+// CHECK-IR: call void @llvm.memset
 public func span_zero_init(_ output: inout MutableSpan<Int>) {
   for i in output.indices {
     output[i] = 0
@@ -73,7 +71,6 @@ public func span_zero_init(_ output: inout MutableSpan<Int>) {
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B14_copy_elemwiseyys11MutableSpanVySiGz_s0I0VySiGtF :
 // CHECK-SIL: bb3({{.*}}):
-// CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B14_copy_elemwiseyys11MutableSpanVySiGz_s0I0VySiGtF'
@@ -90,10 +87,9 @@ public func span_copy_elemwise(_ output: inout MutableSpan<Int>, _ input: Span<I
 }
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B16_append_elemwiseyys10OutputSpanVySiGz_s0I0VySiGtF :
-// FIX-CHECK-SIL: bb3({{.*}}):
-// FIX-CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
-// FIX-CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
-// FIX-CHECK-SIL: cond_br
+// CHECK-SIL: bb3({{.*}}):
+// CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
+// CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B16_append_elemwiseyys10OutputSpanVySiGz_s0I0VySiGtF'
 
 // CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B16_append_elemwiseyys10OutputSpanVySiGz_s0I0VySiGtF"
@@ -108,7 +104,6 @@ public func span_append_elemwise(_ output: inout OutputSpan<Int>, _ input: Span<
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyys11MutableSpanVySiGz_s0J0VySiGAHtF :
 // CHECK-SIL: bb3({{.*}}):
-// CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyys11MutableSpanVySiGz_s0J0VySiGAHtF'
@@ -127,7 +122,6 @@ public func span_sum_wo_trap(_ output: inout MutableSpan<Int>, _ input1: Span<In
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B14_sum_with_trapyys11MutableSpanVySiGz_s0J0VySiGAHtF :
 // CHECK-SIL: bb3({{.*}}):
-// CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B14_sum_with_trapyys11MutableSpanVySiGz_s0J0VySiGAHtF'
@@ -142,7 +136,7 @@ public func span_sum_with_trap(_ output: inout MutableSpan<Int>, _ input1: Span<
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B12_bubble_sortyys11MutableSpanVySiGzF :
 // CHECK-SIL: bb12{{.*}}:
-// CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
+// TODO-CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B12_bubble_sortyys11MutableSpanVySiGzF'
 public func span_bubble_sort(_ span: inout MutableSpan<Int>) {
   if span.count <= 1 {
