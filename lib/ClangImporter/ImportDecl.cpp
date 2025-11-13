@@ -2565,7 +2565,7 @@ namespace {
             /*want param names*/ true,
             /*want body*/ hasUnreferenceableStorage);
         if (!hasUnreferenceableStorage)
-          valueCtor->setIsMemberwiseInitializer();
+          valueCtor->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
 
         if (isNonEscapable)
           markReturnsUnsafeNonescapable(valueCtor);
