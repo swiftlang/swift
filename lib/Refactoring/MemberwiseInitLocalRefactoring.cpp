@@ -16,14 +16,22 @@ using namespace swift::refactoring;
 
 namespace {
 struct MemberwiseParameter {
-  CharSourceRange NameRange;
+  Identifier Name;
   Type MemberType;
   Expr *DefaultExpr;
 
-  MemberwiseParameter(CharSourceRange nameRange, Type type, Expr *initialExpr)
-      : NameRange(nameRange), MemberType(type), DefaultExpr(initialExpr) {}
+  MemberwiseParameter(Identifier name, Type type, Expr *initialExpr)
+      : Name(name), MemberType(type), DefaultExpr(initialExpr) {}
 };
 } // namespace
+
+static void printMemberName(Identifier name, llvm::raw_ostream &OS) {
+  if (escapeIdentifierInContext(name, PrintNameContext::TypeMember)) {
+    OS << '`' << name << '`';
+  } else {
+    OS << name;
+  }
+}
 
 static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
                                    SourceManager &SM,
@@ -34,7 +42,8 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
   auto insertMember = [&SM](const MemberwiseParameter &memberData,
                             raw_ostream &OS, bool wantsSeparator) {
     {
-      OS << SM.extractText(memberData.NameRange) << ": ";
+      printMemberName(memberData.Name, OS);
+      OS << ": ";
       // Unconditionally print '@escaping' if we print out a function type -
       // the assignments we generate below will escape this parameter.
       if (isa<AnyFunctionType>(memberData.MemberType->getCanonicalType())) {
@@ -73,8 +82,11 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
   OS << ") {\n";
   for (auto &member : memberVector) {
     // self.<property> = <property>
-    auto name = SM.extractText(member.NameRange);
-    OS << "self." << name << " = " << name << "\n";
+    OS << "self.";
+    printMemberName(member.Name, OS);
+    OS << " = ";
+    printMemberName(member.Name, OS);
+    OS << "\n";
   }
   OS << "}\n";
 
@@ -104,8 +116,6 @@ collectMembersForInit(ResolvedCursorInfoPtr CursorInfo,
   if (!targetLocation.isValid())
     return SourceLoc();
 
-  SourceManager &SM = nominalDecl->getASTContext().SourceMgr;
-
   for (auto member : nominalDecl->getMemberwiseInitProperties()) {
     auto varDecl = dyn_cast<VarDecl>(member);
     if (!varDecl) {
@@ -130,9 +140,7 @@ collectMembersForInit(ResolvedCursorInfoPtr CursorInfo,
       defaultInit = patternBinding->getOriginalInit(i);
     }
 
-    auto NameRange =
-        Lexer::getCharSourceRangeFromSourceRange(SM, varDecl->getNameLoc());
-    memberVector.emplace_back(NameRange, varDecl->getTypeInContext(),
+    memberVector.emplace_back(varDecl->getName(), varDecl->getTypeInContext(),
                               defaultInit);
   }
 
