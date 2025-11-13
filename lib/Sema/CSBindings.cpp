@@ -668,8 +668,6 @@ bool BindingSet::finalize(bool transitive) {
   if (transitive)
     inferTransitiveBindings();
 
-  determineLiteralCoverage();
-
   if (auto *locator = TypeVar->getImpl().getLocator()) {
     if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
       // If this is a base of an unresolved member chain, as a last
@@ -1198,6 +1196,8 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
     if (!bindings.finalize(true))
       continue;
 
+    bindings.determineLiteralCoverage();
+
     if (!bindings.hasViableBindings() && !bindings.isDirectHole())
       continue;
 
@@ -1595,6 +1595,7 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
 
   BindingSet bindings(*this, typeVar, CG[typeVar].getPotentialBindings());
   bindings.finalize(false);
+  bindings.determineLiteralCoverage();
 
   return bindings;
 }

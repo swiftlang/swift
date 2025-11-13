@@ -142,6 +142,7 @@ BindingSet SemaTest::inferBindings(ConstraintSystem &cs,
     auto &bindings = node.getBindingSet();
     bindings.inferTransitiveProtocolRequirements();
     bindings.finalize(/*transitive=*/true);
+    bindings.determineLiteralCoverage();
   }
 
   auto &node = cs.getConstraintGraph()[typeVar];

@@ -556,6 +556,10 @@ public:
   /// requirements down the subtype or equivalence chain.
   void inferTransitiveProtocolRequirements();
 
+  /// Check whether the given binding set covers any of the
+  /// literal protocols associated with this type variable.
+  void determineLiteralCoverage();
+
   /// Finalize binding computation for this type variable by
   /// inferring bindings from context e.g. transitive bindings.
   ///
@@ -585,10 +589,6 @@ private:
   void addLiteralRequirement(Constraint *literal);
 
   void addDefault(Constraint *constraint);
-
-  /// Check whether the given binding set covers any of the
-  /// literal protocols associated with this type variable.
-  void determineLiteralCoverage();
 
   StringRef getLiteralBindingKind(LiteralBindingKind K) const {
 #define ENTRY(Kind, String)                                                    \
