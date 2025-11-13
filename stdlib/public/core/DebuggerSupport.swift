@@ -350,7 +350,11 @@ public enum _DebuggerSupport {
       }
 
     func loadPointer<T>(type: T.Type) -> Any {
-      unsafe pointer.load(as: T.self)
+      if type is AnyObject.Type {
+        unsafe pointer.assumingMemoryBound(to: T.self).pointee
+      } else {
+        unsafe pointer.load(as: T.self)
+      }
     }
     let anyValue = _openExistential(type, do: loadPointer)
     return (true, stringForPrintObject(anyValue))
