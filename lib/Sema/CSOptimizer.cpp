@@ -261,6 +261,14 @@ static bool isStandardInfixLogicalOperator(Constraint *disjunction) {
   return false;
 }
 
+static bool isNilCoalescingOperator(Constraint *disjunction) {
+  auto *choice = disjunction->getNestedConstraints()[0];
+  if (auto *decl = getOverloadChoiceDecl(choice))
+    return decl->isOperator() &&
+           decl->getBaseIdentifier().isNilCoalescingOperator();
+  return false;
+}
+
 static bool isArithmeticOperator(ValueDecl *decl) {
   return decl->isOperator() && decl->getBaseIdentifier().isArithmeticOperator();
 }
@@ -1085,6 +1093,30 @@ static void determineBestChoicesInContext(
     auto resultType = cs.simplifyType(argFuncType->getResult());
     if (auto *typeVar = resultType->getAs<TypeVariableType>()) {
       auto bindingSet = cs.getBindingsFor(typeVar);
+
+      // `??` operator is overloaded on optionality of its result. When the
+      // first argument matches exactly, the ranking is going to be skewed
+      // towards selecting an overload choice that returns a non-optional type.
+      // This is not always correct i.e. when operator is involved in optional
+      // chaining. To avoid producing an incorrect favoring, let's skip the this
+      // disjunction when constraints associated with result type indicate
+      // that it should be optional.
+      //
+      // Simply adding it as a binding won't work because if the second argument
+      // is non-optional the overload that returns `T?` would still have a lower
+      // score.
+      if (!bindingSet && isNilCoalescingOperator(disjunction)) {
+        auto &cg = cs.getConstraintGraph();
+        if (llvm::any_of(cg[typeVar].getConstraints(),
+                         [&typeVar](Constraint *constraint) {
+                           if (constraint->getKind() !=
+                               ConstraintKind::OptionalObject)
+                             return false;
+                           return constraint->getFirstType()->isEqual(typeVar);
+                         })) {
+          continue;
+        }
+      }
 
       for (const auto &binding : bindingSet.Bindings) {
         resultTypes.push_back(binding.BindingType);
