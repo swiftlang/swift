@@ -8455,20 +8455,8 @@ bool VarDecl::isActorSelf() const {
   return nominal && nominal->isActor();
 }
 
-/// Whether the given variable is the backing storage property for
-/// a declared property that is either `lazy` or has an attached
-/// property wrapper.
-static bool isBackingStorageForDeclaredProperty(const VarDecl *var) {
-  if (var->isLazyStorageProperty())
-    return true;
-
-  if (var->getOriginalWrappedProperty())
-    return true;
-
-  return false;
-}
-
-/// Whether the given variable is a declared property that has separate backing storage.
+/// Whether the given variable is a declared property that has separate backing
+/// storage.
 static bool isDeclaredPropertyWithBackingStorage(const VarDecl *var) {
   if (var->getAttrs().hasAttribute<LazyAttr>())
     return true;
@@ -8488,8 +8476,7 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   // If this is a stored property, and not a backing property in a case where
   // we only want to see the declared properties, it can be memberwise
   // initialized.
-  if (hasStorage() && preferDeclaredProperties &&
-      isBackingStorageForDeclaredProperty(this))
+  if (preferDeclaredProperties && getOriginalVarForBackingStorage())
     return false;
 
   // If this is a computed property with `init` accessor, it's

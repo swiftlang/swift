@@ -6781,9 +6781,14 @@ public:
   bool isLazyStorageProperty() const {
     return Bits.VarDecl.IsLazyStorageProperty;
   }
-  void setLazyStorageProperty(bool IsLazyStorage) {
-    Bits.VarDecl.IsLazyStorageProperty = IsLazyStorage;
-  }
+
+  /// Mark this VarDecl as backing storage for a the lazy variable `VD`.
+  void setLazyStorageFor(VarDecl *VD);
+
+  /// For a backing storage variable for either a property wrapper or `lazy`
+  /// variable, retrieves the original declared variable. Otherwise returns
+  /// \c nullptr.
+  VarDecl *getOriginalVarForBackingStorage() const;
 
   /// Retrieve the backing storage property for a lazy property.
   VarDecl *getLazyStorageProperty() const;
