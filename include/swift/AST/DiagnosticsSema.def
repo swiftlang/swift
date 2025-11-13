@@ -9031,5 +9031,7 @@ GROUPED_WARNING(perf_hint_typealias_uses_existential,ExistentialType,none,
 ERROR(unsafe_self_dependent_result_attr_on_invalid_decl,none,
       "invalid use of @_unsafeSelfDependentResult", ())
 
+REMARK(macro_expansion_line, none, "macro content: |%0|", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

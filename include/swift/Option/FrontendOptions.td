@@ -185,6 +185,9 @@ def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
   MetaVarName<"<module-name>">,
   HelpText<"Verify the generic signatures in the given module">;
 
+def expansion_remarks:  Flag<["-"], "Rmacro-expansions">,
+  HelpText<"Show remarks for each line in macro expansions">;
+
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
 
