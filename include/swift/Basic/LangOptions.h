@@ -648,6 +648,9 @@ namespace swift {
     /// Enables dumping macro expansions.
     bool DumpMacroExpansions = false;
 
+    /// Emits a remark with the content of each macro expansion line, for matching with -verify
+    bool RemarkMacroExpansions = false;
+
     /// Enables dumping imports for each SourceFile.
     bool DumpSourceFileImports = false;
 

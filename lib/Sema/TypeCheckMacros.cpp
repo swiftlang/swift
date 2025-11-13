@@ -1006,6 +1006,21 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
   llvm_unreachable("unhandled MacroRole");
 }
 
+static void remarkMacroExpansionsEmitDiags(ASTContext &ctx, unsigned macroBufferID) {
+  SourceManager &sourceMgr = ctx.SourceMgr;
+  CharSourceRange range = sourceMgr.getRangeForBuffer(macroBufferID);
+  SourceLoc start = range.getStart();
+  StringRef content(start.getPointer(), range.getByteLength());
+  size_t newline;
+  do {
+    newline = content.find('\n');
+    StringRef line = content.take_front(newline);
+    content = content.drop_front(newline + 1);
+
+    ctx.Diags.diagnose(SourceLoc::getFromPointer(line.begin()), diag::macro_expansion_line, line);
+  } while (newline != StringRef::npos);
+}
+
 static SourceFile *
 createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
                       MacroRole role, ASTNode target, DeclContext *dc,
@@ -1069,6 +1084,10 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
       originModule = cast<Decl *>(target)->getModuleContextForNameLookup();
     performImportResolutionForClangMacroBuffer(*macroSourceFile, originModule);
   }
+
+  if (ctx.LangOpts.RemarkMacroExpansions)
+    remarkMacroExpansionsEmitDiags(ctx, macroBufferID);
+
   return macroSourceFile;
 }
 
