@@ -564,7 +564,7 @@ char *copyExecutablePath(void) {
   // a reasonable initial value, then loop and try again on failure.
   uint32_t byteCount = PATH_MAX;
   while (true) {
-    char *result = malloc(byteCount);
+    auto result = static_cast<char *>(malloc(byteCount));
     if (0 == _NSGetExecutablePath(result, &byteCount)) {
       return result;
     }
@@ -575,7 +575,7 @@ char *copyExecutablePath(void) {
 char *copyExecutablePath(void) {
   size_t byteCount = PATH_MAX;
   while (true) {
-    char *result = malloc(byteCount);
+    auto result = static_cast<char *>(malloc(byteCount));
     ssize_t byteCountRead = readlink("/proc/self/exe", result, byteCount);
     if (byteCount < 0) {
       swift::fatalError(
@@ -595,7 +595,7 @@ char *copyExecutablePath(void) {
 char *copyExecutablePath(void) {
   DWORD byteCount = MAX_PATH;
   while (true) {
-    WCHAR *wresult = calloc(byteCount, sizeof(WCHAR));
+    auto wresult = static_cast<WCHAR *>(calloc(byteCount, sizeof(WCHAR)));
     SetLastError(ERROR_SUCCESS);
     (void)GetModuleFileNameW(nullptr, wresult, byteCount);
     DWORD errorCode = GetLastError();
@@ -629,7 +629,7 @@ char *copyExecutablePath(void) {
   int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1 };
   size_t bufferCount = 0;
   if (0 == sysctl(mib, std::size(mib), nullptr, &bufferCount, nullptr, 0)) {
-    char *result = malloc(bufferCount);
+    auto result = static_cast<char *>(malloc(bufferCount));
     if (0 == sysctl(mib, std::size(mib), result, &bufferCount, nullptr, 0)) {
       return result;
     }
@@ -674,7 +674,7 @@ char *copyExecutablePath(void) {
         // path and prepend it with the early CWD.
         if (const char *cwd = earlyCWD.load()) {
           size_t byteCount = strlen(cwd) + 1 + strlen(argv[0]) + 1;
-          char *result = malloc(byteCount);
+          auto result = static_cast<char *>(malloc(byteCount));
           snprintf(result, "%s/%s", cwd, argv[0]);
           return result;
         }
