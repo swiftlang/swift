@@ -15,7 +15,14 @@ set(module_triple_command "${CMAKE_Swift_COMPILER}" -print-target-info)
 if(CMAKE_Swift_COMPILER_TARGET)
   list(APPEND module_triple_command -target ${CMAKE_Swift_COMPILER_TARGET})
 endif()
-execute_process(COMMAND ${module_triple_command} OUTPUT_VARIABLE target_info_json)
+execute_process(COMMAND ${module_triple_command}
+  OUTPUT_VARIABLE target_info_json
+  ERROR_VARIABLE stderr
+  RESULT_VARIABLE ec)
+if(ec)
+  message(FATAL_ERROR "'${module_triple_command}' returned non-zero exit code ${ec}")
+  message(CONFIGURE_LOG "Error Output: ${stderr}")
+endif()
 message(CONFIGURE_LOG "Swift target info: ${module_triple_command}\n"
 "${target_info_json}")
 
