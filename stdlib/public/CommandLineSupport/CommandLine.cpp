@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <climits>
 #include <cstdarg>
@@ -555,7 +556,9 @@ void _swift_stdlib_deallocExecutablePath(char *path) {
   free(path);
 }
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) && false
+// CommandLine.executablePath is implemented in Swift on Darwin so it can be
+// back-deployed. Here is a reference C implementation.
 extern "C" int _NSGetExecutablePath(char *buf, uint32_t *bufsize);
 
 char *copyExecutablePath(void) {

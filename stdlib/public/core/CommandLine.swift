@@ -124,6 +124,15 @@ extension CommandLine {
     }
   }
 
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+@_extern(c, "_NSGetExecutablePath")
+@usableFromInline
+internal func _NSGetExecutablePath(
+  _ buf: UnsafeMutablePointer<CChar>,
+  _ bufsize: UnsafeMutablePointer<UInt32>
+) -> CInt
+#endif
+
   /// The path to the current executable.
   ///
   /// - Important: On some systems, it is possible to move an executable file on
@@ -134,7 +143,27 @@ extension CommandLine {
   @available(*, unavailable, message: "Unavailable on WASI")
   #endif
   @available(SwiftStdlib 6.3, *)
+  @_alwaysEmitIntoClient
   public static let executablePath: String = {
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+  // _NSGetExecutablePath() returns non-zero if the provided buffer is too small
+  // and updates its *bufsize argument to the required value, so we can just set
+  // a reasonable initial value, then loop and try again on failure.
+  var byteCount = UInt32(128)
+  while true {
+    let result = unsafe withUnsafeTemporaryAllocation(
+      of: CChar.self,
+      capacity: byteCount
+    ) { buffer in
+      if (0 == unsafe _NSGetExecutablePath(buffer.baseAddress!, &byteCount)) {
+        return unsafe String(cString: buffer.baseAddress!)
+      }
+    }
+    if let result {
+      return result
+    }
+  }
+#else
     // FIXME: avoid needing to allocate and free a temp C string (if possible)
     let cString = unsafe _copyExecutablePath()
     defer {
@@ -142,6 +171,7 @@ extension CommandLine {
     }
     return unsafe String(cString: cString)
   }()
+#endif
 }
 
 #endif // SWIFT_STDLIB_HAS_COMMANDLINE
