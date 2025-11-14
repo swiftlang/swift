@@ -1146,3 +1146,6 @@ Added: __swift_debug_metadataAllocatorPageSize
 
 // New debug environment variable for the concurrency runtime.
 Added: _concurrencyEnableTaskSlabAllocator
+
+// SE-NNNN: CommandLine.executablePath
+Added: _$ss11CommandLineO14executablePathSSvgZ

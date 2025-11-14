@@ -1151,3 +1151,6 @@ Added: _swift_retain_preservemost
 
 // New debug environment variable for the concurrency runtime.
 Added: _concurrencyEnableTaskSlabAllocator
+
+// SE-NNNN: CommandLine.executablePath
+Added: _$ss11CommandLineO14executablePathSSvgZ
