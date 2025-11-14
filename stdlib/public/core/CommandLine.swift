@@ -153,7 +153,7 @@ internal func _NSGetExecutablePath(
   while true {
     let result = unsafe withUnsafeTemporaryAllocation(
       of: CChar.self,
-      capacity: byteCount
+      capacity: Int(byteCount)
     ) { buffer in
       if (0 == unsafe _NSGetExecutablePath(buffer.baseAddress!, &byteCount)) {
         return unsafe String(cString: buffer.baseAddress!)
