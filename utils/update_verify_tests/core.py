@@ -538,8 +538,10 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
 
     expansion_context = []
     for line in lines:
+        dprint(f"parsing line {line}")
         diag = parse_diag(line, filename, prefix)
         if diag:
+            dprint(f"  parsed diag {diag.render()}")
             line.diag = diag
             if expansion_context:
                 diag.parent = expansion_context[-1]
@@ -549,6 +551,8 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
                 expansion_context.append(diag)
             elif diag.category == "closing":
                 expansion_context.pop()
+        else:
+            dprint(f"  no diag")
 
     fold_expansions(lines)
     update_lines(diag_errors, lines, orig_lines, prefix, filename, None)
@@ -682,15 +686,20 @@ def check_expectations(tool_output, prefix):
         i = 0
         while i < len(tool_output):
             line = tool_output[i].strip()
+            extra_lines = []
 
             curr = []
             if not "error:" in line:
-                pass
+                dprint(f"ignored line: {line.strip()}")
+                if m := diag_expansion_note_re.match(line.strip()):
+                    raise KnownException(f"unexpected 'nested' note found without preceding diagnostic: '{line.strip()}'")
             elif m := diag_error_re.match(line):
+                dprint(f"diag not found: {line.strip()}")
+                extra_lines = tool_output[i+1:i+3]
+                dprint(f"extra lines: {extra_lines}")
                 diag = parse_diag(
-                    Line(tool_output[i + 1], int(m.group(2))), m.group(1), prefix
+                    Line(extra_lines[0], int(m.group(2))), m.group(1), prefix
                 )
-                i += 2
                 curr.append(
                     NotFoundDiag(
                         m.group(1),
@@ -702,6 +711,9 @@ def check_expectations(tool_output, prefix):
                     )
                 )
             elif m := diag_error_re2.match(line):
+                dprint(f"unexpected diag: {line.strip()}")
+                extra_lines = tool_output[i+1:i+3]
+                dprint(f"extra lines: {extra_lines}")
                 curr.append(
                     ExtraDiag(
                         m.group(1),
@@ -712,14 +724,16 @@ def check_expectations(tool_output, prefix):
                         prefix,
                     )
                 )
-                i += 2
             # Create two mirroring mismatches when the compiler reports that the category or diagnostic is incorrect.
             # This makes it easier to handle cases where the same diagnostic is mentioned both in an incorrect message/category
             # diagnostic, as well as in an error not produced diagnostic. This can happen for things like 'expected-error 2{{foo}}'
             # if only one diagnostic is emitted on that line, and the content of that diagnostic is actually 'bar'.
             elif m := diag_error_re3.match(line):
+                dprint(f"wrong diag message: {line.strip()}")
+                extra_lines = tool_output[i+1:i+4]
+                dprint(f"extra lines: {extra_lines}")
                 diag = parse_diag(
-                    Line(tool_output[i + 1], int(m.group(2))), m.group(1), prefix
+                    Line(extra_lines[0], int(m.group(2))), m.group(1), prefix
                 )
                 curr.append(
                     NotFoundDiag(
@@ -737,17 +751,19 @@ def check_expectations(tool_output, prefix):
                         diag.absolute_target(),
                         int(m.group(3)),
                         diag.category,
-                        tool_output[i + 3].strip(),
+                        extra_lines[2].strip(),
                         diag.prefix,
                     )
                 )
-                i += 3
             elif m := diag_error_re4.match(line):
+                dprint(f"wrong diag kind: {line.strip()}")
+                extra_lines = tool_output[i+1:i+4]
+                dprint(f"extra lines: {extra_lines}")
                 diag = parse_diag(
-                    Line(tool_output[i + 1], int(m.group(2))), m.group(1), prefix
+                    Line(extra_lines[0], int(m.group(2))), m.group(1), prefix
                 )
                 assert diag.category == m.group(4)
-                assert tool_output[i + 3].strip() == m.group(5)
+                assert extra_lines[2].strip() == m.group(5)
                 curr.append(
                     NotFoundDiag(
                         m.group(1),
@@ -768,22 +784,22 @@ def check_expectations(tool_output, prefix):
                         diag.prefix,
                     )
                 )
-                i += 3
             else:
-                dprint("no match")
-                dprint(line.strip())
-            i += 1
+                dprint(f"no match: {line.strip()}")
+            i += 1 + len(extra_lines)
 
             while (
                 curr
                 and i < len(tool_output)
                 and (m := diag_expansion_note_re.match(tool_output[i].strip()))
             ):
+                nested_note_lines = tool_output[i:i+3]
+                dprint(f"nested note lines: {nested_note_lines}")
                 curr = [
                     NestedDiag(m.group(1), int(m.group(2)), int(m.group(3)), e)
                     for e in curr
                 ]
-                i += 3
+                i += len(nested_note_lines)
             top_level.extend(curr)
 
     except KnownException as e:
