@@ -6,4 +6,4 @@ func zerome(ptr: UnsafeMutablePointer<Int>) {
 }
 
 // Verify that the asmname is "memset", not a C++-mangled version
-// CHECK: sil [serialized] [asmname "memset"] [clang memset] @$sSo6memsetySvSgAB_s5Int32VSitFTo : $@convention(c) (Optional<UnsafeMutableRawPointer>, Int32, Int) -> Optional<UnsafeMutableRawPointer>
+// CHECK: sil [asmname "memset"] [clang memset] @$sSo6memsetySvSgAB_s5Int32VSitFTo : $@convention(c) (Optional<UnsafeMutableRawPointer>, Int32, Int) -> Optional<UnsafeMutableRawPointer>
