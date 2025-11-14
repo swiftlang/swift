@@ -135,11 +135,11 @@ extension CommandLine {
   #endif
   public static let executablePath: String = {
     // FIXME: avoid needing to allocate and free a temp C string (if possible)
-    let cString = _copyExecutablePath()
+    let cString = unsafe _copyExecutablePath()
     defer {
-      _deallocExecutablePath(cString)
+      unsafe _deallocExecutablePath(cString)
     }
-    return String(cString: cString)
+    return unsafe String(cString: cString)
   }()
 }
 
