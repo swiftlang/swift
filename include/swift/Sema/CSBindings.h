@@ -540,6 +540,8 @@ public:
   /// Check if this binding is favored over a conjunction.
   bool favoredOverConjunction(Constraint *conjunction) const;
 
+  void inferTransitiveKeyPathBindings();
+
   /// Detect `subtype` relationship between two type variables and
   /// attempt to infer supertype bindings transitively e.g.
   ///
@@ -549,9 +551,9 @@ public:
   ///
   /// \param inferredBindings The set of all bindings inferred for type
   /// variables in the workset.
-  void inferTransitiveBindings();
+  void inferTransitiveSupertypeBindings();
 
-  void inferTransitiveKeyPathBindings();
+  void inferTransitiveUnresolvedMemberRefBindings();
 
   /// Detect subtype, conversion or equivalence relationship
   /// between two type variables and attempt to propagate protocol

@@ -141,11 +141,14 @@ BindingSet SemaTest::inferBindings(ConstraintSystem &cs,
 
     auto &bindings = node.getBindingSet();
 
-    // FIXME: This is also called in inferTransitiveBindings(), why do we need
-    // to call it again?
+    // FIXME: This is also called in inferTransitiveUnresolvedMemberRefBindings(),
+    // why do we need to call it here too?
     bindings.inferTransitiveProtocolRequirements();
 
-    bindings.inferTransitiveBindings();
+    bindings.inferTransitiveKeyPathBindings();
+    bindings.inferTransitiveSupertypeBindings();
+    bindings.inferTransitiveUnresolvedMemberRefBindings();
+
     (void) bindings.finalizeKeyPathBindings();
     bindings.finalizeUnresolvedMemberChainResult();
     bindings.determineLiteralCoverage();

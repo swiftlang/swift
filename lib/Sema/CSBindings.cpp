@@ -558,9 +558,7 @@ void BindingSet::inferTransitiveKeyPathBindings() {
   }
 }
 
-void BindingSet::inferTransitiveBindings() {
-  inferTransitiveKeyPathBindings();
-
+void BindingSet::inferTransitiveSupertypeBindings() {
   for (const auto &entry : Info.SupertypeOf) {
     auto &node = CS.getConstraintGraph()[entry.first];
     if (!node.hasBindingSet())
@@ -626,7 +624,9 @@ void BindingSet::inferTransitiveBindings() {
                  /*isTransitive=*/true);
     }
   }
+}
 
+void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
   if (!hasViableBindings()) {
     if (auto *locator = TypeVar->getImpl().getLocator()) {
       if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
@@ -1193,7 +1193,9 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
     // produce a default type.
     bool isViable = isViableForRanking(bindings);
 
-    bindings.inferTransitiveBindings();
+    bindings.inferTransitiveKeyPathBindings();
+    bindings.inferTransitiveSupertypeBindings();
+    bindings.inferTransitiveUnresolvedMemberRefBindings();
 
     if (!bindings.finalizeKeyPathBindings())
       continue;
