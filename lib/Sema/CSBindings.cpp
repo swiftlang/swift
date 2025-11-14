@@ -1141,23 +1141,6 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
       node.initBindingSet();
   }
 
-  // Determine whether given type variable with its set of bindings is
-  // viable to be attempted on the next step of the solver. If type variable
-  // has no "direct" bindings of any kind e.g. direct bindings to concrete
-  // types, default types from "defaultable" constraints or literal
-  // conformances, such type variable is not viable to be evaluated to be
-  // attempted next.
-  auto isViableForRanking = [this](const BindingSet &bindings) -> bool {
-    auto *typeVar = bindings.getTypeVariable();
-
-    // If type variable is marked as a potential hole there is always going
-    // to be at least one binding available for it.
-    if (shouldAttemptFixes() && typeVar->getImpl().canBindToHole())
-      return true;
-
-    return bindings.hasViableBindings() || bindings.isDirectHole();
-  };
-
   // Now let's see if we could infer something for related type
   // variables based on other bindings.
   for (auto *typeVar : getTypeVariables()) {
@@ -1187,14 +1170,10 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
     // associated with given type variable, any default constraints,
     // or any conformance requirements to literal protocols with can
     // produce a default type.
-    bool isViable = isViableForRanking(bindings);
+    bool isViable = bindings.hasViableBindings() || bindings.isDirectHole();
 
     bindings.inferTransitiveSupertypeBindings();
-
     bindings.determineLiteralCoverage();
-
-    if (!bindings.hasViableBindings() && !bindings.isDirectHole())
-      continue;
 
     if (!isViable)
       continue;
