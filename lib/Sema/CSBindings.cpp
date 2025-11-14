@@ -1150,14 +1150,6 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
   auto isViableForRanking = [this](const BindingSet &bindings) -> bool {
     auto *typeVar = bindings.getTypeVariable();
 
-    // Type variable representing a base of unresolved member chain should
-    // always be considered viable for ranking since it's allow to infer
-    // types from transitive protocol requirements.
-    if (auto *locator = typeVar->getImpl().getLocator()) {
-      if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
-        return true;
-    }
-
     // If type variable is marked as a potential hole there is always going
     // to be at least one binding available for it.
     if (shouldAttemptFixes() && typeVar->getImpl().canBindToHole())
@@ -1180,6 +1172,11 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
     if (!bindings.finalizeKeyPathBindings())
       continue;
 
+    // Special handling for "leading-dot" unresolved member references,
+    // like .foo.
+    bindings.inferTransitiveUnresolvedMemberRefBindings();
+    bindings.finalizeUnresolvedMemberChainResult();
+
     // Before attempting to infer transitive bindings let's check
     // whether there are any viable "direct" bindings associated with
     // current type variable, if there are none - it means that this type
@@ -1193,11 +1190,6 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
     bool isViable = isViableForRanking(bindings);
 
     bindings.inferTransitiveSupertypeBindings();
-
-    // Special handling for "leading-dot" unresolved member references,
-    // like .foo.
-    bindings.inferTransitiveUnresolvedMemberRefBindings();
-    bindings.finalizeUnresolvedMemberChainResult();
 
     bindings.determineLiteralCoverage();
 

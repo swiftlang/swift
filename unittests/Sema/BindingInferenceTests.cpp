@@ -128,10 +128,10 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
     bindings.inferTransitiveKeyPathBindings();
     (void) bindings.finalizeKeyPathBindings();
 
-    bindings.inferTransitiveSupertypeBindings();
-
     bindings.inferTransitiveUnresolvedMemberRefBindings();
     bindings.finalizeUnresolvedMemberChainResult();
+
+    bindings.inferTransitiveSupertypeBindings();
 
     bindings.determineLiteralCoverage();
 
