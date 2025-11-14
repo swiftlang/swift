@@ -21,6 +21,6 @@ func test() {
   // CHECK: call swiftcc void @with_swiftcc()
   with_swiftcc()
 }
-// CHECK: declare swiftcc void @with_swiftcc()
+// CHECK: declare {{.*}}swiftcc void @with_swiftcc()
 
 test()
