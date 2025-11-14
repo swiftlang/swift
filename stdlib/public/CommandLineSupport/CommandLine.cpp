@@ -644,8 +644,6 @@ char *copyExecutablePath(void) {
   );
 }
 #elif defined(__OpenBSD__)
-#include <atomic>
-
 /// Storage for ``captureEarlyCWD()``.
 static constinit std::atomic<const char *> earlyCWD { nullptr };
 
