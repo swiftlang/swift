@@ -551,6 +551,8 @@ public:
   /// variables in the workset.
   void inferTransitiveBindings();
 
+  void inferTransitiveKeyPathBindings();
+
   /// Detect subtype, conversion or equivalence relationship
   /// between two type variables and attempt to propagate protocol
   /// requirements down the subtype or equivalence chain.

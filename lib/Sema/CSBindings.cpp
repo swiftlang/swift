@@ -493,9 +493,7 @@ void BindingSet::inferTransitiveProtocolRequirements() {
   } while (!workList.empty());
 }
 
-void BindingSet::inferTransitiveBindings() {
-  using BindingKind = AllowedBindingKind;
-
+void BindingSet::inferTransitiveKeyPathBindings() {
   // If the current type variable represents a key path root type
   // let's try to transitively infer its type through bindings of
   // a key path type.
@@ -550,7 +548,7 @@ void BindingSet::inferTransitiveBindings() {
               }
             } else {
               addBinding(
-                  binding.withSameSource(inferredRootTy, BindingKind::Exact),
+                  binding.withSameSource(inferredRootTy, AllowedBindingKind::Exact),
                   /*isTransitive=*/true);
             }
           }
@@ -558,6 +556,10 @@ void BindingSet::inferTransitiveBindings() {
       }
     }
   }
+}
+
+void BindingSet::inferTransitiveBindings() {
+  inferTransitiveKeyPathBindings();
 
   for (const auto &entry : Info.SupertypeOf) {
     auto &node = CS.getConstraintGraph()[entry.first];
@@ -608,8 +610,8 @@ void BindingSet::inferTransitiveBindings() {
       // either be Exact or Supertypes in order for it to make sense
       // to add Supertype bindings based on the relationship between
       // our type variables.
-      if (binding.Kind != BindingKind::Exact &&
-          binding.Kind != BindingKind::Supertypes)
+      if (binding.Kind != AllowedBindingKind::Exact &&
+          binding.Kind != AllowedBindingKind::Supertypes)
         continue;
 
       auto type = binding.BindingType;
@@ -620,7 +622,7 @@ void BindingSet::inferTransitiveBindings() {
       if (ConstraintSystem::typeVarOccursInType(TypeVar, type))
         continue;
 
-      addBinding(binding.withSameSource(type, BindingKind::Supertypes),
+      addBinding(binding.withSameSource(type, AllowedBindingKind::Supertypes),
                  /*isTransitive=*/true);
     }
   }
