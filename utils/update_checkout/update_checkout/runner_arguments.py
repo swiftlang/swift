@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .cli_arguments import CliArguments
@@ -14,7 +15,7 @@ class RunnerArguments:
 
 @dataclass
 class UpdateArguments(RunnerArguments):
-    source_root: str
+    source_root: Path
     config: Dict[str, Any]
     scheme_map: Any
     tag: Optional[str]

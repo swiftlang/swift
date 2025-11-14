@@ -1006,6 +1006,21 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
   llvm_unreachable("unhandled MacroRole");
 }
 
+static void remarkMacroExpansionsEmitDiags(ASTContext &ctx, unsigned macroBufferID) {
+  SourceManager &sourceMgr = ctx.SourceMgr;
+  CharSourceRange range = sourceMgr.getRangeForBuffer(macroBufferID);
+  SourceLoc start = range.getStart();
+  StringRef content(start.getPointer(), range.getByteLength());
+  size_t newline;
+  do {
+    newline = content.find('\n');
+    StringRef line = content.take_front(newline);
+    content = content.drop_front(newline + 1);
+
+    ctx.Diags.diagnose(SourceLoc::getFromPointer(line.begin()), diag::macro_expansion_line, line);
+  } while (newline != StringRef::npos);
+}
+
 static SourceFile *
 createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
                       MacroRole role, ASTNode target, DeclContext *dc,
@@ -1069,6 +1084,10 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
       originModule = cast<Decl *>(target)->getModuleContextForNameLookup();
     performImportResolutionForClangMacroBuffer(*macroSourceFile, originModule);
   }
+
+  if (ctx.LangOpts.RemarkMacroExpansions)
+    remarkMacroExpansionsEmitDiags(ctx, macroBufferID);
+
   return macroSourceFile;
 }
 
@@ -1360,6 +1379,7 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
   return macroSourceFile->getBufferID();
 }
 
+
 static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
                                          CustomAttr *attr,
                                          bool passParentContext, MacroRole role,
@@ -1370,7 +1390,11 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     dc = attachedTo->getDeclContext();
   } else if (role == MacroRole::Conformance || role == MacroRole::Extension) {
     // Conformance macros always expand to extensions at file-scope.
-    dc = attachedTo->getDeclContext()->getParentSourceFile();
+    dc = attachedTo->getDeclContext();
+    if (!isa<ClangModuleUnit>(dc->getModuleScopeContext()))
+      dc = dc->getParentSourceFile();
+    else
+      ASSERT(isa<FileUnit>(dc) && !isa<SourceFile>(dc) && "decls imported from Clang should not have a SourceFile");
   } else {
     dc = attachedTo->getInnermostDeclContext();
   }
