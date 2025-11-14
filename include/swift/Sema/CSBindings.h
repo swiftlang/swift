@@ -560,12 +560,14 @@ public:
   /// literal protocols associated with this type variable.
   void determineLiteralCoverage();
 
-  /// Finalize binding computation for this type variable by
-  /// inferring bindings from context e.g. transitive bindings.
+  /// Finalize binding computation for key path type variables.
   ///
   /// \returns true if finalization successful (which makes binding set viable),
   /// and false otherwise.
-  bool finalize();
+  bool finalizeKeyPathBindings();
+
+  /// Handle diagnostics of unresolved member chains.
+  void finalizeUnresolvedMemberChainResult();
 
   static BindingScore formBindingScore(const BindingSet &b);
 
