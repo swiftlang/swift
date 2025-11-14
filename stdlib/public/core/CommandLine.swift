@@ -139,11 +139,12 @@ internal func _NSGetExecutablePath(
   ///   disk while it is running. If the current executable file is moved, the
   ///   value of this property is not updated to its new path.
   @_unavailableInEmbedded
-  #if os(WASI)
-  @available(*, unavailable, message: "Unavailable on WASI")
-  #endif
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
+#elseif os(WASI)
+  @available(*, unavailable, message: "Unavailable on WASI")
+#endif
   public static let executablePath: String = {
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
     // _NSGetExecutablePath() returns non-zero if the provided buffer is too
@@ -158,6 +159,7 @@ internal func _NSGetExecutablePath(
         if (0 == unsafe _NSGetExecutablePath(buffer.baseAddress!, &byteCount)) {
           return unsafe String(cString: buffer.baseAddress!)
         }
+        return nil
       }
       if let result {
         return result
