@@ -2570,7 +2570,7 @@ FUNCTION(AsyncLetBegin,
          ),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         UNKNOWN_MEMEFFECTS)
 
 /// void swift_asyncLet_finish(
 ///     AsyncLet *alet,
@@ -2592,7 +2592,7 @@ FUNCTION(AsyncLetFinish,
          ),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         UNKNOWN_MEMEFFECTS)
 
 /// void swift_task_run_inline(
 ///     OpaqueValue *result,
