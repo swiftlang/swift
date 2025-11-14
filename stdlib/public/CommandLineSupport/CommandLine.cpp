@@ -666,30 +666,36 @@ char *copyExecutablePath(void) {
   int argc = 0;
   char **argv = getUnsafeArgvArgc(&argc);
   if (argv && argc > 0) {
-      // OpenBSD does not have API to get a path to the running executable. Use
-      // argv[0]. We do a basic sniff test for a path-like string.
-      if (const char *slash = strchr(argv[0], '/')) {
-        if (slash == argv[0]) {
-          // Looks like an absolute path.
-          return strdup(argv[0]);
-        }
-        // There's a slash after the first character. Assume it's a relative
-        // path and prepend it with the early CWD.
-        if (const char *cwd = earlyCWD.load()) {
-          size_t byteCount = strlen(cwd) + 1 + strlen(argv[0]) + 1;
-          auto result = static_cast<char *>(malloc(byteCount));
-          snprintf(result, "%s/%s", cwd, argv[0]);
-          return result;
-        }
+    // OpenBSD does not have API to get a path to the running executable. Use
+    // argv[0]. We do a basic sniff test for a path-like string.
+    const char *slash = strchr(argv[0], '/');
+    if (slash && slash > argv) {
+      // There's a slash _after_ the first character. Assume it's a relative
+      // path and prepend it with the early CWD.
+      if (const char *cwd = earlyCWD.load()) {
+        size_t byteCount = strlen(cwd) + 1 + strlen(argv[0]) + 1;
+        auto result = static_cast<char *>(malloc(byteCount));
+        snprintf(result, "%s/%s", cwd, argv[0]);
+        return result;
       }
+      swift::fatalError(
+        0,
+        "Fatal error: "
+        "Could not get the current working directory at process start\n"
+      );
+    }
+
+    // Either the first character was a slash (in which case we'll treat argv[0]
+    // as an absolute path) there was no slash at all (in which case there's
+    // not much we can do other than return the string as-is.)
+    return strdup(argv[0]);
   }
   swift::fatalError(
     0,
-    "Fatal error: Could not get the path to the current executable\n",
-    errno
+    "Fatal error: Could not get the path to the current executable\n"
   );
 }
-#else
+#else // Add your favorite OS's executable path getter here.
 char *copyExecutablePath(void) {
   swift::fatalError(
       0,
