@@ -126,10 +126,13 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
     cs.getConstraintGraph()[floatLiteralTy].initBindingSet();
 
     bindings.inferTransitiveKeyPathBindings();
-    bindings.inferTransitiveSupertypeBindings();
-    bindings.inferTransitiveUnresolvedMemberRefBindings();
     (void) bindings.finalizeKeyPathBindings();
+
+    bindings.inferTransitiveSupertypeBindings();
+
+    bindings.inferTransitiveUnresolvedMemberRefBindings();
     bindings.finalizeUnresolvedMemberChainResult();
+
     bindings.determineLiteralCoverage();
 
     // Inferred a single transitive binding through `$T_float`.

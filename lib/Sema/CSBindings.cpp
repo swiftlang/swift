@@ -1150,12 +1150,6 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
   auto isViableForRanking = [this](const BindingSet &bindings) -> bool {
     auto *typeVar = bindings.getTypeVariable();
 
-    // Key path root type variable is always viable because it can be
-    // transitively inferred from key path type during binding set
-    // finalization.
-    if (typeVar->getImpl().isKeyPathRoot())
-      return true;
-
     // Type variable representing a base of unresolved member chain should
     // always be considered viable for ranking since it's allow to infer
     // types from transitive protocol requirements.
@@ -1181,6 +1175,11 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
 
     auto &bindings = node.getBindingSet();
 
+    // Special handling for key paths.
+    bindings.inferTransitiveKeyPathBindings();
+    if (!bindings.finalizeKeyPathBindings())
+      continue;
+
     // Before attempting to infer transitive bindings let's check
     // whether there are any viable "direct" bindings associated with
     // current type variable, if there are none - it means that this type
@@ -1193,14 +1192,13 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
     // produce a default type.
     bool isViable = isViableForRanking(bindings);
 
-    bindings.inferTransitiveKeyPathBindings();
     bindings.inferTransitiveSupertypeBindings();
+
+    // Special handling for "leading-dot" unresolved member references,
+    // like .foo.
     bindings.inferTransitiveUnresolvedMemberRefBindings();
-
-    if (!bindings.finalizeKeyPathBindings())
-      continue;
-
     bindings.finalizeUnresolvedMemberChainResult();
+
     bindings.determineLiteralCoverage();
 
     if (!bindings.hasViableBindings() && !bindings.isDirectHole())

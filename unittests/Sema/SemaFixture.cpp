@@ -146,11 +146,13 @@ BindingSet SemaTest::inferBindings(ConstraintSystem &cs,
     bindings.inferTransitiveProtocolRequirements();
 
     bindings.inferTransitiveKeyPathBindings();
-    bindings.inferTransitiveSupertypeBindings();
-    bindings.inferTransitiveUnresolvedMemberRefBindings();
-
     (void) bindings.finalizeKeyPathBindings();
+
+    bindings.inferTransitiveSupertypeBindings();
+
+    bindings.inferTransitiveUnresolvedMemberRefBindings();
     bindings.finalizeUnresolvedMemberChainResult();
+
     bindings.determineLiteralCoverage();
   }
 
