@@ -1307,7 +1307,7 @@ function Get-Dependencies {
       $GetPipURL = "https://bootstrap.pypa.io/get-pip.py"
       $GetPipPath = "$BinaryCache/$FileName/get-pip.py"
       $WebClient.DownloadFile($GetPipURL, $GetPipPath)
-      & "$BinaryCache/$FileName/python.exe" $GetPipPath
+      Invoke-Program -Silent "$(Get-PythonExecutable)" $GetPipPath
     }
 
     function Install-PIPIfNeeded {
