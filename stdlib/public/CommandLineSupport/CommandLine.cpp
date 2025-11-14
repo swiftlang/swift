@@ -580,13 +580,13 @@ char *copyExecutablePath(void) {
   while (true) {
     auto result = static_cast<char *>(malloc(byteCount));
     ssize_t byteCountRead = readlink("/proc/self/exe", result, byteCount);
-    if (byteCount < 0) {
+    if (byteCountRead < 0) {
       swift::fatalError(
         0,
         "Fatal error: Could not get the path to the current executable: %d\n",
         errno
       );
-    } else if (byteCountRead < byteCount) {
+    } else if (static_cast<size_t>(byteCountRead) < byteCount) {
       result[byteCountRead] = '\0';
       return result;
     }
