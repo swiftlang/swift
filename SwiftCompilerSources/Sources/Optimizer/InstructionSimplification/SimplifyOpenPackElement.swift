@@ -14,73 +14,79 @@ import AST
 import SIL
 
 extension OpenPackElementInst: Simplifiable, SILCombineSimplifiable {
-    func simplify(_ context: SimplifyContext) {
-        replacePackElementTypes(context)
-    }
+  func simplify(_ context: SimplifyContext) {
+    replacePackElementTypes(context)
+  }
 }
 
 extension OpenPackElementInst {
-    fileprivate func replacePackElementTypes(_ context: SimplifyContext) {
+  fileprivate func replacePackElementTypes(_ context: SimplifyContext) {
 
-        if let dpi = operands.first?.value as? DynamicPackIndexInst,
-            dpi.operands.first?.value as? IntegerLiteralInst != nil  // when this is commented, // replacementTypes is not correctly filled
-      {
-          var worklist = ValueWorklist(context)
-          var instStack = Stack<Instruction>(context)
-          
-          defer { worklist.deinitialize() }
-          defer { instStack.deinitialize()}
+    if let dpi = operands.first?.value as? DynamicPackIndexInst,
+      dpi.operands.first?.value as? IntegerLiteralInst != nil  // when this is commented replacementTypes is not correctly filled
+    {
+      var worklist = ValueWorklist(context)
+      var instStack = Stack<Instruction>(context)
 
-            worklist.pushIfNotVisited(self)
-          
-            let packElementTypes = dpi.indexedPackType.packElements
+      defer { worklist.deinitialize() }
+      defer { instStack.deinitialize() }
 
-            var replacementTypes = [AST.Type]()
-            for type in packElementTypes {
-                replacementTypes.append(type.canonical.rawType)
+      worklist.pushIfNotVisited(self)
+
+      let packElementTypes = dpi.indexedPackType.packElements
+
+      var replacementTypes = [AST.Type]()
+      for type in packElementTypes {
+        replacementTypes.append(type.canonical.rawType)
+      }
+
+      let substitutionMap = SubstitutionMap(
+        genericSignature: genericSignature,
+        replacementTypes: replacementTypes)
+
+      var cloner = TypeSubstitutionCloner(
+        cloneBefore: self,
+        substitutions: substitutionMap, context)
+      defer { cloner.deinitialize() }
+
+      // FIXME think about prefix of non-expansion element types
+      // FIXME think about terminator instructions and successor BBs (TermInst)
+      while let v = worklist.pop() {
+        for use in v.uses {
+          let inst = use.instruction  // %0
+          // %t = open_pack_element
+          // apply %0(%1, %2)           // type-def: t
+
+          for result in inst.results {
+            if result.type.hasElementArchetype {
+              worklist.pushIfNotVisited(result)
+              instStack.append(inst)
             }
-
-            let substitutionMap = SubstitutionMap(
-                genericSignature: genericSignature,
-                replacementTypes: replacementTypes)
-
-            var cloner = TypeSubstitutionCloner(
-                cloneBefore: self,
-                substitutions: substitutionMap, context)
-            defer { cloner.deinitialize() }
-
-            // FIXME think about prefix of non-expansion element types
-            // FIXME think about terminator instructions and successor BBs (TermInst)
-            while let v = worklist.pop() {
-                for use in v.uses {
-                    let inst = use.instruction  // %0
-                    // %t = open_pack_element
-                    // apply %0(%1, %2)           // type-def: t
-
-                    for result in inst.results {
-                        if result.type.hasElementArchetype {
-                            worklist.pushIfNotVisited(result)
-                            instStack.push(inst)
-                        }
-                    }
-                }
-            }
-
-            // clone instructions recursively (?) --> nothing is happening
-            for inst in instStack {
-                for op in inst.operands {
-                    if let definingInst = op.value.definingInstructionOrTerminator {
-                        if !instStack.contains(definingInst) && !cloner.isCloned(value: op.value) {
-                            cloner.recordFoldedValue(op.value, mappedTo: op.value)
-                        }
-                      else if instStack.contains(definingInst) {
-                        cloner.cloneRecursively(value: op.value)
-                        cloner.clone(instruction: definingInst)
-                      }
-                  }
-                }
-                cloner.cloneRecursively(inst: inst)
-            }
+          }
         }
+      }
+
+      // clone instructions recursively (?) --> nothing is happening
+      for inst in instStack {
+        for op in inst.operands {
+          if let definingInst = op.value.definingInstructionOrTerminator,
+            !instStack.contains(definingInst) && definingInst != self && !cloner.isCloned(value: op.value)
+          {
+            cloner.recordFoldedValue(op.value, mappedTo: op.value)
+          }
+        }
+      }
+      for inst in instStack {
+        for op in inst.operands {
+          if let definingInst = op.value.definingInstructionOrTerminator,
+            instStack.contains(definingInst)
+          {
+            let val = cloner.cloneRecursively(value: op.value)
+            let clonedDef = cloner.clone(instruction: definingInst)
+          }
+        }
+        let clonedInst = cloner.cloneRecursively(inst: inst, resetInsertionPoint: true)
+      }
     }
+  }
 }

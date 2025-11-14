@@ -63,13 +63,6 @@ extension ClonerCommonUtils {
     return cloneRecursively(value: value, customGetCloned: { _, _ in .defaultValue })!
   }
 
-  public mutating func cloneRecursively(inst: Instruction) -> Instruction? {
-
-    // change insertion point
-    let cloned = clone(instruction: inst)
-    return cloned
-  }
-
   /// Transitively clones `value` including its defining instruction's operands.
   public mutating func cloneRecursively(value: Value, customGetCloned: (Value, inout Self) -> GetClonedResult) -> Value? {
     if isCloned(value: value) {
@@ -256,4 +249,19 @@ public struct TypeSubstitutionCloner<Context: MutatingContext>: ClonerCommonUtil
   public func recordFoldedValue(_ origValue: Value, mappedTo mappedValue: Value) {
     bridged.recordFoldedValue(origValue.bridged, mappedValue.bridged)
   }
+
+  public func setInsertionPoint(inst: Instruction) {
+    bridged.setInsertionPoint(inst.bridged)
+  }
+
+  public mutating func cloneRecursively(inst: Instruction, resetInsertionPoint: Bool) -> Instruction? {
+
+    // change insertion point
+    if resetInsertionPoint {
+      setInsertionPoint(inst: inst)
+    }
+    let cloned = clone(instruction: inst)
+    return cloned
+  }
+
 }

@@ -1605,6 +1605,7 @@ struct BridgedTypeSubstCloner {
   void recordFoldedValue(BridgedValue orig, BridgedValue mapped) const;
   bool isValueCloned(BridgedValue v) const;
   BridgedInstruction clone(BridgedInstruction inst) const;
+  void setInsertionPoint(BridgedInstruction inst) const;
 };
 
 struct BridgedVerifier {

@@ -654,6 +654,10 @@ public:
   }
 
   SILFunction *getOriginal() { return &Original; }
+
+  void setInsertionPoint(SILInstruction *inst) {
+    Builder.setInsertionPoint(inst);
+  }
 };
 
 } // namespace swift
@@ -769,6 +773,10 @@ bool BridgedTypeSubstCloner::isValueCloned(BridgedValue v) const {
 
 BridgedInstruction BridgedTypeSubstCloner::clone(BridgedInstruction inst) const {
   return {cloner->cloneInst(inst.unbridged())->asSILNode()};
+}
+
+void BridgedTypeSubstCloner::setInsertionPoint(BridgedInstruction inst) const {
+  cloner->setInsertionPoint(inst.unbridged());
 }
 
 //===----------------------------------------------------------------------===//
