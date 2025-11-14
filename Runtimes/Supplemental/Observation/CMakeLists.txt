@@ -61,6 +61,9 @@ option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime 
 option(${PROJECT_NAME}_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization"
   ${SwiftCore_ENABLE_PRESPECIALIZATION})
 
+option(${PROJECT_NAME}_ENABLE_DIRECT_RETAIN_RELEASE "Use direct retain release"
+  ${SwiftCore_ENABLE_DIRECT_RETAIN_RELEASE})
+
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
@@ -81,6 +84,11 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+if(${PROJECT_NAME}_ENABLE_DIRECT_RETAIN_RELEASE)
+  find_package(SwiftSwiftDirectRuntime REQUIRED)
+  add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-direct-retain-release>")
+endif()
 
 # LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
 # LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
@@ -116,7 +124,8 @@ target_link_libraries(swiftObservation PRIVATE
   swift_Concurrency
   $<$<PLATFORM_ID:Android>:swiftAndroid>
   $<$<PLATFORM_ID:Linux>:swiftGlibc>
-  $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
+  $<$<PLATFORM_ID:Windows>:swiftWinSDK>
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
 install(TARGETS swiftObservation
   EXPORT SwiftObservationTargets
