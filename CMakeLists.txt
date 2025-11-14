@@ -1550,6 +1550,10 @@ else()
   # Some of the things below depend on the threading library
   add_subdirectory(stdlib/public/Threading)
 
+  if(SWIFT_BUILD_SWIFT_DIRECT_RUNTIME)
+    add_subdirectory(stdlib/public/SwiftDirectRuntime)
+  endif()
+
   if(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT)
     add_subdirectory(stdlib/toolchain)
 
