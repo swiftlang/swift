@@ -605,7 +605,19 @@ public protocol ExecutorFactory {
 }
 
 @available(StdlibDeploymentTarget 6.3, *)
-typealias DefaultExecutorFactory = PlatformExecutorFactory
+extension ExecutorFactory {
+  public static var mainExecutor: any MainExecutor {
+    return PlatformExecutorFactory.mainExecutor
+  }
+
+  public static var defaultExecutor: any TaskExecutor {
+    return PlatformExecutorFactory.defaultExecutor
+  }
+}
+
+@available(StdlibDeploymentTarget 6.3, *)
+public struct DefaultExecutorFactory: ExecutorFactory {
+}
 
 @available(StdlibDeploymentTarget 6.2, *)
 @_silgen_name("swift_createExecutors")
