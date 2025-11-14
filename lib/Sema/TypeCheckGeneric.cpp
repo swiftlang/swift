@@ -950,14 +950,37 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     if (auto *proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
       if (extraReqs.empty() &&
           !ext->getTrailingWhereClause()) {
-        InvertibleProtocolSet protos;
-        for (auto *inherited : proto->getAllInheritedProtocols()) {
-          if (auto kind = inherited->getInvertibleProtocolKind())
-            protos.insert(*kind);
-        }
+        // Check for inverse requirements on Self or any associated types.
+        auto reqSig = proto->getRequirementSignature();
+        SmallVector<Requirement, 2> _ignored;
+        SmallVector<InverseRequirement, 2> inverses;
+        reqSig.getRequirementsWithInverses(proto, _ignored, inverses);
 
-        if (protos == InvertibleProtocolSet::allKnown())
+        if (inverses.empty())
           return extendedNominal->getGenericSignatureOfContext();
+
+        if (ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypes) &&
+            !ctx.LangOpts.hasFeature(
+                Feature::SuppressedAssociatedTypesWithDefaults)) {
+          // NOTE: remove this once SuppressedAssociatedTypes is deprecated.
+          //
+          // We don't infer defaults for the associated types in the legacy
+          // version of the feature, only for Self. If there's no inverse on
+          // Self, then we need to reuse the generic signature of the context,
+          // or else we'll crash with some generic signature verifier error.
+          //
+          // We can assume the subject is Self if it's a GenericTypeParamType.
+          bool hasInverseOnSelf = false;
+          for (auto const &ir : inverses) {
+            if (ir.subject->getAs<GenericTypeParamType>()) {
+              hasInverseOnSelf = true;
+              break;
+            }
+          }
+          if (!hasInverseOnSelf) {
+            return extendedNominal->getGenericSignatureOfContext();
+          }
+        }
       }
     }
 

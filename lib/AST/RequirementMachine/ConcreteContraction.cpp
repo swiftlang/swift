@@ -156,7 +156,7 @@ using namespace rewriting;
 /// Strip associated types from types used as keys to erase differences between
 /// resolved types coming from the parent generic signature and unresolved types
 /// coming from user-written requirements.
-static Type stripBoundDependentMemberTypes(Type t) {
+Type swift::rewriting::stripBoundDependentMemberTypes(Type t) {
   if (auto *depMemTy = t->getAs<DependentMemberType>()) {
     return DependentMemberType::get(
       stripBoundDependentMemberTypes(depMemTy->getBase()),

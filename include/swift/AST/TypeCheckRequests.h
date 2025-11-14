@@ -561,10 +561,11 @@ public:
   void cacheResult(bool value) const;
 };
 
-class StructuralRequirementsRequest :
-    public SimpleRequest<StructuralRequirementsRequest,
-                         ArrayRef<StructuralRequirement>(ProtocolDecl *),
-                         RequestFlags::Cached> {
+class StructuralRequirementsRequest
+    : public SimpleRequest<StructuralRequirementsRequest,
+                       std::pair<ArrayRef<StructuralRequirement>,
+                                 ArrayRef<InverseRequirement>>(ProtocolDecl *),
+                       RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -572,7 +573,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ArrayRef<StructuralRequirement>
+  std::pair<ArrayRef<StructuralRequirement>, ArrayRef<InverseRequirement>>
   evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
 
 public:

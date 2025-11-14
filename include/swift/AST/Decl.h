@@ -5811,6 +5811,11 @@ public:
   /// instead.
   ArrayRef<StructuralRequirement> getStructuralRequirements() const;
 
+  /// Retrieves the original inverse requirements written in source.
+  ///
+  /// The structural requirements already have had these applied to them.
+  ArrayRef<InverseRequirement> getInverseRequirements() const;
+
   /// Retrieve same-type requirements implied by protocol typealiases with the
   /// same name as associated types, and diagnose cases that are better expressed
   /// via a 'where' clause.

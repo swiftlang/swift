@@ -301,7 +301,7 @@ SWIFT_REQUEST(TypeChecker, RequirementRequest,
               Requirement(WhereClauseOwner, unsigned, TypeResolutionStage),
               Cached, HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, StructuralRequirementsRequest,
-              ArrayRef<StructuralRequirement>(ProtocolDecl *), Cached,
+              (std::pair<ArrayRef<StructuralRequirement>, ArrayRef<InverseRequirement>>(ProtocolDecl *)), Cached,
               HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, TypeAliasRequirementsRequest,
               ArrayRef<Requirement>(ProtocolDecl *), Cached,

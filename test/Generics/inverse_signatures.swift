@@ -170,3 +170,17 @@ struct FullyGenericArg<T: ~Escapable & ~Copyable> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=FullyGenericArg
 // CHECK-NEXT: (normal_conformance type="FullyGenericArg<T>" protocol="Empty"{{.*}})
 extension FullyGenericArg: Empty where T: ~Copyable, T: ~Escapable {}
+
+// CHECK-LABEL: .P2@
+// CHECK: <Self where Self : Copyable, Self : Escapable, Self.[P2]A : Copyable, Self.[P2]A : Escapable>
+protocol P2 { associatedtype A }
+
+// CHECK-LABEL: .P2_IC@
+// CHECK: <Self where Self : Escapable, Self.[P2_IC]A : Copyable, Self.[P2_IC]A : Escapable>
+protocol P2_IC: ~Copyable { associatedtype A }
+
+// CHECK-LABEL: .Explicit@
+// CHECK: Requirement signature: <Self where Self : Copyable, Self : Escapable, Self.[Explicit]Elm : Copyable, Self.[Explicit]Elm : Escapable>
+protocol Explicit: Copyable, Escapable {
+  associatedtype Elm: Copyable, Escapable
+}

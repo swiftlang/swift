@@ -1316,6 +1316,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (ParseEnabledFeatureArgs(Opts, Args, Diags, FrontendOpts))
     HadError = true;
 
+  // Do not allow both versions of SuppressedAssociatedTypes at the same time.
+  // Pick the version with defaults if both are specified.
+  if (Opts.hasFeature(SuppressedAssociatedTypes) &&
+      Opts.hasFeature(SuppressedAssociatedTypesWithDefaults)) {
+    Opts.disableFeature(SuppressedAssociatedTypes);
+  }
+
   Opts.EnableAppExtensionLibraryRestrictions |= Args.hasArg(OPT_enable_app_extension_library);
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
   Opts.EnableAppExtensionRestrictions |= Opts.EnableAppExtensionLibraryRestrictions;

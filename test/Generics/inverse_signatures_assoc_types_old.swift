@@ -27,11 +27,19 @@ protocol P3 where Self: (~Copyable & ~Escapable) { associatedtype B: ~Escapable 
 
 // CHECK-LABEL: .P4@
 // CHECK: Requirement signature: <Self where Self : Copyable, Self.[P4]B : Copyable, Self.[P4]C : Escapable>
-protocol P4: ~Escapable {
+protocol P4<B, D>: ~Escapable {
   associatedtype B: ~Escapable
   associatedtype C: ~Copyable
   associatedtype D: ~Escapable, ~Copyable
 }
+
+// CHECK-LABEL: .test3@
+// CHECK-NEXT: Generic signature: <T where T : Escapable, T : P4>
+func test3<T>(_ p: T) where T: P4 {}
+
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=P4
+// CHECK-NEXT: Generic signature: <Self where Self : Escapable, Self : P4>
+extension P4 {}
 
 // CHECK-LABEL: .Explicit@
 // CHECK: Requirement signature: <Self where Self : Copyable, Self : Escapable, Self.[Explicit]Elm : Copyable, Self.[Explicit]Elm : Escapable>
