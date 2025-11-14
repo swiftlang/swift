@@ -46,6 +46,12 @@ void conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
                                   NominalTypeDecl *decl,
                                   const clang::CXXRecordDecl *clangDecl);
 
+/// If the decl is an instantiation of C++ `std::stack`,
+/// synthesize a conformance to CxxStack, which is defined in the Cxx module.
+void conformToCxxStackIfNeeded(ClangImporter::Implementation &impl,
+                               NominalTypeDecl *decl,
+                               const clang::CXXRecordDecl *clangDecl);
+
 /// If the decl is an instantiation of C++ `std::set`, `std::unordered_set` or
 /// `std::multiset`, synthesize a conformance to CxxSet, which is defined in the
 /// Cxx module.
