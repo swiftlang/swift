@@ -109,6 +109,7 @@ defaulted_option(SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtim
 defaulted_option(SwiftCore_ENABLE_STDLIB_TRACING "Enable tracing in the runtime. Assumes the presence of os_log(3) and the os_signpost(3) API.")
 defaulted_option(SwiftCore_ENABLE_CONCURRENCY "Enable Concurrency runtime support")
 defaulted_option(SwiftCore_ENABLE_REMOTE_MIRROR "Enable RemoteMirror runtime support")
+defaulted_option(SwiftCore_ENABLE_DIRECT_RETAIN_RELEASE "Use direct retain release in the runtime/stdlib")
 defaulted_set(SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR STRING "Default Concurrency global executor implementation")
 option(SwiftCore_ENABLE_COMMANDLINE_SUPPORT "Enable command line argument support" ON)
 option(SwiftCore_ENABLE_UNICODE_DATA "Include unicode data in Swift runtimes" ON)
@@ -195,6 +196,11 @@ add_compile_options(
   "$<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+if(SwiftCore_ENABLE_DIRECT_RETAIN_RELEASE)
+  find_package(SwiftSwiftDirectRuntime REQUIRED)
+  add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-direct-retain-release>")
+endif()
 
 include(ExperimentalFeatures)
 
