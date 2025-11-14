@@ -133,6 +133,7 @@ extension CommandLine {
   #if os(WASI)
   @available(*, unavailable, message: "Unavailable on WASI")
   #endif
+  @available(SwiftStdlib 6.3, *)
   public static let executablePath: String = {
     // FIXME: avoid needing to allocate and free a temp C string (if possible)
     let cString = unsafe _copyExecutablePath()
