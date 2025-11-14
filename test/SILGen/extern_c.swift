@@ -10,7 +10,7 @@ func withCName(_ x: Int) -> Int
 @_extern(c, "take_c_func_ptr")
 func takeCFuncPtr(_ f: @convention(c) (Int) -> Int)
 
-// CHECK-DAG: sil [serialized] [asmname "public_visible"] @$s8extern_c16publicVisibilityyS2iFTo : $@convention(c) (Int) -> Int
+// CHECK-DAG: sil [asmname "public_visible"] @$s8extern_c16publicVisibilityyS2iFTo : $@convention(c) (Int) -> Int
 @_extern(c, "public_visible")
 public func publicVisibility(_ x: Int) -> Int
 

@@ -1025,7 +1025,8 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
     // @objc thunks for top-level functions are serializable since they're
     // referenced from @convention(c) conversions inside inlinable
     // functions.
-    return IsSerialized;
+    if (isThunk())
+      return IsSerialized;
   }
 
   // Declarations imported from Clang modules are serialized if
