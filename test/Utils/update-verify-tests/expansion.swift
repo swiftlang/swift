@@ -132,9 +132,9 @@ func foo(_ x: Int) {
 }
 """)
   //expected-expansion@+5:14{{
-    //   expected-error@3  {{cannot find 'b' in scope; did you mean 'x'?}}
     //   expected-note@1   2{{'x' declared here}}
     //   expected-error@2   {{cannot find 'a' in scope; did you mean 'x'?}}
+    //   expected-error@3  {{cannot find 'b' in scope; did you mean 'x'?}}
   //}}
 func foo() {}
 

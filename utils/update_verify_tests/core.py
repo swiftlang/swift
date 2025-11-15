@@ -262,6 +262,7 @@ def parse_diag(line, filename, prefix):
 
 
 def add_line(new_line, lines):
+    assert new_line.line_n > 0
     lines.insert(new_line.line_n - 1, new_line)
     for i in range(new_line.line_n, len(lines)):
         line = lines[i]
@@ -429,7 +430,7 @@ def fold_expansions(lines):
         if line.diag.category == "closing":
             line.diag.parent.closer = line
         else:
-            line.line_n = len(line.diag.parent.nested_lines)
+            line.line_n = len(line.diag.parent.nested_lines) + 1
             add_line(line, line.diag.parent.nested_lines)
 
 
