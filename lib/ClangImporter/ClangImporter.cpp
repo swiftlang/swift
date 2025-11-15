@@ -2377,6 +2377,12 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
     return result;
   };
 
+  if (path.size() == 1) {
+    if (SwiftContext.LangOpts.EnableModuleLoadingRemarks)
+      SwiftContext.Diags.diagnose(SourceLoc(), diag::module_loading_clang_attempt,
+                                  clangPath.front().first->getName());
+  }
+
   // Now load the top-level module, so that we can check if the submodule
   // exists without triggering a fatal error.
   auto clangModule = loadModule(clangPath.front(), clang::Module::AllVisible);
@@ -2386,6 +2392,12 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   // If we're asked to import the top-level module then we're done here.
   auto *topSwiftModule = finishLoadingClangModule(clangModule, importLoc);
   if (path.size() == 1) {
+    if (SwiftContext.LangOpts.EnableModuleLoadingRemarks)
+      SwiftContext.Diags.diagnose(SourceLoc(),
+                                  diag::module_loading_clang_finished,
+                                  (*clangModule).getFullModuleName(),
+                                  (*clangModule).getASTFile()->getName());
+
     return topSwiftModule;
   }
 
@@ -4683,6 +4695,17 @@ void ClangModuleUnit::getImportedModulesForLookup(
   if (imported.empty()) {
     importedModulesForLookup = ArrayRef<ImportedModule>();
     return;
+  }
+
+  if (owner.SwiftContext.LangOpts.EnableModuleLoadingRemarks) {
+    std::string importedModulesList;
+    for (auto &m : imported) {
+      importedModulesList += m->getFullModuleName();
+      importedModulesList += " ";
+    }
+    owner.SwiftContext.Diags.diagnose(
+        SourceLoc(), diag::module_loading_clang_also_imported,
+        clangModule->getFullModuleName(), importedModulesList);
   }
 
   SmallPtrSet<clang::Module *, 32> seen{imported.begin(), imported.end()};
