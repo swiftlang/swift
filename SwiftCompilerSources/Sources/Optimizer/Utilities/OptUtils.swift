@@ -506,12 +506,15 @@ extension Instruction {
 
     // Metatypes (and upcasts of them to existentials) can be used as static initializers for SE-0492, as long as they
     // do not require an accessor to reference the metadata (i.e. are not generic, not resilient and not a class).
+    // See also irgen::isCanonicalCompleteTypeMetadataStaticallyAddressable.
     case let mti as MetatypeInst:
+      let silType = mti.type.loweredInstanceTypeOfMetatype(in: parentFunction)
+      let instanceType = mti.type.canonicalType.instanceTypeOfMetatype
       if !mti.type.isGenericAtAnyLevel,
-        !mti.type.canonicalType.instanceTypeOfMetatype.isClass,
-        let nominal = mti.type.canonicalType.instanceTypeOfMetatype.nominal,
+        !instanceType.isClass,
+        let nominal = instanceType.nominal,
         !nominal.isGenericAtAnyLevel,
-        !nominal.isResilient(in: mti.parentFunction) {
+        silType.isFixedABI(in: mti.parentFunction) {
         return true
       }
       return false

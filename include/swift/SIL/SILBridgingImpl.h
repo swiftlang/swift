@@ -402,6 +402,10 @@ bool BridgedType::isAddressableForDeps(BridgedFunction f) const {
   return unbridged().isAddressableForDeps(*f.getFunction());
 }
 
+bool BridgedType::isFixedABI(BridgedFunction f) const {
+  return unbridged().isFixedABI(*f.getFunction());
+}
+
 BridgedASTType BridgedType::getRawLayoutSubstitutedLikeType() const {
   return {unbridged().getRawLayoutSubstitutedLikeType().getPointer()};
 }
