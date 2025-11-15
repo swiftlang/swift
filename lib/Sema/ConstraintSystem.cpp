@@ -677,52 +677,12 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, newPath);
 }
 
-ConstraintLocator *ConstraintSystem::getImplicitValueConversionLocator(
-    ConstraintLocatorBuilder root, ConversionRestrictionKind restriction) {
-  SmallVector<LocatorPathElt, 4> path;
-  auto anchor = root.getLocatorParts(path);
-  {
-    if (isExpr<DictionaryExpr>(anchor) && path.size() > 1) {
-      // Drop everything except for first `tuple element #`.
-      path.pop_back_n(path.size() - 1);
-    }
-
-    // Drop any value-to-optional conversions that were applied along the
-    // way to reach this one.
-    while (!path.empty()) {
-      if (path.back().is<LocatorPathElt::OptionalInjection>()) {
-        path.pop_back();
-        continue;
-      }
-      break;
-    }
-
-    // If conversion is for a tuple element, let's drop `TupleType`
-    // components from the path since they carry information for
-    // diagnostics that `ExprRewriter` won't be able to re-construct
-    // during solution application.
-    if (!path.empty() && path.back().is<LocatorPathElt::TupleElement>()) {
-      path.erase(llvm::remove_if(path,
-                                 [](const LocatorPathElt &elt) {
-                                   return elt.is<LocatorPathElt::TupleType>();
-                                 }),
-                 path.end());
-    }
-  }
-
-  return getConstraintLocator(/*base=*/getConstraintLocator(anchor, path),
-                              LocatorPathElt::ImplicitConversion(restriction));
-}
-
 ConstraintLocator *ConstraintSystem::getCalleeLocator(
     ConstraintLocator *locator, bool lookThroughApply,
     llvm::function_ref<Type(Expr *)> getType,
     llvm::function_ref<Type(Type)> simplifyType,
     llvm::function_ref<std::optional<SelectedOverload>(ConstraintLocator *)>
         getOverloadFor) {
-  if (locator->findLast<LocatorPathElt::ImplicitConversion>())
-    return locator;
-
   auto anchor = locator->getAnchor();
   auto path = locator->getPath();
   {
@@ -3908,9 +3868,6 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
     }
 
-    case ConstraintLocator::ImplicitConversion:
-      break;
-
     case ConstraintLocator::Witness:
     case ConstraintLocator::WrappedValue:
     case ConstraintLocator::OptionalInjection:
@@ -4063,9 +4020,6 @@ ConstraintSystem::getArgumentInfoLocator(ConstraintLocator *locator) {
   // An empty locator which code completion uses for member references.
   if (anchor.isNull() && locator->getPath().empty())
     return nullptr;
-
-  if (locator->findLast<LocatorPathElt::ImplicitConversion>())
-    return locator;
 
   // Applies and unresolved member exprs can have callee locators that are
   // dependent on the type of their function, which may not have been resolved

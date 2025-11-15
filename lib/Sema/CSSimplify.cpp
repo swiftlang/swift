@@ -7739,16 +7739,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                  isExpr<ForcedCheckedCastExpr>(anchor);
         };
 
-        if (!isCGFloatInit(anchor) && !isCoercionOrCast(anchor, path) &&
-            llvm::none_of(path, [&](const LocatorPathElt &rawElt) {
-              if (auto elt =
-                      rawElt.getAs<LocatorPathElt::ImplicitConversion>()) {
-                auto convKind = elt->getConversionKind();
-                return convKind == ConversionRestrictionKind::DoubleToCGFloat ||
-                       convKind == ConversionRestrictionKind::CGFloatToDouble;
-              }
-              return false;
-            })) {
+        if (!isCGFloatInit(anchor) && !isCoercionOrCast(anchor, path)) {
           conversionsOrFixes.push_back(
               desugar1->isCGFloat()
                   ? ConversionRestrictionKind::CGFloatToDouble
@@ -11029,10 +11020,6 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
                                              ConstraintLocator *locator) {
   auto anchor = locator->getAnchor();
   if (!anchor)
-    return nullptr;
-
-  // Avoid checking implicit conversions injected by the compiler.
-  if (locator->findFirst<LocatorPathElt::ImplicitConversion>())
     return nullptr;
 
   auto getType = [&cs](Expr *expr) -> Type {
