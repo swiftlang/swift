@@ -351,7 +351,7 @@ public enum _DebuggerSupport {
 
     func loadPointer<T>(type: T.Type) -> Any {
       if type is AnyObject.Type {
-        unsafe unsafeBitCast(pointer, to: AnyObject.self)
+        unsafe unsafeBitCast(pointer, to: T.self)
       } else {
         unsafe pointer.load(as: T.self)
       }
