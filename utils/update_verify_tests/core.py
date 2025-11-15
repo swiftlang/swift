@@ -118,7 +118,9 @@ class Diag:
 
     def col(self):
         # expected-expansion requires column. Otherwise only retain column info if it's already there.
-        if self._col and (self.category == "expansion" or self.is_from_source_file):
+        if self._col and (
+            self.category == "expansion" or self.is_from_source_file
+        ):
             return self._col
         return None
 
@@ -296,7 +298,11 @@ def infer_line_context(target, line_n):
             )
     reverse = (
         True
-        if [other for other in target.targeting_diags if other.relative_target() < 0]
+        if [
+            other
+            for other in target.targeting_diags
+            if other.relative_target() < 0
+        ]
         else False
     )
 
@@ -446,7 +452,10 @@ def error_refers_to_diag(diag_error, diag, target_line_n):
     return (
         target_line_n == diag.absolute_target()
         and diag_error.category == diag.category
-        and (diag.category == "expansion" or diag_error.content == diag.diag_content)
+        and (
+            diag.category == "expansion"
+            or diag_error.content == diag.diag_content
+        )
     )
 
 
@@ -468,7 +477,9 @@ def find_other_targeting(lines, orig_lines, is_nested, diag_error):
     return other_diags
 
 
-def update_lines(diag_errors, lines, orig_lines, prefix, filename, nested_context):
+def update_lines(
+    diag_errors, lines, orig_lines, prefix, filename, nested_context
+):
     for diag_error in diag_errors:
         if not isinstance(diag_error, NotFoundDiag):
             continue
@@ -511,10 +522,13 @@ def update_lines(diag_errors, lines, orig_lines, prefix, filename, nested_contex
         if isinstance(diag_error, NestedDiag):
             if not diag.closer:
                 whitespace = (
-                    diag.whitespace_strings[0] if diag.whitespace_strings else " "
+                    diag.whitespace_strings[0]
+                    if diag.whitespace_strings
+                    else " "
                 )
                 diag.closer = Line(
-                    get_indent(diag.line.content) + "//" + whitespace + "}}\n", None
+                    get_indent(diag.line.content) + "//" + whitespace + "}}\n",
+                    None,
                 )
             update_lines(
                 [diag_error.nested],
@@ -533,12 +547,14 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
     else:
         updated_test_files.add(filename)
     with open(filename, "r") as f:
-        lines = [Line(line, i + 1) for i, line in enumerate(f.readlines() + [""])]
+        lines = [
+            Line(line, i + 1) for i, line in enumerate(f.readlines() + [""])
+        ]
     orig_lines = list(lines)
 
     expansion_context = []
     for line in lines:
-        dprint(f"parsing line {line}")
+        dprint(f"parsing line {line.render()}")
         diag = parse_diag(line, filename, prefix)
         if diag:
             dprint(f"  parsed diag {diag.render()}")
@@ -563,7 +579,7 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
             f.write(line.render())
 
 
-def update_test_files(errors, prefix):
+def update_test_files(errors, prefix, unparsed_files):
     errors_by_file = {}
     for error in errors:
         filename = error.file
@@ -572,6 +588,8 @@ def update_test_files(errors, prefix):
         errors_by_file[filename].append(error)
     updated_test_files = set()
     for filename, diag_errors in errors_by_file.items():
+        if filename in unparsed_files:
+            continue
         try:
             update_test_file(filename, diag_errors, prefix, updated_test_files)
         except KnownException as e:
@@ -580,7 +598,12 @@ def update_test_files(errors, prefix):
                 None,
             )
     updated_files = list(updated_test_files)
-    assert updated_files
+    assert updated_files or unparsed_files
+    if not updated_files:
+        return (
+            f"no files updated: found diagnostics in unparsed files {', '.join(unparsed_files)}",
+            None,
+        )
     return (None, updated_files)
 
 
@@ -590,7 +613,9 @@ test.swift:2:6: error: expected error not produced
   // expected-error@+1{{asdf}}
 ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~
 """
-diag_error_re = re.compile(r"(\S+):(\d+):(\d+): error: expected (\S+) not produced")
+diag_error_re = re.compile(
+    r"(\S+):(\d+):(\d+): error: expected (\S+) not produced"
+)
 
 
 """
@@ -611,7 +636,9 @@ test.swift:2:43: error: incorrect message found
                               ^~~~
                               cannot find 'bar' in scope
 """
-diag_error_re3 = re.compile(r"(\S+):(\d+):(\d+): error: incorrect message found")
+diag_error_re3 = re.compile(
+    r"(\S+):(\d+):(\d+): error: incorrect message found"
+)
 
 
 """
@@ -621,7 +648,9 @@ test.swift:2:15: error: expected warning, not error
               ^~~~~~~
               error
 """
-diag_error_re4 = re.compile(r"(\S+):(\d+):(\d+): error: expected (\S+), not (\S+)")
+diag_error_re4 = re.compile(
+    r"(\S+):(\d+):(\d+): error: expected (\S+), not (\S+)"
+)
 
 """
 ex:
@@ -629,7 +658,19 @@ test.swift:12:14: note: in expansion from here
 func foo() {}
              ^
 """
-diag_expansion_note_re = re.compile(r"(\S+):(\d+):(\d+): note: in expansion from here")
+diag_expansion_note_re = re.compile(
+    r"(\S+):(\d+):(\d+): note: in expansion from here"
+)
+
+"""
+ex:
+test.h:8:52: note: file 'test.h' is not parsed for 'expected' statements. Use '-verify-additional-file test.h' to enable, or '-verify-ignore-unrelated' to ignore diagnostics in this file                                                                                                                                    
+void foo(int len, int * __counted_by(len) p);                                                                           
+                                           ^
+"""
+diag_not_parsed_note_re = re.compile(
+    r"(\S+):(\d+):(\d+): note: file '(\S+)' is not parsed for 'expected' statements"
+)
 
 
 class NotFoundDiag:
@@ -682,6 +723,7 @@ def check_expectations(tool_output, prefix):
     Called by the stand-alone update-verify-tests.py as well as litplugin.py.
     """
     top_level = []
+    unparsed_files = set()
     try:
         i = 0
         while i < len(tool_output):
@@ -689,13 +731,23 @@ def check_expectations(tool_output, prefix):
             extra_lines = []
 
             curr = []
+            dprint(f"line: {line.strip()}")
             if not "error:" in line:
-                dprint(f"ignored line: {line.strip()}")
-                if m := diag_expansion_note_re.match(line.strip()):
-                    raise KnownException(f"unexpected 'nested' note found without preceding diagnostic: '{line.strip()}'")
+                if "note:" in line:
+                    if m := diag_not_parsed_note_re.match(line.strip()):
+                        dprint(f"unparsed file: {m.group(4)}")
+                        unparsed_files.add(m.group(4))
+                        extra_lines = tool_output[i + 1 : i + 3]
+                        dprint(f"extra lines: {extra_lines}")
+                    else:
+                        raise KnownException(
+                            f"unhandled note found (line {i+1}): '{line.strip()}'"
+                        )
+                else:
+                    dprint(f"ignored line: {line.strip()}")
             elif m := diag_error_re.match(line):
                 dprint(f"diag not found: {line.strip()}")
-                extra_lines = tool_output[i+1:i+3]
+                extra_lines = tool_output[i + 1 : i + 3]
                 dprint(f"extra lines: {extra_lines}")
                 diag = parse_diag(
                     Line(extra_lines[0], int(m.group(2))), m.group(1), prefix
@@ -712,7 +764,7 @@ def check_expectations(tool_output, prefix):
                 )
             elif m := diag_error_re2.match(line):
                 dprint(f"unexpected diag: {line.strip()}")
-                extra_lines = tool_output[i+1:i+3]
+                extra_lines = tool_output[i + 1 : i + 3]
                 dprint(f"extra lines: {extra_lines}")
                 curr.append(
                     ExtraDiag(
@@ -730,7 +782,7 @@ def check_expectations(tool_output, prefix):
             # if only one diagnostic is emitted on that line, and the content of that diagnostic is actually 'bar'.
             elif m := diag_error_re3.match(line):
                 dprint(f"wrong diag message: {line.strip()}")
-                extra_lines = tool_output[i+1:i+4]
+                extra_lines = tool_output[i + 1 : i + 4]
                 dprint(f"extra lines: {extra_lines}")
                 diag = parse_diag(
                     Line(extra_lines[0], int(m.group(2))), m.group(1), prefix
@@ -757,7 +809,7 @@ def check_expectations(tool_output, prefix):
                 )
             elif m := diag_error_re4.match(line):
                 dprint(f"wrong diag kind: {line.strip()}")
-                extra_lines = tool_output[i+1:i+4]
+                extra_lines = tool_output[i + 1 : i + 4]
                 dprint(f"extra lines: {extra_lines}")
                 diag = parse_diag(
                     Line(extra_lines[0], int(m.group(2))), m.group(1), prefix
@@ -793,7 +845,7 @@ def check_expectations(tool_output, prefix):
                 and i < len(tool_output)
                 and (m := diag_expansion_note_re.match(tool_output[i].strip()))
             ):
-                nested_note_lines = tool_output[i:i+3]
+                nested_note_lines = tool_output[i : i + 3]
                 dprint(f"nested note lines: {nested_note_lines}")
                 curr = [
                     NestedDiag(m.group(1), int(m.group(2)), int(m.group(3)), e)
@@ -803,8 +855,11 @@ def check_expectations(tool_output, prefix):
             top_level.extend(curr)
 
     except KnownException as e:
-        return (f"Error in update-verify-tests while parsing tool output: {e}", None)
+        return (
+            f"Error in update-verify-tests while parsing tool output: {e}",
+            None,
+        )
     if top_level:
-        return update_test_files(top_level, prefix)
+        return update_test_files(top_level, prefix, unparsed_files)
     else:
         return ("no mismatching diagnostics found", None)
