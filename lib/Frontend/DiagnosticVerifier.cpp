@@ -485,7 +485,14 @@ void DiagnosticVerifier::printDiagnostic(const llvm::SMDiagnostic &Diag) const {
   ColoredStream coloredStream{stream};
   raw_ostream &out = UseColor ? coloredStream : stream;
   llvm::SourceMgr &Underlying = SM.getLLVMSourceMgr();
-  Underlying.PrintMessage(out, Diag);
+  if (Diag.getFilename().empty()) {
+    llvm::SMDiagnostic SubstDiag(
+        *Diag.getSourceMgr(), Diag.getLoc(), "<empty-filename>",
+        Diag.getLineNo(), Diag.getColumnNo(), Diag.getKind(), Diag.getMessage(),
+        Diag.getLineContents(), Diag.getRanges(), Diag.getFixIts());
+    Underlying.PrintMessage(out, SubstDiag);
+  } else
+    Underlying.PrintMessage(out, Diag);
 
   SourceLoc Loc = SourceLoc::getFromPointer(Diag.getLoc().getPointer());
   if (Loc.isInvalid())
