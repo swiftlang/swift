@@ -8801,7 +8801,9 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
   auto bufferID = sourceMgr.addMemBufferCopy(attributeText);
 
   auto info = GeneratedSourceInfo{GeneratedSourceInfo::AttributeFromClang,
-                                  CharSourceRange(),
+                                  // NB: This source range is not used by the diagnostic engine,
+                                  // but it is traversed by DiagnostciVerifier.
+                                  CharSourceRange(MappedDecl->getStartLoc(), 0),
                                   sourceMgr.getRangeForBuffer(bufferID)};
   info.astNode = static_cast<void *>(module);
   info.clangNode = MappedDecl->getClangNode();
