@@ -1,5 +1,6 @@
 import sys
 import re
+from codecs import encode, decode
 
 DEBUG = False
 
@@ -172,7 +173,9 @@ class Diag:
         if self.category == "expansion":
             return base_s + "{{"
         else:
-            return base_s + "{{" + self.diag_content + "}}"
+            # python trivia: raw strings can't end with a backslash
+            escaped_diag_s = self.diag_content.replace("\\", "\\\\")
+            return base_s + "{{" + escaped_diag_s + "}}"
 
 
 class ExpansionDiagClose:
@@ -245,9 +248,12 @@ def parse_diag(line, filename, prefix):
     count = int(count_s) if count_s else 1
     line.content = matched_re.sub("{{DIAG}}", s)
 
+    unescaped_diag_s = decode(
+        encode(diag_s, "utf-8", "backslashreplace"), "unicode-escape"
+    )
     return Diag(
         check_prefix,
-        diag_s,
+        unescaped_diag_s,
         category_s,
         target_line_n,
         is_absolute,
