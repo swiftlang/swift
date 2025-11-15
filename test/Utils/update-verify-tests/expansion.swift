@@ -39,6 +39,9 @@
 // RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/nested.swift
 // RUN: %diff %t/nested.swift %t/nested.swift.expected
 
+// RUN: not %target-swift-frontend-verify -I %t -plugin-path %swift-plugin-dir -typecheck %t/unparsed.swift 2>%t/output.txt -Rmacro-expansions
+// RUN: not %update-verify-tests < %t/output.txt | %FileCheck --check-prefix CHECK-UNPARSED %s
+
 //--- single.swift
 @attached(peer, names: overloaded)
 macro unstringifyPeer(_ s: String) =
@@ -237,4 +240,23 @@ func bar(_ y: Int) {
 //   expected-error@10{{argument passed to call that takes no arguments}}
 // }}
 func bar() {}
+
+//--- unparsed.h
+// CHECK-UNPARSED: no files updated: found diagnostics in unparsed files TMP_DIR/unparsed.h
+void foo(int len, int *p) __attribute__((swift_attr("@_SwiftifyImport(.countedBy(pointer: .param(2), count: \"len\"))")));
+
+//--- module.modulemap
+module UnparsedClang {
+  header "unparsed.h"
+  export *
+}
+
+//--- unparsed.swift
+import UnparsedClang
+
+func bar() {
+  let a: CInt = 1
+  var b: CInt = 13
+  foo(a, &b)
+}
 
