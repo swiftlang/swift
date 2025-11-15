@@ -430,7 +430,16 @@ bool DiagnosticVerifier::verifyUnrelated(
     auto diag = SM.GetMessage(Loc, llvm::SourceMgr::DK_Error, Message, {}, {});
     printDiagnostic(diag);
 
-    auto FileName = SM.getIdentifierForBuffer(SM.findBufferContainingLoc(Loc));
+    unsigned TopmostBufferID = SM.findBufferContainingLoc(Loc);
+    while (const GeneratedSourceInfo *GSI =
+               SM.getGeneratedSourceInfo(TopmostBufferID)) {
+      SourceLoc ParentLoc = GSI->originalSourceRange.getStart();
+      if (ParentLoc.isInvalid())
+        break;
+      TopmostBufferID = SM.findBufferContainingLoc(ParentLoc);
+      Loc = ParentLoc;
+    }
+    auto FileName = SM.getIdentifierForBuffer(TopmostBufferID);
     auto noteDiag =
         SM.GetMessage(Loc, llvm::SourceMgr::DK_Note,
                       ("file '" + FileName +
