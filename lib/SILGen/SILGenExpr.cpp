@@ -3600,7 +3600,7 @@ static PreparedArguments loadIndexValuesForKeyPathComponent(
   SmallVector<AnyFunctionType::Param, 8> indexParams;
   for (auto &elt : indexes) {
     // FIXME: Varargs?
-    indexParams.emplace_back(SGF.F.mapTypeIntoContext(elt.first));
+    indexParams.emplace_back(SGF.F.mapTypeIntoEnvironment(elt.first));
   }
   
   PreparedArguments indexValues(indexParams);
@@ -3614,12 +3614,12 @@ static PreparedArguments loadIndexValuesForKeyPathComponent(
     if (indexes.size() > 1) {
       eltAddr = SGF.B.createTupleElementAddr(loc, eltAddr, i);
     }
-    auto ty = SGF.F.mapTypeIntoContext(indexes[i].second);
+    auto ty = SGF.F.mapTypeIntoEnvironment(indexes[i].second);
     auto value = SGF.emitLoad(loc, eltAddr,
                               SGF.getTypeLowering(ty),
                               SGFContext(), IsNotTake);
     auto substType =
-      SGF.F.mapTypeIntoContext(indexes[i].first)->getCanonicalType();
+      SGF.F.mapTypeIntoEnvironment(indexes[i].first)->getCanonicalType();
     indexValues.add(loc, RValue(SGF, loc, substType, value));
   }
 
@@ -3777,8 +3777,8 @@ static void emitKeyPathThunk(
     SILValue &argPtr, SILParameterInfo paramInfo, bool lowerValueArg = false) {
   auto entry = thunk->begin();
   if (genericEnv) {
-    resultArgTy = genericEnv->mapTypeIntoContext(SGM.M, resultArgTy);
-    baseArgTy = genericEnv->mapTypeIntoContext(SGM.M, baseArgTy);
+    resultArgTy = genericEnv->mapTypeIntoEnvironment(SGM.M, resultArgTy);
+    baseArgTy = genericEnv->mapTypeIntoEnvironment(SGM.M, baseArgTy);
   }
   if (!lowerValueArg) {
     if (SGM.M.useLoweredAddresses()) {
@@ -3792,7 +3792,7 @@ static void emitKeyPathThunk(
     auto argTy = subSGF.silConv.getSILType(paramInfo, signature,
                                            subSGF.F.getTypeExpansionContext());
     if (genericEnv)
-      argTy = genericEnv->mapTypeIntoContext(SGM.M, argTy);
+      argTy = genericEnv->mapTypeIntoEnvironment(SGM.M, argTy);
     argPtr = entry->createFunctionArgument(argTy);
   }
 }
@@ -3830,9 +3830,9 @@ static SILFunction *getOrCreateKeyPathGetter(
   // Emit the thunk, which accesses the underlying property normally with
   // reabstraction where necessary.
   if (genericEnv) {
-    baseType = genericEnv->mapTypeIntoContext(baseType)->getCanonicalType();
+    baseType = genericEnv->mapTypeIntoEnvironment(baseType)->getCanonicalType();
     propertyType =
-        genericEnv->mapTypeIntoContext(propertyType)->getCanonicalType();
+        genericEnv->mapTypeIntoEnvironment(propertyType)->getCanonicalType();
     thunk->setGenericEnvironment(genericEnv);
   }
   SILGenFunction subSGF(SGM, *thunk, SGM.SwiftModule);
@@ -3927,9 +3927,9 @@ static SILFunction *getOrCreateKeyPathSetter(
   // Emit the thunk, which accesses the underlying property normally with
   // reabstraction where necessary.
   if (genericEnv) {
-    baseType = genericEnv->mapTypeIntoContext(baseType)->getCanonicalType();
+    baseType = genericEnv->mapTypeIntoEnvironment(baseType)->getCanonicalType();
     propertyType =
-        genericEnv->mapTypeIntoContext(propertyType)->getCanonicalType();
+        genericEnv->mapTypeIntoEnvironment(propertyType)->getCanonicalType();
     thunk->setGenericEnvironment(genericEnv);
   }
   SILGenFunction subSGF(SGM, *thunk, SGM.SwiftModule);
@@ -4063,8 +4063,8 @@ static SILFunction *getOrCreateKeyPathAppliedMethod(
   // Emit the thunk, which accesses the underlying property normally with
   // reabstraction where necessary.
   if (genericEnv) {
-    baseType = genericEnv->mapTypeIntoContext(baseType)->getCanonicalType();
-    methodType = genericEnv->mapTypeIntoContext(methodType)->getCanonicalType();
+    baseType = genericEnv->mapTypeIntoEnvironment(baseType)->getCanonicalType();
+    methodType = genericEnv->mapTypeIntoEnvironment(methodType)->getCanonicalType();
     thunk->setGenericEnvironment(genericEnv);
   }
   SILGenFunction subSGF(SGM, *thunk, SGM.SwiftModule);
@@ -4152,8 +4152,8 @@ static SILFunction *getOrCreateUnappliedKeypathMethod(
   // Emit the thunk, which accesses the underlying property normally with
   // reabstraction where necessary.
   if (genericEnv) {
-    baseType = genericEnv->mapTypeIntoContext(baseType)->getCanonicalType();
-    methodType = genericEnv->mapTypeIntoContext(methodType)->getCanonicalType();
+    baseType = genericEnv->mapTypeIntoEnvironment(baseType)->getCanonicalType();
+    methodType = genericEnv->mapTypeIntoEnvironment(methodType)->getCanonicalType();
     thunk->setGenericEnvironment(genericEnv);
   }
   SILGenFunction subSGF(SGM, *thunk, SGM.SwiftModule);
@@ -4230,12 +4230,12 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
 
   CanType indexTupleTy;
   if (indexes.size() == 1) {
-    indexTupleTy = GenericEnvironment::mapTypeIntoContext(
+    indexTupleTy = GenericEnvironment::mapTypeIntoEnvironment(
         genericEnv, indexes[0].FormalType)->getCanonicalType();
   } else {
     SmallVector<TupleTypeElt, 2> indexElts;
     for (auto &elt : indexes) {
-      indexElts.push_back(GenericEnvironment::mapTypeIntoContext(
+      indexElts.push_back(GenericEnvironment::mapTypeIntoEnvironment(
           genericEnv, elt.FormalType));
     }
 
@@ -4289,8 +4289,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     auto rhsArgTy = subSGF.silConv.getSILType(
         params[1], signature, subSGF.getTypeExpansionContext());
     if (genericEnv) {
-      lhsArgTy = genericEnv->mapTypeIntoContext(SGM.M, lhsArgTy);
-      rhsArgTy = genericEnv->mapTypeIntoContext(SGM.M, rhsArgTy);
+      lhsArgTy = genericEnv->mapTypeIntoEnvironment(SGM.M, lhsArgTy);
+      rhsArgTy = genericEnv->mapTypeIntoEnvironment(SGM.M, rhsArgTy);
     }
     auto lhsAddr = entry->createFunctionArgument(lhsArgTy);
     auto rhsAddr = entry->createFunctionArgument(rhsArgTy);
@@ -4314,7 +4314,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       Type formalTy = index.FormalType;
       ProtocolConformanceRef hashable = index.Hashable;
       if (genericEnv) {
-        formalTy = genericEnv->mapTypeIntoContext(formalTy);
+        formalTy = genericEnv->mapTypeIntoEnvironment(formalTy);
         hashable = hashable.subst(genericEnv->getForwardingSubstitutionMap());
       }
 
@@ -4463,7 +4463,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     auto indexArgTy = subSGF.silConv.getSILType(
         params[0], signature, subSGF.getTypeExpansionContext());
     if (genericEnv)
-      indexArgTy = genericEnv->mapTypeIntoContext(SGM.M, indexArgTy);
+      indexArgTy = genericEnv->mapTypeIntoEnvironment(SGM.M, indexArgTy);
     auto indexPtr = entry->createFunctionArgument(indexArgTy);
 
     SILValue hashCode;
@@ -4487,7 +4487,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       auto formalTy = index.FormalType;
       auto hashable = index.Hashable;
       if (genericEnv) {
-        formalTy = genericEnv->mapTypeIntoContext(formalTy)->getCanonicalType();
+        formalTy = genericEnv->mapTypeIntoEnvironment(formalTy)->getCanonicalType();
         hashable = hashable.subst(
           genericEnv->getForwardingSubstitutionMap());
       }
@@ -4596,10 +4596,10 @@ static void lowerKeyPathMemberIndexTypes(
           AbstractionPattern::getOpaque(), paramTy,
           TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
               ResilienceExpansion::Minimal));
-      paramLoweredTy = paramLoweredTy.mapTypeOutOfContext();
+      paramLoweredTy = paramLoweredTy.mapTypeOutOfEnvironment();
 
       indexPatterns.push_back(
-          {paramTy->mapTypeOutOfContext()->getCanonicalType(), paramLoweredTy});
+          {paramTy->mapTypeOutOfEnvironment()->getCanonicalType(), paramLoweredTy});
     }
   };
 
@@ -4630,7 +4630,7 @@ static void lowerKeyPathMemberIndexPatterns(
     CanType formalTy;
     SILType loweredTy;
     std::tie(formalTy, loweredTy) = indexTypes[i];
-    auto hashable = indexHashables[i].mapConformanceOutOfContext();
+    auto hashable = indexHashables[i].mapConformanceOutOfEnvironment();
     assert(hashable.isAbstract() ||
            hashable.getConcrete()->getType()->isEqual(formalTy));
 
@@ -4663,13 +4663,13 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
           methodTy->getResult()->castTo<AnyFunctionType>()->getResult();
       if (auto genMethodTy = methodResultTy->getAs<GenericFunctionType>())
         methodResultTy = genMethodTy->substGenericArgs(subs);
-      componentTy = methodResultTy->mapTypeOutOfContext()->getCanonicalType();
+      componentTy = methodResultTy->mapTypeOutOfEnvironment()->getCanonicalType();
     } else {
       // Otherwise, component type is method type without Self.
       if (auto genMethodTy = methodTy->getAs<GenericFunctionType>())
         methodTy = genMethodTy->substGenericArgs(subs);
       auto methodInterfaceTy = cast<AnyFunctionType>(
-          methodTy->mapTypeOutOfContext()->getCanonicalType());
+          methodTy->mapTypeOutOfEnvironment()->getCanonicalType());
       componentTy = methodInterfaceTy.getResult();
     }
 
@@ -4814,7 +4814,7 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
         if (externalSubs.getRecursiveProperties().hasArchetype()) {
           needsGenericContext = true;
           // FIXME: This doesn't do anything for local archetypes!
-          externalSubs = externalSubs.mapReplacementTypesOutOfContext();
+          externalSubs = externalSubs.mapReplacementTypesOutOfEnvironment();
         }
       }
 
@@ -4847,15 +4847,15 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
         componentTy = var->getValueInterfaceType()->getCanonicalType();
         ASSERT(!componentTy->hasTypeParameter());
       } else {
-        // The mapTypeIntoContext() / mapTypeOutOfContext() dance is there
+        // The mapTypeIntoEnvironment() / mapTypeOutOfEnvironment() dance is there
         // to handle the case where baseTy being a type parameter subject
         // to a superclass requirement.
         componentTy =
             var->getValueInterfaceType()
-                .subst(GenericEnvironment::mapTypeIntoContext(
+                .subst(GenericEnvironment::mapTypeIntoEnvironment(
                            genericEnv, baseTy->getMetatypeInstanceType())
                            ->getContextSubstitutionMap(var->getDeclContext()))
-                ->mapTypeOutOfContext()
+                ->mapTypeOutOfEnvironment()
                 ->getCanonicalType();
       }
 
@@ -4897,7 +4897,7 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
       if (auto genSubscriptTy = baseSubscriptTy->getAs<GenericFunctionType>())
         baseSubscriptTy = genSubscriptTy->substGenericArgs(subs);
       auto baseSubscriptInterfaceTy = cast<AnyFunctionType>(
-          baseSubscriptTy->mapTypeOutOfContext()->getCanonicalType());
+          baseSubscriptTy->mapTypeOutOfEnvironment()->getCanonicalType());
 
       auto componentTy = baseSubscriptInterfaceTy.getResult();
       if (decl->getAttrs().hasAttribute<OptionalAttr>()) {
@@ -4962,7 +4962,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   bool needsGenericContext = false;
   if (rootTy->hasArchetype()) {
     needsGenericContext = true;
-    rootTy = rootTy->mapTypeOutOfContext()->getCanonicalType();
+    rootTy = rootTy->mapTypeOutOfEnvironment()->getCanonicalType();
   }
   
   auto baseTy = rootTy;
@@ -5409,7 +5409,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   auto selfDecl = E->getSelf();
   auto ctorDecl = cast<ConstructorDecl>(selfDecl->getDeclContext());
   auto selfIfaceTy = ctorDecl->getDeclContext()->getSelfInterfaceType();
-  auto selfTy = ctorDecl->mapTypeIntoContext(selfIfaceTy);
+  auto selfTy = ctorDecl->mapTypeIntoEnvironment(selfIfaceTy);
 
   bool isChaining; // Ignored
   auto *otherCtor = E->getCalledConstructor(isChaining)->getDecl();
@@ -5423,7 +5423,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   // The optionality depth of the result type of the enclosing initializer in
   // this context.
   const auto destOptionalityDepth =
-      ctorDecl->mapTypeIntoContext(ctorDecl->getResultInterfaceType())
+      ctorDecl->mapTypeIntoEnvironment(ctorDecl->getResultInterfaceType())
           ->getOptionalityDepth();
 
   // The subexpression consumes the current 'self' binding.

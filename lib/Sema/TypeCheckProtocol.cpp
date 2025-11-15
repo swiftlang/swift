@@ -1008,7 +1008,7 @@ findMissingGenericRequirementForSolutionFix(
 
   auto selfTy = conformance->getProtocol()->getSelfInterfaceType()
       .subst(reqEnvironment.getRequirementToWitnessThunkSubs())
-        ->mapTypeOutOfContext();
+        ->mapTypeOutOfEnvironment();
 
   auto sig = conformance->getGenericSignature();
   auto *env = conformance->getGenericEnvironment();
@@ -1016,7 +1016,7 @@ findMissingGenericRequirementForSolutionFix(
   auto &ctx = conformance->getDeclContext()->getASTContext();
 
   if (type->is<ArchetypeType>() &&
-      type->mapTypeOutOfContext()->isEqual(selfTy) &&
+      type->mapTypeOutOfEnvironment()->isEqual(selfTy) &&
       missingType->isEqual(conformance->getType())) {
     // e.g. `extension P where Self == C { func foo() { ... } }`
     // and `C` doesn't actually conform to `P`.
@@ -1045,7 +1045,7 @@ findMissingGenericRequirementForSolutionFix(
       if (ordinal == params.size())
         return ErrorType::get(ctx);
 
-      return env->mapTypeIntoContext(gp);
+      return env->mapTypeIntoEnvironment(gp);
     },
     LookUpConformanceInModule(),
     SubstFlags::PreservePackExpansionLevel);
@@ -5324,7 +5324,7 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
   auto typeInContext = conformance->getType();
   ProtocolConformanceRef conformanceInContext(conformance);
   if (auto *genericEnv = conformance->getGenericEnvironment()) {
-    typeInContext = genericEnv->mapTypeIntoContext(typeInContext);
+    typeInContext = genericEnv->mapTypeIntoEnvironment(typeInContext);
     conformanceInContext =
       conformanceInContext.subst(genericEnv->getForwardingSubstitutionMap());
   }
@@ -5463,7 +5463,7 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
       auto assocConf = conformance->getAssociatedConformance(depTy, proto);
       if (assocConf.isConcrete()) {
         auto *concrete = assocConf.getConcrete();
-        auto replacementTy = dc->mapTypeIntoContext(concrete->getType());
+        auto replacementTy = dc->mapTypeIntoEnvironment(concrete->getType());
 
         // If this requirement has a dependent member type, only require the
         // associated conformance to be as available as the requirement's
@@ -5530,7 +5530,7 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
          conformance->getProtocol());
 
   // FIXME: getInterfaceType() on properties returns contextual types that have
-  // been mapped out of context, but mapTypeOutOfContext() does not reconstitute
+  // been mapped out of context, but mapTypeOutOfEnvironment() does not reconstitute
   // type parameters that were substituted with concrete types. Instead,
   // patterns should be refactored to use interface types, at least if they
   // appear in type contexts.
@@ -5873,7 +5873,7 @@ void swift::diagnoseConformanceFailure(Type T,
       // Equatable, say so.
       //
       // Map it into context since we want to check conditional requirements.
-      rawType = enumDecl->mapTypeIntoContext(rawType);
+      rawType = enumDecl->mapTypeIntoEnvironment(rawType);
       if (!TypeChecker::conformsToKnownProtocol(
               rawType, KnownProtocolKind::Equatable)) {
         SourceLoc loc = enumDecl->getInherited().getStartLoc();
@@ -7345,7 +7345,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
         auto match =
             RequirementMatch(asd, MatchKind::ExactMatch, asdTy, reqEnv);
         match.WitnessSubstitutions = reqEnv.getRequirementToWitnessThunkSubs()
-                                           .mapReplacementTypesOutOfContext();
+                                           .mapReplacementTypesOutOfEnvironment();
         checker.recordWitness(asd, match);
       }
     }
@@ -7407,7 +7407,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
       continue;
 
     Type defaultAssocTypeInContext =
-      proto->mapTypeIntoContext(defaultAssocType);
+      proto->mapTypeIntoEnvironment(defaultAssocType);
     auto requirementProto = req.getProtocolDecl();
     auto conformance = checkConformance(defaultAssocTypeInContext,
                                         requirementProto);

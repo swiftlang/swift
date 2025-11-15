@@ -4678,7 +4678,7 @@ bool UnintendedExtraGenericParamMemberFailure::diagnoseAsError() {
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
   auto archetype = baseType->getMetatypeInstanceType()->castTo<ArchetypeType>();
   auto genericTy =
-      archetype->mapTypeOutOfContext()->castTo<GenericTypeParamType>();
+      archetype->mapTypeOutOfEnvironment()->castTo<GenericTypeParamType>();
   SourceLoc loc = genericTy->getDecl()->getSourceRange().End;
   StringRef replacement;
 

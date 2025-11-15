@@ -191,7 +191,7 @@ DerivedConformance::storedPropertiesNotConformingToProtocol(
     if (!type)
       nonconformingProperties.push_back(propertyDecl);
 
-    if (!checkConformance(DC->mapTypeIntoContext(type), protocol)) {
+    if (!checkConformance(DC->mapTypeIntoEnvironment(type), protocol)) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -563,7 +563,7 @@ DerivedConformance::declareDerivedProperty(SynthesizedIntroducer intro,
   propDecl->setInterfaceType(propertyInterfaceType);
 
   auto propertyContextType =
-      getConformanceContext()->mapTypeIntoContext(propertyInterfaceType);
+      getConformanceContext()->mapTypeIntoEnvironment(propertyInterfaceType);
 
   Pattern *propPat =
       NamedPattern::createImplicit(Context, propDecl, propertyContextType);
@@ -830,7 +830,7 @@ DerivedConformance::associatedValuesNotConformingToProtocol(
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (checkConformance(DC->mapTypeIntoContext(type), protocol).isInvalid()) {
+      if (checkConformance(DC->mapTypeIntoEnvironment(type), protocol).isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }

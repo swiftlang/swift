@@ -835,9 +835,9 @@ public:
     SILFunction *impl =
         SGF.SGM.getOrCreateForeignAsyncCompletionHandlerImplFunction(
             cast<SILFunctionType>(
-                impFnTy->mapTypeOutOfContext()->getReducedType(sig)),
-            blockStorageTy->mapTypeOutOfContext()->getReducedType(sig),
-            continuationTy->mapTypeOutOfContext()->getReducedType(sig),
+                impFnTy->mapTypeOutOfEnvironment()->getReducedType(sig)),
+            blockStorageTy->mapTypeOutOfEnvironment()->getReducedType(sig),
+            continuationTy->mapTypeOutOfEnvironment()->getReducedType(sig),
             origFormalType, sig, calleeTypeInfo);
     auto impRef = SGF.B.createFunctionRef(loc, impl);
 
@@ -948,7 +948,7 @@ public:
         }
 
         auto mappedOutContinuationTy =
-            continuationTy->mapTypeOutOfContext()->getCanonicalType();
+            continuationTy->mapTypeOutOfEnvironment()->getCanonicalType();
         auto resumeType =
             cast<BoundGenericType>(mappedOutContinuationTy).getGenericArgs()[0];
 
@@ -958,7 +958,7 @@ public:
                 : SGF.SGM.getResumeUnsafeThrowingContinuationWithError();
 
         Type replacementTypes[] = {
-            SGF.F.mapTypeIntoContext(resumeType)->getCanonicalType()};
+            SGF.F.mapTypeIntoEnvironment(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
                                          LookUpConformanceInModule());

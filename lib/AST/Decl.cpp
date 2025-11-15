@@ -8037,7 +8037,7 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
 }
 
 Type VarDecl::getTypeInContext() const {
-  return getDeclContext()->mapTypeIntoContext(getInterfaceType());
+  return getDeclContext()->mapTypeIntoEnvironment(getInterfaceType());
 }
 
 /// Translate an "is mutable" bit into a StorageMutability value.
@@ -8911,7 +8911,7 @@ Type VarDecl::getPropertyWrapperInitValueInterfaceType() const {
 
   Type valueInterfaceTy = initInfo.getWrappedValuePlaceholder()->getType();
   if (valueInterfaceTy->hasPrimaryArchetype())
-    valueInterfaceTy = valueInterfaceTy->mapTypeOutOfContext();
+    valueInterfaceTy = valueInterfaceTy->mapTypeOutOfEnvironment();
 
   return valueInterfaceTy;
 }
@@ -9221,7 +9221,7 @@ void ParamDecl::setDefaultArgumentKind(DefaultArgumentKind K) {
 
 /// Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {
-  return mapTypeIntoContext(getSelfInterfaceType());
+  return mapTypeIntoEnvironment(getSelfInterfaceType());
 }
 
 TupleType *BuiltinTupleDecl::getTupleSelfType(const ExtensionDecl *owner) const {
@@ -13047,7 +13047,7 @@ std::optional<Type>
 CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
   if (auto func = dyn_cast<AbstractFunctionDecl *>()) {
     if (auto thrownError = func->getEffectiveThrownErrorType())
-      return func->mapTypeIntoContext(*thrownError);
+      return func->mapTypeIntoEnvironment(*thrownError);
 
     return std::nullopt;
   }

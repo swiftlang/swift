@@ -348,7 +348,7 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
         auto bindingsBufPtr = IGF.collectParameters().claimNext();
 
         auto substT = genericEnv
-          ? genericEnv->mapTypeIntoContext(t)->getCanonicalType()
+          ? genericEnv->mapTypeIntoEnvironment(t)->getCanonicalType()
           : t;
 
         // If a type is noncopyable, lie about the resolved type to reflection
@@ -497,7 +497,7 @@ getTypeRefImpl(IRGenModule &IGM,
     // exposing their metadata to them.
     Type contextualTy = type;
     if (sig) {
-      contextualTy = sig.getGenericEnvironment()->mapTypeIntoContext(type);
+      contextualTy = sig.getGenericEnvironment()->mapTypeIntoEnvironment(type);
     }
 
     bool isAlwaysNoncopyable = false;
@@ -640,7 +640,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
                 Address(bindingsBufPtr, Int8Ty, getPointerAlignment()),
                 MetadataState::Complete, genericEnv->getForwardingSubstitutionMap());
 
-            type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
+            type = genericEnv->mapTypeIntoEnvironment(type)->getCanonicalType();
           }
           if (origType->hasTypeParameter()) {
             conformance = conformance.subst(
@@ -1475,7 +1475,7 @@ public:
 
         auto Source = SourceBuilder.createClosureBinding(i);
         auto BindingType = Bindings[i].getTypeParameter().subst(Subs);
-        auto InterfaceType = BindingType->mapTypeOutOfContext();
+        auto InterfaceType = BindingType->mapTypeOutOfEnvironment();
         SourceMap.emplace_back(Kind, InterfaceType->getCanonicalType(), Source);
         break;
       }
@@ -1545,7 +1545,7 @@ public:
       auto Src = Path.getMetadataSource(SourceBuilder, Root);
 
       auto SubstType = Req.getTypeParameter().subst(Subs);
-      auto InterfaceType = SubstType->mapTypeOutOfContext();
+      auto InterfaceType = SubstType->mapTypeOutOfEnvironment();
       SourceMap.emplace_back(Kind, InterfaceType->getCanonicalType(), Src);
     });
 
@@ -1599,7 +1599,7 @@ public:
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
-      addLoweredTypeRef(CaptureType.mapTypeOutOfContext(), sig);
+      addLoweredTypeRef(CaptureType.mapTypeOutOfEnvironment(), sig);
     }
 
     // Add the pairs that make up the generic param -> metadata source map

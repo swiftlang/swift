@@ -769,7 +769,7 @@ public:
   void bindLocalTypeDataFromSelfWitnessTable(
                 const ProtocolConformance *conformance,
                 llvm::Value *selfTable,
-                llvm::function_ref<CanType (CanType)> mapTypeIntoContext);
+                llvm::function_ref<CanType (CanType)> mapTypeIntoEnvironment);
 
   void setDominanceResolver(DominanceResolverFunction resolver) {
     assert(DominanceResolver == nullptr);

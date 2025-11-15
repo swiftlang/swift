@@ -142,18 +142,18 @@ SILType SILType::getUnsafeRawPointer(const ASTContext &ctx) {
 }
 
 bool SILType::isTrivial(const SILFunction &F) const {
-  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
   
   return F.getTypeProperties(contextType).isTrivial();
 }
 
 bool SILType::isOrContainsRawPointer(const SILFunction &F) const {
-  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
   return F.getTypeProperties(contextType).isOrContainsRawPointer();
 }
 
 bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction *f) const {
-  auto contextType = hasTypeParameter() ? f->mapTypeIntoContext(*this) : *this;
+  auto contextType = hasTypeParameter() ? f->mapTypeIntoEnvironment(*this) : *this;
   auto props = f->getTypeProperties(contextType);
   bool result = !props.isTrivial() || props.isOrContainsRawPointer();
   assert((result || !isFunctionTypeWithContext()) &&
@@ -162,7 +162,7 @@ bool SILType::isNonTrivialOrContainsRawPointer(const SILFunction *f) const {
 }
 
 bool SILType::isOrContainsPack(const SILFunction &F) const {
-  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
   return F.getTypeProperties(contextType).isOrContainsPack();
 }
 
@@ -232,7 +232,7 @@ bool SILType::isNoReturnFunction(SILModule &M,
 }
 
 Lifetime SILType::getLifetime(const SILFunction &F) const {
-  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
   auto properties = F.getTypeProperties(contextType);
   if (properties.isTrivial())
     return Lifetime::None;
@@ -488,13 +488,13 @@ bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
 }
 
 bool SILType::isAddressOnly(const SILFunction &F) const {
-  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
     
   return F.getTypeLowering(contextType).isAddressOnly();
 }
 
 bool SILType::isFixedABI(const SILFunction &F) const {
-  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoEnvironment(*this) : *this;
   return F.getTypeProperties(contextType).isFixedABI();
 }
 
@@ -641,13 +641,13 @@ SILType::canUseExistentialRepresentation(ExistentialRepresentation repr,
   llvm_unreachable("Unhandled ExistentialRepresentation in switch.");
 }
 
-SILType SILType::mapTypeOutOfContext() const {
-  return SILType::getPrimitiveType(mapTypeOutOfContext(getASTType()),
+SILType SILType::mapTypeOutOfEnvironment() const {
+  return SILType::getPrimitiveType(mapTypeOutOfEnvironment(getASTType()),
                                    getCategory());
 }
 
-CanType SILType::mapTypeOutOfContext(CanType type) {
-  return type->mapTypeOutOfContext()->getCanonicalType();
+CanType SILType::mapTypeOutOfEnvironment(CanType type) {
+  return type->mapTypeOutOfEnvironment()->getCanonicalType();
 }
 
 CanType swift::getSILBoxFieldLoweredType(TypeExpansionContext context,
@@ -774,7 +774,7 @@ bool SILFunctionType::isAddressable(unsigned paramIdx, SILModule &module,
     if (condAddressableIndices && condAddressableIndices->contains(paramIdx)) {
       CanType argType = paramInfo.getArgumentType(module, this, expansion);
       CanType contextType = genericEnv
-        ? genericEnv->mapTypeIntoContext(argType)->getCanonicalType()
+        ? genericEnv->mapTypeIntoEnvironment(argType)->getCanonicalType()
         : argType;
       assert(!contextType->hasTypeParameter());
       if (typeConverter.getTypeProperties(contextType, expansion)
@@ -1229,7 +1229,7 @@ bool SILType::isMarkedAsImmortal() const {
 
 bool SILType::isAddressableForDeps(const SILFunction &function) const {
   auto contextType =
-    hasTypeParameter() ? function.mapTypeIntoContext(*this) : *this;
+    hasTypeParameter() ? function.mapTypeIntoEnvironment(*this) : *this;
   auto properties = function.getTypeProperties(contextType);
   return properties.isAddressableForDependencies();
 }
@@ -1375,7 +1375,7 @@ SILType::getConcurrencyDiagnosticBehavior(SILFunction *fn) const {
 
 bool SILType::mayHaveCustomDeinit(const SILFunction &function) const {
   auto contextType =
-    hasTypeParameter() ? function.mapTypeIntoContext(*this) : *this;
+    hasTypeParameter() ? function.mapTypeIntoEnvironment(*this) : *this;
   auto properties = function.getTypeProperties(contextType);
   return properties.mayHaveCustomDeinit();
 }

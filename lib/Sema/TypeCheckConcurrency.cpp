@@ -1357,7 +1357,7 @@ inferSendableFromInstanceStorage(NominalTypeDecl *nominal,
             if (missing->getType()->is<ArchetypeType>()) {
               requirements.push_back(
                   Requirement(RequirementKind::Conformance,
-                              missing->getType()->mapTypeOutOfContext(),
+                              missing->getType()->mapTypeOutOfEnvironment(),
                               sendableProto->getDeclaredType()));
               return false;
             }
@@ -2078,7 +2078,7 @@ static ActorIsolation getInnermostIsolatedContext(
 
   case ActorIsolation::GlobalActor:
     return ActorIsolation::forGlobalActor(
-        dc->mapTypeIntoContext(isolation.getGlobalActor()))
+        dc->mapTypeIntoEnvironment(isolation.getGlobalActor()))
           .withPreconcurrency(isolation.preconcurrency());
   }
 }
@@ -3075,7 +3075,7 @@ namespace {
           continue;
 
         Type type = getDeclContext()
-            ->mapTypeIntoContext(decl->getInterfaceType())
+            ->mapTypeIntoEnvironment(decl->getInterfaceType())
             ->getReferenceStorageReferent();
 
         if (type->hasError())
@@ -4416,7 +4416,7 @@ namespace {
       }
       case ActorIsolation::GlobalActor: {
         // Form a <global actor type>.shared reference.
-        Type globalActorType = getDeclContext()->mapTypeIntoContext(
+        Type globalActorType = getDeclContext()->mapTypeIntoEnvironment(
             isolation.getGlobalActor());
         auto typeExpr = TypeExpr::createImplicit(globalActorType, ctx);
         actorExpr = new (ctx) UnresolvedDotExpr(
@@ -5319,7 +5319,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     }
 
     return ActorIsolation::forGlobalActor(
-        globalActorType->mapTypeOutOfContext())
+        globalActorType->mapTypeOutOfEnvironment())
         .withPreconcurrency(decl->preconcurrency() || isUnsafe);
   }
 
@@ -5836,7 +5836,7 @@ getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
 
   return isMainFunction && hasMainActor
              ? ActorIsolation::forGlobalActor(
-                   ctx.getMainActorType()->mapTypeOutOfContext())
+                   ctx.getMainActorType()->mapTypeOutOfEnvironment())
              : std::optional<ActorIsolation>();
 }
 
@@ -6265,7 +6265,7 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
     // If we are required to use main actor... just use that.
     if (defaultIsolation == DefaultIsolation::MainActor)
       if (auto result =
-              globalActorHelper(ctx.getMainActorType()->mapTypeOutOfContext()))
+              globalActorHelper(ctx.getMainActorType()->mapTypeOutOfEnvironment()))
         return *result;
   }
 
@@ -6390,7 +6390,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     checkDeclWithIsolatedParameter(value);
 
     ParamDecl *param = value->getParameterList()->get(*paramIdx);
-    Type paramType = param->getDeclContext()->mapTypeIntoContext(
+    Type paramType = param->getDeclContext()->mapTypeIntoEnvironment(
         param->getInterfaceType());
     Type actorType;
     if (auto wrapped = paramType->getOptionalObjectType()) {
@@ -7634,11 +7634,11 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
   if (classDecl) {
     if (Type superclass = classDecl->getSuperclass()) {
       auto inheritedConformance = checkConformance(
-          classDecl->mapTypeIntoContext(superclass),
+          classDecl->mapTypeIntoEnvironment(superclass),
           proto, /*allowMissing=*/false);
       if (inheritedConformance) {
         inheritedConformance = inheritedConformance
-            .mapConformanceOutOfContext();
+            .mapConformanceOutOfEnvironment();
         if (inheritedConformance.isConcrete()) {
           return ctx.getInheritedConformance(
               nominal->getDeclaredInterfaceType(),
@@ -8366,7 +8366,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
     auto *init = dyn_cast<ConstructorDecl>(fromDC);
     if (init && init->isDesignatedInit() && isStoredProperty(decl) &&
         (!actorInstance || actorInstance->isSelf())) {
-      auto type = fromDC->mapTypeIntoContext(decl->getInterfaceType());
+      auto type = fromDC->mapTypeIntoEnvironment(decl->getInterfaceType());
       if (!type->isSendableType()) {
         // Treat the decl isolation as 'preconcurrency' to downgrade violations
         // to warnings, because violating Sendable here is accepted by the

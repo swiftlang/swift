@@ -416,7 +416,7 @@ protected:
         });
       }
 
-      SubsMap = SubsMap.mapReplacementTypesOutOfContext();
+      SubsMap = SubsMap.mapReplacementTypesOutOfEnvironment();
     }
 
     // One abstract function in the debug info can only have one set of variables
@@ -427,7 +427,7 @@ protected:
         !SubsMap.getRecursiveProperties().hasTypeParameter())
       return ParentFunction;
 
-    // Note that mapReplacementTypesOutOfContext() can't do anything for
+    // Note that mapReplacementTypesOutOfEnvironment() can't do anything for
     // opened existentials, and since archetypes can't be mangled, ignore
     // this case for now.
     if (SubsMap.getRecursiveProperties().hasLocalArchetype())

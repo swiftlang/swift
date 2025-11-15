@@ -5382,7 +5382,7 @@ public:
     LLVM_DEBUG(RI->print(llvm::dbgs()));
 
     SILType functionResultType =
-        F.getLoweredType(F.mapTypeIntoContext(fnConv.getSILResultType(
+        F.getLoweredType(F.mapTypeIntoEnvironment(fnConv.getSILResultType(
                                                   F.getTypeExpansionContext()))
                              .getASTType())
             .getCategoryType(
@@ -5415,7 +5415,7 @@ public:
             "throw in function that doesn't have an error result");
 
     SILType functionResultType =
-        F.getLoweredType(F.mapTypeIntoContext(fnConv.getSILErrorType(
+        F.getLoweredType(F.mapTypeIntoEnvironment(fnConv.getSILErrorType(
                                                   F.getTypeExpansionContext()))
                              .getASTType())
             .getCategoryType(fnConv.getSILErrorType(F.getTypeExpansionContext())
@@ -5444,7 +5444,7 @@ public:
     require(yieldedValues.size() == yieldInfos.size(),
             "wrong number of yielded values for function");
     for (auto i : indices(yieldedValues)) {
-      SILType yieldType = F.mapTypeIntoContext(
+      SILType yieldType = F.mapTypeIntoEnvironment(
           fnConv.getSILType(yieldInfos[i], F.getTypeExpansionContext()));
       requireSameType(yieldedValues[i]->getType(), yieldType,
                       "yielded value does not match yield type of coroutine");
@@ -6446,7 +6446,7 @@ public:
         auto interfaceTy = archetype->getInterfaceType();
         auto rootParamTy = interfaceTy->getRootGenericParam();
 
-        auto root = genericEnv->mapTypeIntoContext(
+        auto root = genericEnv->mapTypeIntoEnvironment(
             rootParamTy)->castTo<ElementArchetypeType>();
         auto it = allOpened.find(root->getCanonicalType());
         assert(it != allOpened.end());
@@ -6619,7 +6619,7 @@ public:
     auto argI = entry->args_begin();
 
     auto check = [&](const char *what, SILType ty) {
-      auto mappedTy = F.mapTypeIntoContext(ty);
+      auto mappedTy = F.mapTypeIntoEnvironment(ty);
       SILArgument *bbarg = *argI;
       ++argI;
       if (bbarg->getType() != mappedTy &&
@@ -7813,7 +7813,7 @@ CanType SILProperty::getBaseType() const {
 
   if (sig) {
     auto env = dc->getGenericEnvironmentOfContext();
-    baseTy = env->mapTypeIntoContext(baseTy)->getCanonicalType();
+    baseTy = env->mapTypeIntoEnvironment(baseTy)->getCanonicalType();
   }
 
   return baseTy;
@@ -7832,7 +7832,7 @@ void SILProperty::verify(const SILModule &M) const {
     auto env =
         decl->getInnermostDeclContext()->getGenericEnvironmentOfContext();
     subs = env->getForwardingSubstitutionMap();
-    leafTy = env->mapTypeIntoContext(leafTy)->getCanonicalType();
+    leafTy = env->mapTypeIntoEnvironment(leafTy)->getCanonicalType();
   }
   bool hasIndices = false;
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {

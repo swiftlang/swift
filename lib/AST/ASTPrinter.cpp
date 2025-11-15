@@ -1182,7 +1182,7 @@ public:
       Type CurrentType = Options.TransformContext->getBaseType();
       if (CurrentType && CurrentType->hasArchetype()) {
         // ExistentialArchetypeTypes get replaced by a GenericTypeParamType without a
-        // name in mapTypeOutOfContext. The GenericTypeParamType has no children
+        // name in mapTypeOutOfEnvironment. The GenericTypeParamType has no children
         // so we can't use it for TypeTransformContext.
         // To work around this, replace the ExistentialArchetypeType with the type of
         // the protocol itself.
@@ -1190,7 +1190,7 @@ public:
           assert(Opened->isRoot());
           CurrentType = Opened->getExistentialType();
         }
-        CurrentType = CurrentType->mapTypeOutOfContext();
+        CurrentType = CurrentType->mapTypeOutOfEnvironment();
       }
       setCurrentType(CurrentType);
     }
@@ -3538,7 +3538,7 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
       Options.TransformContext->isPrintingSynthesizedExtension()) {
     auto extendedType = Options.TransformContext->getBaseType();
     if (extendedType->hasArchetype())
-      extendedType = extendedType->mapTypeOutOfContext();
+      extendedType = extendedType->mapTypeOutOfEnvironment();
     printSynthesizedExtension(extendedType, decl);
   } else
     printExtension(decl);
@@ -6503,14 +6503,14 @@ public:
        if (auto currentType = Options.TransformContext->getBaseType()) {
          auto printingType = T;
          if (currentType->hasArchetype())
-           currentType = currentType->mapTypeOutOfContext();
+           currentType = currentType->mapTypeOutOfEnvironment();
 
          if (auto errorTy = printingType->getAs<ErrorType>())
            if (auto origTy = errorTy->getOriginalType())
              printingType = origTy;
 
          if (printingType->hasArchetype())
-           printingType = printingType->mapTypeOutOfContext();
+           printingType = printingType->mapTypeOutOfEnvironment();
 
          if (currentType->isEqual(printingType))
            return;
@@ -7499,7 +7499,7 @@ public:
   void printArchetypeCommon(Type interfaceTy, GenericEnvironment *env) {
     if (auto *paramTy = interfaceTy->getAs<GenericTypeParamType>()) {
       if (Options.AlternativeTypeNames) {
-        auto archetypeTy = env->mapTypeIntoContext(paramTy)->getAs<GenericTypeParamType>();
+        auto archetypeTy = env->mapTypeIntoEnvironment(paramTy)->getAs<GenericTypeParamType>();
         if (archetypeTy) {
           auto found = Options.AlternativeTypeNames->find(CanType(archetypeTy));
           if (found != Options.AlternativeTypeNames->end()) {
@@ -7517,7 +7517,7 @@ public:
 
     auto *memberTy = interfaceTy->castTo<DependentMemberType>();
     if (auto *paramTy = memberTy->getBase()->getAs<GenericTypeParamType>())
-      printParentType(env->mapTypeIntoContext(paramTy));
+      printParentType(env->mapTypeIntoEnvironment(paramTy));
     else {
       printArchetypeCommon(memberTy->getBase(), env);
       Printer << ".";
@@ -7693,7 +7693,7 @@ public:
 
       // Print based on the type.
       Printer.printKeyword("some", Options, /*Suffix=*/" ");
-      auto archetypeType = decl->getDeclContext()->mapTypeIntoContext(
+      auto archetypeType = decl->getDeclContext()->mapTypeIntoEnvironment(
           decl->getDeclaredInterfaceType())->castTo<ArchetypeType>();
       auto constraintType = archetypeType->getExistentialType();
       if (auto *existentialType = constraintType->getAs<ExistentialType>())

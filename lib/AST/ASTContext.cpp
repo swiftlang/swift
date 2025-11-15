@@ -5812,7 +5812,7 @@ CanExistentialArchetypeType ExistentialArchetypeType::get(CanType existential) {
       existentialSig.Generalization, UUID::fromTime());
 
   return cast<ExistentialArchetypeType>(
-    genericEnv->mapTypeIntoContext(existentialSig.SelfType)
+    genericEnv->mapTypeIntoEnvironment(existentialSig.SelfType)
       ->getCanonicalType());
 }
 

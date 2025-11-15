@@ -706,7 +706,7 @@ static unsigned insertIndirectReturnOrErrorArgs(AddressLoweringState &pass) {
 
   auto createIndirectResult = [&](SILType resultTy, StringRef internalName,
                                   unsigned argIdx) {
-    auto resultTyInContext = pass.function->mapTypeIntoContext(resultTy);
+    auto resultTyInContext = pass.function->mapTypeIntoEnvironment(resultTy);
     auto bodyResultTy = pass.function->getModule().Types.getLoweredType(
         resultTyInContext.getASTType(), *pass.function);
     auto var = new (astCtx)
@@ -3334,7 +3334,7 @@ void YieldRewriter::rewriteYield(YieldInst *yieldInst) {
 void YieldRewriter::rewriteOperand(YieldInst *yieldInst, unsigned index) {
   auto info = opaqueFnConv.getYieldInfoForOperandIndex(index);
   auto convention = info.getConvention();
-  auto ty = pass.function->mapTypeIntoContext(
+  auto ty = pass.function->mapTypeIntoEnvironment(
       opaqueFnConv.getSILType(info, pass.function->getTypeExpansionContext()));
   if (ty.isAddressOnly(*pass.function)) {
     assert(yieldInst->getOperand(index)->getType().isAddress() &&
