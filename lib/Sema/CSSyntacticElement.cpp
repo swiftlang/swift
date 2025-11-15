@@ -2212,6 +2212,8 @@ private:
 
     if (auto newResultTarget = rewriter.rewriteTarget(target)) {
       resultExpr = newResultTarget->getAsExpr();
+    } else {
+      hadError = true;
     }
 
     switch (mode) {
@@ -2259,8 +2261,11 @@ private:
     }
 
     auto *resultExpr = thenStmt->getResult();
-    if (auto newResultTarget = rewriter.rewriteTarget(*target))
+    if (auto newResultTarget = rewriter.rewriteTarget(*target)) {
       resultExpr = newResultTarget->getAsExpr();
+    } else {
+      hadError = true;
+    }
 
     thenStmt->setResult(resultExpr);
 
