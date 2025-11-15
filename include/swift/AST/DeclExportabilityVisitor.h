@@ -115,7 +115,7 @@ public:
   }
 
   bool visitVarDecl(const VarDecl *var) {
-    if (var->isLayoutExposedToClients())
+    if (var->isLayoutExposedToClients() == ExportedLevel::Exported)
       return true;
 
     // Consider all lazy var storage as exportable.

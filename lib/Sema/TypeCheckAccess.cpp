@@ -1498,7 +1498,7 @@ public:
   /// the struct instead of the VarDecl, and customize the diagnostics.
   static const ValueDecl *
   getFixedLayoutStructContext(const VarDecl *VD) {
-    if (VD->isLayoutExposedToClients())
+    if (VD->isLayoutExposedToClients() == ExportedLevel::Exported)
       return dyn_cast<NominalTypeDecl>(VD->getDeclContext());
 
     return nullptr;
