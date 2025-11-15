@@ -119,7 +119,7 @@ public:
   bool EnableThrowsPrediction = false;
 
   /// Controls whether to say that blocks ending in an 'unreachable' are cold.
-  bool EnableNoReturnCold = false;
+  bool EnableNoReturnCold = true;
 
   /// Should we run any SIL performance optimizations
   ///
