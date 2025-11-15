@@ -3620,7 +3620,12 @@ NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind) {
   bool isSerialized = nextIf('q');
   bool asyncRemoved = nextIf('a');
 
-  int PassID = (int)nextChar() - '0';
+  char c = nextChar();
+  if (c == 0) {
+    // End of text.
+    return nullptr;
+  }
+  int PassID = (int)c - '0';
   if (PassID < 0 || PassID >= MAX_SPECIALIZATION_PASS) {
     return nullptr;
   }
