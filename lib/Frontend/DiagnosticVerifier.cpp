@@ -386,19 +386,23 @@ static void autoApplyFixes(SourceManager &SM, unsigned BufferID,
 bool DiagnosticVerifier::verifyUnknown(
     std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const {
   bool HadError = false;
-  for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
-    if (CapturedDiagnostics[i].Loc.isValid())
+  auto CapturedDiagIter = CapturedDiagnostics.begin();
+  while (CapturedDiagIter != CapturedDiagnostics.end()) {
+    if (CapturedDiagIter->Loc.isValid()) {
+      ++CapturedDiagIter;
       continue;
+    }
 
     HadError = true;
     std::string Message =
         ("unexpected " +
-         getDiagKindString(CapturedDiagnostics[i].Classification) +
-         " produced: " + CapturedDiagnostics[i].Message)
+         getDiagKindString(CapturedDiagIter->Classification) +
+         " produced: " + CapturedDiagIter->Message)
             .str();
 
     auto diag = SM.GetMessage({}, llvm::SourceMgr::DK_Error, Message, {}, {});
     printDiagnostic(diag);
+    CapturedDiagIter = CapturedDiagnostics.erase(CapturedDiagIter);
   }
 
   if (HadError) {
@@ -414,17 +418,20 @@ bool DiagnosticVerifier::verifyUnknown(
 bool DiagnosticVerifier::verifyUnrelated(
     std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const {
   bool HadError = false;
-  for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
-    SourceLoc Loc = CapturedDiagnostics[i].Loc;
-    if (!Loc.isValid())
+  auto CapturedDiagIter = CapturedDiagnostics.begin();
+  while (CapturedDiagIter != CapturedDiagnostics.end()) {
+    SourceLoc Loc = CapturedDiagIter->Loc;
+    if (!Loc.isValid()) {
+      ++CapturedDiagIter;
       // checked by verifyUnknown
       continue;
+    }
 
     HadError = true;
     std::string Message =
         ("unexpected " +
-         getDiagKindString(CapturedDiagnostics[i].Classification) +
-         " produced: " + CapturedDiagnostics[i].Message)
+         getDiagKindString(CapturedDiagIter->Classification) +
+         " produced: " + CapturedDiagIter->Message)
             .str();
 
     auto diag = SM.GetMessage(Loc, llvm::SourceMgr::DK_Error, Message, {}, {});
@@ -450,6 +457,7 @@ bool DiagnosticVerifier::verifyUnrelated(
                        "ignore diagnostics in this file"),
                       {}, {});
     printDiagnostic(noteDiag);
+    CapturedDiagIter = CapturedDiagnostics.erase(CapturedDiagIter);
   }
 
   return HadError;

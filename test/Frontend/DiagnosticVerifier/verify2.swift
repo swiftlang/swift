@@ -44,7 +44,6 @@ extension Crap {} // expected-error {{non-nominal type 'Crap' (aka '() -> ()') c
 
 // CHECK: error: unexpected note produced: 'Bool' declared here
 // CHECK: note: file 'Swift.Bool' is not parsed for 'expected' statements. Use '-verify-additional-file Swift.Bool' to enable, or '-verify-ignore-unrelated' to ignore diagnostics in this file
-// CHECK: note: diagnostic produced elsewhere: 'Bool' declared here
 
 // Verify the serialized diags have the right magic at the top.
 // CHECK-SERIALIZED: DIA
