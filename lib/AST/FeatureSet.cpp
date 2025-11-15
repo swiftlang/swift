@@ -144,6 +144,9 @@ UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(SendingArgsAndResults)
+UNINTERESTING_FEATURE(CheckImplementationOnly)
+UNINTERESTING_FEATURE(CheckImplementationOnlyStrict)
+UNINTERESTING_FEATURE(EnforceSPIOperatorGroup)
 
 static bool findUnderscoredLifetimeAttr(Decl *decl) {
   auto hasUnderscoredLifetimeAttr = [](Decl *decl) {
@@ -277,7 +280,6 @@ UNINTERESTING_FEATURE(IsolatedAny2)
 UNINTERESTING_FEATURE(GlobalActorIsolatedTypesUsability)
 UNINTERESTING_FEATURE(ObjCImplementation)
 UNINTERESTING_FEATURE(ObjCImplementationWithResilientStorage)
-UNINTERESTING_FEATURE(CImplementation)
 UNINTERESTING_FEATURE(Sensitive)
 UNINTERESTING_FEATURE(DebugDescriptionMacro)
 UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
@@ -322,17 +324,11 @@ static bool usesFeatureClosureBodyMacro(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureCDecl(Decl *decl) {
-  auto attr = decl->getAttrs().getAttribute<CDeclAttr>();
-  return attr && !attr->Underscored;
-}
-
 UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(LibraryEvolution)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
-UNINTERESTING_FEATURE(SuppressCXXForeignReferenceTypeInitializers)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
@@ -469,6 +465,7 @@ static bool usesFeatureTildeSendable(Decl *decl) {
       });
 }
 
+UNINTERESTING_FEATURE(AnyAppleOSAvailability)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

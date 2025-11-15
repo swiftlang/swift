@@ -292,7 +292,7 @@ extension Span where Element: BitwiseCopyable {
   ///
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized element.
-  ///   - byteCount: the number of initialized elements in the span.
+  ///   - byteCount: the number of bytes in the span.
   @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
   @unsafe
@@ -414,6 +414,7 @@ extension Span where Element: ~Copyable {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: ~Copyable {
+  // SILOptimizer looks for fixed_storage.check_index semantics for bounds check optimizations.
   @_semantics("fixed_storage.check_index")
   @inline(__always)
   @_alwaysEmitIntoClient

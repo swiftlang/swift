@@ -626,8 +626,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       isPack = true;
     }
 
-    auto type = FunctionDC->mapTypeIntoContext(interfaceType);
-    auto valueType = FunctionDC->mapTypeIntoContext(
+    auto type = FunctionDC->mapTypeIntoEnvironment(interfaceType);
+    auto valueType = FunctionDC->mapTypeIntoEnvironment(
       interfaceType->getReferenceStorageReferent());
 
     //
@@ -1158,10 +1158,10 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   auto &closureInfo = SGM.M.Types.getClosureTypeInfo(ace);
   TypeContext = closureInfo;
 
-  auto resultIfaceTy = ace->getResultType()->mapTypeOutOfContext();
+  auto resultIfaceTy = ace->getResultType()->mapTypeOutOfEnvironment();
   std::optional<Type> errorIfaceTy;
   if (auto optErrorTy = ace->getEffectiveThrownType())
-    errorIfaceTy = (*optErrorTy)->mapTypeOutOfContext();
+    errorIfaceTy = (*optErrorTy)->mapTypeOutOfEnvironment();
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(
     SILDeclRef(ace));
   emitProlog(ace, captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
@@ -1605,7 +1605,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
           vd->getPropertyWrapperInitializerInfo().getProjectedValuePlaceholder();
       auto interfaceType = placeholder->getType();
       if (interfaceType->hasArchetype())
-        interfaceType = interfaceType->mapTypeOutOfContext();
+        interfaceType = interfaceType->mapTypeOutOfEnvironment();
 
       param->setInterfaceType(interfaceType);
     }
@@ -1614,7 +1614,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
   }
 
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
-  auto interfaceType = value->getType()->mapTypeOutOfContext();
+  auto interfaceType = value->getType()->mapTypeOutOfEnvironment();
   emitProlog(dc, captureInfo, params, /*selfParam=*/nullptr, interfaceType,
              /*errorType=*/std::nullopt, SourceLoc());
   if (EmitProfilerIncrement) {
@@ -1695,7 +1695,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   const auto i = pbd->getPatternEntryIndexForVarDecl(var);
   auto *anchorVar = pbd->getAnchoringVarDecl(i);
   auto subs = getForwardingSubstitutionMap();
-  auto contextualType = dc->mapTypeIntoContext(interfaceType);
+  auto contextualType = dc->mapTypeIntoEnvironment(interfaceType);
   auto resultType = contextualType->getCanonicalType();
   auto origResultType = AbstractionPattern(resultType);
 

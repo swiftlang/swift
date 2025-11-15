@@ -1752,8 +1752,6 @@ ERROR(opened_attribute_expected_rparen,none,
 // pack_element
 ERROR(pack_element_attribute_expected_lparen,none,
       "expected '(' after 'pack_element' attribute", ())
-ERROR(pack_element_attribute_expected_rparen,none,
-      "expected ')' after id value for 'pack_element' attribute", ())
 ERROR(multiple_open_pack_element,none,
       "multiple 'open_pack_element' instructions with same UUID", ())
 ERROR(opened_shape_class_not_pack_param,none,
@@ -1837,8 +1835,6 @@ ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
       "expected '[' to start the %0", (StringRef))
 ERROR(sil_autodiff_expected_rsquare,PointsToFirstBadToken,
       "expected ']' to complete the %0", (StringRef))
-ERROR(sil_autodiff_expected_index_list,PointsToFirstBadToken,
-      "expected a space-separated list of indices, e.g. '0 1'", ())
 ERROR(sil_autodiff_expected_index_list_label,PointsToFirstBadToken,
       "expected label '%0' in index list", (StringRef))
 ERROR(sil_autodiff_expected_parameter_index,PointsToFirstBadToken,

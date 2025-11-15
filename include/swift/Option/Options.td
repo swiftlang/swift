@@ -377,6 +377,16 @@ def pch_output_dir: Separate<["-"], "pch-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Directory to persist automatically created precompiled bridging headers">;
 
+def sil_output_dir: Separate<["-"], "sil-output-dir">,
+  Flags<[ArgumentIsPath, SupplementaryOutput]>,
+  HelpText<"Output SIL files to directory <dir> as additional output during compilation">,
+  MetaVarName<"<dir>">;
+
+def ir_output_dir: Separate<["-"], "ir-output-dir">,
+  Flags<[ArgumentIsPath, SupplementaryOutput]>,
+  HelpText<"Output LLVM IR files to directory <dir> as additional output during compilation">,
+  MetaVarName<"<dir>">;
+
 def auto_bridging_header_chaining: Flag<["-"], "auto-bridging-header-chaining">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Automatically chaining all the bridging headers">;
@@ -643,6 +653,12 @@ def project_name : Separate<["-"], "project-name">,
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
 
+def debug_module_path : Separate<["-"], "debug-module-path">,
+  Flags<[FrontendOption]>,
+  HelpText<"Path to this module's binary swiftmodule artifact (required by debug info)">;
+def debug_module_path_EQ : Joined<["-"], "debug-module-path=">, Flags<[FrontendOption]>,
+  Alias<debug_module_path>;
+
 def module_alias : Separate<["-"], "module-alias">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   MetaVarName<"<alias_name=real_name>">,
@@ -736,6 +752,16 @@ def emit_variant_package_module_interface_path :
   MetaVarName<"<path>">,
   HelpText<"Output package module interface file for the target variant to <path>">;
 
+def enable_module_selectors_in_module_interface :
+  Flag<["-"], "enable-module-selectors-in-module-interface">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"When emitting module interface files, use module selectors to avoid name collisions">;
+
+def disable_module_selectors_in_module_interface :
+  Flag<["-"], "disable-module-selectors-in-module-interface">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"When emitting module interface files, do not use module selectors to avoid name collisions">;
+
 def verify_emitted_module_interface :
   Flag<["-"], "verify-emitted-module-interface">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -816,9 +842,9 @@ def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
   Alias<emit_objc_header_path>;
 
 def emit_clang_header_min_access : Separate<["-"], "emit-clang-header-min-access">,
-  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath, CacheInvariant]>,
+  Flags<[FrontendOption, NoInteractiveOption, CacheInvariant]>,
   MetaVarName<"<access-level>">,
-  HelpText<"The minimum access level of declarations to include in the emitted header.>">;
+  HelpText<"The minimum access level of declarations to include in the emitted header">;
 
 def static : Flag<["-"], "static">,
   Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,
@@ -1935,6 +1961,11 @@ def skip_protocol_implementations : Flag<["-"], "skip-protocol-implementations">
          NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Skip emitting symbols that are implementations of protocol requirements or inherited from protocol extensions">;
 
+def symbol_graph_shorten_output_names : Flag<["-"], "symbol-graph-shorten-output-names">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Shorten the symbol graph output file names by hashing the module name; outputs an additional JSON file with the map of hash to original name">;
+
 // swift-api-digester-only options
 def dump_sdk: Flag<["-", "--"], "dump-sdk">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
@@ -2067,10 +2098,6 @@ def BI : JoinedOrSeparate<["-"], "BI">,
   HelpText<"add a module for baseline input">;
 def BI_EQ : Joined<["-"], "BI=">, Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   Alias<BI>;
-
-def iframework : JoinedOrSeparate<["-"], "iframework">,
-  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
-  HelpText<"add a directory to the clang importer system framework search path">;
 
 def baseline_path : JoinedOrSeparate<["-"], "baseline-path">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
@@ -2275,6 +2302,10 @@ def cache_compile_job:  Flag<["-"], "cache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Enable compiler caching">;
 
+def no_cache_compile_job:  Flag<["-"], "no-cache-compile-job">,
+  Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
+  HelpText<"Disable compiler caching">;
+
 def cache_remarks:  Flag<["-"], "Rcache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Show remarks for compiler caching">;
@@ -2308,7 +2339,7 @@ def scanner_prefix_map_paths : MultiArg<["-"], "scanner-prefix-map-paths", 2>,
   HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix> <replacement>">;
 
 def scanner_prefix_map : Separate<["-"], "scanner-prefix-map">,
-  Flags<[NewDriverOnlyOption]>,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix=replacement>">;
 
 def scanner_prefix_map_sdk : Separate<["-"], "scanner-prefix-map-sdk">,
@@ -2322,6 +2353,11 @@ def scanner_prefix_map_toolchain : Separate<["-"], "scanner-prefix-map-toolchain
 def cache_replay_prefix_map: MultiArg<["-"], "cache-replay-prefix-map", 2>,
   Flags<[FrontendOption, NoDriverOption, CacheInvariant]>,
   HelpText<"Remap paths when replaying outputs from cache">, MetaVarName<"<prefix> <replacement>">;
+
+def register_module_dependency : Separate<["-"], "register-module-dependency">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Register module for dependency scan without importing in the frontend">;
+
 
 // END ONLY SUPPORTED IN NEW DRIVER
 

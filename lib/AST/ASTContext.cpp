@@ -525,7 +525,9 @@ struct ASTContext::Implementation {
 
   /// The builtin initializer witness for a literal. Used when building
   /// LiteralExprs in fully-checked AST.
-  llvm::DenseMap<const NominalTypeDecl *, ConcreteDeclRef> BuiltinInitWitness;
+  llvm::DenseMap<std::pair<const NominalTypeDecl *, KnownProtocolKind>,
+                 ConcreteDeclRef>
+      BuiltinInitWitness;
 
   /// Mapping from the function decl to its original body's source range. This
   /// is populated if the body is reparsed from other source buffers.
@@ -537,6 +539,13 @@ struct ASTContext::Implementation {
 
   /// Local and closure discriminators per context.
   llvm::DenseMap<const DeclContext *, unsigned> NextDiscriminator;
+
+  /// Cached generic signatures for generic builtin types.
+  static const unsigned NumBuiltinGenericTypes
+    = unsigned(TypeKind::Last_BuiltinGenericType)
+        - unsigned(TypeKind::First_BuiltinGenericType) + 1;
+  std::array<GenericSignature, NumBuiltinGenericTypes>
+  BuiltinGenericTypeSignatures = {};
 
   /// Structure that captures data that is segregated into different
   /// arenas.
@@ -646,6 +655,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
+  llvm::FoldingSet<DeclNameRef::SelectiveDeclNameRef> SelectiveNameRefs;
   llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
@@ -1678,11 +1688,12 @@ ASTContext::getStringBuiltinInitDecl(NominalTypeDecl *stringDecl) const {
   return getBuiltinInitDecl(stringDecl, builtinProtocolKind, fn);
 }
 
-ConcreteDeclRef
-ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
-                               KnownProtocolKind builtinProtocolKind,
-               llvm::function_ref<DeclName (ASTContext &ctx)> initName) const {
-  auto &witness = getImpl().BuiltinInitWitness[decl];
+ConcreteDeclRef ASTContext::getBuiltinInitDecl(
+    NominalTypeDecl *decl, KnownProtocolKind builtinProtocolKind,
+    llvm::function_ref<DeclName(ASTContext &ctx)> initName) const {
+  // Note the initializer name is expected to be unique for each protocol kind
+  // so we don't need it to be part of the key.
+  auto &witness = getImpl().BuiltinInitWitness[{decl, builtinProtocolKind}];
   if (witness)
     return witness;
 
@@ -1690,7 +1701,6 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
   auto builtinProtocol = getProtocol(builtinProtocolKind);
   auto builtinConformance = lookupConformance(type, builtinProtocol);
   if (builtinConformance.isInvalid()) {
-    assert(false && "Missing required conformance");
     witness = ConcreteDeclRef();
     return witness;
   }
@@ -1698,7 +1708,6 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
   auto *ctx = const_cast<ASTContext *>(this);
   witness = builtinConformance.getWitnessByName(initName(*ctx));
   if (!witness) {
-    assert(false && "Missing required witness");
     witness = ConcreteDeclRef();
     return witness;
   }
@@ -5803,7 +5812,7 @@ CanExistentialArchetypeType ExistentialArchetypeType::get(CanType existential) {
       existentialSig.Generalization, UUID::fromTime());
 
   return cast<ExistentialArchetypeType>(
-    genericEnv->mapTypeIntoContext(existentialSig.SelfType)
+    genericEnv->mapTypeIntoEnvironment(existentialSig.SelfType)
       ->getCanonicalType());
 }
 
@@ -6245,6 +6254,39 @@ DeclName::DeclName(ASTContext &C, DeclBaseName baseName,
   for (auto P : *paramList)
     names.push_back(P->getArgumentName());
   initialize(C, baseName, names);
+}
+
+void DeclNameRef::SelectiveDeclNameRef::Profile(llvm::FoldingSetNodeID &id,
+                                                Identifier moduleSelector,
+                                                DeclName fullName) {
+  ASSERT(!moduleSelector.empty() &&
+         "Looking up SelectiveDeclNameRef with empty module?");
+  id.AddPointer(moduleSelector.getAsOpaquePointer());
+  id.AddPointer(fullName.getOpaqueValue());
+}
+
+void DeclNameRef::initialize(ASTContext &C, Identifier moduleSelector,
+                             DeclName fullName) {
+  if (moduleSelector.empty()) {
+    storage = fullName;
+    return;
+  }
+
+  llvm::FoldingSetNodeID id;
+  SelectiveDeclNameRef::Profile(id, moduleSelector, fullName);
+
+  void *insert = nullptr;
+  if (SelectiveDeclNameRef *selectiveRef
+        = C.getImpl().SelectiveNameRefs.FindNodeOrInsertPos(id, insert)) {
+    storage = selectiveRef;
+    return;
+  }
+
+  auto buf = C.Allocate(sizeof(SelectiveDeclNameRef),
+                        alignof(SelectiveDeclNameRef));
+  auto selectiveRef = new (buf) SelectiveDeclNameRef(moduleSelector, fullName);
+  storage = selectiveRef;
+  C.getImpl().SelectiveNameRefs.InsertNode(selectiveRef, insert);
 }
 
 /// Find the implementation of the named type in the given module.
@@ -6851,10 +6893,10 @@ bool ASTContext::overrideGenericSignatureReqsSatisfied(
   auto *baseCtx = base->getAsGenericContext();
   auto *derivedCtx = derived->getAsGenericContext();
 
-  if (baseCtx->isGeneric() != derivedCtx->isGeneric())
+  if (baseCtx->hasGenericParamList() != derivedCtx->hasGenericParamList())
     return false;
 
-  if (baseCtx->isGeneric() &&
+  if (baseCtx->hasGenericParamList() &&
       (baseCtx->getGenericParams()->size() !=
        derivedCtx->getGenericParams()->size()))
     return false;
@@ -7322,4 +7364,14 @@ AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
 
   // Fall back to the universal domain for triples without a platform.
   return AvailabilityDomain::forUniversal();
+}
+
+GenericSignature &
+ASTContext::getCachedBuiltinGenericTypeSignature(TypeKind kind) {
+  ASSERT(kind >= TypeKind::First_BuiltinGenericType
+         && kind <= TypeKind::Last_BuiltinGenericType
+         && "not a builtin generic type kind");
+
+  return getImpl().BuiltinGenericTypeSignatures
+    [unsigned(kind) - unsigned(TypeKind::First_BuiltinGenericType)];
 }

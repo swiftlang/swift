@@ -276,9 +276,9 @@ public:
 
 /// Determine whether the given declaration has
 /// a C-compatible interface.
-class IsCCompatibleFuncDeclRequest :
-    public SimpleRequest<IsCCompatibleFuncDeclRequest,
-                         bool(FuncDecl *),
+class IsCCompatibleDeclRequest :
+    public SimpleRequest<IsCCompatibleDeclRequest,
+                         bool(ValueDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -287,7 +287,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, FuncDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Caching.
@@ -1592,27 +1592,6 @@ private:
   friend SimpleRequest;
 
   FuncDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *actor) const;
-
-public:
-  // Caching
-  bool isCached() const { return true; }
-};
-
-/// Find out if a distributed method is implementing a distributed protocol
-/// requirement.
-class GetDistributedMethodWitnessedProtocolRequirements :
-    public SimpleRequest<GetDistributedMethodWitnessedProtocolRequirements,
-                         llvm::ArrayRef<ValueDecl *> (AbstractFunctionDecl *),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  llvm::ArrayRef<ValueDecl *> evaluate(
-      Evaluator &evaluator,
-      AbstractFunctionDecl *nominal) const;
 
 public:
   // Caching
@@ -2999,9 +2978,6 @@ enum class ImplicitMemberAction : uint8_t {
   ResolveCodingKeys,
   ResolveEncodable,
   ResolveDecodable,
-  ResolveDistributedActor,
-  ResolveDistributedActorID,
-  ResolveDistributedActorSystem,
 };
 
 class ResolveImplicitMemberRequest

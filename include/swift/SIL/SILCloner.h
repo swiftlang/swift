@@ -71,7 +71,7 @@ struct SubstitutionMapWithLocalArchetypes {
       auto *newEnv = found->second;
 
       auto interfaceTy = local->getInterfaceType();
-      return newEnv->mapTypeIntoContext(interfaceTy);
+      return newEnv->mapTypeIntoEnvironment(interfaceTy);
     }
 
     if (SubsMap)
@@ -89,7 +89,7 @@ struct SubstitutionMapWithLocalArchetypes {
     if (SubsMap) {
       if (origType->is<PrimaryArchetypeType>() ||
           origType->is<PackArchetypeType>()) {
-        origType = origType->mapTypeOutOfContext();
+        origType = origType->mapTypeOutOfEnvironment();
       }
 
       return SubsMap->lookupConformance(

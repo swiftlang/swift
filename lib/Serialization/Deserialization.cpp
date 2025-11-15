@@ -2000,6 +2000,34 @@ static bool isReExportedToModule(const ValueDecl *value,
   return exportedName == expectedModule->getName().str();
 }
 
+namespace {
+  /// The result of a type comparison.
+  enum class TypeComparison {
+    NotEqual,
+    Equal,
+    NearMatch,
+  };
+
+  TypeComparison compareTypes(CanType type1, CanType type2, bool nearMatchOk) {
+    if (type1->isEqual(type2))
+      return TypeComparison::Equal;
+
+    if (nearMatchOk) {
+      TypeMatchOptions options = TypeMatchFlags::RequireMatchingParameterLabels;
+      options |= TypeMatchFlags::AllowTopLevelOptionalMismatch;
+      options |= TypeMatchFlags::AllowNonOptionalForIUOParam;
+      options |= TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam;
+      options |= TypeMatchFlags::IgnoreFunctionSendability;
+      options |= TypeMatchFlags::IgnoreSendability;
+      options |= TypeMatchFlags::IgnoreFunctionGlobalActorIsolation;
+      if (type1->matches(type2, options))
+        return TypeComparison::NearMatch;
+    }
+
+    return TypeComparison::NotEqual;
+  }
+}
+
 /// Remove values from \p values that don't match the expected type or module.
 ///
 /// Any of \p expectedTy, \p expectedModule, or \p expectedGenericSig can be
@@ -2015,8 +2043,10 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
   if (expectedTy)
     canTy = expectedTy->getCanonicalType();
 
+  llvm::TinyPtrVector<ValueDecl *> clangNearMatches;
+
   auto newEnd = std::remove_if(values.begin(), values.end(),
-                               [=](ValueDecl *value) {
+                               [=, &clangNearMatches](ValueDecl *value) {
     // Ignore anything that was parsed (vs. deserialized), because a serialized
     // module cannot refer to it.
     if (value->getDeclContext()->getParentSourceFile())
@@ -2026,7 +2056,14 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
       return true;
 
     // If we're expecting a type, make sure this decl has the expected type.
-    if (canTy && !value->getInterfaceType()->isEqual(canTy))
+    TypeComparison typesMatch = TypeComparison::Equal;
+    if (canTy) {
+      typesMatch = compareTypes(canTy,
+                                value->getInterfaceType()->getCanonicalType(),
+                                importedFromClang);
+    }
+
+    if (typesMatch == TypeComparison::NotEqual)
       return true;
 
     if (value->isStatic() != isStatic)
@@ -2075,9 +2112,20 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
           cast<ConstructorDecl>(value)->getInitKind() != *ctorInit)
         return true;
     }
+
+    // Record near matches.
+    if (typesMatch == TypeComparison::NearMatch) {
+      clangNearMatches.push_back(value);
+      return true;
+    }
+
+    ASSERT(typesMatch == TypeComparison::Equal);
     return false;
   });
   values.erase(newEnd, values.end());
+
+  if (values.empty())
+    values.append(clangNearMatches.begin(), clangNearMatches.end());
 }
 
 /// Look for nested types in all files of \p extensionModule except from the \p thisFile.
@@ -4174,7 +4222,6 @@ public:
     bool isIsolated;
     bool isCompileTimeLiteral, isConstValue;
     bool isSending;
-    bool isCallerIsolated;
     bool isAddressable;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
@@ -4188,7 +4235,6 @@ public:
                                          isCompileTimeLiteral,
                                          isConstValue,
                                          isSending,
-                                         isCallerIsolated,
                                          isAddressable,
                                          rawDefaultArg,
                                          defaultExprType,
@@ -4235,7 +4281,6 @@ public:
     param->setCompileTimeLiteral(isCompileTimeLiteral);
     param->setConstValue(isConstValue);
     param->setSending(isSending);
-    param->setCallerIsolated(isCallerIsolated);
     param->setAddressable(isAddressable);
 
     // Decode the default argument kind.
@@ -6129,6 +6174,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Export_DECL_ATTR: {
+        unsigned kind;
+        serialization::decls_block::ExportDeclAttrLayout::readRecord(
+            scratch, kind);
+        Attr = new (ctx) ExportAttr((ExportKind)kind);
+        break;
+      }
+
       case decls_block::NonSendable_DECL_ATTR: {
         unsigned kind;
         serialization::decls_block::NonSendableDeclAttrLayout::readRecord(
@@ -7596,7 +7649,7 @@ Expected<Type> DESERIALIZE_TYPE(PRIMARY_ARCHETYPE_TYPE)(
     return interfaceTypeOrError.takeError();
 
   Type contextType =
-      sigOrError.get().getGenericEnvironment()->mapTypeIntoContext(
+      sigOrError.get().getGenericEnvironment()->mapTypeIntoEnvironment(
           interfaceTypeOrError.get());
 
   if (contextType->hasError())
@@ -7622,7 +7675,7 @@ Expected<Type> DESERIALIZE_TYPE(EXISTENTIAL_ARCHETYPE_TYPE)(
   if (!envOrError)
     return envOrError.takeError();
 
-  return envOrError.get()->mapTypeIntoContext(interfaceTypeOrError.get());
+  return envOrError.get()->mapTypeIntoEnvironment(interfaceTypeOrError.get());
 }
 
 Expected<Type> DESERIALIZE_TYPE(OPAQUE_ARCHETYPE_TYPE)(
@@ -7664,7 +7717,7 @@ Expected<Type> DESERIALIZE_TYPE(PACK_ARCHETYPE_TYPE)(
 
   Type interfaceType = MF.getType(interfaceTypeID);
   Type contextType =
-      sig.getGenericEnvironment()->mapTypeIntoContext(interfaceType);
+      sig.getGenericEnvironment()->mapTypeIntoEnvironment(interfaceType);
 
   if (contextType->hasError())
     return MF.diagnoseFatal();
@@ -7689,7 +7742,7 @@ Expected<Type> DESERIALIZE_TYPE(ELEMENT_ARCHETYPE_TYPE)(
   if (!envOrError)
     return envOrError.takeError();
 
-  return envOrError.get()->mapTypeIntoContext(interfaceTypeOrError.get());
+  return envOrError.get()->mapTypeIntoEnvironment(interfaceTypeOrError.get());
 }
 
 Expected<Type>

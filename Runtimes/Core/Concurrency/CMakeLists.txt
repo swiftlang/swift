@@ -139,6 +139,7 @@ target_link_libraries(swift_Concurrency PRIVATE
   $<$<PLATFORM_ID:Android>:log>
   $<$<PLATFORM_ID:Windows>:Synchronization>
   $<$<PLATFORM_ID:Windows>:mincore>
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>
   # Link to the runtime that we are just building.
   swiftCore)
 set_target_properties(swift_Concurrency PROPERTIES

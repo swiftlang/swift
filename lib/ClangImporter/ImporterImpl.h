@@ -1264,7 +1264,8 @@ public:
   void addSynthesizedProtocolAttrs(
       NominalTypeDecl *nominal,
       ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-      bool isUnchecked = false);
+      bool isUnchecked = false,
+      bool isSuppressed = false);
 
   void makeComputed(AbstractStorageDecl *storage, AccessorDecl *getter,
                     AccessorDecl *setter);
@@ -1827,6 +1828,7 @@ public:
   void addOptionSetTypealiases(NominalTypeDecl *nominal);
 
   void swiftify(AbstractFunctionDecl *MappedDecl);
+  void swiftifyProtocol(NominalTypeDecl *MappedDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///

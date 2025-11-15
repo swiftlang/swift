@@ -1357,12 +1357,12 @@ public:
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
-  Type mapTypeIntoContext(Type type) const;
+  Type mapTypeIntoEnvironment(Type type) const;
 
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
-  SILType mapTypeIntoContext(SILType type) const;
+  SILType mapTypeIntoEnvironment(SILType type) const;
 
   /// Converts the given function definition to a declaration.
   void convertToDeclaration() {
@@ -1421,7 +1421,7 @@ public:
       return false;
 
     auto *V = getLocation().getAsASTNode<ValueDecl>();
-    return V && V->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
+    return V && V->isAlwaysEmittedIntoClient();
   }
 
   /// Return whether this function has attribute @used on it
@@ -1430,7 +1430,7 @@ public:
 
   /// Return custom assembler name, otherwise empty.
   StringRef asmName() const { return AsmName; }
-  void setAsmName(StringRef value) { AsmName = value; }
+  void setAsmName(StringRef value);
 
   /// Return custom section name if @section was used, otherwise empty
   StringRef section() const { return Section; }

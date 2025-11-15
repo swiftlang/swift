@@ -542,16 +542,10 @@ public:
     assert(ED->isCCompatibleEnum() || ED->hasClangNode());
     
     forwardDeclare(ED, [&]{
-      if (ED->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
-        // Forward declare in a way to be compatible with older C standards.
-        os << "typedef SWIFT_ENUM_FWD_DECL(";
-        printer.print(ED->getRawType());
-        os << ", " << getNameForObjC(ED) << ")\n";
-      } else {
-        os << "enum " << getNameForObjC(ED) << " : ";
-        printer.print(ED->getRawType());
-        os << ";\n";
-      }
+      // Forward declare in a way to be compatible with older C standards.
+      os << "typedef SWIFT_ENUM_FWD_DECL(";
+      printer.print(ED->getRawType());
+      os << ", " << getNameForObjC(ED) << ")\n";
     });
   }
 
@@ -616,7 +610,7 @@ public:
       bool imported = false;
       if (TAD->hasClangNode())
         imported = addImport(TD);
-      assert((imported || !TAD->isGeneric()) &&
+      assert((imported || !TAD->hasGenericParamList()) &&
              "referencing non-imported generic typealias?");
     } else if (addImport(TD)) {
       return;
@@ -1115,7 +1109,7 @@ public:
             vd, [this](const NominalTypeDecl *decl) {
               return printer.isZeroSized(decl);
             });
-        if (nmtd->isGeneric()) {
+        if (nmtd->hasGenericParamList()) {
           auto genericSignature =
               nmtd->getGenericSignature().getCanonicalSignature();
           ClangSyntaxPrinter(nmtd->getASTContext(), os).printGenericSignature(genericSignature);

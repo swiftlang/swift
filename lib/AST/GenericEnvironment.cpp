@@ -155,7 +155,7 @@ void GenericEnvironment::forEachPackElementArchetype(
   auto packElements = getGenericSignature().getInnermostGenericParams();
   for (auto eltInterfaceType: packElements) {
     auto *elementArchetype =
-      mapTypeIntoContext(eltInterfaceType)->castTo<ElementArchetypeType>();
+      mapTypeIntoEnvironment(eltInterfaceType)->castTo<ElementArchetypeType>();
     function(elementArchetype);
   }
 }
@@ -194,7 +194,7 @@ void GenericEnvironment::forEachPackElementBinding(
   forEachPackElementGenericTypeParam([&](auto *genericParam) {
     assert(elementIt != packElements.end());
     auto *elementArchetype =
-        mapTypeIntoContext(*elementIt++)->castTo<ElementArchetypeType>();
+        mapTypeIntoEnvironment(*elementIt++)->castTo<ElementArchetypeType>();
     auto *packSubstitution = maybeApplyOuterContextSubstitutions(genericParam)
       ->getPackSubstitutionAsPackType();
     function(elementArchetype, packSubstitution);
@@ -326,7 +326,7 @@ GenericEnvironment::maybeApplyOuterContextSubstitutions(Type type) const {
   }
 }
 
-Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
+Type GenericEnvironment::mapTypeIntoEnvironment(GenericEnvironment *env,
                                             Type type) {
   assert(!type->hasPrimaryArchetype() && "already have a contextual type");
 
@@ -336,7 +336,7 @@ Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
     return type;
   }
 
-  return env->mapTypeIntoContext(type);
+  return env->mapTypeIntoEnvironment(type);
 }
 
 Type MapTypeOutOfContext::operator()(SubstitutableType *type) const {
@@ -348,7 +348,7 @@ Type MapTypeOutOfContext::operator()(SubstitutableType *type) const {
   return type;
 }
 
-Type TypeBase::mapTypeOutOfContext() {
+Type TypeBase::mapTypeOutOfEnvironment() {
   assert(!hasTypeParameter() && "already have an interface type");
   return Type(this).subst(MapTypeOutOfContext(),
                           LookUpConformanceInModule(),
@@ -385,7 +385,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   // If this type parameter is equivalent to a concrete type,
   // map the concrete type into context and cache the result.
   if (!reducedType->isTypeParameter()) {
-    auto result = mapTypeIntoContext(reducedType);
+    auto result = mapTypeIntoEnvironment(reducedType);
     addMapping(canType, result);
     return result;
   }
@@ -553,7 +553,7 @@ struct MapTypeIntoContext: TypeTransform<MapTypeIntoContext> {
 
 }
 
-Type GenericEnvironment::mapTypeIntoContext(Type type) const {
+Type GenericEnvironment::mapTypeIntoEnvironment(Type type) const {
   assert(!type->hasPrimaryArchetype() && "already have a contextual type");
   if (!type->hasTypeParameter())
     return type;
@@ -562,7 +562,7 @@ Type GenericEnvironment::mapTypeIntoContext(Type type) const {
       .doIt(type, TypePosition::Invariant);
 }
 
-Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
+Type GenericEnvironment::mapTypeIntoEnvironment(GenericTypeParamType *type) const {
   return const_cast<GenericEnvironment *>(this)
       ->getOrCreateArchetypeFromInterfaceType(type);
 }
@@ -596,7 +596,7 @@ struct FindElementArchetypeForOpenedPackParam {
   }
 
   Type operator()(Type interfaceType) const {
-    return env->mapTypeIntoContext(getInterfaceType(interfaceType));
+    return env->mapTypeIntoEnvironment(getInterfaceType(interfaceType));
   }
 };
 
@@ -637,7 +637,7 @@ GenericEnvironment::mapContextualPackTypeIntoElementContext(CanType type) const 
 }
 
 /// Unlike mapContextualPackTypeIntoElementContext(), this also applies outer
-/// substitutions, so it behaves like mapTypeIntoContext() in that respect.
+/// substitutions, so it behaves like mapTypeIntoEnvironment() in that respect.
 Type
 GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
   assert(getKind() == Kind::Element);
@@ -649,7 +649,7 @@ GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
   // substituted one, which is what mapContextualPackTypeIntoElementContext()
   // expects.
   auto contextualType = getOuterSubstitutions()
-    .getGenericSignature().getGenericEnvironment()->mapTypeIntoContext(type);
+    .getGenericSignature().getGenericEnvironment()->mapTypeIntoEnvironment(type);
 
   contextualType = mapContextualPackTypeIntoElementContext(contextualType);
   return maybeApplyOuterContextSubstitutions(contextualType);

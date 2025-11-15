@@ -427,10 +427,10 @@ void ModuleQualifiedLookupRequest::writeDependencySink(
 }
 
 //----------------------------------------------------------------------------//
-// LookupConformanceInModuleRequest computation.
+// LookupConformanceRequest computation.
 //----------------------------------------------------------------------------//
 
-void LookupConformanceInModuleRequest::writeDependencySink(
+void LookupConformanceRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker,
     ProtocolConformanceRef lookupResult) const {
   if (lookupResult.isInvalid() || !lookupResult.isConcrete())
@@ -631,12 +631,12 @@ UnqualifiedLookupRequest::UnqualifiedLookupRequest(
 ) : SimpleRequest(contextualizeOptions(descriptor)) { }
 
 LookupInModuleRequest::LookupInModuleRequest(
-      const DeclContext *moduleOrFile, DeclName name, NLKind lookupKind,
-      namelookup::ResolutionKind resolutionKind,
+      const DeclContext *moduleOrFile, DeclName name, bool hasModuleSelector,
+      NLKind lookupKind, namelookup::ResolutionKind resolutionKind,
       const DeclContext *moduleScopeContext,
       SourceLoc loc, NLOptions options
- ) : SimpleRequest(moduleOrFile, name, lookupKind, resolutionKind,
-                   moduleScopeContext,
+ ) : SimpleRequest(moduleOrFile, name, hasModuleSelector, lookupKind,
+                   resolutionKind, moduleScopeContext,
                    contextualizeOptions(moduleOrFile, loc, options)) { }
 
 ModuleQualifiedLookupRequest::ModuleQualifiedLookupRequest(

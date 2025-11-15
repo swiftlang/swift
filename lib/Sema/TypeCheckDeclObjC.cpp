@@ -222,17 +222,11 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for enums.
   if (T->is<EnumType>()) {
-    if (DC->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
-      // New dialog mentioning @c.
-      diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
-                     language)
-          .highlight(TypeRange)
-          .limitBehavior(behavior);
-    } else {
-      diags.diagnose(TypeRange.Start, diag::not_objc_swift_enum)
-          .highlight(TypeRange)
-          .limitBehavior(behavior);
-    }
+    // New dialog mentioning @c.
+    diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
+                   language)
+        .highlight(TypeRange)
+        .limitBehavior(behavior);
     return;
   }
 
@@ -644,9 +638,10 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
           return false;
         if (!classDecl->isTypeErasedGenericClass()) {
           softenIfAccessNote(value, reason.getAttr(),
-            value->diagnose(diag::objc_in_generic_extension,
-                            classDecl->isGeneric())
-                .limitBehavior(behavior));
+                             value
+                                 ->diagnose(diag::objc_in_generic_extension,
+                                            classDecl->hasGenericParamList())
+                                 .limitBehavior(behavior));
           reason.describe(value);
           return true;
         }
@@ -825,7 +820,7 @@ bool swift::isRepresentableInLanguage(
   }
 
   if (auto FD = dyn_cast<FuncDecl>(AFD)) {
-    Type ResultType = FD->mapTypeIntoContext(FD->getResultInterfaceType());
+    Type ResultType = FD->mapTypeIntoEnvironment(FD->getResultInterfaceType());
     if (!FD->hasAsync() &&
         !ResultType->hasError() &&
         !ResultType->isVoid() &&
@@ -924,7 +919,7 @@ bool swift::isRepresentableInLanguage(
 
     // Translate the result type of the function into parameters for the
     // completion handler parameter, exploding one level of tuple if needed.
-    Type resultType = FD->mapTypeIntoContext(FD->getResultInterfaceType());
+    Type resultType = FD->mapTypeIntoEnvironment(FD->getResultInterfaceType());
     if (auto tupleType = resultType->getAs<TupleType>()) {
       for (const auto &tupleElt : tupleType->getElements()) {
         if (addCompletionHandlerParam(tupleElt.getType()))
@@ -1174,7 +1169,7 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
     return isRepresentableInObjC(abiRole.getCounterpart(), Reason);
 
-  Type T = VD->getDeclContext()->mapTypeIntoContext(VD->getInterfaceType());
+  Type T = VD->getDeclContext()->mapTypeIntoEnvironment(VD->getInterfaceType());
   if (auto *RST = T->getAs<ReferenceStorageType>()) {
     // In-memory layout of @weak and @unowned does not correspond to anything
     // in Objective-C, but this does not really matter here, since Objective-C
@@ -4191,15 +4186,6 @@ public:
     // Only encourage adoption if the corresponding language feature is enabled.
     if (isa<ExtensionDecl>(decl) &&
         !decl->getASTContext().LangOpts.hasFeature(Feature::ObjCImplementation))
-      return;
-
-    if (isa<AbstractFunctionDecl>(decl) &&
-        !decl->getASTContext().LangOpts.hasFeature(Feature::CImplementation))
-      return;
-
-    // Only encourage @_objcImplementation *extension* adopters to adopt
-    // @implementation; @_objcImplementation @_cdecl hasn't been stabilized yet.
-    if (!isa<ExtensionDecl>(decl))
       return;
 
     auto diag = diagnose(getAttr()->getLocation(),

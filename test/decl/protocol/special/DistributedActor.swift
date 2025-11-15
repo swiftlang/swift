@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -verify-ignore-unknown -verify-ignore-unrelated
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -63,6 +63,31 @@ distributed actor D5: P1 {
   
   func dist() -> String { "" }
   // expected-note@-1{{non-distributed instance method 'dist()'}}
+}
+
+nonisolated distributed actor D6 {} // expected-error {{'nonisolated' modifier cannot be applied to this declaration}}{{1-13=}}
+
+// Can't define `id` and `actorSystem` in an extension either.
+distributed actor D7 {}
+extension D7 {
+  nonisolated var id: String { fatalError() }
+  // expected-error@-1 {{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+
+  nonisolated var actorSystem: OtherActorIdentity { fatalError() }
+  // expected-error@-1 {{property 'actorSystem' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+}
+
+// FIXME: Unfortunately redeclaration checking is run after conformance checking
+// so we also get a conformace error here.
+distributed actor D8 {} // expected-error {{type 'D8' does not conform to protocol 'DistributedActor'}}
+extension D8 {
+  nonisolated var id: ID { fatalError() }
+  // expected-error@-1 {{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-note@-2 {{candidate exactly matches}}
+
+  nonisolated var actorSystem: DefaultDistributedActorSystem { fatalError() }
+  // expected-error@-1 {{property 'actorSystem' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-note@-2 {{candidate exactly matches}}
 }
 
 // ==== Tests ------------------------------------------------------------------

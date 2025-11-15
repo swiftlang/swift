@@ -812,7 +812,7 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
 
   bool isNoEscape = type->castTo<AnyFunctionType>()->isNoEscape();
   FindCapturedVars finder(AFD->getLoc(), AFD, isNoEscape,
-                          AFD->isObjC(), AFD->isGeneric());
+                          AFD->isObjC(), AFD->hasGenericParamList());
 
   if (auto *body = AFD->getTypecheckedBody())
     body->walk(finder);

@@ -136,7 +136,7 @@ void ContextInfoCallbacks::readyForTypeChecking(SourceFile *SrcFile) {
 
     auto interfaceTy = T;
     if (interfaceTy->hasArchetype())
-      interfaceTy = interfaceTy->mapTypeOutOfContext();
+      interfaceTy = interfaceTy->mapTypeOutOfEnvironment();
 
     // TODO: Do we need '.none' for Optionals?
     auto objTy = T->lookThroughAllOptionalTypes();

@@ -41,7 +41,9 @@ class C {
 
 sil [ossa] @dummy : $@convention(thin) () -> ()
 sil [ossa] @getOwnedC : $@convention(thin) () -> (@owned C)
-sil [ossa] @takeOwnedC : $@convention(thin) (@owned C) -> ()
+sil [ossa] @takeOwnedC : $@convention(thin) (@owned C) -> () {
+  [global:]
+}
 sil [ossa] @getOwnedWrapper : $@convention(thin) () -> (@owned Wrapper)
 sil [ossa] @getOwnedMultiWrapper : $@convention(thin) () -> (@owned MultiWrapper)
 sil [ossa] @getOwnedHasObjectAndInt : $@convention(thin) () -> (@owned HasObjectAndInt)

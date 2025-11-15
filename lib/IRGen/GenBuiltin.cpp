@@ -279,26 +279,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  case BuiltinValueKind::StartAsyncLet: {
-    auto taskOptions = args.claimNext();
-    auto taskFunction = args.claimNext();
-    auto taskContext = args.claimNext();
-    taskOptions = IGF.Builder.CreateIntToPtr(taskOptions,
-                                             IGF.IGM.SwiftTaskOptionRecordPtrTy);
-
-    auto asyncLet = emitBuiltinStartAsyncLet(
-        IGF,
-        taskOptions,
-        taskFunction,
-        taskContext,
-        nullptr,
-        substitutions
-        );
-
-    out.add(asyncLet);
-    return;
-  }
-
   case BuiltinValueKind::StartAsyncLetWithLocalBuffer: {
     auto taskOptions = args.claimNext();
     auto taskFunction = args.claimNext();
@@ -320,11 +300,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  case BuiltinValueKind::EndAsyncLet: {
-    emitEndAsyncLet(IGF, args.claimNext());
-    // Ignore a second operand which is inserted by ClosureLifetimeFixup and
-    // only used for dependency tracking.
-    (void)args.claimAll();
+  case BuiltinValueKind::FinishAsyncLet: {
+    auto asyncLet = args.claimNext();
+    auto resultBuffer = args.claimNext();
+    emitFinishAsyncLet(IGF, asyncLet, resultBuffer);
     return;
   }
 
@@ -1584,6 +1563,29 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto value = IGF.Builder.CreateBitCast(addr, IGF.IGM.Int8PtrTy);
     out.add(value);
     return;
+  }
+
+  case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
+  case BuiltinValueKind::TaskRemoveCancellationHandler: {
+    auto rawPointer = args.claimNext();
+    emitBuiltinTaskRemoveHandler(IGF, Builtin.ID, rawPointer);
+    return;
+  }
+  case BuiltinValueKind::TaskAddCancellationHandler:
+  case BuiltinValueKind::TaskAddPriorityEscalationHandler: {
+    auto func = args.claimNext();
+    auto context = args.claimNext();
+    out.add(emitBuiltinTaskAddHandler(IGF, Builtin.ID, func, context));
+    return;
+  }
+  case BuiltinValueKind::TaskLocalValuePop:
+    return emitBuiltinTaskLocalValuePop(IGF);
+  case BuiltinValueKind::TaskLocalValuePush: {
+    auto *key = args.claimNext();
+    auto *value = args.claimNext();
+    // Grab T from the builtin.
+    auto *valueMetatype = IGF.emitTypeMetadataRef(argTypes[1].getASTType());
+    return emitBuiltinTaskLocalValuePush(IGF, key, value, valueMetatype);
   }
 
   // Builtins without IRGen implementations.

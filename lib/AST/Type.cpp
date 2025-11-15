@@ -3067,7 +3067,7 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
 
     // The 'Self' parameter in a protocol is representable in Objective-C.
     if (auto *protoDecl = dyn_cast<ProtocolDecl>(tyContext))
-      if (type->isEqual(dc->mapTypeIntoContext(protoDecl->getSelfInterfaceType())))
+      if (type->isEqual(dc->mapTypeIntoEnvironment(protoDecl->getSelfInterfaceType())))
         return ForeignRepresentableKind::Object;
   }
 
@@ -3604,6 +3604,11 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
                      OptionalUnwrapping::None)) {
           return false;
         }
+
+        if (matchMode.contains(TypeMatchFlags::RequireMatchingParameterLabels)&&
+            fn1Params[i].getLabel() != fn2Params[i].getLabel()) {
+          return false;
+        }
       }
 
       // Results are covariant.
@@ -3765,7 +3770,7 @@ Type ArchetypeType::getSuperclass() const {
   if (!Bits.ArchetypeType.HasSuperclass) return Type();
 
   auto *genericEnv = getGenericEnvironment();
-  return genericEnv->mapTypeIntoContext(
+  return genericEnv->mapTypeIntoEnvironment(
       *getSubclassTrailingObjects<Type>());
 }
 
@@ -3955,7 +3960,7 @@ PackArchetypeType::get(const ASTContext &Ctx,
 }
 
 CanType PackArchetypeType::getReducedShape() {
-  // mapTypeIntoContext() also calls getReducedShape() via
+  // mapTypeIntoEnvironment() also calls getReducedShape() via
   // PackExpansionType::get(), so avoid that by short-circuiting
   // the case where the pack archetype represents its own
   // shape class.
@@ -3964,7 +3969,7 @@ CanType PackArchetypeType::getReducedShape() {
     return CanType(this);
 
   return getGenericEnvironment()
-      ->mapTypeIntoContext(shapeType)
+      ->mapTypeIntoEnvironment(shapeType)
       ->getCanonicalType();
 }
 
@@ -5309,7 +5314,7 @@ TypeBase::getMatchingParamKind() {
   }
   
   if (auto arch = dyn_cast<ArchetypeType>(this)) {
-    return arch->mapTypeOutOfContext()->getMatchingParamKind();
+    return arch->mapTypeOutOfEnvironment()->getMatchingParamKind();
   }
   
   if (isa<IntegerType>(this)) {

@@ -408,19 +408,16 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
     return true;
   }
 
-  // The lifetime of the original ends after the lifetime of the copy. If the
-  // original is lexical, its lifetime must not be shortened through deinit
-  // barriers.
-  if (cvi->getOperand()->isLexical()) {
-    // At this point, visitedInsts contains all the instructions between the
-    // consuming use of the copy and the destroy.  If any of those instructions
-    // is a deinit barrier, it would be illegal to shorten the original lexical
-    // value's lifetime to end at that consuming use.  Bail if any are.
-    if (llvm::any_of(visitedInsts, [](auto *inst) {
-          return mayBeDeinitBarrierNotConsideringSideEffects(inst);
-        }))
-      return false;
-  }
+  // The lifetime of the original ends after the lifetime of the copy.
+  // Its lifetime must not be shortened through deinit barriers.
+  // At this point, visitedInsts contains all the instructions between the
+  // consuming use of the copy and the destroy.  If any of those instructions
+  // is a deinit barrier, it would be illegal to shorten the original lexical
+  // value's lifetime to end at that consuming use.  Bail if any are.
+  if (llvm::any_of(visitedInsts, [](auto *inst) {
+        return mayBeDeinitBarrierNotConsideringSideEffects(inst);
+      }))
+    return false;
 
   // If we reached this point, isUseBetweenInstAndBlockEnd succeeded implying
   // that we found destroy_value to be after our consuming use. Noting that

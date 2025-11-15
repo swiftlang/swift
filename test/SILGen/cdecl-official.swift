@@ -1,10 +1,7 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-emit-silgen %s -module-name cdecl \
-// RUN:   -enable-experimental-feature CDecl > %t/out.sil
+// RUN: %target-swift-emit-silgen %s -module-name cdecl > %t/out.sil
 // RUN: %FileCheck %s -input-file %t/out.sil
-
-// REQUIRES: swift_feature_CDecl
 
 // CHECK-LABEL: sil hidden [asmname "pear"] [ossa] @$s5cdecl5appleyyS2iXCFTo : $@convention(c) (@convention(c) (Int) -> Int) -> () {
 @c(pear)
@@ -36,7 +33,7 @@ func requiresThunk() {
   acceptSwiftFunc(orange)
 }
 
-// CHECK-LABEL: sil [serialized] [asmname "cauliflower"] [ossa] @$s5cdecl8broccoliyS2iFTo : $@convention(c) (Int) -> Int {
+// CHECK-LABEL: sil [asmname "cauliflower"] [ossa] @$s5cdecl8broccoliyS2iFTo : $@convention(c) (Int) -> Int {
 // CHECK-NOT: apply
 // CHECK: return
 @c(cauliflower)

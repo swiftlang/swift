@@ -474,7 +474,7 @@ SIMPLE_DECL_ATTR(_alwaysEmitIntoClient, AlwaysEmitIntoClient,
   83)
 
 SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
-  OnImport | OnFunc | OnConstructor | OnVar | OnSubscript,
+  OnImport | OnFunc | OnConstructor | OnVar | OnSubscript | OnNominalType,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
   84)
 
@@ -558,7 +558,10 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
   100)
 
-// Unused '101'
+DECL_ATTR(export, Export,
+    OnVar | OnSubscript | OnAbstractFunction,
+    ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+    101)
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
   OnClass,
@@ -774,7 +777,7 @@ DECL_ATTR(_rawLayout, RawLayout,
   146)
 
 DECL_ATTR(_extern, Extern,
-  OnFunc,
+  OnFunc | OnVar,
   AllowMultipleAttributes | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   147)
 

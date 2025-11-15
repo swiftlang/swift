@@ -535,7 +535,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       isAutoClosure ? CTP_AutoclosureDefaultParameter : CTP_DefaultParameter,
       paramType, /*isDiscarded=*/false);
 
-  auto paramInterfaceTy = paramType->mapTypeOutOfContext();
+  auto paramInterfaceTy = paramType->mapTypeOutOfEnvironment();
 
   // Attempt to pre-check expression first, if that fails - skip type-checking.
   // This would make sure that diagnostics about invalid AST are never dropped.
@@ -928,13 +928,7 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
-  // If this expression is already typechecked and has type Bool, then just
-  // re-typecheck it.
-  if (expr->getType() && expr->getType()->isBool()) {
-    auto resultTy =
-        TypeChecker::typeCheckExpression(expr, dc);
-    return !resultTy;
-  }
+  ASSERT(!expr->getType() && "the bool condition is already type checked");
 
   auto *boolDecl = dc->getASTContext().getBoolDecl();
   if (!boolDecl)
@@ -955,7 +949,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                   "typecheck-expr-pattern", EP);
   PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
 
-  EP->getMatchVar()->setInterfaceType(rhsType->mapTypeOutOfContext());
+  EP->getMatchVar()->setInterfaceType(rhsType->mapTypeOutOfEnvironment());
 
   // Check the expression as a condition.
   auto target = SyntacticElementTarget::forExprPattern(EP);
@@ -981,7 +975,7 @@ static Type openTypeParameter(ConstraintSystem &cs,
   }
 
   auto *paramTy = interfaceTy->castTo<GenericTypeParamType>();
-  auto archetypeTy = env->mapTypeIntoContext(paramTy)->castTo<ArchetypeType>();
+  auto archetypeTy = env->mapTypeIntoEnvironment(paramTy)->castTo<ArchetypeType>();
 
   auto found = types.find(archetypeTy);
   if (found != types.end())
@@ -1132,6 +1126,16 @@ bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
 }
 
 Expr *
+TypeChecker::addImplicitBorrowExpr(ASTContext &Ctx, Expr *E,
+                                 std::function<Type(Expr *)> getType,
+                                 std::function<void(Expr *, Type)> setType) {
+  auto objectType = getType(E)->getRValueType();
+  auto *BE = BorrowExpr::createImplicit(Ctx, E->getLoc(), E, objectType);
+  setType(BE, objectType);
+  return BE;
+}
+
+Expr *
 TypeChecker::addImplicitLoadExpr(ASTContext &Context, Expr *expr,
                                  std::function<Type(Expr *)> getType,
                                  std::function<void(Expr *, Type)> setType) {
@@ -1192,10 +1196,7 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
                             llvm::function_ref<Type(Expr *)> getType,
                             llvm::function_ref<void(Expr *, Type)> setType) {
   Type exprTy = getType(expr);
-
-  // If expr has no type, just assume it's the right expr.
-  if (!exprTy)
-    return expr;
+  ASSERT(exprTy);
 
   // If the type is already materializable, then we're already done.
   if (!exprTy->hasLValueType())

@@ -225,6 +225,17 @@ private extension AllocStackInst {
           source: newAlloc, sourceFormalType: concreteFormalType,
           destination: ucca.destination, targetFormalType: ucca.targetFormalType)
         context.erase(instruction: ucca)
+      case let dv as DebugValueInst:
+        if dv.location.isInlined {
+          // We cannot change the type of an inlined instance of a variable
+          // without renaming the inlined function to get a unique
+          // specialization suffix (prior art exists in
+          // SILCloner::remapFunction()).
+          // For now, just remove affected inlined variables.
+          use.set(to: Undef.get(type: type, context), context)
+        } else {
+          use.set(to: newAlloc, context)
+        }
       default:
         use.set(to: newAlloc, context)
       }

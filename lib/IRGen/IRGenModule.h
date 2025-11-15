@@ -882,7 +882,7 @@ public:
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
   // clang-format on
 
-  llvm::StructType *CoroFunctionPointerTy; // { i32, i32 }
+  llvm::StructType *CoroFunctionPointerTy; // { i32, i32, i64 }
   llvm::FunctionType *CoroAllocateFnTy;
   llvm::FunctionType *CoroDeallocateFnTy;
   llvm::IntegerType *CoroAllocatorFlagsTy;
@@ -921,7 +921,7 @@ public:
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
   llvm::CallingConv::ID SwiftAsyncCC;  /// swift calling convention for async
   llvm::CallingConv::ID SwiftCoroCC;   /// swift calling convention for callee-allocated coroutines
-  llvm::CallingConv::ID SwiftClientRR_CC; /// swift client retain/release calling convention
+  llvm::CallingConv::ID SwiftDirectRR_CC; /// swift direct retain/release calling convention
 
   /// What kind of tail call should be used for async->async calls.
   llvm::CallInst::TailCallKind AsyncTailCallKind;
@@ -1674,6 +1674,8 @@ public:
   llvm::AttributeList constructInitialAttributes();
   StackProtectorMode shouldEmitStackProtector(SILFunction *f);
 
+  llvm::ConstantInt *getMallocTypeId(llvm::Function *fn);
+
   void emitProtocolDecl(ProtocolDecl *D);
   void emitEnumDecl(EnumDecl *D);
   void emitStructDecl(StructDecl *D);
@@ -1734,6 +1736,7 @@ public:
   SILFunction *getSILFunctionForCoroFunctionPointer(llvm::Constant *cfp);
 
   llvm::Constant *getAddrOfGlobalCoroMallocAllocator();
+  llvm::Constant *getAddrOfGlobalCoroTypedMallocAllocator();
   llvm::Constant *getAddrOfGlobalCoroAsyncTaskAllocator();
 
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,

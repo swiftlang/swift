@@ -161,7 +161,6 @@ public:
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(AlwaysEmitIntoClient)
-  IGNORED_ATTR(NeverEmitIntoClient)
   IGNORED_ATTR(HasInitialValue)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
@@ -408,6 +407,8 @@ public:
   void visitInlineAttr(InlineAttr *attr);
   void visitOptimizeAttr(OptimizeAttr *attr);
   void visitExclusivityAttr(ExclusivityAttr *attr);
+  void visitNeverEmitIntoClientAttr(NeverEmitIntoClientAttr *attr);
+  void visitExportAttr(ExportAttr *attr);
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
@@ -1841,9 +1842,6 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     }
   }
   else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    if (!hasObjCImplementationFeature(D, attr, Feature::CImplementation))
-      return;
-
     if (!attr->CategoryName.empty()) {
       auto diagnostic =
           diagnose(attr->getLocation(),
@@ -2486,12 +2484,6 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   if (D->getAttrs().getAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(), diag::cdecl_incompatible_with_objc, D);
   }
-
-  // @c needs to be enabled via a feature flag.
-  if (!attr->Underscored &&
-      !Ctx.LangOpts.hasFeature(Feature::CDecl)) {
-    diagnose(attr->getLocation(), diag::cdecl_feature_required);
-  }
 }
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
@@ -2547,58 +2539,78 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
   }
 }
 
-bool IsCCompatibleFuncDeclRequest::evaluate(Evaluator &evaluator,
-                                            FuncDecl *FD) const {
-  if (FD->isInvalid())
+bool IsCCompatibleDeclRequest::evaluate(Evaluator &evaluator,
+                                        ValueDecl *VD) const {
+  if (VD->isInvalid())
     return false;
 
-  bool foundError = false;
+  if (auto FD = dyn_cast<FuncDecl>(VD)) {
+    bool foundError = false;
 
-  if (FD->hasAsync()) {
-    FD->diagnose(diag::c_func_async);
-    foundError = true;
-  }
-
-  if (FD->hasThrows()) {
-    FD->diagnose(diag::c_func_throws);
-    foundError = true;
-  }
-
-  // --- Check for unsupported result types.
-  Type resultTy = FD->getResultInterfaceType();
-  if (!resultTy->isVoid() && !resultTy->isRepresentableIn(ForeignLanguage::C, FD)) {
-    FD->diagnose(diag::c_func_unsupported_type, resultTy);
-    foundError = true;
-  }
-
-  for (auto *param : *FD->getParameters()) {
-    // --- Check for unsupported specifiers.
-    if (param->isVariadic()) {
-      FD->diagnose(diag::c_func_variadic, param->getName(), FD);
-      foundError = true;
-    }
-    if (param->getSpecifier() != ParamSpecifier::Default) {
-      param
-          ->diagnose(diag::c_func_unsupported_specifier,
-                     ParamDecl::getSpecifierSpelling(param->getSpecifier()),
-                     param->getName(), FD)
-          .fixItRemove(param->getSpecifierLoc());
+    if (FD->hasAsync()) {
+      FD->diagnose(diag::c_func_async);
       foundError = true;
     }
 
-    // --- Check for unsupported parameter types.
-    auto paramTy = param->getTypeInContext();
-    if (!paramTy->isRepresentableIn(ForeignLanguage::C, FD)) {
-      param->diagnose(diag::c_func_unsupported_type, paramTy);
+    if (FD->hasThrows()) {
+      FD->diagnose(diag::c_func_throws);
       foundError = true;
     }
+
+    // --- Check for unsupported result types.
+    Type resultTy = FD->getResultInterfaceType();
+    if (!resultTy->isVoid() && !resultTy->isRepresentableIn(ForeignLanguage::C, FD)) {
+      FD->diagnose(diag::c_unsupported_type, resultTy);
+      foundError = true;
+    }
+
+    for (auto *param : *FD->getParameters()) {
+      // --- Check for unsupported specifiers.
+      if (param->isVariadic()) {
+        FD->diagnose(diag::c_func_variadic, param->getName(), FD);
+        foundError = true;
+      }
+      if (param->getSpecifier() != ParamSpecifier::Default) {
+        param
+            ->diagnose(diag::c_func_unsupported_specifier,
+                       ParamDecl::getSpecifierSpelling(param->getSpecifier()),
+                       param->getName(), FD)
+            .fixItRemove(param->getSpecifierLoc());
+        foundError = true;
+      }
+
+      // --- Check for unsupported parameter types.
+      auto paramTy = param->getTypeInContext();
+      if (!paramTy->isRepresentableIn(ForeignLanguage::C, FD)) {
+        param->diagnose(diag::c_unsupported_type, paramTy);
+        foundError = true;
+      }
+    }
+    return !foundError;
   }
-  return !foundError;
+
+  if (auto var = dyn_cast<VarDecl>(VD)) {
+    Type varType = var->getInterfaceType();
+    if (!varType->isRepresentableIn(ForeignLanguage::C,
+                                    var->getDeclContext())) {
+      var->diagnose(diag::c_unsupported_type, varType);
+      return true;
+    }
+
+    if (!var->hasStorage()) {
+      var->diagnose(diag::c_var_computed);
+      return false;
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
-static bool isCCompatibleFuncDecl(FuncDecl *FD) {
-  return evaluateOrDefault(FD->getASTContext().evaluator,
-                           IsCCompatibleFuncDeclRequest{FD}, {});
+static bool isCCompatibleDecl(ValueDecl *VD) {
+  return evaluateOrDefault(VD->getASTContext().evaluator,
+                           IsCCompatibleDeclRequest{VD}, {});
 }
 
 void AttributeChecker::visitExternAttr(ExternAttr *attr) {
@@ -2607,17 +2619,27 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::attr_extern_experimental);
     return;
   }
-  
-  // Only top-level func or static func decls are currently supported.
-  auto *FD = dyn_cast<FuncDecl>(D);
-  if (!FD || (FD->getDeclContext()->isTypeContext() && !FD->isStatic())) {
-    diagnose(attr->getLocation(), diag::extern_not_at_top_level_func);
-  }
 
+  auto VD = dyn_cast<ValueDecl>(D);
+  if (!VD)
+    return;
+
+  // Check the declaration context.
+  // FIXME: Unify this with @c / @_cdecl checking.
+  if (VD->getDeclContext()->isModuleScopeContext()) {
+    // Top-level declarations are okay.
+  } else if (VD->getDeclContext()->isTypeContext() &&
+             !VD->getDeclContext()->getGenericSignatureOfContext() &&
+             ((isa<FuncDecl>(VD) && cast<FuncDecl>(VD)->isStatic()) ||
+              (isa<VarDecl>(VD) && cast<VarDecl>(VD)->isStatic()))) {
+    // Static members of non-generic types are okay.
+  } else {
+    diagnose(attr->getLocation(), diag::extern_not_at_top_level);
+  }
 
   // C name must not be empty.
   if (attr->getExternKind() == ExternKind::C) {
-    StringRef cName = attr->getCName(FD);
+    StringRef cName = attr->getCName(VD);
     if (cName.empty()) {
       diagnose(attr->getLocation(), diag::extern_empty_c_name);
     } else if (!attr->Name.has_value() && !clang::isValidAsciiIdentifier(cName)) {
@@ -2639,10 +2661,10 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
     }
 
     // Ensure the decl has C compatible interface. Otherwise it produces diagnostics.
-    if (!isCCompatibleFuncDecl(FD)) {
+    if (!isCCompatibleDecl(VD)) {
       attr->setInvalid();
       // Mark the decl itself invalid not to require body even with invalid ExternAttr.
-      FD->setInvalid();
+      VD->setInvalid();
     }
   }
 
@@ -2990,6 +3012,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   if (KitModule) {
     SmallVector<ValueDecl *, 1> decls;
     namelookup::lookupInModule(KitModule, Id_ApplicationDelegate,
+                               /*hasModuleSelector=*/false,
                                decls, NLKind::QualifiedLookup,
                                namelookup::ResolutionKind::TypesOnly,
                                SF, attr->getLocation(),
@@ -3254,10 +3277,11 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
     }
 
     CS.addDisjunctionConstraint(typeEqualityConstraints, locator);
-    CS.addValueMemberConstraint(
-        nominal->getInterfaceType(), DeclNameRef(context.Id_main),
-        Type(mainType), declContext, FunctionRefInfo::singleBaseNameApply(), {},
-        locator);
+    CS.addValueMemberConstraint(nominal->getInterfaceType(),
+                                DeclNameRef(context.Id_main), // OK: Generated
+                                Type(mainType), declContext,
+                                FunctionRefInfo::singleBaseNameApply(), {},
+                                locator);
   }
 
   FuncDecl *mainFunction = nullptr;
@@ -3813,6 +3837,27 @@ void AttributeChecker::visitExclusivityAttr(ExclusivityAttr *attr) {
   attr->setInvalid();
 }
 
+void AttributeChecker::visitExportAttr(ExportAttr *attr) {
+  // @export cannot be combined with any of @inlinable, @usableFromInline,
+  // @_alwaysEmitIntoClient, or @_neverEmitIntoClient
+  if (auto other = D->getAttrs().getAttribute<InlinableAttr>())
+    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
+  if (auto other = D->getAttrs().getAttribute<UsableFromInlineAttr>())
+    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
+  if (auto other = D->getAttrs().getAttribute<AlwaysEmitIntoClientAttr>())
+    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
+  if (auto other = D->getAttrs().getAttribute<NeverEmitIntoClientAttr>())
+    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
+  if (auto other = D->getAttrs().getAttribute<ExternAttr>())
+    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
+}
+
+void AttributeChecker::visitNeverEmitIntoClientAttr(NeverEmitIntoClientAttr *attr) {
+  Ctx.Diags.diagnose(attr->getStartLoc(), diag::attr_renamed_warning,
+                     "_neverEmitIntoClient", "export(interface)")
+    .fixItReplace(attr->getRangeWithAt(), "@export(interface)");
+}
+
 void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
   if (auto *FD = dyn_cast<FuncDecl>(D)) {
     if (auto result = FD->getResultInterfaceType()) {
@@ -3871,6 +3916,23 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
                                      results);
 }
 
+static bool
+diagnoseCandidatesEliminatedByModuleSelector(ASTContext &ctx,
+                                             DeclNameRefWithLoc replacedDeclName,
+                                             DeclAttribute *attr,
+                                             const ValueDecl *replacement) {
+  if (!replacedDeclName.Name.hasModuleSelector())
+    return false;
+
+  // Look up without the module selector
+  SmallVector<ValueDecl *, 4> results;
+  lookupReplacedDecl(DeclNameRef(replacedDeclName.Name.getFullName()),
+                     attr, replacement, results);
+
+  ModuleSelectorCorrection correction(results);
+  return correction.diagnose(ctx, replacedDeclName.Loc, replacedDeclName.Name);
+}
+
 /// Remove any argument labels from the interface type of the given value that
 /// are extraneous from the type system's point of view, producing the
 /// type to compare against for the purposes of dynamic replacement.
@@ -3890,14 +3952,14 @@ static Type getDynamicComparisonType(ValueDecl *value) {
   return interfaceType->removeArgumentLabels(numArgumentLabels);
 }
 
-static FuncDecl *findSimilarAccessor(DeclNameRef replacedVarName,
+static FuncDecl *findSimilarAccessor(DeclNameRefWithLoc replacedVarName,
                                      const AccessorDecl *replacement,
                                      DeclAttribute *attr, ASTContext &ctx,
                                      bool forDynamicReplacement) {
 
   // Retrieve the replaced abstract storage decl.
   SmallVector<ValueDecl *, 4> results;
-  lookupReplacedDecl(replacedVarName, attr, replacement, results);
+  lookupReplacedDecl(replacedVarName.Name, attr, replacement, results);
 
   // Filter out any accessors that won't work.
   if (!results.empty()) {
@@ -3928,17 +3990,21 @@ static FuncDecl *findSimilarAccessor(DeclNameRef replacedVarName,
 
   auto &Diags = ctx.Diags;
   if (results.empty()) {
-    Diags.diagnose(attr->getLocation(),
-                   diag::dynamic_replacement_accessor_not_found,
-                   replacedVarName);
+    if (!diagnoseCandidatesEliminatedByModuleSelector(ctx, replacedVarName,
+                                                      attr, replacement)) {
+      Diags.diagnose(attr->getLocation(),
+                     diag::dynamic_replacement_accessor_not_found,
+                     replacedVarName.Name);
+    }
     attr->setInvalid();
+
     return nullptr;
   }
 
   if (results.size() > 1) {
     Diags.diagnose(attr->getLocation(),
                    diag::dynamic_replacement_accessor_ambiguous,
-                   replacedVarName);
+                   replacedVarName.Name);
     for (auto result : results) {
       Diags.diagnose(result,
                      diag::dynamic_replacement_accessor_ambiguous_candidate,
@@ -3980,7 +4046,7 @@ static FuncDecl *findSimilarAccessor(DeclNameRef replacedVarName,
   return origAccessor;
 }
 
-static FuncDecl *findReplacedAccessor(DeclNameRef replacedVarName,
+static FuncDecl *findReplacedAccessor(DeclNameRefWithLoc replacedVarName,
                                       const AccessorDecl *replacement,
                                       DeclAttribute *attr,
                                       ASTContext &ctx) {
@@ -3988,7 +4054,7 @@ static FuncDecl *findReplacedAccessor(DeclNameRef replacedVarName,
                              /*forDynamicReplacement*/ true);
 }
 
-static FuncDecl *findTargetAccessor(DeclNameRef replacedVarName,
+static FuncDecl *findTargetAccessor(DeclNameRefWithLoc replacedVarName,
                                       const AccessorDecl *replacement,
                                       DeclAttribute *attr,
                                       ASTContext &ctx) {
@@ -3997,7 +4063,7 @@ static FuncDecl *findTargetAccessor(DeclNameRef replacedVarName,
 }
 
 static AbstractFunctionDecl *
-findSimilarFunction(DeclNameRef replacedFunctionName,
+findSimilarFunction(DeclNameRefWithLoc replacedFunctionName,
                     const AbstractFunctionDecl *base, DeclAttribute *attr,
                     DiagnosticEngine *Diags, bool forDynamicReplacement) {
 
@@ -4005,7 +4071,7 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
   // Any modification to attr must be guarded by a null check on TC.
   //
   SmallVector<ValueDecl *, 4> lookupResults;
-  lookupReplacedDecl(replacedFunctionName, attr, base, lookupResults);
+  lookupReplacedDecl(replacedFunctionName.Name, attr, base, lookupResults);
 
   SmallVector<AbstractFunctionDecl *, 4> candidates;
   for (auto *result : lookupResults) {
@@ -4022,11 +4088,15 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
 
   if (candidates.empty()) {
     if (Diags) {
-      Diags->diagnose(attr->getLocation(),
-                      forDynamicReplacement
-                          ? diag::dynamic_replacement_function_not_found
-                          : diag::specialize_target_function_not_found,
-                      replacedFunctionName);
+      if (!diagnoseCandidatesEliminatedByModuleSelector(base->getASTContext(),
+                                                        replacedFunctionName,
+                                                        attr, base)) {
+        Diags->diagnose(attr->getLocation(),
+                        forDynamicReplacement
+                        ? diag::dynamic_replacement_function_not_found
+                        : diag::specialize_target_function_not_found,
+                        replacedFunctionName.Name);
+      }
     }
 
     attr->setInvalid();
@@ -4092,7 +4162,7 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
                   forDynamicReplacement
                       ? diag::dynamic_replacement_function_of_type_not_found
                       : diag::specialize_target_function_of_type_not_found,
-                  replacedFunctionName,
+                  replacedFunctionName.Name,
                   base->getInterfaceType()->getCanonicalType());
 
   for (auto *result : matches) {
@@ -4108,7 +4178,7 @@ findSimilarFunction(DeclNameRef replacedFunctionName,
 }
 
 static AbstractFunctionDecl *
-findReplacedFunction(DeclNameRef replacedFunctionName,
+findReplacedFunction(DeclNameRefWithLoc replacedFunctionName,
                      const AbstractFunctionDecl *replacement,
                      DynamicReplacementAttr *attr, DiagnosticEngine *Diags) {
   return findSimilarFunction(replacedFunctionName, replacement, attr, Diags,
@@ -4116,7 +4186,7 @@ findReplacedFunction(DeclNameRef replacedFunctionName,
 }
 
 static AbstractFunctionDecl *
-findTargetFunction(DeclNameRef targetFunctionName,
+findTargetFunction(DeclNameRefWithLoc targetFunctionName,
                    const AbstractFunctionDecl *base,
                    AbstractSpecializeAttr * attr, DiagnosticEngine *diags) {
   return findSimilarFunction(targetFunctionName, base, attr, diags,
@@ -4316,7 +4386,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
 
   bool foundMatch = llvm::any_of(lookupResult, [&](const LookupResultEntry &entry) {
     auto *init = cast<ConstructorDecl>(entry.getValueDecl());
-    if (!init->isGeneric() || init->getGenericParams()->size() != 1)
+    if (!init->hasGenericParamList() || init->getGenericParams()->size() != 1)
       return false;
 
     auto genericSignature = init->getGenericSignature();
@@ -4978,6 +5048,25 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
   }
 
   auto *VD = cast<ValueDecl>(D);
+
+  // @_implementationOnly on types only applies to non-public types.
+  if (isa<NominalTypeDecl>(D)) {
+    if (!Ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
+        !Ctx.LangOpts.hasFeature(Feature::CheckImplementationOnlyStrict)) {
+      diagnoseAndRemoveAttr(attr, diag::implementation_only_on_types_feature);
+      return;
+    }
+
+    auto access =
+        VD->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*treatUsableFromInlineAsPublic=*/true);
+    if (access.isPublicOrPackage())
+      diagnoseAndRemoveAttr(
+          attr, diag::attr_not_on_decl_with_invalid_access_level,
+          attr, access.accessLevelForDiagnostics());
+    return;
+  }
+
   auto *overridden = VD->getOverriddenDecl();
   if (!overridden) {
     diagnoseAndRemoveAttr(attr, diag::implementation_only_decl_non_override);
@@ -5277,6 +5366,11 @@ void AttributeChecker::checkBackDeployedAttrs(
   if (auto *AEICA = D->getAttrs().getAttribute<AlwaysEmitIntoClientAttr>()) {
     diagnoseAndRemoveAttr(AEICA, diag::attr_incompatible_with_back_deployed,
                           AEICA, D);
+  }
+
+  if (auto *EA = D->getAttrs().getAttribute<ExportAttr>()) {
+    diagnoseAndRemoveAttr(EA, diag::attr_incompatible_with_back_deployed,
+                          EA, D);
   }
 
   if (auto *TA = D->getAttrs().getAttribute<TransparentAttr>()) {
@@ -5679,7 +5773,9 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D,
 static bool shouldBlockImplicitDynamic(Decl *D) {
   if (D->getAttrs().hasAttribute<SILGenNameAttr>() ||
       D->getAttrs().hasAttribute<TransparentAttr>() ||
-      D->getAttrs().hasAttribute<InlinableAttr>())
+      D->getAttrs().hasAttribute<InlinableAttr>() ||
+      D->getAttrs().hasAttribute<CDeclAttr>() ||
+      D->getAttrs().hasAttribute<ExternAttr>())
     return true;
   return false;
 }
@@ -5777,13 +5873,15 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
   }
 
   auto &Ctx = VD->getASTContext();
+  DeclNameRefWithLoc nameWithLoc{attr->getReplacedFunctionName(),
+                                 attr->getReplacedFunctionNameLoc(),
+                                 std::nullopt};
   if (auto *AD = dyn_cast<AccessorDecl>(VD)) {
-    return findReplacedAccessor(attr->getReplacedFunctionName(), AD, attr, Ctx);
+    return findReplacedAccessor(nameWithLoc, AD, attr, Ctx);
   }
 
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return findReplacedFunction(attr->getReplacedFunctionName(), AFD,
-                                attr, &Ctx.Diags);
+    return findReplacedFunction(nameWithLoc, AFD, attr, &Ctx.Diags);
   }
 
   if (auto *SD = dyn_cast<AbstractStorageDecl>(VD)) {
@@ -5806,8 +5904,10 @@ SpecializeAttrTargetDeclRequest::evaluate(Evaluator &evaluator,
 
   auto &ctx = vd->getASTContext();
 
-  auto targetFunctionName = attr->getTargetFunctionName();
-  if (!targetFunctionName)
+  DeclNameRefWithLoc targetFunctionName{attr->getTargetFunctionName(),
+                                        attr->getTargetFunctionNameLoc(),
+                                        std::nullopt};
+  if (!targetFunctionName.Name)
     return nullptr;
 
   if (auto *ad = dyn_cast<AccessorDecl>(vd)) {
@@ -5857,9 +5957,9 @@ IndexSubset *TypeChecker::inferDifferentiabilityParameters(
       return false;
     auto paramType = allParamTypes[i];
     if (derivativeGenEnv)
-      paramType = derivativeGenEnv->mapTypeIntoContext(paramType);
+      paramType = derivativeGenEnv->mapTypeIntoEnvironment(paramType);
     else
-      paramType = AFD->mapTypeIntoContext(paramType);
+      paramType = AFD->mapTypeIntoEnvironment(paramType);
     // Return false for existential types.
     if (paramType->isExistentialType())
       return false;
@@ -5921,9 +6021,9 @@ static IndexSubset *computeDifferentiabilityParameters(
     else {
       auto selfType = function->getImplicitSelfDecl()->getInterfaceType();
       if (derivativeGenEnv)
-        selfType = derivativeGenEnv->mapTypeIntoContext(selfType);
+        selfType = derivativeGenEnv->mapTypeIntoEnvironment(selfType);
       else
-        selfType = function->mapTypeIntoContext(selfType);
+        selfType = function->mapTypeIntoEnvironment(selfType);
       if (!conformsToDifferentiable(selfType)) {
         diags
             .diagnose(attrLoc, diag::diff_function_no_parameters, function)
@@ -6307,14 +6407,17 @@ static bool checkFunctionSignature(
 /// generic signature.
 static AnyFunctionType *
 makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
+                 bool throws, Type thrownError,
                  GenericSignature genericSignature) {
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   if (genericSignature) {
     GenericFunctionType::ExtInfo info;
+    info = info.withThrows(throws, thrownError);
     return GenericFunctionType::get(genericSignature, parameters, resultType,
                                     info);
   }
   FunctionType::ExtInfo info;
+  info = info.withThrows(throws, thrownError);
   return FunctionType::get(parameters, resultType, info);
 }
 
@@ -6340,6 +6443,7 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
   auto originalResult = derivativeResult->getElement(0).getType();
   auto *originalType = makeFunctionType(
       curryLevels.back()->getParams(), originalResult,
+      curryLevels.back()->isThrowing(), curryLevels.back()->getThrownError(),
       curryLevels.size() == 1 ? derivativeFnTy->getOptGenericSignature()
                               : nullptr);
 
@@ -6351,6 +6455,7 @@ getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
     AnyFunctionType *curryLevel = pair.value();
     originalType =
         makeFunctionType(curryLevel->getParams(), originalType,
+                         curryLevel->isThrowing(), curryLevel->getThrownError(),
                          i == curryLevelsWithoutLast.size() - 1
                              ? derivativeFnTy->getOptGenericSignature()
                              : nullptr);
@@ -6441,15 +6546,20 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
   // `(Self) -> (<original parameters>) -> <original result>`.
   if (isCurried) {
     assert(selfType && "`Self` type should be resolved");
-    originalType = makeFunctionType(originalParams, originalResult, nullptr);
-    originalType =
-        makeFunctionType(AnyFunctionType::Param(selfType), originalType,
-                         transposeFnType->getOptGenericSignature());
+    originalType = makeFunctionType(originalParams, originalResult,
+                                    transposeFnType->isThrowing(),
+                                    transposeFnType->getThrownError(),
+                                    /*genericSignature=*/nullptr);
+    originalType = makeFunctionType(
+        AnyFunctionType::Param(selfType), originalType,
+        /*throws=*/false, Type(), transposeFnType->getOptGenericSignature());
   }
   // Otherwise, the original function type is simply:
   // `(<original parameters>) -> <original result>`.
   else {
     originalType = makeFunctionType(originalParams, originalResult,
+                                    transposeFnType->isThrowing(),
+                                    transposeFnType->getThrownError(),
                                     transposeFnType->getOptGenericSignature());
   }
   return originalType;
@@ -6655,7 +6765,7 @@ resolveDiffParamIndices(AbstractFunctionDecl *original,
   auto originalFnRemappedTy = original->getInterfaceType()->castTo<AnyFunctionType>();
   if (derivativeGenEnv)
     originalFnRemappedTy =
-        derivativeGenEnv->mapTypeIntoContext(originalFnRemappedTy)
+        derivativeGenEnv->mapTypeIntoEnvironment(originalFnRemappedTy)
             ->castTo<AnyFunctionType>();
 
   // Resolve and validate the differentiability parameters.
@@ -6751,7 +6861,7 @@ typecheckDifferentiableAttrforDecl(AbstractFunctionDecl *original,
   auto originalFnRemappedTy = original->getInterfaceType()->castTo<AnyFunctionType>();
   if (auto *derivativeGenEnv = derivativeGenSig.getGenericEnvironment())
     originalFnRemappedTy =
-        derivativeGenEnv->mapTypeIntoContext(originalFnRemappedTy)
+        derivativeGenEnv->mapTypeIntoEnvironment(originalFnRemappedTy)
             ->castTo<AnyFunctionType>();
   
   auto *resultIndices =
@@ -7183,8 +7293,8 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     return true;
   }
 
-  if (originalAFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() !=
-      derivative->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+  if (originalAFD->isAlwaysEmittedIntoClient() !=
+      derivative->isAlwaysEmittedIntoClient()) {
     diags.diagnose(derivative->getLoc(),
                    diag::derivative_attr_always_emit_into_client_mismatch);
     return true;
@@ -7260,9 +7370,9 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   Type expectedLinearMapType = expectedLinearMapTypeOrError.get();
   if (expectedLinearMapType->hasTypeParameter())
     expectedLinearMapType =
-        derivative->mapTypeIntoContext(expectedLinearMapType);
+        derivative->mapTypeIntoEnvironment(expectedLinearMapType);
   if (expectedLinearMapType->hasArchetype())
-    expectedLinearMapType = expectedLinearMapType->mapTypeOutOfContext();
+    expectedLinearMapType = expectedLinearMapType->mapTypeOutOfEnvironment();
 
   // Compute the actual differential/pullback type for comparison with the
   // expected type. We must canonicalize the derivative interface type before
@@ -7463,11 +7573,11 @@ static bool checkLinearityParameters(
   for (unsigned i : range(linearParams.size())) {
     auto linearParamType = linearParams[i].getPlainType();
     if (!linearParamType->hasTypeParameter())
-      linearParamType = linearParamType->mapTypeOutOfContext();
+      linearParamType = linearParamType->mapTypeOutOfEnvironment();
     if (derivativeGenEnv)
-      linearParamType = derivativeGenEnv->mapTypeIntoContext(linearParamType);
+      linearParamType = derivativeGenEnv->mapTypeIntoEnvironment(linearParamType);
     else
-      linearParamType = originalAFD->mapTypeIntoContext(linearParamType);
+      linearParamType = originalAFD->mapTypeIntoEnvironment(linearParamType);
     SourceLoc loc =
         parsedLinearParams.empty() ? attrLoc : parsedLinearParams[i].getLoc();
     // Parameter must conform to `Differentiable` and satisfy
@@ -7582,7 +7692,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     expectedOriginalResultType =
         expectedOriginalResultType->castTo<AnyFunctionType>()->getResult();
   if (expectedOriginalResultType->hasTypeParameter())
-    expectedOriginalResultType = transpose->mapTypeIntoContext(
+    expectedOriginalResultType = transpose->mapTypeIntoEnvironment(
         expectedOriginalResultType);
   if (!conformsToDifferentiable(expectedOriginalResultType,
                                 /*tangentVectorEqualsSelf*/ true)) {
@@ -7830,8 +7940,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         // The synthesized "id" and "actorSystem" are the only exceptions,
         // because the implementation mirrors them.
         if (nominal->isDistributedActor() &&
-            !(var->getName() == Ctx.Id_id ||
-              var->getName() == Ctx.Id_actorSystem)) {
+            !var->isSpecialDistributedActorProperty()) {
           diagnoseAndRemoveAttr(attr,
                                 diag::nonisolated_distributed_actor_storage);
           return;
@@ -7956,6 +8065,14 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         }
       }
     }
+  }
+
+  // `nonisolated` on an actor declaration is contradictory.
+  if (auto *classDecl = dyn_cast<ClassDecl>(D);
+      classDecl && classDecl->isExplicitActor()) {
+    diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr)
+        .fixItRemove(attr->getRange());
+    return;
   }
 
   if (auto VD = dyn_cast<ValueDecl>(D)) {

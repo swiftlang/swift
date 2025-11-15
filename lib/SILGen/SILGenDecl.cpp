@@ -76,6 +76,7 @@ static void copyOrInitPackExpansionInto(SILGenFunction &SGF,
     SGF.Cleanups.forwardCleanup(componentCleanup);
 
   SGF.emitDynamicPackLoop(loc, formalPackType, componentIndex, openedEnv,
+                          []() -> SILBasicBlock * { return nullptr; },
                           [&](SILValue indexWithinComponent,
                               SILValue packExpansionIndex,
                               SILValue packIndex) {
@@ -827,14 +828,15 @@ public:
       if (isUninitialized)
         address = SGF.B.createMarkUninitializedVar(vd, address);
       DestroyCleanup = SGF.enterDormantTemporaryCleanup(address, *lowering);
-      SGF.VarLocs[vd] = SILGenFunction::VarLoc(address,
-                                               SILAccessEnforcement::Unknown);
+
+      // N.B. We do not register the address in VarLocs yet so that the capture-
+      // before-definition machinery will diagnose such cases.
     }
     // Push a cleanup to destroy the let declaration.  This has to be
-    // inactive until the variable is initialized: if control flow exits the
+    // inactive until the variable is initialized: if control flow exits
     // before the value is bound, we don't want to destroy the value.
     //
-    // Cleanups are required for all lexically scoped variables to delimite
+    // Cleanups are required for all lexically scoped variables to delimit
     // the variable scope, even if the cleanup does nothing.
     SGF.Cleanups.pushCleanupInState<DestroyLocalVariable>(
       CleanupState::Dormant, vd);
@@ -1006,7 +1008,17 @@ public:
   void finishInitialization(SILGenFunction &SGF) override {
     assert(!DidFinish &&
            "called LetValueInit::finishInitialization twice!");
-    assert(SGF.VarLocs.count(vd) && "Didn't bind a value to this let!");
+
+    if (address) {
+      // We should have delayed registration to detect forward-declared
+      // captures.
+      assert(!SGF.VarLocs.count(vd) && "Should not have bound the let yet!");
+      SGF.VarLocs[vd] =
+          SILGenFunction::VarLoc(address, SILAccessEnforcement::Unknown);
+    } else {
+      // We should have already registered the variable in the non-address case.
+      assert(SGF.VarLocs.count(vd) && "Didn't bind a value to this let!");
+    }
 
     // Deactivate any cleanups we made when splitting the tuple.
     for (auto cleanup : SplitCleanups)
@@ -1716,7 +1728,7 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
   }
 
   // Emit lazy and property wrapper backing storage.
-  D->visitAuxiliaryDecls([&](VarDecl *var) {
+  D->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *var) {
     if (auto *patternBinding = var->getParentPatternBinding())
       visitPatternBindingDecl(patternBinding);
 

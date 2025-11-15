@@ -566,7 +566,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DereferenceableID = getLLVMContext().getMDKindID("dereferenceable");
 
   C_CC = getOptions().PlatformCCallingConvention;
-  SwiftClientRR_CC = llvm::CallingConv::PreserveMost;
+  SwiftDirectRR_CC = llvm::CallingConv::PreserveMost;
   // TODO: use "tinycc" on platforms that support it
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
 
@@ -771,10 +771,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 
-  CoroFunctionPointerTy = createStructType(*this, "swift.coro_func_pointer",
-                                           {RelativeAddressTy, Int32Ty}, true);
+  CoroFunctionPointerTy =
+      createStructType(*this, "swift.coro_func_pointer",
+                       {RelativeAddressTy, Int32Ty, Int64Ty}, true);
   CoroAllocateFnTy = llvm::FunctionType::get(
-      CoroAllocationTy, {CoroAllocationTy, CoroAllocatorPtrTy, SizeTy}, /*isVarArg*/ false);
+      CoroAllocationTy, {CoroAllocationTy, CoroAllocatorPtrTy, SizeTy, Int64Ty},
+      /*isVarArg*/ false);
   CoroDeallocateFnTy = llvm::FunctionType::get(
       VoidTy, {CoroAllocationTy, CoroAllocatorPtrTy, CoroAllocationTy}, /*isVarArg*/ false);
   CoroAllocatorFlagsTy = Int32Ty;
@@ -1733,9 +1735,9 @@ void IRGenModule::addLinkLibraries() {
     registerLinkLibrary(
         LinkLibrary{"objc", LibraryKind::Library, /*static=*/false});
 
-  if (TargetInfo.HasSwiftClientRRLibrary &&
-      getOptions().EnableClientRetainRelease)
-    registerLinkLibrary(LinkLibrary{"swiftClientRetainRelease",
+  if (TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
+      getOptions().EnableSwiftDirectRuntime)
+    registerLinkLibrary(LinkLibrary{"swiftSwiftDirectRuntime",
                                     LibraryKind::Library, /*static=*/true});
 
   // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
@@ -2331,9 +2333,8 @@ IRGenModule *IRGenerator::getGenModule(SILGlobalVariable *v) {
   if (found != DefaultIGMForGlobalVariable.end())
     return found->second;
 
-  if (auto decl = v->getDecl()) {
-    return getGenModule(decl->getDeclContext());
-  }
+  if (auto *dc = v->getDeclContext())
+    return getGenModule(dc);
 
   return getPrimaryIGM();
 }

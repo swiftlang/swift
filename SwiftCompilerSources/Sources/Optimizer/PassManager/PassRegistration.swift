@@ -80,6 +80,7 @@ private func registerSwiftPasses() {
   registerPass(computeSideEffects, { computeSideEffects.run($0) })
   registerPass(diagnoseInfiniteRecursion, { diagnoseInfiniteRecursion.run($0) })
   registerPass(destroyHoisting, { destroyHoisting.run($0) })
+  registerPass(mandatoryDestroyHoisting, { mandatoryDestroyHoisting.run($0) })
   registerPass(initializeStaticGlobalsPass, { initializeStaticGlobalsPass.run($0) })
   registerPass(objCBridgingOptimization, { objCBridgingOptimization.run($0) })
   registerPass(objectOutliner, { objectOutliner.run($0) })
@@ -108,6 +109,7 @@ private func registerSwiftPasses() {
   registerPass(closureSpecialization, { closureSpecialization.run($0) })
   registerPass(autodiffClosureSpecialization, { autodiffClosureSpecialization.run($0) })
   registerPass(loopInvariantCodeMotionPass, { loopInvariantCodeMotionPass.run($0) })
+  registerPass(packSpecialization, { packSpecialization.run($0) })
 
   // Instruction passes
   registerForSILCombine(BeginBorrowInst.self,      { run(BeginBorrowInst.self, $0) })

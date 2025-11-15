@@ -649,9 +649,8 @@ CONSTANT_OWNERSHIP_BUILTIN(None, BuildOrdinarySerialExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildComplexEqualitySerialExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildDefaultActorExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildMainActorExecutorRef)
-CONSTANT_OWNERSHIP_BUILTIN(None, StartAsyncLet)
-CONSTANT_OWNERSHIP_BUILTIN(None, EndAsyncLet)
 CONSTANT_OWNERSHIP_BUILTIN(None, StartAsyncLetWithLocalBuffer)
+CONSTANT_OWNERSHIP_BUILTIN(None, FinishAsyncLet)
 CONSTANT_OWNERSHIP_BUILTIN(None, EndAsyncLetLifetime)
 CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroup)
 CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroupWithFlags)
@@ -664,6 +663,13 @@ CONSTANT_OWNERSHIP_BUILTIN(None, InjectEnumTag)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, DistributedActorAsAnyActor)
 CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, ExtractFunctionIsolation) // unreachable
 CONSTANT_OWNERSHIP_BUILTIN(None, AddressOfRawLayout)
+
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddCancellationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemoveCancellationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddPriorityEscalationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemovePriorityEscalationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskLocalValuePush)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskLocalValuePop)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

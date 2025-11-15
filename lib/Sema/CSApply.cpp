@@ -1246,7 +1246,7 @@ namespace {
         auto *param = thunkParamList->get(idx);
         auto arg = thunkTy->getParams()[idx];
 
-        param->setInterfaceType(arg.getParameterType()->mapTypeOutOfContext());
+        param->setInterfaceType(arg.getParameterType()->mapTypeOutOfEnvironment());
         param->setSpecifier(ParamDecl::getParameterSpecifierForValueOwnership(
             arg.getValueOwnership()));
       }
@@ -1382,7 +1382,7 @@ namespace {
           new (ctx) ParamDecl(SourceLoc(),
                               /*argument label*/ SourceLoc(), Identifier(),
                               /*parameter name*/ SourceLoc(), ctx.Id_self, dc);
-      selfParamDecl->setInterfaceType(selfThunkParamTy->mapTypeOutOfContext());
+      selfParamDecl->setInterfaceType(selfThunkParamTy->mapTypeOutOfEnvironment());
       selfParamDecl->setSpecifier(
           ParamDecl::getParameterSpecifierForValueOwnership(
               selfThunkParam.getValueOwnership()));
@@ -1557,7 +1557,7 @@ namespace {
                                          ctx.getIdentifier("$base$"),
                                          dc);
         capture->setImplicit();
-        capture->setInterfaceType(base->getType()->mapTypeOutOfContext());
+        capture->setInterfaceType(base->getType()->mapTypeOutOfEnvironment());
 
         auto *capturePat =
             NamedPattern::createImplicit(ctx, capture, base->getType());
@@ -3285,8 +3285,7 @@ namespace {
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
-      simplifyExprType(expr);
-      return expr;
+      return simplifyExprType(expr);
     }
 
     Expr *visitTypeExpr(TypeExpr *expr) {
@@ -3710,65 +3709,34 @@ namespace {
       return expr;
     }
 
-    Expr *visitCopyExpr(CopyExpr *expr) {
-      auto toType = simplifyType(cs.getType(expr));
-      cs.setType(expr, toType);
+    /// Given an expression that has a single sub-expression,
+    /// resolve and set the type for the expression and coerce
+    /// its sub-expression to the resolved type. This is a common
+    /// operation for expressions like Copy, Consume, and *Try.
+    template <class E>
+    Expr *transformExprWithSubExpr(E *expr) {
+      simplifyExprType(expr);
 
       auto *subExpr = expr->getSubExpr();
-      auto type = simplifyType(cs.getType(subExpr));
-
-      // Let's load the value associated with this try.
-      if (type->hasLValueType()) {
-        subExpr = coerceToType(subExpr, type->getRValueType(),
-                               cs.getConstraintLocator(subExpr));
-
-        if (!subExpr)
-          return nullptr;
-      }
+      subExpr = coerceToType(subExpr, cs.getType(expr),
+                             cs.getConstraintLocator(subExpr));
+      if (!subExpr)
+        return nullptr;
 
       expr->setSubExpr(subExpr);
-
       return expr;
+    }
+
+    Expr *visitCopyExpr(CopyExpr *expr) {
+      return transformExprWithSubExpr(expr);
     }
 
     Expr *visitConsumeExpr(ConsumeExpr *expr) {
-      auto toType = simplifyType(cs.getType(expr));
-      cs.setType(expr, toType);
-
-      auto *subExpr = expr->getSubExpr();
-      auto type = simplifyType(cs.getType(subExpr));
-
-      // Let's load the value associated with this consume.
-      if (type->hasLValueType()) {
-        subExpr = coerceToType(subExpr, type->getRValueType(),
-                               cs.getConstraintLocator(subExpr));
-
-        if (!subExpr)
-          return nullptr;
-      }
-
-      expr->setSubExpr(subExpr);
-
-      return expr;
+      return transformExprWithSubExpr(expr);
     }
 
     Expr *visitAnyTryExpr(AnyTryExpr *expr) {
-      auto *subExpr = expr->getSubExpr();
-      auto type = simplifyType(cs.getType(subExpr));
-
-      // Let's load the value associated with this try.
-      if (type->hasLValueType()) {
-        subExpr = coerceToType(subExpr, type->getRValueType(),
-                               cs.getConstraintLocator(subExpr));
-
-        if (!subExpr)
-          return nullptr;
-      }
-
-      cs.setType(expr, cs.getType(subExpr));
-      expr->setSubExpr(subExpr);
-
-      return expr;
+      return transformExprWithSubExpr(expr);
     }
 
     Expr *visitOptionalTryExpr(OptionalTryExpr *expr) {
@@ -3785,16 +3753,8 @@ namespace {
         // Nothing to do for Swift 4 and earlier!
         return simplifyExprType(expr);
       }
-      
-      Type exprType = simplifyType(cs.getType(expr));
 
-      auto subExpr = coerceToType(expr->getSubExpr(), exprType,
-                                  cs.getConstraintLocator(expr));
-      if (!subExpr) return nullptr;
-      expr->setSubExpr(subExpr);
-
-      cs.setType(expr, exprType);
-      return expr;
+      return transformExprWithSubExpr(expr);
     }
 
     Expr *visitParenExpr(ParenExpr *expr) {
@@ -3803,7 +3763,7 @@ namespace {
 
       // A ParenExpr can end up with a tuple type if it contains
       // a pack expansion. Rewrite it to a TupleExpr.
-      if (dyn_cast<PackExpansionExpr>(expr->getSubExpr())) {
+      if (isa<PackExpansionExpr>(expr->getSubExpr())) {
         result = TupleExpr::create(ctx, expr->getLParenLoc(),
                                    {expr->getSubExpr()},
                                    /*elementNames=*/{},
@@ -3958,8 +3918,7 @@ namespace {
     }
 
     Expr *visitTupleElementExpr(TupleElementExpr *expr) {
-      simplifyExprType(expr);
-      return expr;
+      return simplifyExprType(expr);
     }
 
     Expr *visitCaptureListExpr(CaptureListExpr *expr) {
@@ -3986,12 +3945,7 @@ namespace {
     }
 
     Expr *visitVarargExpansionExpr(VarargExpansionExpr *expr) {
-      simplifyExprType(expr);
-
-      auto arrayTy = cs.getType(expr);
-      expr->setSubExpr(coerceToType(expr->getSubExpr(), arrayTy,
-                                    cs.getConstraintLocator(expr)));
-      return expr;
+      return transformExprWithSubExpr(expr);
     }
 
     Expr *visitPackExpansionExpr(PackExpansionExpr *expr) {
@@ -5322,7 +5276,7 @@ namespace {
           SourceLoc(),
           /*argument label*/ SourceLoc(), Identifier(),
           /*parameter name*/ SourceLoc(), ctx.getIdentifier("$0"), closure);
-      param->setInterfaceType(baseTy->mapTypeOutOfContext());
+      param->setInterfaceType(baseTy->mapTypeOutOfEnvironment());
       param->setSpecifier(ParamSpecifier::Default);
       param->setImplicit();
       
@@ -5338,7 +5292,7 @@ namespace {
                                           ctx.getIdentifier("$kp$"),
                                           dc);
       outerParam->setImplicit();
-      outerParam->setInterfaceType(keyPathTy->mapTypeOutOfContext());
+      outerParam->setInterfaceType(keyPathTy->mapTypeOutOfEnvironment());
 
       auto *outerParamPat =
           NamedPattern::createImplicit(ctx, outerParam, keyPathTy);
@@ -5575,7 +5529,7 @@ namespace {
     Expr *visitTapExpr(TapExpr *E) {
       auto type = simplifyType(cs.getType(E));
 
-      E->getVar()->setInterfaceType(type->mapTypeOutOfContext());
+      E->getVar()->setInterfaceType(type->mapTypeOutOfEnvironment());
 
       cs.setType(E, type);
       E->setType(type);
@@ -5818,6 +5772,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
 
   // Convert each OpaqueValueExpr to the correct type.
   SmallVector<Expr *, 4> converted;
+  SmallVector<Identifier, 4> origLabels;
   SmallVector<Identifier, 4> labels;
   SmallVector<TupleTypeElt, 4> convertedElts;
 
@@ -5825,6 +5780,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
   for (unsigned i = 0, e = sources.size(); i != e; ++i) {
     unsigned source = sources[i];
     auto *fromElt = destructured[source];
+    auto fromLabel = fromTuple->getElement(i).getName();
 
     // Actually convert the source element.
     auto toEltType = toTuple->getElementType(i);
@@ -5832,8 +5788,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
 
     // If we're shuffling positions and labels, we have to warn about this
     // conversion.
-    if (i != sources[i] &&
-        fromTuple->getElement(i).getName() != toLabel)
+    if (i != sources[i] && fromLabel != toLabel)
       anythingShuffled = true;
 
     auto *toElt
@@ -5845,6 +5800,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
 
     converted.push_back(toElt);
     labels.push_back(toLabel);
+    origLabels.push_back(fromLabel);
     convertedElts.emplace_back(toEltType, toLabel);
   }
 
@@ -5852,8 +5808,28 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
   // will form the shuffle for now, but a future compiler should decline to
   // do so and begin the process of removing them altogether.
   if (anythingShuffled) {
-    ctx.Diags.diagnose(
-        expr->getLoc(), diag::warn_reordering_tuple_shuffle_deprecated);
+    auto concatLabels = [](SmallVectorImpl<Identifier> &labels,
+                           SmallVectorImpl<char> &out) {
+      llvm::raw_svector_ostream OS(out);
+      for (auto label : labels) {
+        DeclName(label).print(OS, /*skipEmpty*/ false, /*escapeIfNeeded*/ true);
+        OS << ':';
+      }
+    };
+    SmallString<16> fromLabelStr;
+    concatLabels(origLabels, fromLabelStr);
+    SmallString<16> toLabelStr;
+    concatLabels(labels, toLabelStr);
+
+    using namespace version;
+    if (ctx.isSwiftVersionAtLeast(Version::getFutureMajorLanguageVersion())) {
+      ctx.Diags.diagnose(expr->getLoc(), diag::reordering_tuple_shuffle,
+                         fromLabelStr, toLabelStr);
+    } else {
+      ctx.Diags.diagnose(expr->getLoc(),
+                         diag::warn_reordering_tuple_shuffle_deprecated,
+                         fromLabelStr, toLabelStr);
+    }
   }
 
   // Create the result tuple, written in terms of the destructured
@@ -7369,12 +7345,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     case ConversionRestrictionKind::CGFloatToDouble:
     case ConversionRestrictionKind::DoubleToCGFloat: {
-      DeclName name(ctx, DeclBaseName::createConstructor(), Identifier());
+      // OK: Implicit conversion, no module selector to drop here.
+      DeclNameRef initRef(ctx, /*module selector=*/Identifier(),
+                          DeclBaseName::createConstructor(), { Identifier() });
 
       ConstructorDecl *decl = nullptr;
       SmallVector<ValueDecl *, 2> candidates;
-      dc->lookupQualified(toType->getAnyNominal(),
-                          DeclNameRef(name), SourceLoc(),
+      dc->lookupQualified(toType->getAnyNominal(), initRef, SourceLoc(),
                           NL_QualifiedDefault, candidates);
       for (auto *candidate : candidates) {
         auto *ctor = cast<ConstructorDecl>(candidate);
@@ -9215,7 +9192,7 @@ static Pattern *rewriteExprPattern(const SyntacticElementTarget &matchTarget,
     return nullptr;
 
   EP->setMatchExpr(resultTarget->getAsExpr());
-  EP->getMatchVar()->setInterfaceType(patternTy->mapTypeOutOfContext());
+  EP->getMatchVar()->setInterfaceType(patternTy->mapTypeOutOfEnvironment());
   EP->setType(patternTy);
   return EP;
 }
@@ -9293,7 +9270,7 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
   // been subsumed by the backing property.
   if (wrappedVar) {
     ctx.setSideCachedPropertyWrapperBackingPropertyType(
-        wrappedVar, initType->mapTypeOutOfContext());
+        wrappedVar, initType->mapTypeOutOfEnvironment());
 
     // Record the semantic initializer on the outermost property wrapper.
     wrappedVar->getOutermostAttachedPropertyWrapper()->setSemanticInit(
@@ -9357,7 +9334,7 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
         resultTarget.getAsExpr()->forEachChildExpr([&](Expr *expr) -> Expr * {
           if (auto coercionExpr = dyn_cast<UnderlyingToOpaqueExpr>(expr)) {
             auto newSubstitutions =
-                coercionExpr->substitutions.mapReplacementTypesOutOfContext();
+                coercionExpr->substitutions.mapReplacementTypesOutOfEnvironment();
             if (substitutions.empty()) {
               substitutions = newSubstitutions;
             } else {
@@ -9753,7 +9730,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
 
     auto &ctx = solution.getConstraintSystem().getASTContext();
     ctx.setSideCachedPropertyWrapperBackingPropertyType(
-        wrappedVar, backingType->mapTypeOutOfContext());
+        wrappedVar, backingType->mapTypeOutOfEnvironment());
 
     return target;
   } else if (target.getAsUninitializedVar()) {

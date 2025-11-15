@@ -3155,9 +3155,15 @@ public:
     return getSubstCalleeConv().hasGuaranteedResult();
   }
 
+  bool hasGuaranteedAddressResult() const {
+    return getSubstCalleeConv().hasGuaranteedAddressResult();
+  }
+
   bool hasAddressResult() const {
     return getSubstCalleeConv().hasAddressResult();
   }
+
+  bool hasInoutResult() const { return getSubstCalleeConv().hasInoutResult(); }
 };
 
 /// PartialApplyInst - Represents the creation of a closure object by partial
@@ -4308,6 +4314,33 @@ public:
     return getAllOperands().drop_front(numNormalOperands);
   }
 };
+
+inline BuiltinInst *isBuiltinInst(SILValue value,
+                                  BuiltinValueKind kind) {
+  if (auto bi = dyn_cast<BuiltinInst>(value)) {
+    if (bi->getBuiltinKind() == kind)
+      return bi;
+  }
+  return nullptr;
+}
+
+inline BuiltinInst *isBuiltinInst(SILInstruction *inst,
+                                  BuiltinValueKind kind) {
+  if (auto bi = dyn_cast<BuiltinInst>(inst)) {
+    if (bi->getBuiltinKind() == kind)
+      return bi;
+  }
+  return nullptr;
+}
+
+inline const BuiltinInst *isBuiltinInst(const SILInstruction *inst,
+                                        BuiltinValueKind kind) {
+  if (auto bi = dyn_cast<BuiltinInst>(inst)) {
+    if (bi->getBuiltinKind() == kind)
+      return bi;
+  }
+  return nullptr;
+}
 
 /// Increments a given profiler counter for a given PGO function name. This is
 /// lowered to the \c llvm.instrprof.increment LLVM intrinsic.

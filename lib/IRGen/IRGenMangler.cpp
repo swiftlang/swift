@@ -445,7 +445,7 @@ std::string IRGenMangler::mangleSymbolNameForMangledMetadataAccessorString(
     // Reflection metadata is conditionalized for noncopyable types.
     CanType contextType = type;
     if (genericSig) {
-      contextType = genericSig.getGenericEnvironment()->mapTypeIntoContext(contextType)
+      contextType = genericSig.getGenericEnvironment()->mapTypeIntoEnvironment(contextType)
         ->getReducedType(genericSig);
     }
     if (contextType->isNoncopyable()) {

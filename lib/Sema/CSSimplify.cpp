@@ -4825,14 +4825,19 @@ static ConstraintFix *fixPropertyWrapperFailure(
   if (!resolvedOverload)
     return nullptr;
 
+  auto *decl = resolvedOverload->choice.getDeclOrNull();
+  auto *VD = dyn_cast_or_null<VarDecl>(decl);
+  if (!VD)
+    return nullptr;
+
   enum class Fix : uint8_t {
     ProjectedValue,
     PropertyWrapper,
     WrappedValue,
   };
 
-  auto applyFix = [&](Fix fix, VarDecl *decl, Type type) -> ConstraintFix * {
-    if (!decl->hasInterfaceType() || !type)
+  auto applyFix = [&](Fix fix, Type type) -> ConstraintFix * {
+    if (!VD->hasInterfaceType() || !type)
       return nullptr;
 
     if (baseTy->isEqual(type))
@@ -4841,40 +4846,34 @@ static ConstraintFix *fixPropertyWrapperFailure(
     if (baseTy->is<TypeVariableType>() || type->is<TypeVariableType>())
       return nullptr;
 
-    if (!attemptFix(*resolvedOverload, decl, type))
+    if (!attemptFix(*resolvedOverload, VD, type))
       return nullptr;
 
     switch (fix) {
     case Fix::ProjectedValue:
     case Fix::PropertyWrapper:
-      return UsePropertyWrapper::create(cs, decl, fix == Fix::ProjectedValue,
-                                        baseTy, toType.value_or(type),
-                                        locator);
+      return UsePropertyWrapper::create(cs, VD, fix == Fix::ProjectedValue,
+                                        baseTy, toType.value_or(type), locator);
 
     case Fix::WrappedValue:
-      return UseWrappedValue::create(cs, decl, baseTy, toType.value_or(type),
+      return UseWrappedValue::create(cs, VD, baseTy, toType.value_or(type),
                                      locator);
     }
     llvm_unreachable("Unhandled Fix type in switch");
   };
 
-  if (auto projection =
-          cs.getPropertyWrapperProjectionInfo(*resolvedOverload)) {
-    if (auto *fix = applyFix(Fix::ProjectedValue, projection->first,
-                             projection->second))
+  if (auto projectTy = cs.getPropertyWrapperProjectionType(*resolvedOverload)) {
+    if (auto *fix = applyFix(Fix::ProjectedValue, projectTy))
       return fix;
   }
 
-  if (auto wrapper = cs.getPropertyWrapperInformation(*resolvedOverload)) {
-    if (auto *fix =
-            applyFix(Fix::PropertyWrapper, wrapper->first, wrapper->second))
+  if (auto backingTy = cs.getPropertyWrapperBackingType(*resolvedOverload)) {
+    if (auto *fix = applyFix(Fix::PropertyWrapper, backingTy))
       return fix;
   }
 
-  if (auto wrappedProperty =
-          cs.getWrappedPropertyInformation(*resolvedOverload)) {
-    if (auto *fix = applyFix(Fix::WrappedValue, wrappedProperty->first,
-                             wrappedProperty->second))
+  if (auto wrappedTy = cs.getWrappedPropertyType(*resolvedOverload)) {
+    if (auto *fix = applyFix(Fix::WrappedValue, wrappedTy))
       return fix;
   }
 
@@ -7471,21 +7470,28 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Error:
       return getTypeMatchFailure(locator);
 
+    // BuiltinGenericType subclasses
     case TypeKind::BuiltinFixedArray: {
-      auto *fixed1 = cast<BuiltinFixedArrayType>(desugar1);
-      auto *fixed2 = cast<BuiltinFixedArrayType>(desugar2);
+      auto *fixed1 = cast<BuiltinGenericType>(desugar1);
+      auto *fixed2 = cast<BuiltinGenericType>(desugar2);
+      if (fixed1->getBuiltinTypeKind() != fixed2->getBuiltinTypeKind()) {
+        return getTypeMatchFailure(locator);
+      }
 
-      auto result = matchTypes(fixed1->getSize(), fixed2->getSize(),
-                               ConstraintKind::Bind, subflags,
-                               locator.withPathElement(
-                                   LocatorPathElt::GenericArgument(0)));
-      if (result.isFailure())
-        return result;
+      auto result = ConstraintSystem::TypeMatchResult::success();
+      for (unsigned i
+            : indices(fixed1->getSubstitutions().getReplacementTypes())) {
+        result = matchTypes(fixed1->getSubstitutions().getReplacementTypes()[i],
+                            fixed2->getSubstitutions().getReplacementTypes()[i],
+                            ConstraintKind::Bind, subflags,
+                            locator.withPathElement(
+                                   LocatorPathElt::GenericArgument(i)));
+        if (result.isFailure()) {
+          return result;
+        }
+      }
 
-      return matchTypes(fixed1->getElementType(), fixed2->getElementType(),
-                        ConstraintKind::Bind, subflags,
-                        locator.withPathElement(
-                            LocatorPathElt::GenericArgument(0)));
+      return result;
     }
 
     case TypeKind::Placeholder: {
@@ -8098,191 +8104,189 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
   }
 
-  if (kind >= ConstraintKind::Conversion) {
+  // Pointer arguments can be converted from pointer-compatible types.
+  if (kind >= ConstraintKind::ArgumentConversion) {
     // It is never legal to form an autoclosure that results in these
     // implicit conversions to pointer types.
     bool isAutoClosureArgument = locator.isForAutoclosureResult();
 
-    // Pointer arguments can be converted from pointer-compatible types.
-    if (kind >= ConstraintKind::ArgumentConversion) {
-      Type unwrappedType2 = type2;
-      bool type2IsOptional = false;
-      if (Type unwrapped = type2->getOptionalObjectType()) {
-        type2IsOptional = true;
-        unwrappedType2 = unwrapped;
-      }
-      PointerTypeKind pointerKind;
-      if (Type pointeeTy =
-              unwrappedType2->getAnyPointerElementType(pointerKind)) {
-        switch (pointerKind) {
-        case PTK_UnsafeRawPointer:
-        case PTK_UnsafeMutableRawPointer:
-        case PTK_UnsafePointer:
-        case PTK_UnsafeMutablePointer:
-          // UnsafeMutablePointer can be converted from an inout reference to a
-          // scalar or array.
-          if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
+    Type unwrappedType2 = type2;
+    bool type2IsOptional = false;
+    if (Type unwrapped = type2->getOptionalObjectType()) {
+      type2IsOptional = true;
+      unwrappedType2 = unwrapped;
+    }
+    PointerTypeKind pointerKind;
+    if (Type pointeeTy =
+            unwrappedType2->getAnyPointerElementType(pointerKind)) {
+      switch (pointerKind) {
+      case PTK_UnsafeRawPointer:
+      case PTK_UnsafeMutableRawPointer:
+      case PTK_UnsafePointer:
+      case PTK_UnsafeMutablePointer:
+        // UnsafeMutablePointer can be converted from an inout reference to a
+        // scalar or array.
+        if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
+          if (!isAutoClosureArgument) {
+            auto inoutBaseType = getFixedTypeRecursive(
+                inoutType1->getInOutObjectType(), /*wantRValue=*/true);
+
+            // Wait until the base type of `inout` is sufficiently resolved
+            // before making any assessments regarding conversions.
+            if (inoutBaseType->isTypeVariableOrMember())
+              return formUnsolvedResult();
+
+            auto baseIsArray = inoutBaseType->isArray();
+
+            if (baseIsArray)
+              conversionsOrFixes.push_back(
+                  ConversionRestrictionKind::ArrayToPointer);
+
+            // Only try an inout-to-pointer conversion if we know it's not
+            // an array being converted to a raw pointer type. Such
+            // conversions can only use array-to-pointer.
+            if (!baseIsArray || !isRawPointerKind(pointerKind)) {
+              conversionsOrFixes.push_back(
+                  ConversionRestrictionKind::InoutToPointer);
+
+              // If regular inout-to-pointer conversion doesn't work,
+              // let's try C pointer conversion that has special semantics
+              // for imported declarations.
+              if (isArgumentOfImportedDecl(locator)) {
+                conversionsOrFixes.push_back(
+                    baseIsArray ? ConversionRestrictionKind::ArrayToCPointer
+                                : ConversionRestrictionKind::InoutToCPointer);
+              }
+            }
+          }
+        }
+
+        // Operators cannot use these implicit conversions.
+        if (kind == ConstraintKind::ArgumentConversion) {
+          // We can potentially convert from an UnsafeMutablePointer
+          // of a different type, if we're a void pointer.
+          Type unwrappedType1 = type1;
+          bool type1IsOptional = false;
+          if (Type unwrapped = type1->getOptionalObjectType()) {
+            type1IsOptional = true;
+            unwrappedType1 = unwrapped;
+          }
+
+          // Don't handle normal optional-related conversions here.
+          if (unwrappedType1->isEqual(unwrappedType2))
+            break;
+
+          PointerTypeKind type1PointerKind;
+          bool type1IsPointer{
+              unwrappedType1->getAnyPointerElementType(type1PointerKind)};
+          bool optionalityMatches = !type1IsOptional || type2IsOptional;
+          if (type1IsPointer && optionalityMatches) {
+            if (type1PointerKind == PTK_UnsafeMutablePointer) {
+              // Favor an UnsafeMutablePointer-to-UnsafeMutablePointer
+              // conversion.
+              if (type1PointerKind != pointerKind)
+                increaseScore(ScoreKind::SK_ValueToPointerConversion,
+                              locator);
+              conversionsOrFixes.push_back(
+                ConversionRestrictionKind::PointerToPointer);
+            }
+            // UnsafeMutableRawPointer -> UnsafeRawPointer
+            else if (type1PointerKind == PTK_UnsafeMutableRawPointer &&
+                     pointerKind == PTK_UnsafeRawPointer) {
+              if (type1PointerKind != pointerKind)
+                increaseScore(ScoreKind::SK_ValueToPointerConversion,
+                              locator);
+              conversionsOrFixes.push_back(
+                ConversionRestrictionKind::PointerToPointer);
+            }
+          }
+          // UnsafePointer and UnsafeRawPointer can also be converted from an
+          // array or string value, or a UnsafePointer or
+          // AutoreleasingUnsafeMutablePointer.
+          if (pointerKind == PTK_UnsafePointer
+              || pointerKind == PTK_UnsafeRawPointer) {
             if (!isAutoClosureArgument) {
-              auto inoutBaseType = getFixedTypeRecursive(
-                  inoutType1->getInOutObjectType(), /*wantRValue=*/true);
-
-              // Wait until the base type of `inout` is sufficiently resolved
-              // before making any assessments regarding conversions.
-              if (inoutBaseType->isTypeVariableOrMember())
-                return formUnsolvedResult();
-
-              auto baseIsArray = inoutBaseType->isArray();
-
-              if (baseIsArray)
+              if (type1->isArray()) {
                 conversionsOrFixes.push_back(
                     ConversionRestrictionKind::ArrayToPointer);
 
-              // Only try an inout-to-pointer conversion if we know it's not
-              // an array being converted to a raw pointer type. Such
-              // conversions can only use array-to-pointer.
-              if (!baseIsArray || !isRawPointerKind(pointerKind)) {
-                conversionsOrFixes.push_back(
-                    ConversionRestrictionKind::InoutToPointer);
-
-                // If regular inout-to-pointer conversion doesn't work,
+                // If regular array-to-pointer conversion doesn't work,
                 // let's try C pointer conversion that has special semantics
                 // for imported declarations.
                 if (isArgumentOfImportedDecl(locator)) {
                   conversionsOrFixes.push_back(
-                      baseIsArray ? ConversionRestrictionKind::ArrayToCPointer
-                                  : ConversionRestrictionKind::InoutToCPointer);
+                      ConversionRestrictionKind::ArrayToCPointer);
                 }
               }
-            }
-          }
 
-          // Operators cannot use these implicit conversions.
-          if (kind == ConstraintKind::ArgumentConversion) {
-            // We can potentially convert from an UnsafeMutablePointer
-            // of a different type, if we're a void pointer.
-            Type unwrappedType1 = type1;
-            bool type1IsOptional = false;
-            if (Type unwrapped = type1->getOptionalObjectType()) {
-              type1IsOptional = true;
-              unwrappedType1 = unwrapped;
-            }
+              // The pointer can be converted from a string, if the element
+              // type is compatible.
+              auto &ctx = getASTContext();
+              if (type1->isString()) {
+                auto baseTy = getFixedTypeRecursive(pointeeTy, false);
 
-            // Don't handle normal optional-related conversions here.
-            if (unwrappedType1->isEqual(unwrappedType2))
-              break;
-
-            PointerTypeKind type1PointerKind;
-            bool type1IsPointer{
-                unwrappedType1->getAnyPointerElementType(type1PointerKind)};
-            bool optionalityMatches = !type1IsOptional || type2IsOptional;
-            if (type1IsPointer && optionalityMatches) {
-              if (type1PointerKind == PTK_UnsafeMutablePointer) {
-                // Favor an UnsafeMutablePointer-to-UnsafeMutablePointer
-                // conversion.
-                if (type1PointerKind != pointerKind)
-                  increaseScore(ScoreKind::SK_ValueToPointerConversion,
-                                locator);
-                conversionsOrFixes.push_back(
-                  ConversionRestrictionKind::PointerToPointer);
-              }
-              // UnsafeMutableRawPointer -> UnsafeRawPointer
-              else if (type1PointerKind == PTK_UnsafeMutableRawPointer &&
-                       pointerKind == PTK_UnsafeRawPointer) {
-                if (type1PointerKind != pointerKind)
-                  increaseScore(ScoreKind::SK_ValueToPointerConversion,
-                                locator);
-                conversionsOrFixes.push_back(
-                  ConversionRestrictionKind::PointerToPointer);              
-              }
-            }
-            // UnsafePointer and UnsafeRawPointer can also be converted from an
-            // array or string value, or a UnsafePointer or
-            // AutoreleasingUnsafeMutablePointer.
-            if (pointerKind == PTK_UnsafePointer
-                || pointerKind == PTK_UnsafeRawPointer) {
-              if (!isAutoClosureArgument) {
-                if (type1->isArray()) {
+                if (baseTy->isTypeVariableOrMember() ||
+                    isStringCompatiblePointerBaseType(ctx, baseTy))
                   conversionsOrFixes.push_back(
-                      ConversionRestrictionKind::ArrayToPointer);
-
-                  // If regular array-to-pointer conversion doesn't work,
-                  // let's try C pointer conversion that has special semantics
-                  // for imported declarations.
-                  if (isArgumentOfImportedDecl(locator)) {
-                    conversionsOrFixes.push_back(
-                        ConversionRestrictionKind::ArrayToCPointer);
-                  }
-                }
-
-                // The pointer can be converted from a string, if the element
-                // type is compatible.
-                auto &ctx = getASTContext();
-                if (type1->isString()) {
-                  auto baseTy = getFixedTypeRecursive(pointeeTy, false);
-
-                  if (baseTy->isTypeVariableOrMember() ||
-                      isStringCompatiblePointerBaseType(ctx, baseTy))
-                    conversionsOrFixes.push_back(
-                        ConversionRestrictionKind::StringToPointer);
-                }
-              }
-              
-              if (type1IsPointer && optionalityMatches &&
-                  (type1PointerKind == PTK_UnsafePointer ||
-                   type1PointerKind == PTK_AutoreleasingUnsafeMutablePointer)) {
-                conversionsOrFixes.push_back(
-                                   ConversionRestrictionKind::PointerToPointer);
+                      ConversionRestrictionKind::StringToPointer);
               }
             }
 
-            // If both sides are non-optional pointers, let's check whether
-            // this argument supports Swift -> C pointer conversions.
-            //
-            // Do some light verification before recording restriction to
-            // avoid allocating constraints for obviously invalid cases.
-            if (type1IsPointer && !type1IsOptional && !type2IsOptional &&
-                (shouldAttemptFixes() || isArgumentOfImportedDecl(locator))) {
-              // UnsafeRawPointer -> UnsafePointer<[U]Int8>
-              if (type1PointerKind == PTK_UnsafeRawPointer &&
-                  pointerKind == PTK_UnsafePointer) {
-                conversionsOrFixes.push_back(
-                    ConversionRestrictionKind::PointerToCPointer);
-              }
-
-              // UnsafeMutableRawPointer -> Unsafe[Mutable]Pointer<[U]Int8>
-              if (type1PointerKind == PTK_UnsafeMutableRawPointer &&
-                  (pointerKind == PTK_UnsafePointer ||
-                   pointerKind == PTK_UnsafeMutablePointer)) {
-                conversionsOrFixes.push_back(
-                    ConversionRestrictionKind::PointerToCPointer);
-              }
-
-              // Unsafe[Mutable]Pointer -> Unsafe[Mutable]Pointer
-              if (type1PointerKind == PTK_UnsafePointer &&
-                  pointerKind == PTK_UnsafePointer) {
-                conversionsOrFixes.push_back(
-                    ConversionRestrictionKind::PointerToCPointer);
-              }
-
-              if (type1PointerKind == PTK_UnsafeMutablePointer &&
-                  (pointerKind == PTK_UnsafePointer ||
-                   pointerKind == PTK_UnsafeMutablePointer)) {
-                conversionsOrFixes.push_back(
-                    ConversionRestrictionKind::PointerToCPointer);
-              }
+            if (type1IsPointer && optionalityMatches &&
+                (type1PointerKind == PTK_UnsafePointer ||
+                 type1PointerKind == PTK_AutoreleasingUnsafeMutablePointer)) {
+              conversionsOrFixes.push_back(
+                                 ConversionRestrictionKind::PointerToPointer);
             }
           }
-          break;
 
-        case PTK_AutoreleasingUnsafeMutablePointer:
-          // PTK_AutoreleasingUnsafeMutablePointer can be converted from an
-          // inout reference to a scalar.
-          if (!isAutoClosureArgument && type1->is<InOutType>()) {
-            conversionsOrFixes.push_back(
-                                     ConversionRestrictionKind::InoutToPointer);
+          // If both sides are non-optional pointers, let's check whether
+          // this argument supports Swift -> C pointer conversions.
+          //
+          // Do some light verification before recording restriction to
+          // avoid allocating constraints for obviously invalid cases.
+          if (type1IsPointer && !type1IsOptional && !type2IsOptional &&
+              (shouldAttemptFixes() || isArgumentOfImportedDecl(locator))) {
+            // UnsafeRawPointer -> UnsafePointer<[U]Int8>
+            if (type1PointerKind == PTK_UnsafeRawPointer &&
+                pointerKind == PTK_UnsafePointer) {
+              conversionsOrFixes.push_back(
+                  ConversionRestrictionKind::PointerToCPointer);
+            }
+
+            // UnsafeMutableRawPointer -> Unsafe[Mutable]Pointer<[U]Int8>
+            if (type1PointerKind == PTK_UnsafeMutableRawPointer &&
+                (pointerKind == PTK_UnsafePointer ||
+                 pointerKind == PTK_UnsafeMutablePointer)) {
+              conversionsOrFixes.push_back(
+                  ConversionRestrictionKind::PointerToCPointer);
+            }
+
+            // Unsafe[Mutable]Pointer -> Unsafe[Mutable]Pointer
+            if (type1PointerKind == PTK_UnsafePointer &&
+                pointerKind == PTK_UnsafePointer) {
+              conversionsOrFixes.push_back(
+                  ConversionRestrictionKind::PointerToCPointer);
+            }
+
+            if (type1PointerKind == PTK_UnsafeMutablePointer &&
+                (pointerKind == PTK_UnsafePointer ||
+                 pointerKind == PTK_UnsafeMutablePointer)) {
+              conversionsOrFixes.push_back(
+                  ConversionRestrictionKind::PointerToCPointer);
+            }
           }
-          break;
         }
+        break;
+
+      case PTK_AutoreleasingUnsafeMutablePointer:
+        // PTK_AutoreleasingUnsafeMutablePointer can be converted from an
+        // inout reference to a scalar.
+        if (!isAutoClosureArgument && type1->is<InOutType>()) {
+          conversionsOrFixes.push_back(
+                                   ConversionRestrictionKind::InoutToPointer);
+        }
+        break;
       }
     }
   }
@@ -8627,6 +8631,9 @@ ConstraintSystem::simplifyConstructionConstraint(
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
   addValueMemberConstraint(MetatypeType::get(valueType, getASTContext()),
+                           // OK: simplifyConstructionConstraint() is only used
+                           // for `T(...)` init calls, not `T.init(...)` calls,
+                           // so there's no module selector on `init`.
                            DeclNameRef::createConstructor(),
                            memberType,
                            useDC, functionRefInfo,
@@ -9025,7 +9032,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           return SolutionKind::Solved;
         };
 
-        if (witness->isGeneric()) {
+        if (witness->hasGenericParamList()) {
           // `DistributedActorSystem.remoteCall`
           if (witness->isDistributedActorSystemRemoteCall(/*isVoidReturn=*/false)) {
             if (GP->isEqual(cast<FuncDecl>(witness)->getResultInterfaceType()))
@@ -9962,13 +9969,13 @@ ConstraintSystem::matchPackElementType(Type elementType, Type patternType,
   }
 
   auto shapeParam = CanGenericTypeParamType(cast<GenericTypeParamType>(
-      shapeClass->mapTypeOutOfContext()->getCanonicalType()));
+      shapeClass->mapTypeOutOfEnvironment()->getCanonicalType()));
 
   auto *genericEnv = getPackExpansionEnvironment(packExpansion);
   if (genericEnv) {
     if (shapeParam != genericEnv->getOpenedElementShapeClass()) {
       return tryFix([&]() {
-        auto envShape = genericEnv->mapTypeIntoContext(
+        auto envShape = genericEnv->mapTypeIntoEnvironment(
             genericEnv->getOpenedElementShapeClass());
         if (auto *pack = dyn_cast<PackType>(envShape))
           envShape = pack->unwrapSingletonPackExpansion()->getPatternType();
@@ -10278,8 +10285,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // high.
     if (auto *args = getArgumentList(memberLocator)) {
       SmallVector<Identifier, 4> scratch;
-      memberName.getFullName() = DeclName(ctx, memberName.getBaseName(),
-                                          args->getArgumentLabels(scratch));
+      memberName = memberName.withArgumentLabels(
+                                  ctx, args->getArgumentLabels(scratch));
     }
   }
 
@@ -10298,8 +10305,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       }
     }
 
-    DeclName unprefixedName(context, memberName.getBaseName(), lookupLabels);
-    lookupName = DeclNameRef(unprefixedName);
+    lookupName = lookupName.withArgumentLabels(context, lookupLabels);
   }
 
   // Look for members within the base.
@@ -10944,8 +10950,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   }
 
   // If we have no viable or unviable candidates, and we're generating,
-  // diagnostics, rerun the query with inaccessible members included, so we can
-  // include them in the unviable candidates list.
+  // diagnostics, rerun the query with various excluded members included, so we
+  // can include them in the unviable candidates list.
   if (result.ViableCandidates.empty() && result.UnviableCandidates.empty() &&
       includeInaccessibleMembers) {
     NameLookupOptions lookupOptions =
@@ -10954,7 +10960,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // Local function that looks up additional candidates using the given lookup
     // options, recording the results as unviable candidates.
     auto lookupUnviable =
-        [&](NameLookupOptions lookupOptions,
+        [&](DeclNameRef memberName,
+            NameLookupOptions lookupOptions,
             MemberLookupResult::UnviableReason reason) -> bool {
       auto lookup = TypeChecker::lookupMember(DC, instanceTy, memberName,
                                               memberLoc, lookupOptions);
@@ -10978,9 +10985,20 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       return !lookup.empty();
     };
 
+    // Look for members that were excluded because of a module selector.
+    if (memberName.hasModuleSelector()) {
+      DeclNameRef unqualifiedMemberName{memberName.getFullName()};
+
+      if (lookupUnviable(unqualifiedMemberName,
+                         lookupOptions,
+                         MemberLookupResult::UR_WrongModule))
+        return result;
+    }
+
     // Ignore access control so we get candidates that might have been missed
     // before.
-    if (lookupUnviable(lookupOptions | NameLookupFlags::IgnoreAccessControl,
+    if (lookupUnviable(memberName,
+                       lookupOptions | NameLookupFlags::IgnoreAccessControl,
                        MemberLookupResult::UR_Inaccessible))
       return result;
   }
@@ -11180,6 +11198,11 @@ static ConstraintFix *fixMemberRef(
                        cs, baseTy, choice.getDecl(), memberName, locator)
                  : nullptr;
     }
+
+    case MemberLookupResult::UR_WrongModule:
+      ASSERT(choice.isDecl());
+      return AllowMemberFromWrongModule::create(cs, baseTy, choice.getDecl(),
+                                                memberName, locator);
 
     case MemberLookupResult::UR_Inaccessible:
       assert(choice.isDecl());
@@ -11748,7 +11771,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     if (auto archetype =
             baseTy->getMetatypeInstanceType()->getAs<ArchetypeType>()) {
       if (auto genericTy =
-              archetype->mapTypeOutOfContext()->getAs<GenericTypeParamType>()) {
+              archetype->mapTypeOutOfEnvironment()->getAs<GenericTypeParamType>()) {
         for (auto param : DC->getGenericSignatureOfContext()
                               .getGenericParams()) {
           // Find a param at the same depth and one index past the type we're
@@ -15398,7 +15421,23 @@ static void increaseScoreForGenericParamPointerConversion(
     return;
 
   // Check to see if the parameter is a generic parameter, or dependent member.
-  auto paramTy = param->getInterfaceType()->lookThroughAllOptionalTypes();
+  // Look though optionals and pack expansions.
+  auto paramTy = param->getInterfaceType();
+  while (true) {
+    paramTy = paramTy->lookThroughAllOptionalTypes();
+    if (auto packExpansion = paramTy->getAs<PackExpansionType>()) {
+      paramTy = packExpansion->getPatternType();
+      continue;
+    }
+    // Also look through "vanishing" tuples.
+    if (auto *tupleTy = paramTy->getAs<TupleType>()) {
+      if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).hasName()) {
+        paramTy = tupleTy->getElement(0).getType();
+        continue;
+      }
+    }
+    break;
+  }
   if (!paramTy->isTypeParameter())
     return;
 
@@ -16180,6 +16219,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInvalidInitRef:
   case FixKind::AllowClosureParameterDestructuring:
   case FixKind::AllowInaccessibleMember:
+  case FixKind::AllowMemberFromWrongModule:
   case FixKind::AllowAnyObjectKeyPathRoot:
   case FixKind::AllowMultiArgFuncKeyPathMismatch:
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:

@@ -245,9 +245,6 @@ namespace swift {
     // Availability macros definitions to be expanded at parsing.
     SmallVector<std::string, 4> AvailabilityMacros;
 
-    /// Require public declarations to declare that they are Sendable (or not).
-    bool RequireExplicitSendable = false;
-
     /// Detect and automatically import modules' cross-import overlays.
     bool EnableCrossImportOverlays = false;
 
@@ -272,9 +269,6 @@ namespace swift {
 
     /// Emit a remark when indexing a system module.
     bool EnableIndexingSystemModuleRemarks = false;
-
-    /// Emit a remark on early exit in explicit interface build
-    bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
 
     ///
     /// Support for alternate usage modes
@@ -654,6 +648,9 @@ namespace swift {
     /// Enables dumping macro expansions.
     bool DumpMacroExpansions = false;
 
+    /// Emits a remark with the content of each macro expansion line, for matching with -verify
+    bool RemarkMacroExpansions = false;
+
     /// Enables dumping imports for each SourceFile.
     bool DumpSourceFileImports = false;
 
@@ -1021,7 +1018,7 @@ namespace swift {
     bool SolverDisableSplitter = false;
 
     /// Enable the experimental "prepared overloads" optimization.
-    bool SolverEnablePreparedOverloads = false;
+    bool SolverEnablePreparedOverloads = true;
   };
 
   /// Options for controlling the behavior of the Clang importer.

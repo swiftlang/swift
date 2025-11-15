@@ -59,6 +59,6 @@ swiftUser()
 // CHECK-NOT: apply [[SWIFT_FUNC]]() : $@convention(thin) () -> ()
 
 clangUser()
-// CHECK: [[CLANG_FUNC:%.*]] = function_ref @ShadowedFunc : $@convention(c) () -> ()
+// CHECK: [[CLANG_FUNC:%.*]] = function_ref @$sSo12ShadowedFuncyyFTo : $@convention(c) () -> ()
 // CHECK: apply [[CLANG_FUNC]]() : $@convention(c) () -> ()
 // CHECK-NOT: apply [[CLANG_FUNC]]() : $@convention(c) () -> ()

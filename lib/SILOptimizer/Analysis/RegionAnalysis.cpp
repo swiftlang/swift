@@ -538,34 +538,23 @@ static bool isAsyncLetBeginPartialApply(PartialApplyInst *pai) {
 
 /// Returns true if this is a function argument that is able to be sent in the
 /// body of our function.
+///
+/// Needs to stay in sync with SILIsolationInfo::get(SILArgument *).
 static bool canFunctionArgumentBeSent(SILFunctionArgument *arg) {
   // Indirect out parameters can never be sent.
   if (arg->isIndirectResult() || arg->isIndirectErrorResult())
     return false;
 
-  // If we have a function argument that is closure captured by a Sendable
-  // closure, allow for the argument to be sent.
-  //
-  // DISCUSSION: The reason that we do this is that in the case of us
-  // having an actual Sendable closure there are two cases we can see:
-  //
-  // 1. If we have an actual Sendable closure, the AST will emit an
-  // earlier error saying that we are capturing a non-Sendable value in a
-  // Sendable closure. So we want to squelch the error that we would emit
-  // otherwise. This only occurs when we are not in swift-6 mode since in
-  // swift-6 mode we will error on the earlier error... but in the case of
-  // us not being in swift 6 mode lets not emit extra errors.
-  //
-  // 2. If we have an async-let based Sendable closure, we want to allow
-  // for the argument to be sent in the async let's statement and
-  // not emit an error.
-  //
-  // TODO: Once the async let refactoring change this will no longer be needed
-  // since closure captures will have sending parameters and be
-  // non-Sendable.
-  if (arg->isClosureCapture() &&
-      arg->getFunction()->getLoweredFunctionType()->isSendable())
-    return true;
+  // If we have a closure capture...
+  if (arg->isClosureCapture()) {
+    // And that closure capture is from an async let, treat it as sending. This
+    // is because we allow for disconnected values to be sent into async let
+    // closures.
+    if (auto declRef = arg->getFunction()->getDeclRef();
+        declRef && declRef.isAsyncLetClosure) {
+      return true;
+    }
+  }
 
   // Otherwise, we only allow for the argument to be sent if it is explicitly
   // marked as a 'sending' parameter.
@@ -2993,7 +2982,7 @@ public:
   /// dest to src. If the \p dest could be aliased, then we must instead treat
   /// them as merges, to ensure any aliases of \p dest are also updated.
   void translateSILStore(Operand *dest, Operand *src,
-                          SILIsolationInfo resultIsolationInfoOverride = {}) {
+                         SILIsolationInfo resultIsolationInfoOverride = {}) {
     SILValue destValue = dest->get();
 
     if (auto destResult = tryToTrackValue(destValue)) {
@@ -3021,7 +3010,14 @@ public:
                                resultIsolationInfoOverride);
     }
 
-    // Stores to storage of non-Sendable type can be ignored.
+    // If we reached this point, our destination is something that is Sendable
+    // and is not an address that comes from a non-Sendable base... so we can
+    // ignore the store part. But we still need tosee if our src (which also
+    // must be Sendable) comes from a non-Sendable base. In such a case, we need
+    // to require that.
+    if (auto srcResult = tryToTrackValue(src->get())) {
+      builder.addRequire(*srcResult);
+    }
   }
 
   void translateSILTupleAddrConstructor(TupleAddrConstructorInst *inst) {

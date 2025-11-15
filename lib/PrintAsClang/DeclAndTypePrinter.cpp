@@ -1574,7 +1574,7 @@ private:
     }
     os << "\n";
     if (representation.isObjCxxOnly())
-      os << "#endif\n";
+      os << "#endif // defined(__OBJC__)\n";
     return representation;
   }
 
@@ -1684,7 +1684,7 @@ private:
         FD->getParameters(), funcTy->isThrowing(), funcTy);
     os << "}\n";
     if (result.isObjCxxOnly())
-      os << "#endif\n";
+      os << "#endif // defined(__OBJC__)\n";
   }
 
   enum class PrintLeadingSpace : bool {
@@ -1820,6 +1820,14 @@ public:
         break;
       case PlatformKind::visionOSApplicationExtension:
         plat = "visionos_app_extension";
+        break;
+      case PlatformKind::DriverKit:
+        plat = "driverkit";
+        break;
+      case PlatformKind::Swift:
+      case PlatformKind::anyAppleOS:
+        // FIXME: [runtime availability] Figure out how to support this.
+        ASSERT(0);
         break;
       case PlatformKind::FreeBSD:
         plat = "freebsd";
@@ -2373,7 +2381,7 @@ private:
 
     if (auto *clangTypeDecl =
           dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
-      assert(!alias->isGeneric()
+      assert(!alias->hasGenericParamList()
              && "generic typealias backed by clang typedecl?");
 
       maybePrintTagKeyword(alias);
@@ -2383,7 +2391,7 @@ private:
         printNullability(optionalKind);
     } else if (auto *clangObjCClass
                = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
-      assert(!alias->isGeneric()
+      assert(!alias->hasGenericParamList()
              && "generic typealias backed by clang interface?");
 
       os << clangObjCClass->getName() << " *";
@@ -2705,7 +2713,7 @@ private:
 
     if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
       const ClassDecl *extendedClass = extension->getSelfClassDecl();
-      assert(extendedClass->isGeneric());
+      assert(extendedClass->hasGenericParamList());
       assert(extension->getGenericParams()->size() ==
              extendedClass->getGenericParams()->size() &&
              "extensions with custom generic parameters?");

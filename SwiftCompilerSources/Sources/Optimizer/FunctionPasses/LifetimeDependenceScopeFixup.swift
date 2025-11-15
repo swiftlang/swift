@@ -142,6 +142,10 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
 
 private extension Type {
   func mayHaveMutableSpan(in function: Function, _ context: FunctionPassContext) -> Bool {
+    // Escapable and Copyable types cannot have MutableSpan
+    if isEscapable || !isMoveOnly {
+      return false
+    }
     if hasArchetype {
       return true
     }
@@ -176,6 +180,24 @@ private extension Type {
     }
     return false
   }
+
+  // Returns true if a type maybe Array/ArraySlice/ContiguousArray which are optimized COW types.
+  // The standard library introduces builtins begin_cow_mutation/end_cow_mutation for such types which are then used to optimize uniqueness checks.
+  func mayHaveOptimizedCOWType(in function: Function) -> Bool {
+    // Trivial types cannot be Array/ArraySlice/ContiguousArray.
+    if isTrivial(in: function) {
+      return false
+    }
+    // Builtin types do not contain Array/ArraySlice/ContiguousArray.
+    if isBuiltinType {
+      return false
+    }
+    // ~Copyable types cannot contain Array/ArraySlice/ContiguousArray.
+    if isMoveOnly {
+      return false
+    }
+    return true
+  }
 }
 
 /// Insert end_cow_mutation_addr for lifetime dependent values that maybe of type MutableSpan and depend on a mutable address.
@@ -203,7 +225,8 @@ private func createEndCOWMutationIfNeeded(lifetimeDep: LifetimeDependence, _ con
       return
   }
 
-  guard lifetimeDep.dependentValue.type.mayHaveMutableSpan(in: lifetimeDep.dependentValue.parentFunction, context) else {
+  guard lifetimeDep.dependentValue.type.mayHaveMutableSpan(in: lifetimeDep.dependentValue.parentFunction, context) &&
+    lifetimeDep.parentValue.type.mayHaveOptimizedCOWType(in: lifetimeDep.dependentValue.parentFunction) else {
     return
   }
 
@@ -894,7 +917,7 @@ extension ExtendableScope {
         assert(end.parentBlock.singleSuccessor!.terminator is ReturnInst,
                "a phi only ends a use range if it is a returned value")
         fallthrough
-      case is ReturnInst:
+      case is ReturnInstruction:
         // End this inner scope just before the return. The mark_dependence base operand will be redirected to a
         // function argument.
         let builder = Builder(before: end, location: location, context)

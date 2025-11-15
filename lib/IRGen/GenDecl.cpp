@@ -1561,8 +1561,8 @@ void IRGenerator::addLazyGlobalVariable(SILGlobalVariable *v) {
   assert(!FinishedEmittingLazyDefinitions);
   LazyGlobalVariables.push_back(v);
 
-  if (auto decl = v->getDecl()) {
-    if (decl->getDeclContext()->getParentSourceFile())
+  if (auto dc = v->getDeclContext()) {
+    if (dc->getParentSourceFile())
       return;
   }
 
@@ -2201,7 +2201,7 @@ void IRGenModule::emitVTableStubs() {
                                     &Module);
       ApplyIRLinkage(canLinkOnce ? IRLinkage::InternalLinkOnceODR
                                  : IRLinkage::Internal)
-          .to(stub);
+          .to(stub, /* nonAliasedDefinition */ false);
       stub->setAttributes(constructInitialAttributes());
       stub->setCallingConv(DefaultCC);
       auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
@@ -3600,7 +3600,7 @@ llvm::CallBase *swift::irgen::emitCXXConstructorCall(
 bool swift::irgen::hasValidSignatureForEmbedded(SILFunction *f) {
   auto s = f->getLoweredFunctionType()->getInvocationGenericSignature();
   for (auto genParam : s.getGenericParams()) {
-    auto mappedParam = f->getGenericEnvironment()->mapTypeIntoContext(genParam);
+    auto mappedParam = f->getGenericEnvironment()->mapTypeIntoEnvironment(genParam);
     if (auto archeTy = dyn_cast<ArchetypeType>(mappedParam)) {
       if (archeTy->requiresClass())
         continue;

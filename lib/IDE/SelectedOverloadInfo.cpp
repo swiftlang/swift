@@ -59,7 +59,7 @@ swift::ide::getSelectedOverloadInfo(const Solution &S,
           Params[0].getPlainType()->is<ErrorType>()) {
         auto *KPDecl = CS.getASTContext().getKeyPathDecl();
         Type KPTy =
-            KPDecl->mapTypeIntoContext(KPDecl->getDeclaredInterfaceType());
+            KPDecl->mapTypeIntoEnvironment(KPDecl->getDeclaredInterfaceType());
         Type KPValueTy = KPTy->castTo<BoundGenericType>()->getGenericArgs()[1];
         KPTy =
             BoundGenericType::get(KPDecl, Type(), {Result.BaseTy, KPValueTy});

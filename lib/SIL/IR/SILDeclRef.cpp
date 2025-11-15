@@ -505,14 +505,14 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::Deallocator:
   case Kind::IsolatedDeallocator:
   case Kind::Destroyer: {
-    // @_alwaysEmitIntoClient declarations are like the default arguments of
+    // Always-emit-into-client declarations are like the default arguments of
     // public functions; they are roots for dead code elimination and have
     // serialized bodies, but no public symbol in the generated binary.
-    if (d->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    if (d->isAlwaysEmittedIntoClient())
       return Limit::AlwaysEmitIntoClient;
     if (auto accessor = dyn_cast<AccessorDecl>(d)) {
       auto *storage = accessor->getStorage();
-      if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      if (storage->isAlwaysEmittedIntoClient())
         return Limit::AlwaysEmitIntoClient;
     }
     break;
@@ -1025,7 +1025,8 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
     // @objc thunks for top-level functions are serializable since they're
     // referenced from @convention(c) conversions inside inlinable
     // functions.
-    return IsSerialized;
+    if (isThunk())
+      return IsSerialized;
   }
 
   // Declarations imported from Clang modules are serialized if
@@ -1192,13 +1193,13 @@ bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   if (!decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return false;
 
-  // If the declaration is marked as @_neverEmitIntoClient, it has a unique
-  // definition.
+  // If the declaration is marked as never being emitted into the client, it
+  // has a unique definition.
   if (decl->isNeverEmittedIntoClient())
     return false;
 
-  /// @_alwaysEmitIntoClient means that we have a non-unique definition.
-  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+  /// Always-emit-into-client means that we have a non-unique definition.
+  if (decl->isAlwaysEmittedIntoClient())
     return true;
 
   // If the declaration is marked in a manner that indicates that other
@@ -1386,18 +1387,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         silConfig);
   }
 
-  // As a special case, Clang functions and globals don't get mangled at all
-  // - except \c objc_direct decls.
-  if (hasDecl() && !isDefaultArgGenerator()) {
-    if (getDecl()->getClangDecl()) {
-      if (!isForeignToNativeThunk() && !isNativeToForeignThunk()) {
-        auto clangMangling = mangleClangDecl(getDecl(), isForeign);
-        if (!clangMangling.empty())
-          return clangMangling;
-      }
-    }
-  }
-
   // Mangle prespecializations.
   if (getSpecializedSignature()) {
     SILDeclRef nonSpecializedDeclRef = *this;
@@ -1442,23 +1431,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
       if (!NameA->Name.empty() && !isThunk()) {
         return NameA->Name.str();
       }
-
-    // Use a given cdecl name for native-to-foreign thunks. Don't do this
-    // for functions that only have a C entrypoint.
-    if (getDecl()->getAttrs().hasAttribute<CDeclAttr>() &&
-        !(getDecl()->hasOnlyCEntryPoint() &&
-          !getDecl()->getImplementedObjCDecl())) {
-      if (isNativeToForeignThunk() || isForeign) {
-        // If this is an @implementation @_cdecl, mangle it like the clang
-        // function it implements.
-        if (auto objcInterface = getDecl()->getImplementedObjCDecl()) {
-          auto clangMangling = mangleClangDecl(objcInterface, isForeign);
-          if (!clangMangling.empty())
-            return clangMangling;
-        }
-        return getDecl()->getCDeclName().str();
-      }
-    }
 
     if (SKind == ASTMangler::SymbolKind::DistributedThunk) {
       return mangler.mangleDistributedThunk(cast<FuncDecl>(getDecl()));
@@ -1547,13 +1519,33 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   llvm_unreachable("bad entity kind!");
 }
 
-std::optional<StringRef> SILDeclRef::getAsmName() const {
-  if (isForeign && isFunc()) {
-    auto func = getFuncDecl();
-    if (auto *EA = ExternAttr::find(func->getAttrs(), ExternKind::C))
-      return EA->getCName(func);
-    if (func->hasOnlyCEntryPoint() && !func->getImplementedObjCDecl())
-      return func->getCDeclName();
+std::optional<std::string> SILDeclRef::getAsmName() const {
+  if (isAutoDiffDerivativeFunction())
+    return std::nullopt;
+
+  if (hasDecl() && !isDefaultArgGenerator() &&
+      (getDecl()->getClangDecl() || getDecl()->getImplementedObjCDecl())) {
+    // If there is a Clang declaration, use its mangled name.
+    if (isNativeToForeignThunk() || isForeign) {
+      auto decl = getDecl();
+      auto hasClangDecl = decl->getClangDecl()
+          ? decl : decl->getImplementedObjCDecl();
+      auto clangMangling = mangleClangDecl(hasClangDecl, isForeign);
+      if (!clangMangling.empty())
+        return clangMangling;
+    }
+  }
+
+  if (isForeign && hasDecl()) {
+    // @_extern(c)
+    auto decl = getDecl();
+    if (auto *EA = ExternAttr::find(decl->getAttrs(), ExternKind::C))
+      if (auto VD = dyn_cast<ValueDecl>(decl))
+        return std::string(EA->getCName(VD));
+
+    // @c/@_cdecl
+    if (decl->getAttrs().hasAttribute<CDeclAttr>())
+      return std::string(decl->getCDeclName());
   }
 
   return std::nullopt;

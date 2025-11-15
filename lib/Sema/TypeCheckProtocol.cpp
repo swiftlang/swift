@@ -1008,7 +1008,7 @@ findMissingGenericRequirementForSolutionFix(
 
   auto selfTy = conformance->getProtocol()->getSelfInterfaceType()
       .subst(reqEnvironment.getRequirementToWitnessThunkSubs())
-        ->mapTypeOutOfContext();
+        ->mapTypeOutOfEnvironment();
 
   auto sig = conformance->getGenericSignature();
   auto *env = conformance->getGenericEnvironment();
@@ -1016,7 +1016,7 @@ findMissingGenericRequirementForSolutionFix(
   auto &ctx = conformance->getDeclContext()->getASTContext();
 
   if (type->is<ArchetypeType>() &&
-      type->mapTypeOutOfContext()->isEqual(selfTy) &&
+      type->mapTypeOutOfEnvironment()->isEqual(selfTy) &&
       missingType->isEqual(conformance->getType())) {
     // e.g. `extension P where Self == C { func foo() { ... } }`
     // and `C` doesn't actually conform to `P`.
@@ -1045,7 +1045,7 @@ findMissingGenericRequirementForSolutionFix(
       if (ordinal == params.size())
         return ErrorType::get(ctx);
 
-      return env->mapTypeIntoContext(gp);
+      return env->mapTypeIntoEnvironment(gp);
     },
     LookUpConformanceInModule(),
     SubstFlags::PreservePackExpansionLevel);
@@ -1094,10 +1094,10 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
 
   GenericSignature reqSig = proto->getGenericSignature();
   if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(req)) {
-    if (funcDecl->isGeneric())
+    if (funcDecl->hasGenericParamList())
       reqSig = funcDecl->getGenericSignature();
   } else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(req)) {
-    if (subscriptDecl->isGeneric())
+    if (subscriptDecl->hasGenericParamList())
       reqSig = subscriptDecl->getGenericSignature();
   }
 
@@ -2472,9 +2472,9 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       if (auto classDecl = ext->getSelfClassDecl()) {
         if (classDecl->isGenericContext()) {
           if (!classDecl->isTypeErasedGenericClass()) {
-            Context.Diags.diagnose(ComplainLoc,
-                                   diag::objc_protocol_in_generic_extension,
-                                   classDecl->isGeneric(), T, ProtoType);
+            Context.Diags.diagnose(
+                ComplainLoc, diag::objc_protocol_in_generic_extension,
+                classDecl->hasGenericParamList(), T, ProtoType);
             conformance->setInvalid();
             return;
           }
@@ -4712,15 +4712,6 @@ deriveProtocolRequirement(const NormalProtocolConformance *Conformance,
   case KnownDerivableProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
 
-  case KnownDerivableProtocolKind::Identifiable:
-    if (derived.Nominal->isDistributedActor()) {
-      return derived.deriveDistributedActor(Requirement);
-    } else {
-      // No synthesis is required for other types; we should only end up
-      // attempting synthesis if the nominal was a distributed actor.
-      llvm_unreachable("Identifiable is synthesized for distributed actors");
-    }
-
   case KnownDerivableProtocolKind::DistributedActor:
     return derived.deriveDistributedActor(Requirement);
 
@@ -5333,7 +5324,7 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
   auto typeInContext = conformance->getType();
   ProtocolConformanceRef conformanceInContext(conformance);
   if (auto *genericEnv = conformance->getGenericEnvironment()) {
-    typeInContext = genericEnv->mapTypeIntoContext(typeInContext);
+    typeInContext = genericEnv->mapTypeIntoEnvironment(typeInContext);
     conformanceInContext =
       conformanceInContext.subst(genericEnv->getForwardingSubstitutionMap());
   }
@@ -5472,7 +5463,7 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
       auto assocConf = conformance->getAssociatedConformance(depTy, proto);
       if (assocConf.isConcrete()) {
         auto *concrete = assocConf.getConcrete();
-        auto replacementTy = dc->mapTypeIntoContext(concrete->getType());
+        auto replacementTy = dc->mapTypeIntoEnvironment(concrete->getType());
 
         // If this requirement has a dependent member type, only require the
         // associated conformance to be as available as the requirement's
@@ -5539,7 +5530,7 @@ hasInvalidTypeInConformanceContext(const ValueDecl *requirement,
          conformance->getProtocol());
 
   // FIXME: getInterfaceType() on properties returns contextual types that have
-  // been mapped out of context, but mapTypeOutOfContext() does not reconstitute
+  // been mapped out of context, but mapTypeOutOfEnvironment() does not reconstitute
   // type parameters that were substituted with concrete types. Instead,
   // patterns should be refactored to use interface types, at least if they
   // appear in type contexts.
@@ -5882,7 +5873,7 @@ void swift::diagnoseConformanceFailure(Type T,
       // Equatable, say so.
       //
       // Map it into context since we want to check conditional requirements.
-      rawType = enumDecl->mapTypeIntoContext(rawType);
+      rawType = enumDecl->mapTypeIntoEnvironment(rawType);
       if (!TypeChecker::conformsToKnownProtocol(
               rawType, KnownProtocolKind::Equatable)) {
         SourceLoc loc = enumDecl->getInherited().getStartLoc();
@@ -6243,11 +6234,11 @@ static unsigned getNameLength(DeclName name) {
 }
 
 /// Determine whether a particular declaration is generic.
-static bool isGeneric(ValueDecl *decl) {
+static bool hasGenericParamList(ValueDecl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-    return func->isGeneric();
+    return func->hasGenericParamList();
   if (auto subscript = dyn_cast<SubscriptDecl>(decl))
-    return subscript->isGeneric();
+    return subscript->hasGenericParamList();
   return false;
 }
 
@@ -6294,7 +6285,7 @@ static bool shouldWarnAboutPotentialWitness(
 
   // If the witness is generic and requirement is not, or vice-versa,
   // don't warn.
-  if (isGeneric(req) != isGeneric(witness))
+  if (hasGenericParamList(req) != hasGenericParamList(witness))
     return false;
 
   // Don't warn if the potential witness has been explicitly given less
@@ -7347,14 +7338,14 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
         auto asdTy = asd->getInterfaceType();
         GenericSignature reqSig = proto->getGenericSignature();
         if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(asd)) {
-          if (subscriptDecl->isGeneric())
+          if (subscriptDecl->hasGenericParamList())
             reqSig = subscriptDecl->getGenericSignature();
         }
         RequirementEnvironment reqEnv(proto, reqSig, proto, nullptr, nullptr);
         auto match =
             RequirementMatch(asd, MatchKind::ExactMatch, asdTy, reqEnv);
         match.WitnessSubstitutions = reqEnv.getRequirementToWitnessThunkSubs()
-                                           .mapReplacementTypesOutOfContext();
+                                           .mapReplacementTypesOutOfEnvironment();
         checker.recordWitness(asd, match);
       }
     }
@@ -7416,7 +7407,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
       continue;
 
     Type defaultAssocTypeInContext =
-      proto->mapTypeIntoContext(defaultAssocType);
+      proto->mapTypeIntoEnvironment(defaultAssocType);
     auto requirementProto = req.getProtocolDecl();
     auto conformance = checkConformance(defaultAssocTypeInContext,
                                         requirementProto);

@@ -21,6 +21,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/DiagnosticKind.h"
 #include "swift/AST/DiagnosticList.h"
+#include "swift/AST/ExportKind.h"
 #include "swift/AST/GenericTypeParamKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LayoutConstraintKind.h"
@@ -164,10 +165,13 @@ BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
 
 class BridgedDeclNameLoc {
   const void *_Nullable LocationInfo;
-  size_t NumArgumentLabels;
+  uint32_t NumArgumentLabels;
+  bool HasModuleSelectorLoc;
 
 public:
-  BridgedDeclNameLoc() : LocationInfo(nullptr), NumArgumentLabels(0) {}
+  BridgedDeclNameLoc()
+    : LocationInfo(nullptr), NumArgumentLabels(0), HasModuleSelectorLoc(false)
+  {}
 
   BRIDGED_INLINE BridgedDeclNameLoc(swift::DeclNameLoc loc);
 
@@ -777,6 +781,10 @@ SWIFT_NAME("BridgedDeclAttributes.add(self:_:)")
 void BridgedDeclAttributes_add(BridgedDeclAttributes *_Nonnull attrs,
                                BridgedDeclAttribute add);
 
+SWIFT_NAME("BridgedDeclAttributes.hasAttribute(self:_:)")
+bool BridgedDeclAttributes_hasAttribute(
+    const BridgedDeclAttributes *_Nonnull attrs, swift::DeclAttrKind kind);
+
 SWIFT_NAME("BridgedDeclAttribute.createSimple(_:kind:atLoc:nameLoc:)")
 BridgedDeclAttribute BridgedDeclAttribute_createSimple(
     BridgedASTContext cContext, swift::DeclAttrKind kind,
@@ -948,6 +956,12 @@ BridgedImplementsAttr BridgedImplementsAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedTypeRepr cProtocolType,
     BridgedDeclNameRef cMemberName, BridgedDeclNameLoc cMemberNameLoc);
+
+SWIFT_NAME("BridgedExportAttr.createParsed(_:atLoc:range:kind:)")
+BridgedExportAttr BridgedExportAttr_createParsed(BridgedASTContext cContext,
+                                                 swift::SourceLoc atLoc,
+                                                 swift::SourceRange range,
+                                                 swift::ExportKind kind);
 
 SWIFT_NAME("BridgedInlineAttr.createParsed(_:atLoc:range:kind:)")
 BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
@@ -2959,6 +2973,8 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isBuiltinVector() const;
   BRIDGED_INLINE bool isBuiltinFixedArray() const;
   BRIDGED_INLINE bool isBox() const;
+  BRIDGED_INLINE bool isPack() const;
+  BRIDGED_INLINE bool isSILPack() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getBuiltinVectorElementType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArrayElementType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArraySizeType() const;
@@ -2982,7 +2998,9 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getInvocationGenericSignatureOfFunctionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;  
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;
+  BRIDGED_INLINE bool containsSILPackExpansionType() const;
+  BRIDGED_INLINE bool isSILPackElementAddress() const;
 };
 
 class BridgedCanType {
@@ -3056,7 +3074,7 @@ struct BridgedGenericSignature {
   BRIDGED_INLINE swift::GenericSignature unbridged() const;
   BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray getGenericParams() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoContext(BridgedASTType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoEnvironment(BridgedASTType type) const;
 };
 
 struct BridgedFingerprint {

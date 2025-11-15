@@ -83,6 +83,9 @@ actor MyGenericGlobalActor<T> {
 // AVAILABILITY1-NEXT: Keyword/None:                       macOSApplicationExtension[#Platform#]; name=macOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalyst[#Platform#]; name=macCatalyst
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalystApplicationExtension[#Platform#]; name=macCatalystApplicationExtension
+// AVAILABILITY1-NEXT: Keyword/None:                       DriverKit[#Platform#]; name=DriverKit{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       Swift[#Platform#]; name=Swift{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       anyAppleOS[#Platform#]; name=anyAppleOS{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       FreeBSD[#Platform#]; name=FreeBSD{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       OpenBSD[#Platform#]; name=OpenBSD{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       Windows[#Platform#]; name=Windows{{$}}
@@ -115,6 +118,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-NEXT:             Keyword/None:                       derivative[#Func Attribute#]; name=derivative
 // KEYWORD2-NEXT:             Keyword/None:                       transpose[#Func Attribute#]; name=transpose
 // KEYWORD2-NEXT:             Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
+// KEYWORD2-NEXT:             Keyword/None:                       export[#Func Attribute#]; name=export
 // KEYWORD2-NEXT:             Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // KEYWORD2-NEXT:             Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
 // KEYWORD2-NEXT:             Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed

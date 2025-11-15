@@ -21,6 +21,7 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -30,6 +31,7 @@
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ManagedStatic.h"
 #include <tuple>
 
@@ -1761,6 +1763,12 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getFinishAsyncLet(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _async(_thin),
+                            _parameters(_rawPointer, _rawPointer),
+                            _void);
+}
+
 static ValueDecl *getEndAsyncLet(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_rawPointer),
@@ -2356,6 +2364,52 @@ static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getTaskAddCancellationHandler(ASTContext &ctx,
+                                                Identifier id) {
+  auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
+  auto fnType = FunctionType::get({}, ctx.TheEmptyTupleType, extInfo);
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_label("handler", fnType)),
+                            _unsafeRawPointer);
+}
+
+static ValueDecl *getTaskRemoveCancellationHandler(ASTContext &ctx,
+                                                   Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
+}
+
+static ValueDecl *getTaskAddPriorityEscalationHandler(ASTContext &ctx,
+                                                      Identifier id) {
+  std::array<AnyFunctionType::Param, 2> params = {
+      AnyFunctionType::Param(ctx.getUInt8Type()),
+      AnyFunctionType::Param(ctx.getUInt8Type()),
+  };
+  // (UInt8, UInt8) -> ()
+  auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
+  auto *functionType =
+      FunctionType::get(params, ctx.TheEmptyTupleType, extInfo);
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_label("handler", functionType)),
+                            _unsafeRawPointer);
+}
+
+static ValueDecl *getTaskRemovePriorityEscalationHandler(ASTContext &ctx,
+                                                         Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
+}
+
+static ValueDecl *getTaskLocalValuePush(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
+                            _parameters(_rawPointer, _consuming(_typeparam(0))),
+                            _void);
+}
+
+static ValueDecl *getTaskLocalValuePop(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -2912,6 +2966,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!autodiff::getBuiltinApplyDerivativeConfig(
             OperationName, kind, arity, throws))
       return nullptr;
+    // TODO: Support somehow typed throws
     return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity,
                                               throws, /*thrownType=*/Type());
   }
@@ -2921,6 +2976,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!autodiff::getBuiltinApplyTransposeConfig(
             OperationName, arity, throws))
       return nullptr;
+    // TODO: Support somehow typed throws
     return getAutoDiffApplyTransposeFunction(Context, Id, arity, throws,
                                              /*thrownType=*/Type());
   }
@@ -3377,11 +3433,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::InitializeDistributedRemoteActor:
     return getDistributedActorInitializeRemote(Context, Id);
 
-  case BuiltinValueKind::StartAsyncLet:
   case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
     return getStartAsyncLet(Context, Id);
 
-  case BuiltinValueKind::EndAsyncLet:
+  case BuiltinValueKind::FinishAsyncLet:
+    return getFinishAsyncLet(Context, Id);
+
   case BuiltinValueKind::EndAsyncLetLifetime:
     return getEndAsyncLet(Context, Id);
 
@@ -3441,6 +3498,24 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     
   case BuiltinValueKind::Emplace:
     return getEmplace(Context, Id);
+
+  case BuiltinValueKind::TaskAddCancellationHandler:
+    return getTaskAddCancellationHandler(Context, Id);
+
+  case BuiltinValueKind::TaskRemoveCancellationHandler:
+    return getTaskRemoveCancellationHandler(Context, Id);
+
+  case BuiltinValueKind::TaskAddPriorityEscalationHandler:
+    return getTaskAddPriorityEscalationHandler(Context, Id);
+
+  case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
+    return getTaskRemovePriorityEscalationHandler(Context, Id);
+
+  case BuiltinValueKind::TaskLocalValuePush:
+    return getTaskLocalValuePush(Context, Id);
+
+  case BuiltinValueKind::TaskLocalValuePop:
+    return getTaskLocalValuePop(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");
@@ -3649,11 +3724,10 @@ BuiltinUnboundGenericType::getBuiltinTypeNameString() const {
   return getBuiltinTypeName();
 }
 
-GenericSignature
-BuiltinUnboundGenericType::getGenericSignature() const {
-  auto &C = getASTContext();
-  
-  switch (BoundGenericTypeKind) {
+static GenericSignature
+getBuiltinGenericSignature(ASTContext &C,
+                           TypeKind kind) {
+  switch (kind) {
   case TypeKind::BuiltinFixedArray: {
     auto Count = GenericTypeParamType::get(C.getIdentifier("Count"),
                                            GenericTypeParamKind::Value,
@@ -3663,35 +3737,48 @@ BuiltinUnboundGenericType::getGenericSignature() const {
                                              0, 1, Type(), C);
     return GenericSignature::get({Count, Element}, {});
   }
-  
+
   case TypeKind::BuiltinInteger: {
     auto bits = GenericTypeParamType::get(C.getIdentifier("Bits"),
                                           GenericTypeParamKind::Type,
                                           0, 0, C.getIntType(), C);
     return GenericSignature::get(bits, {});
+
   }
   default:
-    llvm_unreachable("not a generic builtin");
+    llvm_unreachable("not a generic builtin type");
   }
 }
 
-Type
-BuiltinUnboundGenericType::getBound(SubstitutionMap subs) const {
-  if (!subs.getGenericSignature()->isEqual(getGenericSignature())) {
-    return ErrorType::get(const_cast<BuiltinUnboundGenericType*>(this));
+GenericSignature
+BuiltinUnboundGenericType::getGenericSignature() const {
+  return getBuiltinGenericSignature(getASTContext(), BoundGenericTypeKind);
+}
+
+static Type
+getBuiltinBoundGenericType(ASTContext &C,
+                           TypeKind kind,
+                           SubstitutionMap subs,
+                           bool validate) {
+  if (!subs.getGenericSignature()->isEqual(getBuiltinGenericSignature(C, kind))) {
+    return ErrorType::get(BuiltinUnboundGenericType::get(kind, C));
   }
 
-  switch (BoundGenericTypeKind) {
+  switch (kind) {
   case TypeKind::BuiltinFixedArray: {
     auto types = subs.getReplacementTypes();
   
     auto size = types[0]->getCanonicalType();
-    if (size->getMatchingParamKind() != GenericTypeParamKind::Value) {
-      return ErrorType::get(const_cast<BuiltinUnboundGenericType*>(this));
+    if (validate
+        && size->getMatchingParamKind() != GenericTypeParamKind::Value
+        && !size->hasTypeVariableOrPlaceholder()) {
+      return ErrorType::get(BuiltinUnboundGenericType::get(kind, C));
     }
     auto element = types[1]->getCanonicalType();
-    if (element->getMatchingParamKind() != GenericTypeParamKind::Type) {
-      return ErrorType::get(const_cast<BuiltinUnboundGenericType*>(this));
+    if (validate
+        && element->getMatchingParamKind() != GenericTypeParamKind::Type
+        && !element->hasTypeVariableOrPlaceholder()) {
+      return ErrorType::get(BuiltinUnboundGenericType::get(kind, C));
     }
     
     return BuiltinFixedArrayType::get(size, element);
@@ -3699,24 +3786,78 @@ BuiltinUnboundGenericType::getBound(SubstitutionMap subs) const {
   
   case TypeKind::BuiltinInteger: {
     auto size = subs.getReplacementTypes()[0];
-    if (size->getMatchingParamKind() != GenericTypeParamKind::Value) {
-      return ErrorType::get(const_cast<BuiltinUnboundGenericType*>(this));
+    if (validate
+        && size->getMatchingParamKind() != GenericTypeParamKind::Value) {
+      return ErrorType::get(BuiltinUnboundGenericType::get(kind, C));
     }
     
     // TODO: support actual generic parameters
     auto literalSize = size->getAs<IntegerType>();
     
     if (!literalSize) {
-      return ErrorType::get(const_cast<BuiltinUnboundGenericType*>(this));
+      assert(validate && "can't represent an unbound generic sized integer yet");
+      return ErrorType::get(BuiltinUnboundGenericType::get(kind, C));
     }
     
-    return BuiltinIntegerType::get(literalSize->getValue().getLimitedValue(),
-                                   getASTContext());
+    return BuiltinIntegerType::get(literalSize->getValue().getLimitedValue(),C);
   }
     
   default:
     llvm_unreachable("not a generic builtin kind");
   }
+}
+
+Type
+BuiltinUnboundGenericType::getBound(SubstitutionMap subs) const {
+  return getBuiltinBoundGenericType(getASTContext(), BoundGenericTypeKind,
+                                    subs, /*validate*/ true);
+}
+
+CanBuiltinGenericType
+BuiltinGenericType::getWithSubstitutions(SubstitutionMap subs) const {
+  auto t = getBuiltinBoundGenericType(getASTContext(), getKind(), subs,
+                                      /*validate*/ false);
+  return CanBuiltinGenericType(t->castTo<BuiltinGenericType>());
+}
+
+GenericSignature
+BuiltinGenericType::getGenericSignature() const {
+  auto &cached = getASTContext()
+    .getCachedBuiltinGenericTypeSignature(getKind());
+
+  if (!cached) {
+    cached = getBuiltinGenericSignature(getASTContext(), getKind());
+  }
+    
+  return cached;
+}
+
+SubstitutionMap
+BuiltinGenericType::getSubstitutions() const {
+  if (auto cached = CachedSubstitutionMap) {
+    return *cached;
+  }
+
+  auto buildSubstitutions = [&]() -> SubstitutionMap {
+#define BUILTIN_GENERIC_SUBCLASS(c) \
+    if (auto t = dyn_cast<c>(this)) { \
+      return t->c::buildSubstitutions(); \
+    }
+  
+    BUILTIN_GENERIC_SUBCLASS(BuiltinFixedArrayType)
+    llvm_unreachable("unhandled BuiltinGenericType subclass");
+  };
+
+  auto subs = buildSubstitutions();
+  CachedSubstitutionMap = subs;
+  return subs;
+}
+
+SubstitutionMap
+BuiltinFixedArrayType::buildSubstitutions() const {
+  return SubstitutionMap::get(getGenericSignature(),
+                              {getSize(), getElementType()},
+                              ArrayRef<ProtocolConformanceRef>{});
 }
 
 std::optional<uint64_t>
@@ -3737,4 +3878,8 @@ BuiltinFixedArrayType::isFixedNegativeSize() const {
     return intSize->getValue().isNegative();
   }
   return false;
+}
+
+ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, StringRef Name) {
+  return getBuiltinValueDecl(Context, Context.getIdentifier(Name));
 }

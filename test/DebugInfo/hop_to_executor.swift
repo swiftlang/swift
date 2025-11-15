@@ -11,8 +11,7 @@ func foo() async {
     work()
     async let timestamp2 = getTimestamp(x:2)
     print(await timestamp2)
-  // CHECK: %[[REG:[0-9]+]] = function_ref @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> (), loc {{.*}}:[[@LINE+3]]
-  // CHECK-NEXT: %{{[0-9]+}} = apply %[[REG]](%{{[0-9]+}}, %{{[0-9]+}}) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> (), loc{{.*}}:[[@LINE+2]]
+  // CHECK:     %{{[0-9]+}} = builtin "finishAsyncLet"(%{{[0-9]+}}, %{{[0-9]+}}) : $(), loc{{.*}}:[[@LINE+2]]
   // CHECK-NEXT: hop_to_executor %0, loc * {{.*}}:[[@LINE+1]]
   }
   work()

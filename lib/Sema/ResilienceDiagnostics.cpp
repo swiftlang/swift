@@ -98,11 +98,8 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   }
 
   // Embedded functions can reference non-public decls as they are visible
-  // to clients. Still report references to decls imported non-publicly
-  // to enforce access-level on imports.
-  ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
-  if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient &&
-      !problematicImport)
+  // to clients.
+  if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient)
     return false;
 
   DowngradeToWarning downgradeToWarning = DowngradeToWarning::No;
@@ -135,6 +132,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
   Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
 
+  ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
   if (problematicImport.has_value() &&
       problematicImport->accessLevel < D->getFormalAccess()) {
     Context.Diags.diagnose(problematicImport->importLoc,
@@ -176,7 +174,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
   auto ignoredDowngradeToWarning = DowngradeToWarning::No;
   auto originKind =
       getDisallowedOriginKind(D, where, ignoredDowngradeToWarning);
-  if (originKind == DisallowedOriginKind::None)
+  if (where.canReferenceOrigin(originKind))
     return false;
 
   // As an exception, if the import of the module that defines the desugared
@@ -298,6 +296,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
         }
       });
 
+  auto fragileKind = where.getFragileFunctionKind();
   switch (originKind) {
   case DisallowedOriginKind::None:
     // The decl does not come from a source that needs to be checked for
@@ -329,12 +328,17 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
     if (reason && reason == ExportabilityReason::AvailableAttribute &&
         ctx.LangOpts.LibraryLevel == LibraryLevel::API)
       return false;
+    LLVM_FALLTHROUGH;
+
+  case DisallowedOriginKind::SPIImported:
+  case DisallowedOriginKind::SPILocal:
+    if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient)
+      return false;
     break;
 
   case DisallowedOriginKind::ImplementationOnly:
-  case DisallowedOriginKind::SPIImported:
-  case DisallowedOriginKind::SPILocal:
   case DisallowedOriginKind::FragileCxxAPI:
+  case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
     break;
   }
 
@@ -345,7 +349,6 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
       return false;
   }
 
-  auto fragileKind = where.getFragileFunctionKind();
   if (fragileKind.kind == FragileFunctionKind::None) {
     DiagnosticBehavior limit = downgradeToWarning == DowngradeToWarning::Yes
                              ? DiagnosticBehavior::Warning
@@ -440,7 +443,7 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
       });
 
   auto originKind = getDisallowedOriginKind(ext, where);
-  if (originKind == DisallowedOriginKind::None)
+  if (where.canReferenceOrigin(originKind))
     return false;
 
   auto reason = where.getExportabilityReason();

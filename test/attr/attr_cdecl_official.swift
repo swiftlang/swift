@@ -2,9 +2,7 @@
 /// This test shouldn't require the objc runtime.
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s \
-// RUN:   -enable-experimental-feature CDecl -disable-objc-interop
-
-// REQUIRES: swift_feature_CDecl
+// RUN:    -disable-objc-interop
 
 @c(cdecl_foo) func foo(x: Int) -> Int { return x }
 

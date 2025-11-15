@@ -549,7 +549,7 @@ Type ConstraintSystem::getExplicitCaughtErrorType(CatchNode catchNode) {
   // If there is an explicit caught type for this node, use it.
   if (Type explicitCaughtType = catchNode.getExplicitCaughtType(ctx)) {
     if (explicitCaughtType->hasTypeParameter())
-      explicitCaughtType = DC->mapTypeIntoContext(explicitCaughtType);
+      explicitCaughtType = DC->mapTypeIntoEnvironment(explicitCaughtType);
 
     return explicitCaughtType;
   }
@@ -1244,72 +1244,63 @@ TypeVariableType *ConstraintSystem::isRepresentativeFor(
   return *member;
 }
 
-static std::optional<std::pair<VarDecl *, Type>>
-getPropertyWrapperInformationFromOverload(
-    SelectedOverload resolvedOverload, DeclContext *DC,
-    llvm::function_ref<std::optional<std::pair<VarDecl *, Type>>(VarDecl *)>
-        getInformation) {
-  if (auto *decl =
-          dyn_cast_or_null<VarDecl>(resolvedOverload.choice.getDeclOrNull())) {
-    if (auto declInformation = getInformation(decl)) {
-      Type type;
-      VarDecl *memberDecl;
-      std::tie(memberDecl, type) = *declInformation;
-      if (Type baseType = resolvedOverload.choice.getBaseType()) {
-        type = baseType->getRValueType()->getTypeOfMember(memberDecl, type);
-      }
-      return std::make_pair(decl, type);
-    }
+static Type getPropertyWrapperTypeFromOverload(
+    ConstraintSystem &cs, SelectedOverload resolvedOverload,
+    llvm::function_ref<VarDecl *(VarDecl *)> getWrapperVar) {
+  auto *D = dyn_cast_or_null<VarDecl>(resolvedOverload.choice.getDeclOrNull());
+  if (!D)
+    return Type();
+
+  auto *wrapperVar = getWrapperVar(D);
+  if (!wrapperVar)
+    return Type();
+
+  // First check to see if we have a type for this wrapper variable, which will
+  // the case for e.g local wrappers in closures.
+  if (auto ty = cs.getTypeIfAvailable(wrapperVar))
+    return ty;
+
+  // If we don't have a type for the wrapper variable this shouldn't be a
+  // VarDecl we're solving for.
+  ASSERT(!cs.hasType(D) && "Should have recorded type for wrapper var");
+
+  // For the backing property we need to query the request to ensure it kicks
+  // type-checking if necessary. Otherwise we can query the interface type.
+  auto ty = wrapperVar == D->getPropertyWrapperBackingProperty()
+                ? D->getPropertyWrapperBackingPropertyType()
+                : wrapperVar->getInterfaceType();
+  if (!ty)
+    return Type();
+
+  // If this is a for a property, substitute the base type. Otherwise we have
+  // a local property wrapper and need to map the resulting type into context.
+  if (auto baseType = resolvedOverload.choice.getBaseType()) {
+    ty = baseType->getRValueType()->getTypeOfMember(wrapperVar, ty);
+  } else {
+    ty = cs.DC->mapTypeIntoEnvironment(ty);
   }
-  return std::nullopt;
+  return ty;
 }
 
-std::optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getPropertyWrapperProjectionInfo(
+Type ConstraintSystem::getPropertyWrapperProjectionType(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrapperInformationFromOverload(
-      resolvedOverload, DC,
-      [](VarDecl *decl) -> std::optional<std::pair<VarDecl *, Type>> {
-        if (!decl->hasAttachedPropertyWrapper())
-          return std::nullopt;
-
-        auto projectionVar = decl->getPropertyWrapperProjectionVar();
-        if (!projectionVar)
-          return std::nullopt;
-
-        return std::make_pair(projectionVar,
-                              projectionVar->getInterfaceType());
-      });
+  return getPropertyWrapperTypeFromOverload(
+      *this, resolvedOverload,
+      [&](VarDecl *decl) { return decl->getPropertyWrapperProjectionVar(); });
 }
 
-std::optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getPropertyWrapperInformation(
+Type ConstraintSystem::getPropertyWrapperBackingType(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrapperInformationFromOverload(
-      resolvedOverload, DC,
-      [](VarDecl *decl) -> std::optional<std::pair<VarDecl *, Type>> {
-        if (!decl->hasAttachedPropertyWrapper())
-          return std::nullopt;
-
-        auto backingTy = decl->getPropertyWrapperBackingPropertyType();
-        if (!backingTy)
-          return std::nullopt;
-
-        return std::make_pair(decl, backingTy);
-      });
+  return getPropertyWrapperTypeFromOverload(
+      *this, resolvedOverload,
+      [](VarDecl *decl) { return decl->getPropertyWrapperBackingProperty(); });
 }
 
-std::optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getWrappedPropertyInformation(
+Type ConstraintSystem::getWrappedPropertyType(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrapperInformationFromOverload(
-      resolvedOverload, DC,
-      [](VarDecl *decl) -> std::optional<std::pair<VarDecl *, Type>> {
-        if (auto wrapped = decl->getOriginalWrappedProperty())
-          return std::make_pair(decl, wrapped->getInterfaceType());
-
-        return std::nullopt;
-      });
+  return getPropertyWrapperTypeFromOverload(
+      *this, resolvedOverload,
+      [](VarDecl *decl) { return decl->getOriginalWrappedProperty(); });
 }
 
 void ConstraintSystem::addOverloadSet(Type boundType,
@@ -1922,7 +1913,7 @@ static Type replacePlaceholderType(PlaceholderType *placeholder,
   // logic work with ErrorTypes instead.
   if (forCompletion) {
     if (auto *GP = replacement->getAs<GenericTypeParamType>())
-      return GP->getDecl()->getInnermostDeclContext()->mapTypeIntoContext(GP);
+      return GP->getDecl()->getInnermostDeclContext()->mapTypeIntoEnvironment(GP);
   }
   // Return an ErrorType with the replacement as the original type. Note that
   // if we failed to replace a type variable with a generic parameter,
@@ -1935,7 +1926,7 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType,
   // If we've been asked for an interface type, start by mapping any archetypes
   // out of context.
   if (wantInterfaceType)
-    type = type->mapTypeOutOfContext();
+    type = type->mapTypeOutOfEnvironment();
 
   if (!type->hasTypeVariableOrPlaceholder())
     return type;
@@ -1949,7 +1940,7 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType,
         if (wantInterfaceType) {
           if (auto *gp = tvt->getImpl().getGenericParameter())
             return gp;
-          return getFixedType(tvt)->mapTypeOutOfContext();
+          return getFixedType(tvt)->mapTypeOutOfEnvironment();
         }
         return getFixedType(tvt);
       });
@@ -5102,7 +5093,7 @@ bool ConstraintSystem::isArgumentGenericFunction(Type argType, Expr *argExpr) {
       auto choice = selectedOverload->choice;
       if (auto func =
               dyn_cast_or_null<AbstractFunctionDecl>(choice.getDeclOrNull())) {
-        if (func->isGeneric())
+        if (func->hasGenericParamList())
           return true;
       }
 
@@ -5125,7 +5116,7 @@ bool ConstraintSystem::isArgumentGenericFunction(Type argType, Expr *argExpr) {
       continue;
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-      if (func->isGeneric())
+      if (func->hasGenericParamList())
         return true;
   }
 

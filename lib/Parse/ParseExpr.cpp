@@ -2284,9 +2284,6 @@ unsigned Parser::isAtModuleSelector() {
 }
 
 std::optional<Located<Identifier>> Parser::parseModuleSelector() {
-  if (!Context.LangOpts.hasFeature(Feature::ModuleSelector))
-    return std::nullopt;
-
   if (!isAtModuleSelector())
     return std::nullopt;
 

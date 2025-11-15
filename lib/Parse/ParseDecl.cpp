@@ -2788,6 +2788,21 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::Export: {
+    auto kind = parseSingleAttrOption<ExportKind>(
+        *this, Loc, AttrRange, AttrName, DK, {
+          { Context.Id_interface,       ExportKind::Interface },
+          { Context.Id_implementation,  ExportKind::Implementation },
+        });
+    if (!kind)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) ExportAttr(AtLoc, AttrRange, *kind));
+
+    break;
+  }
+
   case DeclAttrKind::Inline: {
     auto kind = parseSingleAttrOption<InlineKind>(
         *this, Loc, AttrRange, AttrName, DK, {
@@ -4257,8 +4272,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
         .warnUntilSwiftVersion(6);
   }
 
-  bool hasModuleSelector = Context.LangOpts.hasFeature(Feature::ModuleSelector)
-                              && peekToken().is(tok::colon_colon);
+  bool hasModuleSelector = peekToken().is(tok::colon_colon);
 
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
@@ -8747,13 +8761,18 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
 
   SourceLoc VarLoc = newBindingContext.getIntroducer() ? consumeToken() : Tok.getLoc();
 
+  bool IsConst = Attributes.hasAttribute<SectionAttr>() ||
+                 Attributes.hasAttribute<ConstValAttr>() ||
+                 Attributes.hasAttribute<ExternAttr>();
+
   // If this is a var in the top-level of script/repl source file, wrap the
   // PatternBindingDecl in a TopLevelCodeDecl, since it represents executable
   // code.  The VarDecl and any accessor decls (for computed properties) go in
-  // CurDeclContext.
-  //
+  // CurDeclContext.  @const/@section globals are not top-level, per SE-0492.
+  // We follow the same rule for @_extern.
   TopLevelCodeDecl *topLevelDecl = nullptr;
-  if (allowTopLevelCode() && CurDeclContext->isModuleScopeContext()) {
+  if (allowTopLevelCode() && CurDeclContext->isModuleScopeContext() &&
+      !IsConst) {
     // The body of topLevelDecl will get set later.
     topLevelDecl = new (Context) TopLevelCodeDecl(CurDeclContext);
   }

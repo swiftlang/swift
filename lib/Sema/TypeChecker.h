@@ -95,9 +95,14 @@ class LookupTypeResult {
   SmallVector<LookupTypeResultEntry, 4> Results;
 
 public:
+  using const_iterator = SmallVectorImpl<LookupTypeResultEntry>::const_iterator;
+  const_iterator begin() const { return Results.begin(); }
+  const_iterator end() const { return Results.end(); }
+
   using iterator = SmallVectorImpl<LookupTypeResultEntry>::iterator;
   iterator begin() { return Results.begin(); }
   iterator end() { return Results.end(); }
+
   unsigned size() const { return Results.size(); }
 
   LookupTypeResultEntry operator[](unsigned index) const {
@@ -299,6 +304,44 @@ public:
   CheckRequirementsResult getKind() const { return Kind; }
 };
 
+/// Helper type for diagnosing a lookup that failed merely because it was
+/// restricted by a module selector.
+///
+/// To use this, perform the lookup again without its module selector and
+/// construct a \c ModuleSelectorCorrection from the lookup result. If
+/// there are any results, the \c diagnose() method will emit an error and a
+/// set of fix-it notes.
+class ModuleSelectorCorrection {
+  enum class CandidateKind {
+    /// A declaration that is found without depending on context.
+    /// Usually either a top-level type or a member with an explicit base type.
+    ContextFree,
+    /// A member declaration accessed via implicit \c self .
+    MemberViaSelf,
+    /// A member declaration not accessed via implicit \c self (usually a static
+    /// member of an enclosing type).
+    MemberViaContext,
+    /// A local declaration.
+    Local
+  };
+
+  using CandidateModule = std::pair<Identifier, CandidateKind>;
+  SmallSetVector<CandidateModule, 4> candidateModules;
+
+public:
+  ModuleSelectorCorrection(const LookupResult &candidates);
+  ModuleSelectorCorrection(const LookupTypeResult &candidates);
+  ModuleSelectorCorrection(const SmallVectorImpl<ValueDecl *> &candidates);
+  ModuleSelectorCorrection(const SmallVectorImpl<constraints::OverloadChoice> &candidates);
+
+  /// Emit an error and warnings if there were any candidates.
+  ///
+  /// \returns \c true if an error was diagnosed.
+  bool diagnose(ASTContext &ctx,
+                DeclNameLoc nameLoc,
+                DeclNameRef originalName) const;
+};
+
 /// Describes the kind of checked cast operation being performed.
 enum class CheckedCastContextKind {
   /// None: we're just establishing how to perform the checked cast. This
@@ -317,6 +360,18 @@ enum class CheckedCastContextKind {
   /// Coerce to checked cast. Used when we verify if it is possible to
   /// suggest to convert a coercion to a checked cast.
   Coercion,
+};
+
+/// Determines which BraceStmts should be type-checked.
+enum class BraceStmtChecking {
+  /// Type-check all BraceStmts. This should always be the case for regular
+  /// type-checking.
+  All,
+
+  /// Only type-check the body of a do-catch statement, not including catch
+  /// clauses. This is necessary for completion where we still need the caught
+  /// error type to be computed.
+  OnlyDoCatchBody,
 };
 
 namespace TypeChecker {
@@ -482,7 +537,7 @@ bool typeCheckStmtConditionElement(StmtConditionElement &elt, bool &isFalsable,
 ConcreteDeclRef getReferencedDeclForHasSymbolCondition(Expr *E);
 
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
-                      bool LeaveBodyUnchecked = false);
+                      BraceStmtChecking braceChecking = BraceStmtChecking::All);
 
 /// Try to apply the result builder transform of the given builder type
 /// to the body of the function.
@@ -834,6 +889,12 @@ Expr *coerceToRValue(
 /// `LoadExpr`, because `ForceValueExpr` and `ParenExpr` supposed to appear
 /// only at certain positions in AST.
 Expr *addImplicitLoadExpr(
+    ASTContext &Context, Expr *expr,
+    std::function<Type(Expr *)> getType = [](Expr *E) { return E->getType(); },
+    std::function<void(Expr *, Type)> setType =
+        [](Expr *E, Type type) { E->setType(type); });
+
+Expr *addImplicitBorrowExpr(
     ASTContext &Context, Expr *expr,
     std::function<Type(Expr *)> getType = [](Expr *E) { return E->getType(); },
     std::function<void(Expr *, Type)> setType =

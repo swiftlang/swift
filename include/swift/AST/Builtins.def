@@ -885,17 +885,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "
 /// Cancel the given asynchronous task.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Special)
 
-/// startAsyncLet()<T>: (
-///     __owned @escaping () async throws -> sending T
-/// ) -> Builtin.RawPointer
-///
-/// DEPRECATED. startAsyncLetWithLocalBuffer is used instead.
-///
-/// Create, initialize and start a new async-let and associated task.
-/// Returns an AsyncLet* that must be passed to endAsyncLet for destruction.
-BUILTIN_MISC_OPERATION(StartAsyncLet, "startAsyncLet", "", Special)
-
-/// startAsyncLetWithLocalBuffer()<T>: (
+/// startAsyncLetWithLocalBuffer: <T> (
 ///     __owned @escaping () async throws -> sending T,
 ///     _ resultBuf: Builtin.RawPointer
 /// ) -> Builtin.RawPointer
@@ -936,16 +926,11 @@ BUILTIN_MISC_OPERATION(FlowSensitiveSelfIsolation, "flowSensitiveSelfIsolation",
 BUILTIN_MISC_OPERATION(FlowSensitiveDistributedSelfIsolation,
                        "flowSensitiveDistributedSelfIsolation", "", Special)
 
-/// endAsyncLet(): (Builtin.RawPointer) -> Void
+/// finishAsyncLet(Builtin.RawPointer, Builtin.RawPointer) -> Void
 ///
-/// DEPRECATED. The swift_asyncLet_finish intrinsic and endAsyncLetLifetime
-/// builtin are used instead.
-///
-/// Ends and destroys an async-let.
-/// The ClosureLifetimeFixup pass adds a second operand to the builtin to
-/// ensure that optimizations keep the stack-allocated closure arguments alive
-/// until the endAsyncLet.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(EndAsyncLet, "endAsyncLet", "", Special)
+/// End the scope of an async let. An async operation. Deallocates stack
+/// memory that was allocated by startAsyncLetWithLocalBuffer.
+BUILTIN_MISC_OPERATION(FinishAsyncLet, "finishAsyncLet", "", Special)
 
 /// endAsyncLetLifetime(): (Builtin.RawPointer) -> Void
 ///
@@ -1188,6 +1173,42 @@ BUILTIN_TYPE_CHECKER_OPERATION(TriggerFallbackDiagnostic, trigger_fallback_diagn
 /// @objc protocol type. The answer is a tri-state of 0 = No, 1 = Yes, 2 =
 /// Maybe.
 BUILTIN_TYPE_TRAIT_OPERATION(CanBeObjCClass, canBeClass)
+
+/// Equivalent to calling swift_task_addCancellationHandler.
+///
+/// Signature: (handler: () -> Void) -> UnsafeRawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddCancellationHandler,
+                                  "taskAddCancellationHandler", "",
+                                   Special)
+
+/// Equivalent to calling swift_task_removeCancellationHandler.
+///
+/// Signature: (record: UnsafeRawPointer) -> ()
+BUILTIN_MISC_OPERATION(TaskRemoveCancellationHandler,
+                       "taskRemoveCancellationHandler", "", Special)
+
+/// Equivalent to calling swift_task_addPriorityEscalationHandler.
+///
+/// Signature: (handler: (UInt8, UInt8) -> Void) -> UnsafeRawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddPriorityEscalationHandler,
+                                   "taskAddPriorityEscalationHandler", "",
+                                   Special)
+
+/// Equivalent to calling swift_task_removePriorityEscalationHandler.
+///
+/// Signature: (record: UnsafeRawPointer) -> ()
+BUILTIN_MISC_OPERATION(TaskRemovePriorityEscalationHandler,
+                       "taskRemovePriorityEscalationHandler", "", Special)
+
+/// Equivalent to calling swift_task_localValuePush.
+///
+/// Signature: <Value> (key: Builtin.RawPointer, value: __owned Value) -> ()
+BUILTIN_MISC_OPERATION(TaskLocalValuePush, "taskLocalValuePush", "", Special)
+
+/// Equivalent to calling swift_task_localValuePop.
+///
+/// Signature: () -> ()
+BUILTIN_MISC_OPERATION(TaskLocalValuePop, "taskLocalValuePop", "", Special)
 
 #undef BUILTIN_TYPE_TRAIT_OPERATION
 #undef BUILTIN_UNARY_OPERATION

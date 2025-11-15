@@ -113,6 +113,19 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     .init(bridgedOrNil: bridged.getRawLayoutSubstitutedCountType())
   }
 
+  public var approximateFormalPackType: CanonicalType {
+    precondition(isSILPack);
+    return CanonicalType(bridged: bridged.getApproximateFormalPackType());
+  }
+
+  /// True if destroying a value of this type might invoke a custom deinitialer
+  /// with side effects. This includes any recursive deinitializers that may be
+  /// invoked by releasing a reference. False if this only has default
+  /// deinitialization.
+  public func mayHaveCustomDeinit(in function: Function) -> Bool {
+    return bridged.mayHaveCustomDeinit(function.bridged)
+  }
+
   //===--------------------------------------------------------------------===//
   //                Properties of lowered `SILFunctionType`s
   //===--------------------------------------------------------------------===//
@@ -131,7 +144,7 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   public var hasValidSignatureForEmbedded: Bool {
     let genericSignature = invocationGenericSignatureOfFunction
     for genParam in genericSignature.genericParameters {
-      let mappedParam = genericSignature.mapTypeIntoContext(genParam)
+      let mappedParam = genericSignature.mapTypeIntoEnvironment(genParam)
       if mappedParam.isArchetype && !mappedParam.archetypeRequiresClass {
         return false
       }
@@ -159,6 +172,11 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   public func getBoxFields(in function: Function) -> BoxFieldsArray {
     precondition(isBox)
     return BoxFieldsArray(boxType: canonicalType, function: function)
+  }
+
+  public var packElements: PackElementArray {
+    precondition(isSILPack)
+    return PackElementArray(type: self)
   }
 
   /// Returns nil if the nominal is a resilient type because in this case the complete list
@@ -319,6 +337,17 @@ public struct BoxFieldsArray : RandomAccessCollection, FormattedLikeArray {
 
   public func isMutable(fieldIndex: Int) -> Bool {
     BridgedType.getBoxFieldIsMutable(boxType.bridged, fieldIndex)
+  }
+}
+
+public struct PackElementArray : RandomAccessCollection, FormattedLikeArray {
+  fileprivate let type: Type
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { Int(type.bridged.getNumPackElements()) }
+
+  public subscript(_ index: Int) -> Type {
+    type.bridged.getPackElementType(index).type
   }
 }
 

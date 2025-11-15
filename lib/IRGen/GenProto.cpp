@@ -596,7 +596,7 @@ EmitPolymorphicParameters::EmitPolymorphicParameters(IRGenFunction &IGF,
 
 
 CanType EmitPolymorphicParameters::getTypeInContext(CanType type) const {
-  return Fn.mapTypeIntoContext(type)->getCanonicalType();
+  return Fn.mapTypeIntoEnvironment(type)->getCanonicalType();
 }
 
 CanType EmitPolymorphicParameters::getArgTypeInContext(unsigned paramIndex) const {
@@ -768,7 +768,7 @@ void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
   auto loc = Fn.getLocation();
 
   auto *funcDecl = dyn_cast_or_null<FuncDecl>(loc.getAsDeclContext());
-  if (!(funcDecl && funcDecl->isGeneric()))
+  if (!(funcDecl && funcDecl->hasGenericParamList()))
     return;
 
   if (!funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())
@@ -1480,7 +1480,7 @@ public:
           Conformance(*SILWT->getConformance()->getRootConformance()),
           ConformanceInContext(*mapConformanceIntoContext(SILWT->getConformance()->getRootConformance())),
           ConcreteType(Conformance.getDeclContext()
-                         ->mapTypeIntoContext(Conformance.getType())
+                         ->mapTypeIntoEnvironment(Conformance.getType())
                          ->getCanonicalType()) {}
 
     void defineAssociatedTypeWitnessTableAccessFunction(
@@ -1955,7 +1955,7 @@ void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
         &Conformance,
         destTable.getAddress(),
         [&](CanType type) {
-          return Conformance.getDeclContext()->mapTypeIntoContext(type)
+          return Conformance.getDeclContext()->mapTypeIntoEnvironment(type)
                    ->getCanonicalType();
         });
 
@@ -2123,7 +2123,7 @@ llvm::Function *FragileWitnessTableBuilder::buildInstantiationFunction() {
     const auto &condConformance = SILConditionalConformances[idx];
     CanType reqTypeInContext =
       Conformance.getDeclContext()
-        ->mapTypeIntoContext(condConformance.getType())
+        ->mapTypeIntoEnvironment(condConformance.getType())
         ->getCanonicalType();
     if (auto archetype = dyn_cast<ArchetypeType>(reqTypeInContext)) {
       auto condProto = condConformance.getProtocol();

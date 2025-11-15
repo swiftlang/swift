@@ -16,6 +16,7 @@
 
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ParameterList.h"
@@ -30,35 +31,122 @@ using namespace swift;
 using namespace importer;
 
 #define DEBUG_TYPE "safe-interop-wrappers"
-#define DLOG(x) LLVM_DEBUG(llvm::dbgs() << x)
+
+#define DLOG(x) LLVM_DEBUG(LogIndentTracker::indent(DBGS) << x)
+
+#ifndef NDEBUG
+#define DBGS llvm::dbgs() << "[swiftify:" << __LINE__ << "] "
+#define DUMP(x) DLOG(""); x->dump()
+#define DLOG_SCOPE(x) DLOG(x); LogIndentTracker Scope
+#else
+#define DLOG_SCOPE(x) do {} while(false);
+#endif
+
 
 namespace {
+#ifndef NDEBUG
+struct LogIndentTracker {
+  static thread_local uint8_t LogIndent;
+  static llvm::raw_ostream &indent(llvm::raw_ostream &out) {
+    for (uint8_t i = 0; i < LogIndent; i++)
+      out << "| ";
+    return out;
+  }
+
+  LogIndentTracker() {
+    LogIndent++;
+  }
+  ~LogIndentTracker() {
+    LogIndent--;
+  }
+};
+thread_local uint8_t LogIndentTracker::LogIndent = 0;
+#endif
+
 ValueDecl *getKnownSingleDecl(ASTContext &SwiftContext, StringRef DeclName) {
   SmallVector<ValueDecl *, 1> decls;
   SwiftContext.lookupInSwiftModule(DeclName, decls);
-  assert(decls.size() < 2);
+  ASSERT(decls.size() < 2);
   if (decls.size() != 1) return nullptr;
   return decls[0];
 }
 
-class SwiftifyInfoPrinter {
-public:
+struct SwiftifyInfoPrinter {
   static const ssize_t SELF_PARAM_INDEX = -2;
   static const ssize_t RETURN_VALUE_INDEX = -1;
   clang::ASTContext &ctx;
   ASTContext &SwiftContext;
-  llvm::raw_ostream &out;
+  llvm::raw_svector_ostream &out;
   MacroDecl &SwiftifyImportDecl;
   bool firstParam = true;
-  llvm::StringMap<std::string> typeMapping;
+  llvm::StringMap<std::string> &typeMapping;
 
+protected:
   SwiftifyInfoPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext,
-                      llvm::raw_ostream &out, MacroDecl &SwiftifyImportDecl)
+                      llvm::raw_svector_ostream &out,
+                      MacroDecl &SwiftifyImportDecl,
+                      llvm::StringMap<std::string> &typeMapping)
       : ctx(ctx), SwiftContext(SwiftContext), out(out),
-        SwiftifyImportDecl(SwiftifyImportDecl) {
-    out << "(";
+        SwiftifyImportDecl(SwiftifyImportDecl), typeMapping(typeMapping) {}
+
+public:
+  void printTypeMapping() {
+    printSeparator();
+    out << "typeMappings: [";
+    if (typeMapping.empty()) {
+      out << ":]";
+      return;
+    }
+    llvm::interleaveComma(typeMapping, out, [&](const auto &entry) {
+      out << '"' << entry.getKey() << "\" : \"" << entry.getValue() << '"';
+    });
+    out << "]";
   }
-  ~SwiftifyInfoPrinter() { out << ")"; }
+
+  void printAvailability() {
+    if (!hasMacroParameter("spanAvailability"))
+      return;
+    printSeparator();
+    out << "spanAvailability: ";
+    printAvailabilityOfType("Span");
+  }
+private:
+  bool hasMacroParameter(StringRef ParamName) {
+    for (auto *Param : *SwiftifyImportDecl.parameterList)
+      if (Param->getArgumentName().str() == ParamName)
+        return true;
+    return false;
+  }
+
+  void printAvailabilityOfType(StringRef Name) {
+    ValueDecl *D = getKnownSingleDecl(SwiftContext, Name);
+    out << "\"";
+    llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
+    for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
+      auto introducedOpt = attr.getIntroduced();
+      if (!introducedOpt.has_value()) continue;
+      printSeparator();
+      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
+    }
+    out << "\"";
+  }
+
+protected:
+  void printSeparator() {
+    if (!firstParam) {
+      out << ", ";
+    } else {
+      firstParam = false;
+    }
+  }
+};
+
+struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
+  SwiftifyInfoFunctionPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext,
+                      llvm::raw_svector_ostream &out,
+                      MacroDecl &SwiftifyImportDecl,
+                      llvm::StringMap<std::string> &typeMapping)
+      : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl, typeMapping) {}
 
   void printCountedBy(const clang::CountAttributedType *CAT,
                       ssize_t pointerIndex) {
@@ -109,56 +197,7 @@ public:
     return false;
   }
 
-  void printTypeMapping() {
-    printSeparator();
-    out << "typeMappings: [";
-    if (typeMapping.empty()) {
-      out << ":]";
-      return;
-    }
-    llvm::interleaveComma(typeMapping, out, [&](const auto &entry) {
-      out << '"' << entry.getKey() << "\" : \"" << entry.getValue() << '"';
-    });
-    out << "]";
-  }
-
-  void printAvailability() {
-    if (!hasMacroParameter("spanAvailability"))
-      return;
-    printSeparator();
-    out << "spanAvailability: ";
-    printAvailabilityOfType("Span");
-  }
-
 private:
-  bool hasMacroParameter(StringRef ParamName) {
-    for (auto *Param : *SwiftifyImportDecl.parameterList)
-      if (Param->getArgumentName().str() == ParamName)
-        return true;
-    return false;
-  }
-
-  void printAvailabilityOfType(StringRef Name) {
-    ValueDecl *D = getKnownSingleDecl(SwiftContext, Name);
-    out << "\"";
-    llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
-    for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
-      auto introducedOpt = attr.getIntroduced();
-      if (!introducedOpt.has_value()) continue;
-      printSeparator();
-      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
-    }
-    out << "\"";
-  }
-
-  void printSeparator() {
-    if (!firstParam) {
-      out << ", ";
-    } else {
-      firstParam = false;
-    }
-  }
-
   void printParamOrReturn(ssize_t pointerIndex) {
     if (pointerIndex == SELF_PARAM_INDEX)
       out << ".self";
@@ -186,8 +225,7 @@ struct CountedByExpressionValidator
     case clang::BuiltinType::ULong:
     case clang::BuiltinType::LongLong:
     case clang::BuiltinType::ULongLong:
-      // These integer literals are printed with a suffix that isn't valid Swift
-      // syntax
+      DLOG("Ignoring count parameter with non-portable integer literal");
       return false;
     default:
       return true;
@@ -226,7 +264,10 @@ struct CountedByExpressionValidator
   SUPPORTED_BINOP(Or)
 #undef SUPPORTED_BINOP
 
-  bool VisitStmt(const clang::Stmt *) { return false; }
+  bool VisitStmt(const clang::Stmt *) {
+    DLOG("Ignoring count parameter with unsupported expression\n");
+    return false;
+  }
 };
 
 
@@ -245,16 +286,24 @@ static bool SwiftifiableSizedByPointerType(const clang::ASTContext &ctx,
   if (nonnullType->isOpaquePointer())
     return true;
   PointerTypeKind PTK;
-  if (!nonnullType->getAnyPointerElementType(PTK))
+  if (!nonnullType->getAnyPointerElementType(PTK)) {
+    DLOG("Ignoring sized_by on non-pointer type\n");
     return false;
+  }
   if (PTK == PTK_UnsafeRawPointer || PTK == PTK_UnsafeMutableRawPointer)
     return true;
-  if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeMutablePointer)
+  if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeMutablePointer) {
+    DLOG("Ignoring sized_by on Autoreleasing pointer\n");
+    CONDITIONAL_ASSERT(PTK == PTK_AutoreleasingUnsafeMutablePointer);
     return false;
+  }
   // We have a pointer to a type with a size. Verify that it is char-sized.
   auto PtrT = CAT->getAs<clang::PointerType>();
   auto PointeeT = PtrT->getPointeeType();
-  return ctx.getTypeSizeInChars(PointeeT).isOne();
+  bool isByteSized = ctx.getTypeSizeInChars(PointeeT).isOne();
+  if (!isByteSized)
+    DLOG("Ignoring sized_by on non-byte-sized pointer\n");
+  return isByteSized;
 }
 static bool SwiftifiableCAT(const clang::ASTContext &ctx,
                             const clang::CountAttributedType *CAT,
@@ -277,6 +326,7 @@ struct UnaliasedInstantiationVisitor
   bool
   VisitTemplateSpecializationType(const clang::TemplateSpecializationType *) {
     hasUnaliasedInstantiation = true;
+    DLOG("Signature contains raw template, skipping");
     return false;
   }
 };
@@ -296,26 +346,32 @@ static StringRef getAttributeName(const clang::CountAttributedType *CAT) {
       llvm_unreachable("CountAttributedType cannot be ended_by");
   }
 }
+
+template<typename T>
+static bool getImplicitObjectParamAnnotation(const clang::ObjCMethodDecl* D) {
+    return false; // Only C++ methods have implicit params
+}
+
+static size_t getNumParams(const clang::ObjCMethodDecl* D) {
+    return D->param_size();
+}
+static size_t getNumParams(const clang::FunctionDecl* D) {
+    return D->getNumParams();
+}
 } // namespace
 
+template<typename T>
 static bool swiftifyImpl(ClangImporter::Implementation &Self,
-                         SwiftifyInfoPrinter &printer,
+                         SwiftifyInfoFunctionPrinter &printer,
                          const AbstractFunctionDecl *MappedDecl,
-                         const clang::FunctionDecl *ClangDecl) {
-  DLOG("Checking " << *ClangDecl << " for bounds and lifetime info\n");
+                         const T *ClangDecl) {
+  DLOG_SCOPE("Checking '" << *ClangDecl << "' for bounds and lifetime info\n");
 
   // FIXME: for private macro generated functions we do not serialize the
   // SILFunction's body anywhere triggering assertions.
   if (ClangDecl->getAccess() == clang::AS_protected ||
       ClangDecl->getAccess() == clang::AS_private)
     return false;
-
-  {
-    UnaliasedInstantiationVisitor visitor;
-    visitor.TraverseType(ClangDecl->getType());
-    if (visitor.hasUnaliasedInstantiation)
-      return false;
-  }
 
   clang::ASTContext &clangASTContext = Self.getClangASTContext();
 
@@ -332,12 +388,13 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       swiftReturnTy = ctorDecl->getResultInterfaceType();
     else
       ABORT("Unexpected AbstractFunctionDecl subclass.");
+    clang::QualType clangReturnTy = ClangDecl->getReturnType();
     bool returnIsStdSpan = printer.registerStdSpanTypeMapping(
-        swiftReturnTy, ClangDecl->getReturnType());
-    auto *CAT = ClangDecl->getReturnType()->getAs<clang::CountAttributedType>();
+        swiftReturnTy, clangReturnTy);
+    auto *CAT = clangReturnTy->getAs<clang::CountAttributedType>();
     if (SwiftifiableCAT(clangASTContext, CAT, swiftReturnTy)) {
       printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
-      DLOG("  Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
+      DLOG("Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
       attachMacro = true;
     }
     auto dependsOnClass = [](const ParamDecl *fromParam) {
@@ -345,12 +402,14 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     };
     bool returnHasLifetimeInfo = false;
     if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(ClangDecl)) {
-      DLOG("  Found lifetimebound attribute on implicit 'this'\n");
+      DLOG("Found lifetimebound attribute on implicit 'this'\n");
       if (!dependsOnClass(
               MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true))) {
         printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
                                          true);
         returnHasLifetimeInfo = true;
+      } else {
+        DLOG("lifetimebound ignored because it depends on class with refcount\n");
       }
     }
 
@@ -361,13 +420,15 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     size_t swiftNumParams = MappedDecl->getParameters()->size() -
                             (ClangDecl->isVariadic() ? 1 : 0);
     ASSERT((MappedDecl->isImportAsInstanceMember() == isClangInstanceMethod) ==
-           (ClangDecl->getNumParams() == swiftNumParams));
+           (getNumParams(ClangDecl) == swiftNumParams));
 
     size_t selfParamIndex = MappedDecl->isImportAsInstanceMember()
                                 ? MappedDecl->getSelfIndex()
-                                : ClangDecl->getNumParams();
+                                : getNumParams(ClangDecl);
     for (auto [index, clangParam] : llvm::enumerate(ClangDecl->parameters())) {
-      auto clangParamTy = clangParam->getType();
+      clang::QualType clangParamTy = clangParam->getType();
+      DLOG_SCOPE("Checking parameter '" << *clangParam << "' with type '"
+                                        << clangParamTy << "'\n");
       int mappedIndex = index < selfParamIndex ? index :
         index > selfParamIndex ? index - 1 :
         SwiftifyInfoPrinter::SELF_PARAM_INDEX;
@@ -383,17 +444,15 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       auto *CAT = clangParamTy->getAs<clang::CountAttributedType>();
       if (CAT && mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX) {
         Self.diagnose(HeaderLoc(clangParam->getLocation()),
-                      diag::warn_clang_ignored_bounds_on_self,
-                      getAttributeName(CAT));
-        auto swiftName = ClangDecl->getAttr<clang::SwiftNameAttr>();
+                 diag::warn_clang_ignored_bounds_on_self, getAttributeName(CAT));
+        auto swiftName = ClangDecl->template getAttr<clang::SwiftNameAttr>();
         ASSERT(swiftName &&
                "free function mapped to instance method without swift_name??");
         Self.diagnose(HeaderLoc(swiftName->getLocation()),
-                      diag::note_swift_name_instance_method);
+                 diag::note_swift_name_instance_method);
       } else if (SwiftifiableCAT(clangASTContext, CAT, swiftParamTy)) {
         printer.printCountedBy(CAT, mappedIndex);
-        DLOG("  Found bounds info '" << clangParamTy << "' on parameter '"
-                                     << *clangParam << "'\n");
+        DLOG("Found bounds info '" << clangParamTy << "'\n");
         attachMacro = paramHasBoundsInfo = true;
       }
       bool paramIsStdSpan =
@@ -401,14 +460,13 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       paramHasBoundsInfo |= paramIsStdSpan;
 
       bool paramHasLifetimeInfo = false;
-      if (clangParam->hasAttr<clang::NoEscapeAttr>()) {
-        DLOG("  Found noescape attribute on parameter '" << *clangParam << "'\n");
+      if (clangParam->template hasAttr<clang::NoEscapeAttr>()) {
+        DLOG("Found noescape attribute\n");
         printer.printNonEscaping(mappedIndex);
         paramHasLifetimeInfo = true;
       }
       if (clangParam->template hasAttr<clang::LifetimeBoundAttr>()) {
-        DLOG("  Found lifetimebound attribute on parameter '" << *clangParam
-                                                              << "'\n");
+        DLOG("Found lifetimebound attribute\n");
         if (!dependsOnClass(swiftParam)) {
           // If this parameter has bounds info we will tranform it into a Span,
           // so then it will no longer be Escapable.
@@ -419,21 +477,64 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
           printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);
           paramHasLifetimeInfo = true;
           returnHasLifetimeInfo = true;
+        } else {
+          DLOG("lifetimebound ignored because it depends on class with refcount\n");
         }
       }
       if (paramIsStdSpan && paramHasLifetimeInfo) {
-        DLOG("  Found both std::span and lifetime info for parameter '"
-             << *clangParam << "'\n");
+        DLOG("Found both std::span and lifetime info\n");
         attachMacro = true;
       }
     }
     if (returnIsStdSpan && returnHasLifetimeInfo) {
-      DLOG("  Found both std::span and lifetime info for return value\n");
+      DLOG("Found both std::span and lifetime info for return value\n");
       attachMacro = true;
     }
   }
   return attachMacro;
 }
+
+class SwiftifyProtocolInfoPrinter : public SwiftifyInfoPrinter {
+private:
+  ClangImporter::Implementation &ImporterImpl;
+
+public:
+  SwiftifyProtocolInfoPrinter(ClangImporter::Implementation &ImporterImpl,
+                              clang::ASTContext &ctx, ASTContext &SwiftContext,
+                              llvm::raw_svector_ostream &out,
+                              MacroDecl &SwiftifyImportDecl,
+                              llvm::StringMap<std::string> &typeMapping)
+      : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl, typeMapping),
+        ImporterImpl(ImporterImpl) {}
+
+  bool printMethod(const FuncDecl *Method) {
+    auto ClangDecl = dyn_cast_or_null<clang::ObjCMethodDecl>(Method->getClangDecl());
+    if (!ClangDecl)
+      return false;
+
+    llvm::SmallString<128> paramInfoString;
+    llvm::raw_svector_ostream tmpOut(paramInfoString);
+
+    SwiftifyInfoFunctionPrinter methodPrinter(ctx, SwiftContext, tmpOut,
+                                              SwiftifyImportDecl, typeMapping);
+    bool hadAttributes = swiftifyImpl(ImporterImpl, methodPrinter, Method, ClangDecl);
+    if (hadAttributes) {
+      printSeparator();
+      out << ".method(signature: \"";
+      printMethodSignature(Method);
+      out << "\", paramInfo: [" << paramInfoString << "])";
+    }
+    return hadAttributes;
+  }
+
+private:
+  void printMethodSignature(const FuncDecl *Method) {
+    auto options =
+        PrintOptions::printForDiagnostics(AccessLevel::Private, true);
+    StreamPrinter printer(out);
+    Method->print(printer, options);
+  }
+};
 
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers) ||
@@ -443,20 +544,39 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (!ClangDecl)
     return;
 
+  DLOG_SCOPE(
+      "Checking '" << *ClangDecl << "' (imported as '"
+                   << MappedDecl->getName().getBaseName().userFacingName()
+                   << "')\n");
+
+  {
+    UnaliasedInstantiationVisitor visitor;
+    visitor.TraverseType(ClangDecl->getType());
+    if (visitor.hasUnaliasedInstantiation)
+      return;
+  }
+
   MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
-  if (!SwiftifyImportDecl)
+  if (!SwiftifyImportDecl) {
+    DLOG("_SwiftifyImport macro not found");
     return;
+  }
 
   llvm::SmallString<128> MacroString;
   {
     llvm::raw_svector_ostream out(MacroString);
-    out << "@_SwiftifyImport";
+    out << "@_SwiftifyImport(";
 
-    SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl);
-    if (!swiftifyImpl(*this, printer, MappedDecl, ClangDecl))
+    llvm::StringMap<std::string> typeMapping;
+    SwiftifyInfoFunctionPrinter printer(getClangASTContext(), SwiftContext, out,
+                                        *SwiftifyImportDecl, typeMapping);
+    if (!swiftifyImpl(*this, printer, MappedDecl, ClangDecl)) {
+      DLOG("No relevant bounds or lifetime info found\n");
       return;
+    }
     printer.printAvailability();
     printer.printTypeMapping();
+    out << ")";
   }
 
   DLOG("Attaching safe interop macro: " << MacroString << "\n");
@@ -477,5 +597,53 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   } else {
     importNontrivialAttribute(MappedDecl, MacroString);
   }
+}
+
+void ClangImporter::Implementation::swiftifyProtocol(
+    NominalTypeDecl *MappedDecl) {
+  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers) ||
+      SwiftContext.ClangImporterOpts.DisableSafeInteropWrappers)
+    return;
+  if (!isa<ProtocolDecl, ClassDecl>(MappedDecl))
+    return;
+
+  MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(
+      getKnownSingleDecl(SwiftContext, "_SwiftifyImportProtocol"));
+  if (!SwiftifyImportDecl) {
+    DLOG("_SwiftifyImportProtocol macro not found");
+    return;
+  }
+
+  DLOG_SCOPE("Checking '" << MappedDecl->getName()
+              << "' protocol for methods with bounds and lifetime info\n");
+  llvm::SmallString<128> MacroString;
+  {
+    llvm::raw_svector_ostream out(MacroString);
+    out << "@_SwiftifyImportProtocol(";
+
+    bool hasBoundsAttributes = false;
+    llvm::StringMap<std::string> typeMapping;
+    SwiftifyProtocolInfoPrinter printer(*this, getClangASTContext(),
+                                        SwiftContext, out, *SwiftifyImportDecl,
+                                        typeMapping);
+    for (Decl *SwiftMember :
+         cast<IterableDeclContext>(MappedDecl)->getAllMembers()) {
+      FuncDecl *SwiftDecl = dyn_cast<FuncDecl>(SwiftMember);
+      if (!SwiftDecl)
+        continue;
+      hasBoundsAttributes |= printer.printMethod(SwiftDecl);
+    }
+
+    if (!hasBoundsAttributes) {
+      DLOG("No relevant bounds or lifetime info found\n");
+      return;
+    }
+    printer.printAvailability();
+    printer.printTypeMapping();
+    out << ")";
+  }
+
+  DLOG("Attaching safe interop macro: " << MacroString << "\n");
+  importNontrivialAttribute(MappedDecl, MacroString);
 }
 
