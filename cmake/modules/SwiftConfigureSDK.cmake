@@ -44,6 +44,7 @@ function(_report_sdk prefix)
   foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
     message(STATUS "  ${arch} triple: ${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}")
     message(STATUS "  Module triple: ${SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE}")
+    message(STATUS "  Full triple: ${SWIFT_SDK_${prefix}_${arch}_TRIPLE}")
   endforeach()
   if("${prefix}" STREQUAL "WINDOWS")
     foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
@@ -270,16 +271,20 @@ macro(configure_sdk_darwin
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE
         "${arch}-apple-${module_name}")
 
+    set(SWIFT_SDK_${prefix}_${arch}_TRIPLE
+        "${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
     # If this is a simulator target, append -simulator.
     if (SWIFT_SDK_${prefix}_IS_SIMULATOR)
-      set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
-          "${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}-simulator")
+      string(APPEND SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE "-simulator")
+      string(APPEND SWIFT_SDK_${prefix}_${arch}_TRIPLE "-simulator")
     endif ()
 
     if(SWIFT_ENABLE_MACCATALYST AND "${prefix}" STREQUAL "OSX")
       # For macCatalyst append the '-macabi' environment to the target triple.
       set(SWIFT_SDK_MACCATALYST_ARCH_${arch}_TRIPLE "${arch}-apple-ios-macabi")
       set(SWIFT_SDK_MACCATALYST_ARCH_${arch}_MODULE "${arch}-apple-ios-macabi")
+      set(SWIFT_SDK_MACCATALYST_${arch}_TRIPLE
+        "${arch}-apple-ios${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}-macabi")
 
       # For macCatalyst, the xcrun_name is "macosx" since it uses that sdk.
       # Hard code the library subdirectory to "maccatalyst" in that case.
@@ -491,6 +496,8 @@ macro(configure_sdk_unix name architectures)
     if(NOT SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE)
       set(SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE "${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}")
     endif()
+    set(SWIFT_SDK_${prefix}_${arch}_TRIPLE
+      ${SWIFT_SDK_${prefix}_ARCH_${prefix}_TRIPLE})
   endforeach()
 
   # Add this to the list of known SDKs.
@@ -534,6 +541,7 @@ macro(configure_sdk_windows name environment architectures)
     endif()
 
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_MODULE "${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}")
+    set(SWIFT_SDK_${prefix}_${arch}_TRIPLE "${SWIFT_SDK_${prefix}_ARCH_${prefix}_TRIPLE}")
 
     # NOTE: set the path to / to avoid a spurious `--sysroot` from being passed
     # to the driver -- rely on the `INCLUDE` AND `LIB` environment variables
