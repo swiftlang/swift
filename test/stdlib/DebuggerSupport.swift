@@ -162,7 +162,7 @@ if #available(SwiftStdlib 6.3, *) {
           let pointer = unsafeBitCast(obj, to: UnsafeRawPointer.self)
           let (success, printed) = _DebuggerSupport.stringForPrintObject(pointer, mangledTypeName: mangledTypeName)
           expectTrue(success)
-          expectEqual(printed.hasPrefix("<main.ClassWithMembers: 0x"), true)
+          expectTrue(printed.hasPrefix("<ClassWithMembers: 0x"))
         }
       } else {
         expectTrue(false)
