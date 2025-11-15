@@ -20,6 +20,7 @@
 #include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -1426,9 +1427,9 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
       // Diagnostics attached to generated sources originating in this
       // buffer also count as part of this buffer for this purpose.
-      const GeneratedSourceInfo *GSI =
-          SM.getGeneratedSourceInfo(CapturedDiagIter->SourceBufferID.value());
-      if (!GSI || llvm::find(GSI->ancestors, BufferID) == GSI->ancestors.end()) {
+      unsigned scratch;
+      llvm::ArrayRef<unsigned> ancestors = SM.getAncestors(CapturedDiagIter->SourceBufferID.value(), scratch);
+      if (llvm::find(ancestors, BufferID) == ancestors.end()) {
         ++CapturedDiagIter;
         continue;
       }
