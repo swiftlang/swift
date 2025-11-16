@@ -4766,8 +4766,10 @@ void ClangImporter::Implementation::getMangledName(
     auto ctorGlobalDecl =
         clang::GlobalDecl(ctor, clang::CXXCtorType::Ctor_Complete);
     mangler->mangleCXXName(ctorGlobalDecl, os);
-  } else {
+  } else if (mangler->shouldMangleDeclName(clangDecl)) {
     mangler->mangleName(clangDecl, os);
+  } else {
+    os << clangDecl->getName();
   }
 }
 
