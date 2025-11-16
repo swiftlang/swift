@@ -53,7 +53,7 @@ func bar(x: Int) -> String { return "test" }
 @section("mysection") let invalidFuncRef1 = foo()
 // expected-error@-1{{not supported in a constant expression}}
 @section("mysection") let invalidFuncRef2 = Bool.self.random
-// expected-error@-1{{closures not supported in a constant expression}}
+// expected-error@-1{{not supported in a constant expression}}
 @section("mysection") let invalidFuncRef3 = (Bool.self as Bool.Type).random
 // expected-error@-1{{not supported in a constant expression}}
 
@@ -61,11 +61,38 @@ func bar(x: Int) -> String { return "test" }
 @section("mysection") let invalidGenericFunc = [Int].randomElement
 // expected-error@-1{{not supported in a constant expression}}
 
-// closures (should be rejected)
-@section("mysection") let invalidClosure1 = { }
-// expected-error@-1{{closures not supported in a constant expression}}
-@section("mysection") let invalidClosure2 = { return 42 }
-// expected-error@-1{{closures not supported in a constant expression}}
+// closures
+@section("mysection") let closure1 = { } // ok
+@section("mysection") let closure2 = { return 42 } // ok
+@section("mysection") let closure3 = { (x: Int) in return x + 1 } // ok
+@section("mysection") let closure4: () -> Void = { } // ok
+@section("mysection") let closure5: (Int) -> Int = { x in x * 2 } // ok
+@section("mysection") let closure6: @convention(c) (Int) -> Int = { x in x * 2 } // ok
+struct W {
+  @section("mysection") static let closure7: @convention(c) (Int) -> Int = { x in x * 2 } // ok
+}
+
+let capturedVar = 10
+class TestClass {}
+var capturedMutableVar = TestClass()
+
+// closures with captures (should be rejected)
+@section("mysection") let invalidClosure1 = { capturedVar }
+// expected-error@-1{{closures with captures not supported in a constant expression}}
+@section("mysection") let invalidClosure2 = { return capturedVar + 1 }
+// expected-error@-1{{closures with captures not supported in a constant expression}}
+@section("mysection") let invalidClosure3 = { [capturedVar] in return capturedVar }
+// expected-error@-1{{not supported in a constant expression}}
+@section("mysection") let invalidClosure4 = { [weak capturedMutableVar] in return capturedMutableVar }
+// expected-error@-1{{not supported in a constant expression}}
+@section("mysection") let invalidClosure5 = { [unowned capturedMutableVar] in return capturedMutableVar }
+// expected-error@-1{{not supported in a constant expression}}
+@section("mysection") let invalidClosure6 = { [capturedVar, capturedMutableVar] in return 42 }
+// expected-error@-1{{not supported in a constant expression}}
+@section("mysection") let invalidClosure7 = { [renamed = capturedVar] in return renamed * 2 }
+// expected-error@-1{{not supported in a constant expression}}
+@section("mysection") let invalidClosure8 = { [computed = capturedVar + 5] in return computed }
+// expected-error@-1{{not supported in a constant expression}}
 
 struct S { }
 enum E { case a }
