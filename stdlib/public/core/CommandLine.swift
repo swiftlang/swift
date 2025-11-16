@@ -127,7 +127,7 @@ extension CommandLine {
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
 @_extern(c, "_NSGetExecutablePath")
 @usableFromInline
-internal func _NSGetExecutablePath(
+internal static func _NSGetExecutablePath(
   _ buf: UnsafeMutablePointer<CChar>,
   _ bufsize: UnsafeMutablePointer<UInt32>
 ) -> CInt
@@ -156,7 +156,7 @@ internal func _NSGetExecutablePath(
         of: CChar.self,
         capacity: Int(byteCount)
       ) { buffer in
-        if (0 == unsafe _NSGetExecutablePath(buffer.baseAddress!, &byteCount)) {
+        if (unsafe 0 == _NSGetExecutablePath(buffer.baseAddress!, &byteCount)) {
           return unsafe String(cString: buffer.baseAddress!)
         }
         return nil
