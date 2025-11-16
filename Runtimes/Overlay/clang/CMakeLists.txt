@@ -12,6 +12,7 @@ target_compile_options(swift_Builtin_float PRIVATE
   $<$<COMPILE_LANGUAGE:Swift>:-autolink-force-load>)
 target_link_libraries(swift_Builtin_float PRIVATE
   $<$<PLATFORM_ID:Windows>:ClangModules>
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>
   swiftCore)
 
 install(TARGETS swift_Builtin_float

@@ -1100,9 +1100,6 @@ extension Type {
   /// False if expanding a type is invalid. For example, expanding a
   /// struct-with-deinit drops the deinit.
   func shouldExpand(_ context: some Context) -> Bool {
-    if !context.options.useAggressiveReg2MemForCodeSize {
-      return true
-    }
     return context.bridgedPassContext.shouldExpand(self.bridged)
   }
 }

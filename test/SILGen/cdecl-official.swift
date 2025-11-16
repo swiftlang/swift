@@ -33,7 +33,7 @@ func requiresThunk() {
   acceptSwiftFunc(orange)
 }
 
-// CHECK-LABEL: sil [serialized] [asmname "cauliflower"] [ossa] @$s5cdecl8broccoliyS2iFTo : $@convention(c) (Int) -> Int {
+// CHECK-LABEL: sil [asmname "cauliflower"] [ossa] @$s5cdecl8broccoliyS2iFTo : $@convention(c) (Int) -> Int {
 // CHECK-NOT: apply
 // CHECK: return
 @c(cauliflower)

@@ -1486,7 +1486,15 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
     if (nominalTy->getValueTypeDestructor())
       return false;
   }
+
+  // At this point we know it's valid to expand the type, next decide if we
+  // "should" expand it.
+
   if (EnableExpandAll) {
+    return true;
+  }
+
+  if (!module.getOptions().UseAggressiveReg2MemForCodeSize) {
     return true;
   }
 

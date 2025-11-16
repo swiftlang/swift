@@ -26,9 +26,6 @@
 // Never referenced.
 // LIBRARY-IR-NOT: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = linkonce_odr {{(protected |dllexport )?}}global
 
-// Note: referenced by swift_allocEmptyBox.
-// LIBRARY-IR: @"$es16_emptyBoxStorageSi_Sitvp" = linkonce_odr {{(protected |dllexport )?}}global
-
 // LIBRARY-IR-NOT: define {{.*}}@"$e7Library5helloSaySiGyF"()
 public func hello() -> [Int] {
   getArray()
