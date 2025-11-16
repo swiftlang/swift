@@ -337,7 +337,7 @@ class BenchmarkDriver(object):
         driver = BenchmarkDriver(args)
         results = driver.run_and_log(csv_console=(args.output_dir is None))
         if args.output_dir:
-            driver.log_results([r.json for r in results])
+            driver.log_results([r.json() for r in results])
         return 0
 
 
