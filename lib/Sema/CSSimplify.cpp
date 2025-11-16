@@ -16696,7 +16696,6 @@ void ConstraintSystem::addContextualConversionConstraint(
 
   case CTP_ArrayElement:
   case CTP_AssignSource:
-  case CTP_CalleeResult:
   case CTP_CannotFail:
   case CTP_Condition:
   case CTP_Unused:

@@ -867,7 +867,6 @@ GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_Unused:
   case CTP_CannotFail:
   case CTP_YieldByReference:
-  case CTP_CalleeResult:
   case CTP_EnumCaseRawValue:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
@@ -2954,9 +2953,6 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_CannotFail:
     llvm_unreachable("These contextual type purposes cannot fail with a "
                      "conversion type specified!");
-  case CTP_CalleeResult:
-    llvm_unreachable("CTP_CalleeResult does not actually install a "
-                     "contextual type");
   case CTP_Initialization:
     return diag::cannot_convert_initializer_value_nil;
 
@@ -3758,7 +3754,6 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_Unused:
   case CTP_CannotFail:
   case CTP_YieldByReference:
-  case CTP_CalleeResult:
   case CTP_ExprPattern:
     break;
   }
