@@ -832,6 +832,8 @@ ERROR(const_unsupported_type_expr,none,
       "type expressions not supported in a constant expression", ())
 ERROR(const_unsupported_closure,none,
       "closures not supported in a constant expression", ())
+ERROR(const_unsupported_closure_with_captures,none,
+      "closures with captures not supported in a constant expression", ())
 ERROR(const_unsupported_keypath,none,
       "keypaths not supported in a constant expression", ())
 ERROR(const_opaque_decl_ref,none,

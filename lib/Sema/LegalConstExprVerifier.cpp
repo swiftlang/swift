@@ -46,6 +46,7 @@ enum IllegalConstErrorDiagnosis {
   TypeExpression,
   KeyPath,
   Closure,
+  ClosureWithCaptures,
   OpaqueDeclRef,
   OpaqueFuncDeclRef,
   NonConventionCFunc,
@@ -81,6 +82,9 @@ static void diagnoseError(const Expr *errorExpr,
     break;
   case Closure:
     diags.diagnose(errorLoc, diag::const_unsupported_closure);
+    break;
+  case ClosureWithCaptures:
+    diags.diagnose(errorLoc, diag::const_unsupported_closure_with_captures);
     break;
   case OpaqueDeclRef:
     diags.diagnose(errorLoc, diag::const_opaque_decl_ref);
@@ -222,9 +226,19 @@ checkSupportedWithSectionAttribute(const Expr *expr,
     if (isa<KeyPathExpr>(expr))
       return std::make_pair(expr, KeyPath);
 
-    // Closure expressions are not supported in constant expressions
-    if (isa<AbstractClosureExpr>(expr))
-      return std::make_pair(expr, Closure);
+    // Closures are allowed if they have no captures
+    if (auto closureExpr = dyn_cast<ClosureExpr>(expr)) {
+      TypeChecker::computeCaptures(const_cast<ClosureExpr *>(closureExpr));
+      if (!closureExpr->getCaptureInfo().isTrivial()) {
+        return std::make_pair(expr, ClosureWithCaptures);
+      }
+      continue;
+    }
+    
+    // No auto-closures
+    if (isa<AbstractClosureExpr>(expr)) {
+      return std::make_pair(expr, Default);
+    }
 
     // Function conversions are allowed if the conversion is to '@convention(c)'
     if (auto functionConvExpr = dyn_cast<FunctionConversionExpr>(expr)) {
