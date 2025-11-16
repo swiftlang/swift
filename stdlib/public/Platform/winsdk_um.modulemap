@@ -195,6 +195,17 @@ module WinSDK [system] {
       link "dxgi.lib"
     }
 
+    module Direct2D {
+      header "d2d1.h"
+      header "d2d1_1.h"
+      header "d2d1_2.h"
+      header "d2d1_3.h"
+      export *
+
+      link "d2d1.lib"
+      link "dxgi.lib"
+    }
+
     // FIXME(compnerd) DXGI is part of the Direct3D interfaces currently; we
     // should split it out, but because it is part of the D3D11 interfaces, this
     // separate module is meant to augment the uncovered portions only.
