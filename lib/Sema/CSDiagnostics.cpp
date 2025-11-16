@@ -863,7 +863,6 @@ GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_CaseStmt:
   case CTP_ThrowStmt:
   case CTP_ForEachSequence:
-  case CTP_ComposedPropertyWrapper:
   case CTP_Unused:
   case CTP_CannotFail:
   case CTP_YieldByReference:
@@ -2965,7 +2964,6 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_ForEachSequence:
   case CTP_YieldByReference:
   case CTP_WrappedProperty:
-  case CTP_ComposedPropertyWrapper:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
     return std::nullopt;
@@ -3750,7 +3748,6 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 
   case CTP_ThrowStmt:
   case CTP_ForEachSequence:
-  case CTP_ComposedPropertyWrapper:
   case CTP_Unused:
   case CTP_CannotFail:
   case CTP_YieldByReference:

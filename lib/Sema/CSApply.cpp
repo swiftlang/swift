@@ -9616,7 +9616,6 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     case CTP_SubscriptAssignSource:
     case CTP_Condition:
     case CTP_WrappedProperty:
-    case CTP_ComposedPropertyWrapper:
     case CTP_CannotFail:
     case CTP_SingleValueStmtBranch:
       result.setExpr(rewrittenExpr);

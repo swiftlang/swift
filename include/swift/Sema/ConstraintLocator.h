@@ -77,8 +77,6 @@ enum ContextualTypePurpose : uint8_t {
                         ///  to a type of a switch subject or an `Error` type.
   CTP_ForEachSequence,  ///< Sequence expression associated with `for-in` loop.
   CTP_WrappedProperty,  ///< Property type expected to match 'wrappedValue' type
-  CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
-                               ///< former 'wrappedValue' type
 
   CTP_SingleValueStmtBranch, ///< The contextual type for a branch in a single
                              ///< value statement expression.

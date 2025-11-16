@@ -273,7 +273,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   case CTP_SubscriptAssignSource:
   case CTP_Condition:
   case CTP_WrappedProperty:
-  case CTP_ComposedPropertyWrapper:
   case CTP_CannotFail:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:

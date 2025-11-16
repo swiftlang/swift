@@ -16711,7 +16711,6 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_CoerceOperand:
   case CTP_SubscriptAssignSource:
   case CTP_WrappedProperty:
-  case CTP_ComposedPropertyWrapper:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
     break;
