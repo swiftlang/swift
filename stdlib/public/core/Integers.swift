@@ -1755,7 +1755,7 @@ extension BinaryInteger {
           offset &-= chunkByteCount
           (value, remainder) = value.quotientAndRemainder(dividingBy: divisor)
 
-          precondition(offset >= chunkSafetyMargin, "Insufficient buffer size")
+          _precondition(offset >= chunkSafetyMargin, "Insufficient buffer size")
           let buffer_ =
             unsafe UnsafeMutableBufferPointer<UTF8.CodeUnit>(
               _uncheckedStart: buffer.baseAddress! + offset,
@@ -1778,7 +1778,7 @@ extension BinaryInteger {
           remainder = UInt64(truncatingIfNeeded: value) & mask
           value >>= divisorOrRightShiftCount
 
-          precondition(offset >= chunkSafetyMargin, "Insufficient buffer size")
+          _precondition(offset >= chunkSafetyMargin, "Insufficient buffer size")
           let buffer_ =
             unsafe UnsafeMutableBufferPointer<UTF8.CodeUnit>(
               _uncheckedStart: buffer.baseAddress! + offset,
@@ -1793,7 +1793,7 @@ extension BinaryInteger {
         }
       }
 
-      precondition(offset >= safetyMargin, "Insufficient buffer size")
+      _precondition(offset >= safetyMargin, "Insufficient buffer size")
       let buffer_ =
         unsafe UnsafeMutableBufferPointer<UTF8.CodeUnit>(
           _uncheckedStart: buffer.baseAddress!,
