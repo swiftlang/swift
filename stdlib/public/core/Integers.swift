@@ -1724,7 +1724,7 @@ extension BinaryInteger {
       //   `i + 2` to the power of `j`; or, if `i + 2` is a power of 2, the
       //   exponent `k` such that `1 << k` is the result of raising `i + 2` to
       //   the power of `j`.
-      let lookup: InlineArray<35, UInt64> = [
+      let lookup: _InlineArray<35, UInt64> = [
         0x40_00000000000040, 0x23_b1bf6cd930979b, 0x20_00000000000040,
         0x18_d3c21bcecceda1, 0x15_4def8a56600000, 0x13_287f3c1a5b27d7,
         0x15_0000000000003f, 0x11_3b3fcef3103289, 0x10_2386f26fc10000,
