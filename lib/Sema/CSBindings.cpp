@@ -966,15 +966,6 @@ void BindingSet::determineLiteralCoverage() {
 }
 
 void BindingSet::addLiteralRequirement(Constraint *constraint) {
-  auto isDirectRequirement = [&](Constraint *constraint) -> bool {
-    if (auto *typeVar = constraint->getFirstType()->getAs<TypeVariableType>()) {
-      auto *repr = CS.getRepresentative(typeVar);
-      return repr == TypeVar;
-    }
-
-    return false;
-  };
-
   auto *protocol = constraint->getProtocol();
 
   // Let's try to coalesce integer and floating point literal protocols
@@ -1000,23 +991,25 @@ void BindingSet::addLiteralRequirement(Constraint *constraint) {
   if (Literals.count(protocol) > 0)
     return;
 
+  auto isDirectRequirement = [&](Constraint *constraint) -> bool {
+    if (auto *typeVar = constraint->getFirstType()->getAs<TypeVariableType>()) {
+      auto *repr = CS.getRepresentative(typeVar);
+      return repr == TypeVar;
+    }
+
+    return false;
+  };
+
   bool isDirect = isDirectRequirement(constraint);
 
-  // Coverage is not applicable to `ExpressibleByNilLiteral` since it
-  // doesn't have a default type.
-  if (protocol->isSpecificProtocol(
+  Type defaultType;
+  // `ExpressibleByNilLiteral` doesn't have a default type.
+  if (!protocol->isSpecificProtocol(
           KnownProtocolKind::ExpressibleByNilLiteral)) {
-    Literals.insert(
-        {protocol, LiteralRequirement(constraint,
-                                      /*DefaultType=*/Type(), isDirect)});
-    return;
+    defaultType = TypeChecker::getDefaultType(protocol, CS.DC);
   }
 
-  // Check whether any of the existing bindings covers this literal
-  // protocol.
-  LiteralRequirement literal(
-      constraint, TypeChecker::getDefaultType(protocol, CS.DC), isDirect);
-
+  LiteralRequirement literal(constraint, defaultType, isDirect);
   Literals.insert({protocol, std::move(literal)});
 }
 
