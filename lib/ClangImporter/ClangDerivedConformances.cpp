@@ -1536,19 +1536,22 @@ void swift::conformToHashableIfNeeded(ClangImporter::Implementation &impl,
       lookupAndSpecializeFunctionObject(impl, clangDecl, "equal_to");
 
   // we bail if [std::hash<>] couldn't be found
-  if (!stdHashSpec) {
+  if (!stdHashSpec)
     return;
-  }
 
   if (!stdETSpec && !getEqualEqualOperator(decl))
-      return;
+    return;
 
-  auto *stdHash =
-      dyn_cast<StructDecl>(impl.importDecl(stdHashSpec, impl.CurrentVersion));
+  auto *stdHash = impl.importDecl(stdHashSpec, impl.CurrentVersion);
   if (!stdHash)
     return;
-  FuncDecl *hashFunc = synthesizer.makeHashFunc(decl, stdHash);
-  decl->addMember(hashFunc);
+
+  if (auto *stdHashStruct = dyn_cast<StructDecl>(stdHash)) {
+    FuncDecl *hashFunc = synthesizer.makeHashFunc(decl, stdHashStruct);
+    decl->addMember(hashFunc);
+  } else {
+    return;
+  }
 
   // we have two possible sources for [==(_:_:)]
   // 1. [std::equal_to<T>]
@@ -1562,9 +1565,11 @@ void swift::conformToHashableIfNeeded(ClangImporter::Implementation &impl,
   // custom [std::equal_to<T>] specialization that does not agree with
   // [operator==(T, T)]
   if (!getEqualEqualOperator(decl)) {
-    auto *stdET =
-        dyn_cast<StructDecl>(impl.importDecl(stdETSpec, impl.CurrentVersion));
-    if (!stdET)
+    // FIXME: I'm simply importing the [std::equal_to<T>] declaration so that
+    // it's loaded into clang context, otherwise the next
+    // [synthesizeCXXOperatorWithFunctionObject] call will fail. There is
+    // probably a more suitable function to call here.
+    if (!impl.importDecl(stdETSpec, impl.CurrentVersion))
       return;
     if (!synthesizeCXXOperatorWithFunctionObject(
             impl, clangDecl, stdETSpec, clang::BinaryOperatorKind::BO_EQ))
