@@ -252,12 +252,21 @@ func test_lambda1() {
 
 func test_lambda2() {
   // A recursive lambda.
-  var fib = { (n: Int) -> Int in // expected-note 2{{'fib' declared here}}
+  var fibLocal = { (n: Int) -> Int in // expected-note 2{{'fibLocal' declared here}}
     if (n < 2) {
       return n
     }
     
-    return fib(n-1)+fib(n-2) // expected-error 2{{use of local variable 'fib' before its declaration}}
+    return fibLocal(n-1)+fibLocal(n-2) // expected-error 2{{use of local variable 'fibLocal' before its declaration}}
+  }
+
+  var fib = { (n: Int) -> Int in
+    if (n < 2) {
+      return n
+    }
+
+    // These resolve to the top-level function.
+    return fib(n-1)+fib(n-2)
   }
 }
 
