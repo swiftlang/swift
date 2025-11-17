@@ -922,7 +922,7 @@ bool ConstraintGraph::contractEdges() {
     if (tyvar1->getImpl().canBindToInOut()) {
       bool isNotContractable = true;
       auto bindings = CS.getBindingsFor(tyvar1);
-      if (bindings.hasViableBindings() || bindings.isDirectHole()) {
+      if (bindings.isViable()) {
         // Holes can't be contracted.
         if (bindings.isHole())
           continue;

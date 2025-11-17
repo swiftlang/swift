@@ -482,6 +482,12 @@ public:
            !Defaults.empty();
   }
 
+  /// Determine whether this set can be chosen as the next binding set
+  /// to attempt.
+  bool isViable() const {
+    return hasViableBindings() || isDirectHole();
+  }
+
   ArrayRef<Constraint *> getConformanceRequirements() const {
     return Protocols;
   }

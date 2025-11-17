@@ -1170,7 +1170,7 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
     // associated with given type variable, any default constraints,
     // or any conformance requirements to literal protocols with can
     // produce a default type.
-    bool isViable = bindings.hasViableBindings() || bindings.isDirectHole();
+    bool isViable = bindings.isViable();
 
     bindings.inferTransitiveSupertypeBindings();
     bindings.determineLiteralCoverage();
