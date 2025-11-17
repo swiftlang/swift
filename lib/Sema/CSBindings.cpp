@@ -219,10 +219,11 @@ bool BindingSet::involvesTypeVariables() const {
       TypeVar->getImpl().canBindToPack())
     return true;
 
-  // This is effectively O(1) right now since bindings are re-computed
-  // on each step of the solver, but once bindings are computed
-  // incrementally it becomes more important to double-check that
-  // any adjacent type variables found previously are still unresolved.
+  // This is effectively a no-op right now since bindings are re-computed
+  // on each step of the solver and fixed types won't appear in AdjancentVars,
+  // but once bindings are computed incrementally it becomes important
+  // to double-check that any adjacent type variables found previously are
+  // still unresolved.
   return llvm::any_of(AdjacentVars, [](TypeVariableType *typeVar) {
     return !typeVar->getImpl().getFixedType(/*record=*/nullptr);
   });
