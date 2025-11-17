@@ -261,6 +261,15 @@ public func swift_allocEmptyBox() -> Builtin.RawPointer {
   return box
 }
 
+/// The embedded swift_allocBox version is different to the standad one in that
+/// we want to avoid building metadata for the box type. Instead we store the
+/// metadata of the contained type in the heap object. To make this work when
+/// destroying the box the release needs to be special i.e `swift_releaseBox`.
+/// It does not call the the heap object metadata's destroy function. Rather, it
+/// knows that the allocBox's metadata is the contained objects and calls an
+/// appropriate implementation: `_swift_embedded_invoke_box_destroy`.
+/// Therefore, one cannot not use `swift_release` but rather must use
+/// `swift_releaseBox` to implement the "release" function of a box object.
 
 @_silgen_name("swift_allocBox")
 public func swift_allocBox(_ metadata: Builtin.RawPointer) -> (Builtin.RawPointer, Builtin.RawPointer) {
