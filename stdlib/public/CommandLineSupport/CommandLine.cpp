@@ -41,6 +41,10 @@
 #pragma comment(lib, "shell32.lib")
 #endif
 
+#if defined(__OpenBSD__)
+#include <unistd.h>
+#endif
+
 // Backing storage for overrides of `Swift.CommandLine.arguments`.
 static char **_swift_stdlib_ProcessOverrideUnsafeArgv = nullptr;
 static int _swift_stdlib_ProcessOverrideUnsafeArgc = 0;
@@ -645,7 +649,7 @@ char *copyExecutablePath(void) {
 }
 #elif defined(__OpenBSD__)
 /// Storage for ``captureEarlyCWD()``.
-static constinit std::atomic<const char *> earlyCWD { nullptr };
+static std::atomic<const char *> earlyCWD { nullptr };
 
 /// At process start (before `main()` is called), capture the current working
 /// directory.
@@ -667,13 +671,13 @@ char *copyExecutablePath(void) {
     // OpenBSD does not have API to get a path to the running executable. Use
     // argv[0]. We do a basic sniff test for a path-like string.
     const char *slash = strchr(argv[0], '/');
-    if (slash && slash > argv) {
+    if (slash && slash > argv[0]) {
       // There's a slash _after_ the first character. Assume it's a relative
       // path and prepend it with the early CWD.
       if (const char *cwd = earlyCWD.load()) {
         size_t byteCount = strlen(cwd) + 1 + strlen(argv[0]) + 1;
         auto result = static_cast<char *>(malloc(byteCount));
-        snprintf(result, "%s/%s", cwd, argv[0]);
+        snprintf(result, byteCount, "%s/%s", cwd, argv[0]);
         return result;
       }
       swift::fatalError(
