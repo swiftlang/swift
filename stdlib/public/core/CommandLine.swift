@@ -152,7 +152,7 @@ internal static func _NSGetExecutablePath(
     // just set a reasonable initial value, then loop and try again on failure.
     var byteCount = UInt32(128)
     while true {
-      let result = unsafe withUnsafeTemporaryAllocation(
+      let result: String? = unsafe withUnsafeTemporaryAllocation(
         of: CChar.self,
         capacity: Int(byteCount)
       ) { buffer in
