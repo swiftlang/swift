@@ -1841,6 +1841,22 @@ static void swift_task_removePriorityEscalationHandlerImpl(
 }
 
 SWIFT_CC(swift)
+static void swift_task_cancellationShieldPushImpl() {
+  if (AsyncTask *task = swift_task_getCurrent()) {
+    // return // TODO: impl bool return
+    auto pushed = task->cancellationShieldPush();
+  }
+  // return false; // TODO: impl bool return
+}
+
+SWIFT_CC(swift)
+static void swift_task_cancellationShieldPopImpl() {
+  if (AsyncTask *task = swift_task_getCurrent()) {
+    task->cancellationShieldPop();
+  }
+}
+
+SWIFT_CC(swift)
 static NullaryContinuationJob*
 swift_task_createNullaryContinuationJobImpl(
     size_t priority,

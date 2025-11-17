@@ -163,3 +163,25 @@ public struct CancellationError: Error {
   // no extra information, cancellation is intended to be light-weight
   public init() {}
 }
+
+// ==== Task Cancellation Shielding -------------------------------------------
+
+@available(SwiftStdlib 6.3, *)
+public nonisolated(nonsending) func withTaskCancellationShield<T, E>(
+  operation: nonisolated(nonsending) () async throws(E) -> T,
+) async throws(E) -> T {
+  let record = unsafe Builtin.taskCancellationShieldPush()
+  defer { unsafe Builtin.taskCancellationShieldPop() }
+
+  return try await operation()
+}
+
+@available(SwiftStdlib 6.3, *)
+public func withTaskCancellationShield<T, E>(
+  operation: () throws(E) -> T,
+) throws(E) -> T {
+  let record = unsafe Builtin.taskCancellationShieldPush()
+  defer { unsafe Builtin.taskCancellationShieldPop() }
+
+  return try operation()
+}
