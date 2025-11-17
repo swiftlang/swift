@@ -3183,7 +3183,7 @@ FuncDecl *SwiftDeclSynthesizer::makeAvailabilityDomainPredicate(
       BuiltinIntegerType::get(1, ctx), ImporterImpl.ImportedHeaderUnit);
   funcDecl->setBodySynthesizer(synthesizeAvailabilityDomainPredicateBody,
                                (void *)var);
-  funcDecl->setAccess(AccessLevel::Internal);
+  funcDecl->setAccess(AccessLevel::Private);
 
   ImporterImpl.availabilityDomainPredicates[var] = funcDecl;
 
