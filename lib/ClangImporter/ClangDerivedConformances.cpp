@@ -1535,12 +1535,11 @@ void swift::conformToHashableIfNeeded(ClangImporter::Implementation &impl,
   auto *stdETSpec =
       lookupAndSpecializeFunctionObject(impl, clangDecl, "equal_to");
 
-  // we bail if std::hash<> couldn't be found
+  // we bail if [std::hash<>] couldn't be found
   if (!stdHashSpec) {
     return;
   }
 
-  // if we cannot find std::equal_to<>, we can still try operator==
   if (!stdETSpec && !getEqualEqualOperator(decl))
       return;
 
@@ -1553,8 +1552,15 @@ void swift::conformToHashableIfNeeded(ClangImporter::Implementation &impl,
 
   // we have two possible sources for [==(_:_:)]
   // 1. [std::equal_to<T>]
-  // 2. [bool operator==(T, T)]
-  // For backward compatibility and simplicity, 2 is prioritized over 1
+  // 2. [operator==(T, T)]
+  // The current implementation prioritize 2 over 1, which as the following
+  // effects,
+  // - the behavior of [==(_:_:)] operator in Swift will match that of
+  // [operator==(T, T)] in C++, if both exist,
+  // - the behavior of unordered containers (such as [Set]) in Swift will not
+  // match their equivalences ([unordered_set]) in C++, if the C++ type has a
+  // custom [std::equal_to<T>] specialization that does not agree with
+  // [operator==(T, T)]
   if (!getEqualEqualOperator(decl)) {
     auto *stdET =
         dyn_cast<StructDecl>(impl.importDecl(stdETSpec, impl.CurrentVersion));
