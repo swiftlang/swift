@@ -1126,10 +1126,12 @@ func rdar17170728() {
     // expected-error@-1 4 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
   }
 
+  // FIXME: Bad diagnostic, `Bool.Stride` is bogus, we shouldn't be suggesting
+  // `reduce(into:)`, and the actual problem is that Int cannot be used as a boolean
+  // condition.
   let _ = [i, j, k].reduce(0 as Int?) { // expected-error {{missing argument label 'into:' in call}}
-    // expected-error@-1 {{cannot convert value of type 'Int?' to expected argument type '(inout (Bool, Bool) -> Bool?, Int?) throws -> ()'}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
-    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
+    // expected-error@-1 {{binary operator '+' cannot be applied to operands of type 'Bool.Stride' and 'Bool'}}
   }
 }
 

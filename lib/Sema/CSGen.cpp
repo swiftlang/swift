@@ -1308,14 +1308,17 @@ namespace {
       CS.setType(expr, expansionType);
     }
 
-    /// Records a fix for an invalid AST node, and returns a potential hole
-    /// type variable for it.
+    /// Records a fix for an invalid AST node, and returns a hole for it.
     Type recordInvalidNode(ASTNode node) {
       CS.recordFix(
           IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(node)));
 
-      return CS.createTypeVariable(CS.getConstraintLocator(node),
-                                   TVO_CanBindToHole);
+      // Ideally we wouldn't need a type variable here, but we don't have a
+      // suitable placeholder originator for all the cases here.
+      auto ty = CS.createTypeVariable(CS.getConstraintLocator(node),
+                                      TVO_CanBindToHole);
+      CS.recordTypeVariablesAsHoles(ty);
+      return ty;
     }
 
     virtual Type visitErrorExpr(ErrorExpr *E) {
