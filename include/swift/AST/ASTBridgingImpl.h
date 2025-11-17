@@ -177,12 +177,20 @@ OptionalBridgedDeclObj BridgedDeclObj::getParent() const {
   return {unbridged()->getDeclContext()->getAsDecl()};
 }
 
-BridgedDeclContext BridgedDeclObj::getDeclContext() const {
+BridgedNullableDeclContext BridgedDeclObj::getDeclContext() const {
   return {unbridged()->getDeclContext()};
 }
 
 BridgedDeclContext BridgedDeclObj::asGenericContext() const {
   return {static_cast<swift::DeclContext *>(getAs<swift::GenericContext>())};
+}
+
+BridgedDeclContext BridgedDeclObj::asTopLevelCodeDecl() const {
+  return {static_cast<swift::DeclContext *>(getAs<swift::TopLevelCodeDecl>())};
+}
+
+BridgedDeclContext BridgedDeclObj::asModuleDecl() const {
+  return {static_cast<swift::DeclContext *>(getAs<swift::ModuleDecl>())};
 }
 
 void BridgedDeclObj::setImplicit() const {

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,18 +23,21 @@ public class Decl: CustomStringConvertible, Hashable {
   /// The module in which this declaration resides.
   final public var parentModule: ModuleDecl { bridged.getModuleContext().getAs(ModuleDecl.self) }
 
-  /// The parent DeclContext if it is a Decl.
-  final public var parent: Decl? { bridged.getParent().decl }
+  /// The parent DeclContext.
+  final public var parentDeclContext: DeclContext? {
+    if let decl = bridged.getParent().decl {
+      return decl as! DeclContext
+    }
+    if let bridgedDeclContext = BridgedDeclContext(bridged: bridged.getDeclContext()) {
+      // A DeclContext which is not a Decl.
+      // TODO: once we have bridged those DeclContext classes, get rid of UnknownDeclContext
+      return UnknownDeclContext(bridged: bridgedDeclContext)
+    }
+    return nil
+  }
 
   // True if this declaration is imported from C/C++/ObjC.
   final public var hasClangNode: Bool { bridged.hasClangNode() }
-
-  final public var declContext: DeclContext {
-    if let decl = parent {
-      return decl as! DeclContext
-    }
-    return UnknownDeclContext(bridged: bridged.getDeclContext())
-  }
 
   final public var bridgedDecl: BridgedDecl { BridgedDecl(raw: bridged.obj) }
 
@@ -153,7 +156,9 @@ final public class GenericTypeParamDecl: TypeDecl {
 
 final public class AssociatedTypeDecl: TypeDecl {}
 
-final public class ModuleDecl: TypeDecl {}
+final public class ModuleDecl: TypeDecl, DeclContext {
+  public var bridgedDeclContext: BridgedDeclContext { bridged.asModuleDecl() }
+}
 
 public class AbstractStorageDecl: ValueDecl {
   final public var isConst: Bool { bridged.AbstractStorage_isConst() }
@@ -171,9 +176,9 @@ final public class ParamDecl: VarDecl {
   }
 }
 
-final public class SubscriptDecl: AbstractStorageDecl {}
+final public class SubscriptDecl: AbstractStorageDecl, GenericContext {}
 
-public class AbstractFunctionDecl: ValueDecl {
+public class AbstractFunctionDecl: ValueDecl, GenericContext {
   public var isOverridden: Bool { bridged.AbstractFunction_isOverridden() }
 }
 
@@ -209,9 +214,11 @@ final public class EnumElementDecl: ValueDecl {
   }
 }
 
-final public class ExtensionDecl: Decl {}
+final public class ExtensionDecl: Decl, GenericContext {}
 
-final public class TopLevelCodeDecl: Decl {}
+final public class TopLevelCodeDecl: Decl, DeclContext {
+  public var bridgedDeclContext: BridgedDeclContext { bridged.asTopLevelCodeDecl() }
+}
 
 final public class ImportDecl: Decl {}
 
@@ -320,9 +327,17 @@ extension GenericParameterList {
 
 extension BridgedDecl {
   public var declObj: BridgedDeclObj {
-    BridgedDeclObj(SwiftObject(raw.bindMemory(to: BridgedSwiftObject.self, capacity: 1)))
+    BridgedDeclObj(self)
   }
-  public var decl: Decl { declObj.decl }
+}
+
+extension BridgedDeclContext {
+  public init?(bridged: BridgedNullableDeclContext) {
+    guard let raw = bridged.raw else {
+      return nil
+    }
+    self.init(raw: raw)
+  }
 }
 
 extension SourceFile {
