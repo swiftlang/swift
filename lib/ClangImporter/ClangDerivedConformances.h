@@ -14,6 +14,7 @@
 #define SWIFT_CLANG_DERIVED_CONFORMANCES_H
 
 #include "ImporterImpl.h"
+#include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTContext.h"
 
 namespace swift {
@@ -83,6 +84,10 @@ void conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
                                 NominalTypeDecl *decl,
                                 const clang::CXXRecordDecl *clangDecl);
 
+void conformToHashableIfNeeded(ClangImporter::Implementation &impl,
+                               SwiftDeclSynthesizer &synthesizer,
+                               NominalTypeDecl *decl,
+                               const clang::CXXRecordDecl *clangDecl);
 } // namespace swift
 
 #endif // SWIFT_CLANG_DERIVED_CONFORMANCES_H

@@ -1364,3 +1364,64 @@ void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
     impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxMutableSpan});
   }
 }
+static clang::ClassTemplateSpecializationDecl *
+lookupAndSpecializeFunctionObject(ClangImporter::Implementation &impl,
+                                  const clang::CXXRecordDecl *clangDecl,
+                                  std::string name) {
+  assert(clangDecl);
+  clang::ASTContext &Ctx = impl.getClangASTContext();
+  clang::Sema &clangSema = impl.getClangSema();
+
+  clang::NamespaceDecl *stdNS = clangSema.getStdNamespace();
+  // maybe the C++ header didn't include standard library?
+  if (!stdNS)
+    return nullptr;
+
+  clang::DeclarationName declName =
+      Ctx.DeclarationNames.getIdentifier(&Ctx.Idents.get(name));
+
+  clang::ClassTemplateDecl *tmplDecl =
+      stdNS->lookup(declName).find_first<clang::ClassTemplateDecl>();
+
+  if (!tmplDecl)
+    return nullptr;
+
+  // find specialization to the current clangDecl
+  void *insertPos = nullptr;
+  return tmplDecl->findSpecialization(
+      {clang::TemplateArgument(
+          clangDecl->getASTContext().getTypeDeclType(clangDecl))},
+      insertPos);
+}
+
+void swift::conformToHashableIfNeeded(ClangImporter::Implementation &impl,
+                                      SwiftDeclSynthesizer &synthesizer,
+                                      NominalTypeDecl *decl,
+                                      const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("conforming to Hashable", decl);
+
+  assert(decl);
+  assert(clangDecl);
+
+  auto *stdHashSpec =
+      lookupAndSpecializeFunctionObject(impl, clangDecl, "hash");
+
+  // we bail if std::hash<> couldn't be found
+  if (!stdHashSpec) {
+    return;
+  }
+
+  // we bail if we cannot find any operator==
+  if (!getEqualEqualOperator(decl))
+    return;
+
+  auto *stdHash =
+      dyn_cast<StructDecl>(impl.importDecl(stdHashSpec, impl.CurrentVersion));
+  if (!stdHash)
+    return;
+  FuncDecl *hashFunc = synthesizer.makeHashFunc(decl, stdHash);
+  decl->addMember(hashFunc);
+
+  impl.addSynthesizedProtocolAttrs(
+      decl, {KnownProtocolKind::Equatable, KnownProtocolKind::Hashable});
+}
