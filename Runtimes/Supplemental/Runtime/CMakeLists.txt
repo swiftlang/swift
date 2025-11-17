@@ -93,7 +93,8 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:-cxx-interoperability-mode=default>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -experimental-spi-only-imports>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
-  "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+  "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -define-availability -Xfrontend \"Backtracing 6.2: macOS 26.0\">")
 
 if(${PROJECT_NAME}_ENABLE_DIRECT_RETAIN_RELEASE)
   find_package(SwiftSwiftDirectRuntime REQUIRED)

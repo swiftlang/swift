@@ -108,6 +108,16 @@ else()
   set(osx_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
 endif()
 
+# Set the availability macro correctly; do NOT update this for newer
+# versions; instead, please use SwiftStdlib or StdlibDeploymentTarget for
+# future releases.  We don't do that here, because we don't yet support
+# iOS/watchOS/tvOS/visionOS.
+if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "26.0")
+  set(backtracing_availability "macOS ${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
+else()
+  set(backtracing_availability "macOS 26.0")
+endif()
+
 add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${RUNTIME_SOURCES}
 
@@ -130,6 +140,8 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     ${RUNTIME_COMPILE_FLAGS}
     -parse-stdlib
+    -Xfrontend -define-availability
+    -Xfrontend "Backtracing 6.2: ${backtracing_availability}"
 
   LINK_FLAGS
     ${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}

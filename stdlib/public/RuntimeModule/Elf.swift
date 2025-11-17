@@ -2047,6 +2047,7 @@ func getElfImageInfo<R: MemoryReader, Traits: ElfTraits>(
 // .. Testing ..................................................................
 
 @_spi(ElfTest)
+@available(Backtracing 6.2, *)
 public func testElfImageAt(path: String) -> Bool {
   guard let source = try? ImageSource(path: path) else {
     print("\(path) was not accessible")
