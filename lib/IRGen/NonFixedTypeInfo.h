@@ -63,18 +63,21 @@ public:
   static bool isFixed() { return false; }
 
   StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                             const llvm::Twine &name) const override {
+                             const llvm::Twine &name,
+                             StackAllocationIsNested_t isNested =
+                                 StackAllocationIsNested) const override {
     // Allocate memory on the stack.
-    auto alloca = IGF.emitDynamicAlloca(T, name);
+    auto alloca = IGF.emitDynamicStackAllocation(T, isNested, name);
     IGF.Builder.CreateLifetimeStart(alloca.getAddressPointer());
     return alloca.withAddress(
              getAsBitCastAddress(IGF, alloca.getAddressPointer()));
   }
 
-  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
-                       SILType T) const override {
+  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,
+                       StackAllocationIsNested_t isNested =
+                           StackAllocationIsNested) const override {
     IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
-    IGF.emitDeallocateDynamicAlloca(stackAddress);
+    IGF.emitDynamicStackDeallocation(stackAddress, isNested);
   }
 
   void destroyStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,

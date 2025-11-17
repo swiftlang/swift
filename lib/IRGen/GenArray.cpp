@@ -638,24 +638,26 @@ public:
     return nullptr;
   }
 
-  StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                             const llvm::Twine &name) const override {
+  StackAddress
+  allocateStack(IRGenFunction &IGF, SILType T, const llvm::Twine &name,
+                StackAllocationIsNested_t isNested) const override {
     // Allocate memory on the stack.
-    auto alloca = IGF.emitDynamicAlloca(T, name);
+    auto alloca = IGF.emitDynamicStackAllocation(T, isNested, name);
     IGF.Builder.CreateLifetimeStart(alloca.getAddressPointer());
     return alloca.withAddress(getAddressForPointer(alloca.getAddressPointer()));
   }
 
-  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
-                       SILType T) const override {
+  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,
+                       StackAllocationIsNested_t isNested) const override {
     IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
-    IGF.emitDeallocateDynamicAlloca(stackAddress);
+    IGF.emitDynamicStackDeallocation(stackAddress, isNested);
   }
 
   void destroyStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,
                     bool isOutlined) const override {
     emitDestroyCall(IGF, T, stackAddress.getAddress());
-    deallocateStack(IGF, stackAddress, T);
+    // For now, just always do nested.
+    deallocateStack(IGF, stackAddress, T, StackAllocationIsNested);
   }
 
   TypeLayoutEntry *
