@@ -315,6 +315,113 @@ public func swifft_makeBoxUnique(buffer: Builtin.RawPointer, metadata: Builtin.R
     return (box, oldObjectAddr._rawValue)
   }
 }
+/// Dynamic cast support
+/// Only supports existential container to concrete casts.
+struct DynamicCastFlags {
+  static let Default           = UInt(bitPattern: 0x0)
+  static let Unconditional     = UInt(bitPattern: 0x1)
+  static let TakeOnSuccess     = UInt(bitPattern: 0x2)
+  static let DestroyOnFailure  = UInt(bitPattern: 0x4)
+}
+
+struct MetadataKind {
+  static let LastEnumerated = UInt(bitPattern: 0x7FF)
+}
+
+func projectExistentialMetadata(
+  _ exist: Builtin.RawPointer
+) -> Builtin.RawPointer {
+
+  let offset = (3 * MemoryLayout<Builtin.RawPointer>.size)
+  let addrOfMetadata = unsafe UnsafeMutableRawPointer(exist) + offset
+  let metadataPtrAddr = unsafe addrOfMetadata.bindMemory(to: Builtin.RawPointer.self, capacity: 1)
+  return unsafe metadataPtrAddr.pointee
+}
+
+func isClassMetadata(_ metadata: Builtin.RawPointer) -> Bool {
+  let addrOfMetadataKind = unsafe UnsafePointer<UInt>(metadata)
+  let kind = unsafe addrOfMetadataKind.pointee
+  return  kind == 0 || kind > MetadataKind.LastEnumerated
+}
+
+func projectHeapObject(_ exist: Builtin.RawPointer) -> UnsafeMutableRawPointer{
+  let addrOfHeapObject = unsafe UnsafePointer<UnsafeMutableRawPointer>(exist)
+  return unsafe addrOfHeapObject.pointee
+}
+
+@c
+public func swift_dynamicCast(
+  _ dest: Builtin.RawPointer, /* points to a concrete type */
+  _ src: Builtin.RawPointer, /* points to an existential */
+  _ srcMetadata: Builtin.RawPointer, /* always nullptr */
+  _ dstMetadata: Builtin.RawPointer,
+  _ flags: UInt
+) -> Bool {
+
+  let isUnconditionalCast : Bool = (flags & DynamicCastFlags.Unconditional) != 0
+  let isTakeOnSuccess : Bool = (flags & DynamicCastFlags.TakeOnSuccess) != 0
+  let isDestroyOnFailure : Bool =
+    (flags & DynamicCastFlags.DestroyOnFailure) != 0
+
+  let srcMetadata = projectExistentialMetadata(src)
+
+  let isClass = isClassMetadata(dstMetadata)
+
+  if isClass {
+    var success = false
+    let obj = unsafe projectHeapObject(src)
+    if isClassMetadata(srcMetadata) {
+      if srcMetadata != dstMetadata {
+        // check parent chain
+        success = unsafe swift_dynamicCastClass(object: obj, targetMetadata: UnsafeMutableRawPointer(dstMetadata)) != nil
+      } else {
+        success = true
+      }
+    }
+    if !success {
+      if isDestroyOnFailure {
+        unsafe _swift_embedded_existential_destroy(UnsafeMutableRawPointer(src))
+      }
+
+      if isUnconditionalCast {
+        fatalError("failed cast")
+      }
+      return false
+    }
+    if isTakeOnSuccess {
+      let dst = unsafe UnsafeMutablePointer<UnsafeMutableRawPointer>(dest)
+      unsafe dst.pointee = obj
+
+    } else {
+      let dst = unsafe UnsafeMutablePointer<UnsafeMutableRawPointer>(dest)
+      unsafe dst.pointee = obj
+      swift_retain(object: obj._rawValue)
+    }
+    return true;
+  }
+  // destintation type is not a class. Test exact match.
+  let success = srcMetadata == dstMetadata
+  if !success {
+    if isDestroyOnFailure {
+      unsafe _swift_embedded_existential_destroy(UnsafeMutableRawPointer(src))
+    }
+
+    if isUnconditionalCast {
+      fatalError("failed cast")
+    }
+    return false
+  }
+  if isTakeOnSuccess {
+    // take from an existential to a concrete type
+    unsafe _swift_embedded_existential_init_with_take(
+             UnsafeMutableRawPointer(dest), UnsafeMutableRawPointer(src))
+  } else {
+    // copy from an existential to a concrete type
+    unsafe _swift_embedded_existential_init_with_copy(
+             UnsafeMutableRawPointer(dest), UnsafeMutableRawPointer(src))
+  }
+  return true
+}
 
 /// Refcounting
 

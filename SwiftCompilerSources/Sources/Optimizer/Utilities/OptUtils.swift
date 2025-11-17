@@ -1001,6 +1001,23 @@ func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalTy
   }
 }
 
+func isCastSupportedInEmbeddedSwift(from sourceType: Type,
+                                    to destType: Type ) -> Bool {
+  if !sourceType.isExistential {
+    return false
+  }
+  if destType.hasArchetype {
+    return false
+  }
+
+  // Tuple?
+  if !destType.isStruct && !destType.isClass && !destType.isEnum {
+    return false
+  }
+
+  return true
+}
+
 extension CheckedCastAddrBranchInst {
   var dynamicCastResult: Bool? {
     switch classifyDynamicCastBridged(bridged) {
@@ -1009,6 +1026,18 @@ extension CheckedCastAddrBranchInst {
       case .willFail:    return false
       default: fatalError("unknown result from classifyDynamicCastBridged")
     }
+  }
+
+  var supportedInEmbeddedSwift: Bool {
+    return isCastSupportedInEmbeddedSwift(from: source.type,
+                                          to: destination.type)
+  }
+}
+
+extension UnconditionalCheckedCastAddrInst {
+  var supportedInEmbeddedSwift: Bool {
+    return isCastSupportedInEmbeddedSwift(from: source.type,
+                                          to: destination.type)
   }
 }
 
