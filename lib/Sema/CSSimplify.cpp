@@ -16696,7 +16696,6 @@ void ConstraintSystem::addContextualConversionConstraint(
 
   case CTP_ArrayElement:
   case CTP_AssignSource:
-  case CTP_CalleeResult:
   case CTP_CannotFail:
   case CTP_Condition:
   case CTP_Unused:
@@ -16712,7 +16711,6 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_CoerceOperand:
   case CTP_SubscriptAssignSource:
   case CTP_WrappedProperty:
-  case CTP_ComposedPropertyWrapper:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
     break;
