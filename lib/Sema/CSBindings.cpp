@@ -38,12 +38,6 @@ void ConstraintGraphNode::initBindingSet() {
   Set.emplace(CG.getConstraintSystem(), TypeVar, Potential);
 }
 
-/// Check whether there exists a type that could be implicitly converted
-/// to a given type i.e. is the given type is Double or Optional<..> this
-/// function is going to return true because CGFloat could be converted
-/// to a Double and non-optional value could be injected into an optional.
-static bool hasConversions(Type);
-
 BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
                        const PotentialBindings &info)
     : CS(CS), TypeVar(TypeVar), Info(info) {
@@ -1340,6 +1334,40 @@ static bool checkTypeOfBinding(TypeVariableType *typeVar, Type type) {
   return true;
 }
 
+/// Check whether there exists a type that could be implicitly converted
+/// to a given type i.e. is the given type is Double or Optional<..> this
+/// function is going to return true because CGFloat could be converted
+/// to a Double and non-optional value could be injected into an optional.
+static bool hasConversions(Type type) {
+  if (type->isAnyHashable() || type->isDouble() || type->isCGFloat())
+    return true;
+
+  if (type->getAnyPointerElementType())
+    return true;
+
+  if (auto *structTy = type->getAs<BoundGenericStructType>()) {
+    if (auto eltTy = structTy->getArrayElementType()) {
+      return hasConversions(eltTy);
+    } else if (auto pair = ConstraintSystem::isDictionaryType(structTy)) {
+      return hasConversions(pair->second);
+    } else if (auto eltTy = ConstraintSystem::isSetType(structTy)) {
+      return hasConversions(*eltTy);
+    }
+
+    return false;
+  }
+
+  if (auto *enumTy = type->getAs<BoundGenericEnumType>()) {
+    if (enumTy->getOptionalObjectType())
+      return true;
+
+    return false;
+  }
+
+  return !(type->is<StructType>() || type->is<EnumType>() ||
+           type->is<BuiltinType>() || type->is<ArchetypeType>());
+}
+
 bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
@@ -1414,36 +1442,6 @@ bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
   }
 
   return true;
-}
-
-static bool hasConversions(Type type) {
-  if (type->isAnyHashable() || type->isDouble() || type->isCGFloat())
-    return true;
-
-  if (type->getAnyPointerElementType())
-    return true;
-
-  if (auto *structTy = type->getAs<BoundGenericStructType>()) {
-    if (auto eltTy = structTy->getArrayElementType()) {
-      return hasConversions(eltTy);
-    } else if (auto pair = ConstraintSystem::isDictionaryType(structTy)) {
-      return hasConversions(pair->second);
-    } else if (auto eltTy = ConstraintSystem::isSetType(structTy)) {
-      return hasConversions(*eltTy);
-    }
-
-    return false;
-  }
-
-  if (auto *enumTy = type->getAs<BoundGenericEnumType>()) {
-    if (enumTy->getOptionalObjectType())
-      return true;
-
-    return false;
-  }
-
-  return !(type->is<StructType>() || type->is<EnumType>() ||
-           type->is<BuiltinType>() || type->is<ArchetypeType>());
 }
 
 bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
