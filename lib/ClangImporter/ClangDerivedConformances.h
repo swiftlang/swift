@@ -14,6 +14,7 @@
 #define SWIFT_CLANG_DERIVED_CONFORMANCES_H
 
 #include "ImporterImpl.h"
+#include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTContext.h"
 
 namespace swift {
