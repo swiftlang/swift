@@ -263,7 +263,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   case CTP_EnumCaseRawValue:
   case CTP_DefaultParameter:
   case CTP_AutoclosureDefaultParameter:
-  case CTP_CalleeResult:
   case CTP_CallArgument:
   case CTP_ClosureResult:
   case CTP_ArrayElement:
@@ -274,7 +273,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   case CTP_SubscriptAssignSource:
   case CTP_Condition:
   case CTP_WrappedProperty:
-  case CTP_ComposedPropertyWrapper:
   case CTP_CannotFail:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
