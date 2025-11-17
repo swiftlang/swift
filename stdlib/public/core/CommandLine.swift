@@ -125,13 +125,12 @@ extension CommandLine {
   }
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-@_extern(c, "_NSGetExecutablePath")
-@usableFromInline
-internal static func _NSGetExecutablePath(
-  _ buf: UnsafeMutablePointer<CChar>,
-  _ bufsize: UnsafeMutablePointer<UInt32>
-) -> CInt
-#endif
+  @_extern(c, "_NSGetExecutablePath")
+  @usableFromInline
+  internal static func _NSGetExecutablePath(
+    _ buf: UnsafeMutablePointer<CChar>,
+    _ bufsize: UnsafeMutablePointer<UInt32>
+  ) -> CInt
 
   /// The path to the current executable.
   ///
@@ -139,14 +138,9 @@ internal static func _NSGetExecutablePath(
   ///   disk while it is running. If the current executable file is moved, the
   ///   value of this property is not updated to its new path.
   @_unavailableInEmbedded
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
-#elseif os(WASI)
-  @available(*, unavailable, message: "Unavailable on WASI")
-#endif
-  public static let executablePath: String = {
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+  public static let executablePath: String { // NOTE: can't be AEIC and stored!
     // _NSGetExecutablePath() returns non-zero if the provided buffer is too
     // small and updates its *bufsize argument to the required value, so we can
     // just set a reasonable initial value, then loop and try again on failure.
@@ -165,15 +159,25 @@ internal static func _NSGetExecutablePath(
         return result
       }
     }
+  }
 #else
+  /// The path to the current executable.
+  ///
+  /// - Important: On some systems, it is possible to move an executable file on
+  ///   disk while it is running. If the current executable file is moved, the
+  ///   value of this property is not updated to its new path.
+  @_unavailableInEmbedded
+#if os(WASI)
+  @available(*, unavailable, message: "Unavailable on WASI")
+#endif
+  public static let executablePath: String = {
     // FIXME: avoid needing to allocate and free a temp C string (if possible)
     let cString = unsafe _copyExecutablePath()
     defer {
       unsafe _deallocExecutablePath(cString)
     }
     return unsafe String(cString: cString)
-#endif
   }()
-}
+#endif
 
 #endif // SWIFT_STDLIB_HAS_COMMANDLINE
