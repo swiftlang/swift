@@ -1541,10 +1541,8 @@ void swift::conformToHashableIfNeeded(ClangImporter::Implementation &impl,
   }
 
   // if we cannot find std::equal_to<>, we can still try operator==
-  if (!stdETSpec) {
-    if (!getEqualEqualOperator(decl))
+  if (!stdETSpec && !getEqualEqualOperator(decl))
       return;
-  }
 
   auto *stdHash =
       dyn_cast<StructDecl>(impl.importDecl(stdHashSpec, impl.CurrentVersion));
