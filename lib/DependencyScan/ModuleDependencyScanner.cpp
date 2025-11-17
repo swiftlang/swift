@@ -314,14 +314,9 @@ ModuleDependencyScanningWorker::scanFilesystemForSwiftModuleDependency(
 
 std::optional<clang::tooling::dependencies::TranslationUnitDeps>
 ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
-    Identifier moduleName,
-    LookupModuleOutputCallback lookupModuleOutput,
+    Identifier moduleName, LookupModuleOutputCallback lookupModuleOutput,
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenModules) {
-  //  auto clangModuleDependencies = clangScanningTool.getModuleDependencies(
-  //      moduleName.str(), clangScanningModuleCommandLineArgs,
-  //      clangScanningWorkingDirectoryPath, alreadySeenModules,
-  //      lookupModuleOutput);
   auto clangModuleDependencies =
       clangScanningTool.computeDependenciesByNameWithContext(
           moduleName.str(), alreadySeenModules, lookupModuleOutput);
