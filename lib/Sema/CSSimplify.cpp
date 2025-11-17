@@ -11604,22 +11604,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             // `key path` constraint can't be retired until all components
             // are simplified.
             addTypeVariableConstraintsToWorkList(memberTypeVar);
-          } else if (isa<Expr *>(locator->getAnchor()) &&
-                     !getSemanticsProvidingParentExpr(
-                         getAsExpr(locator->getAnchor()))) {
-            // If there are no contextual expressions that could provide
-            // a type for the member type variable, let's default it to
-            // a placeholder eagerly so it could be propagated to the
-            // pattern if necessary.
-            recordTypeVariablesAsHoles(memberTypeVar);
-          } else if (locator->isLastElement<LocatorPathElt::PatternMatch>()) {
-            // Let's handle member patterns specifically because they use
-            // equality instead of argument application constraint, so allowing
-            // them to bind member could mean missing valid hole positions in
-            // the pattern.
-            recordTypeVariablesAsHoles(memberTypeVar);
           } else {
-            recordPotentialHole(memberTypeVar);
+            // Eagerly turn the member type variable into a hole since we know
+            // this is where the issue is and we've recorded a fix for it. This
+            // avoids producing unnecessary holes for e.g generic parameters.
+            recordTypeVariablesAsHoles(memberTypeVar);
           }
         }
 
@@ -13661,15 +13650,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
   // a fix, let's propagate holes to the "input" type. Doing so
   // provides more information to upcoming argument and result matching.
   if (shouldAttemptFixes()) {
-    if (auto *typeVar = type2->getAs<TypeVariableType>()) {
+    Type underlyingType = desugar2->getMetatypeInstanceType();
+    if (auto *typeVar = underlyingType->getAs<TypeVariableType>()) {
       auto *locator = typeVar->getImpl().getLocator();
       if (hasFixFor(locator)) {
         recordAnyTypeVarAsPotentialHole(func1);
       }
-    }
-    Type underlyingType = desugar2;
-    while (auto *MT = underlyingType->getAs<AnyMetatypeType>()) {
-      underlyingType = MT->getInstanceType();
     }
     underlyingType =
         getFixedTypeRecursive(underlyingType, flags, /*wantRValue=*/true);

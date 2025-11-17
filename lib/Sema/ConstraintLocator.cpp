@@ -560,6 +560,22 @@ bool ConstraintLocator::isSubscriptMemberRef() const {
   return path.back().getKind() == ConstraintLocator::SubscriptMember;
 }
 
+bool ConstraintLocator::isClosureParameterType() const {
+  if (!getAnchor())
+    return false;
+
+  return isExpr<ClosureExpr>(getAnchor()) &&
+         isLastElement<LocatorPathElt::TupleElement>();
+}
+
+bool ConstraintLocator::isClosureResultType() const {
+  if (!getAnchor())
+    return false;
+
+  return isExpr<ClosureExpr>(getAnchor()) &&
+         isLastElement<LocatorPathElt::ClosureResult>();
+}
+
 bool ConstraintLocator::isKeyPathType() const {
   auto anchor = getAnchor();
   auto path = getPath();

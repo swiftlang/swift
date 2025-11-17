@@ -9,7 +9,8 @@ struct MyView: View {
 
   var body: some View {
     Table(self.data) {
-      // expected-error@-1 {{expected expression of type 'Columns' in result builder 'TableColumnBuilder'}} {{23-23=<#T##Columns#>}}
+      // expected-error@-1 {{expected expression of type 'Column' in result builder 'TableColumnBuilder'}} {{23-23=<#T##Column#>}}
+      // expected-error@-2 {{generic parameter 'Column' could not be inferred}}
     }
   }
 }
