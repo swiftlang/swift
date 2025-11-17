@@ -2734,6 +2734,26 @@ FUNCTION(TaskLocalValuePop,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
+// void swift_task_cancellationShieldPush();
+FUNCTION(TaskCancellationShieldPush,
+         _Concurrency, swift_task_cancellationShieldPush, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(Int1Ty),
+         ARGS(),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_task_cancellationShieldPop();
+FUNCTION(TaskCancellationShieldPop,
+         _Concurrency, swift_task_cancellationShieldPop, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(),
+         ARGS(),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
 // AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContextWithType(const Metadata *);
 FUNCTION(AutoDiffCreateLinearMapContextWithType,
          Swift, swift_autoDiffCreateLinearMapContextWithType, SwiftCC,

@@ -486,6 +486,8 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// use the task executor preference when we'd otherwise be running on
     /// the generic global pool.
     HasTaskExecutorPreference = 0x8000,
+    
+    HasActiveTaskCancellationShield = 0x10000,
   };
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
@@ -536,12 +538,32 @@ public:
 #endif
 
   /// Is the task currently cancelled?
-  bool isCancelled() const { return Flags & IsCancelled; }
+  /// This does take into account cancellation shields, i.e. while a shield is active this function will always return 'false'.
+  bool isCancelled(bool ignoreShield = false) const { 
+    return (Flags & IsCancelled) && (ignoreShield || !(Flags & HasActiveTaskCancellationShield)); 
+  }
+  bool isCancelledIgnoringShield() const { return Flags & IsCancelled; }
   ActiveTaskStatus withCancelled() const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     return ActiveTaskStatus(Record, Flags | IsCancelled, ExecutionLock);
 #else
     return ActiveTaskStatus(Record, Flags | IsCancelled);
+#endif
+  }  
+  
+  bool hasCancellationShield() const { return Flags & HasActiveTaskCancellationShield; }
+  ActiveTaskStatus withCancellationShield() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags | HasActiveTaskCancellationShield, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags | HasActiveTaskCancellationShield);
+#endif
+  }
+  ActiveTaskStatus withoutCancellationShield() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags & ~HasActiveTaskCancellationShield, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags & ~HasActiveTaskCancellationShield);
 #endif
   }
 
@@ -965,9 +987,9 @@ inline const AsyncTask::PrivateStorage &AsyncTask::_private() const {
   return Private.get();
 }
 
-inline bool AsyncTask::isCancelled() const {
+inline bool AsyncTask::isCancelled(bool ignoreShield = false) const {
   return _private()._status().load(std::memory_order_relaxed)
-                          .isCancelled();
+                          .isCancelled(ignoreShield);
 }
 
 inline uint32_t AsyncTask::flagAsRunning() {
@@ -1294,6 +1316,44 @@ inline OpaqueValue *AsyncTask::localValueGet(const HeapObject *key) {
 /// Returns true if storage has still more bindings.
 inline bool AsyncTask::localValuePop() {
   return _private().Local.popValue(this);
+}
+
+// ==== Cancellation Shields --------------------------------------------------
+
+inline bool AsyncTask::cancellationShieldPush() {
+  while (true) {
+    auto oldStatus = _private()._status().load(std::memory_order_relaxed);
+    if (oldStatus.hasCancellationShield()) {
+      return false;
+    }
+
+    auto newStatus = oldStatus.withCancellationShield();
+    assert(newStatus.hasCancellationShield());
+    
+    if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
+              /* success */ std::memory_order_relaxed,
+              /* failure */ std::memory_order_relaxed)) {
+      return true; // we did successfully install the shield
+    }
+  } 
+}
+
+inline void AsyncTask::cancellationShieldPop() {
+  while (true) {
+    auto oldStatus = _private()._status().load(std::memory_order_relaxed);
+    if (!oldStatus.hasCancellationShield()) {
+      return;
+    }
+
+    auto newStatus = oldStatus.withoutCancellationShield();
+    assert(!newStatus.hasCancellationShield());
+    
+    if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
+              /* success */ std::memory_order_relaxed,
+              /* failure */ std::memory_order_relaxed)) {
+      return;
+    }
+  } 
 }
 
 } // end namespace swift
