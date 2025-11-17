@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %s -I %S/Inputs -cxx-interoperability-mode=default -diagnostic-style llvm
+// RUN: %target-typecheck-verify-swift %s -I %S/Inputs -cxx-interoperability-mode=default
 
 import StdHash
 import CxxStdlib
