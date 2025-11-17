@@ -20,7 +20,7 @@ struct Test { // expected-note {{to match this opening '{'}}
     var infos = [Info]()
 
     for (index, info) in infos.enumerated() {
-      let dataPerHost = Dictionary(grouping: info.data) { data in
+      let dataPerHost = Dictionary(grouping: info.data) { data in // expected-note {{'dataPerHost' declared here}}
         let location = data.location()
         guard let host = location.host else {
           return 0
@@ -30,7 +30,7 @@ struct Test { // expected-note {{to match this opening '{'}}
         // Missing paren!
       }
 
-      for _ in dataPerHost { // `dataPerHost` is inside of the closure!
+      for _ in dataPerHost { // expected-error {{use of local variable 'dataPerHost' before its declaration}}
       }
     }
   }
