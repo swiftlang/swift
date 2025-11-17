@@ -72,10 +72,10 @@ extension Value {
       switch v {
       case let fw as ForwardingInstruction:
         worklist.pushIfNotVisited(contentsOf: fw.definedOperands.values)
+      case let ot as OwnershipTransitionInstruction where !(ot is CopyingInstruction):
+        worklist.pushIfNotVisited(ot.operand.value)
       case let bf as BorrowedFromInst:
         worklist.pushIfNotVisited(bf.borrowedValue)
-      case let bb as BeginBorrowInst:
-        worklist.pushIfNotVisited(bb.borrowedValue)
       case let arg as Argument:
         if let phi = Phi(arg) {
           worklist.pushIfNotVisited(contentsOf: phi.incomingValues)
@@ -880,7 +880,7 @@ private struct EscapesToValueVisitor : EscapeVisitor {
     if operand.value == target.value && path.projectionPath.mayOverlap(with: target.path) {
       return .abort
     }
-    if operand.instruction is ReturnInst {
+    if operand.instruction is ReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }
@@ -1100,9 +1100,6 @@ extension Type {
   /// False if expanding a type is invalid. For example, expanding a
   /// struct-with-deinit drops the deinit.
   func shouldExpand(_ context: some Context) -> Bool {
-    if !context.options.useAggressiveReg2MemForCodeSize {
-      return true
-    }
     return context.bridgedPassContext.shouldExpand(self.bridged)
   }
 }

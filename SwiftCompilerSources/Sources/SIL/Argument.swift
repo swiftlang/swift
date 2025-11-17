@@ -212,7 +212,7 @@ public struct Phi {
 extension Phi {
   /// Return true of this phi is directly returned with no side effects between the phi and the return.
   public var isReturnValue: Bool {
-    if let singleUse = value.uses.singleUse, let ret = singleUse.instruction as? ReturnInst,
+    if let singleUse = value.uses.singleUse, let ret = singleUse.instruction as? ReturnInstruction,
        ret.parentBlock == successor {
       for inst in successor.instructions {
         if inst.mayHaveSideEffects {

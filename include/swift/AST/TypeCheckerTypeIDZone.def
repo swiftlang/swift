@@ -581,8 +581,8 @@ SWIFT_REQUEST(TypeChecker, SerializeAttrGenericSignatureRequest,
 SWIFT_REQUEST(TypeChecker, IsFunctionBodySkippedRequest,
               bool(const AbstractFunctionDecl *),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsCCompatibleFuncDeclRequest,
-              bool(const FuncDecl *),
+SWIFT_REQUEST(TypeChecker, IsCCompatibleDeclRequest,
+              bool(const ValueDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SemanticDeclAttrsRequest,
               DeclAttributes(const Decl *),

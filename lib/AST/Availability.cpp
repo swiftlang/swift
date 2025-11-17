@@ -1006,8 +1006,21 @@ bool swift::isExported(const ValueDecl *VD) {
 
   // Is this a stored property in a @frozen struct or class?
   if (auto *property = dyn_cast<VarDecl>(VD))
-    if (property->isLayoutExposedToClients())
+    if (property->isLayoutExposedToClients(/*applyImplicit=*/true))
       return true;
+
+  // Is this a type exposed by default in a non-resilient module?
+  if (isa<NominalTypeDecl>(VD) &&
+      VD->getASTContext().LangOpts.hasFeature(
+          Feature::CheckImplementationOnly) &&
+      VD->getDeclContext()->getParentModule()->getResilienceStrategy() !=
+          ResilienceStrategy::Resilient &&
+      !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+    return true;
+
+  // Case of an enum not marked @_implementationOnly in a non-resilient module?
+  if (auto *EED = dyn_cast<EnumElementDecl>(VD))
+    return isExported(EED->getParentEnum());
 
   return false;
 }

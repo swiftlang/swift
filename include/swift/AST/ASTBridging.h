@@ -21,6 +21,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/DiagnosticKind.h"
 #include "swift/AST/DiagnosticList.h"
+#include "swift/AST/ExportKind.h"
 #include "swift/AST/GenericTypeParamKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LayoutConstraintKind.h"
@@ -987,6 +988,12 @@ BridgedImplementsAttr BridgedImplementsAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedTypeRepr cProtocolType,
     BridgedDeclNameRef cMemberName, BridgedDeclNameLoc cMemberNameLoc);
+
+SWIFT_NAME("BridgedExportAttr.createParsed(_:atLoc:range:kind:)")
+BridgedExportAttr BridgedExportAttr_createParsed(BridgedASTContext cContext,
+                                                 swift::SourceLoc atLoc,
+                                                 swift::SourceRange range,
+                                                 swift::ExportKind kind);
 
 SWIFT_NAME("BridgedInlineAttr.createParsed(_:atLoc:range:kind:)")
 BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
@@ -3037,7 +3044,7 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getInvocationGenericSignatureOfFunctionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeOutOfContext() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapOutOfEnvironment() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType
   getReducedType(BridgedGenericSignature sig) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::Identifier
@@ -3124,7 +3131,7 @@ struct BridgedGenericSignature {
   BRIDGED_INLINE swift::GenericSignature unbridged() const;
   BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray getGenericParams() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoContext(BridgedASTType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoEnvironment(BridgedASTType type) const;
   BRIDGED_INLINE BridgedCanGenericSignature getCanonicalSignature() const;
 };
 
@@ -3133,6 +3140,7 @@ struct BridgedCanGenericSignature {
 
   BRIDGED_INLINE swift::CanGenericSignature unbridged() const;
   BRIDGED_INLINE BridgedGenericSignature getGenericSignature() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoEnvironment(BridgedASTType type) const;
 };
 
 struct BridgedFingerprint {

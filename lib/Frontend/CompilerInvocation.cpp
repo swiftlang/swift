@@ -392,7 +392,7 @@ void CompilerInvocation::computeCXXStdlibOptions() {
     LangOpts.PlatformDefaultCXXStdlib = CXXStdlibKind::Msvcprt;
   } else if (LangOpts.Target.isOSLinux() || LangOpts.Target.isOSDarwin() ||
              LangOpts.Target.isOSFreeBSD()) {
-    auto [clangDriver, clangDiagEngine] =
+    auto [clangDriver, clangDiagEngine, clangDiagOpts] =
         ClangImporter::createClangDriver(LangOpts, ClangImporterOpts);
     auto clangDriverArgs = ClangImporter::createClangArgs(
         ClangImporterOpts, SearchPathOpts, clangDriver);
@@ -1272,7 +1272,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_debug_cycles))
     Opts.DebugDumpCycles = true;
 
-  Opts.RequireExplicitSendable |= Args.hasArg(OPT_require_explicit_sendable);
   for (const Arg *A : Args.filtered(OPT_define_availability)) {
     Opts.AvailabilityMacros.push_back(A->getValue());
   }
@@ -1774,6 +1773,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DumpMacroExpansions = Args.hasArg(
       OPT_dump_macro_expansions);
 
+  Opts.RemarkMacroExpansions = Args.hasArg(
+      OPT_expansion_remarks);
+
   Opts.DumpSourceFileImports = Args.hasArg(
       OPT_dump_source_file_imports);
 
@@ -1897,6 +1899,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::InferIsolatedConformances);
     Opts.enableFeature(Feature::NoExplicitNonIsolated);
   }
+
+  if (Opts.hasFeature(Feature::CheckImplementationOnlyStrict) &&
+      !::getenv("SWIFT_DISABLE_IMPLICIT_CHECK_IMPLEMENTATION_ONLY"))
+    Opts.enableFeature(Feature::CheckImplementationOnly);
 
 #if !defined(NDEBUG) && SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   /// Enable round trip parsing via the new swift parser unless it is disabled
@@ -2286,6 +2292,7 @@ static void ParseSymbolGraphArgs(symbolgraphgen::SymbolGraphOptions &Opts,
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.SkipProtocolImplementations = Args.hasArg(OPT_skip_protocol_implementations);
   Opts.IncludeSPISymbols = Args.hasArg(OPT_include_spi_symbols);
+  Opts.ShortenOutputNames = Args.hasArg(OPT_symbol_graph_shorten_output_names);
   Opts.EmitExtensionBlockSymbols =
       Args.hasFlag(OPT_emit_extension_block_symbols,
                    OPT_omit_extension_block_symbols, /*default=*/false);
@@ -2519,6 +2526,12 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.ScannerPrefixMapper.push_back({A->getValue(0), A->getValue(1)});
   }
 
+  // Handle legacy prefix map option.
+  for (StringRef Opt : Args.getAllArgValues(OPT_scanner_prefix_map)) {
+    if (auto Mapping = llvm::MappedPrefix::getFromJoined(Opt))
+      Opts.ScannerPrefixMapper.push_back({Mapping->Old, Mapping->New});
+  }
+
   Opts.ResolvedPluginVerification |=
       Args.hasArg(OPT_resolved_plugin_verification);
 
@@ -2724,6 +2737,14 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       }
     }());
   }
+
+  // `-require-explicit-sendable` is an alias to `-Wwarning ExplicitSendable`.
+  if (Args.hasArg(OPT_require_explicit_sendable) &&
+      !Args.hasArg(OPT_suppress_warnings)) {
+    Opts.WarningsAsErrorsRules.push_back(WarningAsErrorRule(
+        WarningAsErrorRule::Action::Disable, "ExplicitSendable"));
+  }
+
   if (Args.hasArg(OPT_debug_diagnostic_names)) {
     Opts.PrintDiagnosticNames = PrintDiagnosticNamesMode::Identifier;
   }
@@ -4011,10 +4032,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.MergeableTraps = Args.hasArg(OPT_mergeable_traps);
 
-  Opts.EnableClientRetainRelease =
-    Args.hasFlag(OPT_enable_client_retain_release,
-                 OPT_disable_client_retain_release,
-                 Opts.EnableClientRetainRelease);
+  Opts.EnableSwiftDirectRuntime =
+    Args.hasFlag(OPT_enable_direct_retain_release,
+                 OPT_disable_direct_retain_release,
+                 Opts.EnableSwiftDirectRuntime);
 
   Opts.EnableObjectiveCProtocolSymbolicReferences =
     Args.hasFlag(OPT_enable_objective_c_protocol_symbolic_references,

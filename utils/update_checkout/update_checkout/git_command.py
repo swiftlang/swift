@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import shlex
 import subprocess
 import sys
@@ -44,7 +45,7 @@ class GitException(Exception):
 class Git:
     @staticmethod
     def run(
-        repo_path: str,
+        repo_path: Path,
         args: List[str],
         echo: bool = False,
         env: Optional[Dict[str, Any]] = None,
@@ -77,9 +78,7 @@ class Git:
                     f"command `{command}` terminated with a non-zero exit "
                     f"status {str(e.returncode)}, aborting"
                 )
-            raise GitException(
-                e.returncode, command, os.path.dirname(repo_path), output
-            )
+            raise GitException(e.returncode, command, repo_path.name, output)
         except OSError as e:
             if fatal:
                 sys.exit(

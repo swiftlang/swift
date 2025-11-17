@@ -67,8 +67,8 @@ LinearMapInfo::LinearMapInfo(ADContext &context, AutoDiffLinearMapKind kind,
 
 SILType LinearMapInfo::remapTypeInDerivative(SILType ty) {
   if (ty.hasArchetype())
-    return derivative->mapTypeIntoContext(ty.mapTypeOutOfContext());
-  return derivative->mapTypeIntoContext(ty);
+    return derivative->mapTypeIntoEnvironment(ty.mapTypeOutOfEnvironment());
+  return derivative->mapTypeIntoEnvironment(ty);
 }
 
 EnumDecl *
@@ -146,14 +146,15 @@ void LinearMapInfo::populateBranchingTraceDecl(SILBasicBlock *originalBB,
       heapAllocatedContext = true;
       decl->setInterfaceType(astCtx.TheRawPointerType);
     } else { // Otherwise the payload is the linear map tuple.
-      auto *linearMapStructTy = getLinearMapTupleType(predBB);
+      auto *linearMapTupleTy = getLinearMapTupleType(predBB);
       // Do not create entries for unreachable predecessors
-      if (!linearMapStructTy)
+      if (!linearMapTupleTy)
         continue;
-      auto canLinearMapStructTy = linearMapStructTy->getCanonicalType();
-      decl->setInterfaceType(
-          canLinearMapStructTy->hasArchetype()
-              ? canLinearMapStructTy->mapTypeOutOfContext() : canLinearMapStructTy);
+
+      auto canLinearMapTupleTy = linearMapTupleTy->getCanonicalType();
+      decl->setInterfaceType(canLinearMapTupleTy->hasArchetype()
+                                 ? canLinearMapTupleTy->mapTypeOutOfEnvironment()
+                                 : canLinearMapTupleTy);
     }
     // Create enum element and enum case declarations.
     auto *paramList = ParameterList::create(astCtx, {decl});
@@ -185,6 +186,7 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
   auto hasActiveResults = llvm::any_of(allResults, [&](SILValue res) {
     return activityInfo.isActive(res, config);
   });
+
   bool hasActiveSemanticResultArgument = false;
   bool hasActiveArguments = false;
   auto numIndirectResults = fai.getNumIndirectSILResults();
@@ -313,10 +315,12 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
         params, silFnTy->getAllResultsInterfaceType().getASTType(), info);
   }
 
-  if (astFnTy->hasArchetype())
-    return astFnTy->mapTypeOutOfContext();
+  Type resultType =
+      astFnTy->hasArchetype() ? astFnTy->mapTypeOutOfEnvironment() : astFnTy;
+  if (fai.getKind() == FullApplySiteKind::TryApplyInst)
+    resultType = resultType->wrapInOptionalType();
 
-  return astFnTy;
+  return resultType;
 }
 
 void LinearMapInfo::generateDifferentiationDataStructures(

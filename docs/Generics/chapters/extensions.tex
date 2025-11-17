@@ -2,9 +2,9 @@
 
 \begin{document}
 
-\chapter{Extensions}\label{extensions}
+\chapter{Extensions}\label{chap:extensions}
 
-\lettrine{E}{xtensions add members} to existing nominal type declarations. We refer to this nominal type declaration as the \IndexDefinition{extended type}\emph{extended type} of the extension. The extended type may have been declared in the same source file, another source file of the main module, or in some other module. Extensions themselves are \IndexDefinition{extension declaration}declarations, but they are \emph{not} \index{value declaration}value declarations in the sense of \ChapRef{decls}, meaning the extension itself cannot be referenced by name. Instead, the members of an extension are referenced as members of the extended type, visible to \index{qualified lookup}qualified name lookup.
+\lettrine{E}{xtensions add members} to existing nominal type declarations. We refer to this nominal type declaration as the \IndexDefinition{extended type}\emph{extended type} of the extension. The extended type can originate from the same \index{source file}source file, another source file of the main module, or most generally, some other module. Extensions themselves are \IndexDefinition{extension declaration}declarations, but they are \emph{not} \index{value declaration}value declarations in the sense of \ChapRef{chap:decls}, meaning the extension itself cannot be referenced by name. Instead, the members of an extension become visible as members of the extended type to \index{qualified lookup}qualified name lookup.
 
 Consider a module containing a pair of struct declarations, \texttt{Outer} and \texttt{Outer.Middle}:
 \begin{Verbatim}
@@ -22,9 +22,9 @@ extension Outer.Middle {
 If a third module subsequently imports both the first and second module, it will see the members \texttt{Outer.Middle.foo()} and \texttt{Outer.Middle.Inner} just as if they were defined inside \texttt{Outer.Middle} itself. 
 
 \paragraph{Extensions and generics.}
-The \index{generic parameter declaration}generic parameters of the extended type are visible in the \index{scope tree}scope of the extension's body. Each extension has a generic signature, which describes the \index{interface type!extension member}interface types of its members. The generic signature of an ``unconstrained'' extension is the same as that of the extended type. Extensions can impose additional requirements on their generic parameters via a \Index{where clause@\texttt{where} clause!extension declaration}\texttt{where} clause; this declares a \emph{constrained extension} with its own generic signature (\SecRef{constrained extensions}). An extension can also state a conformance to a protocol, which is represented as \index{normal conformance}normal conformance visible to global conformance lookup. If the extension is unconstrained, this is essentially equivalent to stating a conformance on the extended type. If the extension is constrained, the conformance becomes a \emph{conditional conformance} (\SecRef{conditional conformance}).
+The \index{generic parameter declaration}generic parameters of the extended type are visible in the \index{scope tree}scope of the extension's body. Each extension has a generic signature, which describes the \index{interface type!extension member}interface types of its members. An \emph{unconstrained extension} has the same generic signature as the extended type. Extensions can also impose additional requirements on their generic parameters via a \Index{where clause@\texttt{where} clause!extension declaration}\texttt{where} clause; this declares a \emph{constrained extension} with its own generic signature (\SecRef{constrained extensions}). Finally, an extension can state a conformance to a protocol, which as we recall, declares a \index{normal conformance}normal conformance visible to global conformance lookup. If the extension is unconstrained, this is essentially equivalent to stating a conformance on the extended type. If the extension is constrained, the conformance becomes a \emph{conditional conformance} (\SecRef{sec:conditional conformances}).
 
-Let's begin by taking a closer look at \index{generic parameter list}generic parameter lists of extensions, by way of our nested type \texttt{Outer.Middle} and its extension above. Recall how generic parameters of nominal types work from \SecRef{generic params}: their names are lexically scoped to the body of the type declaration, and each generic parameter uniquely identified by its \index{depth}depth and \index{index}index. We can represent the declaration context nesting and generic parameter lists of our nominal type declaration \texttt{Outer.Middle} with a diagram like the following:
+Let's begin by taking a closer look at \index{generic parameter list}generic parameter lists of extensions, by way of our nested type \texttt{Outer.Middle} and its extension above. Recall how generic parameters of nominal types work from \SecRef{generic params}: their names are lexically scoped to the body of the type declaration, and each generic parameter is uniquely identified by its \index{depth}depth and \index{index}index. We can represent the declaration context nesting and generic parameter lists of our nominal type declaration \texttt{Outer.Middle} with a diagram like the following:
 \begin{quote}
 \begin{tikzpicture}[node distance=5mm and 5mm,text height=1.5ex,text depth=.25ex]
 
@@ -45,9 +45,9 @@ Let's begin by taking a closer look at \index{generic parameter list}generic par
 \end{tikzpicture}
 \end{quote}
 
-We create the fiction that each generic parameter in the scope of the extended type is also visible inside the extension by \emph{cloning} generic parameter declarations. The cloned declarations have the same name, depth and index as the originals, but they are parented to the extension. This ensures that looking up a generic parameter inside an extension finds a generic parameter with the same depth and index as the one with the same name in the extended type.  Since all generic parameter in a single generic parameter list have the same depth, an extension conceptually has multiple generic parameter lists, one for each level of depth (that is, the generic context nesting) of the extended type.
+We create the fiction that each generic parameter in the scope of the extended type is also visible inside the extension, by \emph{cloning} generic parameter declarations. The cloned declarations have the same name, depth, and index as the originals, but they are parented to the extension. This ensures that looking up a generic parameter inside an extension finds a generic parameter with the same depth and index as the one with the same name in the extended type.
 
-This is represented by linking the generic parameter lists together via an optional ``outer list'' pointer. The innermost generic parameter list is ``the'' generic parameter list of the extension, and the head of the list; it is cloned from the extended type. Its outer list pointer is cloned from the extended type's parent generic context, if any, and so on. The outermost generic parameter list has a null outer list pointer. In our extension of \texttt{Outer.Middle}, this looks like so:
+Since all generic parameters in a single generic parameter list have the same depth, an extension may have multiple generic parameter lists, one for each level of depth (that is, generic context nesting) of the extended type. We link the cloned generic parameter lists together using an ``outer list'' pointer. The innermost generic parameter list is ``the'' generic parameter list of the extension, and the head of the list; it is cloned from the extended type. Its outer list is cloned from the extended type's parent generic context, if any, and so on. The outermost generic parameter list has a null outer list. In our extension of \texttt{Outer.Middle}, this looks like so:
 \begin{quote}
 \begin{tikzpicture}[every node/.style={draw,rectangle},node distance=5mm and 5mm,text height=1.5ex,text depth=.25ex]
 
@@ -72,7 +72,7 @@ extension Outer.Middle {
   struct Inner<V> {}
 }
 \end{Verbatim}
-When an extension declares a nested generic type, the depth of the nested type's generic parameters becomes one greater than the depth of the extension's innermost generic parameter list. Thus, the generic parameter \texttt{V} of \texttt{Inner} has depth 2 and index 0. All three generic parameter lists are visible inside the body of \texttt{Outer.Middle.Inner}:
+If an extension declares a nested generic type, the depth of the nested type's generic parameters becomes one greater than the depth of the extension's innermost generic parameter list. Thus, the generic parameter \texttt{V} of \texttt{Inner} has depth 2 and index 0. All three generic parameter lists are visible inside the body of \texttt{Outer.Middle.Inner}:
 \begin{quote}
 \begin{tikzpicture}[every node/.style={draw,rectangle},node distance=5mm and 5mm,text height=1.5ex,text depth=.25ex]
 
@@ -129,23 +129,19 @@ extension S {
   var flippedX: Int { return -x }  // computed property: okay
 }
 \end{Verbatim}
-All stored properties must be initialized by all declared constructors; extensions being able to introduce stored properties hithero-unknown to the original module would break this invariant. Another reason is that the stored property layout of a struct or class is computed when the struct or class declaration is emitted, and there is no mechanism for extensions to alter this layout after the fact.
-\index{enum declaration}
-\item Extensions cannot add new cases to enum declarations, for similar reasons as stored properties; doing so would complicate both the static exhaustiveness checking for \texttt{switch} statements and the in-memory layout computation of the enum.
+All stored properties must be initialized by all declared constructors; extensions being able to introduce stored properties hitherto-unknown to the original module would break this invariant. Another reason is that the stored property layout of a struct or class is computed when the struct or class declaration is emitted, and there is no mechanism for extensions to alter this layout after the fact.
+\item Extensions cannot add new cases to \index{enum declaration!extension}enum declarations, for similar reasons as stored properties; doing so would complicate both the static exhaustiveness checking for \texttt{switch} statements and the in-memory layout computation of the enum.
 
-\index{class declaration}
-\index{vtable}
-\item When the extended type is a \index{class type!extended type}class, the methods of the extension are implicitly \texttt{final}, and the extension's methods are not permitted to override methods from the superclass. Non-\texttt{final} methods declared inside a class are dispatched through a vtable of function pointers attached to the runtime metadata of the class, and there is no mechanism for extensions to add new entries or replace existing entries inherited from the superclass.
+\item When the extended type is a \index{class declaration!extension}\index{class type!extended type}class, the methods of the extension are implicitly \texttt{final}, and the extension's methods are not permitted to \index{override}override methods from the superclass. Calls to non-\texttt{final} class methods are dispatched through a \index{vtable}\emph{vtable}, or table of function pointers, attached to the runtime metadata of the class, and there is no mechanism for extensions to add new entries or replace existing entries in the vtable.
 
-\index{nested type declaration}
-\item The rules for nested types in extensions are the same as those for other nominal types (\SecRef{nested nominal types}). An extension of a struct, enum or class may contain nested structs, enums and classes, while a protocol extension cannot just as a protocol cannot. Extensions themselves must be at the top level of a source file, but the extended type can be nested inside of another nominal type (or extension).
+\item The rules for types \index{nested type declaration!extension}nested in extensions are the same as those for types nested in nominal types (\SecRef{nested nominal types}). An extension of a struct, enum, or class may contain a nested struct, enum, or class, while a protocol extension cannot, just as a protocol cannot. Extensions themselves must be at the \index{global declaration}top level of a \index{source file}source file, but the extended type can be nested inside of another nominal type (or extension).
 \end{itemize}
 
 \section{Extension Binding}\label{extension binding}
 
-The extended type of an extension is given as a \index{type representation}type representation following the \texttt{extension} keyword. Extension members are made available to \index{qualified lookup}qualified lookup by the process of \IndexDefinition{extension binding}\emph{extension binding}, which resolves the type representation of an extension to its extended type, and adds the extension's members to the extended type's name lookup table.
+The extended type of an extension is specified by the \index{type representation}type representation that follows the \texttt{extension} keyword. Extension members are made available to \index{qualified lookup}qualified lookup by the process of \IndexDefinition{extension binding}\emph{extension binding}, which resolves the type representation of an extension to its extended type, and adds the extension's members to the extended type's name lookup table.
 
-A complication is that the extended type of an extension can itself be declared inside of another extension. Extension binding cannot simply visit all extension declarations in a single pass in source order, because of ordering dependencies between extensions and nested types. Instead, multiple passes are performed; a failure to bind an extension is not a fatal condition, and instead failed extensions are revisited later after subsequent extensions are successfully bound. This process iterates until fixed point.
+A complication is that the extended type of an extension may \emph{itself} be declared inside of another extension. Extension binding cannot simply visit all extension declarations in a single pass in source order, because of ordering dependencies between extensions and nested types. Instead, multiple passes are performed; a failure to bind an extension is not a fatal condition, and instead failed extensions are revisited later after subsequent extensions are successfully bound. This process iterates until fixed point.
 \begin{algorithm}[Bind extensions]\label{extension binding algorithm}
 Takes a list of all extensions in the main module as input, in any order.
 \begin{enumerate}
@@ -159,15 +155,15 @@ Takes a list of all extensions in the main module as input, in any order.
 \end{algorithm}
 The worklist-driven extension binding algorithm was introduced in \IndexSwift{5.0}Swift~5. Older compiler releases attempted to bind extensions in a single pass, something that could either succeed or fail depending on declaration order. This incorrect behavior was one of the most frequently reported bugs of all time \cite{sr631}.
 
-\paragraph{Invalid extensions.} If extension binding fails to resolve the extended type of an extension, it simply remains on the delayed list without any diagnostics emitted. Invalid extensions are \index{diagnostic!extension binding}diagnosed later, when the \index{type-check source file request}\Request{type-check source file request} visits all \index{primary file}primary files and attempts to resolve the extended types of any extensions again.
+\paragraph{Invalid extensions.} If extension binding fails to resolve the extended type of an extension, it simply remains on the delayed list without any diagnostics emitted. Invalid extensions are \index{diagnostic!extension binding}diagnosed later, when the \index{type-check primary file request}\Request{type-check primary file request} visits all \index{primary file}primary files and attempts to resolve the extended types of any extensions again.
 
 Extension binding uses a more limited form of type resolution, because we only need to resolve the type representation to a \emph{type declaration} and not a \emph{type}. This type declaration must be a \index{nominal type}nominal type declaration, so the extended type is typically written as an \index{identifier type representation}\emph{identifier} or \index{member type representation}\emph{member} type representation (Sections \ref{identtyperepr}~and~\ref{member type repr}). Extension binding runs early in the type checking process, immediately after parsing and import resolution. We cannot build \index{generic signature!extension binding}generic signatures or \index{conformance checker!extension binding}check conformances in extension binding, because those requests assume that extension binding has already taken place, freely relying on qualified lookup to find members of arbitrary extensions.
 
-In particular, extension binding \index{limitation!extension binding}cannot find declarations \index{synthesized declaration}synthesized by the compiler, including type aliases created by \index{associated type inference}associated type inference. Also, it cannot perform type substitution; this rules out extensions of \index{generic type alias}generic type aliases whose underlying type is itself a type parameter.
+In particular, extension binding \index{limitation!extension binding}cannot find declarations \index{synthesized declaration}synthesized by the compiler, including type aliases created by \index{associated type inference!extension binding}associated type inference. Also, it cannot perform type substitution; this rules out extensions of \index{generic type alias}generic type aliases whose underlying type is itself a type parameter.
 
-If extension binding fails while the \Request{type-check source file request} successfully resolve the extended type when it visits the extension later, we emit a special diagnostic, tailored by a couple of additional checks. If ordinary type resolution returned a \index{type alias type}type alias type \texttt{Foo} desugaring to a nominal type \texttt{Bar}, the type checker emits the ``extension of type \texttt{Foo} must be declared as an extension of \texttt{Bar}'' diagnostic. Even though we know what the extended type should be at this point, we must still diagnose an error; it is too late to bind the extension, because other name lookups may have already been performed, potentially missing out on finding members of this extension.
+If extension binding fails while the \Request{type-check primary file request} successfully resolves the extended type when it visits the extension later, we emit a special diagnostic, tailored by a couple of additional checks. If ordinary type resolution returned a \index{type alias type}type alias type \texttt{Foo} whose underlying type is a nominal type \texttt{Bar}, the type checker emits the ``extension of type \texttt{Foo} must be declared as an extension of \texttt{Bar}'' diagnostic. Even though we know what the extended type should be at this point, we must still diagnose an error; it is too late to bind the extension, because other name lookups may have already been performed, potentially missing out on finding members of this extension.
 
-\begin{example}\label{bad extension 1} An invalid extension of an inferred type alias:\index{horse}
+\begin{example}\label{bad extension 1} An invalid extension of a synthesized type alias:\index{horse}
 \begin{Verbatim}
 protocol Animal {
   associatedtype FeedType
@@ -182,7 +178,7 @@ struct Horse: Animal {
 // extension of `Hay'
 extension Horse.FeedType {...}
 \end{Verbatim}
-Extension binding fails to resolve \texttt{Horse.FeedType}, because this type alias was not stated explicitly and is inferred by the conformance checker from the witness \verb|Horse.eat(_:)|. Therefore, the type alias does not exist at extension binding time, and we specifically do not trigger its synthesis.
+Extension binding fails to resolve \texttt{Horse.FeedType}, because this type alias was not written in source, so it does not exist when extension binding runs. However, when the \Request{type-check primary file request} visits this extension later, type resolution will trigger associated type inference, which will synthesize the type alias from the witness \verb|Horse.eat(_:)|. We produce a diagnostic directing the user to state the correct extended type that can be found at extension binding time.
 \end{example}
 \begin{example}\label{bad extension 2}
 An invalid extension of a type alias with an underlying type that is a type parameter:
@@ -200,7 +196,7 @@ Extension binding fails to resolve \texttt{G<Array<Int>>}, because this requires
 \end{gather*}
 \end{example}
 
-The other case where extension binding fails but \textbf{type-check source file request} is able to resolve the extended type is when this type is not actually a nominal type. In this situation, the type checker emits the fallback ``non-nominal type cannot be extended'' diagnostic:
+The other case where extension binding fails but \textbf{type-check primary file request} is able to resolve the extended type is when this type is not actually a nominal type. In this situation, the type checker emits the fallback ``non-nominal type cannot be extended'' diagnostic:
 \begin{Verbatim}
 typealias Fn = () -> ()
 
@@ -235,7 +231,7 @@ In the first pass, the extensions of \texttt{Outer.Middle.Inner} and \texttt{Out
 
 \paragraph{Local types.}
 \index{local type declaration}
-\index{limitation!conditional conformance and local types}
+\index{limitation!conditional conformance}
 Because extensions can only appear at the top level of a source file, the extended type must ultimately be visible from the top level. This allows extensions of types nested inside other top-level types, but precludes extensions of local types nested inside of functions or other local contexts, because there is ultimately no way to name a local type from the top level of a source file. (As a curious consequence, local types cannot conditionally conform to protocols, since the only way to declare a conditional conformance is to write an extension!)
 
 \section{Direct Lookup}\label{direct lookup}
@@ -244,14 +240,14 @@ Now we're going to take closer look at \IndexDefinition{direct lookup}\emph{dire
 
 Nominal type declarations and extensions are \IndexDefinition{iterable declaration context}\emph{iterable declaration contexts}, meaning they contain member declarations. Before discussing direct lookup, let's consider what happens if we ask an iterable declaration context to list its members. This is a lazy operation which triggers work the first time it is called:
 \begin{itemize}
-\item Iterable declaration contexts parsed from source are populated by \index{delayed parsing}delayed parsing; when the \index{parser}parser first reads a source file, the bodies of iterable declaration contexts are skipped, and only the source range is recorded. Asking for the list of members goes and parses the source range again, constructing declarations from their parsed representation (\SecRef{delayed parsing}).
+\item Iterable declaration contexts parsed from source are populated by \index{delayed parsing}delayed parsing; when the \index{parser}parser first reads a \index{source file}source file, the bodies of iterable declaration contexts are skipped, and only the source range is recorded. Asking for the list of members goes and parses the source range again, constructing declarations from their parsed representation (\SecRef{delayed parsing}).
 \item Iterable declaration contexts from \index{serialized module}binary and \index{imported module}imported modules are equipped with a \IndexDefinition{lazy member loader}\emph{lazy member loader} which serves a similar purpose. Asking the lazy member loader to list all members will build the corresponding Swift declarations from deserialized records or imported Clang declarations. The lazy member loader can also find just those declarations with a \emph{specific} name, as explained below; this is the more common operation, since it is much more efficient.
 \end{itemize}
 
 \paragraph{Member lookup table.}
 Every nominal type declaration has an associated \IndexDefinition{member lookup table}\emph{member lookup table}, which is used for direct lookup. This table maps each identifier to a list of value declarations with that name (multiple value declarations can share a name because Swift allows type-based overloading). The declarations in a member lookup table are understood to be members of one or more iterable declaration contexts, which are exactly the type declaration itself and all of its extensions. These iterable declaration contexts might originate from a mix of different module kinds. For example, the nominal type itself might be an \index{Objective-C}Objective-C class from an imported Objective-C module, with one extension declared in a binary Swift module, and another extension defined in the main module, parsed from source. 
 
-The lookup table is populated lazily, in a manner resembling a state machine. Say we're asked to perform a direct lookup for some given name. If this is the first direct lookup, we populate the member lookup table with \emph{all} members from any \emph{parsed} iterable declaration contexts, which might trigger delayed parsing. Each entry in the member lookup table stores a ``complete'' bit. The ``complete'' bit of these initially-populated entries is \emph{not} set, meaning that the entry only contains those members that were parsed from source. If any iterable declaration contexts originate from binary and imported modules, direct lookup then asks each lazy member loader to selectively load only those members with the given name. (Parsed declaration contexts do not offer this level of laziness, because there is no way to parse a subset of the members only.) After the lazy member loaders do their work, the lookup table entry for this name is now complete, and the ``complete'' bit is set. Later when direct lookup finds a member lookup table entry with the ``complete'' bit set, it knows this entry is fully populated, and the stored list of declarations is returned immediately without querying the lazy member loaders.
+The lookup table is populated lazily, kind of like a state machine. Say we're asked to perform a direct lookup for some given name~\tX. If this is the first lookup into this table, we begin by populating the table with \emph{all} members from any \emph{parsed} iterable declaration contexts, which might trigger delayed parsing. Each entry in the member lookup table also stores a ``complete'' bit. The ``complete'' bit of these initially-populated entries is \emph{not} set, meaning that each entry only contains those members that were parsed from source. Next, if any iterable declaration contexts originate from binary or imported modules, direct lookup asks each lazy member loader to selectively load only those members named \tX. (Parsed declaration contexts do not offer this level of granularity, because there is no way to find a specific member without parsing them all.) After the lazy member loaders do their work, the lookup table entry for \tX\ is now complete, so we set its ``complete'' bit. If a subsequent direct lookup encounters a member lookup table entry whose ``complete'' bit is already set, the list of declarations stored in the entry is returned immediately, without querying the lazy member loaders.
 
 This \emph{lazy member loading} mechanism ensures that only those members which are actually referenced in a compilation session are loaded from serialized and imported iterable declaration contexts.
 
@@ -393,13 +389,13 @@ Lazy member loading was introduced in \IndexSwift{4.1}Swift~4.1 to avoid wasted 
 
 \section{Constrained Extensions}\label{constrained extensions}
 
-An extension can impose its own requirements on the generic parameters of the extended type; we refer to this as a \IndexDefinition{constrained extension}\emph{constrained extension}. These requirements are always additive; the generic signature of a constrained extension is built from the generic signature of the extended type, together with the new requirements. The members of a constrained extension are then only available on specializations of the extended type that satisfy these requirements. There are three ways to declare a constrained extension:
+An extension can impose its own requirements on the generic parameters of the extended type; we say this as a \IndexDefinition{constrained extension}\emph{constrained extension}. These requirements are always additive; the generic signature of a constrained extension is built from the generic signature of the extended type, together with the new requirements. The members of a constrained extension are then only available on specializations of the extended type that satisfy these requirements. There are three ways to declare a constrained extension:
 \begin{enumerate}
 \item using a \Index{where clause@\texttt{where} clause!extension declaration}\texttt{where} clause,
-\item by writing a \index{generic nominal type!extended type}bound generic type as the extended type,
+\item by writing a \index{generic nominal type!extended type}generic nominal type with generic arguments as the extended type,
 \item by writing a generic \index{type alias type!extended type}type alias type as the extended type, with some restrictions.
 \end{enumerate}
-Case~1 is the most general form; Case~2 and Case~3 can be expressed by writing the appropriate requirements in a \texttt{where} clause. An extension that does not fall under one of these three cases is sometimes called an \IndexDefinition{unconstrained extension}\emph{unconstrained extension} when it is important to distinguish it from a constrained extension. The generic signature of an unconstrained extension is the same as the generic signature of the extended type. 
+Case~1 is the most general form; Case~2 and Case~3 can also be expressed by writing the appropriate requirements in a \texttt{where} clause. An extension that does not fall under one of these three cases is sometimes called an \IndexDefinition{unconstrained extension}\emph{unconstrained extension} when it is important to distinguish it from a constrained extension. The generic signature of an unconstrained extension is the same as the generic signature of the extended type. 
 
 Here is a constrained extension of \texttt{Set} which constrains the \texttt{Element} type to \texttt{Int}:
 \begin{Verbatim}
@@ -415,7 +411,7 @@ In the early days of Swift, this extension was not supported at all, because the
 \begin{Verbatim}
 extension Set<Int> {...}
 \end{Verbatim}
-A non-generic type alias type whose underlying type is a bound generic type can also be used in the same manner:
+A non-generic type alias type whose underlying type is a generic nominal type can also be used in the same manner:
 \begin{Verbatim}
 typealias StringMap = Dictionary<String, String>
 extension StringMap {...}
@@ -474,16 +470,16 @@ typealias B<Value> = Dictionary<AnyHashable, Value>
 \end{verbatim}
 \item This type alias does not substitute the second generic parameter of the underlying type with the second generic parameter of the type alias:
 \begin{verbatim}
-typealias D<Key, Value> = Dictionary<Key, (Value) -> Int>
+typealias C<Key, Value> = Dictionary<Key, (Value) -> Int>
 \end{verbatim}
 \end{enumerate}
 \end{example}
 
-\section{Conditional Conformances}\label{conditional conformance}
+\section{Conditional Conformances}\label{sec:conditional conformances}
 
 A conformance written on a nominal type or unconstrained extension implements the protocol's requirements for all specializations of the nominal type, and we call this an \emph{unconditional} conformance. A conformance declared on a \emph{constrained} extension is what's known as a \IndexDefinition{conditional conformance}\emph{conditional conformance}, which implements the protocol requirements only for those specializations of the extended type which satisfy the requirements of the extension. Conditional conformances were introduced in \IndexSwift{4.2}Swift 4.2~\cite{se0143}.
 
-For example, arrays have a natural notion of equality, defined in terms of the equality operation on the element type. However, there is no reason to restrict all arrays to only storing \texttt{Equatable} types. Instead, the standard library defines a conditional conformance of \texttt{Array} to \texttt{Equatable} where the element type is \texttt{Equatable}:
+For example, arrays have a natural notion of equality, defined in terms of an equality operation on the element type. However, we don't require that every array has an \texttt{Equatable} element type. Instead, we declare a conditional conformance of \texttt{Array} to \texttt{Equatable}, for those arrays whose element type is \texttt{Equatable}:
 \begin{Verbatim}
 struct Array<Element> {...}
 
@@ -500,7 +496,7 @@ extension Array: Equatable where Element: Equatable {
   }
 }
 \end{Verbatim}
-More complex conditional requirements can also be written. We previously discussed overlapping conformances and coherence in \SecRef{conformance lookup}, and conditional conformances inherit an important restriction. A nominal type can only conform to a protocol once, so in particular, \index{overlapping conformance}overlapping conditional conformances are not supported and we emit a \index{diagnostic!overlapping conformance}diagnostic:
+More complex conditional requirements can also be written. We previously discussed overlapping conformances and coherence in \SecRef{conformance lookup}, and conditional conformances inherit an important restriction. A nominal type can still only conform to a protocol once, even if that conformance is conditional, so in particular, \index{overlapping conformance}overlapping conditional conformances are not supported and we emit a \index{diagnostic!overlapping conformance}diagnostic:
 \begin{Verbatim}
 struct G<T> {}
 
@@ -533,7 +529,7 @@ extension G: Sequence where T: Sequence, T.Element: Hashable {...}
 \end{Verbatim}
 \paragraph{Specialized conditional conformances.} Building upon \SecRef{conformance lookup}, we now describe how substitution relates to conditional conformances. If $\tXd$ is the \index{declared interface type!nominal type declaration}declared interface type of some nominal type declaration~$d$ that \emph{unconditionally} conforms to \tP, and $\tX = \tXd \otimes \Sigma$ is a \index{specialized type}specialized type of~$d$ for some substitution map $\Sigma$, then looking up the conformance of \tX\ to $\texttt{P}$ returns a \index{specialized conformance!conditional conformance}specialized conformance with \index{conformance substitution map}conformance substitution map~$\Sigma$:
 \[\PP\otimes\tX=\ConfReq{$\tXd$}{P}\otimes\Sigma\]
-If $\ConfReq{$\tXd$}{P}$ is conditional though, we cannot take~$\Sigma$ to be the \index{context substitution map!for a declaration context}context substitution map of~\tX. The \index{type witness!of conditional conformance}type witnesses of $\ConfReq{$\tXd$}{P}$ might contain type parameters of the constrained extension, and not just the conforming type; however the context substitution map of \tX\ has the generic signature of the conforming type. We must set $\Sigma$ to be the context substitution map of \tX\ for the generic signature of the constrained extension, as in \SecRef{member type repr}. Indeed, this is the same problem as member type resolution when the referenced type declaration is declared in a constrained extension; we must perform some additional \index{global conformance lookup!substitution map}global conformance lookups to populate the substitution map completely.
+If $\ConfReq{$\tXd$}{P}$ is conditional though, we cannot take~$\Sigma$ to be the \index{context substitution map!for a declaration context}context substitution map of~\tX. The \index{type witness!of conditional conformance}type witnesses of $\ConfReq{$\tXd$}{P}$ might contain type parameters of the constrained extension, and not just the conforming type; however the context substitution map of~\tX\ has the generic signature of the conforming type. We instead define $\Sigma$ to be the context substitution map of~\tX\ for the generic signature of the constrained extension, as in \SecRef{member type repr}. Indeed, we find ourselves in the same situation as in member type resolution, when the referenced type declaration is declared in a constrained extension; we must perform some additional \index{global conformance lookup!substitution map}global conformance lookups to completely populate the substitution map.
 
 The conditional requirements of the specialized conformance $\XP$ are the \index{substituted requirement}substituted requirements obtained by applying $\Sigma$ to each conditional requirement of \ConfReq{$\tXd$}{P}. This makes the following \index{commutative diagram!conditional conformance}diagram commute for each conditional requirement~$R$:
 \begin{center}
@@ -544,7 +540,7 @@ R \arrow[r, "\text{apply $\Sigma$}"]&R\otimes\Sigma
 \end{tikzcd}
 \end{center}
 
-Consider the $\ConfReq{Array<\rT>}{Equatable}$ conformance from the standard library. The generic signature of \texttt{Array} is \texttt{<\rT>} with no requirements, while the conformance context is the constrained extension with signature \texttt{<\rT\ where \rT:~Equatable>}. The context substitution map of \texttt{Array<Int>} for the constrained extension is:
+Consider the $\ConfReq{Array<\rT>}{Equatable}$ conformance from the standard library. The generic signature of \texttt{Array} is \texttt{<\rT>}, with no requirements, while the conformance context is the constrained extension with signature \texttt{<\rT\ where \rT:~Equatable>}. The context substitution map of \texttt{Array<Int>} for the constrained extension is:
 \begin{align*}
 \Sigma := \SubstMapC{
 &\SubstType{\rT}{Int}}{
@@ -592,13 +588,13 @@ Protocol inheritance is modeled as an \index{associated conformance requirement!
 protocol Base {...}
 protocol Derived: Base {...}
 \end{Verbatim}
-When checking a conformance to \texttt{Derived}, the \index{conformance checker}conformance checker ensures that the conforming type satisfies the $\ConfReq{Self}{Base}$ requirement. When the conformance to \texttt{Base} is unconditional, this always succeeds, because the conformance declaration also implies an unconditional conformance to the base protocol:
+When checking a conformance to \texttt{Derived}, the \index{conformance checker}conformance checker ensures that the conforming type satisfies the $\ConfReq{Self}{Base}$ requirement. When the conformance to \texttt{Base} is unconditional, this always succeeds, because the conformance declaration also \index{implied conformance}\emph{implies} an unconditional conformance to the base protocol:
 \begin{Verbatim}
 struct Pair<T, U> {}
 extension Pair: Derived {...}
 // implies `extension Pair: Base {}'
 \end{Verbatim}
-The nominal type's \index{conformance lookup table}conformance lookup table synthesizes these implied conformances and makes them available to global conformance lookup. With conditional conformances, such implied conformances are not synthesized because there is no way to guess what the conditional requirements should be. The conformance checker still checks the associated conformance requirement on \tSelf\ though, so the user must first explicitly declare a conformance to each base protocol when writing a conditional conformance.
+The nominal type's \index{conformance lookup table}conformance lookup table synthesizes these implied conformances and makes them available to global conformance lookup. With conditional conformances, such implied conformances are not synthesized, because there is no way to guess what the conditional requirements should be. The conformance checker still checks the associated conformance requirement on \tSelf\ though, so the user must first explicitly declare a conformance to each base protocol when writing a conditional conformance.
 
 Suppose we wish for \texttt{Pair} to conform to \texttt{Derived} when $\SameReq{\rT}{Int}$:
 \begin{Verbatim}
@@ -653,7 +649,7 @@ In the generic signature of the extension where the \texttt{Derived} conformance
 
 \paragraph{Termination.}
 Conditional conformances can express \index{non-terminating computation}non-terminating computation at compile time. 
-The below code is taken from a bug report which remains \index{limitation!non-terminating conditional conformance}unfixed for the time being \cite{sr6724}:
+The below code is taken from a bug report which remains \index{limitation!conditional conformance}unfixed for the time being \cite{sr6724}:
 \begin{Verbatim}
 protocol P {}
 
@@ -723,7 +719,7 @@ struct Bad: Sequence {
 The substitution map
 $\Sigma:=\SubstMapC{\SubstType{\rT}{Bad}}{\SubstConf{\rT}{Bad}{Sequence}}$ satisfies all of the explicit requirements of its generic signature, but it does not satisfy the derived requirement $\ConfReq{\rT.[Sequence]Iterator}{IteratorProtocol}$. However, this is not a problem, because we still \index{diagnostic!conformance checker}diagnose an error when we \index{conformance checker}check the conformance, so the program is rejected anyway.
 
-Unfortunately, we can write down a substitution map that is not well-formed, and yet \AlgRef{check generic arguments algorithm} does not produce any diagnostics at all, including during conformance checking. This reveals a \index{limitation!conditional conformance soundness hole}soundness hole with conditional conformances that remains unfixed for the time being. We start with two protocols:
+Unfortunately, we can write down a substitution map that is not well-formed, and yet \AlgRef{check generic arguments algorithm} does not produce any diagnostics at all, including during conformance checking. This reveals a \index{limitation!conditional conformance}soundness hole with conditional conformances that remains unfixed for the time being. We start with two protocols:
 \begin{Verbatim}
 protocol Bar {
   associatedtype Beer
@@ -792,7 +788,7 @@ Inside the body of \texttt{both()}, we're assuming the calls to \texttt{brew()} 
 \end{enumerate}
 The second approach is more desirable, and we will revisit this problem in \ChapRef{rqm minimization}.
 
-\section{Source Code Reference}\label{extensionssourceref}
+\section{Source Code Reference}\label{src:extensions}
 
 Key source files:
 \begin{itemize}
@@ -845,7 +841,7 @@ Key source files:
 
 \IndexSource{direct lookup}
 \apiref{DirectLookupRequest}{class}
-The request evaluator request implementing direct lookup. The entry point is the \texttt{NominalTypeDecl::lookupDirect()} method, which was introduced in \SecRef{compilation model source reference}. This request is uncached, because the member lookup table effectively implements caching outside of the request evaluator.
+The request evaluator request implementing direct lookup. The entry point is the \texttt{NominalTypeDecl::lookupDirect()} method, which was introduced in \SecRef{src:compilation model}. This request is uncached, because the member lookup table effectively implements caching outside of the request evaluator.
 
 To understand the implementation of \verb|DirectLookupRequest::evaluate()|, one can start with the following functions:
 \begin{itemize}
@@ -876,10 +872,10 @@ Key source files:
 \item \SourceFile{lib/Sema/TypeCheckDecl.cpp}
 \item \SourceFile{lib/Sema/TypeCheckGeneric.cpp}
 \end{itemize}
-The \texttt{GenericSignatureRequest} was previously introduced in \SecRef{buildinggensigsourceref}. It delegates to a pair of utility functions to implement special behaviors of extensions.
+The \texttt{GenericSignatureRequest} was previously introduced in \SecRef{src:building generic signatures}. It delegates to a pair of utility functions to implement special behaviors of extensions.
 
 \apiref{collectAdditionalExtensionRequirements()}{function}
-Collects an extension's requirements from the extended type, which handles extensions of pass-through type aliases (\verb|extension CountableRange {...}|) and extensions of bound generic types (\verb|extension Array<Int> {...}|).
+Collects an extension's requirements from the extended type, which handles extensions of pass-through type aliases (\verb|extension CountableRange {...}|) and extensions of generic nominal types (\verb|extension Array<Int> {...}|).
 
 \IndexSource{pass-through type alias}
 \apiref{isPassthroughTypealias()}{function}
@@ -897,9 +893,9 @@ Key source files:
 \end{itemize}
 
 \apiref{checkConformance}{function}
-A utility function that first calls \texttt{lookupConformance()} (\SecRef{conformancesourceref}), and then checks any conditional requirements using \texttt{checkRequirements()}, described in \SecRef{type resolution source ref}.
+A utility function that first calls \IndexSource{global conformance lookup}\texttt{lookupConformance()} (\SecRef{src:conformances}), and then checks any conditional requirements using \texttt{checkRequirements()}, described in \SecRef{src:type resolution}.
 
-The \verb|NormalProtocolConformance| and \verb|SpecializedProtocolConformance| classes were previously introduced in \SecRef{conformancesourceref}.
+The \verb|NormalProtocolConformance| and \verb|SpecializedProtocolConformance| classes were previously introduced in \SecRef{src:conformances}.
 \apiref{NormalProtocolConformance}{class}
 \begin{itemize}
 \item \texttt{getConditionalRequirements()} returns an array of \IndexSource{conditional requirement}conditional requirements; this is non-empty exactly when this is a \IndexSource{conditional conformance}conditional conformance.
@@ -909,7 +905,7 @@ The \verb|NormalProtocolConformance| and \verb|SpecializedProtocolConformance| c
 \item \texttt{getConditionalRequirements()} applies the \IndexSource{conformance substitution map}conformance substitution map to each conditional requirement of the underlying normal conformance.
 \end{itemize}
 \apiref{GenericSignatureImpl}{class}
-See also \SecRef{genericsigsourceref}.
+See also \SecRef{src:generic signatures}.
 \begin{itemize}
 \item \texttt{requirementsNotSatisfiedBy()} returns an array of those requirements of this generic signature not satisfied by the given generic signature. This is used for computing the conditional requirements of a \texttt{NormalProtocolConformance}.
 \end{itemize}

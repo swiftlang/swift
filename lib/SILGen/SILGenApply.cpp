@@ -4345,6 +4345,7 @@ private:
     auto openedElementEnv = expansionExpr->getGenericEnvironment();
     SGF.emitDynamicPackLoop(expansionExpr, formalPackType,
                             packComponentIndex, openedElementEnv,
+                            []() -> SILBasicBlock * { return nullptr; },
                             [&](SILValue indexWithinComponent,
                                 SILValue packExpansionIndex,
                                 SILValue packIndex) {
@@ -5483,15 +5484,23 @@ ManagedValue SILGenFunction::applyBorrowMutateAccessor(
   if (fn.getFunction()->getConventions().hasGuaranteedResult()) {
     auto selfArg = args.back().getValue();
     if (isa<LoadBorrowInst>(selfArg)) {
+      // unchecked_ownership is used to silence the ownership verifier for
+      // returning a value produced within a load_borrow scope. SILGenCleanup
+      // eliminates it and introduces return_borrow appropriately.
       rawResult = B.createUncheckedOwnership(loc, rawResult);
     }
   }
 
   if (rawResult->getType().isMoveOnly()) {
     if (rawResult->getType().isAddress()) {
+      SILFunctionConventions substFnConv(substFnType, SGM.M);
       auto result = B.createMarkUnresolvedNonCopyableValueInst(
           loc, rawResult,
-          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+          substFnConv.hasInoutResult()
+              ? MarkUnresolvedNonCopyableValueInst::CheckKind::
+                    AssignableButNotConsumable
+              : MarkUnresolvedNonCopyableValueInst::CheckKind::
+                    NoConsumeOrAssign);
       return ManagedValue::forRValueWithoutOwnership(result);
     }
     auto result = emitManagedCopy(loc, rawResult);
@@ -6366,7 +6375,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
     // Convert to the outer error, if we need to.
     SILValue outerError;
     SILType innerErrorType = innerError->getType().getObjectType();
-    SILType outerErrorType = F.mapTypeIntoContext(
+    SILType outerErrorType = F.mapTypeIntoEnvironment(
         F.getConventions().getSILErrorType(getTypeExpansionContext()));
     if (IndirectErrorResult && IndirectErrorResult == innerError) {
       // Fast path: we aliased the indirect error result slot because both are
@@ -6497,7 +6506,7 @@ void SILGenFunction::emitYield(SILLocation loc,
   SmallVector<SILParameterInfo, 4> substYieldTys;
   for (auto origYield : fnType->getYields()) {
     substYieldTys.push_back(
-        {F.mapTypeIntoContext(origYield.getArgumentType(
+        {F.mapTypeIntoEnvironment(origYield.getArgumentType(
                                   SGM.M, fnType, getTypeExpansionContext()))
              ->getCanonicalType(),
          origYield.getConvention()});
@@ -6911,6 +6920,7 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
                                                       PreparedArguments &&args,
                                                       Type overriddenSelfType,
                                                       SGFContext C) {
+  ASSERT(init);
   ConstructorDecl *ctor = cast<ConstructorDecl>(init.getDecl());
 
   // Form the reference to the allocating initializer.
@@ -7941,7 +7951,7 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
     ->castTo<FunctionType>()->getResult();
   Type replacementTypes[] = {resultType};
   auto startBuiltin = cast<FuncDecl>(
-      getBuiltinValueDecl(ctx, ctx.getIdentifier("startAsyncLet")));
+      getBuiltinValueDecl(ctx, ctx.getIdentifier("startAsyncLetWithLocalBuffer")));
   auto subs = SubstitutionMap::get(startBuiltin->getGenericSignature(),
                                    replacementTypes,
                                    ArrayRef<ProtocolConformanceRef>{});
@@ -8084,16 +8094,19 @@ void SILGenFunction::emitFinishAsyncLet(
     SILLocation loc, SILValue asyncLet, SILValue resultPtr) {
   // This runtime function cancels the task, awaits its completion, and
   // destroys the value in the result buffer if necessary.
-  emitApplyOfLibraryIntrinsic(
-      loc, SGM.getFinishAsyncLet(), {},
-      {ManagedValue::forObjectRValueWithoutOwnership(asyncLet),
-       ManagedValue::forObjectRValueWithoutOwnership(resultPtr)},
-      SGFContext());
-  // This builtin ends the lifetime of the allocation for the async let.
   auto &ctx = getASTContext();
   B.createBuiltin(loc,
+    ctx.getIdentifier(getBuiltinName(BuiltinValueKind::FinishAsyncLet)),
+    SILType::getEmptyTupleType(ctx), {},
+    {asyncLet, resultPtr});
+
+  // Return to the correct executor.
+  ExecutorBreadcrumb(true).emit(*this, loc);
+
+  // This builtin ends the lifetime of the allocation for the async let.
+  B.createBuiltin(loc,
     ctx.getIdentifier(getBuiltinName(BuiltinValueKind::EndAsyncLetLifetime)),
-    getLoweredType(ctx.TheEmptyTupleType), {},
+    SILType::getEmptyTupleType(ctx), {},
     {asyncLet});
 }
 

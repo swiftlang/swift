@@ -1085,12 +1085,22 @@ public:
   /// behaviors for it and, if it's an extension, its members.
   bool isObjCImplementation() const;
 
+  /// True if this declaration should always have its implementation made
+  /// available to the client, and not have an ABI symbol.
+  ///
+  /// This can be spelled with @export(implementation) or the historical
+  /// @_alwaysEmitIntoClient.
+  bool isAlwaysEmittedIntoClient() const;
+
   /// True if this declaration should never have its implementation made
   /// available to any client. This overrides cross-module optimization and
   /// optimizations that might use the implementation, such that the only
   /// implementation of this function is the one compiled into its owning
   /// module. Practically speaking, this prohibits serialization of the SIL
   /// for this definition.
+  ///
+  /// This can be spelled with @export(interface) or the historical
+  /// @_neverEmitIntoClient.
   bool isNeverEmittedIntoClient() const;
 
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
@@ -1686,15 +1696,15 @@ public:
   ///
   /// \code
   /// class C<T> {
-  ///   func f1() {}    // isGeneric == false
-  ///   func f2<T>() {} // isGeneric == true
+  ///   func f1() {}    // hasGenericParamList == false
+  ///   func f2<T>() {} // hasGenericParamList == true
   /// }
   ///
-  /// protocol P { // isGeneric == true due to implicit Self param
-  ///   func p()   // isGeneric == false
+  /// protocol P { // hasGenericParamList == true due to implicit Self param
+  ///   func p()   // hasGenericParamList == false
   /// }
   /// \endcode
-  bool isGeneric() const { return getGenericParams() != nullptr; }
+  bool hasGenericParamList() const { return getGenericParams() != nullptr; }
   bool hasComputedGenericSignature() const;
   bool isComputingGenericSignature() const;
   
@@ -6071,9 +6081,7 @@ public:
 
   /// Return true if this is a property that either has storage
   /// or init accessor associated with it.
-  bool supportsInitialization() const {
-    return hasStorage() || hasInitAccessor();
-  }
+  bool supportsInitialization() const;
 
   /// Return true if this storage has the basic accessors/capability
   /// to be mutated.  This is generally constant after the accessors are
@@ -6727,7 +6735,10 @@ public:
   ///
   /// From the standpoint of access control and exportability checking, this
   /// var will behave as if it was public, even if it is internal or private.
-  bool isLayoutExposedToClients() const;
+  ///
+  /// If \p applyImplicit, consider implicitly exposed layouts as well.
+  /// This applies to non-resilient modules.
+  bool isLayoutExposedToClients(bool applyImplicit = false) const;
 
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
@@ -7020,9 +7031,6 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'sending'.
     IsSending = 1 << 4,
-
-    /// Whether or not this parameter is isolated to a caller.
-    IsCallerIsolated = 1 << 5,
   };
 
   /// The type repr and 3 bits used for flags.
@@ -7321,18 +7329,6 @@ public:
       addFlag(Flag::IsSending);
     else
       removeFlag(Flag::IsSending);
-  }
-
-  /// Whether or not this parameter is marked with 'nonisolated(nonsending)'.
-  bool isCallerIsolated() const {
-    return getOptions().contains(Flag::IsCallerIsolated);
-  }
-
-  void setCallerIsolated(bool value = true) {
-    if (value)
-      addFlag(Flag::IsCallerIsolated);
-    else
-      removeFlag(Flag::IsCallerIsolated);
   }
 
   /// Whether or not this parameter is marked with '@_addressable'.

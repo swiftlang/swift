@@ -1129,6 +1129,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::AccessControl:
   case DeclAttrKind::ReferenceOwnership:
   case DeclAttrKind::Effects:
+  case DeclAttrKind::Export:
   case DeclAttrKind::Optimize:
   case DeclAttrKind::Exclusivity:
   case DeclAttrKind::NonSendable:
@@ -1932,6 +1933,15 @@ StringRef DeclAttribute::getAttrName() const {
       case EffectsKind::Custom:
         return "_effects";
     }
+  case DeclAttrKind::Export: {
+    switch (cast<ExportAttr>(this)->exportKind) {
+    case ExportKind::Interface:
+      return "export(interface)";
+    case ExportKind::Implementation:
+      return "export(implementation)";
+    }
+    llvm_unreachable("Invalid export kind");
+  }
   case DeclAttrKind::AccessControl:
   case DeclAttrKind::SetterAccess: {
     AccessLevel access = cast<AbstractAccessControlAttr>(this)->getAccess();
@@ -3167,6 +3177,20 @@ ASTContext &CustomAttr::getASTContext() const {
   return getOwner().getDeclContext()->getASTContext();
 }
 
+bool CustomAttr::shouldPreferPropertyWrapperOverMacro() const {
+  // If we have a VarDecl in a local context, prefer to use a property wrapper
+  // if one exists. This is necessary since we don't properly support peer
+  // declarations in local contexts, so want to use a property wrapper if one
+  // exists.
+  if (auto *D = getOwner().getAsDecl()) {
+    if ((isa<VarDecl>(D) || isa<PatternBindingDecl>(D)) &&
+        D->getDeclContext()->isLocalContext()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 NominalTypeDecl *CustomAttr::getNominalDecl() const {
   auto &eval = getASTContext().evaluator;
   auto *mutThis = const_cast<CustomAttr *>(this);
@@ -3304,6 +3328,13 @@ DeclAttributes::getEffectiveSendableAttr() const {
 
   if (auto sendableAttr = getAttribute<SendableAttr>())
     return sendableAttr;
+
+  // ~Sendable on declarations imported from Objective-C.
+  for (auto *attr : getAttributes<SynthesizedProtocolAttr>()) {
+    if (attr->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+        attr->isSuppressed())
+      return nullptr;
+  }
 
   return assumedAttr;
 }

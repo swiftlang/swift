@@ -716,7 +716,7 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
 
   for (auto Param : SubstParams) {
     // Map the parameter into context
-    auto ContextTy = Callee->mapTypeIntoContext(Param->getCanonicalType());
+    auto ContextTy = Callee->mapTypeIntoEnvironment(Param->getCanonicalType());
     auto Archetype = ContextTy->getAs<ArchetypeType>();
     if (!Archetype)
       continue;

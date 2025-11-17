@@ -26,7 +26,7 @@ let escapeInfoDumper = FunctionPass(name: "dump-escape-info") {
     var result: Set<String> =  Set()
     
     mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
-      if operand.instruction is ReturnInst {
+      if operand.instruction is ReturnInstruction {
         result.insert("return[\(path.projectionPath)]")
         return .ignore
       }
@@ -94,7 +94,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info") {
       if user == apply {
         return .abort
       }
-      if user is ReturnInst {
+      if user is ReturnInstruction {
         // Anything which is returned cannot escape to an instruction inside the function.
         return .ignore
       }

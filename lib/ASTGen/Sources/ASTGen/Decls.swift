@@ -612,7 +612,10 @@ extension ASTGenVisitor {
     }
 
     // @const/@section globals are not top-level, per SE-0492.
-    let isConst = attrs.attributes.hasAttribute(.Section) || attrs.attributes.hasAttribute(.ConstVal)
+    // We follow the same rule for @_extern.
+    let isConst = attrs.attributes.hasAttribute(.Section)
+      || attrs.attributes.hasAttribute(.ConstVal)
+      || attrs.attributes.hasAttribute(.Extern)
 
     let topLevelDecl: BridgedTopLevelCodeDecl?
     if self.declContext.isModuleScopeContext, self.declContext.parentSourceFile.isScriptMode, !isConst {

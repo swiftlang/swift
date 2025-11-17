@@ -362,6 +362,18 @@ enum class CheckedCastContextKind {
   Coercion,
 };
 
+/// Determines which BraceStmts should be type-checked.
+enum class BraceStmtChecking {
+  /// Type-check all BraceStmts. This should always be the case for regular
+  /// type-checking.
+  All,
+
+  /// Only type-check the body of a do-catch statement, not including catch
+  /// clauses. This is necessary for completion where we still need the caught
+  /// error type to be computed.
+  OnlyDoCatchBody,
+};
+
 namespace TypeChecker {
 // DANGER: callers must verify that elementType satisfies the requirements of
 // the Wrapped generic parameter, as this function will not do so!
@@ -525,7 +537,7 @@ bool typeCheckStmtConditionElement(StmtConditionElement &elt, bool &isFalsable,
 ConcreteDeclRef getReferencedDeclForHasSymbolCondition(Expr *E);
 
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
-                      bool LeaveBodyUnchecked = false);
+                      BraceStmtChecking braceChecking = BraceStmtChecking::All);
 
 /// Try to apply the result builder transform of the given builder type
 /// to the body of the function.
@@ -877,6 +889,12 @@ Expr *coerceToRValue(
 /// `LoadExpr`, because `ForceValueExpr` and `ParenExpr` supposed to appear
 /// only at certain positions in AST.
 Expr *addImplicitLoadExpr(
+    ASTContext &Context, Expr *expr,
+    std::function<Type(Expr *)> getType = [](Expr *E) { return E->getType(); },
+    std::function<void(Expr *, Type)> setType =
+        [](Expr *E, Type type) { E->setType(type); });
+
+Expr *addImplicitBorrowExpr(
     ASTContext &Context, Expr *expr,
     std::function<Type(Expr *)> getType = [](Expr *E) { return E->getType(); },
     std::function<void(Expr *, Type)> setType =

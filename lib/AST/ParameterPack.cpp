@@ -113,7 +113,7 @@ struct PackReferenceCollector: TypeWalker {
     }
 
     if (auto *typeAliasType = dyn_cast<TypeAliasType>(t.getPointer())) {
-      if (typeAliasType->getDecl()->isGeneric()) {
+      if (typeAliasType->getDecl()->hasGenericParamList()) {
         if (auto parentType = typeAliasType->getParent())
           parentType.walk(*this);
 
@@ -168,7 +168,7 @@ void TypeBase::getTypeParameterPacks(
         auto *genericEnv = archetypeTy->getGenericEnvironment();
         auto paramTy = archetypeTy->getInterfaceType()->getRootGenericParam();
         rootParameterPacks.push_back(
-            genericEnv->mapTypeIntoContext(paramTy));
+            genericEnv->mapTypeIntoEnvironment(paramTy));
       }
     }
 
@@ -403,7 +403,7 @@ SmallVector<Type, 2> BoundGenericType::getExpandedGenericArgs() {
 
 /// <T...> Foo<T, Pack{Int, String}> => Pack{T..., Int, String}
 SmallVector<Type, 2> TypeAliasType::getExpandedGenericArgs() {
-  if (!getDecl()->isGeneric())
+  if (!getDecl()->hasGenericParamList())
     return SmallVector<Type, 2>();
 
   auto genericSig = getGenericSignature();

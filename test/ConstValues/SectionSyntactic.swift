@@ -35,8 +35,8 @@
 // non-literal expressions (should be rejected)
 @section("mysection") let invalidNonLiteral1 = Int.max
 // expected-error@-1{{not supported in a constant expression}}
-@section("mysection") let invalidNonLiteral2 = UInt8(42)
-// expected-error@-1{{not supported in a constant expression}}
+@section("mysection") let invalidNonLiteral2 = UInt64(42)
+// expected-error@-1{{unsupported type in a constant expression}}
 @section("mysection") let invalidNonLiteral3 = true.hashValue
 // expected-error@-1{{not supported in a constant expression}}
 
@@ -46,6 +46,8 @@ func bar(x: Int) -> String { return "test" }
 // function references
 @section("mysection") let funcRef1 = foo // ok
 @section("mysection") let funcRef2 = bar // ok
+@section("mysection") let funcRef3: ()->Int = foo // ok
+@section("mysection") let funcRef4: @convention(c) ()->Int = foo // ok
 
 // invalid function references (should be rejected)
 @section("mysection") let invalidFuncRef1 = foo()
@@ -85,6 +87,7 @@ enum E { case a }
 @section("mysection") let tuple1 = (1, 2, 3, 2.718, true) // ok
 @section("mysection") let tuple2: (Int, Float, Bool) = (42, 3.14, false) // ok
 @section("mysection") let tuple3 = (foo, bar) // ok (function references in tuple)
+@section("mysection") let tuple4 = (1 as UInt8, 2 as UInt8, 3 as UInt8) // ok
 
 // invalid tuples (should be rejected)
 @section("mysection") let invalidTuple1 = (1, 2, Int.max)

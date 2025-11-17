@@ -842,9 +842,9 @@ def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
   Alias<emit_objc_header_path>;
 
 def emit_clang_header_min_access : Separate<["-"], "emit-clang-header-min-access">,
-  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath, CacheInvariant]>,
+  Flags<[FrontendOption, NoInteractiveOption, CacheInvariant]>,
   MetaVarName<"<access-level>">,
-  HelpText<"The minimum access level of declarations to include in the emitted header.>">;
+  HelpText<"The minimum access level of declarations to include in the emitted header">;
 
 def static : Flag<["-"], "static">,
   Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,
@@ -1961,6 +1961,11 @@ def skip_protocol_implementations : Flag<["-"], "skip-protocol-implementations">
          NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Skip emitting symbols that are implementations of protocol requirements or inherited from protocol extensions">;
 
+def symbol_graph_shorten_output_names : Flag<["-"], "symbol-graph-shorten-output-names">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Shorten the symbol graph output file names by hashing the module name; outputs an additional JSON file with the map of hash to original name">;
+
 // swift-api-digester-only options
 def dump_sdk: Flag<["-", "--"], "dump-sdk">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
@@ -2093,10 +2098,6 @@ def BI : JoinedOrSeparate<["-"], "BI">,
   HelpText<"add a module for baseline input">;
 def BI_EQ : Joined<["-"], "BI=">, Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   Alias<BI>;
-
-def iframework : JoinedOrSeparate<["-"], "iframework">,
-  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
-  HelpText<"add a directory to the clang importer system framework search path">;
 
 def baseline_path : JoinedOrSeparate<["-"], "baseline-path">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
@@ -2338,7 +2339,7 @@ def scanner_prefix_map_paths : MultiArg<["-"], "scanner-prefix-map-paths", 2>,
   HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix> <replacement>">;
 
 def scanner_prefix_map : Separate<["-"], "scanner-prefix-map">,
-  Flags<[NewDriverOnlyOption]>,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix=replacement>">;
 
 def scanner_prefix_map_sdk : Separate<["-"], "scanner-prefix-map-sdk">,
@@ -2352,6 +2353,11 @@ def scanner_prefix_map_toolchain : Separate<["-"], "scanner-prefix-map-toolchain
 def cache_replay_prefix_map: MultiArg<["-"], "cache-replay-prefix-map", 2>,
   Flags<[FrontendOption, NoDriverOption, CacheInvariant]>,
   HelpText<"Remap paths when replaying outputs from cache">, MetaVarName<"<prefix> <replacement>">;
+
+def register_module_dependency : Separate<["-"], "register-module-dependency">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Register module for dependency scan without importing in the frontend">;
+
 
 // END ONLY SUPPORTED IN NEW DRIVER
 

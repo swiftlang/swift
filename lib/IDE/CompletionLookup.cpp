@@ -266,7 +266,7 @@ void CompletionLookup::foundFunction(const AnyFunctionType *AFT) {
 
 bool CompletionLookup::canBeUsedAsRequirementFirstType(Type selfTy,
                                                        TypeAliasDecl *TAD) {
-  if (TAD->isGeneric())
+  if (TAD->hasGenericParamList())
     return false;
 
   auto T = TAD->getDeclaredInterfaceType();
@@ -2020,7 +2020,7 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
 
     if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
       addTypeAliasRef(TAD, Reason, dynamicLookupInfo);
-      auto type = TAD->mapTypeIntoContext(TAD->getDeclaredInterfaceType());
+      auto type = TAD->mapTypeIntoEnvironment(TAD->getDeclaredInterfaceType());
       if (type->mayHaveMembers())
         addConstructorCallsForType(type, TAD->getName(), Reason,
                                    dynamicLookupInfo);
@@ -2030,7 +2030,7 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
     if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
       addGenericTypeParamRef(GP, Reason, dynamicLookupInfo);
       auto type =
-          CurrDeclContext->mapTypeIntoContext(GP->getDeclaredInterfaceType());
+          CurrDeclContext->mapTypeIntoEnvironment(GP->getDeclaredInterfaceType());
       addConstructorCallsForType(type, GP->getName(), Reason,
                                  dynamicLookupInfo);
       return;
@@ -3119,7 +3119,7 @@ void CompletionLookup::getSelfTypeCompletionInDeclContext(
     return;
 
   Type selfType =
-      CurrDeclContext->mapTypeIntoContext(typeDC->getSelfInterfaceType());
+      CurrDeclContext->mapTypeIntoEnvironment(typeDC->getSelfInterfaceType());
 
   if (typeDC->getSelfClassDecl()) {
     // In classes, 'Self' can be used in result type of func, subscript and

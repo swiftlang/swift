@@ -335,8 +335,12 @@ extension GUID {
 // comes from the _GUIDDef clang module rather than the WinSDK clang module.
 
 extension GUID: @retroactive Equatable {
+  // When C++ interop is enabled, Swift imports a == operator from guiddef.h
+  // that conflicts with the definition of == here, so we've renamed it to
+  // __equals to avoid the conflict.
   @_transparent
-  public static func ==(lhs: Self, rhs: Self) -> Bool {
+  @_implements(Equatable, ==(_:_:))
+  public static func __equals(lhs: Self, rhs: Self) -> Bool {
     lhs.uint128Value == rhs.uint128Value
   }
 }

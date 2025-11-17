@@ -10,14 +10,10 @@
 % Remove these
 %%%%
 \newcommand{\proto}[1]{\texttt{#1}}
-\usepackage{bm}
 \newcommand{\namesym}[1]{\mathrm{#1}}
-\newcommand{\genericparam}[1]{\bm{\mathsf{#1}}}
+\newcommand{\genericparam}[1]{\mathsf{#1}}
 \newcommand{\gensig}[2]{\langle #1\;\textit{where}\;#2\rangle}
-\newcommand{\genericsym}[2]{\bm{\uptau}_{#1,#2}}
-\DeclareMathOperator{\gpdepth}{depth}
-\DeclareMathOperator{\gpindex}{index}
-\DeclareMathOperator{\domain}{domain}
+\newcommand{\genericsym}[2]{\uptau_{#1,#2}}
 %%%%%
 
 Until now, you've seen how to solve the \texttt{requiresProtocol()} generic signature
@@ -280,6 +276,44 @@ $\genericsym{0}{0}.\assocsym{P}{B}$&$\pQ$, $\pR$, $\supersym{\namesym{Cache}\lan
 
 \IndexTwoFlag{debug-requirement-machine}{concrete-unification}
 
+\section[]{Concrete Conformances}\label{rqm concrete conformances}
+
+\ifWIP
+TODO:
+\begin{itemize}
+\item Concrete conformance rule, property-like
+\item Virtual rule that introduces it
+\item Idea: it should eliminate the conformance rule but not the concrete type rule
+\item Doesn't actually appear in signature so should not impact minimization
+\item Conditional requirement inference, only in generic signatures and not protocols, because we can't merge connected components during completion. for a generic signature this actually has to import new components in the general case
+\end{itemize}
+\fi
+
+\IndexTwoFlag{debug-requirement-machine}{concretize-nested-types}
+
+\ifWIP
+TODO:
+\begin{itemize}
+\item Concrete type witness
+\item Abstract type witness
+\item Virtual rules
+\item Algorithm for building a ``relative'' concrete type symbol from substituting another symbol's pattern type
+\end{itemize}
+
+TODO:
+\begin{itemize}
+\item Free conformances
+\item Can a protocol have a free conformance
+\item Can a conformance be made free by changing the protocol
+\item Conformance evaluation graph
+\item Heuristic to find same-type requirements from a conformance; just the parent type thing
+\item The problem with opaque archetypes
+\item Open question: can we encode a conformance more directly without evaluating it; \verb|G<G<G<T>>>| example
+\end{itemize}
+\fi
+
+\IndexFlag{enable-requirement-machine-opaque-archetypes}
+
 \section[]{Generic Signature Queries}\label{implqueries}
 
 \ifWIP
@@ -306,7 +340,7 @@ Given two layout symbols $A$ and $B$, $A\wedge B$ is the most general symbol tha
 
 Layout symbols store a layout constraint as an instance of the \texttt{LayoutConstraint} class. The join operation used in the implementation of the \texttt{requiresClass()} query is defined in the \texttt{merge()} method on \texttt{LayoutConstraint}.
 
-You've already seen the \texttt{requiresProtocol()} query in \ChapRef{symbols terms rules}, where it was shown that it can be implemented by checking if $\Lambda(T).\pP\downarrow\Lambda(T)$. The property map implementation is perhaps slightly more efficient, since it only simplifies a single term and not two. The $\texttt{requiresClass()}$ and $\texttt{isConcreteType()}$ queries are new on the other hand, and demonstrate the power of the property map. With the rewrite system alone, they cannot be implemented except by exhaustive enumeration over all known layout and concrete type symbols.
+You've already seen the \texttt{requiresProtocol()} query in \ChapRef{chap:symbols terms rules}, where it was shown that it can be implemented by checking if $\Lambda(T).\pP\downarrow\Lambda(T)$. The property map implementation is perhaps slightly more efficient, since it only simplifies a single term and not two. The $\texttt{requiresClass()}$ and $\texttt{isConcreteType()}$ queries are new on the other hand, and demonstrate the power of the property map. With the rewrite system alone, they cannot be implemented except by exhaustive enumeration over all known layout and concrete type symbols.
 
 All of the subsequent examples reference the protocol definitions from \ExRef{propmapexample3}, and the resulting property map shown in Table~\ref{propmapexample2table}.
 \begin{example} Consider the canonical type term $\genericsym{0}{0}.\assocsym{P}{B}$. This type parameter conforms to $\proto{Q}$ via a requirement stated in the generic signature, and also to $\proto{R}$, because $\proto{Q}$ inherits from $\proto{R}$. The $\texttt{requiresProtocol()}$ query will confirm these facts, because the property map entry for $\genericsym{0}{0}.\assocsym{P}{B}$ contains the protocol symbols $\pQ$ and $\pR$:

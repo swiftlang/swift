@@ -4825,14 +4825,19 @@ static ConstraintFix *fixPropertyWrapperFailure(
   if (!resolvedOverload)
     return nullptr;
 
+  auto *decl = resolvedOverload->choice.getDeclOrNull();
+  auto *VD = dyn_cast_or_null<VarDecl>(decl);
+  if (!VD)
+    return nullptr;
+
   enum class Fix : uint8_t {
     ProjectedValue,
     PropertyWrapper,
     WrappedValue,
   };
 
-  auto applyFix = [&](Fix fix, VarDecl *decl, Type type) -> ConstraintFix * {
-    if (!decl->hasInterfaceType() || !type)
+  auto applyFix = [&](Fix fix, Type type) -> ConstraintFix * {
+    if (!VD->hasInterfaceType() || !type)
       return nullptr;
 
     if (baseTy->isEqual(type))
@@ -4841,40 +4846,34 @@ static ConstraintFix *fixPropertyWrapperFailure(
     if (baseTy->is<TypeVariableType>() || type->is<TypeVariableType>())
       return nullptr;
 
-    if (!attemptFix(*resolvedOverload, decl, type))
+    if (!attemptFix(*resolvedOverload, VD, type))
       return nullptr;
 
     switch (fix) {
     case Fix::ProjectedValue:
     case Fix::PropertyWrapper:
-      return UsePropertyWrapper::create(cs, decl, fix == Fix::ProjectedValue,
-                                        baseTy, toType.value_or(type),
-                                        locator);
+      return UsePropertyWrapper::create(cs, VD, fix == Fix::ProjectedValue,
+                                        baseTy, toType.value_or(type), locator);
 
     case Fix::WrappedValue:
-      return UseWrappedValue::create(cs, decl, baseTy, toType.value_or(type),
+      return UseWrappedValue::create(cs, VD, baseTy, toType.value_or(type),
                                      locator);
     }
     llvm_unreachable("Unhandled Fix type in switch");
   };
 
-  if (auto projection =
-          cs.getPropertyWrapperProjectionInfo(*resolvedOverload)) {
-    if (auto *fix = applyFix(Fix::ProjectedValue, projection->first,
-                             projection->second))
+  if (auto projectTy = cs.getPropertyWrapperProjectionType(*resolvedOverload)) {
+    if (auto *fix = applyFix(Fix::ProjectedValue, projectTy))
       return fix;
   }
 
-  if (auto wrapper = cs.getPropertyWrapperInformation(*resolvedOverload)) {
-    if (auto *fix =
-            applyFix(Fix::PropertyWrapper, wrapper->first, wrapper->second))
+  if (auto backingTy = cs.getPropertyWrapperBackingType(*resolvedOverload)) {
+    if (auto *fix = applyFix(Fix::PropertyWrapper, backingTy))
       return fix;
   }
 
-  if (auto wrappedProperty =
-          cs.getWrappedPropertyInformation(*resolvedOverload)) {
-    if (auto *fix = applyFix(Fix::WrappedValue, wrappedProperty->first,
-                             wrappedProperty->second))
+  if (auto wrappedTy = cs.getWrappedPropertyType(*resolvedOverload)) {
+    if (auto *fix = applyFix(Fix::WrappedValue, wrappedTy))
       return fix;
   }
 
@@ -9033,7 +9032,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           return SolutionKind::Solved;
         };
 
-        if (witness->isGeneric()) {
+        if (witness->hasGenericParamList()) {
           // `DistributedActorSystem.remoteCall`
           if (witness->isDistributedActorSystemRemoteCall(/*isVoidReturn=*/false)) {
             if (GP->isEqual(cast<FuncDecl>(witness)->getResultInterfaceType()))
@@ -9970,13 +9969,13 @@ ConstraintSystem::matchPackElementType(Type elementType, Type patternType,
   }
 
   auto shapeParam = CanGenericTypeParamType(cast<GenericTypeParamType>(
-      shapeClass->mapTypeOutOfContext()->getCanonicalType()));
+      shapeClass->mapTypeOutOfEnvironment()->getCanonicalType()));
 
   auto *genericEnv = getPackExpansionEnvironment(packExpansion);
   if (genericEnv) {
     if (shapeParam != genericEnv->getOpenedElementShapeClass()) {
       return tryFix([&]() {
-        auto envShape = genericEnv->mapTypeIntoContext(
+        auto envShape = genericEnv->mapTypeIntoEnvironment(
             genericEnv->getOpenedElementShapeClass());
         if (auto *pack = dyn_cast<PackType>(envShape))
           envShape = pack->unwrapSingletonPackExpansion()->getPatternType();
@@ -11772,7 +11771,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     if (auto archetype =
             baseTy->getMetatypeInstanceType()->getAs<ArchetypeType>()) {
       if (auto genericTy =
-              archetype->mapTypeOutOfContext()->getAs<GenericTypeParamType>()) {
+              archetype->mapTypeOutOfEnvironment()->getAs<GenericTypeParamType>()) {
         for (auto param : DC->getGenericSignatureOfContext()
                               .getGenericParams()) {
           // Find a param at the same depth and one index past the type we're
@@ -15422,7 +15421,23 @@ static void increaseScoreForGenericParamPointerConversion(
     return;
 
   // Check to see if the parameter is a generic parameter, or dependent member.
-  auto paramTy = param->getInterfaceType()->lookThroughAllOptionalTypes();
+  // Look though optionals and pack expansions.
+  auto paramTy = param->getInterfaceType();
+  while (true) {
+    paramTy = paramTy->lookThroughAllOptionalTypes();
+    if (auto packExpansion = paramTy->getAs<PackExpansionType>()) {
+      paramTy = packExpansion->getPatternType();
+      continue;
+    }
+    // Also look through "vanishing" tuples.
+    if (auto *tupleTy = paramTy->getAs<TupleType>()) {
+      if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).hasName()) {
+        paramTy = tupleTy->getElement(0).getType();
+        continue;
+      }
+    }
+    break;
+  }
   if (!paramTy->isTypeParameter())
     return;
 

@@ -1692,7 +1692,7 @@ namespace {
       assert(typeContext);
 
       auto selfTy =
-          CS.DC->mapTypeIntoContext(typeContext->getDeclaredInterfaceType());
+          CS.DC->mapTypeIntoEnvironment(typeContext->getDeclaredInterfaceType());
       auto superclassTy = selfTy->getSuperclass();
 
       if (!superclassTy)

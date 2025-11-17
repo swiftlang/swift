@@ -962,7 +962,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     // DependentMemberType X, and the right hand side is the
     // underlying type of the typealias.
     if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
-      if (typeAliasDecl->isGeneric())
+      if (typeAliasDecl->hasGenericParamList())
         continue;
 
       // Ignore the typealias if we have an associated type with the same name
@@ -1046,7 +1046,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   auto isSuitableType = [&](TypeDecl *req) -> bool {
     // Ignore generic types.
     if (auto genReq = dyn_cast<GenericTypeDecl>(req))
-      if (genReq->isGeneric())
+      if (genReq->hasGenericParamList())
         return false;
 
     // Ignore typealiases with UnboundGenericType, since they

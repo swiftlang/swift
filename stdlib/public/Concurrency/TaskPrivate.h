@@ -26,6 +26,7 @@
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/DispatchShims.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Error.h"
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/HeapObject.h"
@@ -301,11 +302,11 @@ namespace {
 ///   @_silgen_name("swift_task_future_wait_throwing")
 ///   func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
 ///
-///   @_silgen_name("swift_asyncLet_wait")
-///   func _asyncLetGet<T>(_ task: Builtin.RawPointer) async -> T
+///   @_silgen_name("swift_asyncLet_get")
+///   func _asyncLet_get<T>(_ task: Builtin.RawPointer) async -> T
 ///
-///   @_silgen_name("swift_asyncLet_waitThrowing")
-///   func _asyncLetGetThrowing<T>(_ task: Builtin.RawPointer) async throws -> T
+///   @_silgen_name("swift_asyncLet_get_throwing")
+///   func _asyncLet_get_throwing<T>(_ task: Builtin.RawPointer) async throws -> T
 ///
 ///   @_silgen_name("swift_taskGroup_wait_next_throwing")
 ///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
@@ -744,14 +745,48 @@ public:
 static_assert(sizeof(ActiveTaskStatus) == ACTIVE_TASK_STATUS_SIZE,
   "ActiveTaskStatus is of incorrect size");
 
+struct TaskAllocatorConfiguration {
+#if SWIFT_CONCURRENCY_EMBEDDED
+
+  // Slab allocator is always enabled on embedded.
+  bool enableSlabAllocator() { return true; }
+
+#else
+
+  enum class EnableState : uint8_t {
+    Uninitialized,
+    Enabled,
+    Disabled,
+  };
+
+  static std::atomic<EnableState> enableState;
+
+  bool enableSlabAllocator() {
+    auto state = enableState.load(std::memory_order_relaxed);
+    if (SWIFT_UNLIKELY(state == EnableState::Uninitialized)) {
+      state = runtime::environment::concurrencyEnableTaskSlabAllocator()
+                  ? EnableState::Enabled
+                  : EnableState::Disabled;
+      enableState.store(state, std::memory_order_relaxed);
+    }
+
+    return SWIFT_UNLIKELY(state == EnableState::Enabled);
+  }
+
+#endif // SWIFT_CONCURRENCY_EMBEDDED
+};
+
 /// The size of an allocator slab. We want the full allocation to fit into a
 /// 1024-byte malloc quantum. We subtract off the slab header size, plus a
 /// little extra to stay within our limits even when there's overhead from
 /// malloc stack logging.
-static constexpr size_t SlabCapacity = 1024 - StackAllocator<0, nullptr>::slabHeaderSize() - 8;
+static constexpr size_t SlabCapacity =
+    1024 - 8 -
+    StackAllocator<0, nullptr, TaskAllocatorConfiguration>::slabHeaderSize();
 extern Metadata TaskAllocatorSlabMetadata;
 
-using TaskAllocator = StackAllocator<SlabCapacity, &TaskAllocatorSlabMetadata>;
+using TaskAllocator = StackAllocator<SlabCapacity, &TaskAllocatorSlabMetadata,
+                                     TaskAllocatorConfiguration>;
 
 /// Private storage in an AsyncTask object.
 struct AsyncTask::PrivateStorage {

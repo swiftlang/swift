@@ -176,6 +176,16 @@ checkSupportedWithSectionAttribute(const Expr *expr,
       // Non-InlineArray arrays are not allowed
       return std::make_pair(expr, TypeNotSupported);
     }
+    
+    // Coerce expressions to UInt8 are allowed (to support @DebugDescription)
+    if (const CoerceExpr *coerceExpr = dyn_cast<CoerceExpr>(expr)) {
+      auto coerceType = coerceExpr->getType();
+      if (coerceType && coerceType->isUInt8()) {
+        expressionsToCheck.push_back(coerceExpr->getSubExpr());
+        continue;
+      }
+      return std::make_pair(expr, TypeNotSupported);
+    }
 
     // Operators are not allowed in @section expressions
     if (isa<BinaryExpr>(expr)) {
@@ -216,9 +226,18 @@ checkSupportedWithSectionAttribute(const Expr *expr,
     if (isa<AbstractClosureExpr>(expr))
       return std::make_pair(expr, Closure);
 
-    // Function conversions are not allowed in constant expressions
-    if (isa<FunctionConversionExpr>(expr))
+    // Function conversions are allowed if the conversion is to '@convention(c)'
+    if (auto functionConvExpr = dyn_cast<FunctionConversionExpr>(expr)) {
+      if (auto targetFnTy =
+              functionConvExpr->getType()->getAs<AnyFunctionType>()) {
+        if (targetFnTy->getExtInfo().getRepresentation() ==
+            FunctionTypeRepresentation::CFunctionPointer) {
+          expressionsToCheck.push_back(functionConvExpr->getSubExpr());
+          continue;
+        }
+      }
       return std::make_pair(expr, Default);
+    }
 
     // Direct references to non-generic functions are allowed
     if (const DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(expr)) {
@@ -226,7 +245,7 @@ checkSupportedWithSectionAttribute(const Expr *expr,
 
       // Function references are allowed if they are non-generic
       if (auto *funcDecl = dyn_cast<FuncDecl>(decl)) {
-        if (!funcDecl->isGeneric() &&
+        if (!funcDecl->hasGenericParamList() &&
             !funcDecl->getDeclContext()->isGenericContext()) {
           continue;
         }
@@ -246,7 +265,7 @@ checkSupportedWithSectionAttribute(const Expr *expr,
           auto instanceType = baseType->getMetatypeInstanceType();
           if (auto nominal = instanceType->getNominalOrBoundGenericNominal()) {
             // Allow non-generic, non-resilient types
-            if (!nominal->isGeneric() && !nominal->isResilient()) {
+            if (!nominal->hasGenericParamList() && !nominal->isResilient()) {
               continue;
             }
           }

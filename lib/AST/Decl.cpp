@@ -2276,8 +2276,32 @@ bool Decl::isObjCImplementation() const {
   return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
 }
 
+bool Decl::isAlwaysEmittedIntoClient() const {
+  // @export(implementation)
+  if (auto exportAttr = getAttrs().getAttribute<ExportAttr>()) {
+    if (exportAttr->exportKind == ExportKind::Implementation)
+      return true;
+  }
+
+  // @_alwaysEmitIntoClient
+  if (getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    return true;
+
+  return false;
+}
+
 bool Decl::isNeverEmittedIntoClient() const {
-  return getAttrs().hasAttribute<NeverEmitIntoClientAttr>();
+  // @export(interface)
+  if (auto exportAttr = getAttrs().getAttribute<ExportAttr>()) {
+    if (exportAttr->exportKind == ExportKind::Interface)
+      return true;
+  }
+
+  // @_neverEmitIntoClient
+  if (getAttrs().hasAttribute<NeverEmitIntoClientAttr>())
+    return true;
+
+  return false;
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
@@ -2753,20 +2777,33 @@ bool VarDecl::isInitExposedToClients() const {
   return hasInitialValue() && isLayoutExposedToClients();
 }
 
-bool VarDecl::isLayoutExposedToClients() const {
+bool VarDecl::isLayoutExposedToClients(bool applyImplicit) const {
   auto parent = dyn_cast<NominalTypeDecl>(getDeclContext());
   if (!parent) return false;
   if (isStatic()) return false;
 
-
+  auto M = getDeclContext()->getParentModule();
   auto nominalAccess =
     parent->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
-  if (!nominalAccess.isPublic()) return false;
 
-  if (!parent->getAttrs().hasAttribute<FrozenAttr>() &&
-      !parent->getAttrs().hasAttribute<FixedLayoutAttr>())
+  // Resilient modules and classes hide layouts by default.
+  bool layoutIsHiddenByDefault = !applyImplicit ||
+    !getASTContext().LangOpts.hasFeature(Feature::CheckImplementationOnly) ||
+    M->getResilienceStrategy() == ResilienceStrategy::Resilient;
+  if (layoutIsHiddenByDefault) {
+    if (!nominalAccess.isPublic())
+      return false;
+
+    if (!parent->getAttrs().hasAttribute<FrozenAttr>() &&
+        !parent->getAttrs().hasAttribute<FixedLayoutAttr>())
     return false;
+  } else {
+    // Non-resilient module: layouts are exposed by default unless marked
+    // otherwise.
+    if (parent->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+      return false;
+  }
 
   if (!hasStorage() &&
       !getAttrs().hasAttribute<LazyAttr>() &&
@@ -4213,7 +4250,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   }
 
   if (auto *extension = dyn_cast<ExtensionDecl>(getDeclContext()))
-    if (extension->isGeneric())
+    if (extension->hasGenericParamList())
       signature.InExtensionOfGenericType = true;
 
   return signature;
@@ -4949,14 +4986,14 @@ bool ValueDecl::isUsableFromInline() const {
     return abiRole.getCounterpart()->isUsableFromInline();
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
-      getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+      isAlwaysEmittedIntoClient() ||
       hasAttributeWithInlinableSemantics())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
     auto *storage = accessor->getStorage();
     if (storage->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
-        storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+        storage->isAlwaysEmittedIntoClient() ||
         storage->hasAttributeWithInlinableSemantics())
       return true;
   }
@@ -4964,7 +5001,7 @@ bool ValueDecl::isUsableFromInline() const {
   if (auto *opaqueType = dyn_cast<OpaqueTypeDecl>(this)) {
     if (auto *namingDecl = opaqueType->getNamingDecl()) {
       if (namingDecl->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
-          namingDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+          namingDecl->isAlwaysEmittedIntoClient() ||
           namingDecl->hasAttributeWithInlinableSemantics())
         return true;
     }
@@ -5499,8 +5536,18 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return srcPkg && usePkg && usePkg->isSamePackageAs(srcPkg);
   }
   case AccessLevel::Public:
-  case AccessLevel::Open:
+  case AccessLevel::Open: {
+    if (VD->getASTContext().LangOpts.hasFeature(
+            Feature::EnforceSPIOperatorGroup) &&
+        VD->isOperator() && VD->isSPI()) {
+      const DeclContext *useFile = useDC->getModuleScopeContext();
+      if (useFile->getParentModule() == sourceDC->getParentModule())
+        return true;
+      auto *useSF = dyn_cast<SourceFile>(useFile);
+      return !useSF || useSF->isImportedAsSPI(VD);
+    }
     return true;
+  }
   }
   llvm_unreachable("bad access level");
 }
@@ -7977,6 +8024,13 @@ bool AbstractStorageDecl::hasInitAccessor() const {
       HasInitAccessorRequest{const_cast<AbstractStorageDecl *>(this)}, false);
 }
 
+bool AbstractStorageDecl::supportsInitialization() const {
+  if (getAttrs().hasAttribute<ExternAttr>())
+    return false;
+
+  return hasStorage() || hasInitAccessor();
+}
+
 VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
                  SourceLoc nameLoc, Identifier name,
                  DeclContext *dc, StorageIsMutable_t supportsMutation)
@@ -7993,7 +8047,7 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
 }
 
 Type VarDecl::getTypeInContext() const {
-  return getDeclContext()->mapTypeIntoContext(getInterfaceType());
+  return getDeclContext()->mapTypeIntoEnvironment(getInterfaceType());
 }
 
 /// Translate an "is mutable" bit into a StorageMutability value.
@@ -8143,6 +8197,10 @@ bool VarDecl::isLazilyInitializedGlobal() const {
     return false;
 
   if (getAttrs().hasAttribute<SILGenNameAttr>())
+    return false;
+
+  // @_extern declarations are not initialized.
+  if (getAttrs().hasAttribute<ExternAttr>())
     return false;
 
   // Top-level global variables in the main source file and in the REPL are not
@@ -8863,7 +8921,7 @@ Type VarDecl::getPropertyWrapperInitValueInterfaceType() const {
 
   Type valueInterfaceTy = initInfo.getWrappedValuePlaceholder()->getType();
   if (valueInterfaceTy->hasPrimaryArchetype())
-    valueInterfaceTy = valueInterfaceTy->mapTypeOutOfContext();
+    valueInterfaceTy = valueInterfaceTy->mapTypeOutOfEnvironment();
 
   return valueInterfaceTy;
 }
@@ -9156,8 +9214,8 @@ void ParamDecl::setTypeRepr(TypeRepr *repr) {
 
       if (auto *callerIsolated =
               dyn_cast<CallerIsolatedTypeRepr>(unwrappedType)) {
-        setCallerIsolated(true);
         unwrappedType = callerIsolated->getBase();
+        continue;
       }
 
       break;
@@ -9173,7 +9231,7 @@ void ParamDecl::setDefaultArgumentKind(DefaultArgumentKind K) {
 
 /// Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {
-  return mapTypeIntoContext(getSelfInterfaceType());
+  return mapTypeIntoEnvironment(getSelfInterfaceType());
 }
 
 TupleType *BuiltinTupleDecl::getTupleSelfType(const ExtensionDecl *owner) const {
@@ -12999,7 +13057,7 @@ std::optional<Type>
 CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
   if (auto func = dyn_cast<AbstractFunctionDecl *>()) {
     if (auto thrownError = func->getEffectiveThrownErrorType())
-      return func->mapTypeIntoContext(*thrownError);
+      return func->mapTypeIntoEnvironment(*thrownError);
 
     return std::nullopt;
   }

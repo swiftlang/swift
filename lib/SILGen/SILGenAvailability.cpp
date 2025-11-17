@@ -233,14 +233,14 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
     // Emit error block.
     SGF.B.emitBlock(errorBB);
     ManagedValue error =
-        SGF.B.createPhi(SGF.F.mapTypeIntoContext(fnConv.getSILErrorType(TEC)),
+        SGF.B.createPhi(SGF.F.mapTypeIntoEnvironment(fnConv.getSILErrorType(TEC)),
                         OwnershipKind::Owned);
     SGF.B.createBranch(loc, SGF.ThrowDest.getBlock(), {error});
 
     // Emit normal block.
     SGF.B.emitBlock(normalBB);
     SILValue result = normalBB->createPhiArgument(
-        SGF.F.mapTypeIntoContext(fnConv.getSILResultType(TEC)),
+        SGF.F.mapTypeIntoEnvironment(fnConv.getSILResultType(TEC)),
         OwnershipKind::Owned);
     SmallVector<SILValue, 4> directResults;
     extractAllElements(result, loc, SGF.B, directResults);

@@ -28,7 +28,7 @@
 // RUN: rm -rf %t/Dependencies
 
 // Build the application against the library. This is expected to work because
-// @_neverEmitIntoClient hides the body of test().
+// @export(interface) hides the body of test().
 // RUN: %target-swift-frontend -emit-ir -parse-as-library %t/Files/Application.swift -enable-experimental-feature Embedded -I %t/Modules -o %t/Application.ir
 
 // REQUIRES: swift_in_compiler
@@ -38,7 +38,7 @@
 @_implementationOnly import CDependency // expected-warning {{using '@_implementationOnly' without enabling library evolution for 'Library' may lead to instability during execution}}
 @_implementationOnly import SwiftDependency // expected-warning {{using '@_implementationOnly' without enabling library evolution for 'Library' may lead to instability during execution}}
 
-@_neverEmitIntoClient
+@export(interface)
 public func test() {
   _ = getPoint(3.14159, 2.71828)
   A().doSomething()
@@ -46,13 +46,13 @@ public func test() {
 
 #if BAD_IOI_USAGE
 public func badCLibraryUsage() {
-  _ = getPoint(3.14159, 2.71828) // expected-error {{global function 'getPoint' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'CDependency' was imported implementation-only}}
+  _ = getPoint(3.14159, 2.71828) // expected-error {{global function 'getPoint' cannot be used in an embedded function not marked '@export(interface)' because 'CDependency' was imported implementation-only}}
 }
 
 public func badSwiftLibraryUsage() {
-  A().doSomething() // expected-error {{struct 'A' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'SwiftDependency' was imported implementation-only}}
-  // expected-error @-1 {{initializer 'init()' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'SwiftDependency' was imported implementation-only}}
-  // expected-error @-2 {{instance method 'doSomething()' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'SwiftDependency' was imported implementation-only}}
+  A().doSomething() // expected-error {{struct 'A' cannot be used in an embedded function not marked '@export(interface)' because 'SwiftDependency' was imported implementation-only}}
+  // expected-error @-1 {{initializer 'init()' cannot be used in an embedded function not marked '@export(interface)' because 'SwiftDependency' was imported implementation-only}}
+  // expected-error @-2 {{instance method 'doSomething()' cannot be used in an embedded function not marked '@export(interface)' because 'SwiftDependency' was imported implementation-only}}
 }
 #endif
 

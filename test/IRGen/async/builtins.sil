@@ -262,6 +262,9 @@ bb0(%out : $*Pair<T>):
   // CHECK-NEXT:    [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK-NEXT:    call swiftcc void @swift_asyncLet_begin({{.*}}, ptr [[METADATA]], {{.*}})
   %asyncLet = builtin "startAsyncLetWithLocalBuffer"<Pair<T>>(%scratch, %fn, %outPtr) : $Builtin.RawPointer
+
+  // CHECK:         musttail call swifttailcc void @swift_asyncLet_finish
+  %t0 = builtin "finishAsyncLet"(%asyncLet, %outPtr) : $()
   %t1 = builtin "endAsyncLetLifetime"(%asyncLet, %fn) : $()
   %result = tuple ()
   return %result

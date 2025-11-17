@@ -3768,7 +3768,7 @@ createTupleExtensionGenericParams(ASTContext &ctx,
     return nullptr;
 
   auto *typeAlias = cast<TypeAliasDecl>(referenced.first[0]);
-  if (!typeAlias->isGeneric())
+  if (!typeAlias->hasGenericParamList())
     return nullptr;
 
   return createExtensionGenericParams(ctx, ext, typeAlias);
@@ -4020,20 +4020,6 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
       parsedGenericParams->getRAngleLoc());
 }
 
-static bool shouldPreferPropertyWrapperOverMacro(CustomAttrOwner owner) {
-  // If we have a VarDecl in a local context, prefer to use a property wrapper
-  // if one exists. This is necessary since we don't properly support peer
-  // declarations in local contexts, so want to use a property wrapper if one
-  // exists.
-  if (auto *D = owner.getAsDecl()) {
-    if ((isa<VarDecl>(D) || isa<PatternBindingDecl>(D)) &&
-        D->getDeclContext()->isLocalContext()) {
-      return true;
-    }
-  }
-  return false;
-}
-
 NominalTypeDecl *CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                                     CustomAttr *attr) const {
   auto owner = attr->getOwner();
@@ -4048,7 +4034,7 @@ NominalTypeDecl *CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   auto macroName = (macro) ? macro->getNameRef() : DeclNameRef();
   auto macros = namelookup::lookupMacros(dc, moduleName, macroName,
                                          getAttachedMacroRoles());
-  auto shouldPreferPropWrapper = shouldPreferPropertyWrapperOverMacro(owner);
+  auto shouldPreferPropWrapper = attr->shouldPreferPropertyWrapperOverMacro();
   if (!macros.empty() && !shouldPreferPropWrapper)
     return nullptr;
 
@@ -4217,7 +4203,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
     if (attr->isUnchecked())
       attributes.uncheckedLoc = loc;
     result.push_back({attr->getProtocol(), loc, /*inheritedTypeRepr=*/nullptr,
-                      attributes, /*isSuppressed=*/false});
+                      attributes, attr->isSuppressed()});
   }
 
   // Else we have access to this information on the where clause.

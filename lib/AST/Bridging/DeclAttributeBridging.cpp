@@ -351,6 +351,14 @@ BridgedImplementsAttr BridgedImplementsAttr_createParsed(
       cMemberName.unbridged().getFullName(), cMemberNameLoc.unbridged());
 }
 
+BridgedExportAttr BridgedExportAttr_createParsed(BridgedASTContext cContext,
+                                                 SourceLoc atLoc,
+                                                 SourceRange range,
+                                                 swift::ExportKind kind) {
+  return new (cContext.unbridged()) ExportAttr(atLoc, range, kind);
+}
+
+
 BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
                                                  SourceLoc atLoc,
                                                  SourceRange range,

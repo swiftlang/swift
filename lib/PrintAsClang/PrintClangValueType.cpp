@@ -91,9 +91,9 @@ printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
 void ClangValueTypePrinter::forwardDeclType(
     raw_ostream &os, const NominalTypeDecl *typeDecl,
     DeclAndTypePrinter &declAndTypePrinter) {
-  ClangSyntaxPrinter(typeDecl->getASTContext(), os).printParentNamespaceForNestedTypes(
-      typeDecl, [&](raw_ostream &) {
-        if (typeDecl->isGeneric()) {
+  ClangSyntaxPrinter(typeDecl->getASTContext(), os)
+      .printParentNamespaceForNestedTypes(typeDecl, [&](raw_ostream &) {
+        if (typeDecl->hasGenericParamList()) {
           auto genericSignature =
               typeDecl->getGenericSignature().getCanonicalSignature();
           ClangSyntaxPrinter(typeDecl->getASTContext(), os).printGenericSignature(genericSignature);
@@ -201,7 +201,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
       return;
     ClangSyntaxPrinter(Context, os).printGenericSignatureParams(genericSignature);
   };
-  if (typeDecl->isGeneric()) {
+  if (typeDecl->hasGenericParamList()) {
     genericSignature = typeDecl->getGenericSignature();
     assert(cxx_translation::isExposableToCxx(genericSignature));
 
@@ -580,7 +580,7 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
   printer.printNominalTypeReference(typeDecl,
                                     /*moduleContext=*/nullptr);
   os << "> = ";
-  if (typeDecl->isGeneric()) {
+  if (typeDecl->hasGenericParamList()) {
     auto signature = typeDecl->getGenericSignature().getCanonicalSignature();
     llvm::interleave(
         signature.getInnermostGenericParams(), os,
@@ -729,7 +729,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
       os << "::";
     os << cxx_synthesis::getCxxImplNamespaceName() << "::";
     printCxxImplClassName(os, NTD);
-    if (NTD->isGeneric())
+    if (NTD->hasGenericParamList())
       printer.printGenericSignatureParams(
           NTD->getGenericSignature().getCanonicalSignature());
     os << "; };\n";
@@ -737,7 +737,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   os << "} // namespace\n";
   os << "#pragma clang diagnostic pop\n";
   if (objCxxOnly)
-    os << "#endif // #if defined(__OBJC__)\n";
+    os << "#endif // defined(__OBJC__)\n";
   os << "} // namespace swift\n";
   os << "\n";
   printer.printModuleNamespaceStart(*moduleContext);

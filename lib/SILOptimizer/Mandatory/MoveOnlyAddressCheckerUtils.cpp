@@ -472,6 +472,22 @@ static bool visitScopeEndsRequiringInit(
     return true;
   }
 
+  // Check for mutate accessor.
+  if (auto ai =
+          dyn_cast_or_null<ApplyInst>(operand->getDefiningInstruction())) {
+    if (ai->hasInoutResult()) {
+      auto *access =
+          dyn_cast<BeginAccessInst>(getAccessScope(ai->getSelfArgument()));
+      if (access) {
+        assert(access->getAccessKind() == SILAccessKind::Modify);
+        for (auto *inst : access->getEndAccesses()) {
+          visit(inst, ScopeRequiringFinalInit::ModifyMemoryAccess);
+        }
+        return true;
+      }
+      return false;
+    }
+  }
   return false;
 }
 

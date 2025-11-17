@@ -392,7 +392,7 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
     // Subscripts can be generic, and different key paths could
     // capture the same subscript at different generic arguments.
     for (auto sub : subs.getReplacementTypes()) {
-      sub = sub->mapTypeOutOfContext();
+      sub = sub->mapTypeOutOfEnvironment();
 
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
@@ -428,7 +428,7 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
     // Subscripts can be generic, and different key paths could capture the same
     // subscript at different generic arguments.
     for (auto sub : subs.getReplacementTypes()) {
-      sub = sub->mapTypeOutOfContext();
+      sub = sub->mapTypeOutOfEnvironment();
 
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
@@ -464,7 +464,7 @@ std::string ASTMangler::mangleKeyPathAppliedMethodThunkHelper(
     // Methods can be generic, and different key paths could capture the same
     // method at different generic arguments.
     for (auto sub : subs.getReplacementTypes()) {
-      sub = sub->mapTypeOutOfContext();
+      sub = sub->mapTypeOutOfEnvironment();
 
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
@@ -498,7 +498,7 @@ std::string ASTMangler::mangleKeyPathUnappliedMethodThunkHelper(
     // Methods can be generic, and different key paths could capture the same
     // method at different generic arguments.
     for (auto sub : subs.getReplacementTypes()) {
-      sub = sub->mapTypeOutOfContext();
+      sub = sub->mapTypeOutOfEnvironment();
 
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
@@ -1961,7 +1961,7 @@ void ASTMangler::appendFlatGenericArgs(SubstitutionMap subs,
 
   for (auto replacement : subs.getReplacementTypes()) {
     if (replacement->hasArchetype())
-      replacement = replacement->mapTypeOutOfContext();
+      replacement = replacement->mapTypeOutOfEnvironment();
     if (DWARFMangling) {
       appendType(replacement, sig, forDecl);
     } else {
@@ -2008,9 +2008,10 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
       // type declaration are not part of the mangling, so check whether the
       // naming declaration has generic parameters.
       auto namedGenericContext = opaque->getNamingDecl()->getAsGenericContext();
-      treatAsGeneric = namedGenericContext && namedGenericContext->isGeneric();
+      treatAsGeneric =
+          namedGenericContext && namedGenericContext->hasGenericParamList();
     } else {
-      treatAsGeneric = genericContext->isGeneric();
+      treatAsGeneric = genericContext->hasGenericParamList();
     }
     if (treatAsGeneric) {
       auto genericParams = subs.getGenericSignature().getGenericParams();
@@ -2022,7 +2023,7 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
            ++currentGenericParamIdx) {
         Type replacementType = replacements[currentGenericParamIdx];
         if (replacementType->hasArchetype())
-          replacementType = replacementType->mapTypeOutOfContext();
+          replacementType = replacementType->mapTypeOutOfEnvironment();
 
         appendType(replacementType, sig, forDecl);
       }
@@ -2523,7 +2524,7 @@ void ASTMangler::appendOpaqueTypeArchetype(ArchetypeType *archetype,
     appendOperator("Qo", Index(genericParam->getIndex()));
   } else {
     auto *env = archetype->getGenericEnvironment();
-    appendType(env->mapTypeIntoContext(interfaceType->getRootGenericParam()),
+    appendType(env->mapTypeIntoEnvironment(interfaceType->getRootGenericParam()),
                sig, forDecl);
 
     // Mangle associated types of opaque archetypes like dependent member
@@ -4644,7 +4645,7 @@ void ASTMangler::appendConcreteProtocolConformance(
   // Conforming type.
   Type conformingType = conformance->getType();
   if (conformingType->hasArchetype())
-    conformingType = conformingType->mapTypeOutOfContext();
+    conformingType = conformingType->mapTypeOutOfEnvironment();
   appendType(conformingType->getReducedType(sig), sig);
 
   // Protocol conformance reference.
@@ -4655,7 +4656,7 @@ void ASTMangler::appendConcreteProtocolConformance(
   forEachConditionalConformance(conformance,
     [&](Type substType, ProtocolConformanceRef substConf) -> bool {
       if (substType->hasArchetype())
-        substType = substType->mapTypeOutOfContext();
+        substType = substType->mapTypeOutOfEnvironment();
       CanType canType = substType->getReducedType(sig);
       appendAnyProtocolConformance(sig, canType, substConf);
       appendListSeparator(firstRequirement);
@@ -5430,7 +5431,7 @@ static std::optional<unsigned> getEnclosingTypeGenericDepth(const Decl *decl) {
   if (!typeDecl)
     return std::nullopt;
 
-  if (!typeDecl->isGeneric())
+  if (!typeDecl->hasGenericParamList())
     return std::nullopt;
 
   return typeDecl->getGenericSignature()->getMaxDepth();
