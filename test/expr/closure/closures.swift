@@ -1852,6 +1852,18 @@ class TestLazyLocal {
   }
 }
 
+class TestLocalPropertyShadowing {
+  var str: String = ""
+
+  func foo() {
+    let str = { str }
+    // expected-error@-1 {{reference to property 'str' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-note@-2 {{reference 'self.' explicitly}}
+    // expected-note@-3 {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+    _ = str
+  }
+}
+
 class TestExtensionOnOptionalSelf {
   init() {}
 }

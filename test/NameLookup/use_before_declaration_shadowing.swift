@@ -54,20 +54,41 @@ func testTopLevel() {
   }
   do {
     _ = {
-      let _: String = topLevelString // expected-error {{use of local variable 'topLevelString' before its declaration}}
+      let _: String = topLevelString
     }
-    let topLevelString = 0 // expected-note {{'topLevelString' declared here}}
+    let topLevelString = 0
+    _ = topLevelString
   }
   _ = {
     _ = {
-      let _: String = topLevelString // expected-error {{use of local variable 'topLevelString' before its declaration}}
+      let _: String = topLevelString
     }
-    let topLevelString = 0 // expected-note {{'topLevelString' declared here}}
+    let topLevelString = 0
+    _ = topLevelString
   }
   func bar() {
     _ = {
-      let _: String = topLevelString // expected-error {{use of local variable 'topLevelString' before its declaration}}
+      let _: String = topLevelString
     }
-    let topLevelString = 0 // expected-note {{'topLevelString' declared here}}
+    let topLevelString = 0
+    _ = topLevelString
+  }
+}
+
+struct TestLocalPropertyShadowing {
+  var str: String
+
+  func foo() {
+    { _ = str }()
+    let str = str
+    _ = str
+  }
+  func bar() {
+    let str = { str }
+    _ = str
+  }
+  func baz() {
+    let str = str
+    _ = str
   }
 }

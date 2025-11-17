@@ -393,8 +393,7 @@ static bool isMemberChainTail(Expr *expr, Expr *parent, MemberChainKind kind) {
 }
 
 static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
-                                    ValueDecl *&localDeclAfterUse,
-                                    bool &shouldUseOuterResults) {
+                                    ValueDecl *&localDeclAfterUse) {
   // Only VarDecls require declaration before use.
   auto *VD = dyn_cast<VarDecl>(D);
   if (!VD)
@@ -412,11 +411,6 @@ static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
     }
     if (isa<AbstractClosureExpr>(DC) ||
         (isa<FuncDecl>(DC) && cast<FuncDecl>(DC)->isDeferBody())) {
-      // If we cross a closure, don't allow falling back to an outer result if
-      // we have a forward reference. This preserves the behavior prior to
-      // diagnosing this in Sema.
-      if (isa<AbstractClosureExpr>(DC))
-        shouldUseOuterResults = false;
       DC = DC->getParent();
       continue;
     }
@@ -592,12 +586,10 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
     Lookup = TypeChecker::lookupUnqualified(DC, LookupName, Loc, lookupOptions);
 
     ValueDecl *localDeclAfterUse = nullptr;
-    bool shouldUseOuterResults = true;
     AllDeclRefs = findNonMembers(
         Lookup.innerResults(), UDRE->getRefKind(),
         /*breakOnMember=*/true, ResultValues, [&](ValueDecl *D) {
-          return isValidForwardReference(D, DC, localDeclAfterUse,
-                                         shouldUseOuterResults);
+          return isValidForwardReference(D, DC, localDeclAfterUse);
         });
 
     // If local declaration after use is found, check outer results for
@@ -605,7 +597,7 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
     if (ResultValues.empty() && localDeclAfterUse) {
       auto innerDecl = localDeclAfterUse;
       while (localDeclAfterUse) {
-        if (!shouldUseOuterResults || Lookup.outerResults().empty()) {
+        if (Lookup.outerResults().empty()) {
           Context.Diags.diagnose(Loc, diag::use_local_before_declaration, Name);
           Context.Diags.diagnose(innerDecl, diag::decl_declared_here,
                                  localDeclAfterUse);
@@ -618,8 +610,7 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
         AllDeclRefs = findNonMembers(
             Lookup.innerResults(), UDRE->getRefKind(),
             /*breakOnMember=*/true, ResultValues, [&](ValueDecl *D) {
-              return isValidForwardReference(D, DC, localDeclAfterUse,
-                                             shouldUseOuterResults);
+              return isValidForwardReference(D, DC, localDeclAfterUse);
             });
       }
     }
