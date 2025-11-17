@@ -1080,6 +1080,9 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemovePriorityEscalationHandler)
 // second is an address to our generic Value.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskLocalValuePush)
 
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPush)
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPop)
+
 #undef BUILTIN_OPERAND_OWNERSHIP
 
 #define SHOULD_NEVER_VISIT_BUILTIN(ID)                                         \
@@ -1091,6 +1094,8 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskLocalValuePush)
 SHOULD_NEVER_VISIT_BUILTIN(GetCurrentAsyncTask)
 SHOULD_NEVER_VISIT_BUILTIN(GetCurrentExecutor)
 SHOULD_NEVER_VISIT_BUILTIN(TaskLocalValuePop)
+// SHOULD_NEVER_VISIT_BUILTIN(TaskCancellationShieldPush)
+// SHOULD_NEVER_VISIT_BUILTIN(TaskCancellationShieldPop)
 #undef SHOULD_NEVER_VISIT_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see

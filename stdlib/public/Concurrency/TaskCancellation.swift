@@ -255,3 +255,35 @@ func _taskRemoveCancellationHandler(
   record: UnsafeRawPointer /*CancellationNotificationStatusRecord*/
 )
 
+
+// ==== Task Cancellation Shielding -------------------------------------------
+
+@available(SwiftStdlib 6.3, *)
+public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
+  operation: nonisolated(nonsending) () async throws(Failure) -> Value,
+) async throws(Failure) -> Value {
+  let didInstallShield = Builtin.taskCancellationShieldPush()
+
+  defer { 
+    if Bool(didInstallShield) {
+      Builtin.taskCancellationShieldPop()
+     }
+  }
+
+  return try await operation()
+}
+
+@available(SwiftStdlib 6.3, *)
+public func withTaskCancellationShield<Value, Failure>(
+  operation: () throws(Failure) -> Value,
+) throws(Failure) -> Value {
+  let didInstallShield = Builtin.taskCancellationShieldPush()
+
+  defer { 
+    if Bool(didInstallShield) {
+      Builtin.taskCancellationShieldPop()
+    }
+  }
+
+  return try operation()
+}
