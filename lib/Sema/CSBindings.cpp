@@ -44,8 +44,6 @@ void ConstraintGraphNode::initBindingSet() {
 /// to a Double and non-optional value could be injected into an optional.
 static bool hasConversions(Type);
 
-static bool checkTypeOfBinding(TypeVariableType *typeVar, Type type);
-
 BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
                        const PotentialBindings &info)
     : CS(CS), TypeVar(TypeVar), Info(info) {
@@ -1311,6 +1309,37 @@ void PotentialBindings::addPotentialBinding(TypeVariableType *TypeVar,
   Bindings.push_back(std::move(binding));
 }
 
+/// Check whether the given type can be used as a binding for the given
+/// type variable.
+///
+/// \returns true if the binding is okay.
+static bool checkTypeOfBinding(TypeVariableType *typeVar, Type type) {
+  // If the type references the type variable, don't permit the binding.
+  if (type->hasTypeVariable()) {
+    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
+    type->getTypeVariables(referencedTypeVars);
+    if (referencedTypeVars.count(typeVar))
+      return false;
+  }
+
+  {
+    auto objType = type->getWithoutSpecifierType();
+
+    // If the type is a type variable itself, don't permit the binding.
+    if (objType->is<TypeVariableType>())
+      return false;
+
+    // Don't bind to a dependent member type, even if it's currently
+    // wrapped in any number of optionals, because binding producer
+    // might unwrap and try to attempt it directly later.
+    if (objType->lookThroughAllOptionalTypes()->is<DependentMemberType>())
+      return false;
+  }
+
+  // Okay, allow the binding.
+  return true;
+}
+
 bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
@@ -1566,37 +1595,6 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
   bindings.determineLiteralCoverage();
 
   return bindings;
-}
-
-/// Check whether the given type can be used as a binding for the given
-/// type variable.
-///
-/// \returns true if the binding is okay.
-static bool checkTypeOfBinding(TypeVariableType *typeVar, Type type) {
-  // If the type references the type variable, don't permit the binding.
-  if (type->hasTypeVariable()) {
-    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
-    type->getTypeVariables(referencedTypeVars);
-    if (referencedTypeVars.count(typeVar))
-      return false;
-  }
-
-  {
-    auto objType = type->getWithoutSpecifierType();
-
-    // If the type is a type variable itself, don't permit the binding.
-    if (objType->is<TypeVariableType>())
-      return false;
-
-    // Don't bind to a dependent member type, even if it's currently
-    // wrapped in any number of optionals, because binding producer
-    // might unwrap and try to attempt it directly later.
-    if (objType->lookThroughAllOptionalTypes()->is<DependentMemberType>())
-      return false;
-  }
-
-  // Okay, allow the binding.
-  return true;
 }
 
 std::optional<PotentialBinding>
