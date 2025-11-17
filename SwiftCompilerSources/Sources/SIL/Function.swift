@@ -94,8 +94,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return AST.`Type`(bridged: bridged.mapTypeIntoEnvironment(type.bridged))
   }
 
-  public func mapTypeIntoContext(_ type: Type) -> Type {
-    return Type(bridged: bridged.mapTypeIntoContext(type.bridged))
+  public func mapTypeIntoEnvironment(_ type: Type) -> Type {
+    return Type(bridged: bridged.mapTypeIntoEnvironment(type.bridged))
   }
 
   /// Returns true if the function is a definition and not only an external declaration.

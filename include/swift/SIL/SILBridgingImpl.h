@@ -342,8 +342,8 @@ bool BridgedType::isAddress() const {
   return unbridged().isAddress();
 }
 
-BridgedType BridgedType::mapTypeOutOfContext() const {
-  return unbridged().mapTypeOutOfContext();
+BridgedType BridgedType::mapTypeOutOfEnvironment() const {
+  return unbridged().mapTypeOutOfEnvironment();
 }
 
 BridgedCanType BridgedType::getCanType() const {
@@ -812,8 +812,8 @@ BridgedASTType BridgedFunction::mapTypeIntoEnvironment(BridgedASTType ty) const 
   return {getFunction()->mapTypeIntoEnvironment(ty.unbridged()).getPointer()};
 }
 
-BridgedType BridgedFunction::mapTypeIntoContext(BridgedType ty) const {
-  return {getFunction()->mapTypeIntoContext(ty.unbridged())};
+BridgedType BridgedFunction::mapTypeIntoEnvironment(BridgedType ty) const {
+  return {getFunction()->mapTypeIntoEnvironment(ty.unbridged())};
 }
 
 OptionalBridgedBasicBlock BridgedFunction::getFirstBlock() const {

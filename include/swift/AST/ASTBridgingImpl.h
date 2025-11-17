@@ -718,8 +718,8 @@ bool BridgedASTType::isSILPackElementAddress() const {
   return unbridged()->castTo<swift::SILPackType>()->isElementAddress();
 }
 
-BridgedASTType BridgedASTType::mapTypeOutOfContext() const {
-  return {unbridged()->mapTypeOutOfContext().getPointer()};
+BridgedASTType BridgedASTType::mapOutOfEnvironment() const {
+  return {unbridged()->mapTypeOutOfEnvironment().getPointer()};
 }
 
 BridgedCanType

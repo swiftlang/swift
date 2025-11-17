@@ -67,8 +67,8 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
     return Type(bridged: bridged.subst(substitutionMap.bridged))
   }
 
-  public func mapOutOfContext() -> Type {
-    return Type(bridged: bridged.mapTypeOutOfContext())
+  public func mapOutOfEnvironment() -> Type {
+    return Type(bridged: bridged.mapOutOfEnvironment())
   }
 
   /// Returns a stronger canonicalization which folds away equivalent

@@ -16,48 +16,35 @@ import ASTBridging
 /// The base class for all declarations in Swift.
 @_semantics("arc.immortal")
 public class Decl: CustomStringConvertible, Hashable {
-  public var bridged: BridgedDeclObj { BridgedDeclObj(SwiftObject(self)) }
+  final public var bridged: BridgedDeclObj { BridgedDeclObj(SwiftObject(self)) }
 
-  public var description: String { String(taking: bridged.getDebugDescription()) }
+  final public var description: String { String(taking: bridged.getDebugDescription()) }
 
   /// The module in which this declaration resides.
-  public var parentModule: ModuleDecl { bridged.getModuleContext().getAs(ModuleDecl.self) }
+  final public var parentModule: ModuleDecl { bridged.getModuleContext().getAs(ModuleDecl.self) }
 
   /// The parent DeclContext if it is a Decl.
-  public var parent: Decl? { bridged.getParent().decl }
+  final public var parent: Decl? { bridged.getParent().decl }
 
   // True if this declaration is imported from C/C++/ObjC.
-  public var hasClangNode: Bool { bridged.hasClangNode() }
+  final public var hasClangNode: Bool { bridged.hasClangNode() }
 
-  public var declContext: DeclContext {
+  final public var declContext: DeclContext {
     if let decl = parent {
       return decl as! DeclContext
     }
-    return DeclContextObj(bridged: bridged.getDeclContext())
+    return UnknownDeclContext(bridged: bridged.getDeclContext())
   }
 
-  public var bridgedDecl: BridgedDecl { BridgedDecl(raw: bridged.obj) }
+  final public var bridgedDecl: BridgedDecl { BridgedDecl(raw: bridged.obj) }
 
   public static func ==(lhs: Decl, rhs: Decl) -> Bool { lhs === rhs }
 
-  public func hash(into hasher: inout Hasher) {
+  final public func hash(into hasher: inout Hasher) {
     hasher.combine(ObjectIdentifier(self))
   }
 
-  public func setImplicit() { bridged.setImplicit() }
-}
-
-public protocol DeclContext {
-  var bridgedDeclContext: BridgedDeclContext { get }
-}
-
-extension DeclContext {
-  public var astContext: ASTContext { bridgedDeclContext.astContext }
-}
-
-fileprivate class DeclContextObj : DeclContext {
-  public var bridgedDeclContext: BridgedDeclContext
-  public init(bridged: BridgedDeclContext) { bridgedDeclContext = bridged }
+  final public func setImplicit() { bridged.setImplicit() }
 }
 
 public protocol GenericContext: Decl, DeclContext {}
@@ -108,9 +95,9 @@ final public class EnumDecl: NominalTypeDecl {
   public var hasRawType: Bool { bridged.Enum_hasRawType() }
 
   public static func create(
-    _ astContext: ASTContext, declContext: DeclContext, enumKeywordLoc: SourceLoc?, name: String,
-    nameLoc: SourceLoc?, genericParamList: GenericParamList?, inheritedTypes: [Type],
-    genericWhereClause: TrailingWhereClause?, braceRange: SourceRange
+    declContext: DeclContext, enumKeywordLoc: SourceLoc?, name: String,
+    nameLoc: SourceLoc?, genericParamList: GenericParameterList?, inheritedTypes: [Type],
+    genericWhereClause: TrailingWhereClause?, braceRange: SourceRange, _ astContext: ASTContext
   ) -> EnumDecl {
     name.withCString { strPtr in
       inheritedTypes.withBridgedArrayRef { types in
@@ -208,10 +195,10 @@ final public class EnumElementDecl: ValueDecl {
   public var name: StringRef { StringRef(bridged: bridged.EnumElementDecl_getNameStr()) }
 
   public static func create(
-    _ astContext: ASTContext, declContext: DeclContext,
+    declContext: DeclContext,
     name: Identifier, nameLoc: SourceLoc?,
     parameterList: ParameterList?,
-    equalsLoc: SourceLoc?, rawValue: Expr?
+    equalsLoc: SourceLoc?, rawValue: Expr?, _ astContext: ASTContext
   ) -> EnumElementDecl {
     BridgedEnumElementDecl.createParsed(
       astContext, declContext: declContext.bridgedDeclContext,
@@ -282,7 +269,7 @@ public typealias SourceFile = BridgedSourceFile
 
 public typealias FileUnit = BridgedFileUnit
 
-public class GenericParamList {
+public class GenericParameterList {
   public var bridged: BridgedGenericParamList
   public init(bridged: BridgedGenericParamList) { self.bridged = bridged }
 }
@@ -290,26 +277,8 @@ public class GenericParamList {
 public typealias TrailingWhereClause = BridgedTrailingWhereClause
 
 public class ParameterList : RandomAccessCollection {
-  public class Iterator : IteratorProtocol {
-    public typealias Element = ParamDecl
-    private var index : Int = 0
-    private let parameterList : ParameterList
-    init(parameterList : ParameterList) { self.parameterList = parameterList }
-    public func next() -> Element? {
-      if index < parameterList.bridged.size {
-        return parameterList.bridged.get(index).asDecl.declObj.getAs(ParamDecl.self)
-      }
-      return nil
-    }
-  }
-  public typealias Index = Int
-  public var startIndex: Index { 0 }
-  public var endIndex: Index { bridged.size }
-  public func index(after i: Index) -> Index { i + 1 }
-
-  public func makeIterator() -> Iterator {
-    Self.Iterator(parameterList: self)
-  }
+  public var startIndex: Int { 0 }
+  public var endIndex: Int { bridged.size }
 
   public var bridged: BridgedParameterList
 
@@ -317,13 +286,13 @@ public class ParameterList : RandomAccessCollection {
     self.bridged = bridged
   }
 
-  public subscript(_ index: Index) -> ParamDecl {
+  public subscript(_ index: Int) -> ParamDecl {
     return bridged.get(index).asDecl.declObj.getAs(ParamDecl.self)
   }
 
   public static func create(
-    _ astContext: ASTContext, leftParenLoc: SourceLoc?, parameters: [ParamDecl],
-    rightParenLoc: SourceLoc?
+    leftParenLoc: SourceLoc?, parameters: [ParamDecl],
+    rightParenLoc: SourceLoc?, _ astContext: ASTContext
   ) -> ParameterList {
     ParameterList(bridged: parameters.map{BridgedParamDecl(raw: $0.bridged.obj)}.withBridgedArrayRef {
       BridgedParameterList.createParsed(
@@ -333,15 +302,15 @@ public class ParameterList : RandomAccessCollection {
   }
 }
 
-extension GenericParamList {
+extension GenericParameterList {
   public static func create(
-    _ astContext: ASTContext, leftAngleLoc: SourceLoc?, parameters: [GenericTypeParamDecl],
+    leftAngleLoc: SourceLoc?, parameters: [GenericTypeParamDecl],
     genericWhereClause: TrailingWhereClause?,
-    rightAngleLoc: SourceLoc?
-  ) -> GenericParamList {
+    rightAngleLoc: SourceLoc?, _ astContext: ASTContext
+  ) -> GenericParameterList {
     let paramsNew = parameters.map{ ASTBridging.BridgedGenericTypeParamDecl(raw: $0.bridged.obj) }
     return paramsNew.withBridgedArrayRef {
-      GenericParamList(bridged: BridgedGenericParamList.createParsed(
+      GenericParameterList(bridged: BridgedGenericParamList.createParsed(
         astContext, leftAngleLoc: leftAngleLoc.bridgedLocation, parameters: $0,
         genericWhereClause: genericWhereClause.bridged, rightAngleLoc: rightAngleLoc.bridgedLocation
       ))
@@ -371,10 +340,7 @@ extension FileUnit {
 
 extension ParameterList? {
   public var bridged: BridgedParameterList? {
-    if self == nil {
-      return nil
-    }
-    return self!.bridged
+    return self?.bridged
   }
 }
 
@@ -384,7 +350,7 @@ extension BridgedParameterList? {
   }
 }
 
-extension GenericParamList? {
+extension GenericParameterList? {
   public var bridged: BridgedNullableGenericParamList {
     BridgedNullableGenericParamList(raw: self?.bridged.raw)
   }
