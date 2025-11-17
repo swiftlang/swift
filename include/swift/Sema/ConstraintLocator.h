@@ -1010,26 +1010,6 @@ public:
   }
 };
 
-class LocatorPathElt::ImplicitConversion final
-    : public StoredIntegerElement<1> {
-public:
-  ImplicitConversion(ConversionRestrictionKind kind)
-      : StoredIntegerElement(ConstraintLocator::ImplicitConversion,
-                             static_cast<unsigned>(kind)) {}
-
-  ConversionRestrictionKind getConversionKind() const {
-    return static_cast<ConversionRestrictionKind>(getValue());
-  }
-
-  bool is(ConversionRestrictionKind kind) const {
-    return getConversionKind() == kind;
-  }
-
-  static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::ImplicitConversion;
-  }
-};
-
 class LocatorPathElt::ContextualType final : public StoredIntegerElement<1> {
 public:
   ContextualType(ContextualTypePurpose purpose)
