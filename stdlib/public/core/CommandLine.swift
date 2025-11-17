@@ -140,7 +140,7 @@ extension CommandLine {
   @_unavailableInEmbedded
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
-  public static let executablePath: String { // NOTE: can't be AEIC and stored!
+  public static var executablePath: String { // NOTE: can't be AEIC and stored!
     // _NSGetExecutablePath() returns non-zero if the provided buffer is too
     // small and updates its *bufsize argument to the required value, so we can
     // just set a reasonable initial value, then loop and try again on failure.
@@ -179,5 +179,5 @@ extension CommandLine {
     return unsafe String(cString: cString)
   }()
 #endif
-
+}
 #endif // SWIFT_STDLIB_HAS_COMMANDLINE
