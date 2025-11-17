@@ -1895,10 +1895,13 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
           };
 
           for (auto *constraint : CG[typeVar].getConstraints()) {
-            if (isTransferableConformance(constraint))
-              cs.addConstraint(ConstraintKind::TransitivelyConformsTo, argTy,
-                               constraint->getSecondType(),
-                               constraint->getLocator());
+            if (isTransferableConformance(constraint)) {
+              auto *transitiveConformance = Constraint::create(
+                  cs, ConstraintKind::TransitivelyConformsTo, argTy,
+                  constraint->getSecondType(), constraint->getLocator());
+              cs.addUnsolvedConstraint(transitiveConformance);
+              cs.activateConstraint(transitiveConformance);
+            }
           }
         }
       }
@@ -9340,7 +9343,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
 
   // Since this is a performance optimization, let's ignore it
   // in diagnostic mode.
-  if (shouldAttemptFixes())
+  if (inSalvageMode())
     return SolutionKind::Solved;
 
   auto formUnsolved = [&]() {
