@@ -27,6 +27,7 @@ import Swift
 // #endif
 
 /// Holds a backtrace.
+@available(Backtracing 6.2, *)
 public struct Backtrace: CustomStringConvertible, Sendable {
   /// The type of an address.
   ///
@@ -259,7 +260,6 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   var representation: [UInt8]
 
   /// A list of captured frame information.
-  @available(macOS 10.15, *)
   public var frames: some Sequence<Frame> {
     return CompactBacktraceFormat.Decoder(representation)
   }

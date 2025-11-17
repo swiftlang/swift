@@ -17,6 +17,7 @@
 import Swift
 
 @_spi(Internal)
+@available(Backtracing 6.2, *)
 public enum RichFrame<T: FixedWidthInteger>: CustomStringConvertible, Equatable {
   public typealias Address = T
 

@@ -23,6 +23,7 @@ internal import BacktracingImpl.OS.Darwin
 #endif
 
 /// Holds a map of the process's address space.
+@available(Backtracing 6.2, *)
 public struct ImageMap: Collection, Sendable, Hashable {
 
   /// A type representing the sequence's elements.
