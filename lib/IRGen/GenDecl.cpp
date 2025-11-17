@@ -5318,7 +5318,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
                 : LinkEntity::forTypeMetadata(
                       concreteType, TypeMetadataAddress::FullMetadata));
 
-  if (Context.LangOpts.hasFeature(Feature::Embedded) ) {
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
     entity = LinkEntity::forTypeMetadata(concreteType,
                                          TypeMetadataAddress::AddressPoint);
     if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials))

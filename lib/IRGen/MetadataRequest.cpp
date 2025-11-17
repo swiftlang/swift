@@ -3387,8 +3387,9 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
 MetadataResponse
 IRGenFunction::emitTypeMetadataRef(CanType type,
                                    DynamicMetadataRequest request) {
-  if (type->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
-      !type->getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials) &&
+  auto &langOpts = type->getASTContext().LangOpts;
+  if (langOpts.hasFeature(Feature::Embedded) &&
+      !langOpts.hasFeature(Feature::EmbeddedExistentials) &&
       !isMetadataAllowedInEmbedded(type)) {
     llvm::errs() << "Metadata pointer requested in embedded Swift for type "
                  << type << "\n";
@@ -3408,7 +3409,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   if (type->hasArchetype() ||
       !shouldTypeMetadataAccessUseAccessor(IGM, type) ||
       isa<PackType>(type) ||
-      type->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      langOpts.hasFeature(Feature::Embedded)) {
     return emitDirectTypeMetadataRef(*this, type, request);
   }
 

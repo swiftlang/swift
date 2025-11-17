@@ -90,8 +90,9 @@ inline bool isEmbedded(CanType t) {
   return t->getASTContext().LangOpts.hasFeature(Feature::Embedded);
 }
 inline bool isEmbeddedWithoutEmbeddedExitentials(CanType t) {
-  return t->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
-    !t->getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials);
+  auto &langOpts = t->getASTContext().LangOpts;
+  return langOpts.hasFeature(Feature::Embedded) &&
+    !langOpts.hasFeature(Feature::EmbeddedExistentials);
 }
 // Metadata is not generated and not allowed to be referenced in Embedded Swift,
 // expect for classes (both generic and non-generic), dynamic self, and
