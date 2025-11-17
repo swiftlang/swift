@@ -44,8 +44,7 @@ void ConstraintGraphNode::initBindingSet() {
 /// to a Double and non-optional value could be injected into an optional.
 static bool hasConversions(Type);
 
-static std::optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
-                                              Type type);
+static bool checkTypeOfBinding(TypeVariableType *typeVar, Type type);
 
 BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
                        const PotentialBindings &info)
@@ -1579,15 +1578,14 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
 /// Check whether the given type can be used as a binding for the given
 /// type variable.
 ///
-/// \returns the type to bind to, if the binding is okay.
-static std::optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
-                                              Type type) {
+/// \returns true if the binding is okay.
+static bool checkTypeOfBinding(TypeVariableType *typeVar, Type type) {
   // If the type references the type variable, don't permit the binding.
   if (type->hasTypeVariable()) {
     SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
     type->getTypeVariables(referencedTypeVars);
     if (referencedTypeVars.count(typeVar))
-      return std::nullopt;
+      return false;
   }
 
   {
@@ -1595,17 +1593,17 @@ static std::optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
 
     // If the type is a type variable itself, don't permit the binding.
     if (objType->is<TypeVariableType>())
-      return std::nullopt;
+      return false;
 
     // Don't bind to a dependent member type, even if it's currently
     // wrapped in any number of optionals, because binding producer
     // might unwrap and try to attempt it directly later.
     if (objType->lookThroughAllOptionalTypes()->is<DependentMemberType>())
-      return std::nullopt;
+      return false;
   }
 
-  // Okay, allow the binding (with the simplified type).
-  return type;
+  // Okay, allow the binding.
+  return true;
 }
 
 std::optional<PotentialBinding>
@@ -1814,9 +1812,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
   }
 
   // Check whether we can perform this binding.
-  if (auto boundType = checkTypeOfBinding(TypeVar, type)) {
-    type = *boundType;
-  } else {
+  if (!checkTypeOfBinding(TypeVar, type)) {
     auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>();
 
     if (!bindingTypeVar)
@@ -2677,8 +2673,7 @@ bool TypeVarBindingProducer::computeNext() {
 
       for (auto supertype : enumerateDirectSupertypes(type)) {
         // If we're not allowed to try this binding, skip it.
-        if (auto simplifiedSuper = checkTypeOfBinding(TypeVar, supertype)) {
-          auto supertype = *simplifiedSuper;
+        if (checkTypeOfBinding(TypeVar, supertype)) {
           // A key path type cannot be bound to type-erased key path variants.
           if (TypeVar->getImpl().isKeyPathType() &&
               isTypeErasedKeyPathType(supertype))
