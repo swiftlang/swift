@@ -127,6 +127,7 @@ public struct ImageMap: Collection, Sendable, Hashable {
   }
 }
 
+@available(Backtracing 6.2, *)
 extension ImageMap: CustomStringConvertible {
   /// Generate a description of an ImageMap
   public var description: String {
@@ -157,6 +158,7 @@ extension ImageMap: CustomStringConvertible {
   }
 }
 
+@available(Backtracing 6.2, *)
 extension Backtrace.Image {
   /// Convert an ImageMap.Image to a Backtrace.Image.
   ///
@@ -194,6 +196,7 @@ extension Backtrace.Image {
   }
 }
 
+@available(Backtracing 6.2, *)
 extension ImageMap: Codable {
 
   public func encode(to encoder: any Encoder) throws {
