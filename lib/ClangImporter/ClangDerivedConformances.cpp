@@ -1465,7 +1465,7 @@ static bool synthesizeCXXOperatorWithFunctionObject(
       /*RequiresZeroInit=*/false, clang::CXXConstructionKind::Complete,
       clang::SourceRange(funcLoc, funcLoc));
 
-  assert(!synthCtorExprResult.isInvalid() &&
+  ASSERT(!synthCtorExprResult.isInvalid() &&
          "Unable to synthesize constructor expression for std::equal_to");
   clang::Expr *synthCtorExpr = synthCtorExprResult.get();
 
@@ -1495,7 +1495,7 @@ static clang::ClassTemplateSpecializationDecl *
 lookupAndSpecializeFunctionObject(ClangImporter::Implementation &impl,
                                   const clang::CXXRecordDecl *clangDecl,
                                   std::string name) {
-  assert(clangDecl);
+  ASSERT(clangDecl);
   clang::ASTContext &Ctx = impl.getClangASTContext();
   clang::Sema &clangSema = impl.getClangSema();
 
@@ -1527,8 +1527,8 @@ void swift::conformToHashableIfNeeded(ClangImporter::Implementation &impl,
                                       const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("conforming to Hashable", decl);
 
-  assert(decl);
-  assert(clangDecl);
+  ASSERT(decl);
+  ASSERT(clangDecl);
 
   auto *stdHashSpec =
       lookupAndSpecializeFunctionObject(impl, clangDecl, "hash");
