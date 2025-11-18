@@ -2155,6 +2155,11 @@ public:
   createInitExistentialMetatype(SILLocation Loc, SILValue metatype,
                                 SILType existentialType,
                                 ArrayRef<ProtocolConformanceRef> conformances) {
+    if (isInsertingIntoGlobal()) {
+      return insert(InitExistentialMetatypeInst::create(
+          getSILDebugLocation(Loc), existentialType, metatype, conformances,
+            getModule()));
+    }
     return insert(InitExistentialMetatypeInst::create(
         getSILDebugLocation(Loc), existentialType, metatype, conformances,
         &getFunction()));
@@ -2289,6 +2294,10 @@ public:
   }
 
   MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype) {
+    if (isInsertingIntoGlobal()) {
+      return insert(MetatypeInst::create(getSILDebugLocation(Loc), Metatype,
+                                         getModule()));
+    }
     return insert(MetatypeInst::create(getSILDebugLocation(Loc), Metatype,
                                        &getFunction()));
   }

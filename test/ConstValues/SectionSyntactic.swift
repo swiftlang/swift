@@ -121,6 +121,9 @@ enum E { case a }
 
 // metatypes
 @section("mysection") let metatype1 = Int.self // ok
+@section("mysection") let metatype2: Any.Type = Int.self // ok
+@section("mysection") let metatype3: any (Hashable).Type = Int.self // ok
+@section("mysection") let metatype4: any (Hashable & Sendable).Type = Int.self // ok
 
 // invalid metatype references
 @section("mysection") let invalidMetatype1 = Int.self.self
