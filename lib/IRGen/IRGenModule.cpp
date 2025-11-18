@@ -392,6 +392,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     TypeMetadataStructTy
   });
 
+  EmbeddedExistentialsMetadataStructTy = createStructType(*this, "swift.embedded_existential_type", {
+    WitnessTablePtrTy,
+    TypeMetadataStructTy
+  });
+
   // A full heap metadata is basically just an additional small prefix
   // on a full metadata, used for metadata corresponding to heap
   // allocations.
@@ -1481,7 +1486,9 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 
 void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
   // In Embedded Swift, only class-bound wtables are allowed.
-  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+  auto &langOpts = SIL.getASTContext().LangOpts;
+  if (langOpts.hasFeature(Feature::Embedded) &&
+      !langOpts.hasFeature(Feature::EmbeddedExistentials)) {
     assert(Conf->getProtocol()->requiresClass());
   }
 

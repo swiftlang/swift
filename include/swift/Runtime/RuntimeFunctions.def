@@ -236,6 +236,14 @@ FUNCTION(NativeStrongReleaseDirect, Swift, swift_releaseDirect, SwiftDirectRR_CC
          EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
          UNKNOWN_MEMEFFECTS)
 
+// void swift_releaseBox(void *ptr);
+FUNCTION(ReleaseBox, Swift, swift_releaseBox, C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
 // void *swift_retain_n(void *ptr, int32_t n);
 FUNCTION(NativeStrongRetainN, Swift, swift_retain_n, C_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),

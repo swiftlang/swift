@@ -696,6 +696,12 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     if (isForcedShared())
       return SILLinkage::Shared;
 
+    // In embedded existenitals mode we generate metadata for tuple types.
+    if (getType()->getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials) &&
+        isa<TupleType>(getType())) {
+      return SILLinkage::Shared;
+    }
+
     auto *nominal = getType().getAnyNominal();
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata:
@@ -1120,6 +1126,9 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata:
+      if (IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+        return IGM.EmbeddedExistentialsMetadataStructTy;
+      }
       if (getType().getClassOrBoundGenericClass())
         return IGM.FullHeapMetadataStructTy;
       else

@@ -962,13 +962,17 @@ namespace {
 
     void addAssociatedType(AssociatedTypeDecl *assocType) {
       // In Embedded Swift witness tables don't have associated-types entries.
-      if (assocType->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+      auto &langOpts = assocType->getASTContext().LangOpts;
+      if (langOpts.hasFeature(Feature::Embedded) &&
+          !langOpts.hasFeature(Feature::EmbeddedExistentials))
         return;
       Entries.push_back(WitnessTableEntry::forAssociatedType(assocType));
     }
 
     void addAssociatedConformance(const AssociatedConformance &req) {
-      if (req.getAssociation()->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      auto &langOpts = req.getAssociation()->getASTContext().LangOpts;
+      if (langOpts.hasFeature(Feature::Embedded) &&
+          !langOpts.hasFeature(Feature::EmbeddedExistentials) &&
           !req.getAssociatedRequirement()->requiresClass()) {
         // If it's not a class protocol, the associated type can never be used to create
         // an existential. Therefore this witness entry is never used at runtime
@@ -1728,7 +1732,9 @@ public:
       SILEntries = SILEntries.slice(1);
 
       // In Embedded Swift witness tables don't have associated-types entries.
-      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded))
+      auto &langOpts = IGM.Context.LangOpts;
+      if (langOpts.hasFeature(Feature::Embedded) &&
+          !langOpts.hasFeature(Feature::EmbeddedExistentials))
         return;
 
 #ifndef NDEBUG
@@ -1745,6 +1751,17 @@ public:
 #endif
 
       auto typeWitness = Conformance.getTypeWitness(assocType);
+
+      if (IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+        // In Embedded Swift associated type witness point to the metadata.
+        llvm::Constant *witnessEntry = IGM.getAddrOfTypeMetadata(
+          typeWitness->getCanonicalType());
+        auto &schema = IGM.getOptions().PointerAuth
+                          .ProtocolAssociatedTypeAccessFunctions;
+        Table.addSignedPointer(witnessEntry, schema, assocType);
+        return;
+      }
+
       llvm::Constant *typeWitnessAddr =
           IGM.getAssociatedTypeWitness(
             typeWitness,
@@ -1768,8 +1785,9 @@ public:
       auto &entry = SILEntries.front();
       (void)entry;
       SILEntries = SILEntries.slice(1);
-
-      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+      auto &langOpts = IGM.Context.LangOpts;
+      if (langOpts.hasFeature(Feature::Embedded) &&
+          !langOpts.hasFeature(Feature::EmbeddedExistentials) &&
           !requirement.getAssociatedRequirement()->requiresClass()) {
         // If it's not a class protocol, the associated type can never be used to create
         // an existential. Therefore this witness entry is never used at runtime
@@ -2731,7 +2749,8 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
     // In Embedded Swift, only class-bound wtables are allowed.
-    if (!wt->getConformance()->getProtocol()->requiresClass())
+    if (!wt->getConformance()->getProtocol()->requiresClass() &&
+        !Context.LangOpts.hasFeature(Feature::EmbeddedExistentials))
       return;
   }
 
@@ -3752,7 +3771,9 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   auto proto = conformance.getProtocol();
 
   // In Embedded Swift, only class-bound wtables are allowed.
-  if (srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+  auto &langOpts = srcType->getASTContext().LangOpts;
+  if (langOpts.hasFeature(Feature::Embedded) &&
+      !langOpts.hasFeature(Feature::EmbeddedExistentials)) {
     assert(proto->requiresClass());
   }
 
@@ -4531,6 +4552,28 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                      DynamicMetadataRequest request) {
   auto &IGM = IGF.IGM;
 
+  // Im embedded with existentials mode the type metadata is directly referenced
+  // by the witness table.
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+    auto proto = assocType->getProtocol();
+    assert(!IGF.IGM.isResilient(proto, ResilienceExpansion::Maximal));
+    assert(!IGF.IGM.IRGen.Opts.UseRelativeProtocolWitnessTables);
+
+    auto &protoInfo = IGF.IGM.getProtocolInfo(proto, ProtocolInfoKind::Full);
+    auto index = protoInfo.getAssociatedTypeIndex(IGM, assocType);
+    auto slot =
+      slotForLoadOfOpaqueWitness(IGF, wtable, index.forProtocolWitnessTable(),
+                                 false/*isRelativeTable*/);
+    llvm::Value *assocTypeMetadata = IGF.emitInvariantLoad(slot);
+
+    if (auto &schema = IGF.getOptions().PointerAuth.ProtocolAssociatedTypeAccessFunctions) {
+      auto authInfo = PointerAuthInfo::emit(IGF, schema, slot.getAddress(), assocType);
+      assocTypeMetadata = emitPointerAuthAuth(IGF, assocTypeMetadata, authInfo);
+
+    }
+
+    return MetadataResponse::forComplete(assocTypeMetadata);
+  }
   // Extract the requirements base descriptor.
   auto reqBaseDescriptor =
     IGM.getAddrOfProtocolRequirementsBaseDescriptor(
