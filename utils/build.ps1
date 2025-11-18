@@ -1013,16 +1013,6 @@ function Get-Dependencies {
       Expand-ZipFile "$FileName.zip" "$BinaryCache" "$FileName"
       Write-Ouptut "$ArchName Python $PythonVersion installed."
     }
-    if (-not $EmbeddedPython) {
-      return
-    }
-    $PythonPTHPath = "$BinaryCache/$FileName/$(Get-PythonLibName)._pth"
-    $PythonPTHContent = [System.IO.File]::ReadAllText($PythonPTHPath).Replace("#import site","import site")
-    [System.IO.File]::WriteAllText($PythonPTHPath, $PythonPTHContent)
-    $GetPipURL = "https://bootstrap.pypa.io/get-pip.py"
-    $GetPipPath = "$BinaryCache/$FileName/get-pip.py"
-    $WebClient.DownloadFile($GetPipURL, $GetPipPath)
-    & "$BinaryCache/$FileName/python.exe" $GetPipPath
   }
 
   function Install-PIPIfNeeded() {
