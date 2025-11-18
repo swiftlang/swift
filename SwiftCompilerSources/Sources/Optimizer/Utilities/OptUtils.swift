@@ -503,6 +503,19 @@ extension Instruction {
       }
     case let gvi as GlobalValueInst:
       return context.canMakeStaticObjectReadOnly(objectType: gvi.type)
+
+    // Metatypes (and upcasts of them to existentials) can be used as static initializers for SE-0492, as long as they
+    // are not generic or resilient
+    case let mti as MetatypeInst:
+      if !mti.type.hasTypeParameter,
+        let nominal = mti.type.canonicalType.instanceTypeOfMetatype.nominal,
+        !nominal.isResilient(in: mti.parentFunction) {
+        return true
+      }
+      return false
+    case let iemi as InitExistentialMetatypeInst:
+      return !iemi.type.hasTypeParameter
+
     case is StructInst,
          is TupleInst,
          is EnumInst,

@@ -2330,6 +2330,17 @@ InitExistentialMetatypeInst::InitExistentialMetatypeInst(
 
 InitExistentialMetatypeInst *InitExistentialMetatypeInst::create(
     SILDebugLocation Loc, SILType existentialMetatypeType, SILValue metatype,
+    ArrayRef<ProtocolConformanceRef> conformances, SILModule &M) {
+  unsigned size = totalSizeToAlloc<swift::Operand, ProtocolConformanceRef>(
+      1, conformances.size());
+  void *buffer = M.allocateInst(size, alignof(InitExistentialMetatypeInst));
+  return ::new (buffer) InitExistentialMetatypeInst(
+      Loc, existentialMetatypeType, metatype,
+      {}, conformances);
+}
+
+InitExistentialMetatypeInst *InitExistentialMetatypeInst::create(
+    SILDebugLocation Loc, SILType existentialMetatypeType, SILValue metatype,
     ArrayRef<ProtocolConformanceRef> conformances, SILFunction *F) {
   SILModule &M = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
@@ -2736,6 +2747,13 @@ CheckedCastBranchInst *CheckedCastBranchInst::create(
       TypeDependentOperands,
       DestLoweredTy, DestFormalTy, SuccessBB, FailureBB, Target1Count,
       Target2Count, forwardingOwnershipKind, preservesOwnership);
+}
+
+MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,
+                                   SILModule &Mod) {
+  auto Size = totalSizeToAlloc<swift::Operand>(1);
+  auto Buffer = Mod.allocateInst(Size, alignof(MetatypeInst));
+  return ::new (Buffer) MetatypeInst(Loc, Ty, {});
 }
 
 MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,

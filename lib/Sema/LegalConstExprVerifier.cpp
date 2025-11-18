@@ -20,8 +20,10 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/AST/Type.h"
 #include "swift/Basic/Assertions.h"
 using namespace swift;
 
@@ -342,6 +344,25 @@ checkSupportedWithSectionAttribute(const Expr *expr,
     if (const IdentityExpr *identityExpr = dyn_cast<IdentityExpr>(expr)) {
       expressionsToCheck.push_back(identityExpr->getSubExpr());
       continue;
+    }
+    
+    // Upcasts of metatypes to existential metatypes (e.g. Any.Type)
+    if (const ErasureExpr *erasureExpr = dyn_cast<ErasureExpr>(expr)) {
+      if (const DotSelfExpr *dotSelfExpr = dyn_cast<DotSelfExpr>(erasureExpr->getSubExpr())) {
+        if (const TypeExpr *typeExpr = dyn_cast<TypeExpr>(dotSelfExpr->getSubExpr())) {
+          auto baseType = typeExpr->getType();
+          if (baseType && baseType->is<MetatypeType>()) {
+            auto instanceType = baseType->getMetatypeInstanceType();
+            if (auto nominal = instanceType->getNominalOrBoundGenericNominal()) {
+              // Allow non-generic, non-resilient types
+              if (!nominal->isGeneric() && !nominal->isResilient()) {
+                continue;
+              }
+            }
+          }
+        }
+      }
+      return std::make_pair(expr, TypeExpression);
     }
 
     // Function calls and constructors are not allowed

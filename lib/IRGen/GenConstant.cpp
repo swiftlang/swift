@@ -20,6 +20,7 @@
 #include "Explosion.h"
 #include "GenConstant.h"
 #include "GenEnum.h"
+#include "GenExistential.h"
 #include "GenIntegerLiteral.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
@@ -31,9 +32,11 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Support/BLAKE3.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 using namespace irgen;
@@ -414,6 +417,24 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     assert(ti.isFixedSize(expansion));
     Address addr = IGM.getAddrOfSILGlobalVariable(var, ti, NotForDefinition);
     return addr.getAddress();
+  } else if (auto *mti = dyn_cast<MetatypeInst>(operand)) {
+    auto metaTy = mti->getType().castTo<MetatypeType>();
+    auto type = metaTy.getInstanceType();
+    return IGM.getAddrOfTypeMetadata(type);
+  } else if (auto *iemi = dyn_cast<InitExistentialMetatypeInst>(operand)) {
+    auto *mti =
+        dyn_cast<MetatypeInst>(iemi->getOperand().getDefiningInstruction());
+    ASSERT(mti != nullptr && "couldn't constant fold initializer expression");
+
+    auto metaTy = mti->getType().castTo<MetatypeType>();
+    auto type = metaTy.getInstanceType();
+    llvm::Constant *metatype = IGM.getAddrOfTypeMetadata(type);
+
+    Explosion result;
+    emitExistentialMetatypeContainer(IGM, result, iemi->getType(), metatype,
+                                     iemi->getOperand()->getType(),
+                                     iemi->getConformances());
+    return result;
   } else if (auto *atp = dyn_cast<AddressToPointerInst>(operand)) {
     auto *val = emitConstantValue(IGM, atp->getOperand()).claimNextConstant();
     return val;
