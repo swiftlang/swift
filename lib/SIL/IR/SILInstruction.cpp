@@ -1339,6 +1339,27 @@ SILValue SILInstruction::getStackAllocation() const {
   return cast<SingleValueInstruction>(this);
 }
 
+StackAllocationIsNested_t SILInstruction::isStackAllocationNested() const {
+  assert(isAllocatingStack());
+  if (auto ASI = dyn_cast<AllocStackInst>(this)) {
+    return ASI->isStackAllocationNested();
+  } else {
+    // TODO: implement for all remaining allocations
+    return StackAllocationIsNested;
+  }
+}
+
+void SILInstruction::setStackAllocationIsNested(
+    StackAllocationIsNested_t nested) {
+  assert(isAllocatingStack());
+  if (auto ASI = dyn_cast<AllocStackInst>(this)) {
+    assert(nested == StackAllocationIsNested);
+    ASI->setStackAllocationIsNested(nested);
+  } else if (!nested) {
+    llvm_unreachable("unimplemented");
+  }
+}
+
 bool SILInstruction::isDeallocatingStack() const {
   // NOTE: If you're adding a new kind of deallocating instruction,
   // there are several places scattered around the SIL optimizer which

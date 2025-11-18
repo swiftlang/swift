@@ -141,6 +141,24 @@ class SILPrintContext;
 
 template <typename ImplClass> class SILClonerWithScopes;
 
+/// An enum that describes whether or not a stack allocation may violate the
+/// stack discipline of swift.
+///
+/// DISCUSSION: In swift, we require that all allocations on the stack be
+/// strictly allocated in a LIFO order... that is the last stack allocation
+/// created must be the first stack allocation destroyed. In some cases, we
+/// cannot guarantee that behavior. In such cases we may need to use other
+/// strategies that do not involve stack memory (e.x.: using heap memory
+/// although we do not require heap memory to be used).
+enum StackAllocationIsNested_t : bool {
+  /// The instruction may not obey the LIFO rule of stack allocation.
+  StackAllocationIsNotNested = false,
+
+  /// The instruction obeys the LIFO rule of stack allocation and can allocate
+  /// memory on the stack normally.
+  StackAllocationIsNested = true,
+};
+
 enum class MemoryBehavior {
   None,
   /// The instruction may read memory.
@@ -857,6 +875,15 @@ public:
 
   /// The stack allocation produced by the instruction, if any.
   SILValue getStackAllocation() const;
+
+  /// Returns the kind of stack memory that should be allocated. There are
+  /// certain (unfortunate) situations in which "stack" allocations may become
+  /// unnested and must use alternative allocation strategies. Rather than
+  /// requiring all of these to explicitly use heap allocation, which may be
+  /// to be significantly less efficient (e.g. )
+  StackAllocationIsNested_t isStackAllocationNested() const;
+
+  void setStackAllocationIsNested(StackAllocationIsNested_t isNested);
 
   /// Returns true if this is the deallocation of a stack allocating instruction.
   /// The first operand must be the allocating instruction.
@@ -2052,6 +2079,24 @@ public:
     size_t end = sharedUInt32().AllocStackInst.numOperands;
     for (unsigned i = 0; i < end; ++i) {
       Operands[i].~Operand();
+    }
+  }
+
+  StackAllocationIsNested_t isStackAllocationNested() const {
+    if (sharedUInt8().AllocStackInst.isNested) {
+      return StackAllocationIsNested;
+    }
+    return StackAllocationIsNotNested;
+  }
+
+  void setStackAllocationIsNested(StackAllocationIsNested_t isNested) {
+    switch (isNested) {
+    case StackAllocationIsNotNested:
+      sharedUInt8().AllocStackInst.isNested = false;
+      break;
+    case StackAllocationIsNested:
+      sharedUInt8().AllocStackInst.isNested = true;
+      break;
     }
   }
 
