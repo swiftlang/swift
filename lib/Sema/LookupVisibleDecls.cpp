@@ -1121,20 +1121,20 @@ static void lookupVisibleDynamicMemberLookupDecls(
   if (!baseType->hasDynamicMemberLookupAttribute())
     return;
 
-  // Fetch all subscripts which satisfy the `@dynamicMemberLookup` attribute.
   SmallVector<ValueDecl *, 4> subscripts;
   dc->lookupQualified(baseType, DeclNameRef::createSubscript(), loc,
                       NL_QualifiedDefault | NL_ProtocolMembers, subscripts);
-  (void)std::remove_if(subscripts.begin(), subscripts.end(), [](ValueDecl *VD) {
-    auto *SD = dyn_cast<SubscriptDecl>(VD);
-    return !SD || SD->getDynamicMemberLookupSubscriptEligibility() ==
-                      DynamicMemberLookupSubscriptEligibility::None;
-  });
 
   for (ValueDecl *VD : subscripts) {
     auto *subscript = cast<SubscriptDecl>(VD);
-    auto rootType = evaluateOrDefault(subscript->getASTContext().evaluator,
-      RootTypeOfKeypathDynamicMemberRequest{subscript}, Type());
+    if (!subscript || subscript->getDynamicMemberLookupKind(dc) !=
+                          SubscriptDecl::DynamicMemberLookupKind::KeyPath) {
+      continue;
+    }
+
+    auto rootType = evaluateOrDefault(
+        subscript->getASTContext().evaluator,
+        RootTypeOfKeypathDynamicMemberRequest{subscript}, Type());
     if (rootType.isNull())
       continue;
 
