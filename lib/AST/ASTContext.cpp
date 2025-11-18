@@ -3840,7 +3840,7 @@ BuiltinFixedArrayType *BuiltinFixedArrayType::get(CanType Size,
   return faTy;
 }
 
-BuiltinBorrowType *BuiltinBorrowType::get(CanType Referent) {
+CanBuiltinBorrowType BuiltinBorrowType::get(CanType Referent) {
   RecursiveTypeProperties properties;
   properties |= Referent->getRecursiveProperties();
 
@@ -3854,13 +3854,13 @@ BuiltinBorrowType *BuiltinBorrowType::get(CanType Referent) {
   if (BuiltinBorrowType *faTy
         = ctx.getImpl().getArena(arena).BuiltinBorrowTypes
                  .FindNodeOrInsertPos(id, insertPos))
-    return faTy;
+    return CanBuiltinBorrowType(faTy);
 
   BuiltinBorrowType *faTy
     = new (ctx, arena) BuiltinBorrowType(Referent, properties);
   ctx.getImpl().getArena(arena).BuiltinBorrowTypes
       .InsertNode(faTy, insertPos);
-  return faTy;
+  return CanBuiltinBorrowType(faTy);
 }
 
 BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,

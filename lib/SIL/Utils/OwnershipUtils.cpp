@@ -609,6 +609,9 @@ void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
   case Kind::BeginAsyncLet:
     os << "BeginAsyncLet";
     return;
+  case Kind::MakeBorrow:
+    os << "MakeBorrow";
+    return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
@@ -641,6 +644,7 @@ bool BorrowingOperand::hasEmptyRequiredEndingUses() const {
   case BorrowingOperandKind::StoreBorrow:
   case BorrowingOperandKind::BeginApply:
   case BorrowingOperandKind::BeginAsyncLet:
+  case BorrowingOperandKind::MakeBorrow:
   case BorrowingOperandKind::PartialApplyStack:
   case BorrowingOperandKind::MarkDependenceNonEscaping: {
     return op->getUser()->hasUsesOfAnyResult();
@@ -749,6 +753,9 @@ bool BorrowingOperand::visitScopeEndingUses(
     }
     return true;
   }
+  case swift::BorrowingOperandKind::MakeBorrow: {
+    return true;
+  }
   // These are instantaneous borrow scopes so there aren't any special end
   // scope instructions.
   case BorrowingOperandKind::Apply:
@@ -802,6 +809,7 @@ SILValue BorrowingOperand::getBorrowIntroducingUserResult() const {
     return SILValue();
 
   case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::MakeBorrow:
     return cast<SingleValueInstruction>(op->getUser());
 
   case BorrowingOperandKind::BorrowedFrom: {
@@ -862,6 +870,7 @@ SILValue BorrowingOperand::getDependentUserResult() const {
     return SILValue();
   }
   case BorrowingOperandKind::Invalid:
+  case BorrowingOperandKind::MakeBorrow:
   case BorrowingOperandKind::BeginBorrow:
   case BorrowingOperandKind::StoreBorrow:
   case BorrowingOperandKind::BeginApply:

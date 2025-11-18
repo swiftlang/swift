@@ -1912,7 +1912,8 @@ public:
     return T->getKind() == TypeKind::BuiltinBorrow;
   }
   
-  static BuiltinBorrowType *get(CanType Referent);
+  static CanTypeWrapper<BuiltinBorrowType>
+  get(CanType Referent);
 
   /// Get the type of the referenced borrow.
   CanType getReferentType() const { return Referent; }
