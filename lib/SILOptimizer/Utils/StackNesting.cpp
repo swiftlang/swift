@@ -579,7 +579,9 @@ StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
       // In the formal presentation, the state change is
       //   state = STATE_PUSH(state, alloc)
       if (I->isAllocatingStack()) {
-        state.allocations.push_back(I);
+        // Only handle nested stack allocations.
+        if (I->isStackAllocationNested() == StackAllocationIsNested)
+          state.allocations.push_back(I);
         continue;
       }
 
@@ -593,6 +595,11 @@ StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
       // [deallocation-preconditions] in the proof.
       SILInstruction *dealloc = I;
       SILInstruction *alloc = getAllocForDealloc(dealloc);
+
+      // Since we only processed nested allocations above, ignore deallocations
+      // from non-nested allocations.
+      if (alloc->isStackAllocationNested() == StackAllocationIsNotNested)
+        continue;
 
 #ifndef NDEBUG
       if (state.allocations.empty()) {
@@ -657,9 +664,10 @@ StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
 }
 
 namespace swift::test {
-static FunctionTest MyNewTest("stack_nesting_fixup",
-                              [](auto &function, auto &arguments, auto &test) {
-                                StackNesting::fixNesting(&function);
-                                function.print(llvm::outs());
-                              });
+static FunctionTest StackNestingTests("stack_nesting_fixup",
+                                      [](auto &function, auto &arguments,
+                                         auto &test) {
+                                        StackNesting::fixNesting(&function);
+                                        function.print(llvm::outs());
+                                      });
 } // end namespace swift::test
