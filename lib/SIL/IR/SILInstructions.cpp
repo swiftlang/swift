@@ -231,6 +231,7 @@ AllocStackInst::AllocStackInst(
   sharedUInt8().AllocStackInst.fromVarDecl = (bool)isFromVarDecl;
   sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo =
       (bool)usesMoveableValueDebugInfo || elementType.isMoveOnly();
+  setStackAllocationIsNested(StackAllocationIsNested);
   sharedUInt32().AllocStackInst.numOperands = TypeDependentOperands.size();
 
   // VarInfo must be initialized after
