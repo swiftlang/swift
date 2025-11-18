@@ -945,10 +945,6 @@ namespace {
     ConstraintSystem &CS;
     DeclContext *CurDC;
 
-    /// A map from each UnresolvedMemberExpr to the respective (implicit) base
-    /// found during our walk.
-    llvm::MapVector<UnresolvedMemberExpr *, Type> UnresolvedBaseTypes;
-
     /// A stack of pack expansions that can open pack elements.
     llvm::SmallVector<PackExpansionExpr *, 1> OuterExpansions;
 
@@ -1837,16 +1833,6 @@ namespace {
       llvm_unreachable("Already typechecked");
     }
 
-    void setUnresolvedBaseType(UnresolvedMemberExpr *UME, Type ty) {
-      UnresolvedBaseTypes.insert({UME, ty});
-    }
-
-    Type getUnresolvedBaseType(UnresolvedMemberExpr *UME) {
-      auto result = UnresolvedBaseTypes.find(UME);
-      assert(result != UnresolvedBaseTypes.end());
-      return result->second;
-    }
-    
     virtual Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
       auto baseLocator = CS.getConstraintLocator(
                             expr,
@@ -1858,7 +1844,7 @@ namespace {
       // should be marked as a potential hole.
       auto baseTy = CS.createTypeVariable(baseLocator, TVO_CanBindToNoEscape |
                                                            TVO_CanBindToHole);
-      setUnresolvedBaseType(expr, baseTy);
+      CS.recordUnresolvedMemberBase(expr, baseTy);
 
       auto memberTy = CS.createTypeVariable(
           memberLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
@@ -1891,7 +1877,7 @@ namespace {
       auto chainResultTy = CS.createTypeVariable(
           locator,
           TVO_CanBindToLValue | TVO_CanBindToHole | TVO_CanBindToNoEscape);
-      auto chainBaseTy = getUnresolvedBaseType(base);
+      auto chainBaseTy = CS.findUnresolvedMemberBase(base);
 
       // The result of the last element of the chain must be convertible to the
       // whole chain, and the type of the whole chain must be equal to the base.

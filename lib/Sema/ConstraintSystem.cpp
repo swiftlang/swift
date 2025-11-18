@@ -26,6 +26,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/MacroDefinition.h"
@@ -4075,6 +4076,24 @@ ArgumentList *Solution::getArgumentList(ConstraintLocator *locator) const {
       return known->second;
   }
   return nullptr;
+}
+
+Type ConstraintSystem::findUnresolvedMemberBase(UnresolvedMemberExpr *E) {
+  auto *locator = getConstraintLocator(E);
+  auto known = UnresolvedMemberBaseTypes.find(locator);
+  if (known != UnresolvedMemberBaseTypes.end())
+    return known->second;
+  return Type();
+}
+
+void ConstraintSystem::recordUnresolvedMemberBase(UnresolvedMemberExpr *E,
+                                                  Type baseTy) {
+  auto *locator = getConstraintLocator(E);
+  bool inserted = UnresolvedMemberBaseTypes.insert({locator, baseTy}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedUnresolvedMemberBase(locator));
 }
 
 std::optional<ConversionRestrictionKind>
