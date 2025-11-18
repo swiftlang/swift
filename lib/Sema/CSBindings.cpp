@@ -112,6 +112,73 @@ bool PotentialBinding::isViableForJoin() const {
          !isDefaultableBinding();
 }
 
+namespace {
+
+struct PrintableBinding {
+private:
+  enum class BindingKind { Exact, Subtypes, Supertypes, Literal };
+  BindingKind Kind;
+  Type BindingType;
+  bool Viable;
+  PrintableBinding(BindingKind kind, Type bindingType, bool viable)
+      : Kind(kind), BindingType(bindingType), Viable(viable) {}
+
+public:
+  static PrintableBinding supertypesOf(Type binding) {
+    return PrintableBinding{BindingKind::Supertypes, binding, true};
+  }
+
+  static PrintableBinding subtypesOf(Type binding) {
+    return PrintableBinding{BindingKind::Subtypes, binding, true};
+  }
+
+  static PrintableBinding exact(Type binding) {
+    return PrintableBinding{BindingKind::Exact, binding, true};
+  }
+
+  static PrintableBinding literalDefaultType(Type binding, bool viable) {
+    return PrintableBinding{BindingKind::Literal, binding, viable};
+  }
+
+  void print(llvm::raw_ostream &out, const PrintOptions &PO,
+             unsigned indent = 0) const {
+    switch (Kind) {
+    case BindingKind::Exact:
+      break;
+    case BindingKind::Subtypes:
+      out << "(subtypes of) ";
+      break;
+    case BindingKind::Supertypes:
+      out << "(supertypes of) ";
+      break;
+    case BindingKind::Literal:
+      out << "(default type of literal) ";
+      break;
+    }
+    if (BindingType)
+      BindingType.print(out, PO);
+    if (!Viable)
+      out << " [literal not viable]";
+  }
+};
+
+}
+
+void PotentialBinding::print(llvm::raw_ostream &out,
+                             const PrintOptions &PO) const {
+  switch (Kind) {
+  case AllowedBindingKind::Exact:
+    PrintableBinding::exact(BindingType).print(out, PO);
+    break;
+  case AllowedBindingKind::Supertypes:
+    PrintableBinding::supertypesOf(BindingType).print(out, PO);
+    break;
+  case AllowedBindingKind::Subtypes:
+    PrintableBinding::subtypesOf(BindingType).print(out, PO);
+    break;
+  }
+}
+
 bool BindingSet::isDelayed() const {
   if (auto *locator = TypeVar->getImpl().getLocator()) {
     if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
@@ -1301,6 +1368,21 @@ void PotentialBindings::addPotentialBinding(TypeVariableType *TypeVar,
     binding = binding.withType(binding.BindingType->getRValueType());
   }
 
+  LLVM_DEBUG(
+    PrintOptions PO = PrintOptions::forDebugging();
+    llvm::dbgs() << "Recording ";
+    TypeVar->print(llvm::dbgs(), PO);
+    llvm::dbgs() << " ";
+    binding.print(llvm::dbgs(), PO);
+    llvm::dbgs() << " from ";
+    if (auto *constraint = dyn_cast<Constraint *>(binding.BindingSource)) {
+      constraint->print(llvm::dbgs(), &TypeVar->getASTContext().SourceMgr, 0);
+    } else {
+      auto *locator = cast<ConstraintLocator *>(binding.BindingSource);
+      locator->dump(&TypeVar->getASTContext().SourceMgr, llvm::dbgs());
+    }
+    llvm::dbgs() << "\n");
+
   Bindings.push_back(std::move(binding));
 }
 
@@ -1604,11 +1686,29 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
              ConstraintClassification::Relational &&
          "only relational constraints handled here");
 
+  LLVM_DEBUG(
+      llvm::dbgs() << "inferFromRelational(";
+      TypeVar->print(llvm::dbgs(), PrintOptions::forDebugging());
+      llvm::dbgs() << ", ";
+      constraint->print(llvm::dbgs(), &CS.getASTContext().SourceMgr, 0);
+      llvm::dbgs() << ")\n");
+
   auto first = CS.simplifyType(constraint->getFirstType());
   auto second = CS.simplifyType(constraint->getSecondType());
 
-  if (first->is<TypeVariableType>() && first->isEqual(second))
+#define DEBUG_BAILOUT(msg)                                              \
+  LLVM_DEBUG(                                                           \
+      PrintOptions PO = PrintOptions::forDebugging();                   \
+      llvm::dbgs() << msg << " ";                                       \
+      TypeVar->print(llvm::dbgs(), PO);                                 \
+      llvm::dbgs() << " from ";                                         \
+      constraint->print(llvm::dbgs(), &CS.getASTContext().SourceMgr);   \
+      llvm::dbgs() << "\n");
+
+  if (first->is<TypeVariableType>() && first->isEqual(second)) {
+    DEBUG_BAILOUT("First is second");
     return std::nullopt;
+  }
 
   Type type;
   AllowedBindingKind kind;
@@ -1629,6 +1729,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     // of bindings for them until closure's body is opened.
     if (auto *typeVar = first->getAs<TypeVariableType>()) {
       if (typeVar->getImpl().isClosureType()) {
+        DEBUG_BAILOUT("Delayed (1)");
         DelayedBy.push_back(constraint);
         return std::nullopt;
       }
@@ -1662,8 +1763,10 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
   }
 
   // Do not attempt to bind to ErrorType.
-  if (type->hasError())
+  if (type->hasError()) {
+    DEBUG_BAILOUT("Has error");
     return std::nullopt;
+  }
 
   if (TypeVar->getImpl().isKeyPathType()) {
     auto objectTy = type->lookThroughAllOptionalTypes();
@@ -1682,8 +1785,10 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
       }
     }
 
-    if (!(objectTy->isKnownKeyPathType() || objectTy->is<AnyFunctionType>()))
+    if (!(objectTy->isKnownKeyPathType() || objectTy->is<AnyFunctionType>())) {
+      DEBUG_BAILOUT("Bad key path type (1)");
       return std::nullopt;
+    }
   }
 
   if (TypeVar->getImpl().isKeyPathSubscriptIndex()) {
@@ -1701,6 +1806,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
         if (auto superclass = layout.explicitSuperclass) {
           type = superclass;
         } else if (!CS.shouldAttemptFixes()) {
+          DEBUG_BAILOUT("Bad key path type (2)");
           return std::nullopt;
         }
       }
@@ -1724,8 +1830,10 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     // type of a chain, Result should always be a concrete type which conforms
     // to the protocol inferred for the base.
     if (constraint->getKind() == ConstraintKind::UnresolvedMemberChainBase &&
-        kind == AllowedBindingKind::Subtypes && type->is<ProtocolType>())
+        kind == AllowedBindingKind::Subtypes && type->is<ProtocolType>()) {
+      DEBUG_BAILOUT("Unresolved member chain base");
       return std::nullopt;
+    }
   }
 
   if (constraint->getKind() == ConstraintKind::LValueObject) {
@@ -1733,14 +1841,17 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     // not the other way around, that would be handled by constraint
     // simplification.
     if (kind == AllowedBindingKind::Subtypes) {
-      if (type->isTypeVariableOrMember())
+      if (type->isTypeVariableOrMember()) {
+        DEBUG_BAILOUT("Disallowed l-value inference");
         return std::nullopt;
+      }
 
       type = LValueType::get(type);
     } else {
       // Right-hand side of the l-value object constraint can only
       // be bound via constraint simplification when l-value type
       // is inferred or contextually from other constraints.
+      DEBUG_BAILOUT("Delayed (2)");
       DelayedBy.push_back(constraint);
       return std::nullopt;
     }
@@ -1781,6 +1892,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     if (!containsSelf)
       DelayedBy.push_back(constraint);
 
+    DEBUG_BAILOUT("Dependent member");
     return std::nullopt;
   }
 
@@ -1805,8 +1917,10 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
   if (!checkTypeOfBinding(TypeVar, type)) {
     auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>();
 
-    if (!bindingTypeVar)
+    if (!bindingTypeVar) {
+      DEBUG_BAILOUT("Not a type variable");
       return std::nullopt;
+    }
 
     // If current type variable is associated with a code completion token
     // it's possible that it doesn't have enough contextual information
@@ -1873,8 +1987,10 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
   // lvalue-binding rules.
   if (auto otherTypeVar = type->getAs<TypeVariableType>()) {
     if (TypeVar->getImpl().canBindToLValue() !=
-        otherTypeVar->getImpl().canBindToLValue())
+        otherTypeVar->getImpl().canBindToLValue()) {
+      DEBUG_BAILOUT("LValue mismatch");
       return std::nullopt;
+    }
   }
 
   if (type->is<InOutType>() && !TypeVar->getImpl().canBindToInOut())
@@ -1898,6 +2014,8 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
 
   return PotentialBinding{type, kind, constraint};
 }
+
+#undef DEBUG_BAILOUT
 
 /// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
@@ -2347,54 +2465,6 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   auto numDefaultable = getNumViableDefaultableBindings();
   if (numDefaultable > 0)
     out << "[defaultable bindings: " << numDefaultable << "] ";
-
-  struct PrintableBinding {
-  private:
-    enum class BindingKind { Exact, Subtypes, Supertypes, Literal };
-    BindingKind Kind;
-    Type BindingType;
-    bool Viable;
-    PrintableBinding(BindingKind kind, Type bindingType, bool viable)
-        : Kind(kind), BindingType(bindingType), Viable(viable) {}
-
-  public:
-    static PrintableBinding supertypesOf(Type binding) {
-      return PrintableBinding{BindingKind::Supertypes, binding, true};
-    }
-    
-    static PrintableBinding subtypesOf(Type binding) {
-      return PrintableBinding{BindingKind::Subtypes, binding, true};
-    }
-    
-    static PrintableBinding exact(Type binding) {
-      return PrintableBinding{BindingKind::Exact, binding, true};
-    }
-    
-    static PrintableBinding literalDefaultType(Type binding, bool viable) {
-      return PrintableBinding{BindingKind::Literal, binding, viable};
-    }
-
-    void print(llvm::raw_ostream &out, const PrintOptions &PO,
-               unsigned indent = 0) const {
-      switch (Kind) {
-      case BindingKind::Exact:
-        break;
-      case BindingKind::Subtypes:
-        out << "(subtypes of) ";
-        break;
-      case BindingKind::Supertypes:
-        out << "(supertypes of) ";
-        break;
-      case BindingKind::Literal:
-        out << "(default type of literal) ";
-        break;
-      }
-      if (BindingType)
-        BindingType.print(out, PO);
-      if (!Viable)
-        out << " [literal not viable]";
-    }
-  };
 
   out << "[potential bindings: ";
   SmallVector<PrintableBinding, 2> potentialBindings;
