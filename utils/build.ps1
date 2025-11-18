@@ -4080,13 +4080,38 @@ function Build-Inspect([Hashtable] $Platform) {
     }
 }
 
-function Build-DocC() {
-  Build-SPMProject `
-    -Action Build `
+function Build-SymbolKit([hashtable] $Platform) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-docc-symbolkit `
+    -Bin $(Get-ProjectBinaryCache $Platform SymbolKit) `
+    -BuildTargets default `
+    -Platform $Platform `
+    -UseBuiltCompilers C,Swift `
+    -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
+    -Defines @{
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+    }
+}
+
+function Build-DocC([hashtable] $Platform) {
+  Build-CMakeProject `
     -Src $SourceCache\swift-docc `
-    -Bin $(Get-ProjectBinaryCache $BuildPlatform DocC) `
-    -Platform $BuildPlatform `
-    --product docc
+    -Bin (Get-ProjectBinaryCache $BuildPlatform DocC) `
+    -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+    -Platform $Platform `
+    -UseBuiltCompilers C,Swift `
+    -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
+      SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
+      SwiftCrypto_DIR = (Get-ProjectCMakeModules $Platform Crypto);
+      SwiftMarkdown_DIR = (Get-ProjectCMakeModules $Platform Markdown);
+      LMDB_DIR = (Get-ProjectCMakeModules $Platform LMDB);
+      SymbolKit_DIR = (Get-ProjectCMakeModules $Platform SymbolKit);
+      "cmark-gfm_DIR" = "$($Platform.ToolchainInstallRoot)\usr\lib\cmake";
+    }
 }
 
 function Test-PackageManager() {
@@ -4461,7 +4486,8 @@ if (-not $SkipBuild -and $IncludeNoAsserts) {
   Build-NoAssertsToolchain
 }
 
-if (-not $SkipBuild -and -not $IsCrossCompiling) {
+if (-not $SkipBuild) {
+  Invoke-BuildStep Build-SymbolKit $HostPlatform
   Invoke-BuildStep Build-DocC $HostPlatform
 }
 
