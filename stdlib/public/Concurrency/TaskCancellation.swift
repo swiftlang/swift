@@ -76,15 +76,14 @@ import Swift
 @available(SwiftStdlib 5.1, *)
 @export(implementation)
 nonisolated(nonsending)
-public func withTaskCancellationHandler<T, E>(
-  operation: () async throws(E) -> T,
-  onCancel handler: @Sendable () -> Void
-) async throws(E) -> T {
+public func withTaskCancellationHandler<Return, Failure>(
+  operation: nonisolated(nonsending) () async throws(Failure) -> Return,
+  onCancel handler: sending () -> Void
+) async throws(Failure) -> Return {
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
   let record = unsafe Builtin.taskAddCancellationHandler(handler: handler)
   defer { unsafe Builtin.taskRemoveCancellationHandler(record: record) }
-
   return try await operation()
 }
 
