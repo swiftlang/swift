@@ -239,10 +239,10 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 /// Extensions to the `Copyable` protocol are not allowed.
 @_marker public protocol Copyable/*: ~Escapable*/ {}
 
-/// A protocol representing types whose values can persist beyond the immediate local context.
+/// A type whose values can persist beyond their immediate local scope.
 ///
-/// They may be freely assigned to global or static variables, returned from functions, or captured by escaping
-/// closures, etc. All Swift types implicitly conform to this protocol by default, allowing them to be moved across
+/// Escapable values can be assigned to global or static variables, returned from functions, captured by escaping
+/// closures, and so on. All Swift types implicitly conform to this protocol by default, allowing them to be moved across
 /// scopes freely because they lack any lifetime dependencies.
 ///
 /// In contrast, values of types that suppress their implicit conformance to `Escapable` (by writing `~Escapable`)
@@ -250,8 +250,8 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 /// depends on. Explicit lifetime dependency annotations may be required when working with these types.
 ///
 /// In generic contexts, `~Escapable` works much in the same way as `~Copyable`. It allows functions and types to work
-/// with values that may or may not be Escapable, and types can be conditionally Escapable based on their generic
-/// arguments. A conformance requirement for Escapable is automatically inferred in extensions and for generic type
+/// with values that may or may not be Escapable, and types can be conditionally `Escapable` based on their generic
+/// arguments. A conformance requirement for `Escapable` is automatically inferred in extensions and for generic type
 /// parameters, unless suppressed with `~Escapable`.
 @_marker public protocol Escapable/*: ~Copyable*/ {}
 
