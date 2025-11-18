@@ -39,14 +39,16 @@ struct W {
   @section("mysection") static let closure7: @convention(c) (Int) -> Int = { x in x * 2 }
 }
 
-struct S: Hashable, Sendable {}
+protocol P1 { }
+protocol P2 { }
+struct S: Hashable, Sendable, P1, P2 {}
 
 // metatypes
 @section("mysection") let metatype1 = Int.self
 @section("mysection") let metatype2: Any.Type = Int.self
 @section("mysection") let metatype3: Any.Type = S.self
-@section("mysection") let metatype4: any (Hashable & Sendable).Type = Int.self
-@section("mysection") let metatype5: any (Hashable & Sendable).Type = S.self
+@section("mysection") let metatype4: any (P1).Type = S.self
+@section("mysection") let metatype5: any (P1 & P2).Type = S.self
 
 // tuples
 @section("mysection") let tuple1 = (1, 2, 3, 2.718, true) // ok
@@ -84,8 +86,8 @@ struct S: Hashable, Sendable {}
 
 // CHECK: @"$s9SectionIR9metatype2ypXpvp" = {{.*}}constant ptr @"$sSiN", section "mysection"
 // CHECK: @"$s9SectionIR9metatype3ypXpvp" = {{.*}}constant ptr getelementptr inbounds (<{ ptr, ptr, {{i64|i32}}, ptr }>, ptr @"$s9SectionIR1SVMf", i32 0, i32 2), section "mysection"
-// CHECK: @"$s9SectionIR9metatype4SH_s8SendablepXpvp" = {{.*}}constant <{ ptr, ptr }> <{ ptr @"$sSiN", ptr @"$sSiSHsWP" }>, section "mysection"
-// CHECK: @"$s9SectionIR9metatype5SH_s8SendablepXpvp" = {{.*}}constant <{ ptr, ptr }> <{ ptr getelementptr inbounds (<{ ptr, ptr, {{i64|i32}}, ptr }>, ptr @"$s9SectionIR1SVMf", i32 0, i32 2), ptr @"$s9SectionIR1SVSHAAWP" }>, section "mysection"
+// CHECK: @"$s9SectionIR9metatype4AA2P1_pXpvp" = {{.*}}constant <{ ptr, ptr }> <{ ptr getelementptr inbounds (<{ ptr, ptr, {{i64|i32}}, ptr }>, ptr @"$s9SectionIR1SVMf", i32 0, i32 2), ptr @"$s9SectionIR1SVAA2P1AAWP" }>, section "mysection"
+// CHECK: @"$s9SectionIR9metatype5AA2P1_AA2P2pXpvp" = {{.*}}constant <{ ptr, ptr, ptr }> <{ ptr getelementptr inbounds (<{ ptr, ptr, {{i64|i32}}, ptr }>, ptr @"$s9SectionIR1SVMf", i32 0, i32 2), ptr @"$s9SectionIR1SVAA2P1AAWP", ptr @"$s9SectionIR1SVAA2P2AAWP" }>, section "mysection"
 
 // CHECK: @"$s9SectionIR6tuple1Si_S2iSdSbtvp" = {{.*}}constant <{ %TSi, %TSi, %TSi, {{.*}} }> <{ %TSi <{ {{i64|i32}} 1 }>, %TSi <{ {{i64|i32}} 2 }>, %TSi <{ {{i64|i32}} 3 }>, {{.*}} }>, section "mysection"
 // CHECK: @"$s9SectionIR6tuple2Si_SfSbtvp" = {{.*}}constant <{ %TSi, %TSf, %TSb }> <{ %TSi <{ {{i64|i32}} 42 }>, %TSf <{ float 0x40091EB860000000 }>, %TSb zeroinitializer }>, section "mysection"

@@ -514,7 +514,10 @@ extension Instruction {
       }
       return false
     case let iemi as InitExistentialMetatypeInst:
-      return !iemi.type.hasTypeParameter
+      let isAnyConformanceResilient = iemi.conformances.contains { 
+        !$0.protocol.isInvertible && $0.isResilientConformance(currentModule: context.currentModuleContext)
+      }
+      return !iemi.type.hasTypeParameter && !isAnyConformanceResilient
 
     case is StructInst,
          is TupleInst,

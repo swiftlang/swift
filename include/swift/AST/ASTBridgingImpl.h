@@ -22,6 +22,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IfConfigClauseRangeInfo.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
@@ -29,6 +30,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Fingerprint.h"
+#include <optional>
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -266,6 +268,10 @@ bool BridgedDeclObj::ProtocolDecl_requiresClass() const {
 
 bool BridgedDeclObj::ProtocolDecl_isMarkerProtocol() const {
   return getAs<swift::ProtocolDecl>()->isMarkerProtocol();
+}
+
+bool BridgedDeclObj::ProtocolDecl_isInvertible() const {
+  return getAs<swift::ProtocolDecl>()->getInvertibleProtocolKind() != std::nullopt;
 }
 
 bool BridgedDeclObj::AbstractFunction_isOverridden() const {
