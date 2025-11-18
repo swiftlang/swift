@@ -255,10 +255,10 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
                                              *CKind, Owner.DC);
 }
 
-TypePair
-RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
-                                              SubscriptDecl *subscript) const {
-  auto keyPathType = subscript->getDynamicMemberLookupKeyPathType();
+TypePair RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(
+    Evaluator &evaluator, SubscriptDecl *subscript) const {
+  auto keyPathType =
+      subscript->getDynamicMemberLookupKeyPathType(/*useDC=*/std::nullopt);
   if (!keyPathType)
     return TypePair();
 

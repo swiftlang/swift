@@ -9929,20 +9929,6 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
   return ObjCSubscriptKind::Keyed;
 }
 
-DynamicMemberLookupSubscriptEligibility
-SubscriptDecl::getStoredDynamicMemberLookupEligibility() const {
-  return Bits.SubscriptDecl.DynamicMemberLookupEligibility
-             ? static_cast<DynamicMemberLookupSubscriptEligibility>(
-                   Bits.SubscriptDecl.DynamicMemberLookupEligibility - 1)
-             : DynamicMemberLookupSubscriptEligibility::None;
-}
-
-void SubscriptDecl::setDynamicMemberLookupEligibility(
-    DynamicMemberLookupSubscriptEligibility eligibility) {
-  Bits.SubscriptDecl.DynamicMemberLookupEligibility =
-      static_cast<uint8_t>(eligibility) + 1;
-}
-
 void SubscriptDecl::setElementInterfaceType(Type type) {
   getASTContext().evaluator.cacheOutput(ResultTypeRequest{this},
                                         std::move(type));
@@ -10076,22 +10062,34 @@ SourceRange SubscriptDecl::getSignatureSourceRange() const {
   return getSubscriptLoc();
 }
 
-DynamicMemberLookupSubscriptEligibility
-SubscriptDecl::getDynamicMemberLookupSubscriptEligibility() {
-  evaluateDynamicMemberLookupEligibility();
-  return getStoredDynamicMemberLookupEligibility();
+bool SubscriptDecl::isValidDynamicMemberLookupSubscript(
+    std::optional<const DeclContext *> useDC) const {
+  return (bool)getDynamicMemberLookupKind(useDC);
 }
 
-BoundGenericType *SubscriptDecl::getDynamicMemberLookupKeyPathType() {
-  if (getDynamicMemberLookupSubscriptEligibility() !=
-      DynamicMemberLookupSubscriptEligibility::KeyPath) {
+std::optional<SubscriptDecl::DynamicMemberLookupKind>
+SubscriptDecl::getDynamicMemberLookupKind(
+    std::optional<const DeclContext *> useDC) const {
+  auto &ctx = getASTContext();
+  auto [eligibility, isAccessible] = evaluateOrFatal(
+      ctx.evaluator,
+      DynamicMemberLookupSubscriptRequest{this, useDC ? *useDC : nullptr});
+
+  // `getDynamicMemberKind()` checks `isValid()`
+  return (isAccessible || !useDC) ? eligibility.getDynamicMemberKind()
+                                  : std::nullopt;
+}
+
+BoundGenericType *SubscriptDecl::getDynamicMemberLookupKeyPathType(
+    std::optional<const DeclContext *> useDC) const {
+  if (getDynamicMemberLookupKind(useDC) != DynamicMemberLookupKind::KeyPath) {
     return nullptr;
   }
 
   auto *indices = getIndices();
   assert(indices->size() > 0 && "subscript must have at least one arg");
   return getDynamicMemberParamTypeAsKeyPathType(
-    indices->get(0)->getInterfaceType());
+      indices->get(0)->getInterfaceType());
 }
 
 DeclName AbstractFunctionDecl::getEffectiveFullName() const {

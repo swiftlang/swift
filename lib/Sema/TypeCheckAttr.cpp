@@ -2086,142 +2086,6 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
   }
 }
 
-DynamicMemberLookupSubscriptEligibility
-SubscriptDecl::evaluateDynamicMemberLookupEligibility(
-    AccessScope *requiredAccessScope, DiagnosticEngine *Diags) {
-  if (Bits.SubscriptDecl.DynamicMemberLookupEligibility) {
-    return getStoredDynamicMemberLookupEligibility();
-  }
-
-  auto eligibility = DynamicMemberLookupSubscriptEligibility::None;
-  [&] {
-    // If we have an explicit diagnostic engine, we'll output to it on error; if
-    // we don't then all queued diagnostics will get discarded.
-    DiagnosticQueue queue{Diags ? *Diags : getDiags(),
-                          /*emitOnDestruction=*/(bool)Diags};
-
-    queue.getDiags().diagnose(this, diag::invalid_dynamic_member_lookup_type,
-                              getDeclContext()->getDeclaredInterfaceType());
-
-    if (isInvalid()) {
-      return;
-    }
-
-    auto *indices = getIndices();
-    if (indices->size() == 0) {
-      return;
-    }
-
-    auto isInvalid = false;
-    auto &ctx = getASTContext();
-    auto diagnosedOutOfOrder = false;
-    auto firstIndex = indices->get(0);
-    if (firstIndex->getArgumentName() != ctx.Id_dynamicMember) {
-      if (!Diags) {
-        // If we're not here to produce diagnostics during type-checking,
-        // there's no need to keep going.
-        return;
-      }
-
-      isInvalid = true;
-
-      // We can separately diagnose whether the `dynamicMember` parameter is out
-      // of order vs. whether we're missing a `dynamicMember` label altogether.
-      if (indices->size() > 1) {
-        for (auto idx : range(1, indices->size())) {
-          auto index = indices->get(idx);
-          if (index->getArgumentName() == ctx.Id_dynamicMember) {
-            queue.getDiags()
-                .diagnose(this,
-                          diag::invalid_dynamic_member_subscript_out_of_order)
-                .highlight(index->getSourceRange());
-            diagnosedOutOfOrder = true;
-            break;
-          }
-        }
-      }
-
-      // If there is no argument label at all, we can offer a fix-it to insert
-      // it. Note that we intentionally don't want to emit a diagnostic if there
-      // _is_ a label, since it's clearly just not a dynamic member lookup
-      // subscript.
-      if (!diagnosedOutOfOrder && firstIndex->getParameterNameLoc().isValid() &&
-          firstIndex->getArgumentNameLoc().isInvalid()) {
-        queue.getDiags()
-            .diagnose(this,
-                      diag::invalid_dynamic_member_subscript_missing_label)
-            .highlight(firstIndex->getSourceRange())
-            .fixItInsert(firstIndex->getParameterNameLoc(), "dynamicMember ");
-      }
-    }
-
-    for (auto index : *indices) {
-      if (!index->hasInterfaceType() ||
-          (index == firstIndex && index->isVariadic())) {
-        isInvalid = true;
-      }
-
-      if (index != firstIndex &&
-          (!diagnosedOutOfOrder ||
-           index->getArgumentName() != ctx.Id_dynamicMember) &&
-          (!index->isDefaultArgument() && !index->isVariadic() &&
-           !isa<PackExpansionType>(
-               index->getInterfaceType()->getCanonicalType()))) {
-        queue.getDiags()
-            .diagnose(this,
-                      diag::invalid_dynamic_member_subscript_missing_default)
-            .highlight(index->getSourceRange())
-            .fixItInsertAfter(index->getEndLoc(), " = <#Default#>");
-        isInvalid = true;
-      }
-    }
-
-    if (isInvalid) {
-      // There's no point in checking the `dynamicMember` argument type since
-      // we've already output diagnostics.
-      return;
-    }
-
-    if (TypeChecker::conformsToKnownProtocol(
-            firstIndex->getTypeInContext(),
-            KnownProtocolKind::ExpressibleByStringLiteral)) {
-      queue.clear();
-      eligibility = DynamicMemberLookupSubscriptEligibility::String;
-    } else if (getDynamicMemberParamTypeAsKeyPathType(
-                   firstIndex->getInterfaceType())) {
-      queue.clear();
-      eligibility = DynamicMemberLookupSubscriptEligibility::KeyPath;
-    }
-
-    // This subscript is valid, but it also needs to be sufficiently accessible
-    // to be considered.
-    if (requiredAccessScope &&
-        !isAccessibleFrom(requiredAccessScope->getDeclContext())) {
-      eligibility = DynamicMemberLookupSubscriptEligibility::None;
-
-      auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-      bool shouldError = getASTContext().isLanguageModeAtLeast(futureVersion);
-
-      // Diagnose as an error in resilient modules regardless of language
-      // version since this will break the swiftinterface. Don't diagnose
-      // cases in existing swiftinterface files, though.
-      shouldError |= getModuleContext()->isResilient() &&
-                     !getDeclContext()->isInSwiftinterface();
-
-      auto diag = queue.getDiags().diagnose(
-          this, diag::dynamic_member_lookup_candidate_inaccessible, this);
-      fixItAccess(diag, this,
-                  requiredAccessScope->requiredAccessForDiagnostics(),
-                  /*isForSetter=*/false, /*useDefaultAccess=*/false,
-                  /*updateAttr=*/false);
-      diag.warnUntilLanguageModeIf(!shouldError, futureVersion);
-    }
-  }();
-
-  setDynamicMemberLookupEligibility(eligibility);
-  return eligibility;
-}
-
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
 /// least one subscript member declared like this:
 ///
@@ -2239,29 +2103,109 @@ void AttributeChecker::visitDynamicMemberLookupAttr(
   // This attribute is only allowed on nominal types.
   auto decl = cast<NominalTypeDecl>(D);
   auto type = decl->getDeclaredType();
+  auto &ctx = decl->getASTContext();
+
+  // Because dynamic member subscripts can take any number of parameters, we
+  // can't look them up by specific name: we'll find all subscript members on
+  // the type and filter for ones attempting to fulfill the
+  // `@dynamicMemberLookup` requirement.
   auto candidates =
       TypeChecker::lookupMember(decl, type, DeclNameRef::createSubscript());
 
-  if (candidates.empty()) {
-    diagnose(attr->getLocation(), diag::invalid_dynamic_member_lookup_type,
-             type);
-  } else {
-    auto requiredAccessScope = decl->getFormalAccessScope(/*useDC=*/nullptr);
-    // If we find at least one valid candidate, we won't produce any
-    // diagnostics.
-    DiagnosticQueue queue{Ctx.Diags, /*emitOnDestruction=*/true};
-    for (auto candidate : candidates) {
-      auto *SD = cast<SubscriptDecl>(candidate.getValueDecl());
-      if (SD->evaluateDynamicMemberLookupEligibility(&requiredAccessScope,
-                                                     &queue.getDiags()) !=
-          DynamicMemberLookupSubscriptEligibility::None) {
-        queue.clear();
+  // For validity and diagnostics, there are 4 kinds of subscripts we care
+  // about:
+  //
+  //   1. Subscripts which are both valid for fulfilling the requirement, and
+  //      are accessible from outside the type
+  //   2. Subscripts which have a `dynamicMember` argument/parameter label for
+  //      at least one parameter (so are considered for validation) but which
+  //      are invalid
+  //   3. Subscripts which are valid for fulfilling the requirement but which
+  //      are inaccessible from outside the type
+  //   4. Subscripts which _would_ be valid if a `dynamicMember` argument label
+  //      were inserted for their first argument (we can offer a fix-it)
+  //
+  // If we have any of (1), the attribute requirements will be considered
+  // fulfilled and we won't diagnose; if not, then we'll go through (2), (3),
+  // and (4) in order and produce diagnostics/fix-its for the first non-empty
+  // group. (3) produces warnings in the current language mode, which will be
+  // upgraded to errors in the next language mode (hence the separate diagnostic
+  // stages).
+  SmallVector<DynamicMemberLookupSubscriptEligibility> invalid,
+      validButInacessible, potentiallyValid;
+
+  auto requiredAccessScope = decl->getFormalAccessScope();
+  auto accessDC = requiredAccessScope.getDeclContext();
+  for (auto &candidate : candidates) {
+    auto *SD = dyn_cast<SubscriptDecl>(candidate.getValueDecl());
+    if (!SD) {
+      continue;
+    }
+
+    auto result = evaluateOrFatal(
+        ctx.evaluator, DynamicMemberLookupSubscriptRequest{SD, accessDC});
+    auto [eligibility, isAccessible] = result;
+    if (eligibility.isValid()) {
+      if (isAccessible) {
         return;
       }
+
+      validButInacessible.emplace_back(eligibility);
+    } else if (eligibility.isEligibleForArgumentLabelFixIt()) {
+      potentiallyValid.emplace_back(eligibility);
+    } else {
+      invalid.emplace_back(eligibility);
     }
   }
 
+  if (!invalid.empty()) {
+    for (auto &candidate : invalid) {
+      candidate.diagnose();
+    }
+
+    attr->setInvalid();
+    return;
+  }
+
+  if (!validButInacessible.empty()) {
+    auto futureVersion = version::Version::getFutureMajorLanguageVersion();
+    bool shouldError = ctx.isLanguageModeAtLeast(futureVersion);
+
+    // Diagnose as an error in resilient modules regardless of language
+    // version since this will break the swiftinterface. Don't diagnose
+    // cases in existing swiftinterface files, though.
+    shouldError |= decl->getModuleContext()->isResilient() &&
+                   !decl->getDeclContext()->isInSwiftinterface();
+
+    auto firstInaccessible =
+        const_cast<SubscriptDecl *>(validButInacessible[0].getDecl());
+    auto diag = diagnose(firstInaccessible->getLoc(),
+                         diag::dynamic_member_lookup_candidate_inaccessible,
+                         firstInaccessible);
+    fixItAccess(diag, firstInaccessible,
+                requiredAccessScope.requiredAccessForDiagnostics(),
+                /*isForSetter=*/false, /*useDefaultAccess=*/false,
+                /*updateAttr=*/false);
+    diag.warnUntilLanguageModeIf(!shouldError, futureVersion);
+
+    if (shouldError) {
+      attr->setInvalid();
+    }
+    return;
+  }
+
+  if (!potentiallyValid.empty()) {
+    for (auto &candidate : potentiallyValid) {
+      candidate.diagnose();
+    }
+
+    attr->setInvalid();
+    return;
+  }
+
+  // There were no candidates at all.
   attr->setInvalid();
+  diagnose(attr->getStartLoc(), diag::invalid_dynamic_member_lookup_type, type);
 }
 
 /// Get the innermost enclosing declaration for a declaration.

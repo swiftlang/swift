@@ -2868,13 +2868,10 @@ public:
           if (outerTy->hasDynamicMemberLookupAttribute()) {
             auto D = outerTy->getAnyNominal();
             if (!D->getAttrs().hasAttribute<DynamicMemberLookupAttr>()) {
-              if (overriddenDecl
-                      ->getDynamicMemberLookupSubscriptEligibility() !=
-                  DynamicMemberLookupSubscriptEligibility::None) {
-                auto accessScope = D->getFormalAccessScope();
-                if (SD->evaluateDynamicMemberLookupEligibility(
-                        &accessScope, &SD->getDiags()) ==
-                    DynamicMemberLookupSubscriptEligibility::None) {
+              if (overriddenDecl->isValidDynamicMemberLookupSubscript(
+                      /*useDC=*/std::nullopt)) {
+                if (!SD->isValidDynamicMemberLookupSubscript(
+                        /*useDC=*/std::nullopt)) {
                   SD->setInvalid();
                 }
               }

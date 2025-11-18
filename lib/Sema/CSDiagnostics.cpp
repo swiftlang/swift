@@ -2533,21 +2533,25 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
   auto *SD = member->choice.isDecl()
                  ? dyn_cast<SubscriptDecl>(member->choice.getDecl())
                  : nullptr;
-  auto eligibility = SD ? SD->getDynamicMemberLookupSubscriptEligibility()
-                        : DynamicMemberLookupSubscriptEligibility::None;
-  switch (eligibility) {
-  case DynamicMemberLookupSubscriptEligibility::None:
+
+  auto kind = SD ? SD->getDynamicMemberLookupKind(getDC()) : std::nullopt;
+  if (!kind) {
     // Not a decl, subscript, or dynamic member lookup subscript; stick with the
     // existing overload choice.
     return member->choice;
+  }
 
-  case DynamicMemberLookupSubscriptEligibility::String:
+  switch (*kind) {
+  case SubscriptDecl::DynamicMemberLookupKind::String:
     // There is no member declaration for string-based dynamic member lookup
     // subscripts.
     return std::nullopt;
 
-  case DynamicMemberLookupSubscriptEligibility::KeyPath: {
-    auto keyPathType = SD->getDynamicMemberLookupKeyPathType();
+  case SubscriptDecl::DynamicMemberLookupKind::KeyPath: {
+    // Access control has already been checked above when fetching `kind`; no
+    // need to repeat here.
+    auto keyPathType =
+        SD->getDynamicMemberLookupKeyPathType(/*useDC=*/std::nullopt);
     assert(keyPathType && "KeyPath-based dynamic member lookup subscripts must "
                           "have a valid dynamic member type");
 
