@@ -45,6 +45,7 @@ class AvailabilityDomainOrIdentifier;
 class Argument;
 class ASTContext;
 struct ASTNode;
+class CanGenericSignature;
 struct CaptureListEntry;
 class DeclAttributes;
 class DeclBaseName;
@@ -318,7 +319,8 @@ struct BridgedDeclObj {
 #endif
 
   BridgedDeclObj(SwiftObject obj) : obj(obj) {}
-  BridgedDeclObj(BridgedDecl decl) : obj(decl.unbridged()) {}
+  BridgedDeclObj(BridgedDecl decl)
+      : obj(static_cast<SwiftObject>(decl.unbridged())) {}
   BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE swift::SourceLoc getLoc() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getModuleContext() const;
