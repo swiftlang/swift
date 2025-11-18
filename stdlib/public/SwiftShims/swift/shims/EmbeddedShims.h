@@ -83,6 +83,73 @@ static inline void _swift_embedded_set_heap_object_metadata_pointer(void *object
   ((EmbeddedHeapObject *)object)->metadata = metadata;
 }
 
+typedef struct {
+  void  *initializeBufferWithCopyOfBufferFn;
+#if __has_feature(ptrauth_calls)
+  void  (* __ptrauth(0, 1, 0x04f8)  destroyFn)(void *, void*);
+#else
+  void  (*destroyFn)(void *, void*);
+#endif
+#if __has_feature(ptrauth_calls)
+  void* (* __ptrauth(0, 1, 0xe3ba) initializeWithCopyFn)(void*, void*, void*);
+#else
+  void* (*initializeWithCopyFn)(void*, void*, void*);
+#endif
+  void  *assignWithCopyFn;
+  void  *initializeWithTakeFn;
+  void  *assignWithTakeFn;
+  void  *getEnumTagSinglePayloadFn;
+  void  *storeEnumTagSinglePayload;
+  __swift_size_t size;
+  __swift_size_t stride;
+  unsigned flags;
+} EmbeddedValueWitnessTable;
+
+typedef struct {
+#if __has_feature(ptrauth_calls)
+  EmbeddedValueWitnessTable * __ptrauth(2, 1, 0x2e3f) vwt;
+#else
+  EmbeddedValueWitnessTable *vwt;
+#endif
+} EmbeddedMetaDataPrefix;
+
+static inline __swift_size_t
+_swift_embedded_metadata_get_size(void *metadata) {
+  EmbeddedMetaDataPrefix *fullmeta = (EmbeddedMetaDataPrefix*)&((void **)metadata)[-1];
+  return fullmeta->vwt->size;
+}
+
+static inline __swift_size_t
+_swift_embedded_metadata_get_align_mask_impl(EmbeddedMetaDataPrefix *fullMetadata) {
+  unsigned flags =  fullMetadata->vwt->flags;
+  unsigned embeddedValueWitnessTableFlagsMask = 0xFF;
+
+  return flags & embeddedValueWitnessTableFlagsMask;
+}
+
+static inline __swift_size_t
+_swift_embedded_metadata_get_align_mask(void *metadata) {
+  EmbeddedMetaDataPrefix *fullmeta = (EmbeddedMetaDataPrefix*)&((void **)metadata)[-1];
+  return _swift_embedded_metadata_get_align_mask_impl(fullmeta);
+}
+
+static inline void
+_swift_embedded_invoke_box_destroy(void *object) {
+  void *metadata = ((EmbeddedHeapObject *)object)->metadata;
+  EmbeddedMetaDataPrefix *fullmeta = (EmbeddedMetaDataPrefix*)&((void **)metadata)[-1];
+  __swift_size_t alignMask = _swift_embedded_metadata_get_align_mask_impl(fullmeta);
+  __swift_size_t headerSize = sizeof(void*) + sizeof(__swift_size_t);
+  __swift_size_t startOfBoxedValue = (headerSize + alignMask) & ~alignMask;
+  void *addrInBox = (void *)(((unsigned char *)object) + startOfBoxedValue);
+  fullmeta->vwt->destroyFn(addrInBox, metadata);
+}
+
+static inline void
+_swift_embedded_initialize_box(void *metadata, void *newObjectAddr, void *oldObjectAddr) {
+  EmbeddedMetaDataPrefix *fullmeta = (EmbeddedMetaDataPrefix*)&((void **)metadata)[-1];
+  fullmeta->vwt->initializeWithCopyFn(newObjectAddr, oldObjectAddr, metadata);
+}
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

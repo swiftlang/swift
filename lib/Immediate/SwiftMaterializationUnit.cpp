@@ -262,7 +262,8 @@ generateModule(const CompilerInstance &CI, std::unique_ptr<SILModule> SM) {
   // Lower the SIL module to LLVM IR
   auto GenModule = performIRGeneration(
       swiftModule, IRGenOpts, TBDOpts, std::move(SM),
-      swiftModule->getName().str(), PSPs, ArrayRef<std::string>(),
+      swiftModule->getName().str(), PSPs, /*CAS=*/nullptr,
+      ArrayRef<std::string>(),
       /*parallelIROutputFilenames*/ ArrayRef<std::string>());
 
   if (Context.hadError()) {

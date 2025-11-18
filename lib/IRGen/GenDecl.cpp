@@ -1361,7 +1361,9 @@ deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRec
 void IRGenerator::emitLazyDefinitions() {
   if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     // In embedded Swift, the compiler cannot emit any metadata, etc.
-    assert(LazyTypeMetadata.empty());
+    // Other than to support existentials.
+    assert(LazyTypeMetadata.empty() ||
+           SIL.getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials));
     assert(LazySpecializedTypeMetadataRecords.empty());
     assert(LazyTypeContextDescriptors.empty());
     assert(LazyOpaqueTypeDescriptors.empty());
@@ -1388,7 +1390,8 @@ void IRGenerator::emitLazyDefinitions() {
          !LazyCanonicalSpecializedMetadataAccessors.empty() ||
          !LazyMetadataAccessors.empty() ||
          !LazyClassMetadata.empty() ||
-         !LazySpecializedClassMetadata.empty()
+         !LazySpecializedClassMetadata.empty() ||
+         !LazySpecializedValueMetadata.empty()
          ) {
     // Emit any lazy type metadata we require.
     while (!LazyTypeMetadata.empty()) {
@@ -1514,6 +1517,12 @@ void IRGenerator::emitLazyDefinitions() {
       CurrentIGMPtr IGM = getGenModule(classType->getClassOrBoundGenericClass());
       emitLazySpecializedClassMetadata(*IGM.get(), classType);
     }
+
+    while(!LazySpecializedValueMetadata.empty()) {
+      CanType valueType = LazySpecializedValueMetadata.pop_back_val();
+      CurrentIGMPtr IGM = getGenModule(valueType->getNominalOrBoundGenericNominal());
+      emitLazySpecializedValueMetadata(*IGM.get(), valueType);
+    }
   }
 
   FinishedEmittingLazyDefinitions = true;
@@ -1580,6 +1589,14 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   if (found != HasLazyMetadata.end())
     return found->second;
 
+  if (SIL.getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials) &&
+      (isa<StructDecl>(type) || isa<EnumDecl>(type))) {
+    bool isGeneric = cast<NominalTypeDecl>(type)->isGenericContext();
+    HasLazyMetadata[type] = !isGeneric;
+
+    return !isGeneric;
+  }
+
   auto canBeLazy = [&]() -> bool {
     auto *dc = type->getDeclContext();
     if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
@@ -1628,8 +1645,14 @@ void IRGenerator::noteUseOfClassMetadata(CanType classType) {
 }
 
 void IRGenerator::noteUseOfSpecializedClassMetadata(CanType classType) {
-  if (LazilyEmittedSpecializedClassMetadata.insert(classType.getPointer()).second) {
+  if (LazilyEmittedSpecializedMetadata.insert(classType.getPointer()).second) {
     LazySpecializedClassMetadata.push_back(classType);
+  }
+}
+
+void IRGenerator::noteUseOfSpecializedValueMetadata(CanType valueType) {
+  if (LazilyEmittedSpecializedMetadata.insert(valueType.getPointer()).second) {
+    LazySpecializedValueMetadata.push_back(valueType);
   }
 }
 
@@ -3601,7 +3624,7 @@ bool swift::irgen::hasValidSignatureForEmbedded(SILFunction *f) {
   auto s = f->getLoweredFunctionType()->getInvocationGenericSignature();
   for (auto genParam : s.getGenericParams()) {
     auto mappedParam = f->getGenericEnvironment()->mapTypeIntoEnvironment(genParam);
-    if (auto archeTy = dyn_cast<ArchetypeType>(mappedParam)) {
+    if (auto *archeTy = mappedParam->getAs<ArchetypeType>()) {
       if (archeTy->requiresClass())
         continue;
     }
@@ -5298,6 +5321,9 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
     entity = LinkEntity::forTypeMetadata(concreteType,
                                          TypeMetadataAddress::AddressPoint);
+    if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials))
+      entity = LinkEntity::forTypeMetadata(concreteType,
+                                           TypeMetadataAddress::FullMetadata);
   }
 
   auto DbgTy = DebugTypeInfo::getGlobalMetadata(MetatypeType::get(concreteType),
@@ -5320,7 +5346,8 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
   markGlobalAsUsedBasedOnLinkage(*this, link, var);
   
-  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+  if (Context.LangOpts.hasFeature(Feature::Embedded) &&
+      !Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
     return var;
   }
 
@@ -5331,12 +5358,15 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   if (auto nominal = concreteType->getAnyNominal()) {
     // Keep type metadata around for all types (except @_objcImplementation,
     // since we're using ObjC metadata for that).
-    if (!isObjCImpl)
+    if (!isObjCImpl &&
+        !Context.LangOpts.hasFeature(Feature::EmbeddedExistentials))
       addRuntimeResolvableType(nominal);
 
     // Don't define the alias for foreign type metadata, prespecialized
     // generic metadata, or @_objcImplementation classes, since they're not ABI.
-    if (requiresForeignTypeMetadata(nominal) || isPrespecialized || isObjCImpl)
+    if (requiresForeignTypeMetadata(nominal) ||
+        (isPrespecialized && !Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) ||
+        isObjCImpl)
       return var;
 
     // Native Swift class metadata has a destructor before the address point.
@@ -5347,6 +5377,10 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
     if (concreteType->is<TupleType>()) {
       adjustmentIndex = MetadataAdjustmentIndex::NoTypeLayoutString;
     }
+  }
+
+  if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+    adjustmentIndex = MetadataAdjustmentIndex::EmbeddedWithExistentials;
   }
 
   llvm::Constant *indices[] = {
@@ -5390,7 +5424,10 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
-  if (concreteType->isAny() || concreteType->isAnyObject() || concreteType->isVoid() || concreteType->is<TupleType>() || concreteType->is<BuiltinType>()) {
+  if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+    adjustmentIndex = 0;
+    defaultVarTy = EmbeddedExistentialsMetadataStructTy;
+  } else if (concreteType->isAny() || concreteType->isAnyObject() || concreteType->isVoid() || concreteType->is<TupleType>() || concreteType->is<BuiltinType>()) {
     defaultVarTy = FullExistentialTypeMetadataStructTy;
     adjustmentIndex = MetadataAdjustmentIndex::NoTypeLayoutString;
   } else if (fullMetadata) {
@@ -5433,6 +5470,18 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
         }
       }
     }
+
+    if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+      if ((isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) &&
+          nominal->isGenericContext()) {
+        IRGen.noteUseOfSpecializedValueMetadata(concreteType);
+      }
+    }
+  }
+
+  if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials) &&
+      isa<TupleType>(concreteType)) {
+    IRGen.noteUseOfSpecializedValueMetadata(concreteType);
   }
 
   if (shouldPrespecializeGenericMetadata()) {

@@ -89,11 +89,18 @@ enum class TypeMetadataAddress {
 inline bool isEmbedded(CanType t) {
   return t->getASTContext().LangOpts.hasFeature(Feature::Embedded);
 }
-
+inline bool isEmbeddedWithoutEmbeddedExitentials(CanType t) {
+  auto &langOpts = t->getASTContext().LangOpts;
+  return langOpts.hasFeature(Feature::Embedded) &&
+    !langOpts.hasFeature(Feature::EmbeddedExistentials);
+}
 // Metadata is not generated and not allowed to be referenced in Embedded Swift,
 // expect for classes (both generic and non-generic), dynamic self, and
 // class-bound existentials.
 inline bool isMetadataAllowedInEmbedded(CanType t) {
+  bool embeddedExistentials =
+    t->getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials);
+
   if (isa<ClassType>(t) || isa<BoundGenericClassType>(t) ||
       isa<DynamicSelfType>(t)) {
     return true;
@@ -106,6 +113,9 @@ inline bool isMetadataAllowedInEmbedded(CanType t) {
     if (archeTy->requiresClass())
       return true;
   }
+
+  if (embeddedExistentials)
+    return true;
   return false;
 }
 
@@ -115,6 +125,11 @@ inline bool isEmbedded(Decl *d) {
 
 inline bool isEmbedded(const ProtocolConformance *c) {
   return c->getType()->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+}
+
+inline bool isEmbeddedWithoutEmbeddedExitentials(const ProtocolConformance *c) {
+  return isEmbedded(c) && !c->getType()->getASTContext().
+    LangOpts.hasFeature(Feature::EmbeddedExistentials);
 }
 
 /// A link entity is some sort of named declaration, combined with all
@@ -1098,7 +1113,7 @@ public:
   }
 
   static LinkEntity forValueWitnessTable(CanType type) {
-    assert(!isEmbedded(type));
+    assert(!isEmbeddedWithoutEmbeddedExitentials(type));
     LinkEntity entity;
     entity.setForType(Kind::ValueWitnessTable, type);
     return entity;
@@ -1128,7 +1143,7 @@ public:
   }
 
   static LinkEntity forProtocolWitnessTable(const ProtocolConformance *C) {
-    if (isEmbedded(C)) {
+    if (isEmbeddedWithoutEmbeddedExitentials(C)) {
       assert(C->getProtocol()->requiresClass());
     }
 

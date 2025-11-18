@@ -5626,7 +5626,7 @@ struct ImplementationOnlyWalker : TypeWalker {
   const ModuleDecl *currentModule;
   ImplementationOnlyWalker(const ModuleDecl *M) : currentModule(M) {}
   Action walkToTypePre(Type ty) override {
-    if (auto *typeAlias = dyn_cast<TypeAliasType>(ty)) {
+    if (auto *typeAlias = dyn_cast<TypeAliasType>(ty.getPointer())) {
       if (importedImplementationOnly(typeAlias->getDecl()))
         return Action::Stop;
     } else if (auto *nominal = ty->getAs<NominalType>()) {

@@ -1322,7 +1322,18 @@ namespace {
     }
 
     virtual Type visitErrorExpr(ErrorExpr *E) {
-      return recordInvalidNode(E);
+      auto ty = recordInvalidNode(E);
+      // If we have an original expression, introduce a conversion to the hole
+      // type of the ErrorExpr. This avoids unnecessary diagnostics for the
+      // original expression in cases where the ErrorExpr could have provided
+      // contextual info, while also still allowing the original expression to
+      // be solved without holes being introduced prematurely, allowing e.g
+      // cursor info to work correctly.
+      if (auto *orig = E->getOriginalExpr()) {
+        CS.addConstraint(ConstraintKind::Conversion, CS.getType(orig), ty,
+                         CS.getConstraintLocator(E));
+      }
+      return ty;
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
@@ -3156,6 +3167,16 @@ namespace {
       }
 
       case PatternKind::Expr: {
+        // Make sure we invalidate any nested VarDecls early since generating
+        // constraints for a `where` clause may happen before we've generated
+        // constraints for the ExprPattern. We'll record a fix when visiting
+        // the UnresolvedPatternExpr.
+        // FIXME: We ought to use a conjunction for switch cases, then we
+        // wouldn't need this logic.
+        auto *EP = cast<ExprPattern>(pattern);
+        EP->getSubExpr()->forEachUnresolvedVariable([&](VarDecl *VD) {
+          CS.setType(VD, ErrorType::get(CS.getASTContext()));
+        });
         // We generate constraints for ExprPatterns in a separate pass. For
         // now, just create a type variable.
         return setType(CS.createTypeVariable(CS.getConstraintLocator(locator),

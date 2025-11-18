@@ -959,11 +959,8 @@ AnnotatedInsertionPoint
 ConditionalClausePatternUseScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   auto *initializer = sec.getInitializer();
-  if (!isa<ErrorExpr>(initializer)) {
-    scopeCreator
-      .constructExpandAndInsert<ConditionalClauseInitializerScope>(
-        this, initializer);
-    }
+  scopeCreator.constructExpandAndInsert<ConditionalClauseInitializerScope>(
+      this, initializer);
 
   return {this,
           "Succeeding code must be in scope of conditional clause pattern bindings"};

@@ -28,6 +28,17 @@ func bar(x: Int) -> String { return "test" }
 @section("mysection") let funcRef1 = foo // ok
 @section("mysection") let funcRef2 = bar // ok
 
+// closures
+@section("mysection") let closure1 = { }
+@section("mysection") let closure2 = { return 42 }
+@section("mysection") let closure3 = { (x: Int) in return x + 1 }
+@section("mysection") let closure4: () -> Void = { }
+@section("mysection") let closure5: (Int) -> Int = { x in x * 2 }
+@section("mysection") let closure6: @convention(c) (Int) -> Int = { x in x * 2 }
+struct W {
+  @section("mysection") static let closure7: @convention(c) (Int) -> Int = { x in x * 2 }
+}
+
 // metatypes - TODO
 //@section("mysection") let metatype1 = Int.self
 
@@ -56,6 +67,15 @@ func bar(x: Int) -> String { return "test" }
 // CHECK: @"$s9SectionIR12boolLiteral2Sbvp" = {{.*}}constant %TSb zeroinitializer, section "mysection"
 // CHECK: @"$s9SectionIR8funcRef1Siycvp" = {{.*}}constant %swift.function { ptr @"$s9SectionIR3fooSiyF{{.*}}", ptr null }, section "mysection"
 // CHECK: @"$s9SectionIR8funcRef2ySSSicvp" = {{.*}}constant %swift.function { ptr @"$s9SectionIR3bar1xSSSi_tF{{.*}}", ptr null }, section "mysection"
+
+// CHECK: @"$s9SectionIR8closure1yycvp" = {{.*}}constant %swift.function { {{.*}} }, section "mysection"
+// CHECK: @"$s9SectionIR8closure2Siycvp" = {{.*}}constant %swift.function { {{.*}} }, section "mysection"
+// CHECK: @"$s9SectionIR8closure3yS2icvp" = {{.*}}constant %swift.function { {{.*}} }, section "mysection"
+// CHECK: @"$s9SectionIR8closure4yycvp" = {{.*}}constant %swift.function { {{.*}} }, section "mysection"
+// CHECK: @"$s9SectionIR8closure5yS2icvp" = {{.*}}constant %swift.function { {{.*}} }, section "mysection"
+// CHECK: @"$s9SectionIR8closure6yS2iXCvp" = {{.*}}constant ptr @"$s9SectionIR8closure6yS2iXCvpfiS2icfU_To", section "mysection"
+// CHECK: @"$s9SectionIR1WV8closure7yS2iXCvpZ" = {{.*}}constant ptr @"$s9SectionIR1WV8closure7yS2iXCvpZfiS2icfU_To", section "mysection"
+
 // CHECK: @"$s9SectionIR6tuple1Si_S2iSdSbtvp" = {{.*}}constant <{ %TSi, %TSi, %TSi, {{.*}} }> <{ %TSi <{ {{i64|i32}} 1 }>, %TSi <{ {{i64|i32}} 2 }>, %TSi <{ {{i64|i32}} 3 }>, {{.*}} }>, section "mysection"
 // CHECK: @"$s9SectionIR6tuple2Si_SfSbtvp" = {{.*}}constant <{ %TSi, %TSf, %TSb }> <{ %TSi <{ {{i64|i32}} 42 }>, %TSf <{ float 0x40091EB860000000 }>, %TSb zeroinitializer }>, section "mysection"
 // CHECK: @"$s9SectionIR6tuple3Siyc_SSSictvp" = {{.*}}constant <{ %swift.function, %swift.function }> <{ %swift.function { ptr @"$s9SectionIR3fooSiyF{{.*}}", ptr null }, %swift.function { ptr @"$s9SectionIR3bar1xSSSi_tF{{.*}}", ptr null } }>, section "mysection"

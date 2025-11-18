@@ -5582,6 +5582,10 @@ bool ConstraintSystem::repairFailures(
     if (!anchor)
       return false;
 
+    // If we have an ErrorExpr anchor, we don't need to do any more fixes.
+    if (isExpr<ErrorExpr>(anchor))
+      return true;
+
     // This could be:
     // - `InOutExpr` used with r-value e.g. `foo(&x)` where `x` is a `let`.
     // - `ForceValueExpr` e.g. `foo.bar! = 42` where `bar` or `foo` are
@@ -9972,7 +9976,7 @@ ConstraintSystem::matchPackElementType(Type elementType, Type patternType,
       return tryFix([&]() {
         auto envShape = genericEnv->mapTypeIntoEnvironment(
             genericEnv->getOpenedElementShapeClass());
-        if (auto *pack = dyn_cast<PackType>(envShape))
+        if (auto *pack = dyn_cast<PackType>(envShape.getPointer()))
           envShape = pack->unwrapSingletonPackExpansion()->getPatternType();
 
         return SkipSameShapeRequirement::create(
