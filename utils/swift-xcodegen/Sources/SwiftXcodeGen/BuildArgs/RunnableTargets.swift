@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import System
+
 /// A target that defines a runnable executable.
 struct RunnableTarget: Hashable {
   var name: String

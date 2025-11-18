@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Foundation
+public import Foundation
 import Synchronization
 
 public final class Logger: @unchecked Sendable {
@@ -35,8 +35,8 @@ public final class Logger: @unchecked Sendable {
     set { stateLock.withLock { _useColor = newValue } }
   }
 
-  private var _output: LoggableStream?
-  public var output: LoggableStream? {
+  private var _output: (any LoggableStream)?
+  public var output: (any LoggableStream)? {
     get { stateLock.withLock { _output } }
     set { stateLock.withLock { _output = newValue } }
   }
@@ -100,7 +100,7 @@ extension Logger {
 }
 
 public protocol Loggable {
-  func write(to stream: LoggableStream, useColor: Bool)
+  func write(to stream: any LoggableStream, useColor: Bool)
 }
 
 extension Logger.LogLevel: Loggable, CustomStringConvertible {
@@ -122,7 +122,7 @@ extension Logger.LogLevel: Loggable, CustomStringConvertible {
     case .error:   .brightRed
     }
   }
-  public func write(to stream: LoggableStream, useColor: Bool) {
+  public func write(to stream: any LoggableStream, useColor: Bool) {
     let str = useColor 
       ? "\(fg: ansiColor)\(weight: .bold)\(self)\(fg: .normal)\(weight: .normal)"
       : "\(self)"

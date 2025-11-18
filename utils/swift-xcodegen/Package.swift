@@ -33,6 +33,34 @@ let package = Package(
     swiftLanguageModes: [.v6]
 )
 
+// Apply global Swift settings to targets.
+do {
+  var globalSwiftSettings: [SwiftSetting] = [
+    // Swift 7 mode upcoming features. These must be compatible with 'swift-tools-version'.
+    .enableUpcomingFeature("ExistentialAny"),
+    .enableUpcomingFeature("InternalImportsByDefault"),
+    .enableUpcomingFeature("MemberImportVisibility"),
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+  ]
+
+  #if compiler(>=6.1)
+  globalSwiftSettings.append(
+    .unsafeFlags(["-Werror", "ExistentialAny"])
+  )
+  #endif
+
+  globalSwiftSettings += []  // avoid unused warning
+
+  for target in package.targets where target.type != .plugin {
+    if let swiftSettings = target.swiftSettings {
+      // Target-specific settings should come last.
+      target.swiftSettings = globalSwiftSettings + swiftSettings
+    } else {
+      target.swiftSettings = globalSwiftSettings
+    }
+  }
+}
+
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
   package.dependencies += [
     .package(url: "https://github.com/apple/swift-argument-parser", from: "1.4.0"),

@@ -15,13 +15,13 @@ import Synchronization
 public final class NinjaBuildDir: Sendable {
   public let path: AbsolutePath
   public let projectRootDir: AbsolutePath
-  private let _tripleSuffix: Result<String, Error>
+  private let _tripleSuffix: Result<String, any Error>
 
   private let repoBuildDirs = Mutex<[Repo: RepoBuildDir]>()
 
   private static func detectTripleSuffix(
     buildDir: AbsolutePath
-  ) -> Result<String, Error> {
+  ) -> Result<String, any Error> {
     Result {
       for dir in try buildDir.getDirContents() {
         guard buildDir.appending(dir).isDirectory,

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift open source project
 //
-// Copyright (c) 2014-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2014-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -204,7 +204,7 @@ extension Xcode.Target: PropertyListSerializable {
     dict["buildPhases"] = try .array(buildPhases.map({ phase in
       // Here we have the same problem as for Reference; we cannot inherit
       // functionality since we're in an extension.
-      try .identifier(serializer.serialize(object: phase as! PropertyListSerializable))
+      try .identifier(serializer.serialize(object: phase as! any PropertyListSerializable))
     }))
     /// Private wrapper class for a target dependency relation.  This is
     /// glue between our value-based settings structures and the Xcode
@@ -446,9 +446,9 @@ fileprivate class PropertyListSerializer {
   /// during the serialization and replaced with other objects having the
   /// same object identifier (a violation of our assumptions)
   struct SerializedObjectRef: Hashable, Equatable {
-    let object: PropertyListSerializable
+    let object: any PropertyListSerializable
 
-    init(_ object: PropertyListSerializable) {
+    init(_ object: any PropertyListSerializable) {
       self.object = object
     }
 
@@ -473,7 +473,7 @@ fileprivate class PropertyListSerializer {
   var idsToDicts = [String: PropertyList]()
 
   /// Returns the quoted identifier for the object, assigning one if needed.
-  func id(of object: PropertyListSerializable) -> String {
+  func id(of object: any PropertyListSerializable) -> String {
     // We need a "serialized object ref" wrapper for the `objsToIds` map.
     let serObjRef = SerializedObjectRef(object)
     if let id = objsToIds[serObjRef] {
@@ -492,7 +492,7 @@ fileprivate class PropertyListSerializer {
   /// recursive invocations of `serialize(object:)`; the closure of these
   /// invocations end up serializing the whole object graph.
   @discardableResult
-  func serialize(object: PropertyListSerializable) throws -> String {
+  func serialize(object: any PropertyListSerializable) throws -> String {
     // Assign an id for the object, if it doesn't already have one.
     let id = self.id(of: object)
 
