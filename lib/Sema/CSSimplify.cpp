@@ -5582,6 +5582,10 @@ bool ConstraintSystem::repairFailures(
     if (!anchor)
       return false;
 
+    // If we have an ErrorExpr anchor, we don't need to do any more fixes.
+    if (isExpr<ErrorExpr>(anchor))
+      return true;
+
     // This could be:
     // - `InOutExpr` used with r-value e.g. `foo(&x)` where `x` is a `let`.
     // - `ForceValueExpr` e.g. `foo.bar! = 42` where `bar` or `foo` are

@@ -1091,12 +1091,14 @@ public:
     auto &eval = getASTContext().evaluator;
     auto *S =
         evaluateOrDefault(eval, PreCheckReturnStmtRequest{RS, DC}, nullptr);
+    if (!S)
+      return nullptr;
 
-    // We do a cast here as it may have been turned into a FailStmt. We should
-    // return that without doing anything else.
-    RS = dyn_cast_or_null<ReturnStmt>(S);
+    // We do a cast here as we may now have a different stmt (e.g a FailStmt, or
+    // a BraceStmt for error cases). If so, recurse into the visitor.
+    RS = dyn_cast<ReturnStmt>(S);
     if (!RS)
-      return S;
+      return visit(S);
 
     auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
     assert(TheFunc && "Should have bailed from pre-check if this is None");
@@ -1785,16 +1787,31 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
   auto &ctx = DC->getASTContext();
   auto fn = AnyFunctionRef::fromDeclContext(DC);
 
+  auto errorResult = [&]() -> Stmt * {
+    // We don't need any recovery if there's no result, just bail.
+    if (!RS->hasResult())
+      return nullptr;
+
+    // If we have a result, make sure it's preserved, insert an implicit brace
+    // with a wrapping error expression. This ensures we can still do semantic
+    // functionality, and avoids downstream crashes where we expect the
+    // expression to have been type-checked.
+    auto *result = RS->getResult();
+    RS->setResult(nullptr);
+    auto *err = new (ctx) ErrorExpr(result->getSourceRange(), Type(), result);
+    return BraceStmt::createImplicit(ctx, {err});
+  };
+
   // Not valid outside of a function.
   if (!fn) {
     ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_invalid_outside_func);
-    return nullptr;
+    return errorResult();
   }
 
   // If the return is in a defer, then it isn't valid either.
   if (isDefer(DC)) {
     ctx.Diags.diagnose(RS->getReturnLoc(), diag::jump_out_of_defer, "return");
-    return nullptr;
+    return errorResult();
   }
 
   // The rest of the checks only concern return statements with results.
@@ -1815,8 +1832,7 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
     if (!nilExpr) {
       ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_init_non_nil)
           .highlight(E->getSourceRange());
-      RS->setResult(nullptr);
-      return RS;
+      return errorResult();
     }
 
     // "return nil" is only permitted in a failable initializer.
@@ -1826,8 +1842,7 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
       ctx.Diags
           .diagnose(ctor->getLoc(), diag::make_init_failable, ctor)
           .fixItInsertAfter(ctor->getLoc(), "?");
-      RS->setResult(nullptr);
-      return RS;
+      return errorResult();
     }
 
     // Replace the "return nil" with a new 'fail' statement.
