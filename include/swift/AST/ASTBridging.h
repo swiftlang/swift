@@ -17,6 +17,7 @@
 /// include here and keep these includes minimal!
 ///
 /// See include guidelines and caveats in `BasicBridging.h`.
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/AccessorKind.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/DiagnosticKind.h"
@@ -335,6 +336,7 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Class_getDestructor() const;
   BRIDGED_INLINE bool ProtocolDecl_requiresClass() const;
+  BRIDGED_INLINE bool ProtocolDecl_isInvertible() const;
   BRIDGED_INLINE bool AbstractFunction_isOverridden() const;
   BRIDGED_INLINE bool Destructor_isIsolated() const;
   BRIDGED_INLINE bool EnumElementDecl_hasAssociatedValues() const;
