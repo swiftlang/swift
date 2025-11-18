@@ -15,14 +15,14 @@
 import Dispatch
 import StdlibUnittest
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftStdlib 6.3, *)
 actor MyActor {
   public func doSleep() async {
     try! await Task.sleep(for: .seconds(0.1))
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftStdlib 6.3, *)
 final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable {
   var asScheduling: SchedulingExecutor? {
     return self
@@ -58,7 +58,7 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftStdlib 6.3, *)
 @main struct Main {
   static func main() async {
     let tests = TestSuite("sleep_executor")
