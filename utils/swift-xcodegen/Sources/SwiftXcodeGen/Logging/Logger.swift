@@ -11,10 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
+import Synchronization
 
 public final class Logger: @unchecked Sendable {
-  private let stateLock = Lock()
-  private let outputLock = Lock()
+  private let stateLock = Mutex<Void>()
+  private let outputLock = Mutex<Void>()
 
   private var _hadError = false
   public var hadError: Bool {
@@ -44,7 +45,7 @@ public final class Logger: @unchecked Sendable {
 }
 
 extension Logger {
-  public enum LogLevel: Comparable {
+  public enum LogLevel: Comparable, Sendable {
     /// A message with information that isn't useful to the user, but is
     /// useful when debugging issues.
     case debug

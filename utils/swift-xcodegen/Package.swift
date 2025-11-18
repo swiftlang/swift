@@ -6,7 +6,7 @@ import class Foundation.ProcessInfo
 
 let package = Package(
     name: "swift-xcodegen",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v15)],
     targets: [
         .target(
             name: "SwiftXcodeGen",
