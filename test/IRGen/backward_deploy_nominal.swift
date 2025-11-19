@@ -19,7 +19,7 @@ public struct Fridge<Contents> {}
 // CHECK-SHIM-DAG: @"$ss6FridgeVMn" =
 
 // The home module also has linker directives.
-// CHECK-DAG: @"\01$ld$previous$libswiftCompatibility59.dylib$$1$13.0$14.0$_$ss6FridgeVMn$" =
+// CHECK-DAG: @"\01$ld$previous$libswiftCompatibility59.dylib$$1$1.0$14.0$_$ss6FridgeVMn$" =
 // ALSO-NOT: $ld$hide$
 
 // The compatibility shim does not have any linker directives.
