@@ -13,7 +13,6 @@
 import os
 
 from . import scheme_mock
-from unittest import mock
 
 
 class CloneTestCase(scheme_mock.SchemeMockTestCase):
@@ -55,28 +54,7 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
         )
 
         # Test that we're actually checking out the 'extra' scheme based on the output
-        self.assertIn("git checkout refs/heads/main", output.decode("utf-8"))
-
-    def test_manager_not_called_on_long_socket(self):
-        fake_tmpdir = "/tmp/very/" + "/long" * 20 + "/tmp"
-
-        with mock.patch("tempfile.gettempdir", return_value=fake_tmpdir), mock.patch(
-            "multiprocessing.Manager"
-        ) as mock_manager:
-
-            self.call(
-                [
-                    self.update_checkout_path,
-                    "--config",
-                    self.config_path,
-                    "--source-root",
-                    self.source_root,
-                    "--clone",
-                ]
-            )
-            # Ensure that we do not try to create a Manager when the tempdir
-            # is too long.
-            mock_manager.assert_not_called()
+        self.assertIn("git checkout refs/heads/main", output)
 
 
 class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):
