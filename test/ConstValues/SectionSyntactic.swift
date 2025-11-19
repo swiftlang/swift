@@ -43,11 +43,23 @@
 func foo() -> Int { return 42 }
 func bar(x: Int) -> String { return "test" }
 
-// function references
+// global function references
 @section("mysection") let funcRef1 = foo // ok
 @section("mysection") let funcRef2 = bar // ok
 @section("mysection") let funcRef3: ()->Int = foo // ok
 @section("mysection") let funcRef4: @convention(c) ()->Int = foo // ok
+
+struct Q {
+  func memberFunc() {}
+  static func staticFunc() {}
+  func genericFunc<T>(t: T) {}
+  static func staticGenericFunc<T>(t: T) {}
+}
+
+// non-global function references
+@section("mysection") let staticFuncRef1 = Q.staticFunc // ok
+extension Q { @section("mysection") static let staticFuncRef2 = staticFunc } // ok
+@section("mysection") let staticFuncRef3 = Bool.random // ok
 
 // invalid function references (should be rejected)
 @section("mysection") let invalidFuncRef1 = foo()
@@ -55,6 +67,16 @@ func bar(x: Int) -> String { return "test" }
 @section("mysection") let invalidFuncRef2 = Bool.self.random
 // expected-error@-1{{not supported in a constant expression}}
 @section("mysection") let invalidFuncRef3 = (Bool.self as Bool.Type).random
+// expected-error@-1{{not supported in a constant expression}}
+@section("mysection") let invalidFuncRef4 = Q.memberFunc
+// expected-error@-1{{not supported in a constant expression}}
+extension Q { @section("mysection") static let invalidFuncRef5 = memberFunc }
+// expected-error@-1{{not supported in a constant expression}}
+extension Q { @section("mysection") static let invalidFuncRef6: (Int)->() = genericFunc(Q()) }
+// expected-error@-1{{not supported in a constant expression}}
+extension Q { @section("mysection") static let invalidFuncRef7: (Q) -> (Int) -> () = genericFunc }
+// expected-error@-1{{not supported in a constant expression}}
+extension Q { @section("mysection") static let invalidFuncRef8: (Int)->() = staticGenericFunc }
 // expected-error@-1{{not supported in a constant expression}}
 
 // generic function references (should be rejected)

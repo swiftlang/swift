@@ -234,11 +234,6 @@ checkSupportedWithSectionAttribute(const Expr *expr,
       }
       continue;
     }
-    
-    // No auto-closures
-    if (isa<AbstractClosureExpr>(expr)) {
-      return std::make_pair(expr, Default);
-    }
 
     // Function conversions are allowed if the conversion is to '@convention(c)'
     if (auto functionConvExpr = dyn_cast<FunctionConversionExpr>(expr)) {
@@ -269,6 +264,60 @@ checkSupportedWithSectionAttribute(const Expr *expr,
       // Variable references are not allowed
       return std::make_pair(expr, OpaqueDeclRef);
     }
+
+    // Allow specific patterns of AutoClosureExpr, which is used in static func
+    // references. E.g. "MyStruct.staticFunc" is:
+    // - autoclosure_expr type="() -> ()"
+    //   - call_expr type="()"
+    //     - dot_syntax_call_expr
+    //       - declref_expr decl="MyStruct.staticFunc"
+    //       - dot_self_expr type="MyStruct.Type"
+    //         - type_expr type="MyStruct.Type"
+    if (auto autoClosureExpr = dyn_cast<AutoClosureExpr>(expr)) {
+      auto subExpr = autoClosureExpr->getUnwrappedCurryThunkExpr();
+      if (auto dotSyntaxCall = dyn_cast<DotSyntaxCallExpr>(subExpr)) {
+        if (auto declRef = dyn_cast<DeclRefExpr>(dotSyntaxCall->getFn())) {
+          if (auto funcDecl = dyn_cast<FuncDecl>(declRef->getDecl())) {
+            // Check if it's a function on a concrete non-generic type
+            if (!funcDecl->hasGenericParamList() &&
+                !funcDecl->getDeclContext()->isGenericContext() &&
+                funcDecl->isStatic()) {
+              if (auto args = dotSyntaxCall->getArgs()) {
+                if (args->size() == 1) {
+                  // Check that the single arg is a DotSelfExpr with only a
+                  // direct concrete TypeExpr inside
+                  if (auto dotSelfExpr =
+                          dyn_cast<DotSelfExpr>(args->get(0).getExpr())) {
+                    if (const TypeExpr *typeExpr =
+                            dyn_cast<TypeExpr>(dotSelfExpr->getSubExpr())) {
+                      auto baseType = typeExpr->getType();
+                      if (baseType && baseType->is<MetatypeType>()) {
+                        auto instanceType =
+                            baseType->getMetatypeInstanceType();
+                        if (auto nominal =
+                                instanceType
+                                    ->getNominalOrBoundGenericNominal()) {
+                          if (!nominal->hasGenericParamList() &&
+                              !nominal->getDeclContext()->isGenericContext() &&
+                              !nominal->isResilient()) {
+                            continue;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      return std::make_pair(expr, Default);
+    }
+
+    // Other closure expressions (auto-closures) are not allowed
+    if (isa<AbstractClosureExpr>(expr))
+      return std::make_pair(expr, Default);
 
     // DotSelfExpr for metatype references (but only a direct TypeExpr inside)
     if (const DotSelfExpr *dotSelfExpr = dyn_cast<DotSelfExpr>(expr)) {
