@@ -999,19 +999,6 @@ private extension Instruction {
         move(before: terminator, context)
       }
     }
-    
-    if let singleValueInst = self as? SingleValueInstruction,
-       !(self is ScopedInstruction || self is AllocStackInst),
-       let identicalInst = (loop.preheader!.instructions.first { otherInst in
-         return singleValueInst != otherInst && singleValueInst.isIdenticalTo(otherInst)
-    }) {
-      guard let identicalSingleValueInst = identicalInst as? SingleValueInstruction else {
-        return true
-      }
-      
-      singleValueInst.replace(with: identicalSingleValueInst, context)
-    }
-
     return true
   }
   
