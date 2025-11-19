@@ -357,14 +357,31 @@ public func _unsafeInheritExecutor_withCheckedContinuation<T>(
 @inlinable
 @available(SwiftStdlib 5.1, *)
 #if !$Embedded
-@backDeployed(before: SwiftStdlib 6.0)
+@backDeployed(before: SwiftStdlib 6.2)
 #endif
-public func withCheckedThrowingContinuation<T>(
+public func withCheckedThrowingContinuation<T, E>(
+  isolation: isolated (any Actor)? = #isolation,
+  function: String = #function,
+  _ body: (CheckedContinuation<T, E>) -> Void
+) async throws(E) -> sending T {
+  return try await Builtin.withUnsafeThrowingContinuation(E.self) {
+    let unsafeContinuation = unsafe UnsafeContinuation<T, E>($0)
+    return body(unsafe CheckedContinuation(continuation: unsafeContinuation,
+                                           function: function))
+  }
+}
+
+// Superseded by the typed-throws version of this function. This function
+// is retained for ABI purposes.
+@available(SwiftStdlib 5.1, *)
+@usableFromInline
+@_silgen_name("$ss31withCheckedThrowingContinuation9isolation8function_xScA_pSgYi_SSyScCyxs5Error_pGXEtYaKlF")
+internal func __abi_withCheckedThrowingContinuation<T>(
   isolation: isolated (any Actor)? = #isolation,
   function: String = #function,
   _ body: (CheckedContinuation<T, Error>) -> Void
 ) async throws -> sending T {
-  return try await Builtin.withUnsafeThrowingContinuation {
+  return try await Builtin.withUnsafeThrowingContinuation(Error.self) {
     let unsafeContinuation = unsafe UnsafeContinuation<T, Error>($0)
     return body(unsafe CheckedContinuation(continuation: unsafeContinuation,
                                            function: function))
