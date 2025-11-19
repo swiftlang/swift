@@ -16,6 +16,8 @@ to ask for help!
 - [GettingStarted.md](/docs/HowToGuides/GettingStarted.md):
   Describes how to set up a working Swift development environment
   for Linux and macOS, and get an edit-build-test-debug loop going.
+- [WindowsBuild.md](/docs/WindowsBuild.md)
+  Describes how to build and test the toolchain on Windows.
 - Building for Android:
   - [Android.md](/docs/Android.md):
     How to run some simple programs and the Swift test suite on an Android device.
