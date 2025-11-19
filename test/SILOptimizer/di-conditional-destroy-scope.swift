@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s -Onone -Xllvm \
 // RUN:   -sil-print-after=raw-sil-inst-lowering -Xllvm \
-// RUN:   -sil-print-functions=$s2fs36RecursibleDirectoryContentsGeneratorC4path10fileSystemAcA12AbsolutePathV_AA04FileH0_ptKc33_F988CDD4B32A48D8BEE265DC43B61560Llfc \
+// RUN:   -sil-print-functions='$s2fs36RecursibleDirectoryContentsGeneratorC4path10fileSystemAcA12AbsolutePathV_AA04FileH0_ptKc33_F988CDD4B32A48D8BEE265DC43B61560Llfc' \
 // RUN:   -Xllvm -sil-print-types -Xllvm -sil-print-debuginfo -o /dev/null -module-name fs 2>&1 | %FileCheck %s
 
 // REQUIRES: foundation
