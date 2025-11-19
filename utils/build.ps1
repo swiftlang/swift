@@ -3909,6 +3909,10 @@ function Build-SourceKitLSP([Hashtable] $Platform) {
       IndexStoreDB_DIR = (Get-ProjectCMakeModules $Platform IndexStoreDB);
       SwiftToolsProtocols_DIR = (Get-ProjectCMakeModules $Platform ToolsProtocols);
     }
+
+    Copy-Item -Force `
+      -Path "$SourceCache\sourcekit-lsp\config.schema.json" `
+      -Destination "$($Platform.ToolchainInstallRoot)\usr\share\sourcekit-lsp"
 }
 
 function Test-SourceKitLSP {
