@@ -428,6 +428,16 @@ public func funcB() { }\n"));
   ASSERT_FALSE(DependenciesOrErr.getError());
   auto Dependencies = DependenciesOrErr.get();
   auto Diagnostics = Dependencies->diagnostics;
+
+  // Temporary debug output to diagnose CI failure
+  std::cerr << "TestModuleCycle: Diagnostic count = " << Diagnostics->count << std::endl;
+  for (size_t i = 0; i < Diagnostics->count; ++i) {
+    auto Diag = Diagnostics->diagnostics[i];
+    std::string Msg((const char*)Diag->message.data, Diag->message.length);
+    std::cerr << "TestModuleCycle: Diagnostic[" << i << "]: severity=" << Diag->severity
+              << ", message=" << Msg << std::endl;
+  }
+
   ASSERT_TRUE(Diagnostics->count == 1);
   auto Diagnostic = Diagnostics->diagnostics[0];
   ASSERT_TRUE(Diagnostic->severity == SWIFTSCAN_DIAGNOSTIC_SEVERITY_ERROR);
