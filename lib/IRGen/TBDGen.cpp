@@ -705,6 +705,11 @@ class APIGenRecorder final : public APIRecorder {
   bool isSPI(const Decl *decl) {
     assert(decl);
 
+    // If the module's library level is more restricted than API, all symbols
+    // should be SPIs.
+    if (module->getLibraryLevel() < swift::LibraryLevel::API)
+      return true;
+
     if (auto value = dyn_cast<ValueDecl>(decl)) {
       auto accessScope =
           value->getFormalAccessScope(/*useDC=*/nullptr,
