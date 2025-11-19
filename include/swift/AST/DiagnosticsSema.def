@@ -8910,6 +8910,10 @@ ERROR(nonisolated_nonsending_incompatible_with_isolated_any,none,
       "cannot use %0 together with '@isolated(any)'",
       (TypeRepr *))
 
+ERROR(nonisolated_nonsending_incompatible_with_sending,none,
+      "cannot use 'nonisolated(nonsending)' together with 'sending'",
+      ())
+
 ERROR(invalid_function_conversion_with_non_sendable,none,
       "cannot convert %0 to %1 because crossing of an isolation boundary "
       "requires parameter and result types to conform to 'Sendable' protocol",

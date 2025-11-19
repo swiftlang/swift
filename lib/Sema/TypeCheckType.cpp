@@ -5472,6 +5472,12 @@ TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
     type = resolveAttributedType(baseRepr, options, attrs);
 
     attrs.diagnoseUnclaimed(resolution, options, type);
+
+    if (isa<SendingTypeRepr>(baseRepr)) {
+      diagnoseInvalid(repr, repr->getStartLoc(),
+                      diag::nonisolated_nonsending_incompatible_with_sending);
+      return ErrorType::get(getASTContext());
+    }
   }
 
   if (type->hasError())

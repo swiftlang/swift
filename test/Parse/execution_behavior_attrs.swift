@@ -84,3 +84,14 @@ do {
   nonisolated(0) // expected-warning {{result of call to 'nonisolated' is unused}}
   print("hello")
 }
+
+do {
+  func testSending1(_: nonisolated(nonsending) sending @escaping () async -> Void) {}
+  // expected-error@-1 {{cannot use 'nonisolated(nonsending)' together with 'sending'}}
+  func testSending2(_: sending nonisolated(nonsending) @escaping () async -> Void) {}
+  // expected-error@-1 {{cannot use 'nonisolated(nonsending)' together with 'sending'}}
+  func testSending3(_: () -> nonisolated(nonsending) sending () async -> Void) {}
+  // expected-error@-1 {{cannot use 'nonisolated(nonsending)' together with 'sending'}}
+  func testSending4(_: (() -> sending nonisolated(nonsending) @Sendable () async -> Void) -> Void) {}
+  // expected-error@-1 {{cannot use 'nonisolated(nonsending)' together with 'sending'}}
+}
