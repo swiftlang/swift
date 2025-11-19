@@ -1,4 +1,6 @@
 // REQUIRES: swift_feature_CustomAvailability
+// XFAIL: OS=linux-android
+// XFAIL: OS=linux-androideabi
 
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -x c %S/Inputs/AvailabilityDomains.c -o %t/AvailabilityDomains.c.o -c
