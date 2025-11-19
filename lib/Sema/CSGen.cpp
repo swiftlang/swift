@@ -3153,6 +3153,16 @@ namespace {
       }
 
       case PatternKind::Expr: {
+        // Make sure we invalidate any nested VarDecls early since generating
+        // constraints for a `where` clause may happen before we've generated
+        // constraints for the ExprPattern. We'll record a fix when visiting
+        // the UnresolvedPatternExpr.
+        // FIXME: We ought to use a conjunction for switch cases, then we
+        // wouldn't need this logic.
+        auto *EP = cast<ExprPattern>(pattern);
+        EP->getSubExpr()->forEachUnresolvedVariable([&](VarDecl *VD) {
+          CS.setType(VD, ErrorType::get(CS.getASTContext()));
+        });
         // We generate constraints for ExprPatterns in a separate pass. For
         // now, just create a type variable.
         return setType(CS.createTypeVariable(CS.getConstraintLocator(locator),
