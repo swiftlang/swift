@@ -38,7 +38,7 @@ repositories.
         )
         parser.add_argument(
             "--clone",
-            help="obtain sources for Swift and related projects",
+            help="Obtain sources for Swift and related projects",
             action="store_true",
         )
         parser.add_argument(
