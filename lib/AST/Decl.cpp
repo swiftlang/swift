@@ -10820,13 +10820,16 @@ bool AbstractFunctionDecl::isResilient(ModuleDecl *M,
 OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
                                GenericParamList *GenericParams, DeclContext *DC,
                                GenericSignature OpaqueInterfaceGenericSignature,
-                               ArrayRef<TypeRepr *>
-                                   OpaqueReturnTypeReprs)
+                               ArrayRef<TypeRepr *> OpaqueReturnTypeReprs,
+                               bool hasLazyUnderlyingSubstitutions)
     : GenericTypeDecl(DeclKind::OpaqueType, DC, Identifier(), SourceLoc(), {},
                       GenericParams),
       NamingDeclAndHasOpaqueReturnTypeRepr(
         NamingDecl, !OpaqueReturnTypeReprs.empty()),
       OpaqueInterfaceGenericSignature(OpaqueInterfaceGenericSignature) {
+  Bits.OpaqueTypeDecl.HasLazyUnderlyingSubstitutions
+      = hasLazyUnderlyingSubstitutions;
+
   // Always implicit.
   setImplicit();
 
@@ -10839,7 +10842,7 @@ OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
                           OpaqueReturnTypeReprs.end(), getTrailingObjects());
 }
 
-OpaqueTypeDecl *OpaqueTypeDecl::get(
+OpaqueTypeDecl *OpaqueTypeDecl::create(
       ValueDecl *NamingDecl, GenericParamList *GenericParams,
       DeclContext *DC,
       GenericSignature OpaqueInterfaceGenericSignature,
@@ -10850,7 +10853,33 @@ OpaqueTypeDecl *OpaqueTypeDecl::get(
   auto mem = ctx.Allocate(size, alignof(OpaqueTypeDecl));
   return new (mem) OpaqueTypeDecl(
       NamingDecl, GenericParams, DC, OpaqueInterfaceGenericSignature,
-      OpaqueReturnTypeReprs);
+      OpaqueReturnTypeReprs, /*hasLazyUnderlyingSubstitutions=*/false);
+}
+
+OpaqueTypeDecl *OpaqueTypeDecl::createDeserialized(
+    GenericParamList *GenericParams, DeclContext *DC,
+    GenericSignature OpaqueInterfaceGenericSignature,
+    LazyMemberLoader *lazyLoader, uint64_t underlyingSubsData) {
+  bool hasLazyUnderlyingSubstitutions = (underlyingSubsData != 0);
+
+  ASTContext &ctx = DC->getASTContext();
+  auto size = totalSizeToAlloc<TypeRepr *>(0);
+  auto mem = ctx.Allocate(size, alignof(OpaqueTypeDecl));
+
+  // NamingDecl is set later by deserialization
+  auto *decl = new (mem) OpaqueTypeDecl(
+      /*namingDecl=*/nullptr, GenericParams, DC,
+      OpaqueInterfaceGenericSignature, { },
+      hasLazyUnderlyingSubstitutions);
+
+  if (hasLazyUnderlyingSubstitutions) {
+    auto &ctx = DC->getASTContext();
+    auto *data = static_cast<LazyOpaqueTypeData *>(
+          ctx.getOrCreateLazyContextData(decl, lazyLoader));
+    data->underlyingSubsData = underlyingSubsData;
+  }
+
+  return decl;
 }
 
 bool OpaqueTypeDecl::isOpaqueReturnTypeOf(const Decl *ownerDecl) const {
@@ -10906,14 +10935,39 @@ bool OpaqueTypeDecl::exportUnderlyingType() const {
   llvm_unreachable("The naming decl is expected to be either an AFD or ASD");
 }
 
+void OpaqueTypeDecl::loadLazyUnderlyingSubstitutions() {
+  if (!Bits.OpaqueTypeDecl.HasLazyUnderlyingSubstitutions)
+    return;
+
+  Bits.OpaqueTypeDecl.HasLazyUnderlyingSubstitutions = 0;
+
+  auto &ctx = getASTContext();
+  auto *data = static_cast<LazyOpaqueTypeData *>(
+          ctx.getLazyContextData(this));
+  ASSERT(data != nullptr);
+
+  data->loader->finishOpaqueTypeDecl(
+      this, data->underlyingSubsData);
+}
+
 std::optional<SubstitutionMap>
 OpaqueTypeDecl::getUniqueUnderlyingTypeSubstitutions(
     bool typeCheckFunctionBodies) const {
+  const_cast<OpaqueTypeDecl *>(this)->loadLazyUnderlyingSubstitutions();
+
   if (!typeCheckFunctionBodies)
     return UniqueUnderlyingType;
 
   return evaluateOrDefault(getASTContext().evaluator,
                            UniqueUnderlyingTypeSubstitutionsRequest{this}, {});
+}
+
+ArrayRef<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
+OpaqueTypeDecl::getConditionallyAvailableSubstitutions() const {
+  const_cast<OpaqueTypeDecl *>(this)->loadLazyUnderlyingSubstitutions();
+
+  assert(ConditionallyAvailableTypes);
+  return ConditionallyAvailableTypes.value();
 }
 
 std::optional<unsigned>
@@ -10945,7 +10999,8 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
 
 void OpaqueTypeDecl::setConditionallyAvailableSubstitutions(
     ArrayRef<ConditionallyAvailableSubstitutions *> substitutions) {
-  assert(!ConditionallyAvailableTypes &&
+  ASSERT(!Bits.OpaqueTypeDecl.HasLazyUnderlyingSubstitutions);
+  ASSERT(!ConditionallyAvailableTypes &&
          "resetting conditionally available substitutions?!");
   ConditionallyAvailableTypes = getASTContext().AllocateCopy(substitutions);
 }

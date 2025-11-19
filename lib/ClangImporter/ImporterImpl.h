@@ -1762,6 +1762,11 @@ public:
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
+  void finishOpaqueTypeDecl(OpaqueTypeDecl *decl,
+                            uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
   template <typename DeclTy, typename ...Targs>
   DeclTy *createDeclWithClangNode(ClangNode ClangN, AccessLevel access,
                                   Targs &&... Args) {
