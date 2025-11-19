@@ -23,8 +23,10 @@ extension OpenPackElementInst {
   fileprivate func replacePackElementTypes(_ context: SimplifyContext) {
 
     if let dpi = operands.first?.value as? DynamicPackIndexInst,
-      dpi.operands.first?.value as? IntegerLiteralInst != nil  // when this is commented replacementTypes is not correctly filled
+       let ili = dpi.operands.first?.value as? IntegerLiteralInst,
+       let index = ili.value
     {
+      //return dpi.indexedPackType.packElementTypes[index].canonical
       var worklist = ValueWorklist(context)
       var instStack = Stack<Instruction>(context)
 
@@ -40,14 +42,9 @@ extension OpenPackElementInst {
         replacementTypes.append(type.canonical.rawType)
       }
 
-      let substitutionMap = SubstitutionMap(
-        genericSignature: genericSignature,
-        replacementTypes: replacementTypes)
-
-      var cloner = TypeSubstitutionCloner(
-        cloneBefore: self,
-        substitutions: substitutionMap, context)
+      /* var cloner = 
       defer { cloner.deinitialize() }
+      */
 
       // FIXME think about prefix of non-expansion element types
       // FIXME think about terminator instructions and successor BBs (TermInst)
@@ -66,27 +63,28 @@ extension OpenPackElementInst {
         }
       }
 
-      // clone instructions recursively (?) --> nothing is happening
+      /*
       for inst in instStack {
         for op in inst.operands {
           if let definingInst = op.value.definingInstructionOrTerminator,
-            !instStack.contains(definingInst) && definingInst != self && !cloner.isCloned(value: op.value)
+            !worklist.hasBeenPushed(op.value) && !cloner.isCloned(value: op.value)
+            /* not sure about this next part */ && definingInst != self
           {
             cloner.recordFoldedValue(op.value, mappedTo: op.value)
           }
         }
       }
+
       for inst in instStack {
         for op in inst.operands {
-          if let definingInst = op.value.definingInstructionOrTerminator,
-            instStack.contains(definingInst)
+          if worklist.hasBeenPushed(op.value)
           {
             let val = cloner.cloneRecursively(value: op.value)
-            let clonedDef = cloner.clone(instruction: definingInst)
           }
         }
         let clonedInst = cloner.cloneRecursively(inst: inst, resetInsertionPoint: true)
       }
+    */
     }
   }
 }

@@ -83,7 +83,8 @@ extension ClonerCommonUtils {
     }
 
     for op in inst.operands {
-      if cloneRecursively(value: op.value, customGetCloned: customGetCloned) == nil {
+      if let clonedOp = cloneRecursively(value: op.value, customGetCloned: customGetCloned),
+         clonedOp == nil {
         return nil
       }
     }

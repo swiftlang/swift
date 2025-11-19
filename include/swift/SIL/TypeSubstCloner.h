@@ -392,18 +392,6 @@ protected:
             getOpValue(dfei->getOperand()), remappedDerivativeFnType));
   }
 
-  void visitUncheckedAddrCastInst(UncheckedAddrCastInst *uaci) {
-    getBuilder().setCurrentDebugScope(super::getOpScope(uaci->getDebugScope()));
-
-    SILLocation loc = getOpLocation(uaci->getLoc());
-    SILValue src = getOpValue(uaci->getOperand());
-    SILType targetType = getOpType(uaci->getType());
-
-    recordClonedInstruction(uaci,
-        getBuilder().createUncheckedAddrCast(loc, src, targetType));
-    return;
-  }
-
   enum { ForInlining = true };
   /// Helper function to clone the parent function of a SILDebugScope if
   /// necessary when inlining said function into a new generic context.
