@@ -165,6 +165,9 @@ BridgedFileUnit_castToSourceFile(BridgedFileUnit fileUnit) {
 // MARK: BridgedDeclObj
 //===----------------------------------------------------------------------===//
 
+BridgedDeclObj::BridgedDeclObj(BridgedDecl decl)
+    : obj(static_cast<SwiftObject>(decl.unbridged())) {}
+
 swift::SourceLoc BridgedDeclObj::getLoc() const {
   return unbridged()->getLoc();
 }

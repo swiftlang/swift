@@ -319,8 +319,7 @@ struct BridgedDeclObj {
 #endif
 
   BridgedDeclObj(SwiftObject obj) : obj(obj) {}
-  BridgedDeclObj(BridgedDecl decl)
-      : obj(static_cast<SwiftObject>(decl.unbridged())) {}
+  BRIDGED_INLINE BridgedDeclObj(BridgedDecl decl);
   BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE swift::SourceLoc getLoc() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getModuleContext() const;
