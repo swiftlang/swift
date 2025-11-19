@@ -42,9 +42,18 @@ public struct InferenceTest {
   public func testNested(dict: [String: (() async -> Void)?]) {}
 
   // CHECK: nonisolated(nonsending) public func testAutoclosure(value1 fn: nonisolated(nonsending) @autoclosure () async -> Swift.Int) async
-  public func testAutoclosure(value1 fn: @autoclosure () async -> Int) async { await fn() }
+  public func testAutoclosure(value1 fn: @autoclosure () async -> Int) async { }
   // CHECK: nonisolated(nonsending) public func testAutoclosure(value2 fn: nonisolated(nonsending) @autoclosure () async -> Swift.Int) async
-  public func testAutoclosure(value2 fn: nonisolated(nonsending) @autoclosure () async -> Int) async { await fn() }
+  public func testAutoclosure(value2 fn: nonisolated(nonsending) @autoclosure () async -> Int) async { }
+}
+
+public struct TestSendingIteraction {
+  // CHECK: public func testSending1(_: sending @concurrent () async -> Swift.Void)
+  public func testSending1(_: sending () async -> Void) {}
+  // CHECK: public func testSending2(_: sending @concurrent (nonisolated(nonsending) () async -> Swift.Void) async -> Swift.Void)
+  public func testSending2(_: sending (() async -> Void) async -> Void) {}
+  // CHECK: public func testSending3(_: nonisolated(nonsending) () async -> sending @concurrent () async -> Swift.Void)
+  public func testSending3(_: () async -> sending () async -> Void) {}
 }
 
 //--- Client.swift
@@ -91,4 +100,18 @@ func testInference(t: InferenceTest) async {
 func testAutoclosure(t: InferenceTest) async {
     await t.testAutoclosure(value1: 42)
     await t.testAutoclosure(value2: 42)
+}
+
+// CHECK-LABEL: sil hidden @$s6Client11testSending1ty1A04TestC10IteractionV_tF : $@convention(thin) (@in_guaranteed TestSendingIteraction) -> ()
+// CHECK: function_ref @$s6Client11testSending1ty1A04TestC10IteractionV_tFyyYaXEfU_ : $@convention(thin) @async () -> ()
+// CHECK: function_ref @$s1A21TestSendingIteractionV12testSending1yyyyYaXEF : $@convention(method) (@sil_sending @guaranteed @noescape @async @callee_guaranteed () -> (), @in_guaranteed TestSendingIteraction) -> ()
+// CHECK: function_ref @$s6Client11testSending1ty1A04TestC10IteractionV_tFyyyYaYCXEYaXEfU0_ : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
+// CHECK: function_ref @$s1A21TestSendingIteractionV12testSending2yyyyyYaYCXEYaXEF : $@convention(method) (@sil_sending @guaranteed @noescape @async @callee_guaranteed (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> (), @in_guaranteed TestSendingIteraction) -> ()
+// CHECK: function_ref @$s6Client11testSending1ty1A04TestC10IteractionV_tFyyYacyYaYCYTXEfU1_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @sil_sending @owned @async @callee_guaranteed () -> ()
+// CHECK: function_ref @$s1A21TestSendingIteractionV12testSending3yyyyYacyYaYCYTXEF : $@convention(method) (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @sil_sending @owned @async @callee_guaranteed () -> (), @in_guaranteed TestSendingIteraction) -> ()
+// CHECK: } // end sil function '$s6Client11testSending1ty1A04TestC10IteractionV_tF'
+func testSending(t: TestSendingIteraction) {
+  t.testSending1 { }
+  t.testSending2 { _ in }
+  t.testSending3 { { } }
 }

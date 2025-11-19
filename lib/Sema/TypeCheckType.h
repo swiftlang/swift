@@ -87,6 +87,9 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Whether the immediate context has an @escaping attribute.
   DirectEscaping = 1 << 14,
+
+  /// Whether the immediate context is a `sending` parameter or result.
+  DirectSending = 1 << 15,
 };
 
 /// Type resolution contexts that require special handling.
@@ -265,7 +268,8 @@ public:
   void setContext(Context newContext) {
     context = newContext;
     flags &= ~(unsigned(TypeResolutionFlags::Direct) |
-               unsigned(TypeResolutionFlags::DirectEscaping));
+               unsigned(TypeResolutionFlags::DirectEscaping) |
+               unsigned(TypeResolutionFlags::DirectSending));
   }
   void setContext(std::nullopt_t) { setContext(Context::None); }
 

@@ -54,6 +54,12 @@ do {
     // expected-warning@+1:10 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async instance method 'asyncF' to run on the caller's actor; use '@concurrent' to preserve behavior}}{{5-5=@concurrent }}{{none}}
     func asyncF() async
   }
+
+  func sending1(_: sending () async -> Void) {}
+  func sending2(_: sending (() async -> Void) async -> Void) {}
+  // expected-warning@-1:29 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async function type to be treated as specified to run on the caller's actor; use '@concurrent' to preserve behavior}}
+  func sending3(_: () async -> sending () async -> Void) {}
+  // expected-warning@-1:20 {{feature 'NonisolatedNonsendingByDefault' will cause nonisolated async function type to be treated as specified to run on the caller's actor; use '@concurrent' to preserve behavior}}
 }
 protocol Functions {}
 extension Functions {

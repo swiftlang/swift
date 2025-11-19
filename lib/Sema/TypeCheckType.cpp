@@ -4417,15 +4417,17 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     // Infer async function type as `nonisolated(nonsending)` if there is
     // no `@concurrent` or `nonisolated(nonsending)` attribute and isolation
     // is nonisolated.
-    if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
-        repr->isAsync() && isolation.isNonIsolated()) {
-      isolation = FunctionTypeIsolation::forNonIsolatedCaller();
-    } else if (ctx.LangOpts
-                   .getFeatureState(Feature::NonisolatedNonsendingByDefault)
-                   .isEnabledForMigration()) {
-      // Diagnose only in the interface stage, which is run once.
-      if (inStage(TypeResolutionStage::Interface)) {
-        warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, repr, isolation);
+    if (!parentOptions.contains(TypeResolutionFlags::DirectSending)) {
+      if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
+          repr->isAsync() && isolation.isNonIsolated()) {
+        isolation = FunctionTypeIsolation::forNonIsolatedCaller();
+      } else if (ctx.LangOpts
+                     .getFeatureState(Feature::NonisolatedNonsendingByDefault)
+                     .isEnabledForMigration()) {
+        // Diagnose only in the interface stage, which is run once.
+        if (inStage(TypeResolutionStage::Interface)) {
+          warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, repr, isolation);
+        }
       }
     }
   }
@@ -5451,7 +5453,8 @@ TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
   }
 
   // Return the type.
-  return resolveType(repr->getBase(), options);
+  return resolveType(repr->getBase(),
+                     options | TypeResolutionFlags::DirectSending);
 }
 
 NeverNullType
