@@ -72,7 +72,6 @@ CONSTANT_OWNERSHIP_INST(Owned, WeakCopyValue)
   CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
 
-CONSTANT_OWNERSHIP_INST(Guaranteed, DereferenceBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, BorrowedFrom)
 CONSTANT_OWNERSHIP_INST(Guaranteed, LoadBorrow)
@@ -240,9 +239,8 @@ CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MarkUninitialized)
 
 // In raw SIL, a MoveValue delimits the scope of trivial variables.
 CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MoveValue)
+CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, DereferenceBorrow)
 
-// result.
-//
 // If the operand is nontrivial and the result is trivial, then it is the
 // programmer's responsibility to use Builtin.fixLifetime.
 //

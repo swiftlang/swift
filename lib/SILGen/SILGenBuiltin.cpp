@@ -2233,7 +2233,8 @@ static ManagedValue emitBuiltinMakeBorrow(SILGenFunction &SGF,
     assert(loweredBorrowTy.isLoadable(SGF.F)
            && "borrow must be loadable if referent is");
 
-    auto referent = std::move(args[0]).getAsSingleValue(SGF);
+    auto referent = std::move(args[0]).getAsSingleValue(SGF,
+                                          SGFContext::AllowGuaranteedPlusZero);
     if (referent.getType().isAddress()) {
       referent = SGF.B.createLoadBorrow(loc, referent);
     }
@@ -2275,8 +2276,21 @@ static ManagedValue emitBuiltinDereferenceBorrow(SILGenFunction &SGF,
                                        SubstitutionMap subs,
                                        ArrayRef<ManagedValue> args,
                                        SGFContext C) {
-  #warning "todo"
-  llvm_unreachable("todo");
+  // This operation is only valid as the return expression of a borrow accessor,
+  // so typically should only get emitted as part of an lvalue. However,
+  // trivial values can still be emitted as rvalues and end up here, since
+  // a borrow of a trivial value is essentially a copy.
+  auto loweredTy = SGF.getLoweredType(subs.getReplacementTypes()[0]);
+  if (!loweredTy.isTrivial(SGF.F)) {
+    SGF.SGM.diagnose(loc, diag::invalid_sil_builtin, "dereferenceBorrow");
+    auto undef = SILUndef::get(SGF.F, loweredTy);
+    return SGF.emitManagedRValueWithCleanup(undef);
+  }
+
+  // A trivial value can be returned after being dereferenced without
+  // being formally borrowed.
+  auto result = SGF.B.createDereferenceBorrow(loc, args[0].getValue());
+  return ManagedValue::forRValueWithoutOwnership(result);
 }
 
 std::optional<SpecializedEmitter>

@@ -223,7 +223,7 @@ public:
     return Storage.get<LValueStorage>(StoredKind).Loc;
   }
 
-  Expr *findStorageReferenceExprForBorrow() &&;
+  Expr *findStorageReferenceExprForBorrow(SILModule &M) &&;
   Expr *findStorageReferenceExprForMoveOnly(SILGenFunction &SGF,
                                       StorageReferenceOperationKind refKind) &&;
   Expr *findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) &&;

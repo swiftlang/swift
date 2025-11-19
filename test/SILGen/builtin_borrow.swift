@@ -1,16 +1,17 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -module-name ResilientTypes -emit-module-path %t/ResilientTypes.swiftmodule -enable-library-evolution %S/Inputs/builtin_borrow_ResilientTypes.swift
-// RUN: %target-swift-emit-silgen -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes -I %t %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name main -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature Lifetimes -enable-experimental-feature BorrowAndMutateAccessors -I %t %s | %FileCheck %s
 
 // REQUIRES: swift_feature_BuiltinModule
 // REQUIRES: swift_feature_AddressableTypes
 // REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 import Builtin
 import ResilientTypes
 
 struct NonGeneric {
-	var x: Int
+	var x: AnyObject
 }
 
 struct NonGenericAO {
@@ -152,4 +153,98 @@ func value_address_make_borrow_afd_trivial_downward(_ referent: AFDTrivial) {
 @_lifetime(borrow referent)
 func address_address_make_borrow<T>(_ referent: T) -> Builtin.Borrow<T> {
 	return Builtin.makeBorrow(referent)
+}
+
+struct BorrowTrivial: ~Escapable {
+	var borrowed: Builtin.Borrow<Int>
+
+	var value: Int {
+		// CHECK-LABEL: sil{{.*}} @$s{{.*}}13BorrowTrivialV5value{{.*}}vb :
+		// CHECK:       bb0([[STRUCT:%.*]] :
+		// CHECK:         [[BORROW:%.*]] = struct_extract [[STRUCT]]
+		// CHECK:         [[REFERENT:%.*]] = dereference_borrow [[BORROW]]
+		// CHECK:         return [[REFERENT]]
+		borrow {
+			return Builtin.dereferenceBorrow(borrowed)
+		}
+	}
+}
+
+struct BorrowLoadable: ~Escapable {
+	var borrowed: Builtin.Borrow<NonGeneric>
+
+	var value: NonGeneric {
+		// CHECK-LABEL: sil{{.*}} @$s{{.*}}14BorrowLoadableV5value{{.*}}vb :
+		// CHECK:       bb0([[STRUCT:%.*]] :
+		// CHECK:         [[BORROW:%.*]] = struct_extract [[STRUCT]]
+		// CHECK:         [[REFERENT:%.*]] = dereference_borrow [[BORROW]]
+		// CHECK:         [[UNCHECKED:%.*]] = unchecked_ownership [[REFERENT]]
+		// CHECK:         return [[UNCHECKED]]
+		borrow {
+			return Builtin.dereferenceBorrow(borrowed)
+		}
+	}
+}
+
+struct BorrowAO: ~Escapable {
+	var borrowed: Builtin.Borrow<NonGenericAO>
+
+	var value: NonGenericAO {
+		// CHECK-LABEL: sil{{.*}} @$s{{.*}}8BorrowAOV5value{{.*}}vb :
+		// CHECK:       bb0([[STRUCT:%.*]] :
+		// CHECK:         [[BORROW:%.*]] = struct_extract [[STRUCT]]
+		// CHECK:         [[REFERENT:%.*]] = dereference_addr_borrow [[BORROW]]
+		// CHECK:         return [[REFERENT]]
+		borrow {
+			return Builtin.dereferenceBorrow(borrowed)
+		}
+	}
+}
+
+struct BorrowAFD: ~Escapable {
+	var borrowed: Builtin.Borrow<AFD>
+
+	var value: AFD {
+		// CHECK-LABEL: sil{{.*}} @$s{{.*}}9BorrowAFDV5value{{.*}}vb :
+		// CHECK:       bb0([[STRUCT:%.*]] :
+		// CHECK:         [[BORROW:%.*]] = struct_extract [[STRUCT]]
+		// CHECK:         [[REFERENT:%.*]] = dereference_addr_borrow [[BORROW]]
+		// CHECK:         return [[REFERENT]]
+		borrow {
+			return Builtin.dereferenceBorrow(borrowed)
+		}
+	}
+}
+
+struct BorrowAFDTrivial: ~Escapable {
+	var borrowed: Builtin.Borrow<AFDTrivial>
+
+	var value: AFDTrivial {
+		// CHECK-LABEL: sil{{.*}} @$s{{.*}}16BorrowAFDTrivialV5value{{.*}}vb :
+		// CHECK:       bb0([[STRUCT:%.*]] :
+		// CHECK:         [[BORROW:%.*]] = struct_extract [[STRUCT]]
+		// CHECK:         [[REFERENT:%.*]] = dereference_addr_borrow [[BORROW]]
+		// CHECK:         return [[REFERENT]]
+		borrow {
+			return Builtin.dereferenceBorrow(borrowed)
+		}
+	}
+}
+
+struct BorrowDep<T>: ~Escapable {
+	var borrowed: Builtin.Borrow<T>
+
+	var value: T {
+		// CHECK-LABEL: sil{{.*}} @$s{{.*}}9BorrowDepV5value{{.*}}vb :
+		// CHECK:       bb0([[STRUCT:%.*]] :
+		// CHECK:         [[BORROW:%.*]] = struct_element_addr [[STRUCT]]
+		// TODO: This copy is unnecessary. Can we make SILGen avoid it?
+		// CHECK:         [[BORROW_COPY:%.*]] = alloc_stack
+		// CHECK:         copy_addr [[BORROW]] to [init] [[BORROW_COPY]]
+		// CHECK:         [[REFERENT:%.*]] = dereference_borrow_addr [[BORROW_COPY]]
+		// CHECK:         return [[REFERENT]]
+		borrow {
+			return Builtin.dereferenceBorrow(borrowed)
+		}
+	}
 }

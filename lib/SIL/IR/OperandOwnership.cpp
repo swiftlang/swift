@@ -637,6 +637,9 @@ OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
   case OwnershipKind::Any:
     llvm_unreachable("invalid value ownership");
   case OwnershipKind::Guaranteed:
+    // TODO: Could this be treated as a Reborrow? That would let the return
+    // be understood as a lifetime-ender for the borrow.
+    // return OperandOwnership::Reborrow;
     return OperandOwnership::GuaranteedForwarding;
   case OwnershipKind::None:
     return OperandOwnership::TrivialUse;

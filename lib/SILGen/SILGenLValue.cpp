@@ -26,9 +26,11 @@
 #include "SILGen.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -332,6 +334,8 @@ public:
                               LValueOptions options);
   LValue visitPackElementExpr(PackElementExpr *e, SGFAccessKind accessKind,
                               LValueOptions options);
+  LValue visitApplyExpr(ApplyExpr *e, SGFAccessKind accessKind,
+                        LValueOptions options);
 
   // Nodes that make up components of lvalue paths
   
@@ -3357,6 +3361,65 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   LValue lv;
   lv.add<ValueComponent>(rv, std::nullopt, typeData, /*isRValue=*/true);
   return lv;
+}
+
+LValue SILGenLValue::visitApplyExpr(ApplyExpr *e, SGFAccessKind accessKind,
+                                    LValueOptions options) {
+  // Some builtins serve to produce borrowable values as special cases.
+  auto builtin = e->getFn()->getReferencedDecl();
+  ASSERT(builtin && builtin.getDecl()->getModuleContext()->isBuiltinModule()
+         && "not a builtin call");
+  auto &builtinInfo = SGF.SGM.M
+    .getBuiltinInfo(builtin.getDecl()->getBaseIdentifier());
+
+  switch (builtinInfo.ID) {
+  case BuiltinValueKind::DereferenceBorrow: {
+    // The `Builtin.Borrow` argument is evaluated as a normal rvalue.
+    auto borrowValue = visitRecNonInOutBase(*this, e->getArgs()->getExpr(0),
+                      SGFAccessKind::OwnedObjectRead, options,
+                      AbstractionPattern(e->getArgs()->getExpr(0)->getType()));
+    
+    ManagedValue deref;
+    // Project the borrow of the value from there.
+    if (borrowValue.getType().isAddress()) {
+      // If `Builtin.Borrow` is address-only, then the referent must be.
+      deref = ManagedValue::forBorrowedAddressRValue(
+                 SGF.B.createDereferenceBorrowAddr(e, borrowValue.getValue()));
+    } else {
+      auto loweredReferentTy = SGF.getLoweredType(e->getType());
+
+      bool addressReferent;
+
+      if (loweredReferentTy.isAddressableForDeps(SGF.F)) {
+        addressReferent = true;
+      } else {
+        addressReferent = SGF.useLoweredAddresses()
+          && loweredReferentTy.isAddressOnly(SGF.F);
+      }
+
+      if (addressReferent) {
+        deref = ManagedValue::forBorrowedAddressRValue(
+                 SGF.B.createDereferenceAddrBorrow(e, borrowValue.getValue()));
+      } else {
+        SILValue derefValue
+          = SGF.B.createDereferenceBorrow(e, borrowValue.getValue());
+        // TODO: The ownership of the borrow ought to be verifiable, but in the
+        // meantime mark it as unchecked.
+        deref = ManagedValue::forBorrowedObjectRValue(
+                 SGF.B.createUncheckedOwnership(e, derefValue));
+      }
+    }
+
+    auto typeData = getValueTypeData(accessKind, getSubstFormalRValueType(e),
+                                     deref.getValue());
+    LValue lv;
+    lv.add<ValueComponent>(deref, std::nullopt, typeData, /*isRValue*/ true);
+    return lv;
+  }
+
+  default:
+    llvm_unreachable("not an lvalue builtin");
+  }
 }
 
 LValue SILGenLValue::visitExpr(Expr *e, SGFAccessKind accessKind,

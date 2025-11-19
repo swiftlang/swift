@@ -347,7 +347,7 @@ bool SILValueOwnershipChecker::gatherUsers(
     SILInstruction *user = op->getUser();
 
     if (isa<UncheckedOwnershipInst>(user)) {
-      continue;
+      return false;
     }
 
     // If this op is a type dependent operand, skip it. It is not interesting
