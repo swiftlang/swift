@@ -147,7 +147,7 @@ func test_CallerSyncNormal_CalleeAsyncNonIsolated() async {
     normalAcceptsSendingAsyncClosure { }
 
     // CHECK-LABEL: // closure #3 in test_CallerSyncNormal_CalleeAsyncNonIsolated()
-    // CHECK-NEXT: // Isolation: nonisolated
+    // CHECK-NEXT: // Isolation: {{nonisolated|caller_isolation_inheriting}}
     normalAcceptsSendableAsyncClosure { }
 }
 
@@ -181,7 +181,7 @@ func test_CallerSyncNormal_CalleeAsyncMainActorIsolated() async {
     await normalGlobalActorAcceptsSendingAsyncClosure { }
 
     // CHECK-LABEL: // closure #3 in test_CallerSyncNormal_CalleeAsyncMainActorIsolated()
-    // CHECK-NEXT: // Isolation: nonisolated
+    // CHECK-NEXT: // Isolation: {{nonisolated|caller_isolation_inheriting}}
     await normalGlobalActorAcceptsSendableAsyncClosure { }
 }
 
@@ -258,7 +258,7 @@ func test_CallerAsyncNormal_CalleeAsyncNonIsolated() async {
     await asyncNormalAcceptsSendingAsyncClosure { }
 
     // CHECK-LABEL: // closure #3 in test_CallerAsyncNormal_CalleeAsyncNonIsolated()
-    // CHECK-NEXT: // Isolation: nonisolated
+    // CHECK-NEXT: // Isolation: {{nonisolated|caller_isolation_inheriting}}
     await asyncNormalAcceptsSendableAsyncClosure { }
 }
 
@@ -300,7 +300,7 @@ func test_CallerAsyncNormal_CalleeAsyncMainActorIsolated() async {
     await asyncNormalGlobalActorAcceptsSendingAsyncClosure { }
 
     // CHECK-LABEL: // closure #3 in test_CallerAsyncNormal_CalleeAsyncMainActorIsolated()
-    // CHECK-NEXT: // Isolation: nonisolated
+    // CHECK-NEXT: // Isolation: {{nonisolated|caller_isolation_inheriting}}
     await asyncNormalGlobalActorAcceptsSendableAsyncClosure { }
 }
 
