@@ -5750,6 +5750,7 @@ SILGenFunction::tryEmitProjectedLValue(SILLocation loc, LValue &&src,
   for (auto component = src.begin(); component != src.end(); component++) {
     if (component->get()->getKind() != PathComponent::BorrowMutateKind &&
         component->get()->getKind() != PathComponent::StructElementKind &&
+        component->get()->getKind() != PathComponent::RefElementKind &&
         component->get()->getKind() != PathComponent::TupleElementKind &&
         component->get()->getKind() != PathComponent::ValueKind) {
       return std::nullopt;
