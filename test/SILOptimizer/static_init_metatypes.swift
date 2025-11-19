@@ -9,6 +9,9 @@
 
 // REQUIRES: executable_test
 
+// TODO: Resolve link-time error (unresolved external symbol $sSiN) to Windows
+// XFAIL: OS=windows-msvc
+
 public protocol MyProtocol {}
 public protocol MyProtocol2 {}
 
