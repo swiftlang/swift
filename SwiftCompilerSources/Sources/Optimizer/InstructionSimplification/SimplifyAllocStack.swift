@@ -18,7 +18,10 @@ extension AllocStackInst : Simplifiable, SILCombineSimplifiable {
     if optimizeEnum(context) {
       return
     }
-    _ = optimizeExistential(context)
+    if optimizeExistential(context) {
+      return
+    }
+    _ = optimizePackElement(context)
   }
 }
 
@@ -313,4 +316,38 @@ private extension AllocStackInst {
     }
     return concreteType
   }
+
+  /// Replaces an alloc_stack of an Pack Element by an alloc_stack of the concrete type.
+  ///
+  /// For example:
+  /// ```
+  ///  %1 = dynamic_pack_index %0 of $Pack{T, U}
+  ///  %2 = open_pack_element %1 of <...> at <Pack{T, U}> ...
+  ///  %3 = alloc_stack $@pack_element(...) ...
+  ///  use %3
+  /// ```
+  /// is transformed to
+  /// ```
+  ///   %0 = alloc_stack $T
+  ///   use %0
+  /// ```
+  ///
+  private func optimizePackElement(_ context: SimplifyContext) -> Bool {
+    guard let concreteType = concreteTypeOfDependentPackElementArchetype else {
+      return false
+    }
+
+    let builder = Builder(before: self, context)
+    let newAlloc = builder.createAllocStack(concreteType.loweredType(in: parentFunction),
+                                            hasDynamicLifetime: hasDynamicLifetime,
+                                            isLexical: isLexical,
+                                            isFromVarDecl: isFromVarDecl,
+                                            usesMoveableValueDebugInfo: usesMoveableValueDebugInfo)    
+    let builderAfter = Builder(after: self, context)
+    let addrCast = builderAfter.createUncheckedAddrCast(from: newAlloc, to: self.type.addressType)
+    uses.replaceAll(with: addrCast, context)
+    self.replace(with: newAlloc, context)
+    return true
+  }
+
 }

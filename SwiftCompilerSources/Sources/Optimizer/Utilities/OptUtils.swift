@@ -547,6 +547,24 @@ extension Instruction {
     return nil
   }
 
+  var concreteTypeOfDependentPackElementArchetype: CanonicalType? {
+    // For simplicity only support a single type dependent operand, which is true in most of the cases anyway.
+    if let openArchetypeOp = typeDependentOperands.singleElement,
+       // Match the sequence
+       //   %1 = integer_literal $Builtin.Word, (integer value)
+       //   %2 = dynamic_pack_index %1 of $Pack{...}
+       //   %3 = open_pack_element %2 of ...
+       //   this_instruction_which_uses $*@pack_element(...)  // type-defs: %3
+       let ope = openArchetypeOp.value as? OpenPackElementInst,
+       let dpi = ope.operands.first?.value as? DynamicPackIndexInst,
+       let ili = dpi.operands.first?.value as? IntegerLiteralInst,
+       let index = ili.value
+    {
+      return dpi.indexedPackType.packElementTypes[index].canonical
+    }
+    return nil
+  }
+
   /// Returns true if a destroy of `type` must not be moved across this instruction.
   func isBarrierForDestroy(of type: Type, _ context: some Context) -> Bool {
     let instEffects = memoryEffects

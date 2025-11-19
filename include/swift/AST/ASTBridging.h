@@ -2922,6 +2922,15 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   BridgedBuiltinIsolationMacro,
 };
 
+struct BridgedASTTypeArray {
+  BridgedArrayRef typeArray;
+
+  SwiftInt getCount() const { return SwiftInt(typeArray.Length); }
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedASTType getAt(SwiftInt index) const;
+};
+
 struct BridgedASTType {
   enum class TraitResult {
     IsNot,
@@ -3001,6 +3010,7 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;
   BRIDGED_INLINE bool containsSILPackExpansionType() const;
   BRIDGED_INLINE bool isSILPackElementAddress() const;
+  BRIDGED_INLINE BridgedASTTypeArray getPackElementTypes() const;
 };
 
 class BridgedCanType {
@@ -3011,15 +3021,6 @@ public:
   BRIDGED_INLINE BridgedCanType(swift::CanType ty);
   BRIDGED_INLINE swift::CanType unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getRawType() const;
-};
-
-struct BridgedASTTypeArray {
-  BridgedArrayRef typeArray;
-
-  SwiftInt getCount() const { return SwiftInt(typeArray.Length); }
-
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
-  BridgedASTType getAt(SwiftInt index) const;
 };
 
 struct BridgedConformance {

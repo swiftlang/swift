@@ -273,6 +273,10 @@ extension TypeProperties {
   public var isSILPackElementAddress: Bool {
     return rawType.bridged.isSILPackElementAddress()
   }
+
+  public var packElementTypes: TypeArray {
+    return TypeArray(bridged: rawType.bridged.getPackElementTypes())
+  }
 }
 
 public struct TypeArray : RandomAccessCollection, CustomReflectable {
