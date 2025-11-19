@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-runtime --check-prefix=CHECK -DINT=i%target-ptrsize
+// UNSUPPORTED: CPU=wasm32
 
 sil_stage canonical
 
