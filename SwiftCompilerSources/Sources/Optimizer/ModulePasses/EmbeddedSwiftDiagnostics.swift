@@ -94,6 +94,11 @@ private struct FunctionChecker {
         for conf in ie.conformances {
           try checkConformance(conf, location: ie.location)
         }
+      } else if instruction is OpenExistentialAddrInst {
+          // okay in embedded with exitentials
+      } else {
+          // not supported even in embedded with exitentials
+        throw Diagnostic(.embedded_swift_existential_type, instruction.operands[0].value.type, at: instruction.location)
       }
 
     case let aeb as AllocExistentialBoxInst:
