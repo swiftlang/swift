@@ -269,6 +269,39 @@ func test12(_ p: any Any) {
   }
 }
 
+protocol Q {
+  func printit()
+}
+
+protocol P4<T> {
+  associatedtype T: Q
+
+  var t: T { get }
+}
+
+struct QConformer : Q {
+  var x = (0, 1, 2,3)
+
+  func printit() {
+      print("QConformer \(x.3)")
+  }
+}
+
+struct P4Conformer : P4 {
+  var q = QConformer()
+
+  var t : QConformer {
+    get {
+      return q
+    }
+  }
+}
+
+func test13(_ p: any P4) {
+  print("test13")
+  p.t.printit()
+}
+
 @main
 struct Main {
   static func main() {
@@ -387,5 +420,8 @@ struct Main {
 // OUTPUT: test any as! (Int, Int, Int, Int)
 // OUTPUT:   success
 // OUTPUT:   tuple: 0
+    test13(P4Conformer())
+// OUTPUT: test13
+// OUTPUT:  QConformer 3
   }
 }
