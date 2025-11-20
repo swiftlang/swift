@@ -2095,11 +2095,11 @@ namespace {
       return importer::recordHasReferenceSemantics(decl, &Impl);
     }
 
-    bool recordHasMoveOnlySemantics(const clang::RecordDecl *decl) {
+    bool recordIsCopyable(const clang::RecordDecl *decl) {
       auto semanticsKind = evaluateOrDefault(
           Impl.SwiftContext.evaluator,
           CxxValueSemantics({decl->getTypeForDecl(), &Impl}), {});
-      return semanticsKind == CxxValueSemanticsKind::MoveOnly;
+      return semanticsKind == CxxValueSemanticsKind::Copyable;
     }
 
     void markReturnsUnsafeNonescapable(AbstractFunctionDecl *fd) {
@@ -2278,7 +2278,7 @@ namespace {
             loc, ArrayRef<InheritedEntry>(), nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
-      if (recordHasMoveOnlySemantics(decl)) {
+      if (!recordIsCopyable(decl)) {
         if (decl->isInStdNamespace() && decl->getName() == "promise") {
           // Do not import std::promise.
           return nullptr;
@@ -3162,8 +3162,7 @@ namespace {
       auto valueSemanticsKind = evaluateOrDefault(
           Impl.SwiftContext.evaluator,
           CxxValueSemantics({decl->getTypeForDecl(), &Impl}), {});
-      if (valueSemanticsKind == CxxValueSemanticsKind::MissingLifetimeOperation ||
-          valueSemanticsKind == CxxValueSemanticsKind::UnavailableConstructors) {
+      if (valueSemanticsKind == CxxValueSemanticsKind::Unknown) {
 
         HeaderLoc loc(decl->getLocation());
         if (hasUnsafeAPIAttr(decl))
@@ -3175,12 +3174,6 @@ namespace {
         if (hasIteratorAPIAttr(decl))
           Impl.diagnose(loc, diag::api_pattern_attr_ignored, "import_iterator",
                         decl->getNameAsString());
-
-        if (valueSemanticsKind == CxxValueSemanticsKind::UnavailableConstructors) {
-          Impl.addImportDiagnostic(
-              decl, Diagnostic(diag::record_unsupported_default_args),
-              decl->getLocation());
-        }
 
         Impl.addImportDiagnostic(
             decl,
@@ -3418,7 +3411,7 @@ namespace {
         auto semanticsKind = evaluateOrDefault(
             Impl.SwiftContext.evaluator,
             CxxValueSemantics({parent->getTypeForDecl(), &Impl}), {});
-        if (semanticsKind == CxxValueSemanticsKind::MissingLifetimeOperation)
+        if (semanticsKind == CxxValueSemanticsKind::Unknown)
           return nullptr;
       }
 
