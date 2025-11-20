@@ -7083,8 +7083,8 @@ public:
     struct BBState {
       std::vector<SILValue> Stack;
 
-      /// Contents: BeginAccessInst*, BeginApplyInst*.
-      std::set<SILInstruction*> ActiveOps;
+      /// Contents: Results of BeginAccessInst*, BeginApplyInst*.
+      std::set<SILValue> ActiveOps;
 
       CFGState CFG = Normal;
 
@@ -7237,19 +7237,16 @@ public:
         }
       }
 
-      void handleScopeInst(SILInstruction &i) {
-        if (!ActiveOps.insert(&i).second) {
+      void handleScopeInst(SILValue i) {
+        if (!ActiveOps.insert(i).second) {
           verificationFailure("operation was not ended before re-beginning it",
-                              &i, nullptr);
+                              i, nullptr);
         }
       }
 
-      void handleScopeEndingInst(SILInstruction &i) {
-        if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
-          if (!ActiveOps.erase(beginOp)) {
-            verificationFailure("operation has already been ended", &i,
-                                nullptr);
-          }
+      void handleScopeEndingInst(const SILInstruction &i) {
+        if (!ActiveOps.erase(i.getOperand(0))) {
+          verificationFailure("operation has already been ended", &i, nullptr);
         }
       }
     };
@@ -7263,23 +7260,30 @@ public:
     };
   };
 
-  static bool isScopeInst(SILInstruction *i) {
-    if (isa<BeginAccessInst>(i) ||
-        isa<BeginApplyInst>(i) ||
-        isa<StoreBorrowInst>(i)) {
-      return true;
-    } else if (auto bi = dyn_cast<BuiltinInst>(i)) {
+  /// If this is a scope ending inst, return the result from the instruction
+  /// that provides the scoped value whose lifetime must be ended by some other
+  /// scope ending instruction.
+  static SILValue isScopeInst(SILInstruction *i) {
+    if (auto *bai = dyn_cast<BeginAccessInst>(i))
+      return bai;
+    if (auto *bai = dyn_cast<BeginApplyInst>(i))
+      return bai->getTokenResult();
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(i))
+      return sbi;
+
+    if (auto bi = dyn_cast<BuiltinInst>(i)) {
       if (auto bk = bi->getBuiltinKind()) {
         switch (*bk) {
         case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
-          return true;
+          return bi->getResult(0);
 
         default:
-          return false;
+          return SILValue();
         }
       }
     }
-    return false;
+
+    return SILValue();
   }
 
   static bool isScopeEndingInst(SILInstruction *i) {
@@ -7287,7 +7291,9 @@ public:
         isa<AbortApplyInst>(i) ||
         isa<EndApplyInst>(i)) {
       return true;
-    } else if (auto bi = dyn_cast<BuiltinInst>(i)) {
+    }
+
+    if (auto bi = dyn_cast<BuiltinInst>(i)) {
       if (auto bk = bi->getBuiltinKind()) {
         switch (*bk) {
         case BuiltinValueKind::FinishAsyncLet:
@@ -7359,10 +7365,12 @@ public:
             state.Stack.push_back(i.getStackAllocation());
 
             // Also track begin_apply as a scope instruction.
-            if (isa<BeginApplyInst>(i))
-              state.handleScopeInst(i);
+            if (auto *bai = dyn_cast<BeginApplyInst>(&i)) {
+              state.handleScopeInst(bai->getStackAllocation());
+              state.handleScopeInst(bai->getTokenResult());
+            }
           } else {
-            state.handleScopeInst(i);
+            state.handleScopeInst(i.getStackAllocation());
           }
         } else if (i.isDeallocatingStack()) {
           SILValue op = i.getOperand(0);
@@ -7388,8 +7396,8 @@ public:
                   // failure.
                 });
           }
-        } else if (isScopeInst(&i)) {
-          state.handleScopeInst(i);
+        } else if (auto scopeEndingValue = isScopeInst(&i)) {
+          state.handleScopeInst(scopeEndingValue);
         } else if (isScopeEndingInst(&i)) {
           state.handleScopeEndingInst(i);
         } else if (auto *endBorrow = dyn_cast<EndBorrowInst>(&i)) {

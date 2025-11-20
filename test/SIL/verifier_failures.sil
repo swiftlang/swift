@@ -89,3 +89,18 @@ failure(%error : @owned $any Error):
   dealloc_stack %allocation : $*Builtin.SILToken
   throw %error : $any Error
 }
+
+sil [ossa] @yield_test : $@yield_once @convention(thin) (@inout Builtin.Int32) -> @yields @inout Builtin.Int32 {
+bb0(%0 : $*Builtin.Int32):
+  (%2, %3) = begin_apply undef(%0) : $@yield_once @convention(method) (@inout Builtin.Int32) -> @yields @inout Builtin.Int32
+  yield %2, resume bb1, unwind bb2
+
+bb1:
+  %5 = end_apply %3 as $()
+  %6 = tuple ()
+  return %6
+
+bb2:
+  abort_apply %3
+  unwind
+}
