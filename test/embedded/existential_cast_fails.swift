@@ -32,6 +32,8 @@
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedExistentials
 
+// REQUIRES: OS=macosx
+
 class CP {
   func foo() { print("foo called") }
   deinit {
