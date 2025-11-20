@@ -347,7 +347,7 @@ private extension Function {
         if decl is DestructorDecl || decl is ConstructorDecl {
           return 4
         }
-        if let parent = decl.parent, parent is ClassDecl {
+        if let parent = decl.parentDeclContext, parent is ClassDecl {
           return 2
         }
       }

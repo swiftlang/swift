@@ -22,6 +22,7 @@
 #include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILGenUtils.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/Test.h"
 #include "llvm/Support/Debug.h"
@@ -2483,6 +2484,12 @@ void swift::checkSwitchEnumBlockArg(SILPhiArgument *arg) {
     arg->dump();
     llvm_unreachable("unexpected box source.");
   }
+}
+
+bool swift::isPossibleUnsafeAccessInvalidStorage(SILValue address,
+                                                 SILFunction *F) {
+  auto storage = AccessStorage::compute(address);
+  return storage && !isPossibleFormalAccessStorage(storage, F);
 }
 
 bool swift::isPossibleFormalAccessStorage(const AccessStorage &storage,
