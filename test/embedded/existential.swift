@@ -302,6 +302,47 @@ func test13(_ p: any P4) {
   p.t.printit()
 }
 
+struct GenericConformer<T> : ValuePrinter {
+  var t: T?
+  var l = (0, 1, 2, 3)
+
+  init(_ t: T) { self.t = t }
+
+  func printValue() {
+    print("GenericConformer \(l.0) \(l.1) \(l.2) \(l.3)")
+  }
+
+  mutating func mutate() {
+    l = (4, 5, 6, 7)
+  }
+}
+
+struct GenericConformerWithAssoc<T> : WithAssoc {
+  var g : GenericConformer<T>
+
+  init( _ g: T) {
+    self.g = GenericConformer(g)
+  }
+
+  func a() -> GenericConformer<T> {
+    return g
+  }
+}
+
+func test14(_ p: any ValuePrinter) {
+  print("test any ValuePrinter")
+  p.printValue()
+  var p2 = p
+  p2.mutate()
+  p2.printValue()
+}
+
+func test15(_ p: any WithAssoc) {
+  print("test any WithAssoc")
+  let l = p.a()
+  l.printValue()
+}
+
 @main
 struct Main {
   static func main() {
@@ -423,5 +464,13 @@ struct Main {
     test13(P4Conformer())
 // OUTPUT: test13
 // OUTPUT:  QConformer 3
+// OUTPUT-NOT:  deinit
+    test14(GenericConformer(1))
+// OUTPUT: test any ValuePrinter
+// OUTPUT:  GenericConformer 0 1 2 3
+// OUTPUT:  GenericConformer 4 5 6 7
+    test15(GenericConformerWithAssoc(1))
+// OUTPUT: test any WithAssoc
+// OUTPUT:  GenericConformer 0 1 2 3
   }
 }
