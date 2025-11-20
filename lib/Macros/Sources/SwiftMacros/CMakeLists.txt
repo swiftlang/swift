@@ -16,6 +16,7 @@ add_swift_macro_library(SwiftMacros
   DistributedResolvableMacro.swift
   SyntaxExtensions.swift
   TaskLocalMacro.swift
+  SwiftifyImportMacro.swift
   SWIFT_DEPENDENCIES
     SwiftDiagnostics
     SwiftSyntax

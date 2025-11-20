@@ -38,6 +38,10 @@
 #define GRAPH_NODE_CHANGE(Name) CHANGE(Name)
 #endif
 
+#ifndef BINDING_RELATION_CHANGE
+#define BINDING_RELATION_CHANGE(Name) CHANGE(Name)
+#endif
+
 #ifndef SCORE_CHANGE
 #define SCORE_CHANGE(Name) CHANGE(Name)
 #endif
@@ -51,10 +55,8 @@ LOCATOR_CHANGE(RecordedAppliedDisjunction, AppliedDisjunctions)
 LOCATOR_CHANGE(RecordedMatchCallArgumentResult, argumentMatchingChoices)
 LOCATOR_CHANGE(RecordedOpenedTypes, OpenedTypes)
 LOCATOR_CHANGE(RecordedOpenedExistentialType, OpenedExistentialTypes)
-LOCATOR_CHANGE(RecordedPackExpansionEnvironment, PackExpansionEnvironments)
 LOCATOR_CHANGE(RecordedDefaultedConstraint, DefaultedConstraints)
 LOCATOR_CHANGE(ResolvedOverload, ResolvedOverloads)
-LOCATOR_CHANGE(RecordedImplicitValueConversion, ImplicitValueConversions)
 LOCATOR_CHANGE(RecordedArgumentList, ArgumentLists)
 LOCATOR_CHANGE(RecordedImplicitCallAsFunctionRoot, ImplicitCallAsFunctionRoots)
 LOCATOR_CHANGE(RecordedSynthesizedConformance, SynthesizedConformances)
@@ -74,6 +76,12 @@ GRAPH_NODE_CHANGE(AddedConstraint)
 GRAPH_NODE_CHANGE(RemovedConstraint)
 GRAPH_NODE_CHANGE(InferredBindings)
 GRAPH_NODE_CHANGE(RetractedBindings)
+GRAPH_NODE_CHANGE(RetractedDelayedBy)
+
+BINDING_RELATION_CHANGE(RetractedAdjacentVar)
+BINDING_RELATION_CHANGE(RetractedSubtypeOf)
+BINDING_RELATION_CHANGE(RetractedSupertypeOf)
+BINDING_RELATION_CHANGE(RetractedEquivalentTo)
 
 SCORE_CHANGE(IncreasedScore)
 SCORE_CHANGE(DecreasedScore)
@@ -86,7 +94,8 @@ CHANGE(AddedConversionRestriction)
 CHANGE(AddedFix)
 CHANGE(AddedFixedRequirement)
 CHANGE(RecordedOpenedPackExpansionType)
-CHANGE(RecordedPackEnvironment)
+CHANGE(RecordedPackElementExpansion)
+CHANGE(RecordedPackExpansionEnvironment)
 CHANGE(RecordedNodeType)
 CHANGE(RecordedKeyPathComponentType)
 CHANGE(RecordedResultBuilderTransform)
@@ -97,14 +106,16 @@ CHANGE(RecordedPotentialThrowSite)
 CHANGE(RecordedIsolatedParam)
 CHANGE(RecordedKeyPath)
 CHANGE(RetiredConstraint)
+CHANGE(RetractedBinding)
 
-LAST_CHANGE(RetiredConstraint)
+LAST_CHANGE(RetractedBinding)
 
 #undef LOCATOR_CHANGE
 #undef EXPR_CHANGE
 #undef CLOSURE_CHANGE
 #undef CONSTRAINT_CHANGE
 #undef GRAPH_NODE_CHANGE
+#undef BINDING_RELATION_CHANGE
 #undef SCORE_CHANGE
 #undef LAST_CHANGE
 #undef CHANGE

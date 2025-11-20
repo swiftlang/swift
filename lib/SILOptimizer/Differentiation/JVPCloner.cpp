@@ -42,7 +42,7 @@ namespace swift {
 namespace autodiff {
 
 class JVPCloner::Implementation final
-    : public TypeSubstCloner<JVPCloner::Implementation, SILOptFunctionBuilder> {
+    : public TypeSubstCloner<JVPCloner::Implementation> {
 private:
   /// The global context.
   ADContext &context;
@@ -333,15 +333,15 @@ private:
   /// Remap any archetypes into the differential function's context.
   Type remapTypeInDifferential(Type ty) {
     if (ty->hasArchetype())
-      return getDifferential().mapTypeIntoContext(ty->mapTypeOutOfContext());
-    return getDifferential().mapTypeIntoContext(ty);
+      return getDifferential().mapTypeIntoEnvironment(ty->mapTypeOutOfEnvironment());
+    return getDifferential().mapTypeIntoEnvironment(ty);
   }
 
   /// Remap any archetypes into the differential function's context.
   SILType remapSILTypeInDifferential(SILType ty) {
     if (ty.hasArchetype())
-      return getDifferential().mapTypeIntoContext(ty.mapTypeOutOfContext());
-    return getDifferential().mapTypeIntoContext(ty);
+      return getDifferential().mapTypeIntoEnvironment(ty.mapTypeOutOfEnvironment());
+    return getDifferential().mapTypeIntoEnvironment(ty);
   }
 
   /// Find the tangent space of a given canonical type.
@@ -702,7 +702,7 @@ public:
         loc, differentialRef, jvpSubstMap, {diffStructVal},
         ParameterConvention::Direct_Guaranteed);
 
-    auto differentialType = jvp->mapTypeIntoContext(
+    auto differentialType = jvp->mapTypeIntoEnvironment(
         jvp->getConventions().getSILType(
             jvp->getLoweredFunctionType()->getResults().back(),
             jvp->getTypeExpansionContext()));
@@ -949,8 +949,9 @@ public:
     auto tanDest = getTangentBuffer(bb, uccai->getDest());
 
     diffBuilder.createUnconditionalCheckedCastAddr(
-        loc, tanSrc, tanSrc->getType().getASTType(), tanDest,
-        tanDest->getType().getASTType());
+       loc, uccai->getCheckedCastOptions(),
+        tanSrc, tanSrc->getType().getASTType(),
+        tanDest, tanDest->getType().getASTType());
   }
 
   /// Handle `begin_access` instruction (and do differentiability checks).
@@ -959,14 +960,14 @@ public:
   CLONE_AND_EMIT_TANGENT(BeginAccess, bai) {
     // Check for non-differentiable writes.
     if (bai->getAccessKind() == SILAccessKind::Modify) {
-      if (auto *gai = dyn_cast<GlobalAddrInst>(bai->getSource())) {
+      if (isa<GlobalAddrInst>(bai->getSource())) {
         context.emitNondifferentiabilityError(
             bai, invoker,
             diag::autodiff_cannot_differentiate_writes_to_global_variables);
         errorOccurred = true;
         return;
       }
-      if (auto *pbi = dyn_cast<ProjectBoxInst>(bai->getSource())) {
+      if (isa<ProjectBoxInst>(bai->getSource())) {
         context.emitNondifferentiabilityError(
             bai, invoker,
             diag::autodiff_cannot_differentiate_writes_to_mutable_captures);
@@ -1684,7 +1685,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
     linearMapInfo->getLinearMapTupleLoweredType(origEntry).getASTType();
   dfParams.push_back({dfTupleType, ParameterConvention::Direct_Owned});
 
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(module.getASTContext());
   auto diffName = mangler.mangleLinearMap(
       witness->getOriginalFunction()->getName(),
       AutoDiffLinearMapKind::Differential, witness->getConfig());

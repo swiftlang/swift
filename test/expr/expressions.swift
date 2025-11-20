@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 //===----------------------------------------------------------------------===//
 // Tests and samples.
@@ -194,7 +194,7 @@ func test5() {
 
 
   let c: (a: Int, b: Int) = (1,2)
-  let _: (b: Int, a: Int) = c  // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated}}
+  let _: (b: Int, a: Int) = c  // expected-warning {{implicit reordering of tuple elements from 'a:b:' to 'b:a:' is deprecated; this will be an error in a future Swift language mode}}
 }
 
 
@@ -758,15 +758,15 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns false}}
-_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns false}}
-_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns true}}
-_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns true}}
+_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns false}}
+_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns false}}
+_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns true}}
+_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns true}}
 
-_ = Int.self == .none  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns false}}
-_ = .none == Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns false}}
-_ = Int.self != .none  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns true}}
-_ = .none != Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns true}}
+_ = Int.self == .none  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns false}}
+_ = .none == Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns false}}
+_ = Int.self != .none  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns true}}
+_ = .none != Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns true}}
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
@@ -794,7 +794,7 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'ClosedRange<Int>?' and 'Int'}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error {{cannot convert value of type 'ClosedRange<Int>?' to expected argument type 'Int?'}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
   
   

@@ -7,6 +7,10 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
+// rdar://76038845
+// REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
+
 import StdlibUnittest
 import reasync
 

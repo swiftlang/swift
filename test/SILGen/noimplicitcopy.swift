@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-experimental-move-only %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-move-only %s | %FileCheck -check-prefix=SIL %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen -enable-experimental-move-only %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -enable-experimental-move-only %s | %FileCheck -check-prefix=SIL %s
 
 // This test does two different things:
 //

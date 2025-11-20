@@ -52,6 +52,7 @@ benefit of all Swift developers.
     - [Viewing allocation history, references, and page-level info](#viewing-allocation-history-references-and-page-level-info)
     - [Printing memory contents](#printing-memory-contents)
     - [Windows Error Codes](#windows-error-codes)
+    - [Debugging Simulator Apps](#working-simulator-apps)
 - [Debugging LLDB failures](#debugging-lldb-failures)
     - ["Types" Log](#types-log)
     - ["Expression" Log](#expression-log)
@@ -173,13 +174,13 @@ constraints and present the final type checked solution, e.g.:
 
 Score: <default 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>
 Type Variables:
-   ($T0 [attributes: [literal: integer]] [with possible bindings: (default type of literal) Int]) @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
+   ($T0 [attributes: [literal: integer]] [potential bindings: (default type of literal) Int]) @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
 
 Inactive Constraints:
   $T0 literal conforms to ExpressibleByIntegerLiteral @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
 
   (Potential Binding(s): 
-    ($T0 [attributes: [literal: integer]] [with possible bindings: (default type of literal) Int])
+    ($T0 [attributes: [literal: integer]] [potential bindings: (default type of literal) Int])
   (attempting type variable $T0 := Int
     (considering: $T0 literal conforms to ExpressibleByIntegerLiteral @ locator@0x13e009800 [IntegerLiteral@test.swift:3:1]
       (simplification result:
@@ -218,6 +219,26 @@ passing the flag `-Xfrontend -debug-constraints`:
 
     $ swift repl -Xfrontend -debug-constraints
     1> let foo = 1
+
+### Debugging Evaluator Cycles
+
+When triggering code in the type checker, one can by mistake cause a cycle in
+the request evaluator. The error looks as follows:
+
+```
+<unknown>:0: error: circular reference
+file.swift:18:22: note: through reference here
+16 | 
+17 | extension MyType {
+18 |   public static func test() -> MyType { ... }
+   |                      `- note: through reference here
+19 | }
+20 | 
+```
+
+To determine the actual circular request that is occuring, one can pass in the
+flag `-debug-cycles` to the compiler which will cause the compiler to dump out
+the linear chain of requests that led to the cycle.
 
 ## Debugging on SIL Level
 
@@ -1180,6 +1201,15 @@ Some relevant Microsoft documentation:
 * https://learn.microsoft.com/en-us/windows/win32/seccrypto/common-hresult-values
 * https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/0642cb2f-2075-4469-918c-4441e69c548a
 * https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
+
+## Debugging Simulator Apps
+
+Sometimes one has to debug apps compiled for one of the simulators (e.x.: iOS
+simulator). To manipulate the simulator from the command line, one uses the tool
+called `simctl`. This lets one perform actions such as installing apps,
+uninstalling apps, and of course launching apps. To pass through environment
+variables to launched apps, one sets them in the calling environment using the
+environment variable prefix `SIMCTL_CHILD_$ACTUAL_ENV_VAR_NAME`.
 
 # Debugging LLDB failures
 

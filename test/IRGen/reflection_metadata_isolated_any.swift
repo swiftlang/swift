@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir -target %target-cpu-apple-macos99.99 %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-PRESENT %s
-// RUN: %target-swift-frontend -emit-ir -target %target-cpu-apple-macos14.4 %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-SUPPRESSED %s
+// RUN: %target-swift-frontend -emit-ir -target %target-swift-6.0-abi-triple %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-PRESENT %s
+// RUN: %target-swift-frontend -emit-ir -target %target-swift-5.10-abi-triple %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-SUPPRESSED %s
 
 // REQUIRES: OS=macosx
 // UNSUPPORTED: CPU=arm64e
@@ -10,7 +10,7 @@
 // is fine.  Since this is for reflective metadata, we could go a step
 // further if we decide we really only care about layout equivalence for
 // these; if so, we could just suppress the @isolated(any) part of the
-// type completely, since it has the the same external layout as an
+// type completely, since it has the same external layout as an
 // ordinary function type.
 // rdar://129861211
 

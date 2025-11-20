@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -sil-verify-all -emit-sil -verify %s
 
 class Class {}
 //struct Class : ~Copyable {}

@@ -369,6 +369,40 @@ Added: _$ss15ContinuousClockV7InstantV3nowADvpZMV
 Added: _$ss15SuspendingClockV3nowAB7InstantVvpZMV
 Added: _$ss15SuspendingClockV7InstantV3nowADvpZMV
 Added: _$ss9TaskLocalC18_enclosingInstance7wrapped7storagexs5NeverO_s24ReferenceWritableKeyPathCyAGxGAIyAgByxGGtcipZMV
+Added: _$ss11GlobalActorPsE21sharedUnownedExecutorScevpZMV
+Added: _$ss5ClockPss010ContinuousA0VRszrlE10continuousADvpZMV
+Added: _$ss5ClockPss010SuspendingA0VRszrlE10suspendingADvpZMV
 
 Added: _swift_taskGroup_initializeWithOptions
 Added: _swift_task_isCurrentExecutorWithFlags
+
+// task priority escalation handlers
+Added: _swift_task_addPriorityEscalationHandler
+Added: _swift_task_removePriorityEscalationHandler
+Added: _$sScT16escalatePriority2toyScP_tF
+Added: _$sSct16escalatePriority2toyScP_tF
+Added: _$ss33withTaskPriorityEscalationHandler9operation02onC9Escalated9isolationxxyYaq_YKXE_yScP_ScPtYbXEScA_pSgYitYaq_YKs5ErrorR_r0_lF
+Added: _$ss33withTaskPriorityEscalationHandler9operation02onC9Escalated9isolationxxyYaq_YKXE_yScP_ScPtYbXEScA_pSgYitYaq_YKs5ErrorR_r0_lFTu
+
+// task names
+Added: _$sScTss5NeverORszABRs_rlE4nameSSSgvgZ
+Added: _$sScTss5NeverORszABRs_rlE4nameSSSgvpZMV
+Added: _swift_task_getCurrentTaskName
+
+// startSynchronously, immediate, addImmediateTask{UnlessCancelled}
+Added: _swift_task_immediate
+
+// isIsolatingCurrentContext
+Added: _swift_task_invokeSwiftIsIsolatingCurrentContext
+Added: _swift_task_isIsolatingCurrentContext
+Added: _swift_task_isIsolatingCurrentContext_hook
+Added: _$sScfsE25isIsolatingCurrentContextSbSgyF
+Added: _$sScf25isIsolatingCurrentContextSbSgyFTj
+Added: _$sScf25isIsolatingCurrentContextSbSgyFTq
+
+// CoroutineAccessors
+Added: _swift_task_dealloc_through
+
+// Clock systemEpochs
+Added: _$ss15ContinuousClockV11systemEpochAB7InstantVvpMV
+Added: _$ss15SuspendingClockV11systemEpochAB7InstantVvpMV

@@ -2,6 +2,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
+// REQUIRES: swift_feature_RawLayout
 
 protocol P {
   func protoMethod(_ a: Int) -> Int
@@ -21,7 +22,7 @@ struct Str : P {
     return a + x
   }
 
-  static let s = 27
+  static let s = 27 << 0
   static var s2 = 10 + s
   static var s3 = initFunc() // expected-error {{global/static variable initialization can cause locking}}
 }
@@ -100,13 +101,22 @@ func errorExistential(_ b: Bool) throws -> Int {
   if b {
     return 28
   }
-  throw MyError()
+  throw MyError() // expected-error{{Using type 'MyError' can cause metadata allocation or locks}}
+}
+
+@_noLocks
+func concreteThrowsExistential(_ b: Bool) throws -> Int {
+  if b {
+    return 28
+  }
+
+  throw ErrorEnum.tryAgain // expected-error{{Using type 'any Error' can cause metadata allocation or locks}}
 }
 
 @_noLocks
 func multipleThrows(_ b1: Bool, _ b2: Bool) throws -> Int {
   if b1 {
-    throw MyError()
+    throw MyError() // expected-error{{Using type 'MyError' can cause metadata allocation or locks}}
   }
   if b2 {
     throw MyError2()
@@ -118,9 +128,40 @@ func multipleThrows(_ b1: Bool, _ b2: Bool) throws -> Int {
 func testCatch(_ b: Bool) throws -> Int? {
   do {
     return try errorExistential(true)
-  } catch let e as MyError {
+  } catch let e as MyError { // expected-error{{this code performs reference counting operations which can cause locking}}
     print(e)
     return nil
+  }
+}
+
+enum ErrorEnum: Error {
+  case failed
+  case tryAgain
+}
+
+@_noLocks
+func concreteError(_ b: Bool) throws(ErrorEnum) -> Int {
+  if b {
+    return 28
+  }
+
+  throw .tryAgain
+}
+
+func concreteErrorOther(_ b: Bool) throws(ErrorEnum) -> Int {
+  if b {
+    return 28
+  }
+
+  throw .tryAgain
+}
+
+@_noLocks
+func testCatchConcrete(_ b: Bool) -> Int {
+  do {
+    return try concreteError(b) + concreteErrorOther(b)
+  } catch {
+    return 17
   }
 }
 
@@ -444,7 +485,7 @@ func dynamicCastNoExistential(_ a: AnyObject) -> Cl? {
 
 @_noExistentials
 func useOfExistential() -> P {
-  Str(x: 1) // expected-error {{cannot use a value of protocol type 'any P' in @_noExistential function}}
+  Str(x: 1) // expected-error {{cannot use a value of protocol type 'any P' in '@_noExistential' function}}
 }
 
 @_noExistentials

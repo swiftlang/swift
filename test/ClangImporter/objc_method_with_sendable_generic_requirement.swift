@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-silgen %t/main.swift -import-objc-header %t/Test.h | %FileCheck %t/main.swift
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %t/main.swift -import-objc-header %t/Test.h | %FileCheck %t/main.swift
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency

@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t -I %t %S/Inputs/ambiguous.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/DeclsUsedWrongly.swift
 
-// RUN: %target-swift-frontend -typecheck -I %t -serialize-diagnostics-path %t.dia %s -verify
+// RUN: %target-swift-frontend -typecheck -I %t -serialize-diagnostics-path %t.dia %s -verify -verify-ignore-unrelated
 // RUN: c-index-test -read-diagnostics %t.dia > %t.deserialized_diagnostics.txt 2>&1
 // RUN: %FileCheck --input-file=%t.deserialized_diagnostics.txt %s
 
@@ -36,7 +36,7 @@ import struct DeclsUsedWrongly.Choice // expected-error {{'Choice' was imported 
 import struct DeclsUsedWrongly.Callback // expected-error {{type alias 'Callback' (aka '() -> ()') cannot be imported as 'struct'}} {{8-14=typealias}}
 import var DeclsUsedWrongly.Callback // expected-error {{'Callback' was imported as 'var', but is a type}} {{8-11=typealias}}
 
-import struct DeclsUsedWrongly.Pair // expected-error {{type alias 'Pair<T>' (aka '(T, T)') cannot be imported as 'struct'}} {{8-14=typealias}}
+import struct DeclsUsedWrongly.Pair // expected-error {{generic type alias 'Pair<T>' (aka '(T, T)') cannot be imported as 'struct'}} {{8-14=typealias}}
 import var DeclsUsedWrongly.Pair // expected-error {{'Pair' was imported as 'var', but is a type}} {{8-11=typealias}}
 
 import struct Swift.print // expected-error {{'print' was imported as 'struct', but is a function}} {{8-14=func}}

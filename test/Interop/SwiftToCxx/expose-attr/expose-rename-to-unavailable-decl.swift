@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Expose -enable-experimental-cxx-interop -emit-clang-header-path %t/expose.h
+// RUN: %target-swift-frontend %s -module-name Expose -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/expose.h
 // RUN: %FileCheck %s < %t/expose.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/expose.h -Wno-error=unused-function)

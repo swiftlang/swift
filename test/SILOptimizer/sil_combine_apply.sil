@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -407,8 +407,7 @@ sil @helperForOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.I
 // CHECK-LABEL: sil @testOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32 {
 // CHECK: bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int8):
 // CHECK:   [[FN:%.*]] = function_ref @helperForOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32
-// CHECK:   [[TTF:%.*]] = thin_to_thick_function [[FN]] : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32 to $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
-// CHECK:   %{{.*}} = apply [[TTF]](%0, %1) : $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
+// CHECK:   %{{.*}} = apply [[FN]](%0, %1) : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32
 // CHECK:   %{{.*}} = tuple ()
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function 'testOptimizeApplyOfConvertFunction'
@@ -569,6 +568,24 @@ bb0:
   %result = apply %converted(%metatype) : $@convention(thin) (@thick Derived.Type) -> ()
   %return = tuple ()
   return %return : $()
+}
+
+class GenC<T> {
+}
+
+sil @takeGenC : $@convention(thin) <τ_0_0> (@owned GenC<τ_0_0>) -> ()
+
+// CHECK-LABEL: sil [ossa] @convert_function_with_generic_arg :
+// CHECK:         [[C:%.*]] = convert_function
+// CHECK:         apply [[C]]
+// CHECK:       } // end sil function 'convert_function_with_generic_arg'
+sil [ossa] @convert_function_with_generic_arg : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %2 = function_ref @takeGenC : $@convention(thin) <τ_0_0> (@owned GenC<τ_0_0>) -> ()
+  %9 = convert_function %2 to $@convention(thin) (@owned AnyObject) -> ()
+  %30 = apply %9(%0) : $@convention(thin) (@owned AnyObject) -> ()
+  %r = tuple ()
+  return %r
 }
 
 sil shared [transparent] [thunk] @genericClosure : $@convention(thin) <T> (@in T) -> @out T {

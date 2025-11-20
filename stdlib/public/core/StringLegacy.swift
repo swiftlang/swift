@@ -124,10 +124,10 @@ extension String {
   public func hasPrefix(_ prefix: String) -> Bool {
     if _fastPath(self._guts.isNFCFastUTF8 && prefix._guts.isNFCFastUTF8) {
       guard prefix._guts.count <= self._guts.count else { return false }
-      let isPrefix = prefix._guts.withFastUTF8 { nfcPrefix in
+      let isPrefix = unsafe prefix._guts.withFastUTF8 { nfcPrefix in
         let prefixEnd = nfcPrefix.count
-        return self._guts.withFastUTF8(range: 0..<prefixEnd) { nfcSlicedSelf in
-          return _binaryCompare(nfcSlicedSelf, nfcPrefix) == 0
+        return unsafe self._guts.withFastUTF8(range: 0..<prefixEnd) { nfcSlicedSelf in
+          return unsafe _binaryCompare(nfcSlicedSelf, nfcPrefix) == 0
         }
       }
       let endIndex = Index(_encodedOffset: prefix._guts.count)
@@ -143,9 +143,9 @@ extension String {
     if _fastPath(self._guts.isNFCFastUTF8 && suffix._guts.isNFCFastUTF8) {
       let suffixStart = self._guts.count - suffix._guts.count
       guard suffixStart >= 0 else { return false }
-      let isSuffix = suffix._guts.withFastUTF8 { nfcSuffix in
-        return self._guts.withFastUTF8(range: suffixStart..<self._guts.count) {
-          nfcSlicedSelf in return _binaryCompare(nfcSlicedSelf, nfcSuffix) == 0
+      let isSuffix = unsafe suffix._guts.withFastUTF8 { nfcSuffix in
+        return unsafe self._guts.withFastUTF8(range: suffixStart..<self._guts.count) {
+          nfcSlicedSelf in return unsafe _binaryCompare(nfcSlicedSelf, nfcSuffix) == 0
         }
       }
       let startIndex = Index(_encodedOffset: suffixStart)

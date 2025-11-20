@@ -63,8 +63,10 @@ private extension Instruction {
          is BeginAccessInst,
          is EndAccessInst,
          is EndCOWMutationInst,
+         is EndCOWMutationAddrInst,
          is CopyValueInst,
          is DestroyValueInst,
+         is StrongReleaseInst,
          is IsUniqueInst,
          is EndBorrowInst,
          is LoadInst,
@@ -73,7 +75,10 @@ private extension Instruction {
          is CopyAddrInst,
          is BuiltinInst,
          is StoreBorrowInst,
-         is DebugValueInst:
+         is MarkDependenceInst,
+         is MarkDependenceAddrInst,
+         is DebugValueInst,
+         is DebugStepInst:
       return true
     default:
       return false

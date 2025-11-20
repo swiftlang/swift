@@ -18,9 +18,14 @@
 #ifndef SWIFT_FRONTEND_DIAGNOSTIC_VERIFIER_H
 #define SWIFT_FRONTEND_DIAGNOSTIC_VERIFIER_H
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallString.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
+
+namespace {
+struct ExpectedDiagnosticInfo;
+}
 
 namespace swift {
 class DependencyTracker;
@@ -45,11 +50,13 @@ struct LineColumnRange {
 };
 
 class CapturedFixItInfo final {
+  SourceManager *diagSM;
   DiagnosticInfo::FixIt FixIt;
   mutable LineColumnRange LineColRange;
 
 public:
-  CapturedFixItInfo(DiagnosticInfo::FixIt FixIt) : FixIt(FixIt) {}
+  CapturedFixItInfo(SourceManager &diagSM, DiagnosticInfo::FixIt FixIt)
+    : diagSM(&diagSM), FixIt(FixIt) {}
 
   CharSourceRange &getSourceRange() { return FixIt.getRange(); }
   const CharSourceRange &getSourceRange() const { return FixIt.getRange(); }
@@ -58,30 +65,28 @@ public:
 
   /// Obtain the line-column range corresponding to the fix-it's
   /// replacement range.
-  const LineColumnRange &getLineColumnRange(const SourceManager &SM,
-                                            unsigned BufferID) const;
+  const LineColumnRange &getLineColumnRange(SourceManager &SM) const;
 };
 
 struct CapturedDiagnosticInfo {
   llvm::SmallString<128> Message;
-  llvm::SmallString<32> FileName;
+  std::optional<unsigned> SourceBufferID;
   DiagnosticKind Classification;
   SourceLoc Loc;
   unsigned Line;
   unsigned Column;
   SmallVector<CapturedFixItInfo, 2> FixIts;
-  SmallVector<std::string, 1> EducationalNotes;
+  std::string CategoryDocFile;
 
   CapturedDiagnosticInfo(llvm::SmallString<128> Message,
-                         llvm::SmallString<32> FileName,
+                         std::optional<unsigned> SourceBufferID,
                          DiagnosticKind Classification, SourceLoc Loc,
                          unsigned Line, unsigned Column,
                          SmallVector<CapturedFixItInfo, 2> FixIts,
-                         SmallVector<std::string, 1> EducationalNotes)
-      : Message(Message), FileName(FileName), Classification(Classification),
-        Loc(Loc), Line(Line), Column(Column), FixIts(FixIts),
-        EducationalNotes(EducationalNotes) {
-    std::sort(EducationalNotes.begin(), EducationalNotes.end());
+                         const std::string &categoryDocFile)
+      : Message(Message), SourceBufferID(SourceBufferID),
+        Classification(Classification), Loc(Loc), Line(Line), Column(Column),
+        FixIts(FixIts), CategoryDocFile(categoryDocFile) {
   }
 };
 /// This class implements support for -verify mode in the compiler.  It
@@ -91,24 +96,26 @@ class DiagnosticVerifier : public DiagnosticConsumer {
   SourceManager &SM;
   std::vector<CapturedDiagnosticInfo> CapturedDiagnostics;
   ArrayRef<unsigned> BufferIDs;
-  SmallVector<unsigned, 4> AdditionalBufferIDs;
+  ArrayRef<std::string> AdditionalFilePaths;
   bool AutoApplyFixes;
   bool IgnoreUnknown;
+  bool IgnoreUnrelated;
+  bool IgnoreMacroLocationNote;
   bool UseColor;
   ArrayRef<std::string> AdditionalExpectedPrefixes;
 
 public:
   explicit DiagnosticVerifier(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
+                              ArrayRef<std::string> AdditionalFilePaths,
                               bool AutoApplyFixes, bool IgnoreUnknown,
-                              bool UseColor,
+                              bool IgnoreUnrelated,
+                              bool IgnoreMacroLocationNote, bool UseColor,
                               ArrayRef<std::string> AdditionalExpectedPrefixes)
-      : SM(SM), BufferIDs(BufferIDs), AutoApplyFixes(AutoApplyFixes),
-        IgnoreUnknown(IgnoreUnknown), UseColor(UseColor),
+      : SM(SM), BufferIDs(BufferIDs), AdditionalFilePaths(AdditionalFilePaths),
+        AutoApplyFixes(AutoApplyFixes), IgnoreUnknown(IgnoreUnknown),
+        IgnoreUnrelated(IgnoreUnrelated),
+        IgnoreMacroLocationNote(IgnoreMacroLocationNote), UseColor(UseColor),
         AdditionalExpectedPrefixes(AdditionalExpectedPrefixes) {}
-
-  void appendAdditionalBufferID(unsigned bufferID) {
-    AdditionalBufferIDs.push_back(bufferID);
-  }
 
   virtual void handleDiagnostic(SourceManager &SM,
                                 const DiagnosticInfo &Info) override;
@@ -128,13 +135,33 @@ private:
 
   void printDiagnostic(const llvm::SMDiagnostic &Diag) const;
 
+  /// Check whether there were any diagnostics in files without expected
+  /// diagnostics
+  bool verifyUnrelated(
+      std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;
+
   bool
   verifyUnknown(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;
+
+  std::vector<llvm::SMDiagnostic> Errors;
 
   /// verifyFile - After the file has been processed, check to see if we
   /// got all of the expected diagnostics and check to see if there were any
   /// unexpected ones.
   Result verifyFile(unsigned BufferID);
+  unsigned parseExpectedDiagInfo(unsigned BufferID, StringRef MatchStart,
+                                 unsigned &PrevExpectedContinuationLine,
+                                 ExpectedDiagnosticInfo &Expected);
+  void
+  verifyDiagnostics(std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics,
+                    unsigned BufferID);
+  void verifyRemaining(std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics,
+                       const char *FileStart);
+  void addError(const char *Loc, const Twine &message,
+                ArrayRef<llvm::SMFixIt> FixIts = {});
+
+  std::optional<LineColumnRange>
+  parseExpectedFixItRange(StringRef &Str, unsigned DiagnosticLineNo);
 
   bool checkForFixIt(const std::vector<ExpectedFixIt> &ExpectedAlts,
                      const CapturedDiagnosticInfo &D, unsigned BufferID) const;
@@ -142,6 +169,8 @@ private:
   // Render the verifier syntax for a given set of fix-its.
   std::string renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
                            unsigned BufferID, unsigned DiagnosticLineNo) const;
+
+  llvm::DenseMap<SourceLoc, unsigned> Expansions;
 
   void printRemainingDiagnostics() const;
 };

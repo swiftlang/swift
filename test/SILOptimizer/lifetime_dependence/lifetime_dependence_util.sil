@@ -1,12 +1,14 @@
 // RUN: %target-sil-opt -test-runner %s \
 // RUN:     -module-name Swift \
-// RUN:     -enable-experimental-feature NonescapableTypes \
+// RUN:     -enable-experimental-feature LifetimeDependence \
+// RUN:     -enable-experimental-feature AddressableTypes \
 // RUN:     -o /dev/null 2>&1 | %FileCheck %s
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_AddressableTypes
 
-sil_stage canonical
+sil_stage raw
 
 import Builtin
 
@@ -62,6 +64,11 @@ struct NEWrap : ~Escapable {
   init() { }
 }
 
+@_addressableForDependencies
+public struct InlineInt {
+  var i: Builtin.Int64
+}
+
 sil @coroutine : $@yield_once @convention(method) (@guaranteed NE) -> @yields @guaranteed NE
 
 sil @capture : $@convention(thin) (@guaranteed NE) -> ()
@@ -92,6 +99,34 @@ entry(%0 : @owned $C):
   return %99 : $()
 }
 
+sil hidden [ossa] @testRootForTemp : $@convention(thin) () -> () {
+bb0:
+  %varC = alloc_box ${ var C }, var, name "ne"
+  %borrowC = begin_borrow [lexical] [var_decl] %varC
+  %addrC = project_box %borrowC, 0
+
+  %finit = function_ref @getC : $@convention(thin) () -> @owned C
+  %newC = apply %finit() : $@convention(thin) () -> @owned C
+  store %newC to [init] %addrC
+
+  %accessC = begin_access [read] [unknown] %addrC
+  %tempC = load [copy] %accessC
+  end_access %accessC
+  specify_test "lifetime_dependence_root %tempC"
+// CHECK-LABEL: testRootForTemp: lifetime_dependence_root with: %tempC
+// CHECK: Lifetime dependence roots of: {{%.*}} = load [copy] %{{.*}} : $*C
+// CHECK: root: %{{.*}} = begin_access [read] [unknown] %{{.*}} : $*C
+// CHECK-LABEL: end running test 1 of 1 on testRootForTemp: lifetime_dependence_root with: %tempC
+
+  destroy_value %tempC
+
+  end_borrow %borrowC
+  destroy_value %varC
+
+  %99 = tuple ()
+  return %99
+}
+
 sil [ossa] @dependence_scope : $@convention(thin) (@owned C, @owned D, @guaranteed D, @in_guaranteed D, @inout D) -> () {
 entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
   %move = move_value %1 : $D
@@ -110,9 +145,10 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
   %guaranteed_mark = mark_dependence [nonescaping] %owned_mark : $C on %pair : $PairC
   specify_test "lifetime_dependence_scope %guaranteed_mark"
 // CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %guaranteed_mark
-// CHECK-NEXT: Caller:      %2 = argument of bb0 : $D
+// CHECK-NEXT: Borrowed:    %{{.*}} = begin_borrow %2 : $D
 // CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %{{.*}} : $PairC
-// CHECK-NEXT: Caller range
+// CHECK-NEXT: begin:       %{{.*}} = begin_borrow %2 : $D
+// CHECK-NEXT: ends:        end_borrow {{.*}} : $D
 // CHECK: dependence_scope: lifetime_dependence_scope with: %guaranteed_mark
 
   %m = class_method %2 : $D, #D.field!read : (D) -> () -> (), $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
@@ -130,7 +166,9 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
   %trivial_mark = mark_dependence [nonescaping] %yield_mark : $C on %zero : $Builtin.Int1
   specify_test "lifetime_dependence_scope %trivial_mark"
 // CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %trivial_mark
-// CHECK-NEXT: Trivial Dependence
+// CHECK-NEXT: Unknown:   %{{.*}} = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: Dependent: %{{.*}} = mark_dependence [nonescaping]
+// CHECK-NEXT: Caller range
 // CHECK: dependence_scope: lifetime_dependence_scope with: %trivial_mark
 
   %f = ref_element_addr %borrow : $D, #D.object
@@ -155,14 +193,15 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
   %inguaranteed_arg_mark = mark_dependence [nonescaping] %guaranteed_arg_mark : $C on %3 : $*D
   specify_test "lifetime_dependence_scope %inguaranteed_arg_mark"
 // CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %inguaranteed_arg_mark
-// CHECK-NEXT: Initialized: %3 = argument of bb0 : $*D
+// CHECK-NEXT: Caller: %3 = argument of bb0 : $*D
 // CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %3 : $*D
-// CHECK-NEXT: begin:      %{{.*}} = move_value %{{.*}} : $D
-// CHECK-NEXT: ends:     
+// CHECK-NEXT: Caller range
 // CHECK: dependence_scope: lifetime_dependence_scope with: %inguaranteed_arg_mark
   
   %inout_arg_mark = mark_dependence [nonescaping] %inguaranteed_arg_mark : $C on %4 : $*D
   specify_test "lifetime_dependence_scope %inout_arg_mark"
+// We do not expect a direct dependence on in inout argument. Treat it as unknown.
+// Instead, mutable variable access should have an access scope.
 // CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %inout_arg_mark
 // CHECK-NEXT: Caller:     %4 = argument of bb0 : $*D
 // CHECK-NEXT: Dependent:  %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %4 : $*D
@@ -177,40 +216,10 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
   return %99 : $()
 }
 
-sil [ossa] @dependence_root : $@convention(thin) (@owned D, @owned C) -> () {
-entry(%0 : @owned $D, %1 : @owned $C):
-  %copy = copy_value %0 : $D
-  %move = move_value %copy : $D
-  %borrow = begin_borrow %move : $D
-  %d2c = upcast %borrow : $D to $C
-  %pair = struct $PairC(%d2c : $C, %d2c : $C)
-  %mark_pair = mark_dependence [nonescaping] %1 : $C on %pair : $PairC
-  specify_test "lifetime_dependence_root %mark_pair"
-// CHECK-LABEL: dependence_root: lifetime_dependence_root with: %mark_pair
-// CHECK-NEXT: Scope: Owned: %0 = argument of bb0 : $D
-// CHECK-NEXT: dependence_root: lifetime_dependence_root with: %mark_pair
-
-  %f = ref_element_addr %borrow : $D, #D.object
-  %access = begin_access [read] [static] %f : $*C
-  %load = load [copy] %access : $*C
-  specify_test "lifetime_dependence_root %load"
-// CHECK-LABEL: dependence_root: lifetime_dependence_root with: %load
-// No root: Inheriting a dependence from an Escapable value.
-// CHECK-NEXT: dependence_root: lifetime_dependence_root with: %load
-
-  destroy_value %load : $C
-  end_access %access : $*C
-  destroy_value %mark_pair : $C
-  end_borrow %borrow : $D
-  destroy_value %move : $D
-  destroy_value %0 : $D
-  %99 = tuple()
-  return %99 : $()
-}
-
 // CHECK-LABEL: dependence_access: lifetime_dependence_use with: %0
 // CHECK: LifetimeDependence uses of: %0 = argument of bb0 : $*NE
 // CHECK-NEXT: Leaf use: operand #0 of   end_access %{{.*}} : $*NE
+// CHECK-NEXT: Returned inout: %0 = argument of bb0 : $*NE
 // CHECK-NEXT: dependence_access: lifetime_dependence_use with: %0
 sil [ossa] @dependence_access : $@convention(thin) (@inout NE, @owned C) -> () {
 bb0(%0 : $*NE, %1 : @owned $C):
@@ -251,6 +260,7 @@ bb0(%0 : @guaranteed $NE):
 
 // CHECK-LABEL: dependence_coroutine: lifetime_dependence_use with: %0
 // CHECK: LifetimeDependence uses of: %0 = argument of bb0 : $NE
+// CHECK-NEXT: Leaf use: operand #0 of   destroy_value %{{.*}} : $NE
 // CHECK-NEXT: Leaf use: operand #0 of   %{{.*}} = end_apply %{{.*}} as $()
 // CHECK-NEXT: dependence_coroutine: lifetime_dependence_use with: %0
 sil [ossa] @dependence_coroutine : $@convention(thin) (@guaranteed NE) -> () {
@@ -341,6 +351,29 @@ bb0(%0 : @owned $NCNEInt):
   specify_test "lifetime_dependence_use %0"
   %nd = drop_deinit %0 : $NCNEInt
   destroy_value %nd : $NCNEInt
+  %99 = tuple()
+  return %99 : $()
+}
+
+// =============================================================================
+// isAddressable
+// =============================================================================
+
+sil [ossa] @addressableForInoutDepHelper : $@convention(thin) (@in_guaranteed InlineInt, @lifetime(borrow address_for_deps 0) @inout NE) -> () {
+bb(%0 : $*InlineInt, %1 : $*NE):
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on addressableForInoutDep: addressable_arguments with: @instruction.operand[1]
+// CHECK: Arg Index: 0 of Apply:   %{{.*}} = apply %{{.*}}(%0, %1) : $@convention(thin) (@in_guaranteed InlineInt, @lifetime(borrow address_for_deps 0) @inout NE) -> ()
+// CHECK: isAddressable: true
+// CHECK-LABEL: end running test 1 of 1 on addressableForInoutDep: addressable_arguments with: @instruction.operand[1]
+sil [ossa] @addressableForInoutDep : $@convention(thin) (@in_guaranteed InlineInt, @lifetime(borrow address_for_deps 0) @inout NE) -> () {
+bb(%0 : $*InlineInt, %1 : $*NE):
+  %f = function_ref @addressableForInoutDepHelper : $@convention(thin) (@in_guaranteed InlineInt, @lifetime(borrow address_for_deps 0) @inout NE) -> ()
+  specify_test "addressable_arguments @instruction.operand[1]"
+  %call = apply %f(%0, %1) : $@convention(thin) (@in_guaranteed InlineInt, @lifetime(borrow address_for_deps 0) @inout NE) -> ()
   %99 = tuple()
   return %99 : $()
 }

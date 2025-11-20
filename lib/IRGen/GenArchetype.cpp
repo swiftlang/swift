@@ -101,12 +101,12 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
   auto *member = archetype->getInterfaceType()->castTo<DependentMemberType>();
 
   auto parent = cast<ArchetypeType>(
-    archetype->getGenericEnvironment()->mapTypeIntoContext(
+    archetype->getGenericEnvironment()->mapTypeIntoEnvironment(
       member->getBase())->getCanonicalType());
-  AssociatedType association(member->getAssocType());
+  auto *assocType = member->getAssocType();
 
   MetadataResponse response =
-    emitAssociatedTypeMetadataRef(IGF, parent, association, request);
+    emitAssociatedTypeMetadataRef(IGF, parent, assocType, request);
 
   setTypeMetadataName(IGF.IGM, response.getMetadata(), archetype);
 
@@ -235,7 +235,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   // The first entry in the path is a direct requirement of the signature,
   // for which we should always have local type data available.
   CanType rootArchetype =
-    environment->mapTypeIntoContext(i->first)->getCanonicalType();
+    environment->mapTypeIntoEnvironment(i->first)->getCanonicalType();
   ProtocolDecl *rootProtocol = i->second;
 
   // Turn the rest of the path into a MetadataPath.
@@ -306,8 +306,10 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
     assert(rootWTable && "root witness table not bound in local context!");
   }
 
+  auto conformance = ProtocolConformanceRef::forAbstract(
+      rootArchetype, rootProtocol);
   wtable = path.followFromWitnessTable(IGF, rootArchetype,
-                                       ProtocolConformanceRef(rootProtocol),
+                                       conformance,
                                        MetadataResponse::forComplete(rootWTable),
                                        /*request*/ MetadataState::Complete,
                                        nullptr).getMetadata();
@@ -319,11 +321,11 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
 MetadataResponse
 irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                      CanArchetypeType origin,
-                                     AssociatedType association,
+                                     AssociatedTypeDecl *assocType,
                                      DynamicMetadataRequest request) {
   // Find the conformance of the origin to the associated type's protocol.
   llvm::Value *wtable = emitArchetypeWitnessTableRef(IGF, origin,
-                                               association.getSourceProtocol());
+                                               assocType->getProtocol());
 
   // Find the origin's type metadata.
   llvm::Value *originMetadata =
@@ -331,7 +333,7 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
       .getMetadata();
 
   return emitAssociatedTypeMetadataRef(IGF, originMetadata, wtable,
-                                       association, request);
+                                       assocType, request);
 }
 
 const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
@@ -403,7 +405,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // Opaque result types can be private and from a different module. In this
   // case we can't access their type metadata from another module.
   IsABIAccessible_t abiAccessible = IsABIAccessible;
-  if (auto opaqueArchetype = dyn_cast<OpaqueTypeArchetypeType>(archetype)) {
+  if (isa<OpaqueTypeArchetypeType>(archetype)) {
     auto &currentSILModule = IGM.getSILModule();
     abiAccessible =
         currentSILModule.isTypeMetadataAccessible(archetype->getCanonicalType())

@@ -192,7 +192,7 @@ public:
   /// Collect the set of variables referenced in the given pattern.
   void collectVariables(SmallVectorImpl<VarDecl *> &variables) const;
 
-  /// apply the specified function to all variables referenced in this
+  /// Apply the specified function to all variables referenced in this
   /// pattern.
   void forEachVariable(llvm::function_ref<void(VarDecl *)> f) const;
 
@@ -349,10 +349,10 @@ public:
   }
 
   MutableArrayRef<TuplePatternElt> getElements() {
-    return {getTrailingObjects<TuplePatternElt>(), getNumElements()};
+    return getTrailingObjects(getNumElements());
   }
   ArrayRef<TuplePatternElt> getElements() const {
-    return {getTrailingObjects<TuplePatternElt>(), getNumElements()};
+    return getTrailingObjects(getNumElements());
   }
 
   const TuplePatternElt &getElement(unsigned i) const {return getElements()[i];}
@@ -617,10 +617,10 @@ public:
   }
 
   Expr *getUnresolvedOriginalExpr() const {
-    return ElementDeclOrUnresolvedOriginalExpr.get<Expr*>();
+    return cast<Expr *>(ElementDeclOrUnresolvedOriginalExpr);
   }
   bool hasUnresolvedOriginalExpr() const {
-    return ElementDeclOrUnresolvedOriginalExpr.is<Expr*>();
+    return isa<Expr *>(ElementDeclOrUnresolvedOriginalExpr);
   }
   void setUnresolvedOriginalExpr(Expr *e) {
     ElementDeclOrUnresolvedOriginalExpr = e;
@@ -687,12 +687,15 @@ public:
   static OptionalSomePattern *create(ASTContext &ctx, Pattern *subPattern,
                                      SourceLoc questionLoc);
 
-  static OptionalSomePattern *
-  createImplicit(ASTContext &ctx, Pattern *subPattern,
-                 SourceLoc questionLoc = SourceLoc());
+  static OptionalSomePattern *createImplicit(ASTContext &ctx,
+                                             Pattern *subPattern);
 
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
+
   SourceRange getSourceRange() const {
+    if (QuestionLoc.isInvalid())
+      return SubPattern->getSourceRange();
+
     return SourceRange(SubPattern->getStartLoc(), QuestionLoc);
   }
 

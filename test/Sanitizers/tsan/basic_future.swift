@@ -6,6 +6,12 @@
 // REQUIRES: tsan_runtime
 // UNSUPPORTED: use_os_stdlib
 
+// Bug in TSan on FreeBSD
+// Thread destruction interceptor marks the thread ignored and then checks that
+// the thread isn't being ignored.
+// rdar://158450231
+// XFAIL: OS=freebsd
+
 import Dispatch
 
 #if canImport(Darwin)

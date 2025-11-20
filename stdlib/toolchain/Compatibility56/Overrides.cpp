@@ -39,6 +39,8 @@ struct ConcurrencyOverrideSection {
 
 #undef OVERRIDE
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-designated-field-initializers"
 __attribute__((visibility("hidden")))
 ConcurrencyOverrideSection Swift56ConcurrencyOverrides
 __attribute__((used, section("__DATA,__s_async_hook"))) = {
@@ -55,6 +57,7 @@ RuntimeOverrideSection Swift56RuntimeOverrides
 __attribute__((used, section("__DATA,__swift56_hooks"))) = {
   .version = 0,
 };
+#pragma clang diagnostic pop
 
 // Allow this library to get force-loaded by autolinking
 __attribute__((weak, visibility("hidden")))

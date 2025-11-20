@@ -59,7 +59,12 @@ public:
       /// does not "contribute" any task local values. This is to speed up
       /// lookups by skipping empty parent tasks during get(), and explained
       /// in depth in `initializeLinkParent()`.
-      ParentTaskMarker = 2
+      ParentTaskMarker = 2,
+
+      /// Marker item that indicates that all earlier items should be ignored.
+      /// Allows to temporary disable all task local values in O(1).
+      /// Is used to disable task-locals for fast path of isolated deinit.
+      StopLookupMarker = 3,
     };
 
   private:
@@ -131,14 +136,22 @@ public:
     }
   };
 
-  class ParentTaskMarkerItem : public Item {
-    ParentTaskMarkerItem(Item *next) : Item(next, Kind::ParentTaskMarker) {}
+  class MarkerItem : public Item {
+    MarkerItem(Item *next, Kind kind) : Item(next, kind) {}
+
+    static MarkerItem *create(AsyncTask *task, Item *next, Kind kind);
 
   public:
-    static ParentTaskMarkerItem *create(AsyncTask *task);
+    static MarkerItem *createParentTaskMarker(AsyncTask *task) {
+      return create(task, nullptr, Kind::ParentTaskMarker);
+    }
+    static MarkerItem *createStopLookupMarker(AsyncTask *task, Item *next) {
+      return create(task, next, Kind::StopLookupMarker);
+    }
 
     static bool classof(const Item *item) {
-      return item->getKind() == Kind::ParentTaskMarker;
+      return item->getKind() == Kind::ParentTaskMarker ||
+             item->getKind() == Kind::StopLookupMarker;
     }
   };
 
@@ -185,6 +198,8 @@ public:
 
     void initializeLinkParent(AsyncTask *task, AsyncTask *parent);
 
+    bool isEmpty() const { return head == nullptr; }
+
     void pushValue(AsyncTask *task,
                    const HeapObject *key,
                    /* +1 */ OpaqueValue *value, const Metadata *valueType);
@@ -195,6 +210,9 @@ public:
     /// and `false` if the just popped value was the last one and the storage
     /// can be safely disposed of.
     bool popValue(AsyncTask *task);
+
+    void pushStopLookup(AsyncTask *task);
+    void popStopLookup(AsyncTask *task);
 
     /// Copy all task-local bindings to the target task.
     ///
@@ -212,6 +230,15 @@ public:
     ///
     /// Items owned by a parent task are left untouched, since we do not own them.
     void destroy(AsyncTask *task);
+  };
+
+  class StopLookupScope {
+    AsyncTask *task;
+    Storage *storage;
+
+  public:
+    StopLookupScope();
+    ~StopLookupScope();
   };
 };
 

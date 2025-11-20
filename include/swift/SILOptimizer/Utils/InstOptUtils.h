@@ -35,6 +35,7 @@ namespace swift {
 class DominanceInfo;
 class DeadEndBlocks;
 class BasicCalleeAnalysis;
+class DestructorAnalysis;
 template <class T> class NullablePtr;
 
 /// Transform a Use Range (Operand*) into a User Range (SILInstruction *)
@@ -417,12 +418,6 @@ ignore_expect_uses(ValueBase *value) {
 /// operations from it. These can be simplified and removed.
 bool simplifyUsers(SingleValueInstruction *inst);
 
-/// True if a type can be expanded without a significant increase to code size.
-///
-/// False if expanding a type is invalid. For example, expanding a
-/// struct-with-deinit drops the deinit.
-bool shouldExpand(SILModule &module, SILType ty);
-
 /// Check if the value of value is computed by means of a simple initialization.
 /// Store the actual SILValue into \p Val and the reversed list of instructions
 /// initializing it in \p Insns.
@@ -585,7 +580,8 @@ SILValue makeValueAvailable(SILValue value, SILBasicBlock *inBlock);
 /// use blocks inside a loop relative to \p value. The client must create
 /// separate copies for any uses within the loop.
 void endLifetimeAtLeakingBlocks(SILValue value,
-                                ArrayRef<SILBasicBlock *> userBBs);
+                                ArrayRef<SILBasicBlock *> userBBs,
+                                DeadEndBlocks *deadEndBlocks = nullptr);
 
 /// Given a forwarding instruction, eliminate it if all of its users are debug
 /// instructions and ownership uses.
@@ -595,11 +591,6 @@ bool tryEliminateOnlyOwnershipUsedForwardingInst(
 /// Constant-fold the Builtin.canBeClass if the type is known.
 IntegerLiteralInst *optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
                                                   SILBuilder &builder);
-
-/// Performs "predictable" memory access optimizations.
-///
-/// See the PredictableMemoryAccessOptimizations pass.
-bool optimizeMemoryAccesses(SILFunction *fn);
 
 /// Performs "predictable" dead allocation optimizations.
 ///
@@ -631,6 +622,9 @@ bool findUnreferenceableStorage(StructDecl *decl, SILType structType,
                                 SILFunction *func);
 
 SILValue getInitOfTemporaryAllocStack(AllocStackInst *asi);
+
+bool isDestructorSideEffectFree(SILInstruction *mayRelease,
+                                DestructorAnalysis *DA);
 
 } // end namespace swift
 

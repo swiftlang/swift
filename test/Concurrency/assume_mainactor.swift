@@ -1,22 +1,21 @@
-// RUN: %target-swift-frontend -swift-version 6 -emit-silgen -enable-experimental-feature UnspecifiedMeansMainActorIsolated %s | %FileCheck %s
-// RUN: %target-swift-frontend -swift-version 6 -emit-sil -enable-experimental-feature UnspecifiedMeansMainActorIsolated %s -verify
-
-// REQUIRES: asserts
+// RUN: %target-swift-frontend -swift-version 6 -emit-silgen -default-isolation MainActor %s | %FileCheck %s
+// RUN: %target-swift-frontend -swift-version 6 -emit-sil -default-isolation MainActor %s -verify
 
 // READ THIS! This test is meant to FileCheck the specific isolation when
-// UnspecifiedMeansMainActorIsolated is enabled. Please do not put other types
+// `-default-isolation` is set to `MainActor`. Please do not put other types
 // of tests in here.
 
 class Klass {
   // Implicit deinit
   // CHECK: // Klass.deinit
-  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: // Isolation: global_actor. type: MainActor
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor5KlassCfd : $@convention(method) (@guaranteed Klass) -> @owned Builtin.NativeObject {
 
   // Implicit deallocating deinit
   // CHECK: // Klass.__deallocating_deinit
   // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor5KlassCfD : $@convention(method) (@owned Klass) -> () {
+  // CHECK: swift_task_deinitOnExecutor
 
   // Implicit allocating init
   // CHECK: // Klass.__allocating_init()
@@ -68,9 +67,19 @@ struct NonIsolatedStructContainingKlass {
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor32NonIsolatedStructContainingKlassVACycfC : $@convention(method) (@thin NonIsolatedStructContainingKlass.Type) -> @owned NonIsolatedStructContainingKlass {
 }
 
+struct NonCopyableStruct: ~Copyable {
+  var x: Int
+  var y: Int
+
+  // CHECK: NonCopyableStruct.deinit
+  // CHECK-NEXT: Isolation: nonisolated
+  deinit {
+  }
+}
+
 @globalActor
 actor CustomActor {
-  static let shared = CustomActor()
+  static nonisolated let shared = CustomActor()
 }
 
 // CHECK: // unspecifiedAsync<A>(_:)
@@ -163,7 +172,7 @@ nonisolated func nonisolatedFunctionTest() async {
 
 actor MyActor {
   // CHECK: // variable initialization expression of MyActor.k
-  // CHECK-NEXT: // Isolation: actor_instance
+  // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil hidden [transparent] [ossa] @$s16assume_mainactor7MyActorC1kAA5KlassCvpfi : $@convention(thin) () -> @owned Klass {
 
   // CHECK: // MyActor.k.getter
@@ -175,9 +184,21 @@ actor MyActor {
   // CHECK-NEXT: sil hidden [transparent] [ossa] @$s16assume_mainactor7MyActorC1kAA5KlassCvs : $@convention(method) (@owned Klass, @sil_isolated @guaranteed MyActor) -> () {
   var k = Klass()
 
+  // CHECK: // static MyActor.f()
+  // CHECK-NEXT: // Isolation: unspecified
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor7MyActorC1fyyFZ : $@convention(method) (@thick MyActor.Type) -> ()
+  static func f() {}
+
+  struct Nested {
+    // CHECK: // MyActor.Nested.f()
+    // CHECK-NEXT: // Isolation: unspecified
+    // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor7MyActorC6NestedV1fyyF : $@convention(method) (MyActor.Nested) -> ()
+    func f() {}
+  }
+
   // Implicit deinit
   // CHECK: // MyActor.deinit
-  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor7MyActorCfd : $@convention(method) (@guaranteed MyActor) -> @owned Builtin.NativeObject {
 
   // Non-async init should be nonisolated
@@ -198,4 +219,59 @@ actor MyActor2 {
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor8MyActor2C1xACyt_tcfc : $@convention(method) (@owned MyActor2) -> @owned MyActor2 {
   @CustomActor
   init(x: ()) {}
+}
+
+@CustomActor func validateThatPrintIsStillNonIsolated() {
+  // Since we are in a CustomActor, we can only call this if print is
+  // NonIsolated and not if print was inferred to be main actor.
+  print("123")
+}
+
+nonisolated func localDeclIsolation() async {
+  struct Local {
+    static func f() {}
+  }
+
+  Local.f()
+
+  await withTaskGroup { group in
+    group.addTask { }
+
+    await group.next()
+  }
+}
+
+@CustomActor
+class CustomActorIsolated {
+  struct Nested {
+    // CHECK: // static CustomActorIsolated.Nested.f()
+    // CHECK-NEXT: // Isolation: unspecified
+    static func f() {}
+  }
+
+  // CHECK: // CustomActorIsolated.customIsolated()
+  // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
+  func customIsolated() {
+    Nested.f()
+  }
+}
+
+var global = 0
+
+func onMain() async {
+  await withTaskGroup { group in
+    group.addTask { }
+
+    await group.next()
+  }
+
+  struct Nested {
+    // CHECK: // static useGlobal() in Nested #1 in onMain()
+    // CHECK-NEXT: // Isolation: global_actor. type: MainActor
+    static func useGlobal() -> Int {
+      global
+    }
+  }
+
+  _ = Nested.useGlobal()
 }

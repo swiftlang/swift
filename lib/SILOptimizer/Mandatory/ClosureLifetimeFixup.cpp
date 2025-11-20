@@ -421,27 +421,6 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
   return curr;
 }
 
-/// Returns the (single) "endAsyncLetLifetime" builtin if \p startAsyncLet is a
-/// "startAsyncLetWithLocalBuffer" builtin.
-static BuiltinInst *getEndAsyncLet(BuiltinInst *startAsyncLet) {
-  if (startAsyncLet->getBuiltinKind() != BuiltinValueKind::StartAsyncLetWithLocalBuffer)
-    return nullptr;
-
-  BuiltinInst *endAsyncLet = nullptr;
-  for (Operand *op : startAsyncLet->getUses()) {
-    auto *endBI = dyn_cast<BuiltinInst>(op->getUser());
-    if (endBI && endBI->getBuiltinKind() == BuiltinValueKind::EndAsyncLetLifetime) {
-      // At this stage of the pipeline, it's always the case that a
-      // startAsyncLet has an endAsyncLet: that's how SILGen generates it.
-      // Just to be on the safe side, do this check.
-      if (endAsyncLet)
-        return nullptr;
-      endAsyncLet = endBI;
-    }
-  }
-  return endAsyncLet;
-}
-
 /// Call the \p insertFn with a builder at all insertion points after
 /// a closure is used by \p closureUser.
 static void insertAfterClosureUser(SILInstruction *closureUser,
@@ -467,14 +446,21 @@ static void insertAfterClosureUser(SILInstruction *closureUser,
     }
   }
 
-  if (auto *startAsyncLet = dyn_cast<BuiltinInst>(closureUser)) {
-    BuiltinInst *endAsyncLet = getEndAsyncLet(startAsyncLet);
-    if (!endAsyncLet)
-      return;
-    SILBuilderWithScope builder(std::next(endAsyncLet->getIterator()));
-    insertFn(builder);
+  // If the user is a startAsyncLet builtin, emit the code after all of the
+  // endAsyncLetLifetime builtins.
+  if (auto *startAsyncLet =
+        isBuiltinInst(closureUser, BuiltinValueKind::StartAsyncLetWithLocalBuffer)) {
+    for (Operand *op : startAsyncLet->getUses()) {
+      auto endAsyncLet = isBuiltinInst(op->getUser(),
+                                       BuiltinValueKind::EndAsyncLetLifetime);
+      if (!endAsyncLet) continue;
+
+      SILBuilderWithScope builder(std::next(endAsyncLet->getIterator()));
+      insertFn(builder);
+    }
     return;
   }
+
   FullApplySite fas = FullApplySite::isa(closureUser);
   assert(fas);
   fas.insertAfterApplication(insertFn);
@@ -587,8 +573,7 @@ static SILValue tryRewriteToPartialApplyStack(
     ConvertEscapeToNoEscapeInst *cvt, SILInstruction *closureUser,
     DominanceAnalysis *dominanceAnalysis, InstructionDeleter &deleter,
     llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized,
-    llvm::DenseSet<SILBasicBlock *> &unreachableBlocks,
-    const bool &modifiedCFG) {
+    ReachableBlocks const &reachableBlocks, const bool &modifiedCFG) {
 
   auto *origPA = dyn_cast<PartialApplyInst>(skipConvert(cvt->getOperand()));
   if (!origPA)
@@ -900,10 +885,16 @@ static SILValue tryRewriteToPartialApplyStack(
 
     OrigUnmodifiedDuringClosureLifetimeWalker origUseWalker(
         closureLiveness, origIsUnmodifiedDuringClosureLifetime);
-    auto walkResult = std::move(origUseWalker).walk(orig);
-
-    if (walkResult == AddressUseKind::Unknown ||
-        !origIsUnmodifiedDuringClosureLifetime) {
+    switch (origUseWalker.walk(orig)) {
+    case AddressUseKind::NonEscaping:
+    case AddressUseKind::Dependent:
+      // Dependent uses are ignored because they cannot modify the original.
+      break;
+    case AddressUseKind::PointerEscape:
+    case AddressUseKind::Unknown:
+      continue;
+    }
+    if (!origIsUnmodifiedDuringClosureLifetime) {
       continue;
     }
 
@@ -972,8 +963,8 @@ static SILValue tryRewriteToPartialApplyStack(
 
   // Don't run insertDeallocOfCapturedArguments if newPA is in an unreachable
   // block insertDeallocOfCapturedArguments will run code that computes the DF
-  // for newPA that will loop infinetly.
-  if (unreachableBlocks.count(newPA->getParent()))
+  // for newPA that will loop infinitely.
+  if (!reachableBlocks.isReachable(newPA->getParent()))
     return closureOp;
 
   auto getAddressToDealloc = [&](SILValue argAddress) -> SILValue {
@@ -995,8 +986,8 @@ static bool tryExtendLifetimeToLastUse(
     ConvertEscapeToNoEscapeInst *cvt, DominanceAnalysis *dominanceAnalysis,
     DeadEndBlocksAnalysis *deadEndBlocksAnalysis,
     llvm::DenseMap<SILInstruction *, SILInstruction *> &memoized,
-    llvm::DenseSet<SILBasicBlock *> &unreachableBlocks,
-    InstructionDeleter &deleter, const bool &modifiedCFG) {
+    ReachableBlocks const &reachableBlocks, InstructionDeleter &deleter,
+    const bool &modifiedCFG) {
   // If there is a single user, this is simple: extend the
   // lifetime of the operand until the use ends.
   auto *singleUser = lookThroughRebastractionUsers(cvt, memoized);
@@ -1004,32 +995,43 @@ static bool tryExtendLifetimeToLastUse(
     return false;
 
   // Handle apply instructions and startAsyncLet.
-  BuiltinInst *endAsyncLet = nullptr;
+  BuiltinInst *startAsyncLet = nullptr;
   if (FullApplySite::isa(singleUser)) {
     // TODO: Enable begin_apply/end_apply. It should work, but is not tested yet.
     if (isa<BeginApplyInst>(singleUser))
       return false;
-  } else if (auto *bi = dyn_cast<BuiltinInst>(singleUser)) {
-    endAsyncLet = getEndAsyncLet(bi);
-    if (!endAsyncLet)
-      return false;
+  } else if ((startAsyncLet = isBuiltinInst(singleUser,
+                            BuiltinValueKind::StartAsyncLetWithLocalBuffer))) {
+    // continue
   } else if (!isa<BeginBorrowInst>(singleUser)) {
     return false;
   }
 
   if (SILValue closureOp = tryRewriteToPartialApplyStack(
           cvt, singleUser, dominanceAnalysis, deleter, memoized,
-          unreachableBlocks, /*const*/ modifiedCFG)) {
-    if (endAsyncLet) {
+          reachableBlocks, /*const*/ modifiedCFG)) {
+    if (startAsyncLet) {
+      // Collect all of the endAsyncLet calls in one pass so that we can
+      // safely mutate the use-def chain in the second.
+      SmallVector<BuiltinInst*, 4> endAsyncLets;
+      for (auto use: startAsyncLet->getUses()) {
+        if (auto endAsyncLet =
+              isBuiltinInst(use->getUser(), BuiltinValueKind::EndAsyncLetLifetime)) {
+          endAsyncLets.push_back(endAsyncLet);
+        }
+      }
+
       // Add the closure as a second operand to the endAsyncLet builtin.
       // This ensures that the closure arguments are kept alive until the
       // endAsyncLet builtin.
-      assert(endAsyncLet->getNumOperands() == 1);
-      SILBuilderWithScope builder(endAsyncLet);
-      builder.createBuiltin(endAsyncLet->getLoc(), endAsyncLet->getName(),
-        endAsyncLet->getType(), endAsyncLet->getSubstitutions(),
-        {endAsyncLet->getOperand(0), closureOp});
-      deleter.forceDelete(endAsyncLet);
+      for (auto endAsyncLet: endAsyncLets) {
+        assert(endAsyncLet->getNumOperands() == 1);
+        SILBuilderWithScope builder(endAsyncLet);
+        builder.createBuiltin(endAsyncLet->getLoc(), endAsyncLet->getName(),
+          endAsyncLet->getType(), endAsyncLet->getSubstitutions(),
+          {endAsyncLet->getOperand(0), closureOp});
+        deleter.forceDelete(endAsyncLet);
+      }
     }
     return true;
   }
@@ -1058,6 +1060,11 @@ static bool tryExtendLifetimeToLastUse(
             deadEndBlocks->isDeadEnd(builder.getInsertionPoint()->getParent()));
         builder.createDestroyValue(loc, closureCopy, DontPoisonRefs, isDeadEnd);
       });
+
+  // Closure User may not be post-dominating the previously created copy_value.
+  // Create destroy_value at leaking blocks.
+
+  endLifetimeAtLeakingBlocks(closureCopy, {singleUser->getParent()}, deadEndBlocks);
   /*
   llvm::errs() << "after lifetime extension of\n";
   escapingClosure->dump();
@@ -1311,10 +1318,9 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
     if (singleDestroy) {
       SILBuilderWithScope b(std::next(singleDestroy->getIterator()));
       SILValue v = sentinelClosure;
-      SILValue isEscaping = b.createIsEscapingClosure(
-          loc, v, IsEscapingClosureInst::ObjCEscaping);
+      SILValue isEscaping = b.createDestroyNotEscapedClosure(
+          loc, v, DestroyNotEscapedClosureInst::ObjCEscaping);
       b.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
-      b.createDestroyValue(loc, v);
       return true;
     }
 
@@ -1325,10 +1331,9 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
     for (auto *Block : ExitingBlocks) {
       SILBuilderWithScope B(Block->getTerminator());
       SILValue V = sentinelClosure;
-      SILValue isEscaping = B.createIsEscapingClosure(
-          loc, V, IsEscapingClosureInst::ObjCEscaping);
+      SILValue isEscaping = B.createDestroyNotEscapedClosure(
+          loc, V, DestroyNotEscapedClosureInst::ObjCEscaping);
       B.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
-      B.createDestroyValue(loc, V);
     }
 
     return true;
@@ -1393,15 +1398,14 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
     SILBuilderWithScope(initialValue).createDestroyValue(autoGenLoc, v);
   }
 
-  // And insert an is_escaping_closure, cond_fail, destroy_value at each of the
+  // And insert an destroy_not_escaped_closure, cond_fail at each of the
   // lifetime end points. This ensures we do not expand our lifetime too much.
   if (singleDestroy) {
     SILBuilderWithScope b(std::next(singleDestroy->getIterator()));
     SILValue v = updater.getValueInMiddleOfBlock(singleDestroy->getParent());
     SILValue isEscaping =
-        b.createIsEscapingClosure(loc, v, IsEscapingClosureInst::ObjCEscaping);
+        b.createDestroyNotEscapedClosure(loc, v, DestroyNotEscapedClosureInst::ObjCEscaping);
     b.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
-    b.createDestroyValue(loc, v);
   }
 
   // Then to be careful with regards to loops, insert at each of the destroy
@@ -1428,22 +1432,6 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
   return true;
 }
 
-static void computeUnreachableBlocks(
-  llvm::DenseSet<SILBasicBlock*> &unreachableBlocks,
-  SILFunction &fn) {
-
-  ReachableBlocks isReachable(&fn);
-  llvm::DenseSet<SILBasicBlock *> reachable;
-  isReachable.visit([&] (SILBasicBlock *block) -> bool {
-                    reachable.insert(block);
-                    return true;
-                   });
-  for (auto &block : fn) {
-    if (!reachable.count(&block))
-      unreachableBlocks.insert(&block);
-  }
-}
-
 static bool fixupClosureLifetimes(SILFunction &fn,
                                   DominanceAnalysis *dominanceAnalysis,
                                   DeadEndBlocksAnalysis *deadEndBlocksAnalysis,
@@ -1454,8 +1442,8 @@ static bool fixupClosureLifetimes(SILFunction &fn,
   // queries.
   llvm::DenseMap<SILInstruction *, SILInstruction *> memoizedQueries;
 
-  llvm::DenseSet<SILBasicBlock *> unreachableBlocks;
-  computeUnreachableBlocks(unreachableBlocks, fn);
+  ReachableBlocks reachableBlocks(&fn);
+  reachableBlocks.compute();
 
   for (auto &block : fn) {
     SILSSAUpdater updater;
@@ -1485,7 +1473,7 @@ static bool fixupClosureLifetimes(SILFunction &fn,
 
       if (tryExtendLifetimeToLastUse(cvt, dominanceAnalysis,
                                      deadEndBlocksAnalysis, memoizedQueries,
-                                     unreachableBlocks, updater.getDeleter(),
+                                     reachableBlocks, updater.getDeleter(),
                                      /*const*/ modifiedCFG)) {
         changed = true;
         checkStackNesting = true;
@@ -1529,7 +1517,7 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
     if (fixupClosureLifetimes(*getFunction(), dominanceAnalysis,
                               deadEndBlocksAnalysis, checkStackNesting,
                               modifiedCFG)) {
-      updateBorrowedFrom(getPassManager(), getFunction());
+      updateAllGuaranteedPhis(getPassManager(), getFunction());
       if (checkStackNesting){
         modifiedCFG |=
           StackNesting::fixNesting(getFunction()) == StackNesting::Changes::CFG;

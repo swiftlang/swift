@@ -1,10 +1,8 @@
 // RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking -enable-experimental-feature ThenStatements
 
-// Required for experimental features
-// REQUIRES: asserts
-
 // Required for regex
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ThenStatements
 
 func then(_: Int = 0, x: Int = 0, fn: () -> Void = {}) {}
 

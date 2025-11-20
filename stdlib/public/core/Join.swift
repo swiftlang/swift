@@ -125,6 +125,7 @@ extension JoinedSequence.Iterator: IteratorProtocol {
         return nil
       }
     }
+    fatalError()
   }
 }
 

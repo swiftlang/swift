@@ -63,6 +63,15 @@ def main():
         semihosting = False
         qemu_mode = "-bios"
         always_optimize_for_size = True
+    elif args.device == "riscv32-qemu-virt":
+        target = "riscv32-none-none-eabi"
+        qemu_binary = "qemu-system-riscv32"
+        qemu_machine = "virt"
+        mmcu = ""
+        entry_point = "start"
+        semihosting = False
+        qemu_mode = "-bios none -kernel"
+        always_optimize_for_size = True
     else:
         assert False
 

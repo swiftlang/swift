@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BuiltinInst : OnoneSimplifyable {
+extension BuiltinInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     switch id {
       case .IsConcrete:
@@ -33,9 +33,8 @@ extension BuiltinInst : OnoneSimplifyable {
            .Alignof:
         optimizeTargetTypeConst(context)
       case .DestroyArray:
-        if let elementType = substitutionMap.replacementTypes[0],
-           elementType.isTrivial(in: parentFunction)
-        {
+        let elementType = substitutionMap.replacementType.loweredType(in: parentFunction, maximallyAbstracted: true)
+        if elementType.isTrivial(in: parentFunction) {
           context.erase(instruction: self)
           return
         }
@@ -48,22 +47,23 @@ extension BuiltinInst : OnoneSimplifyable {
            .AssignCopyArrayFrontToBack,
            .AssignCopyArrayBackToFront,
            .AssignTakeArray,
-           .AllocVector,
            .IsPOD:
         optimizeArgumentToThinMetatype(argument: 0, context)
       case .ICMP_EQ:
         constantFoldIntegerEquality(isEqual: true, context)
       case .ICMP_NE:
         constantFoldIntegerEquality(isEqual: false, context)
+      case .Xor:
+        simplifyNegation(context)
       default:
-        if let literal = constantFold(context) {
+        if let literal = context.constantFold(builtin: self) {
           uses.replaceAll(with: literal, context)
         }
     }
   }
 }
 
-extension BuiltinInst : LateOnoneSimplifyable {
+extension BuiltinInst : LateOnoneSimplifiable {
   func simplifyLate(_ context: SimplifyContext) {
     if id == .IsConcrete {
       // At the end of the pipeline we can be sure that the isConcrete's type doesn't get "more" concrete.
@@ -81,7 +81,7 @@ private extension BuiltinInst {
       return
     }
     let builder = Builder(before: self, context)
-    let result = builder.createIntegerLiteral(hasArchetype ? 0 : 1, type: type)
+    let result = builder.createBoolLiteral(!hasArchetype)
     uses.replaceAll(with: result, context)
     context.erase(instruction: self)
   }
@@ -94,7 +94,7 @@ private extension BuiltinInst {
       return
     }
     let builder = Builder(before: self, context)
-    let result = builder.createIntegerLiteral(equal ? 1 : 0, type: type)
+    let result = builder.createBoolLiteral(equal)
 
     uses.replaceAll(with: result, context)
   }
@@ -129,24 +129,18 @@ private extension BuiltinInst {
   }
 
   func optimizeCanBeClass(_ context: SimplifyContext) {
-    guard let ty = substitutionMap.replacementTypes[0] else {
-      return
-    }
     let literal: IntegerLiteralInst
-    switch ty.canBeClass {
-    case .IsNot:
+    switch substitutionMap.replacementType.canonical.canBeClass {
+    case .isNot:
       let builder = Builder(before: self, context)
       literal = builder.createIntegerLiteral(0,  type: type)
-    case .Is:
+    case .is:
       let builder = Builder(before: self, context)
       literal = builder.createIntegerLiteral(1,  type: type)
-    case .CanBe:
+    case .canBe:
       return
-    default:
-      fatalError()
     }
-    uses.replaceAll(with: literal, context)
-    context.erase(instruction: self)
+    self.replace(with: literal, context)
   }
 
   func optimizeAssertConfig(_ context: SimplifyContext) {
@@ -167,15 +161,17 @@ private extension BuiltinInst {
   }
   
   func optimizeTargetTypeConst(_ context: SimplifyContext) {
-    guard let ty = substitutionMap.replacementTypes[0] else {
-      return
-    }
-    
+    let ty = substitutionMap.replacementType.loweredType(in: parentFunction, maximallyAbstracted: true)
     let value: Int?
     switch id {
     case .Sizeof:
       value = ty.getStaticSize(context: context)
     case .Strideof:
+      if isUsedAsStrideOfIndexRawPointer(context) {
+        // Constant folding `stride` would prevent index_raw_pointer simplification.
+        // See `simplifyIndexRawPointer` in SimplifyPointerToAddress.swift.
+        return
+      }
       value = ty.getStaticStride(context: context)
     case .Alignof:
       value = ty.getStaticAlignment(context: context)
@@ -192,7 +188,33 @@ private extension BuiltinInst {
     uses.replaceAll(with: literal, context)
     context.erase(instruction: self)
   }
-  
+
+  private func isUsedAsStrideOfIndexRawPointer(_ context: SimplifyContext) -> Bool {
+    var worklist = ValueWorklist(context)
+    defer { worklist.deinitialize() }
+    worklist.pushIfNotVisited(self)
+    while let v = worklist.pop() {
+      for use in v.uses {
+        switch use.instruction {
+        case let builtin as BuiltinInst:
+          switch builtin.id {
+          case .SMulOver, .TruncOrBitCast, .SExtOrBitCast, .ZExtOrBitCast:
+            worklist.pushIfNotVisited(builtin)
+          default:
+            break
+          }
+        case let tupleExtract as TupleExtractInst where tupleExtract.fieldIndex == 0:
+          worklist.pushIfNotVisited(tupleExtract)
+        case is IndexRawPointerInst:
+          return true
+        default:
+          break
+        }
+      }
+    }
+    return false
+  }
+
   func optimizeArgumentToThinMetatype(argument: Int, _ context: SimplifyContext) {
     let type: Type
 
@@ -204,13 +226,13 @@ private extension BuiltinInst {
       return
     }
 
-    guard type.representationOfMetatype(in: parentFunction) == .Thick else {
+    guard type.representationOfMetatype == .thick else {
       return
     }
     
-    let instanceType = type.loweredInstanceTypeOfMetatype(in: parentFunction)
     let builder = Builder(before: self, context)
-    let newMetatype = builder.createMetatype(of: instanceType, representation: .Thin)
+    let newMetatype = builder.createMetatype(ofInstanceType: type.canonicalType.instanceTypeOfMetatype,
+                                             representation: .thin)
     operands[argument].set(to: newMetatype, context)
   }
 
@@ -218,7 +240,7 @@ private extension BuiltinInst {
     if constantFoldStringNullPointerCheck(isEqual: isEqual, context) {
       return
     }
-    if let literal = constantFold(context) {
+    if let literal = context.constantFold(builtin: self) {
       uses.replaceAll(with: literal, context)
     }
   }
@@ -228,12 +250,59 @@ private extension BuiltinInst {
        operands[0].value.lookThroughScalarCasts is StringLiteralInst
     {
       let builder = Builder(before: self, context)
-      let result = builder.createIntegerLiteral(isEqual ? 0 : 1, type: type)
+      let result = builder.createBoolLiteral(!isEqual)
       uses.replaceAll(with: result, context)
       context.erase(instruction: self)
       return true
     }
     return false
+  }
+
+  /// Replaces a builtin "xor", which negates its operand comparison
+  /// ```
+  ///   %3 = builtin "cmp_slt_Int64"(%1, %2) : $Builtin.Int1
+  ///   %4 = integer_literal $Builtin.Int1, -1
+  ///   %5 = builtin "xor_Int1"(%3, %4) : $Builtin.Int1
+  /// ```
+  /// with the negated comparison
+  /// ```
+  ///   %5 = builtin "cmp_ge_Int64"(%1, %2) : $Builtin.Int1
+  /// ```
+  func simplifyNegation(_ context: SimplifyContext) {
+    assert(id == .Xor)
+    guard let one = arguments[1] as? IntegerLiteralInst,
+          let oneValue = one.value,
+          oneValue == -1,
+          let lhsBuiltin = arguments[0] as? BuiltinInst,
+          lhsBuiltin.type.isBuiltinInteger,
+          let negatedBuiltinName = lhsBuiltin.negatedComparisonBuiltinName
+    else {
+      return
+    }
+
+    let builder = Builder(before: lhsBuiltin, context)
+    let negated = builder.createBuiltinBinaryFunction(name: negatedBuiltinName,
+        operandType: lhsBuiltin.arguments[0].type,
+        resultType: lhsBuiltin.type,
+        arguments: Array(lhsBuiltin.arguments))
+    self.replace(with: negated, context)
+  }
+
+  private var negatedComparisonBuiltinName: String? {
+    switch id {
+    case .ICMP_EQ:  return "cmp_ne"
+    case .ICMP_NE:  return "cmp_eq"
+    case .ICMP_SLE: return "cmp_sgt"
+    case .ICMP_SLT: return "cmp_sge"
+    case .ICMP_SGE: return "cmp_slt"
+    case .ICMP_SGT: return "cmp_sle"
+    case .ICMP_ULE: return "cmp_ugt"
+    case .ICMP_ULT: return "cmp_uge"
+    case .ICMP_UGE: return "cmp_ult"
+    case .ICMP_UGT: return "cmp_ule"
+    default:
+      return nil
+    }
   }
 }
 
@@ -280,13 +349,11 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
     return nil
   }
 
-  let lhsMetatype = lhsExistential.metatype.type
-  let rhsMetatype = rhsExistential.metatype.type
-  if lhsMetatype.isDynamicSelfMetatype != rhsMetatype.isDynamicSelfMetatype {
+  let lhsTy = lhsExistential.metatype.type.canonicalType.instanceTypeOfMetatype
+  let rhsTy = rhsExistential.metatype.type.canonicalType.instanceTypeOfMetatype
+  if lhsTy.isDynamicSelf != rhsTy.isDynamicSelf {
     return nil
   }
-  let lhsTy = lhsMetatype.loweredInstanceTypeOfMetatype(in: function)
-  let rhsTy = rhsMetatype.loweredInstanceTypeOfMetatype(in: function)
 
   // Do we know the exact types? This is not the case e.g. if a type is passed as metatype
   // to the function.
@@ -299,12 +366,18 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
     //   ((Int, Int) -> ())
     //   (((Int, Int)) -> ())
     //
-    if lhsMetatype == rhsMetatype {
+    if lhsTy == rhsTy {
       return true
     }
     // Comparing types of different classes which are in a sub-class relation is not handled by the
     // cast optimizer (below).
     if lhsTy.isClass && rhsTy.isClass && lhsTy.nominal != rhsTy.nominal {
+      return false
+    }
+
+    // Failing function casts are not supported by the cast optimizer (below).
+    // (Reason: "Be conservative about function type relationships we may add in the future.")
+    if lhsTy.isFunction && rhsTy.isFunction && lhsTy != rhsTy && !lhsTy.hasArchetype && !rhsTy.hasArchetype {
       return false
     }
   }

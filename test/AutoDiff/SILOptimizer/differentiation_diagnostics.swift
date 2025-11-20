@@ -46,6 +46,24 @@ func try_apply_rethrows(_ x: Float) -> Float {
   return x
 }
 
+func throwing_result(_ x: Float) throws -> Float { return x; }
+
+@differentiable(reverse)
+func active_try_apply(_ x: Float) -> Float {
+  do {
+    return try throwing_result(x);
+  } catch {
+    return x
+  }
+}
+
+@differentiable(reverse)
+func map_nondiff(_ a: [Float]) -> [Float] {
+  // expected-error @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{cannot differentiate functions that have not been marked '@differentiable' and that are defined in other files}}
+  return a.map { $0 }
+}
+
 //===----------------------------------------------------------------------===//
 // Unreachable
 //===----------------------------------------------------------------------===//
@@ -669,9 +687,7 @@ extension DifferentiableWrapper: Differentiable where Value: Differentiable {}
 // accesses.
 
 struct Struct: Differentiable {
-  // expected-error @+4 {{expression is not differentiable}}
-  // expected-error @+3 {{expression is not differentiable}}
-  // expected-note @+2 {{cannot differentiate access to property 'Struct._x' because 'Struct.TangentVector' does not have a stored property named '_x'}}
+  // expected-error @+2 {{expression is not differentiable}}
   // expected-note @+1 {{cannot differentiate access to property 'Struct._x' because 'Struct.TangentVector' does not have a stored property named '_x'}}  
   @DifferentiableWrapper @DifferentiableWrapper var x: Float = 10
 
@@ -720,12 +736,11 @@ func tupleArrayLiteralInitialization(_ x: Float, _ y: Float) -> Float {
 // Subset parameter differentiation thunks
 //===----------------------------------------------------------------------===//
 
-// FIXME: Non-differentiability diagnostic crash due to invalid source location (https://github.com/apple/swift/issues/55492).
-/*
 func testNoDerivativeParameter(_ f: @differentiable(reverse) (Float, @noDerivative Float) -> Float) -> Float {
+  // expected-error @+2 {{function is not differentiable}}
+  // expected-note @+1 {{cannot differentiate with respect to a '@noDerivative' parameter}}
   return gradient(at: 2) { x in f(x * x, x) }
 }
-*/
 
 // Test parameter subset thunk + partially-applied original function.
 struct TF_675 : Differentiable {
@@ -752,9 +767,7 @@ public func hasImplicitlyDifferentiatedTopLevelDefaultArgument(
   _ f: @differentiable(reverse) (Float) -> Float = implicitlyDifferentiableFromFragile
 ) {}
 
-// TODO(TF-1030): This will eventually not be an error.
-// expected-error @+2 {{function is not differentiable}}
-// expected-note @+1 {{differentiated functions in default arguments must be marked '@differentiable' or have a public '@derivative'; this is not possible with a closure, make a top-level function instead}}
+// No error expected
 public func hasImplicitlyDifferentiatedClosureDefaultArgument(_ f: @differentiable(reverse) (Float) -> Float = { $0 }) {}
 
 @inlinable
@@ -771,32 +784,6 @@ public func fragileDifferentiable(_ x: Float) -> Float {
   // expected-note @+1 {{differentiated functions in '@inlinable' functions must be marked '@differentiable' or have a public '@derivative'}}
   implicitlyDifferentiableFromFragile(x)
 }
-
-
-// FIXME: Differentiable curry thunk RequirementMachine error (rdar://87429620, https://github.com/apple/swift/issues/54819).
-#if false
-// TF-1208: Test curry thunk differentiation regression.
-public struct Struct_54819<Scalar> {
-  var x: Scalar
-}
-extension Struct_54819: Differentiable where Scalar: Differentiable {
-  @differentiable(reverse)
-  public static func id(x: Self) -> Self {
-    return x
-  }
-}
-@differentiable(reverse, wrt: x)
-public func f_54819<Scalar: Differentiable>(
-  _ x: Struct_54819<Scalar>,
-  // NOTE(TF-1208): This diagnostic is unexpected because `Struct_54819.id` is marked `@differentiable`.
-  // xpected-error @+3 2 {{function is not differentiable}}
-  // xpected-note @+2 {{differentiated functions in '@inlinable' functions must be marked '@differentiable' or have a public '@derivative'; this is not possible with a closure, make a top-level function instead}}
-  // xpected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
-  reduction: @differentiable(reverse) (Struct_54819<Scalar>) -> Struct_54819<Scalar> = Struct_54819.id
-) -> Struct_54819<Scalar> {
-  reduction(x)
-}
-#endif
 
 //===----------------------------------------------------------------------===//
 // Coroutines (SIL function yields, `begin_apply`) (not yet supported)

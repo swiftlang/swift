@@ -41,8 +41,8 @@ public actor MyClass {
 }
 
 // CHECK-LABEL: define {{.*}}@"$s11actor_class7MyClassC1xSivg"
-// CHECK: [[T0:%.*]] = getelementptr inbounds %T11actor_class7MyClassC, ptr %0, i32 0, i32 2
-// CHECK: [[T1:%.*]] = getelementptr inbounds %TSi, ptr [[T0]], i32 0, i32 0
+// CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} %T11actor_class7MyClassC, ptr %0, i32 0, i32 2
+// CHECK: [[T1:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[T0]], i32 0, i32 0
 // CHECK: load [[INT]], ptr [[T1]], align
 
 // CHECK-LABEL: define {{.*}}swiftcc ptr @"$s11actor_class7MyClassCACycfc"

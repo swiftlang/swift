@@ -34,7 +34,7 @@ arrayWrapper(overloadedReturn()).#^SKIP_DUPLICATES^#
 // SKIP_DUPLICATES-NOT: count[#Int#]
 // SKIP_DUPLICATES-NOT: formIndex({#(i): &Int#}, {#offsetBy: Int#})[#Void#]
 
-let x: (inout Int, Int) -> () = arrayWrapper(overloadedReturn()).#^SKIP_COMPOUND_DUPLICATES^#
+let x1: (inout Int, Int) -> () = arrayWrapper(overloadedReturn()).#^SKIP_COMPOUND_DUPLICATES^#
 
 // SKIP_COMPOUND_DUPLICATES: Decl[InstanceMethod]/Super/IsSystem/TypeRelation[Convertible]: formIndex(_:offsetBy:)[#(inout Int, Int) -> ()#]{{; name=.+$}}
 // SKIP_COMPOUND_DUPLICATES-NOT: formIndex(_:offsetBy:)[#(inout Int, Int) -> ()#]
@@ -62,8 +62,8 @@ givenErrorExpr(undefined).#^ERROR_IN_BASE?check=SIMPLE^#
 // SIMPLE-DAG: Keyword[self]/CurrNominal:          self[#B#]{{; name=.+$}}
 // SIMPLE-DAG: Decl[InstanceMethod]/CurrNominal:   doBThings()[#Void#]{{; name=.+$}}
 
-let x: A = overloadedReturn().#^RELATED^#
-let x: A = overloadedReturn(1).#^RELATED_EXTRAARG?check=RELATED^#
+let x2: A = overloadedReturn().#^RELATED^#
+let x3: A = overloadedReturn(1).#^RELATED_EXTRAARG?check=RELATED^#
 
 // RELATED: Begin completions, 4 items
 // RELATED-DAG: Keyword[self]/CurrNominal:          self[#A#]{{; name=.+$}}

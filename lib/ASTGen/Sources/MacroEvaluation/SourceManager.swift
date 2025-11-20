@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,12 +23,16 @@ class SourceManager {
     self.bridgedDiagEngine = BridgedDiagnosticEngine(raw: cxxDiagnosticEngine)
   }
 
+  init(cContext: BridgedASTContext) {
+    self.bridgedDiagEngine = cContext.diags
+  }
+
   /// The bridged diagnostic engine (just the wrapped C++ `DiagnosticEngine`).
   let bridgedDiagEngine: BridgedDiagnosticEngine
 
   /// The set of source files that have been exported to the C++ code of
   /// the program.
-  var exportedSourceFilesBySyntax: [SourceFileSyntax: UnsafePointer<ExportedSourceFile>] = [:]
+  var exportedSourceFilesBySyntax: [Syntax: UnsafePointer<ExportedSourceFile>] = [:]
 
   /// The set of nodes that have been detached from their parent nodes.
   ///
@@ -46,7 +50,7 @@ extension SourceManager {
   ///   already there.
   @discardableResult
   func insert(_ sourceFile: UnsafePointer<ExportedSourceFile>) -> Bool {
-    let syntax = sourceFile.pointee.syntax
+    let syntax = Syntax(sourceFile.pointee.syntax)
     if exportedSourceFilesBySyntax[syntax] != nil {
       return false
     }
@@ -80,33 +84,20 @@ extension SourceManager {
 
   /// Find the root source file and offset from within that file for the given
   /// syntax node.
-  func rootSourceFile<Node: SyntaxProtocol>(
+  func rootSyntax<Node: SyntaxProtocol>(
     of node: Node
-  ) -> (SourceFileSyntax, AbsolutePosition)? {
-    let root = node.root
-
-    // If the root is a source file, we're done.
-    if let rootSF = root.as(SourceFileSyntax.self) {
-      return (rootSF, node.position)
-    }
+  ) -> (Syntax, AbsolutePosition) {
+    var root = node.root
+    var offset = node.position
 
     // If the root isn't a detached node we know about, there's nothing we
     // can do.
-    guard let (parent, offset) = detachedNodes[root] else {
-      return nil
+    while let (parent, parentOffset) = detachedNodes[root] {
+      root = parent.root
+      offset += SourceLength(utf8Length: parentOffset)
     }
 
-    // Recursively find the root and its offset.
-    guard let (rootSF, parentOffset) = rootSourceFile(of: parent) else {
-      return nil
-    }
-
-    // The position of our node is...
-    let finalPosition =
-      node.position  // Our position relative to its root
-      + SourceLength(utf8Length: offset)  // and that root's offset in its parent
-      + SourceLength(utf8Length: parentOffset.utf8Offset)
-    return (rootSF, finalPosition)
+    return (root, offset)
   }
 
   /// Produce the C++ source location for a given position based on a
@@ -114,15 +105,12 @@ extension SourceManager {
   func bridgedSourceLoc<Node: SyntaxProtocol>(
     for node: Node,
     at position: AbsolutePosition? = nil
-  ) -> BridgedSourceLoc {
+  ) -> SourceLoc {
     // Find the source file and this node's position within it.
-    guard let (sourceFile, rootPosition) = rootSourceFile(of: node) else {
-      return nil
-    }
+    let (rootNode, rootPosition) = rootSyntax(of: node)
 
     // Find the corresponding exported source file.
-    guard let exportedSourceFile = exportedSourceFilesBySyntax[sourceFile]
-    else {
+    guard let exportedSourceFile = exportedSourceFilesBySyntax[rootNode] else {
       return nil
     }
 
@@ -132,7 +120,7 @@ extension SourceManager {
     let nodeOffset = SourceLength(utf8Length: position.utf8Offset - node.position.utf8Offset)
     let realPosition = rootPosition + nodeOffset
 
-    return BridgedSourceLoc(at: realPosition, in: exportedSourceFile.pointee.buffer)
+    return SourceLoc(at: realPosition, in: exportedSourceFile.pointee.buffer)
   }
 }
 
@@ -146,7 +134,7 @@ extension SourceManager {
     fixItChanges: [FixIt.Change] = []
   ) {
     // Map severity
-    let bridgedSeverity = severity.bridged
+    let bridgedSeverity: swift.DiagnosticKind = severity.bridged
 
     // Emit the diagnostic
     var mutableMessage = message
@@ -169,23 +157,37 @@ extension SourceManager {
 
     // Emit changes for a Fix-It.
     for change in fixItChanges {
-      let replaceStartLoc: BridgedSourceLoc
-      let replaceEndLoc: BridgedSourceLoc
+      let replaceStartLoc: SourceLoc
+      let replaceEndLoc: SourceLoc
       var newText: String
 
       switch change {
       case .replace(let oldNode, let newNode):
+        // Replace the whole node including leading/trailing trivia, but if
+        // the trivia are the same, don't include them in the replacing range.
+        let leadingMatch = oldNode.leadingTrivia == newNode.leadingTrivia
+        let trailingMatch = oldNode.trailingTrivia == newNode.trailingTrivia
         replaceStartLoc = bridgedSourceLoc(
           for: oldNode,
-          at: oldNode.positionAfterSkippingLeadingTrivia
+          at: leadingMatch ? oldNode.positionAfterSkippingLeadingTrivia : oldNode.position
         )
         replaceEndLoc = bridgedSourceLoc(
           for: oldNode,
-          at: oldNode.endPositionBeforeTrailingTrivia
+          at: trailingMatch ? oldNode.endPositionBeforeTrailingTrivia : oldNode.endPosition
         )
+        var newNode = newNode.detached
+        if leadingMatch {
+          newNode.leadingTrivia = []
+        }
+        if trailingMatch {
+          newNode.trailingTrivia = []
+        }
         newText = newNode.description
 
       case .replaceLeadingTrivia(let oldToken, let newTrivia):
+        guard oldToken.leadingTrivia != newTrivia else {
+          continue
+        }
         replaceStartLoc = bridgedSourceLoc(for: oldToken)
         replaceEndLoc = bridgedSourceLoc(
           for: oldToken,
@@ -194,6 +196,9 @@ extension SourceManager {
         newText = newTrivia.description
 
       case .replaceTrailingTrivia(let oldToken, let newTrivia):
+        guard oldToken.trailingTrivia != newTrivia else {
+          continue
+        }
         replaceStartLoc = bridgedSourceLoc(
           for: oldToken,
           at: oldToken.endPositionBeforeTrailingTrivia
@@ -215,6 +220,21 @@ extension SourceManager {
           at: replacementRange.upperBound
         )
         newText = replacingChildData.newChild.description
+
+      case .replaceText(
+        range: let replacementRange,
+        with: let replacementText,
+        in: let syntax
+      ):
+        replaceStartLoc = bridgedSourceLoc(
+          for: syntax,
+          at: replacementRange.lowerBound
+        )
+        replaceEndLoc = bridgedSourceLoc(
+          for: syntax,
+          at: replacementRange.upperBound
+        )
+        newText = replacementText
       }
 
       newText.withBridgedString { bridgedMessage in

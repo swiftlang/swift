@@ -3,7 +3,7 @@
 // RUN:   -emit-module-path=%t/resilient_struct.swiftmodule \
 // RUN:   -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 
-// RUN: %target-sil-opt -sdk %clang-importer-sdk-path -enable-sil-verify-all %s -sil-combine -jumpthread-simplify-cfg -I %t | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sdk %clang-importer-sdk-path -enable-sil-verify-all %s -sil-combine -jumpthread-simplify-cfg -I %t | %FileCheck %s
 
 sil_stage canonical
 

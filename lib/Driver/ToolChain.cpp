@@ -72,6 +72,11 @@ std::optional<Job::ResponseFileInfo>
 ToolChain::getResponseFileInfo(const Compilation &C, const char *executablePath,
                                const ToolChain::InvocationInfo &invocationInfo,
                                const ToolChain::JobContext &context) const {
+  // Never use a response file if this is a dummy driver for SourceKit, we
+  // just want the frontend arguments.
+  if (getDriver().isDummyDriverForFrontendInvocation())
+    return std::nullopt;
+
   const bool forceResponseFiles =
       C.getArgs().hasArg(options::OPT_driver_force_response_files);
   assert((invocationInfo.allowsResponseFiles || !forceResponseFiles) &&
@@ -181,113 +186,6 @@ file_types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
   return file_types::lookupTypeForExtension(Ext);
 }
 
-static bool jobsHaveSameExecutableNames(const Job *A, const Job *B) {
-  // Jobs that get here (that are derived from CompileJobActions) should always
-  // have the same executable name -- it should always be SWIFT_EXECUTABLE_NAME
-  // -- but we check here just to be sure / fail gracefully in non-assert
-  // builds.
-  assert(strcmp(A->getExecutable(), B->getExecutable()) == 0);
-  if (strcmp(A->getExecutable(), B->getExecutable()) != 0) {
-    return false;
-  }
-  return true;
-}
-
-static bool jobsHaveSameOutputTypes(const Job *A, const Job *B) {
-  if (A->getOutput().getPrimaryOutputType() !=
-      B->getOutput().getPrimaryOutputType())
-    return false;
-  return A->getOutput().hasSameAdditionalOutputTypes(B->getOutput());
-}
-
-static bool jobsHaveSameEnvironment(const Job *A, const Job *B) {
-  auto AEnv = A->getExtraEnvironment();
-  auto BEnv = B->getExtraEnvironment();
-  if (AEnv.size() != BEnv.size())
-    return false;
-  for (size_t i = 0; i < AEnv.size(); ++i) {
-    if (strcmp(AEnv[i].first, BEnv[i].first) != 0)
-      return false;
-    if (strcmp(AEnv[i].second, BEnv[i].second) != 0)
-      return false;
-  }
-  return true;
-}
-
-bool ToolChain::jobIsBatchable(const Compilation &C, const Job *A) const {
-  // FIXME: There might be a tighter criterion to use here?
-  if (C.getOutputInfo().CompilerMode != OutputInfo::Mode::StandardCompile)
-    return false;
-  auto const *CJActA = dyn_cast<const CompileJobAction>(&A->getSource());
-  if (!CJActA)
-    return false;
-  // When having only one job output a dependency file, that job is not
-  // batchable since it has an oddball set of additional output types.
-  if (C.OnlyOneDependencyFile &&
-      A->getOutput().hasAdditionalOutputForType(file_types::TY_Dependencies))
-    return false;
-  return CJActA->findSingleSwiftInput() != nullptr;
-}
-
-bool ToolChain::jobsAreBatchCombinable(const Compilation &C, const Job *A,
-                                       const Job *B) const {
-  assert(jobIsBatchable(C, A));
-  assert(jobIsBatchable(C, B));
-  return (jobsHaveSameExecutableNames(A, B) && jobsHaveSameOutputTypes(A, B) &&
-          jobsHaveSameEnvironment(A, B));
-}
-
-/// Form a synthetic \c CommandOutput for a \c BatchJob by merging together the
-/// \c CommandOutputs of all the jobs passed.
-static std::unique_ptr<CommandOutput>
-makeBatchCommandOutput(ArrayRef<const Job *> jobs, Compilation &C,
-                       file_types::ID outputType) {
-  auto output =
-      std::make_unique<CommandOutput>(outputType, C.getDerivedOutputFileMap());
-  for (auto const *J : jobs) {
-    output->addOutputs(J->getOutput());
-  }
-  return output;
-}
-
-/// Set-union the \c Inputs and \c InputActions from each \c Job in \p jobs into
-/// the provided \p inputJobs and \p inputActions vectors, further adding all \c
-/// Actions in the \p jobs -- InputActions or otherwise -- to \p batchCJA. Do
-/// set-union rather than concatenation here to avoid mentioning the same input
-/// multiple times.
-static bool
-mergeBatchInputs(ArrayRef<const Job *> jobs,
-                 llvm::SmallSetVector<const Job *, 16> &inputJobs,
-                 llvm::SmallSetVector<const Action *, 16> &inputActions,
-                 CompileJobAction *batchCJA) {
-
-  llvm::SmallSetVector<const Action *, 16> allActions;
-
-  for (auto const *J : jobs) {
-    for (auto const *I : J->getInputs()) {
-      inputJobs.insert(I);
-    }
-    auto const *CJA = dyn_cast<CompileJobAction>(&J->getSource());
-    if (!CJA)
-      return true;
-    for (auto const *I : CJA->getInputs()) {
-      // Capture _all_ input actions -- whether or not they are InputActions --
-      // in allActions, to set as the inputs for batchCJA below.
-      allActions.insert(I);
-      // Only collect input actions that _are InputActions_ in the inputActions
-      // array, to load into the JobContext in our caller.
-      if (auto const *IA = dyn_cast<InputAction>(I)) {
-        inputActions.insert(IA);
-      }
-    }
-  }
-
-  for (auto const *I : allActions) {
-    batchCJA->addInput(I);
-  }
-  return false;
-}
-
 void ToolChain::addLinkedLibArgs(const llvm::opt::ArgList &Args,
                                  llvm::opt::ArgStringList &FrontendArgs) {
   Args.getLastArg(options::OPT_l);
@@ -295,62 +193,6 @@ void ToolChain::addLinkedLibArgs(const llvm::opt::ArgList &Args,
     const std::string lArg("-l" + Arg);
     FrontendArgs.push_back(Args.MakeArgString(Twine(lArg)));
   }
-}
-
-/// Construct a \c BatchJob by merging the constituent \p jobs' CommandOutput,
-/// input \c Job and \c Action members. Call through to \c constructInvocation
-/// on \p BatchJob, to build the \c InvocationInfo.
-std::unique_ptr<Job>
-ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
-                             Job::PID &NextQuasiPID,
-                             Compilation &C) const {
-  if (unsortedJobs.empty())
-    return nullptr;
-
-  llvm::SmallVector<const Job *, 16> sortedJobs;
-  C.sortJobsToMatchCompilationInputs(unsortedJobs, sortedJobs);
-
-  // Synthetic OutputInfo is a slightly-modified version of the initial
-  // compilation's OI.
-  auto OI = C.getOutputInfo();
-  OI.CompilerMode = OutputInfo::Mode::BatchModeCompile;
-
-  auto const *executablePath = sortedJobs[0]->getExecutable();
-  auto outputType = sortedJobs[0]->getOutput().getPrimaryOutputType();
-  auto output = makeBatchCommandOutput(sortedJobs, C, outputType);
-
-  llvm::SmallSetVector<const Job *, 16> inputJobs;
-  llvm::SmallSetVector<const Action *, 16> inputActions;
-  auto *batchCJA = C.createAction<CompileJobAction>(outputType);
-  if (mergeBatchInputs(sortedJobs, inputJobs, inputActions, batchCJA))
-    return nullptr;
-
-  JobContext context{C, inputJobs.getArrayRef(), inputActions.getArrayRef(),
-                     *output, OI};
-  auto invocationInfo = constructInvocation(*batchCJA, context);
-  // Batch mode can produce quite long command lines; in almost every case these
-  // will trigger use of supplementary output file maps. However, if the driver
-  // command line is long for reasons unrelated to the number of input files,
-  // such as passing a large number of flags, then the individual batch jobs are
-  // also likely to overflow. We have to check for that explicitly here, because
-  // the BatchJob created here does not go through the same code path in
-  // constructJob above.
-  //
-  // The `allowsResponseFiles` flag on the `invocationInfo` we have here exists
-  // only to model external tools that don't know about response files, such as
-  // platform linkers; when talking to the frontend (which we control!) it
-  // should always be true. But double check with an assert here in case someone
-  // failed to set it in `constructInvocation`.
-  assert(invocationInfo.allowsResponseFiles);
-  auto responseFileInfo =
-      getResponseFileInfo(C, executablePath, invocationInfo, context);
-
-  return std::make_unique<BatchJob>(
-      *batchCJA, inputJobs.takeVector(), std::move(output), executablePath,
-      std::move(invocationInfo.Arguments),
-      std::move(invocationInfo.ExtraEnvironment),
-      std::move(invocationInfo.FilelistInfos), sortedJobs, NextQuasiPID,
-      responseFileInfo);
 }
 
 llvm::Expected<file_types::ID>

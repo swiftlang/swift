@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 protocol P {
   associatedtype SomeType
@@ -66,7 +66,7 @@ f1(
    )
 
 f3(
-   f2 // expected-error {{cannot convert value of type '(@escaping ((Int) -> Int)) -> Int' to expected argument type '(@escaping (Int) -> Float) -> Int'}}
+   f2 // expected-error {{cannot convert value of type '(@escaping (Int) -> Int) -> Int' to expected argument type '(@escaping (Int) -> Float) -> Int'}}
    )
 
 f4(i, d) // expected-error {{extra argument in call}}
@@ -891,7 +891,7 @@ do {
 // https://github.com/apple/swift/issues/44772
 // Erroneous diagnostic when unable to infer generic type
 do {
-  struct S<A, B> { // expected-note 4 {{'B' declared as parameter to type 'S'}} expected-note 2 {{'A' declared as parameter to type 'S'}} expected-note * {{generic type 'S' declared here}}
+  struct S<A, B> { // expected-note 4 {{'B' declared as parameter to type 'S'}} expected-note 2 {{'A' declared as parameter to type 'S'}} expected-note * {{generic struct 'S' declared here}}
     init(a: A) {}
     init(b: B) {}
     init(c: Int) {}
@@ -899,11 +899,11 @@ do {
     init(e: A?) {}
   }
 
-  struct S_Array<A, B> { // expected-note {{'B' declared as parameter to type 'S_Array'}} expected-note * {{generic type 'S_Array' declared here}}
+  struct S_Array<A, B> { // expected-note {{'B' declared as parameter to type 'S_Array'}} expected-note * {{generic struct 'S_Array' declared here}}
     init(_ a: [A]) {}
   }
 
-  struct S_Dict<A: Hashable, B> { // expected-note {{'B' declared as parameter to type 'S_Dict'}} expected-note * {{generic type 'S_Dict' declared here}}
+  struct S_Dict<A: Hashable, B> { // expected-note {{'B' declared as parameter to type 'S_Dict'}} expected-note * {{generic struct 'S_Dict' declared here}}
     init(a: [A: Double]) {}
   }
 
@@ -1126,10 +1126,12 @@ func rdar17170728() {
     // expected-error@-1 4 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
   }
 
+  // FIXME: Bad diagnostic, `Bool.Stride` is bogus, we shouldn't be suggesting
+  // `reduce(into:)`, and the actual problem is that Int cannot be used as a boolean
+  // condition.
   let _ = [i, j, k].reduce(0 as Int?) { // expected-error {{missing argument label 'into:' in call}}
-    // expected-error@-1 {{cannot convert value of type 'Int?' to expected argument type '(inout @escaping (Bool, Bool) -> Bool?, Int?) throws -> ()'}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
-    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
+    // expected-error@-1 {{binary operator '+' cannot be applied to operands of type 'Bool.Stride' and 'Bool'}}
   }
 }
 
@@ -1577,4 +1579,11 @@ func testAddMemberVsRemoveCall() {
   let a = Foo_74617()
   let b = Foo_74617()
   let c = (a + b).bar() // expected-error {{cannot call value of non-function type 'Float'}} {{22-24=}}
+}
+
+// Make sure we can still type-check the closure.
+do {
+  _ = {
+    let x: String = 0 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
+  }. // expected-error {{expected member name following '.'}}
 }

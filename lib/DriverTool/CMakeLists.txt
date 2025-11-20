@@ -11,7 +11,6 @@ set(driver_sources_and_options
                 modulewrap_main.cpp
                 swift_api_digester_main.cpp
                 swift_cache_tool_main.cpp
-                swift_indent_main.cpp
                 swift_symbolgraph_extract_main.cpp
                 swift_synthesize_interface_main.cpp
                 swift_parse_test_main.cpp)

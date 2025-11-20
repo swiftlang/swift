@@ -1,5 +1,6 @@
-// RUN: %target-build-swift -typecheck %s -Xfrontend -verify -Xfrontend -verify-ignore-unknown
-// RUN: %target-build-swift -emit-ir -g %s -DNO_ERROR > /dev/null
+// RUN: %empty-directory(%t/cache)
+// RUN: %target-build-swift -typecheck %s -Xfrontend -verify -Xfrontend -verify-ignore-unknown -module-cache-path %t/cache
+// RUN: %target-build-swift -emit-ir -g %s -DNO_ERROR -module-cache-path %t/cache > /dev/null
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop

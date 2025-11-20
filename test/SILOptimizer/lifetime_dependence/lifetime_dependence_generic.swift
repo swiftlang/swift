@@ -2,14 +2,13 @@
 // RUN:   -o /dev/null \
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
-// RUN:   -enable-experimental-feature NonescapableTypes \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
-// RUN:   -disable-experimental-parser-round-trip \
 // RUN:   -parse-stdlib -module-name Swift
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 @_marker public protocol Escapable {}
 
@@ -20,12 +19,12 @@ precedencegroup AssignmentPrecedence { assignment: true }
 
 protocol P {
   associatedtype E: ~Escapable
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   borrowing func getE() -> E
 }
 
 extension P {
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   borrowing func getDefault() -> E {
     return getE()
   }
@@ -53,29 +52,29 @@ struct NCInt: ~Copyable {
 struct NEInt: ~Escapable {
   let value: Builtin.Int64
 
-  @lifetime(o)
+  @_lifetime(copy o)
   init<O: ~Copyable & ~Escapable>(v: Builtin.Int64, o: borrowing O) {
     self.value = v
   }
 
   // Test a generic storage owner.
-  @lifetime(borrow borrowed)
+  @_lifetime(borrow borrowed)
   init(borrowed: borrowing NCInt) {
     self.init(v: borrowed.value, o: borrowed)
   }
 }
 
-@lifetime(ne)
+@_lifetime(copy ne)
 public func consume_indirect<NE: ~Escapable>(ne: consuming NE) -> NE {
   return ne
 }
 
-@lifetime(ne)
+@_lifetime(copy ne)
 public func copy_indirect<NE: ~Escapable>(ne: borrowing NE) -> NE {
   return copy ne
 }
 
-@lifetime(ne)
+@_lifetime(copy ne)
 public func copy_inout<NE: ~Escapable>(ne: inout NE) -> NE {
   return copy ne
 }

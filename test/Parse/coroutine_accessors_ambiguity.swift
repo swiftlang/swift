@@ -6,7 +6,7 @@
 // RUN:     -verify-additional-prefix disabled- \
 // RUN:     -debug-diagnostic-names
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_CoroutineAccessors
 
 // Properties with implicit getters which call functions named modify.
 

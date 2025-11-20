@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -disable-availability-checking -o %t -enable-library-evolution -module-name ResilientLibrary %S/Inputs/opaque_values_silgen_resilient.swift
-// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-silgen -disable-availability-checking -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -Xllvm -sil-print-types -emit-silgen -disable-availability-checking -I %t %s | %FileCheck %s
 
 import ResilientLibrary
 

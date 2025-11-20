@@ -96,7 +96,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     ReabstractionInfo ReInfo(M.getSwiftModule(), M.isWholeModule(), AI,
                              ReferencedF, Subs, IsNotSerialized,
                              /*ConvertIndirectToDirect=*/ true,
-                             /*dropMetatypeArgs=*/ false);
+                             /*dropUnusedArguments=*/ false);
 
     if (!ReInfo.canBeSpecialized())
       continue;
@@ -109,7 +109,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
 
     // Create a name of the specialization. All external pre-specializations
     // are serialized without bodies. Thus use IsNotSerialized here.
-    Mangle::GenericSpecializationMangler NewGenericMangler(ReferencedF,
+    Mangle::GenericSpecializationMangler NewGenericMangler(M.getASTContext(), ReferencedF,
                                                            IsNotSerialized);
     std::string ClonedName = NewGenericMangler.mangleReabstracted(Subs,
        ReInfo.needAlternativeMangling());

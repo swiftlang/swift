@@ -445,6 +445,7 @@ public protocol Sequence<Element> {
   /// - Returns: The value returned from `body`, unless the sequence doesn't
   ///   support contiguous storage, in which case the method ignores `body` and
   ///   returns `nil`.
+  @safe
   func withContiguousStorageIfAvailable<R>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?
@@ -495,6 +496,7 @@ extension DropFirstSequence: Sequence {
   public typealias SubSequence = AnySequence<Element>
   
   @inlinable
+  @inline(__always)
   public __consuming func makeIterator() -> Iterator {
     var it = _base.makeIterator()
     var dropped = 0
@@ -703,6 +705,7 @@ extension Sequence {
     return Array(result)
   }
 
+#if !$Embedded
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
@@ -714,6 +717,7 @@ extension Sequence {
   ) throws -> [T] {
     try map(transform)
   }
+#endif
 
   /// Returns an array containing, in order, the elements of the sequence
   /// that satisfy the given predicate.
@@ -1223,7 +1227,7 @@ extension Sequence {
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
-    return _copySequenceContents(initializing: buffer)
+    return unsafe _copySequenceContents(initializing: buffer)
   }
 
   @_alwaysEmitIntoClient
@@ -1236,13 +1240,14 @@ extension Sequence {
       guard let x = it.next() else {
         return (it, idx)
       }
-      ptr.initialize(to: x)
-      ptr += 1
+      unsafe ptr.initialize(to: x)
+      unsafe ptr += 1
     }
     return (it, buffer.endIndex)
   }
     
   @inlinable
+  @safe
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {

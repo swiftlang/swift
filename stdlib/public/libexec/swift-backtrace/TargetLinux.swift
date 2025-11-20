@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,13 +23,11 @@ import Glibc
 import Musl
 #endif
 
-import _Backtracing
-@_spi(Internal) import _Backtracing
-@_spi(Contexts) import _Backtracing
-@_spi(MemoryReaders) import _Backtracing
-@_spi(Utils) import _Backtracing
-
-internal import Runtime
+import Runtime
+@_spi(Internal) import Runtime
+@_spi(Contexts) import Runtime
+@_spi(MemoryReaders) import Runtime
+@_spi(Utils) import Runtime
 
 enum SomeBacktrace {
   case raw(Backtrace)
@@ -54,7 +52,7 @@ class Target {
   var faultAddress: Address
   var crashingThread: TargetThread.ThreadID
 
-  var images: [Backtrace.Image] = []
+  var images: ImageMap
 
   var threads: [TargetThread] = []
   var crashingThreadNdx: Int = -1
@@ -86,7 +84,7 @@ class Target {
     }
   }
 
-  var reader: CachingMemoryReader<MemserverMemoryReader>
+  var reader: MemserverMemoryReader
 
   // Get the name of a process
   private static func getProcessName(pid: pid_t) -> String {
@@ -120,7 +118,7 @@ class Target {
     let memserverFd: CInt = 4
 
     pid = getppid()
-    reader = CachingMemoryReader(for: MemserverMemoryReader(fd: memserverFd))
+    reader = MemserverMemoryReader(fd: memserverFd)
     name = Self.getProcessName(pid: pid)
 
     let crashInfo: CrashInfo
@@ -135,8 +133,7 @@ class Target {
     signal = crashInfo.signal
     faultAddress = crashInfo.fault_address
 
-    images = Backtrace.captureImages(using: reader,
-                                     forProcess: Int(pid))
+    images = ImageMap.capture(using: reader, forProcess: Int(pid))
 
     do {
       try fetchThreads(threadListHead: Address(crashInfo.thread_list),
@@ -174,34 +171,34 @@ class Target {
       let backtrace = try Backtrace.capture(from: context,
                                             using: reader,
                                             images: images,
+                                            algorithm: .auto,
                                             limit: limit,
+                                            offset: 0,
                                             top: top)
 
       let shouldSymbolicate: Bool
-      let showInlineFrames: Bool
-      let showSourceLocations: Bool
+      var options: Backtrace.SymbolicationOptions
       switch symbolicate {
         case .off:
           shouldSymbolicate = false
-          showInlineFrames = false
-          showSourceLocations = false
+          options = []
         case .fast:
           shouldSymbolicate = true
-          showInlineFrames = false
-          showSourceLocations = false
+          options = [ .showSourceLocations ]
         case .full:
           shouldSymbolicate = true
-          showInlineFrames = true
-          showSourceLocations = true
+          options = [ .showInlineFrames, .showSourceLocations ]
+      }
+
+      if cache {
+        options.insert(.useSymbolCache)
       }
 
       if shouldSymbolicate {
-        guard let symbolicated
-                = backtrace.symbolicated(with: images,
-                                         sharedCacheInfo: nil,
-                                         showInlineFrames: showInlineFrames,
-                                         showSourceLocations: showSourceLocations,
-                                         useSymbolCache: cache) else {
+        guard let symbolicated = backtrace.symbolicated(
+                with: images,
+                options: options
+              ) else {
           print("unable to symbolicate backtrace for thread \(t.tid)")
           exit(1)
         }
@@ -245,37 +242,37 @@ class Target {
       guard let backtrace = try? Backtrace.capture(from: context,
                                                    using: reader,
                                                    images: images,
+                                                   algorithm: .auto,
                                                    limit: limit,
+                                                   offset: 0,
                                                    top: top) else {
         print("unable to capture backtrace from context for thread \(ndx)")
         continue
       }
 
       let shouldSymbolicate: Bool
-      let showInlineFrames: Bool
-      let showSourceLocations: Bool
+      var options: Backtrace.SymbolicationOptions
       switch symbolicate {
         case .off:
           shouldSymbolicate = false
-          showInlineFrames = false
-          showSourceLocations = false
+          options = []
         case .fast:
           shouldSymbolicate = true
-          showInlineFrames = false
-          showSourceLocations = false
+          options = [ .showSourceLocations ]
         case .full:
           shouldSymbolicate = true
-          showInlineFrames = true
-          showSourceLocations = true
+          options = [ .showInlineFrames, .showSourceLocations ]
+      }
+
+      if cache {
+        options.insert(.useSymbolCache)
       }
 
       if shouldSymbolicate {
         guard let symbolicated = backtrace.symbolicated(
                 with: images,
-                sharedCacheInfo: nil,
-                showInlineFrames: showInlineFrames,
-                showSourceLocations: showSourceLocations,
-                useSymbolCache: cache) else {
+                options: options
+              ) else {
           print("unable to symbolicate backtrace from context for thread \(ndx)")
           continue
         }

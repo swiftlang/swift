@@ -78,3 +78,16 @@ extension FooIntBarFloatDoubleInner {
   }
 }
 
+struct Foo2<T1, T2, T3,> {}
+
+typealias Bar2<
+  T1,
+  T2,
+> = Foo2<
+  T1,
+  T2,
+  Bool,
+>
+
+let _ = Foo2<Int, Bool, String,>.self
+let _ = Bar2<Int, Bool,>()

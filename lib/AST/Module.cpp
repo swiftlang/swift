@@ -41,11 +41,13 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/SourceFileExtras.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
@@ -59,12 +61,14 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 using namespace swift;
 
@@ -100,9 +104,6 @@ BuiltinUnit::LookupCache &BuiltinUnit::getCache() const {
 void BuiltinUnit::LookupCache::lookupValue(
        Identifier Name, NLKind LookupKind, const BuiltinUnit &M,
        SmallVectorImpl<ValueDecl*> &Result) {
-  // Only qualified lookup ever finds anything in the builtin module.
-  if (LookupKind != NLKind::QualifiedLookup) return;
-
   ValueDecl *&Entry = Cache[Name];
   ASTContext &Ctx = M.getParentModule()->getASTContext();
   if (!Entry) {
@@ -150,6 +151,11 @@ class swift::SourceLookupCache {
     void add(ValueDecl *VD) {
       if (!VD->hasName()) return;
       VD->getName().addToLookupTable(Members, VD);
+
+      auto abiRole = ABIRoleInfo(VD);
+      if (!abiRole.providesABI() && abiRole.getCounterpart())
+        abiRole.getCounterpart()->getName()
+            .addToLookupTable(Members, abiRole.getCounterpart());
     }
 
     void clear() {
@@ -166,6 +172,7 @@ class swift::SourceLookupCache {
   ValueDeclMap TopLevelValues;
   ValueDeclMap ClassMembers;
   bool MemberCachePopulated = false;
+  llvm::SmallVector<AbstractFunctionDecl *, 0> CustomDerivatives;
   DeclName UniqueMacroNamePlaceholder;
 
   template<typename T>
@@ -173,8 +180,9 @@ class swift::SourceLookupCache {
   OperatorMap<OperatorDecl> Operators;
   OperatorMap<PrecedenceGroupDecl> PrecedenceGroups;
 
-  template<typename Range>
-  void addToUnqualifiedLookupCache(Range decls, bool onlyOperators);
+  template <typename Range>
+  void addToUnqualifiedLookupCache(Range decls, bool onlyOperators,
+                                   bool onlyDerivatives);
   template<typename Range>
   void addToMemberCache(Range decls);
 
@@ -204,6 +212,10 @@ public:
   /// Retrieves all the precedence groups. The order of the results is not
   /// guaranteed to be meaningful.
   void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl *> &results);
+
+  /// Retrieves all the function decls marked as @derivative. The order of the
+  /// results is not guaranteed to be meaningful.
+  llvm::SmallVector<AbstractFunctionDecl *, 0> getCustomDerivativeDecls();
 
   /// Look up an operator declaration.
   ///
@@ -249,9 +261,10 @@ static Decl *getAsDecl(Decl *decl) { return decl; }
 static Expr *getAsExpr(ASTNode node) { return node.dyn_cast<Expr *>(); }
 static Decl *getAsDecl(ASTNode node) { return node.dyn_cast<Decl *>(); }
 
-template<typename Range>
+template <typename Range>
 void SourceLookupCache::addToUnqualifiedLookupCache(Range items,
-                                                    bool onlyOperators) {
+                                                    bool onlyOperators,
+                                                    bool onlyDerivatives) {
   for (auto item : items) {
     // In script mode, we'll see macro expansion expressions for freestanding
     // macros.
@@ -268,19 +281,36 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range items,
       continue;
 
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      if (onlyOperators ? VD->isOperator() : VD->hasName()) {
-        // Cache the value under both its compound name and its full name.
+      auto getDerivative = [VD]() -> AbstractFunctionDecl * {
+        if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
+          if (AFD->getAttrs().hasAttribute<DerivativeAttr>())
+            return AFD;
+        return nullptr;
+      };
+      if (onlyOperators && VD->isOperator())
         TopLevelValues.add(VD);
-
-        if (!onlyOperators && VD->getAttrs().hasAttribute<CustomAttr>()) {
+      if (onlyDerivatives)
+        if (AbstractFunctionDecl *AFD = getDerivative())
+          CustomDerivatives.push_back(AFD);
+      if (!onlyOperators && !onlyDerivatives && VD->hasName()) {
+        TopLevelValues.add(VD);
+        if (VD->getAttrs().hasAttribute<CustomAttr>())
           MayHaveAuxiliaryDecls.push_back(VD);
-        }
+        if (AbstractFunctionDecl *AFD = getDerivative())
+          CustomDerivatives.push_back(AFD);
       }
     }
 
-    if (auto *NTD = dyn_cast<NominalTypeDecl>(D))
-      if (!NTD->hasUnparsedMembers() || NTD->maybeHasOperatorDeclarations())
-        addToUnqualifiedLookupCache(NTD->getMembers(), true);
+    if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+      bool onlyOperatorsArg =
+          (!NTD->hasUnparsedMembers() || NTD->maybeHasOperatorDeclarations());
+      bool onlyDerivativesArg =
+          (!NTD->hasUnparsedMembers() || NTD->maybeHasDerivativeDeclarations());
+      if (onlyOperatorsArg || onlyDerivativesArg) {
+        addToUnqualifiedLookupCache(NTD->getMembers(), onlyOperatorsArg,
+                                    onlyDerivativesArg);
+      }
+    }
 
     if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
       // Avoid populating the cache with the members of invalid extension
@@ -292,8 +322,14 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range items,
         MayHaveAuxiliaryDecls.push_back(ED);
       }
 
-      if (!ED->hasUnparsedMembers() || ED->maybeHasOperatorDeclarations())
-        addToUnqualifiedLookupCache(ED->getMembers(), true);
+      bool onlyOperatorsArg =
+          (!ED->hasUnparsedMembers() || ED->maybeHasOperatorDeclarations());
+      bool onlyDerivativesArg =
+          (!ED->hasUnparsedMembers() || ED->maybeHasDerivativeDeclarations());
+      if (onlyOperatorsArg || onlyDerivativesArg) {
+        addToUnqualifiedLookupCache(ED->getMembers(), onlyOperatorsArg,
+                                    onlyDerivativesArg);
+      }
     }
 
     if (auto *OD = dyn_cast<OperatorDecl>(D))
@@ -307,7 +343,8 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range items,
         MayHaveAuxiliaryDecls.push_back(MED);
     } else if (auto TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       if (auto body = TLCD->getBody()){
-        addToUnqualifiedLookupCache(body->getElements(), onlyOperators);
+        addToUnqualifiedLookupCache(body->getElements(), onlyOperators,
+                                    onlyDerivatives);
       }
     }
   }
@@ -488,8 +525,8 @@ SourceLookupCache::SourceLookupCache(const SourceFile &SF)
 {
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
                              "source-file-populate-cache");
-  addToUnqualifiedLookupCache(SF.getTopLevelItems(), false);
-  addToUnqualifiedLookupCache(SF.getHoistedDecls(), false);
+  addToUnqualifiedLookupCache(SF.getTopLevelItems(), false, false);
+  addToUnqualifiedLookupCache(SF.getHoistedDecls(), false, false);
 }
 
 SourceLookupCache::SourceLookupCache(const ModuleDecl &M)
@@ -499,11 +536,11 @@ SourceLookupCache::SourceLookupCache(const ModuleDecl &M)
                              "module-populate-cache");
   for (const FileUnit *file : M.getFiles()) {
     auto *SF = cast<SourceFile>(file);
-    addToUnqualifiedLookupCache(SF->getTopLevelItems(), false);
-    addToUnqualifiedLookupCache(SF->getHoistedDecls(), false);
+    addToUnqualifiedLookupCache(SF->getTopLevelItems(), false, false);
+    addToUnqualifiedLookupCache(SF->getHoistedDecls(), false, false);
 
     if (auto *SFU = file->getSynthesizedFile()) {
-      addToUnqualifiedLookupCache(SFU->getTopLevelDecls(), false);
+      addToUnqualifiedLookupCache(SFU->getTopLevelDecls(), false, false);
     }
   }
 }
@@ -515,7 +552,8 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
   if (I != TopLevelValues.end()) {
     Result.reserve(I->second.size());
     for (ValueDecl *Elt : I->second)
-      Result.push_back(Elt);
+      if (ABIRoleInfo(Elt).matchesOptions(Flags))
+        Result.push_back(Elt);
   }
 
   // If we aren't supposed to find names introduced by macros, we're done.
@@ -572,6 +610,11 @@ void SourceLookupCache::getOperatorDecls(
     results.append(ops.second.begin(), ops.second.end());
 }
 
+llvm::SmallVector<AbstractFunctionDecl *, 0>
+SourceLookupCache::getCustomDerivativeDecls() {
+  return CustomDerivatives;
+}
+
 void SourceLookupCache::lookupOperator(Identifier name, OperatorFixity fixity,
                                        TinyPtrVector<OperatorDecl *> &results) {
   auto ops = Operators.find(name);
@@ -603,7 +646,8 @@ void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
     if (I == TopLevelValues.end()) return;
 
     for (auto vd : I->second)
-      Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
+      if (ABIRoleInfo(vd).matchesOptions(OptionSet<ModuleLookupFlags>())) // FIXME: figure this out
+        Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
     return;
   }
 
@@ -613,7 +657,8 @@ void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
       // entry for the simple name so that we report each declaration once.
       if (tlv.first.isSimpleName() && !vd->getName().isSimpleName())
         continue;
-      Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
+      if (ABIRoleInfo(vd).matchesOptions(OptionSet<ModuleLookupFlags>())) // FIXME: figure this out
+        Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
     }
   }
 
@@ -638,7 +683,8 @@ void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
     });
   }
   for (auto *vd : macroExpandedDecls) {
-    Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
+    if (ABIRoleInfo(vd).matchesOptions(OptionSet<ModuleLookupFlags>())) // FIXME: figure this out
+      Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
   }
 }
 
@@ -646,32 +692,33 @@ void SourceLookupCache::lookupClassMembers(ImportPath::Access accessPath,
                                            VisibleDeclConsumer &consumer) {
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
 
-  if (!accessPath.empty()) {
-    for (auto &member : ClassMembers) {
-      // Non-simple names are also stored under their simple name, so make
-      // sure to only report them once.
-      if (!member.first.isSimpleName())
-        continue;
+  std::vector<std::pair<DeclName, TinyPtrVector<ValueDecl *>>> OrderedMembers;
+  for (auto &member : ClassMembers) {
+    if (!member.first.isSimpleName())
+      continue;
+    OrderedMembers.emplace_back(member.first, member.second);
+  }
+  llvm::sort(OrderedMembers,
+             [](auto &LHS, auto &RHS) { return LHS.first < RHS.first; });
 
+  if (!accessPath.empty()) {
+    for (auto &member : OrderedMembers) {
       for (ValueDecl *vd : member.second) {
         auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
         if (nominal && nominal->getName() == accessPath.front().Item)
-          consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
-                             DynamicLookupInfo::AnyObject);
+          if (ABIRoleInfo(vd).matchesOptions(OptionSet<ModuleLookupFlags>())) // FIXME: figure this out
+            consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
+                               DynamicLookupInfo::AnyObject);
       }
     }
     return;
   }
 
-  for (auto &member : ClassMembers) {
-    // Non-simple names are also stored under their simple name, so make sure to
-    // only report them once.
-    if (!member.first.isSimpleName())
-      continue;
-
+  for (auto &member : OrderedMembers) {
     for (ValueDecl *vd : member.second)
-      consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
-                         DynamicLookupInfo::AnyObject);
+      if (ABIRoleInfo(vd).matchesOptions(OptionSet<ModuleLookupFlags>())) // FIXME: figure this out
+        consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
+                           DynamicLookupInfo::AnyObject);
   }
 }
 
@@ -688,7 +735,8 @@ void SourceLookupCache::lookupClassMember(ImportPath::Access accessPath,
     for (ValueDecl *vd : iter->second) {
       auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
       if (nominal && nominal->getName() == accessPath.front().Item)
-        results.push_back(vd);
+        if (ABIRoleInfo(vd).matchesOptions(OptionSet<ModuleLookupFlags>())) // FIXME: figure this out
+          results.push_back(vd);
     }
     return;
   }
@@ -701,7 +749,9 @@ void SourceLookupCache::lookupClassMember(ImportPath::Access accessPath,
 //===----------------------------------------------------------------------===//
 
 ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
-                       ImplicitImportInfo importInfo)
+                       ImplicitImportInfo importInfo,
+                       PopulateFilesFn populateFiles,
+                       bool isMainModule)
     : DeclContext(DeclContextKind::Module, nullptr),
       TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), {}),
       ImportInfo(importInfo) {
@@ -720,7 +770,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.ImplicitDynamicEnabled = 0;
   Bits.ModuleDecl.IsSystemModule = 0;
   Bits.ModuleDecl.IsNonSwiftModule = 0;
-  Bits.ModuleDecl.IsMainModule = 0;
+  Bits.ModuleDecl.IsMainModule = isMainModule;
   Bits.ModuleDecl.HasIncrementalInfo = 0;
   Bits.ModuleDecl.HasHermeticSealAtLink = 0;
   Bits.ModuleDecl.IsEmbeddedSwiftModule = 0;
@@ -730,6 +780,24 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.CXXStdlibKind = 0;
   Bits.ModuleDecl.AllowNonResilientAccess = 0;
   Bits.ModuleDecl.SerializePackageEnabled = 0;
+  Bits.ModuleDecl.StrictMemorySafety = 0;
+  Bits.ModuleDecl.DeferredCodeGen = 0;
+
+  // Populate the module's files.
+  SmallVector<FileUnit *, 2> files;
+  populateFiles(this, [&](FileUnit *file) {
+    // If this is a LoadedFile, make sure it loaded without error.
+    assert(!(isa<LoadedFile>(file) &&
+             cast<LoadedFile>(file)->hadLoadError()));
+
+    // Require Main and REPL files to be the first file added.
+    assert(files.empty() ||
+           !isa<SourceFile>(file) ||
+           cast<SourceFile>(file)->Kind == SourceFileKind::Library ||
+           cast<SourceFile>(file)->Kind == SourceFileKind::SIL);
+    files.push_back(file);
+  });
+  Files.emplace(std::move(files));
 }
 
 void ModuleDecl::setIsSystemModule(bool flag) {
@@ -752,18 +820,14 @@ ImplicitImportList ModuleDecl::getImplicitImports() const {
                            {});
 }
 
-void ModuleDecl::addFile(FileUnit &newFile) {
-  // If this is a LoadedFile, make sure it loaded without error.
-  assert(!(isa<LoadedFile>(newFile) &&
-           cast<LoadedFile>(newFile).hadLoadError()));
+const AccessNotesFile *ModuleDecl::getAccessNotes() const {
+  // Only the main module has access notes.
+  if (!isMainModule())
+    return nullptr;
 
-  // Require Main and REPL files to be the first file added.
-  assert(Files.empty() ||
-         !isa<SourceFile>(newFile) ||
-         cast<SourceFile>(newFile).Kind == SourceFileKind::Library ||
-         cast<SourceFile>(newFile).Kind == SourceFileKind::SIL);
-  Files.push_back(&newFile);
-  clearLookupCache();
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator, LoadAccessNotesRequest{&ctx},
+                           nullptr);
 }
 
 SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
@@ -792,48 +856,6 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   return nullptr;
 }
 
-std::pair<unsigned, SourceLoc>
-ModuleDecl::getOriginalLocation(SourceLoc loc) const {
-  assert(loc.isValid());
-
-  SourceManager &SM = getASTContext().SourceMgr;
-  unsigned bufferID = SM.findBufferContainingLoc(loc);
-
-  SourceLoc startLoc = loc;
-  unsigned startBufferID = bufferID;
-  while (const GeneratedSourceInfo *info =
-             SM.getGeneratedSourceInfo(bufferID)) {
-    switch (info->kind) {
-#define MACRO_ROLE(Name, Description)  \
-    case GeneratedSourceInfo::Name##MacroExpansion:
-#include "swift/Basic/MacroRoles.def"
-    {
-      // Location was within a macro expansion, return the expansion site, not
-      // the insertion location.
-      if (info->attachedMacroCustomAttr) {
-        loc = info->attachedMacroCustomAttr->getLocation();
-      } else {
-        ASTNode expansionNode = ASTNode::getFromOpaqueValue(info->astNode);
-        loc = expansionNode.getStartLoc();
-      }
-      bufferID = SM.findBufferContainingLoc(loc);
-      break;
-    }
-    case GeneratedSourceInfo::DefaultArgument:
-      // No original location as it's not actually in any source file
-    case GeneratedSourceInfo::ReplacedFunctionBody:
-      // There's not really any "original" location for locations within
-      // replaced function bodies. The body is actually different code to the
-      // original file.
-    case GeneratedSourceInfo::PrettyPrinted:
-      // No original location, return the original buffer/location
-      return {startBufferID, startLoc};
-    }
-  }
-
-  return {bufferID, loc};
-}
-
 ArrayRef<SourceFile *>
 PrimarySourceFilesRequest::evaluate(Evaluator &evaluator,
                                     ModuleDecl *mod) const {
@@ -853,20 +875,6 @@ ArrayRef<SourceFile *> ModuleDecl::getPrimarySourceFiles() const {
   auto &eval = getASTContext().evaluator;
   auto *mutableThis = const_cast<ModuleDecl *>(this);
   return evaluateOrDefault(eval, PrimarySourceFilesRequest{mutableThis}, {});
-}
-
-SourceFile *IDEInspectionFileRequest::evaluate(Evaluator &evaluator,
-                                               ModuleDecl *mod) const {
-  const auto &SM = mod->getASTContext().SourceMgr;
-  assert(mod->isMainModule() && "Can only do completion in the main module");
-  assert(SM.hasIDEInspectionTargetBuffer() && "Not in IDE inspection mode?");
-
-  for (auto *file : mod->getFiles()) {
-    auto *SF = dyn_cast<SourceFile>(file);
-    if (SF && SF->getBufferID() == SM.getIDEInspectionTargetBufferID())
-      return SF;
-  }
-  llvm_unreachable("Couldn't find the completion file?");
 }
 
 #define FORWARD(name, args)                                                    \
@@ -899,6 +907,22 @@ ModuleDecl *ModuleDecl::getTopLevelModule(bool overlay) {
   }
   // Swift modules don't currently support submodules.
   return this;
+}
+
+bool ModuleDecl::isSubmoduleOf(const ModuleDecl *M) const {
+  // Swift modules don't currently support submodules.
+  if (!isNonSwiftModule())
+    return false;
+
+  auto *ClangParent = M->findUnderlyingClangModule();
+  if (!ClangParent)
+    return false;
+
+  auto *ClangModule = findUnderlyingClangModule();
+  if (!ClangModule)
+    return false;
+
+  return ClangModule->isSubModuleOf(ClangParent);
 }
 
 static bool isParsedModule(const ModuleDecl *mod) {
@@ -987,7 +1011,18 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   } else if (privateDiscriminator.empty()) {
     auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
                                  [](const ValueDecl *VD) -> bool {
-      return VD->getFormalAccess() <= AccessLevel::FilePrivate;
+      // FIXME: The ClangImporter sometimes generates private declarations but
+      // doesn't give their file unit a private discriminator so they mangle
+      // incorrectly.
+      //
+      // The hasClangNode() carveout makes the ASTDemangler work properly in
+      // this case.
+      //
+      // We should fix things up so that such declarations also mangle with a
+      // a private discriminator, in which case this entry point will be called
+      // with the right parameters so that this isn't needed.
+      return (VD->getFormalAccess() <= AccessLevel::FilePrivate &&
+              !VD->hasClangNode());
     });
     results.erase(newEnd, results.end());
 
@@ -1017,9 +1052,40 @@ void ModuleDecl::lookupImportedSPIGroups(
   FORWARD(lookupImportedSPIGroups, (importedModule, spiGroups));
 }
 
+bool ModuleDecl::isModuleImportedPreconcurrency(
+    const ModuleDecl *importedModule) const {
+  for (const FileUnit *file : getFiles()) {
+    if (file->isModuleImportedPreconcurrency(importedModule))
+      return true;
+
+    if (auto *synth = file->getSynthesizedFile()) {
+      if (synth->isModuleImportedPreconcurrency(importedModule))
+        return true;
+    }
+  }
+  return false;
+}
+
+void ModuleDecl::lookupAvailabilityDomains(
+    Identifier identifier,
+    llvm::SmallVectorImpl<AvailabilityDomain> &results) const {
+  auto iter = AvailabilityDomains.find(identifier);
+  if (iter != AvailabilityDomains.end()) {
+    results.push_back(AvailabilityDomain::forCustom(iter->getSecond()));
+    return;
+  }
+
+  FORWARD(lookupAvailabilityDomains, (identifier, results));
+}
+
 void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
                               OptionSet<ModuleLookupFlags> Flags,
                               SmallVectorImpl<ValueDecl*> &result) const {
+  // Only qualified lookup ever finds anything in the builtin module.
+  if (lookupKind != NLKind::QualifiedLookup
+        && !Flags.contains(ModuleLookupFlags::HasModuleSelector))
+    return;
+
   getCache().lookupValue(name.getBaseIdentifier(), lookupKind, *this, result);
 }
 
@@ -1073,6 +1139,10 @@ void SourceFile::lookupClassMembers(ImportPath::Access accessPath,
   cache.lookupClassMembers(accessPath, consumer);
 }
 
+const GeneratedSourceInfo *SourceFile::getGeneratedSourceFileInfo() const {
+  return getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
+}
+
 ASTNode SourceFile::getMacroExpansion() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return nullptr;
@@ -1084,9 +1154,7 @@ SourceRange SourceFile::getMacroInsertionRange() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return SourceRange();
 
-  auto generatedInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  auto origRange = generatedInfo.originalSourceRange;
+  auto origRange = getGeneratedSourceFileInfo()->originalSourceRange;
   return {origRange.getStart(), origRange.getEnd()};
 }
 
@@ -1094,18 +1162,14 @@ CustomAttr *SourceFile::getAttachedMacroAttribute() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return nullptr;
 
-  auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  return genInfo.attachedMacroCustomAttr;
+  return getGeneratedSourceFileInfo()->attachedMacroCustomAttr;
 }
 
 std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   if (Kind != SourceFileKind::MacroExpansion)
     return std::nullopt;
 
-  auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  switch (genInfo.kind) {
+  switch (getGeneratedSourceFileInfo()->kind) {
 #define MACRO_ROLE(Name, Description)               \
   case GeneratedSourceInfo::Name##MacroExpansion: \
     return MacroRole::Name;
@@ -1114,6 +1178,7 @@ std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::AttributeFromClang:
     return std::nullopt;
   }
 }
@@ -1123,9 +1188,7 @@ SourceFile *SourceFile::getEnclosingSourceFile() const {
       Kind != SourceFileKind::DefaultArgument)
     return nullptr;
 
-  auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  auto sourceLoc = genInfo.originalSourceRange.getStart();
+  auto sourceLoc = getGeneratedSourceFileInfo()->originalSourceRange.getStart();
   return getParentModule()->getSourceFileContainingLocation(sourceLoc);
 }
 
@@ -1134,9 +1197,18 @@ ASTNode SourceFile::getNodeInEnclosingSourceFile() const {
       Kind != SourceFileKind::DefaultArgument)
     return nullptr;
 
-  auto genInfo =
-      *getASTContext().SourceMgr.getGeneratedSourceInfo(getBufferID());
-  return ASTNode::getFromOpaqueValue(genInfo.astNode);
+  return ASTNode::getFromOpaqueValue(getGeneratedSourceFileInfo()->astNode);
+}
+
+SourceFileExtras &SourceFile::getExtras() const {
+  if (!extras) {
+    const_cast<SourceFile *>(this)->extras = new SourceFileExtras();
+    getASTContext().addCleanup([extras=this->extras] {
+      delete extras;
+    });
+  }
+
+  return *extras;
 }
 
 void ModuleDecl::lookupClassMember(ImportPath::Access accessPath,
@@ -1175,14 +1247,6 @@ void SourceFile::lookupObjCMethods(
   auto known = ObjCMethods.find(selector);
   if (known == ObjCMethods.end()) return;
   results.append(known->second.begin(), known->second.end());
-}
-
-bool ModuleDecl::shouldCollectDisplayDecls() const {
-  for (const FileUnit *file : Files) {
-    if (!file->shouldCollectDisplayDecls())
-      return false;
-  }
-  return true;
 }
 
 void ModuleDecl::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
@@ -1363,11 +1427,11 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
   bool InGeneratedBuffer =
       !SM.rangeContainsTokenLoc(SM.getRangeForBuffer(BufferID), MainLoc);
   if (InGeneratedBuffer) {
-    unsigned UnderlyingBufferID;
-    std::tie(UnderlyingBufferID, MainLoc) =
-        D->getModuleContext()->getOriginalLocation(MainLoc);
-    if (BufferID != UnderlyingBufferID)
-      return std::nullopt;
+    if (auto R = getUnexpandedMacroRange(SM, MainLoc)) {
+      if (BufferID != SM.findBufferContainingLoc(R.Start))
+        return std::nullopt;
+      MainLoc = R.Start;
+    }
   }
 
   auto setLoc = [&](ExternalSourceLocs::RawLoc &RawLoc, SourceLoc Loc) {
@@ -1409,9 +1473,6 @@ void ModuleDecl::ImportCollector::collect(
     const ImportedModule &importedModule) {
   auto *module = importedModule.importedModule;
 
-  if (!module->shouldCollectDisplayDecls())
-    return;
-
   if (importFilter && !importFilter(module))
     return;
 
@@ -1432,11 +1493,17 @@ static void
 collectExportedImports(const ModuleDecl *topLevelModule,
                        ModuleDecl::ImportCollector &importCollector) {
   SmallVector<const ModuleDecl *> stack;
+  SmallPtrSet<const ModuleDecl *, 4> visited;
+  visited.insert(topLevelModule);
   stack.push_back(topLevelModule);
   while (!stack.empty()) {
     const ModuleDecl *module = stack.pop_back_val();
-    if (module->isNonSwiftModule())
+    if (module->isNonSwiftModule() && module != topLevelModule &&
+        !module->isSubmoduleOf(topLevelModule)) {
+      // Recurse into submodules of the top-level module so that we can
+      // re-export them if necessary.
       continue;
+    }
 
     for (const FileUnit *file : module->getFiles()) {
       if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
@@ -1456,10 +1523,12 @@ collectExportedImports(const ModuleDecl *topLevelModule,
                                  ModuleDecl::ImportFilterKind::Exported);
         for (const auto &im : exportedImports) {
           // Skip collecting the underlying clang module as we already have the relevant import.
-          if (module->isClangOverlayOf(im.importedModule))
-            continue;
-          importCollector.collect(im);
-          stack.push_back(im.importedModule);
+          if (!module->isClangOverlayOf(im.importedModule))
+            importCollector.collect(im);
+          if (!visited.contains(im.importedModule)) {
+            visited.insert(im.importedModule);
+            stack.push_back(im.importedModule);
+          }
         }
       }
     }
@@ -1515,10 +1584,8 @@ Fingerprint SourceFile::getInterfaceHash() const {
   assert(hasInterfaceHash() && "Interface hash not enabled");
   auto &eval = getASTContext().evaluator;
   auto *mutableThis = const_cast<SourceFile *>(this);
-  std::optional<StableHasher> interfaceHasher =
-      evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
-          .InterfaceHasher;
-  return Fingerprint{StableHasher{interfaceHasher.value()}.finalize()};
+  return evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
+      .Fingerprint.value();
 }
 
 Fingerprint SourceFile::getInterfaceHashIncludingTypeMembers() const {
@@ -1759,6 +1826,15 @@ void SourceFile::dumpSeparatelyImportedOverlays() const {
 
 void ModuleDecl::getImportedModulesForLookup(
     SmallVectorImpl<ImportedModule> &modules) const {
+  // FIXME: We can unfortunately end up in a cycle where we attempt to query
+  // the files for a serialized module while attempting to load its LoadedFile
+  // unit. This is because both SerializedModuleLoader and ClangImporter
+  // kick the computation of transitive module dependencies, which can end up
+  // pointing back to the original module in cases where it's an overlay. We
+  // ought to be more lazy there. This is also why
+  // `SourceFile::getImportedModules` cannot assume imports have been resolved.
+  if (!Files.has_value())
+    return;
   FORWARD(getImportedModulesForLookup, (modules));
 }
 
@@ -1782,7 +1858,7 @@ StringRef ModuleDecl::ReverseFullNameIterator::operator*() const {
     return swiftModule->getRealName().str();
 
   auto *clangModule =
-      static_cast<const clang::Module *>(current.get<const void *>());
+      static_cast<const clang::Module *>(cast<const void *>(current));
   if (!clangModule->isSubModule() && clangModule->Name == "std")
     return "CxxStdlib";
   return clangModule->Name;
@@ -1793,13 +1869,13 @@ ModuleDecl::ReverseFullNameIterator::operator++() {
   if (!current)
     return *this;
 
-  if (current.is<const ModuleDecl *>()) {
+  if (isa<const ModuleDecl *>(current)) {
     current = nullptr;
     return *this;
   }
 
   auto *clangModule =
-      static_cast<const clang::Module *>(current.get<const void *>());
+      static_cast<const clang::Module *>(cast<const void *>(current));
   if (clangModule->Parent)
     current = clangModule->Parent;
   else
@@ -1909,7 +1985,7 @@ StringRef ModuleDecl::getModuleFilename() const {
       continue;
     }
     // Skip synthesized files.
-    if (auto *SFU = dyn_cast<SynthesizedFileUnit>(F))
+    if (isa<SynthesizedFileUnit>(F))
       continue;
     return StringRef();
   }
@@ -1935,6 +2011,14 @@ StringRef ModuleDecl::getModuleLoadedFilename() const {
 
 bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
+}
+
+bool ModuleDecl::isCxxModule() const {
+  return !getParent() && getName() == getASTContext().Id_Cxx;
+}
+
+bool ModuleDecl::isConcurrencyModule() const {
+  return !getParent() && getName() == getASTContext().Id_Concurrency;
 }
 
 bool ModuleDecl::hasStandardSubstitutions() const {
@@ -2327,28 +2411,41 @@ void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
   if (auto *clangModule = getUnderlyingModuleIfOverlay())
     worklist.push_back(clangModule);
 
+  auto addOverlay = [&](Identifier overlay) {
+    // We don't present non-underscored overlays as part of the underlying
+    // module, so ignore them.
+    if (!overlay.hasUnderscoredNaming())
+      return;
+
+    ModuleDecl *overlayMod =
+        getASTContext().getModuleByIdentifier(overlay);
+    if (!overlayMod && overlayMod != this)
+      return;
+
+    if (seen.insert(overlayMod).second) {
+      overlayModules.push_back(overlayMod);
+      worklist.push_back(overlayMod);
+      if (auto *clangModule = overlayMod->getUnderlyingModuleIfOverlay())
+        worklist.push_back(clangModule);
+    }
+  };
+
   while (!worklist.empty()) {
     ModuleDecl *current = worklist.back();
     worklist.pop_back();
+
+    if (current->isStdlibModule()) {
+      for (auto overlay : getASTContext().StdlibOverlayNames) {
+        addOverlay(overlay);
+      }
+    }
+
     for (auto &pair: current->declaredCrossImports) {
       Identifier &bystander = std::get<0>(pair);
       for (auto *file: std::get<1>(pair)) {
         auto overlays = file->getOverlayModuleNames(current, unused, bystander);
         for (Identifier overlay: overlays) {
-          // We don't present non-underscored overlays as part of the underlying
-          // module, so ignore them.
-          if (!overlay.hasUnderscoredNaming())
-            continue;
-          ModuleDecl *overlayMod =
-              getASTContext().getModuleByName(overlay.str());
-          if (!overlayMod)
-            continue;
-          if (seen.insert(overlayMod).second) {
-            overlayModules.push_back(overlayMod);
-            worklist.push_back(overlayMod);
-            if (auto *clangModule = overlayMod->getUnderlyingModuleIfOverlay())
-              worklist.push_back(clangModule);
-          }
+          addOverlay(overlay);
         }
       }
     }
@@ -2384,6 +2481,12 @@ ModuleDecl::getDeclaringModuleAndBystander() {
 
   if (!hasUnderscoredNaming())
     return *(declaringModuleAndBystander = {nullptr, Identifier()});
+
+  // If this is one of the stdlib overlays, indicate as much.
+  auto &ctx = getASTContext();
+  if (llvm::is_contained(ctx.StdlibOverlayNames, getRealName()))
+    return *(declaringModuleAndBystander = { ctx.getStdlibModule(),
+                                             Identifier() });
 
   // Search the transitive set of imported @_exported modules to see if any have
   // this module as their overlay.
@@ -2464,11 +2567,18 @@ bool ModuleDecl::getRequiredBystandersIfCrossImportOverlay(
   auto *clangModule = declaring->getUnderlyingModuleIfOverlay();
   auto current = std::make_pair(this, Identifier());
   while ((current = current.first->getDeclaringModuleAndBystander()).first) {
-    bystanderNames.push_back(current.second);
+    if (!current.second.empty())
+      bystanderNames.push_back(current.second);
     if (current.first == declaring || current.first == clangModule)
       return true;
   }
   return false;
+}
+
+Identifier ModuleDecl::getNameForModuleSelector() {
+  if (auto declaring = getDeclaringModuleIfCrossImportOverlay())
+    return declaring->getName();
+  return this->getName();
 }
 
 bool ModuleDecl::isClangHeaderImportModule() const {
@@ -2618,6 +2728,11 @@ void
 SourceFile::setImports(ArrayRef<AttributedImport<ImportedModule>> imports) {
   assert(!Imports && "Already computed imports");
   Imports = getASTContext().AllocateCopy(imports);
+  if (getASTContext().LangOpts.DumpSourceFileImports) {
+    llvm::errs() << "imports for " << getFilename() << ":\n";
+    for (auto Import : imports)
+      llvm::errs() << "\t" << Import.module.importedModule->getName() << "\n";
+  }
 }
 
 std::optional<AttributedImport<ImportedModule>>
@@ -2832,6 +2947,7 @@ bool SourceFile::hasTestableOrPrivateImport(
       });
 }
 
+// FIXME: This should probably be requestified.
 RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *module) const {
   auto &imports = getASTContext().getImportCache();
   RestrictedImportKind importKind = RestrictedImportKind::MissingImport;
@@ -2912,6 +3028,18 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
       restrictiveImport = import;
     }
   }
+
+  // Reexports from the local module take precedence over non-public imports
+  // and lift all access-level restrictions. We still prioritize file local
+  // public imports as diagnostics will have an import to point to and
+  // they are recommended over indirect imports.
+  if ((!restrictiveImport.has_value() ||
+       restrictiveImport->accessLevel < AccessLevel::Public) &&
+      !(restrictiveImport &&
+        restrictiveImport->module.importedModule->isClangHeaderImportModule()) &&
+      imports.isImportedBy(targetModule, getParentModule()))
+    return std::nullopt;
+
   return restrictiveImport;
 }
 
@@ -2944,7 +3072,8 @@ void ModuleDecl::setPackageName(Identifier name) {
   Package = PackageUnit::create(name, *this, getASTContext());
 }
 
-bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
+bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module,
+    bool assumeImported) const {
   if (module == this) return false;
 
   auto &imports = getASTContext().getImportCache();
@@ -2965,34 +3094,17 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
       return false;
   }
 
-  return true;
-}
-
-bool ModuleDecl::
-canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const {
-  ModuleDecl *moduleOfCtxt = ctxt->getParentModule();
-
-  // If the context defined in the same module - or is the same module, it's
-  // fine.
-  if (moduleOfCtxt == this)
+  if (assumeImported)
     return true;
 
-  // See if context is imported in a "regular" way, i.e. not with
-  // @_implementationOnly, `package import` or @_spiOnly.
-  ModuleDecl::ImportFilter filter = {
-    ModuleDecl::ImportFilterKind::ImplementationOnly,
-    ModuleDecl::ImportFilterKind::PackageOnly,
-    ModuleDecl::ImportFilterKind::SPIOnly
-  };
-  SmallVector<ImportedModule, 4> results;
-  getImportedModules(results, filter);
+  results.clear();
+  getImportedModules(results,
+      {ModuleDecl::ImportFilterKind::ImplementationOnly});
+  for (auto &desc : results)
+    if (imports.isImportedBy(module, desc.importedModule))
+      return true;
 
-  auto &imports = getASTContext().getImportCache();
-  for (auto &desc : results) {
-    if (imports.isImportedBy(moduleOfCtxt, desc.importedModule))
-      return false;
-  }
-  return true;
+  return false;
 }
 
 void SourceFile::lookupImportedSPIGroups(
@@ -3007,6 +3119,20 @@ void SourceFile::lookupImportedSPIGroups(
       spiGroups.insert(import.spiGroups.begin(), import.spiGroups.end());
     }
   }
+}
+
+bool SourceFile::isModuleImportedPreconcurrency(
+    const ModuleDecl *importedModule) const {
+  auto &imports = getASTContext().getImportCache();
+  for (auto &import : *Imports) {
+    if (import.options.contains(ImportFlags::Preconcurrency) &&
+        (importedModule == import.module.importedModule ||
+         imports.isImportedByViaSwiftOnly(importedModule,
+                                          import.module.importedModule))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool shouldImplicitImportAsSPI(ArrayRef<Identifier> spiGroups) {
@@ -3042,7 +3168,7 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   return false;
 }
 
-bool ModuleDecl::isImportedAsSPI(const SpecializeAttr *attr,
+bool ModuleDecl::isImportedAsSPI(const AbstractSpecializeAttr *attr,
                                  const ValueDecl *targetDecl) const {
   auto declSPIGroups = attr->getSPIGroups();
   if (shouldImplicitImportAsSPI(declSPIGroups))
@@ -3081,7 +3207,7 @@ bool Decl::isSPI() const {
 }
 
 ArrayRef<Identifier> Decl::getSPIGroups() const {
-  const Decl *D = abstractSyntaxDeclForAvailableAttribute(this);
+  const Decl *D = getAbstractSyntaxDeclForAttributes();
 
   if (!isa<ValueDecl>(D) &&
       !isa<ExtensionDecl>(D))
@@ -3098,6 +3224,11 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
   assert (isa<ValueDecl>(decl) ||
           isa<ExtensionDecl>(decl));
 
+  // ABI decls share the SPI groups of their API decl.
+  auto abiRole = ABIRoleInfo(decl);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getSPIGroups();
+
   // First, look for local attributes.
   llvm::SetVector<Identifier> spiGroups;
   for (auto attr : decl->getAttrs().getAttributes<SPIAccessControlAttr>())
@@ -3111,6 +3242,14 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
       auto originalSPIs = originalDecl->getSPIGroups();
       spiGroups.insert(originalSPIs.begin(), originalSPIs.end());
     }
+
+  // Accessors get the SPI groups from the PBD.
+  if (auto AD = dyn_cast<AccessorDecl>(decl))
+    if (auto VD = dyn_cast<VarDecl>(AD->getStorage()))
+      if (auto *PBD = VD->getParentPatternBinding()) {
+        auto moreGroups = PBD->getSPIGroups();
+        spiGroups.insert(moreGroups.begin(), moreGroups.end());
+      }
 
   // If there is no local SPI information, look at the context.
   if (spiGroups.empty()) {
@@ -3259,7 +3398,19 @@ getInfoForUsedFileNames(const ModuleDecl *module) {
 
 static void computeFileID(const ModuleDecl *module, StringRef name,
                           SmallVectorImpl<char> &result) {
-  result.assign(module->getNameStr().begin(), module->getNameStr().end());
+  // The module might alias itself (e.g., to use a raw identifier as the name
+  // that it references itself with in its own source code), so we need to look
+  // that up.
+  Identifier moduleName = module->getASTContext().getRealModuleName(
+      module->getName(),
+      ASTContext::ModuleAliasLookupOption::aliasFromRealName);
+  if (moduleName.mustAlwaysBeEscaped()) {
+    result.push_back('`');
+    result.append(moduleName.str().begin(), moduleName.str().end());
+    result.push_back('`');
+  } else {
+    result.assign(moduleName.str().begin(), moduleName.str().end());
+  }
   result.push_back('/');
   result.append(name.begin(), name.end());
 }
@@ -3573,6 +3724,11 @@ StringRef SourceFile::getFilename() const {
   return SM.getIdentifierForBuffer(BufferID);
 }
 
+StringRef SourceFile::getBuffer() const {
+  SourceManager &SM = getASTContext().SourceMgr;
+  return SM.getEntireTextForBuffer(BufferID);
+}
+
 ASTScope &SourceFile::getScope() {
   if (!Scope)
     Scope = new (getASTContext()) ASTScope(this);
@@ -3639,16 +3795,20 @@ SynthesizedFileUnit &FileUnit::getOrCreateSynthesizedFile() {
   return *SynthesizedFile;
 }
 
-TypeRefinementContext *SourceFile::getTypeRefinementContext() const {
-  return TRC;
+AvailabilityScope *SourceFile::getAvailabilityScope() const {
+  return RootAvailabilityScope;
 }
 
-void SourceFile::setTypeRefinementContext(TypeRefinementContext *Root) {
-  TRC = Root;
+void SourceFile::setAvailabilityScope(AvailabilityScope *scope) {
+  RootAvailabilityScope = scope;
 }
 
 ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {
   for (auto *vd : UnvalidatedDeclsWithOpaqueReturnTypes.takeVector()) {
+    if (vd->getDeclContext()->getInnermostSkippedFunctionContext()) {
+      // Ignore things in skipped functions.
+      continue;
+    }
     if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
       auto inserted = ValidatedOpaqueReturnTypes.insert(
                 {opaqueDecl->getOpaqueReturnTypeIdentifier().str(),
@@ -3703,6 +3863,35 @@ ArrayRef<TypeDecl *> SourceFile::getLocalTypeDecls() const {
   auto *mutableThis = const_cast<SourceFile *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            LocalTypeDeclsRequest{mutableThis}, {});
+}
+
+std::optional<SourceFile::FileIDStr>
+SourceFile::FileIDStr::parse(StringRef fileID) {
+  auto names = fileID.split('/');
+  auto moduleName = names.first;
+  auto fileName = names.second;
+
+  if (moduleName.empty() || fileName.empty() || !fileName.ends_with(".swift") ||
+      fileName.contains('/'))
+    return {};
+
+  return {SourceFile::FileIDStr{/*.moduleName=*/moduleName,
+                                /*.fileName=*/fileName}};
+}
+
+bool SourceFile::FileIDStr::matches(const SourceFile *file) const {
+  // Never match with SourceFiles that do not correpond to a file on disk
+  if (file->getFilename().empty())
+    return false;
+
+  return moduleName == file->getParentModule()->getNameStr() &&
+         fileName == llvm::sys::path::filename(file->getFilename());
+}
+
+std::optional<DefaultIsolation> SourceFile::getDefaultIsolation() const {
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, DefaultIsolationInSourceFileRequest{this}, std::nullopt);
 }
 
 namespace {
@@ -3790,7 +3979,7 @@ void SynthesizedFileUnit::lookupValue(
     SmallVectorImpl<ValueDecl *> &result) const {
   for (auto *decl : TopLevelDecls) {
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
-      if (VD->getName().matchesRef(name)) {
+      if (VD->getName().matchesRef(name) && ABIRoleInfo(VD).matchesOptions(Flags)) {
         result.push_back(VD);
       }
     }
@@ -3893,7 +4082,7 @@ StringRef LoadedFile::getFilename() const {
 
 static const clang::Module *
 getClangModule(llvm::PointerUnion<const ModuleDecl *, const void *> Union) {
-  return static_cast<const clang::Module *>(Union.get<const void *>());
+  return static_cast<const clang::Module *>(cast<const void *>(Union));
 }
 
 StringRef ModuleEntity::getName(bool useRealNameIfAliased) const {
@@ -3941,7 +4130,7 @@ const ModuleDecl* ModuleEntity::getAsSwiftModule() const {
 
 const clang::Module* ModuleEntity::getAsClangModule() const {
   assert(!Mod.isNull());
-  if (Mod.is<const ModuleDecl*>())
+  if (isa<const ModuleDecl *>(Mod))
     return nullptr;
   return getClangModule(Mod);
 }
@@ -4025,6 +4214,23 @@ bool IsNonUserModuleRequest::evaluate(Evaluator &evaluator, ModuleDecl *mod) con
     return true;
   }
   return false;
+}
+
+evaluator::SideEffect CustomDerivativesRequest::evaluate(Evaluator &evaluator,
+                                                         SourceFile *sf) const {
+  ModuleDecl *module = sf->getParentModule();
+  assert(isParsedModule(module));
+  llvm::SmallVector<AbstractFunctionDecl *, 0> decls =
+      module->getSourceLookupCache().getCustomDerivativeDecls();
+  for (const AbstractFunctionDecl *afd : decls) {
+    for (const auto *derAttr :
+         afd->getAttrs().getAttributes<DerivativeAttr>()) {
+      // Resolve derivative function configurations from `@derivative`
+      // attributes by type-checking them.
+      (void)derAttr->getOriginalFunction(sf->getASTContext());
+    }
+  }
+  return {};
 }
 
 version::Version ModuleDecl::getLanguageVersionBuiltWith() const {

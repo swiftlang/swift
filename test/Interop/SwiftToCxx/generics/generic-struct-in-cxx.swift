@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Generics -clang-header-expose-decls=all-public -emit-clang-header-path %t/generics.h
+// RUN: %target-swift-frontend %s -module-name Generics -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
 // RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
@@ -8,7 +8,7 @@
 // RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -enable-library-evolution -typecheck -module-name Generics -clang-header-expose-decls=all-public -emit-clang-header-path %t/generics.h
+// RUN: %target-swift-frontend %s -enable-library-evolution -module-name Generics -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
 // RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
@@ -39,6 +39,7 @@ class ClassWithT<T>: CustomStringConvertible {
 
 @frozen
 public struct GenericPair<T, T2> {
+    // expected-note@-1 {{'T' previously declared here}}
     #if KNOWN_LAYOUT
     var x_: ClassWithT<T>
     var y_: ClassWithT<T2>
@@ -108,6 +109,7 @@ public struct GenericPair<T, T2> {
     }
 
     public func genericMethod<T>(_ x: T, _ y: T2) -> T {
+        // expected-warning@-1 {{generic parameter 'T' shadows generic parameter from outer scope with the same name}}
         print("GenericPair<T, T2>::genericMethod<T>::\(x),\(y);")
         return x
     }

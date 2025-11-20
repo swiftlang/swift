@@ -28,7 +28,7 @@ let swiftSourceDirectory = #filePath
 let swiftSetttings: [SwiftSetting] = [
   .interoperabilityMode(.Cxx),
   .unsafeFlags([
-    "-Xcc", "-DCOMPILED_WITH_SWIFT",
+    "-Xcc", "-DCOMPILED_WITH_SWIFT", "-Xcc", "-DPURE_BRIDGING_MODE",
     "-Xcc", "-UIBOutlet", "-Xcc", "-UIBAction", "-Xcc", "-UIBInspectable",
     "-Xcc", "-I\(swiftSourceDirectory)/include",
     "-Xcc", "-I\(swiftSourceDirectory)/../llvm-project/llvm/include",
@@ -56,6 +56,7 @@ let package = Package(
       dependencies: [
         .product(name: "SwiftDiagnostics", package: "swift-syntax"),
         .product(name: "SwiftIfConfig", package: "swift-syntax"),
+        .product(name: "SwiftLexicalLookup", package: "swift-syntax"),
         .product(name: "SwiftOperators", package: "swift-syntax"),
         .product(name: "SwiftParser", package: "swift-syntax"),
         .product(name: "SwiftParserDiagnostics", package: "swift-syntax"),

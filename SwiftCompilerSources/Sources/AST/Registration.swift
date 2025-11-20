@@ -36,7 +36,7 @@ public func registerAST() {
   registerDecl(ExtensionDecl.self)
   registerDecl(TopLevelCodeDecl.self)
   registerDecl(ImportDecl.self)
-  registerDecl(PoundDiagnosticDecl.self)
+  registerDecl(UsingDecl.self)
   registerDecl(PrecedenceGroupDecl.self)
   registerDecl(MissingDecl.self)
   registerDecl(MissingMemberDecl.self)
@@ -49,7 +49,7 @@ public func registerAST() {
 }
 
 private func registerDecl<T: AnyObject>(_ cl: T.Type) {
-  String(describing: cl)._withBridgedStringRef { nameStr in
+  "\(cl)"._withBridgedStringRef { nameStr in
     let metatype = unsafeBitCast(cl, to: SwiftMetatype.self)
     registerBridgedDecl(nameStr, metatype)
   }

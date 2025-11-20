@@ -599,6 +599,17 @@ void IRGenFunction::setScopedLocalTypeData(LocalTypeDataKey key,
 
   getOrCreateLocalTypeData().addConcrete(getActiveDominancePoint(),
                                          isConditional, key, value);
+
+  // We query reified types in places so also put a key mapping in for them.
+  auto reified = IGM.getRuntimeReifiedType(key.Type);
+  if (reified != key.Type) {
+    auto reifiedKey = LocalTypeDataKey(reified, key.Kind);
+    if (isConditional) {
+      registerConditionalLocalTypeDataKey(reifiedKey);
+    }
+    getOrCreateLocalTypeData().addConcrete(getActiveDominancePoint(),
+                                           isConditional, reifiedKey, value);
+  }
 }
 
 void IRGenFunction::setUnscopedLocalTypeMetadata(CanType type,
@@ -627,6 +638,15 @@ void IRGenFunction::setUnscopedLocalTypeData(LocalTypeDataKey key,
 
   getOrCreateLocalTypeData().addConcrete(DominancePoint::universal(),
                                          /*conditional*/ false, key, value);
+
+  // We query reified types in places so also put a key mapping in for them.
+  auto reified = IGM.getRuntimeReifiedType(key.Type);
+  if (reified != key.Type) {
+    auto reifiedKey = LocalTypeDataKey(reified, key.Kind);
+    getOrCreateLocalTypeData().addConcrete(DominancePoint::universal(),
+                                           /*conditional*/ false, reifiedKey,
+                                           value);
+  }
 }
 
 void IRGenFunction::bindLocalTypeDataFromTypeMetadata(CanType type,
@@ -715,11 +735,20 @@ void LocalTypeDataCache::addAbstractForTypeMetadata(IRGenFunction &IGF,
   // Look for anything at all that's fulfilled by this.  If we don't find
   // anything, stop.
   FulfillmentMap fulfillments;
-  if (!fulfillments.searchTypeMetadata(IGF.IGM, type, isExact,
-                                       metadata.getStaticLowerBoundOnState(),
-                                       /*source*/ 0, MetadataPath(),
-                                       callbacks)) {
-    return;
+  if (auto tupleType = dyn_cast<TupleType>(type)) {
+    if (!fulfillments.searchTupleTypeMetadata(IGF.IGM, tupleType, isExact,
+                                              metadata.getStaticLowerBoundOnState(),
+                                              /*source*/ 0, MetadataPath(),
+                                              callbacks)) {
+      return;
+    }
+  } else {
+    if (!fulfillments.searchTypeMetadata(IGF.IGM, type, isExact,
+                                         metadata.getStaticLowerBoundOnState(),
+                                         /*source*/ 0, MetadataPath(),
+                                         callbacks)) {
+      return;
+    }
   }
 
   addAbstractForFulfillments(IGF, std::move(fulfillments),

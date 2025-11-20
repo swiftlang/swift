@@ -3,18 +3,16 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -disable-experimental-parser-round-trip
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
+// RUN:   -enable-experimental-feature Lifetimes
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Lifetimes
 
 struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let c: Int
 
-  @lifetime(borrow p)
+  @_lifetime(borrow p)
   init(_ p: UnsafeRawPointer, _ c: Int) {
     self.p = p
     self.c = c
@@ -35,44 +33,47 @@ struct NC : ~Copyable {
 struct NE {
   var bv: BV
 
-  @lifetime(bv)
+  @_lifetime(copy bv)
   init(_ bv: consuming BV) {
     self.bv = bv
   }
 }
 
-func bv_assign_inout(bv: BV, other: inout BV) { // expected-error{{lifetime-dependent variable 'bv' escapes its scope}}
-  // expected-note @-1 {{it depends on the lifetime of argument 'bv'}}
-  other = bv // expected-note {{this use causes the lifetime-dependent value to escape}}
+@_lifetime(other: copy bv)
+func bv_assign_inout_copy(bv: BV, other: inout BV) {
+  other = bv // OK
 }
 
+@_lifetime(other: borrow bv)
+func bv_assign_inout_borrow(bv: BV, other: inout BV) {
+  other = bv
+}
+
+@_lifetime(bv: copy bv)
+@_lifetime(other: copy bv)
 func bvmut_assign_inout(bv: inout BV, other: inout BV) {
-  other = bv // expected-error{{lifetime-dependent value escapes its scope}}
-  // expected-note @-2 {{it depends on the lifetime of argument 'bv'}}
-  // expected-note @-2 {{this use causes the lifetime-dependent value to escape}}
+  other = bv
 }
 
+@_lifetime(other: copy bv)
 func bvcons_assign_inout(bv: consuming BV, other: inout BV) {
-  other = bv // expected-error{{lifetime-dependent value escapes its scope}}
-  // expected-note @-2 {{it depends on the lifetime of argument 'bv'}}
-  // expected-note @-2 {{this use causes the lifetime-dependent value to escape}}
+  other = bv
 }
 
-func bv_assign_field(bv: BV, other: inout NE) { // expected-error{{lifetime-dependent variable 'bv' escapes its scope}}
-  // expected-note @-1 {{it depends on the lifetime of argument 'bv'}}
-  other.bv = bv // expected-note {{this use causes the lifetime-dependent value to escape}}
+@_lifetime(other: copy bv)
+func bv_assign_field(bv: BV, other: inout NE) {
+  other.bv = bv
 }
 
+@_lifetime(bv: copy bv)
+@_lifetime(other: copy bv)
 func bvmut_assign_field(bv: inout BV, other: inout NE) {
-  other.bv = bv // expected-error{{lifetime-dependent value escapes its scope}}
-  // expected-note @-2 {{it depends on the lifetime of argument 'bv'}}
-  // expected-note @-2 {{this use causes the lifetime-dependent value to escape}}
+  other.bv = bv
 }
 
+@_lifetime(other: copy bv)
 func bvcons_assign_field(bv: consuming BV, other: inout NE) {
-  other.bv = bv // expected-error{{lifetime-dependent value escapes its scope}}
-  // expected-note @-2 {{it depends on the lifetime of argument 'bv'}}
-  // expected-note @-2 {{this use causes the lifetime-dependent value to escape}}
+  other.bv = bv
 }
 
 func bv_capture_escape(bv: BV) -> ()->Int { // expected-error{{lifetime-dependent variable 'bv' escapes its scope}}

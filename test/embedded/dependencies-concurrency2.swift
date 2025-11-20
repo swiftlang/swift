@@ -16,6 +16,7 @@
 // DEP: _exit
 // DEP: _free
 // DEP: _malloc
+// DEP: _memcpy
 // DEP: _memmove
 // DEP: _memset
 // DEP: _memset_s
@@ -23,6 +24,7 @@
 // DEP: _putchar
 // DEP: _puts
 // DEP: _strlen
+// DEP: _strncpy
 // DEP: _swift_task_asyncMainDrainQueueImpl
 // DEP: _swift_task_enqueueGlobalImpl
 // DEP: _swift_task_getMainExecutorImpl
@@ -42,6 +44,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
 
 import _Concurrency
 

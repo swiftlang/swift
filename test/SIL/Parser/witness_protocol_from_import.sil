@@ -10,7 +10,7 @@ enum X {
   case twotransp
 }
 
-sil @_TTWO5test21Xs9EquatableS_FS1_oi2eeUS1___fMQPS1_FT3lhsS2_3rhsS2__Sb : $@convention(witness_method: Equatable) (@in X, @in X, @thick X.Type) -> Bool {
+sil @_TTWO5test21Xs9EquatableS_FS1_oi2eeUS1___fMQPS1_FT3lhsS2_3rhsS2__Sb : $@convention(witness_method: Equatable) (@in_guaranteed X, @in_guaranteed X, @thick X.Type) -> Bool {
 bb0(%0 : $*X, %1 : $*X, %2 : $@thick X.Type):
   %3 = load %0 : $*X
   %4 = load %1 : $*X
@@ -21,10 +21,9 @@ bb0(%0 : $*X, %1 : $*X, %2 : $@thick X.Type):
 }
 
 
-sil @_TTWO5test21Xs8HashableS_FS1_g9hashValueSi : $@convention(witness_method: Hashable) (@inout X) -> Int {
+sil @_TTWO5test21Xs8HashableS_FS1_g9hashValueSi : $@convention(witness_method: Hashable) (@in_guaranteed X) -> Int {
 bb0(%0 : $*X):
   %1 = load %0 : $*X
-
   %2 = function_ref @_TFO5test21Xg9hashValueSi : $@convention(method) (X) -> Int
   %3 = apply %2(%1) : $@convention(method) (X) -> Int
   return %3 : $Int

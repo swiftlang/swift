@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangDerivedConformances.h"
+#include "ImporterImpl.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -33,8 +34,7 @@ lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
   TinyPtrVector<ValueDecl *> result;
 
   if (id.isOperator()) {
-    auto underlyingId =
-        ctx.getIdentifier(getPrivateOperatorName(std::string(id)));
+    auto underlyingId = getOperatorName(ctx, id);
     TinyPtrVector<ValueDecl *> underlyingFuncs = evaluateOrDefault(
         ctx.evaluator, ClangRecordMemberLookup({decl, underlyingId}), {});
     for (auto it : underlyingFuncs) {
@@ -81,8 +81,6 @@ static FuncDecl *getInsertFunc(NominalTypeDecl *decl,
   FuncDecl *insert = nullptr;
   for (auto candidate : inserts) {
     if (auto candidateMethod = dyn_cast<FuncDecl>(candidate)) {
-      if (!candidateMethod->hasParameterList())
-        continue;
       auto params = candidateMethod->getParameters();
       if (params->size() != 1)
         continue;
@@ -144,7 +142,7 @@ static ValueDecl *lookupOperator(NominalTypeDecl *decl, Identifier id,
 
   // If no member operator was found, look for out-of-class definitions in the
   // same module.
-  auto module = decl->getModuleContext();
+  auto module = decl->getModuleContextForNameLookup();
   SmallVector<ValueDecl *> nonMemberResults;
   module->lookupValue(id, NLKind::UnqualifiedLookup, nonMemberResults);
   for (const auto &nonMember : nonMemberResults) {
@@ -158,7 +156,7 @@ static ValueDecl *lookupOperator(NominalTypeDecl *decl, Identifier id,
 static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
   auto isValid = [&](ValueDecl *equalEqualOp) -> bool {
     auto equalEqual = dyn_cast<FuncDecl>(equalEqualOp);
-    if (!equalEqual || !equalEqual->hasParameterList())
+    if (!equalEqual)
       return false;
     auto params = equalEqual->getParameters();
     if (params->size() != 2)
@@ -187,7 +185,7 @@ static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
 
   auto isValid = [&](ValueDecl *minusOp) -> bool {
     auto minus = dyn_cast<FuncDecl>(minusOp);
-    if (!minus || !minus->hasParameterList())
+    if (!minus)
       return false;
     auto params = minus->getParameters();
     if (params->size() != 2)
@@ -218,7 +216,7 @@ static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
 static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl, Type distanceTy) {
   auto isValid = [&](ValueDecl *plusEqualOp) -> bool {
     auto plusEqual = dyn_cast<FuncDecl>(plusEqualOp);
-    if (!plusEqual || !plusEqual->hasParameterList())
+    if (!plusEqual)
       return false;
     auto params = plusEqual->getParameters();
     if (params->size() != 2)
@@ -267,15 +265,25 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
       classDecl->getLocation(), clang::OverloadCandidateSet::CSK_Operator,
       clang::OverloadCandidateSet::OperatorRewriteInfo(opKind,
                                               clang::SourceLocation(), false));
-  clangSema.LookupOverloadedBinOp(candidateSet, opKind, ops, {arg, arg}, true);
+  std::array<clang::Expr *, 2> args{arg, arg};
+  clangSema.LookupOverloadedBinOp(candidateSet, opKind, ops, args, true);
 
   clang::OverloadCandidateSet::iterator best;
   switch (candidateSet.BestViableFunction(clangSema, clang::SourceLocation(),
                                           best)) {
   case clang::OR_Success: {
     if (auto clangCallee = best->Function) {
-      auto lookupTable = impl.findLookupTable(classDecl);
-      addEntryToLookupTable(*lookupTable, clangCallee, impl.getNameImporter());
+      // Declarations inside of a C++ namespace are added into two lookup
+      // tables: one for the __ObjC module, one for the actual owning Clang
+      // module of the decl. This is a hack that is meant to address the case
+      // when a namespace spans across multiple Clang modules. Mimic that
+      // behavior for the operator that we just instantiated.
+      auto lookupTable1 = impl.findLookupTable(classDecl);
+      addEntryToLookupTable(*lookupTable1, clangCallee, impl.getNameImporter());
+      auto owningModule = impl.getClangOwningModule(classDecl);
+      auto lookupTable2 = impl.findLookupTable(owningModule);
+      if (lookupTable1 != lookupTable2)
+        addEntryToLookupTable(*lookupTable2, clangCallee, impl.getNameImporter());
       return clangCallee;
     }
     break;
@@ -378,8 +386,13 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
   equalEqualDecl->setBody(equalEqualBody);
 
   impl.synthesizedAndAlwaysVisibleDecls.insert(equalEqualDecl);
-  auto lookupTable = impl.findLookupTable(classDecl);
-  addEntryToLookupTable(*lookupTable, equalEqualDecl, impl.getNameImporter());
+  auto lookupTable1 = impl.findLookupTable(classDecl);
+  addEntryToLookupTable(*lookupTable1, equalEqualDecl, impl.getNameImporter());
+  auto owningModule = impl.getClangOwningModule(classDecl);
+  auto lookupTable2 = impl.findLookupTable(owningModule);
+  if (lookupTable1 != lookupTable2)
+    addEntryToLookupTable(*lookupTable2, equalEqualDecl,
+                          impl.getNameImporter());
   return true;
 }
 
@@ -669,6 +682,8 @@ void swift::conformToCxxOptionalIfNeeded(
   assert(decl);
   assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
+  clang::ASTContext &clangCtx = impl.getClangASTContext();
+  clang::Sema &clangSema = impl.getClangSema();
 
   if (!isStdDecl(clangDecl, {"optional"}))
     return;
@@ -691,6 +706,64 @@ void swift::conformToCxxOptionalIfNeeded(
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"), pointeeTy);
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxOptional});
+
+  // `std::optional` has a C++ constructor that takes the wrapped value as a
+  // parameter. Unfortunately this constructor has templated parameter type, so
+  // it isn't directly usable from Swift. Let's explicitly instantiate a
+  // constructor with the wrapped value type, and then import it into Swift.
+
+  auto valueTypeDecl = lookupNestedClangTypeDecl(clangDecl, "value_type");
+  if (!valueTypeDecl)
+    // `std::optional` without a value_type?!
+    return;
+  auto valueType = clangCtx.getTypeDeclType(valueTypeDecl);
+
+  auto constRefValueType =
+      clangCtx.getLValueReferenceType(valueType.withConst());
+  // Create a fake variable with type of the wrapped value.
+  auto fakeValueVarDecl = clang::VarDecl::Create(
+      clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
+      clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
+      constRefValueType, clangCtx.getTrivialTypeSourceInfo(constRefValueType),
+      clang::StorageClass::SC_None);
+  auto fakeValueRefExpr = new (clangCtx) clang::DeclRefExpr(
+      clangCtx, fakeValueVarDecl, false,
+      constRefValueType.getNonReferenceType(), clang::ExprValueKind::VK_LValue,
+      clang::SourceLocation());
+
+  auto clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
+      clang::QualType(clangDecl->getTypeForDecl(), 0));
+  SmallVector<clang::Expr *, 1> constructExprArgs = {fakeValueRefExpr};
+
+  // Instantiate the templated constructor that would accept this fake variable.
+  clang::Sema::SFINAETrap trap(clangSema);
+  auto constructExprResult = clangSema.BuildCXXTypeConstructExpr(
+      clangDeclTyInfo, clangDecl->getLocation(), constructExprArgs,
+      clangDecl->getLocation(), /*ListInitialization*/ false);
+  if (!constructExprResult.isUsable() || trap.hasErrorOccurred())
+    return;
+
+  auto castExpr = dyn_cast_or_null<clang::CastExpr>(constructExprResult.get());
+  if (!castExpr)
+    return;
+
+  // The temporary bind expression will only be present for some non-trivial C++
+  // types.
+  auto bindTempExpr =
+      dyn_cast_or_null<clang::CXXBindTemporaryExpr>(castExpr->getSubExpr());
+
+  auto constructExpr = dyn_cast_or_null<clang::CXXConstructExpr>(
+      bindTempExpr ? bindTempExpr->getSubExpr() : castExpr->getSubExpr());
+  if (!constructExpr)
+    return;
+
+  auto constructorDecl = constructExpr->getConstructor();
+
+  auto importedConstructor =
+      impl.importDecl(constructorDecl, impl.CurrentVersion);
+  if (!importedConstructor)
+    return;
+  decl->addMember(importedConstructor);
 }
 
 void swift::conformToCxxSequenceIfNeeded(
@@ -923,29 +996,36 @@ void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
                                insert->getResultInterfaceType());
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSet});
 
+  ProtocolDecl *cxxInputIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
+  if (!cxxInputIteratorProto)
+    return;
+
+  auto rawIteratorType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("const_iterator"));
+  auto rawMutableIteratorType =
+      lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+          decl, ctx.getIdentifier("iterator"));
+  if (!rawIteratorType || !rawMutableIteratorType)
+    return;
+
+  auto rawIteratorTy = rawIteratorType->getUnderlyingType();
+  auto rawMutableIteratorTy = rawMutableIteratorType->getUnderlyingType();
+
+  if (!checkConformance(rawIteratorTy, cxxInputIteratorProto) ||
+      !checkConformance(rawMutableIteratorTy, cxxInputIteratorProto))
+    return;
+
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
+                               rawIteratorTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
+                               rawMutableIteratorTy);
+
   // If this isn't a std::multiset, try to also synthesize the conformance to
   // CxxUniqueSet.
   if (!isStdDecl(clangDecl, {"set", "unordered_set"}))
     return;
 
-  ProtocolDecl *cxxIteratorProto =
-      ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
-  if (!cxxIteratorProto)
-    return;
-
-  auto rawMutableIteratorType =
-      lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-          decl, ctx.getIdentifier("iterator"));
-  if (!rawMutableIteratorType)
-    return;
-
-  auto rawMutableIteratorTy = rawMutableIteratorType->getUnderlyingType();
-  // Check if RawMutableIterator conforms to UnsafeCxxInputIterator.
-  if (!checkConformance(rawMutableIteratorTy, cxxIteratorProto))
-    return;
-
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
-                               rawMutableIteratorTy);
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxUniqueSet});
 }
 
@@ -1073,7 +1153,9 @@ void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
       decl, ctx.getIdentifier("value_type"));
   auto iterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
       decl, ctx.getIdentifier("const_iterator"));
-  if (!valueType || !iterType)
+  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("size_type"));
+  if (!valueType || !iterType || !sizeType)
     return;
 
   ProtocolDecl *cxxRandomAccessIteratorProto =
@@ -1091,6 +1173,8 @@ void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
                                valueType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.Id_ArrayLiteralElement,
                                valueType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
+                               sizeType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxVector});
@@ -1263,8 +1347,9 @@ void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
   if (!importedConstructor)
     return;
 
-  auto attr = AvailableAttr::createPlatformAgnostic(importedConstructor->getASTContext(), "use 'init(_:)' instead.", "", PlatformAgnosticAvailabilityKind::Deprecated);
-  importedConstructor->getAttrs().add(attr);
+  auto attr = AvailableAttr::createUniversallyDeprecated(
+      importedConstructor->getASTContext(), "use 'init(_:)' instead.", "");
+  importedConstructor->addAttribute(attr);
 
   decl->addMember(importedConstructor);
 

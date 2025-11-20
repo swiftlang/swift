@@ -120,7 +120,8 @@ Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
 }
 
 Address TypeInfo::getUndefAddress() const {
-  return Address(llvm::UndefValue::get(getStorageType()->getPointerTo(0)),
+  return Address(llvm::UndefValue::get(llvm::PointerType::getUnqual(
+                     getStorageType()->getContext())),
                  getStorageType(), getBestKnownAlignment());
 }
 
@@ -701,16 +702,14 @@ llvm::Value *irgen::getFixedTypeEnumTagSinglePayload(
       // The size of the chunk does not have to be a power of 2.
       auto *caseIndexType =
           llvm::IntegerType::get(Ctx, fixedSize.getValueInBits());
-      auto *caseIndexAddr =
-          Builder.CreateBitCast(valueAddr, caseIndexType->getPointerTo());
+      auto *caseIndexAddr = Builder.CreateBitCast(valueAddr, IGM.PtrTy);
       caseIndexFromValue = Builder.CreateZExtOrTrunc(
           Builder.CreateLoad(
               Address(caseIndexAddr, caseIndexType, Alignment(1))),
           IGM.Int32Ty);
     } else {
       auto *caseIndexType = llvm::IntegerType::get(Ctx, 32);
-      auto *caseIndexAddr =
-          Builder.CreateBitCast(valueAddr, caseIndexType->getPointerTo());
+      auto *caseIndexAddr = Builder.CreateBitCast(valueAddr, IGM.PtrTy);
       caseIndexFromValue = Builder.CreateZExtOrTrunc(
           Builder.CreateLoad(
               Address(caseIndexAddr, caseIndexType, Alignment(1))),
@@ -1378,11 +1377,6 @@ namespace {
                                const llvm::Twine &name) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
-    StackAddress allocateVector(IRGenFunction &IGF, SILType T,
-                                llvm::Value *capacity,
-                                const Twine &name) const override {
-      llvm_unreachable("should not call on an immovable opaque type");
-    }
     void deallocateStack(IRGenFunction &IGF, StackAddress addr,
                          SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
@@ -1490,7 +1484,7 @@ bool TypeConverter::readLegacyTypeInfo(llvm::vfs::FileSystem &fs,
 }
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *decl) {
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(decl->getASTContext());
   return Mangler.mangleTypeAsContextUSR(decl);
 }
 
@@ -1907,22 +1901,27 @@ const Lowering::TypeLowering &IRGenModule::getTypeLowering(SILType type) const {
       type, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
+SILTypeProperties IRGenModule::getTypeProperties(SILType type) const {
+  return getTypeProperties(type,
+             TypeExpansionContext::maximalResilienceExpansionOnly());
+}
+
+SILTypeProperties
+IRGenModule::getTypeProperties(SILType type,
+                               TypeExpansionContext forExpansion) const {
+  return getSILTypes().getTypeProperties(type, forExpansion);
+}
+
+SILTypeProperties
+IRGenModule::getTypeProperties(AbstractionPattern origType,
+                               Type substType,
+                               TypeExpansionContext forExpansion) const {
+  return getSILTypes().getTypeProperties(origType, substType, forExpansion);
+}
+
 bool IRGenModule::isTypeABIAccessible(SILType type) const {
   return getSILModule().isTypeABIAccessible(
       type, TypeExpansionContext::maximalResilienceExpansionOnly());
-}
-
-/// Get a pointer to the storage type for the given type.  Note that,
-/// unlike fetching the type info and asking it for the storage type,
-/// this operation will succeed for forward-declarations.
-llvm::PointerType *IRGenModule::getStoragePointerType(SILType T) {
-  return getStoragePointerTypeForLowered(T.getASTType());
-}
-llvm::PointerType *IRGenModule::getStoragePointerTypeForUnlowered(Type T) {
-  return getStorageTypeForUnlowered(T)->getPointerTo();
-}
-llvm::PointerType *IRGenModule::getStoragePointerTypeForLowered(CanType T) {
-  return getStorageTypeForLowered(T)->getPointerTo();
 }
 
 llvm::Type *IRGenModule::getStorageTypeForUnlowered(Type subst) {
@@ -1994,7 +1993,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Map the archetype out of its own generic environment and into the
   // canonical generic environment.
   auto interfaceType = t->getInterfaceType();
-  auto exemplar = canGenericEnv->mapTypeIntoContext(interfaceType)
+  auto exemplar = canGenericEnv->mapTypeIntoEnvironment(interfaceType)
                     ->castTo<ArchetypeType>();
   assert(isExemplarArchetype(exemplar));
   return exemplar;
@@ -2015,7 +2014,7 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
           return getExemplarArchetype(arch);
         return type;
       },
-      MakeAbstractConformanceForGenericType(),
+      LookUpConformanceInModule(),
       SubstFlags::PreservePackExpansionLevel |
       SubstFlags::SubstitutePrimaryArchetypes);
     return CanType(exemplified);
@@ -2052,7 +2051,7 @@ const TypeInfo *TypeConverter::getTypeEntry(CanType canonicalTy) {
   auto contextTy = canonicalTy;
   if (contextTy->hasTypeParameter()) {
     // The type we got should be lowered, so lower it like a SILType.
-    contextTy = getGenericEnvironment()->mapTypeIntoContext(
+    contextTy = getGenericEnvironment()->mapTypeIntoEnvironment(
                   IGM.getSILModule(),
                   SILType::getPrimitiveAddressType(contextTy)).getASTType();
   }
@@ -2256,6 +2255,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinNativeObject:
     return &getNativeObjectTypeInfo();
+  case TypeKind::BuiltinImplicitActor:
+    return &getImplicitActorTypeInfo();
   case TypeKind::BuiltinBridgeObject:
     return &getBridgeObjectTypeInfo();
   case TypeKind::BuiltinUnsafeValueBuffer:
@@ -2321,7 +2322,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
 
   case TypeKind::PrimaryArchetype:
-  case TypeKind::OpenedArchetype:
+  case TypeKind::ExistentialArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::ElementArchetype:
     return convertArchetypeType(cast<ArchetypeType>(ty));
@@ -2375,7 +2376,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::SILToken:
     llvm_unreachable("should not be asking for representation of a SILToken");
   case TypeKind::Integer:
-    llvm_unreachable("implement me");
+    llvm_unreachable("should not be asking for the type info an IntegerType");
   }
   }
   llvm_unreachable("bad type kind");
@@ -2383,9 +2384,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
 
 /// Convert an inout type.  This is always just a bare pointer.
 const TypeInfo *TypeConverter::convertInOutType(InOutType *T) {
-  auto referenceType =
-    IGM.getStoragePointerTypeForUnlowered(CanType(T->getObjectType()));
-  
+  auto *referenceType = IGM.PtrTy;
+
   // Just use the reference type as a primitive pointer.
   return createPrimitive(referenceType, IGM.getPointerSize(),
                          IGM.getPointerAlignment());
@@ -2427,7 +2427,8 @@ namespace {
   /// type mismatch) if an aggregate type containing a value of this
   /// type is generated generically rather than independently for
   /// different specializations?
-  class IsIRTypeDependent : public CanTypeVisitor<IsIRTypeDependent, bool> {
+  class IsIRTypeDependent :
+      public CanTypeVisitor_AnyNominal<IsIRTypeDependent, bool> {
     IRGenModule &IGM;
   public:
     IsIRTypeDependent(IRGenModule &IGM) : IGM(IGM) {}
@@ -2441,11 +2442,8 @@ namespace {
 
     // Dependent struct types need their own implementation if any
     // field type might need its own implementation.
-    bool visitStructType(CanStructType type) {
-      return visitStructDecl(type->getDecl());
-    }
-    bool visitBoundGenericStructType(CanBoundGenericStructType type) {
-      return visitStructDecl(type->getDecl());
+    bool visitAnyStructType(CanType type, StructDecl *decl) {
+      return visitStructDecl(decl);
     }
     bool visitStructDecl(StructDecl *decl) {
       if (IGM.isResilient(decl, ResilienceExpansion::Maximal))
@@ -2474,11 +2472,8 @@ namespace {
 
     // Dependent enum types need their own implementation if any
     // element payload type might need its own implementation.
-    bool visitEnumType(CanEnumType type) {
-      return visitEnumDecl(type->getDecl());
-    }
-    bool visitBoundGenericEnumType(CanBoundGenericEnumType type) {
-      return visitEnumDecl(type->getDecl());
+    bool visitAnyEnumType(CanType type, EnumDecl *decl) {
+      return visitEnumDecl(decl);
     }
     bool visitEnumDecl(EnumDecl *decl) {
       if (IGM.isResilient(decl, ResilienceExpansion::Maximal))
@@ -2497,11 +2492,8 @@ namespace {
     }
 
     // Conservatively assume classes need unique implementations.
-    bool visitClassType(CanClassType type) {
-      return visitClassDecl(type->getDecl());
-     }
-    bool visitBoundGenericClassType(CanBoundGenericClassType type) {
-      return visitClassDecl(type->getDecl());
+    bool visitAnyClassType(CanType type, ClassDecl *theClass) {
+      return visitClassDecl(theClass);
     }
     bool visitClassDecl(ClassDecl *theClass) {
       return true;
@@ -2752,7 +2744,7 @@ llvm::StructType *IRGenModule::createNominalType(CanType type) {
     type = type.getNominalOrBoundGenericNominal()->getDeclaredType()
                                                  ->getCanonicalType();
 
-  IRGenMangler Mangler;
+  IRGenMangler Mangler(Context);
   std::string typeName = Mangler.mangleTypeForLLVMTypeName(type);
   return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }
@@ -2764,7 +2756,7 @@ llvm::StructType *IRGenModule::createNominalType(CanType type) {
 /// distinguish different cases.
 llvm::StructType *
 IRGenModule::createNominalType(ProtocolCompositionType *type) {
-  IRGenMangler Mangler;
+  IRGenMangler Mangler(Context);
   std::string typeName = Mangler.mangleProtocolForLLVMTypeName(type);
   return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }
@@ -3056,7 +3048,7 @@ IsABIAccessible_t irgen::isTypeABIAccessibleIfFixedSize(IRGenModule &IGM,
                                                         CanType ty) {
 
   // Copyable types currently are always ABI-accessible if they're fixed size.
-  if (!ty->isNoncopyable())
+  if (ty->isCopyable())
     return IsABIAccessible;
 
   // Check for a deinit. If this type does not define a deinit it is ABI

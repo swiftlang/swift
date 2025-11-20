@@ -39,13 +39,9 @@ struct Term::Storage final
     return Size;
   }
 
-  MutableArrayRef<Symbol> getElements() {
-    return {getTrailingObjects<Symbol>(), Size};
-  }
+  MutableArrayRef<Symbol> getElements() { return getTrailingObjects(Size); }
 
-  ArrayRef<Symbol> getElements() const {
-    return {getTrailingObjects<Symbol>(), Size};
-  }
+  ArrayRef<Symbol> getElements() const { return getTrailingObjects(Size); }
 
   void Profile(llvm::FoldingSetNodeID &id) const;
 };
@@ -70,6 +66,17 @@ std::reverse_iterator<const Symbol *> Term::rend() const {
 
 Symbol Term::back() const {
   return Ptr->getElements().back();
+}
+
+bool Term::hasShape() const {
+  return back().getKind() == Symbol::Kind::Shape;
+}
+
+MutableTerm Term::termWithoutShape() const {
+  if (hasShape())
+    return MutableTerm(begin(), end() - 1);
+  else
+    return MutableTerm(begin(), end());
 }
 
 Symbol Term::operator[](size_t index) const {
@@ -122,19 +129,42 @@ bool Term::containsNameSymbols() const {
   return false;
 }
 
-/// Shortlex order on symbol ranges.
+/// Weighted shortlex order on symbol ranges, used for implementing
+/// Term::compare() and MutableTerm::compare().
 ///
-/// First we compare length, then perform a lexicographic comparison
-/// on symbols if the two ranges have the same length.
+/// We first compute a weight vector for both terms and compare the
+/// vectors lexicographically:
+/// - Weight of generic param symbols
+/// - Number of name symbols
+/// - Number of element symbols
 ///
-/// This is used to implement Term::compare() and MutableTerm::compare()
-/// below.
-static std::optional<int> shortlexCompare(const Symbol *lhsBegin,
-                                          const Symbol *lhsEnd,
-                                          const Symbol *rhsBegin,
-                                          const Symbol *rhsEnd,
-                                          RewriteContext &ctx) {
-  // First, compare the number of name and pack element symbols.
+/// If the terms have the same weight, we compare length.
+///
+/// If the terms have the same weight and length, we perform a
+/// lexicographic comparison on symbols.
+///
+static std::optional<int> compareImpl(const Symbol *lhsBegin,
+                                      const Symbol *lhsEnd,
+                                      const Symbol *rhsBegin,
+                                      const Symbol *rhsEnd,
+                                      RewriteContext &ctx) {
+  ASSERT(lhsBegin != lhsEnd);
+  ASSERT(rhsBegin != rhsEnd);
+
+  // First compare weights on generic parameters. The implicit
+  // assumption here is we don't form terms with generic parameter
+  // symbols in the middle, which is true. Otherwise, we'd need
+  // to add up their weights like we do below for name symbols,
+  // of course.
+  if (lhsBegin->getKind() == Symbol::Kind::GenericParam &&
+      rhsBegin->getKind() == Symbol::Kind::GenericParam) {
+    unsigned lhsWeight = lhsBegin->getGenericParam()->getWeight();
+    unsigned rhsWeight = rhsBegin->getGenericParam()->getWeight();
+    if (lhsWeight != rhsWeight)
+      return lhsWeight > rhsWeight ? 1 : -1;
+  }
+
+  // Compare the number of name and pack element symbols.
   unsigned lhsNameCount = 0;
   unsigned lhsPackElementCount = 0;
   for (auto *iter = lhsBegin; iter != lhsEnd; ++iter) {
@@ -192,17 +222,26 @@ static std::optional<int> shortlexCompare(const Symbol *lhsBegin,
   return 0;
 }
 
-/// Shortlex order on terms. Returns None if the terms are identical except
+/// Reduction order on terms. Returns None if the terms are identical except
 /// for an incomparable superclass or concrete type symbol at the end.
 std::optional<int> Term::compare(Term other, RewriteContext &ctx) const {
-  return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
+  return compareImpl(begin(), end(), other.begin(), other.end(), ctx);
 }
 
-/// Shortlex order on mutable terms. Returns None if the terms are identical
+/// Reduction order on mutable terms. Returns None if the terms are identical
 /// except for an incomparable superclass or concrete type symbol at the end.
 std::optional<int> MutableTerm::compare(const MutableTerm &other,
                                         RewriteContext &ctx) const {
-  return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
+  return compareImpl(begin(), end(), other.begin(), other.end(), ctx);
+}
+
+bool MutableTerm::hasShape() const {
+  return back().getKind() == Symbol::Kind::Shape;
+}
+
+void MutableTerm::removeShape() {
+  if (hasShape())
+    Symbols.pop_back();
 }
 
 /// Replace the subterm in the range [from,to) of this term with \p rhs.

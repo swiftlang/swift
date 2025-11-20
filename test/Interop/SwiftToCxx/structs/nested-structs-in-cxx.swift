@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -enable-library-evolution -typecheck -module-name Structs -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
-// RN: %FileCheck %s < %t/structs.h
+// RUN: %target-swift-frontend %s -enable-library-evolution -module-name Structs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/structs.h
+// RUN: %check-interop-cxx-header-in-clang(%t/structs.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -std=c++17)
 
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %s -module-name Structs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/structs.h
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -std=c++17)
 
 public enum AudioFileType {
@@ -59,4 +61,31 @@ public func makeRecordConfig() -> RecordConfig {
 
 public func makeAudioFileType() -> AudioFileType {
     return AudioFileType.CAF(AudioFileType.SubType(id: 42))
+}
+
+public class TestObject {
+    enum CustomError: Swift.Error {
+        case invalid
+    }
+}
+
+extension RecordConfig.File {
+    public func getFileExtension() -> String { ".wav" }
+}
+
+extension RecordConfig {
+    public struct NestedInExtension {
+        public var foo: Int
+    }
+}
+
+extension AudioFileType {
+    public struct NestedInExtension {
+        public var foo: Int
+    }
+}
+
+
+public func getFiles() -> [RecordConfig.File] {
+    []
 }

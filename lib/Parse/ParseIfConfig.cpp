@@ -19,6 +19,7 @@
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
@@ -184,7 +185,7 @@ class ValidateIfConfigCondition :
     if (!UDE)
       return getDeclRefStr(E, DeclRefKind::Ordinary).has_value();
 
-    return UDE->getFunctionRefKind() == FunctionRefKind::Unapplied &&
+    return UDE->getFunctionRefInfo().isUnappliedBaseName() &&
            isModulePath(UDE->getBase());
   }
 
@@ -384,7 +385,7 @@ public:
       return E;
     }
 
-    // ( 'os' | 'arch' | '_endian' | '_pointerBitWidth' | '_runtime' | '_hasAtomicBitWidth' ) '(' identifier ')''
+    // ( 'os' | 'arch' | '_endian' | '_pointerBitWidth' | '_runtime' | '_hasAtomicBitWidth' | 'objectFormat' ) '(' identifier ')''
     auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.has_value()) {
       D.diagnose(E->getLoc(), diag::unsupported_platform_condition_expression);
@@ -428,6 +429,8 @@ public:
         DiagName = "pointer authentication scheme"; break;
       case PlatformConditionKind::HasAtomicBitWidth:
         DiagName = "has atomic bit width"; break;
+      case PlatformConditionKind::ObjectFileFormat:
+        DiagName = "object file format"; break;
       case PlatformConditionKind::Runtime:
         llvm_unreachable("handled above");
       }
@@ -834,6 +837,11 @@ Result Parser::parseIfConfigRaw(
       // determined solely by which block has the completion token.
       !ideInspectionClauseLoc.isValid();
 
+  // For constructing syntactic structures, we need AST nodes even for
+  // non-active regions.
+  bool allActive = SF.getParsingOptions().contains(
+      SourceFile::ParsingFlags::PoundIfAllActive);
+
   bool foundActive = false;
   bool isVersionCondition = false;
   CharSourceRange activeBodyRange;
@@ -892,6 +900,9 @@ Result Parser::parseIfConfigRaw(
     // Treat the region containing code completion token as "active".
     if (ideInspectionClauseLoc.isValid() && !foundActive)
       isActive = (ClauseLoc == ideInspectionClauseLoc);
+
+    if (allActive)
+      isActive = true;
 
     foundActive |= isActive;
 
@@ -991,21 +1002,18 @@ ParserStatus Parser::parseIfConfig(
 }
 
 ParserStatus Parser::parseIfConfigAttributes(
-    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
-    PatternBindingInitializer *initContext) {
+    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs) {
   ParserStatus status = makeParserSuccess();
   return parseIfConfigRaw<ParserStatus>(
       IfConfigContext::DeclAttrs,
       [&](SourceLoc clauseLoc, Expr *condition, bool isActive,
           IfConfigElementsRole role) {
         if (isActive) {
-          status |= parseDeclAttributeList(
-              attributes, ifConfigsAreDeclAttrs, initContext);
+          status |= parseDeclAttributeList(attributes, ifConfigsAreDeclAttrs);
         } else if (role != IfConfigElementsRole::Skipped) {
           DeclAttributes skippedAttributes;
-          PatternBindingInitializer *skippedInitContext = nullptr;
           status |= parseDeclAttributeList(
-              skippedAttributes, ifConfigsAreDeclAttrs, skippedInitContext);
+              skippedAttributes, ifConfigsAreDeclAttrs);
         }
       },
       [&](SourceLoc endLoc, bool hadMissingEnd) {

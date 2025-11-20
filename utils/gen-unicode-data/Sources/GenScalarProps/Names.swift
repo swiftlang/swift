@@ -38,10 +38,12 @@ func getName(
     
     let scalar = UInt32(filteredScalars, radix: 16)!
     
+    // Variation selectors are handled in code.
     if (0xE0100...0xE01EF).contains(scalar) {
       continue
     }
     
+    // Hanguel is handled in code.
     if scalar >= 0xAC00, scalar <= 0xD7A3 {
       continue
     }
@@ -251,7 +253,7 @@ func emitLargestNameCount(_ names: [(UInt32, String)], into result: inout String
 }
 
 func generateNameProp(into result: inout String) {
-  let derivedName = readFile("Data/DerivedName.txt")
+  let derivedName = readFile("Data/16/DerivedName.txt")
   
   var names: [(UInt32, String)] = []
   var words: [String] = []

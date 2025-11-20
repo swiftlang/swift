@@ -11,6 +11,8 @@
 // ASan cannot work in ("Interceptors are not working, AddressSanitizer is
 // loaded too late").
 // REQUIRES: no_asan
+// REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_Extern
 
 @_extern(c, "putchar")
 @discardableResult

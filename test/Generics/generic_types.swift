@@ -107,7 +107,7 @@ struct Dict<K, V> {
   subscript(key: K) -> V { get {} set {} }
 }
 
-class Dictionary<K, V> { // expected-note{{generic type 'Dictionary' declared here}}
+class Dictionary<K, V> { // expected-note{{generic class 'Dictionary' declared here}}
   subscript(key: K) -> V { get {} set {} }
 }
 

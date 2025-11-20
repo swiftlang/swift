@@ -1,5 +1,11 @@
 set(swift_stdlib_unittest_compile_flags)
 
+if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
+  # This library imports Foundation from the SDK, which re-exports
+  # Observation which is part of this build.
+  list(APPEND swift_stdlib_unicode_unittest_darwin_dependencies Observation)
+endif()
+
 add_swift_target_library(swiftStdlibUnicodeUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
@@ -10,6 +16,12 @@ add_swift_target_library(swiftStdlibUnicodeUnittest ${SWIFT_STDLIB_LIBRARY_BUILD
   WordBreaking.swift
 
   SWIFT_MODULE_DEPENDS StdlibUnittest
+  SWIFT_MODULE_DEPENDS_IOS ${swift_stdlib_unicode_unittest_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_OSX ${swift_stdlib_unicode_unittest_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_TVOS ${swift_stdlib_unicode_unittest_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_WATCHOS ${swift_stdlib_unicode_unittest_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_XROS ${swift_stdlib_unicode_unittest_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_stdlib_unicode_unittest_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_LINUX_STATIC Musl
@@ -21,4 +33,11 @@ add_swift_target_library(swiftStdlibUnicodeUnittest ${SWIFT_STDLIB_LIBRARY_BUILD
   SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT stdlib-experimental
   DARWIN_INSTALL_NAME_DIR "${SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR}"
+
+  DEPLOYMENT_VERSION_OSX ${SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_OSX}
+  DEPLOYMENT_VERSION_IOS ${SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_IOS}
+  DEPLOYMENT_VERSION_TVOS ${SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_TVOS}
+  DEPLOYMENT_VERSION_WATCHOS ${SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_WATCHOS}
+  DEPLOYMENT_VERSION_XROS ${SWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_XROS}
+
   MACCATALYST_BUILD_FLAVOR "zippered")

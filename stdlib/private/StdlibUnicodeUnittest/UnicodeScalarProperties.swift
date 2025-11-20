@@ -691,13 +691,13 @@ public let caseFolding: [Unicode.Scalar: String] = {
 //===----------------------------------------------------------------------===//
 
 extension Unicode {
-  // Note: The `Script` enum includes the "meta" script type "Katakana_Or_Hiragana", which
-  // isn't defined by https://www.unicode.org/Public/UCD/latest/ucd/Scripts.txt,
-  // but is defined by https://www.unicode.org/Public/UCD/latest/ucd/PropertyValueAliases.txt.
-  // We may want to split it out, as it's the only case that is a union of
-  // other script types.
-
   /// Character script types.
+  ///
+  /// Note this includes the "meta" script type "Katakana_Or_Hiragana", which
+  /// isn't defined by https://www.unicode.org/Public/UCD/latest/ucd/Scripts.txt,
+  /// but is defined by https://www.unicode.org/Public/UCD/latest/ucd/PropertyValueAliases.txt.
+  /// We may want to split it out, as it's the only case that is a union of
+  /// other script types.
   public enum Script: String, Hashable {
     case adlam = "Adlam"
     case ahom = "Ahom"
@@ -738,6 +738,7 @@ extension Unicode {
     case elbasan = "Elbasan"
     case elymaic = "Elymaic"
     case ethiopic = "Ethiopic"
+    case garay = "Garay"
     case georgian = "Georgian"
     case glagolitic = "Glagolitic"
     case gothic = "Gothic"
@@ -746,6 +747,7 @@ extension Unicode {
     case gujarati = "Gujarati"
     case gunjalaGondi = "Gunjala_Gondi"
     case gurmukhi = "Gurmukhi"
+    case gurungKhema = "Gurung_Khema"
     case han = "Han"
     case hangul = "Hangul"
     case hanifiRohingya = "Hanifi_Rohingya"
@@ -778,6 +780,7 @@ extension Unicode {
     case lisu = "Lisu"
     case lycian = "Lycian"
     case lydian = "Lydian"
+    case kiratRai = "Kirat_Rai"
     case mahajani = "Mahajani"
     case makasar = "Makasar"
     case malayalam = "Malayalam"
@@ -815,6 +818,7 @@ extension Unicode {
     case oldSouthArabian = "Old_South_Arabian"
     case oldTurkic = "Old_Turkic"
     case oldUyghur = "Old_Uyghur"
+    case olOnal = "Ol_Onal"
     case oriya = "Oriya"
     case osage = "Osage"
     case osmanya = "Osmanya"
@@ -837,6 +841,7 @@ extension Unicode {
     case soraSompeng = "Sora_Sompeng"
     case soyombo = "Soyombo"
     case sundanese = "Sundanese"
+    case sunuwar = "Sunuwar"
     case sylotiNagri = "Syloti_Nagri"
     case syriac = "Syriac"
     case tagalog = "Tagalog"
@@ -854,7 +859,9 @@ extension Unicode {
     case tibetan = "Tibetan"
     case tifinagh = "Tifinagh"
     case tirhuta = "Tirhuta"
+    case todhri = "Todhri"
     case toto = "Toto"
+    case tuluTigalari = "Tulu_Tigalari"
     case ugaritic = "Ugaritic"
     case unknown = "Unknown"
     case vai = "Vai"
@@ -940,6 +947,7 @@ func classifyScriptProperty(
     case "elba", "elbasan":               return .elbasan
     case "elym", "elymaic":               return .elymaic
     case "ethi", "ethiopic":              return .ethiopic
+    case "gara", "garay":                 return .garay
     case "geor", "georgian":              return .georgian
     case "glag", "glagolitic":            return .glagolitic
     case "gong", "gunjalagondi":          return .gunjalaGondi
@@ -948,6 +956,7 @@ func classifyScriptProperty(
     case "gran", "grantha":               return .grantha
     case "grek", "greek":                 return .greek
     case "gujr", "gujarati":              return .gujarati
+    case "gukh", "gurungkhema":           return .gurungKhema
     case "guru", "gurmukhi":              return .gurmukhi
     case "hang", "hangul":                return .hangul
     case "hani", "han":                   return .han
@@ -970,6 +979,7 @@ func classifyScriptProperty(
     case "khoj", "khojki":                return .khojki
     case "kits", "khitansmallscript":     return .khitanSmallScript
     case "knda", "kannada":               return .kannada
+    case "krai", "kiratrai":              return .kiratRai
     case "kthi", "kaithi":                return .kaithi
     case "lana", "taitham":               return .taiTham
     case "laoo", "lao":                   return .lao
@@ -997,7 +1007,7 @@ func classifyScriptProperty(
     case "mtei", "meeteimayek":           return .meeteiMayek
     case "mult", "multani":               return .multani
     case "mymr", "myanmar":               return .myanmar
-    case "nagm", "nagmundari":           return .nagMundari
+    case "nagm", "nagmundari":            return .nagMundari
     case "nand", "nandinagari":           return .nandinagari
     case "narb", "oldnortharabian":       return .oldNorthArabian
     case "nbat", "nabataean":             return .nabataean
@@ -1006,6 +1016,7 @@ func classifyScriptProperty(
     case "nshu", "nushu":                 return .nushu
     case "ogam", "ogham":                 return .ogham
     case "olck", "olchiki":               return .olChiki
+    case "onao", "olonal":                return .olOnal
     case "orkh", "oldturkic":             return .oldTurkic
     case "orya", "oriya":                 return .oriya
     case "osge", "osage":                 return .osage
@@ -1037,6 +1048,7 @@ func classifyScriptProperty(
     case "sora", "sorasompeng":           return .soraSompeng
     case "soyo", "soyombo":               return .soyombo
     case "sund", "sundanese":             return .sundanese
+    case "sunu", "sunuwar":               return .sunuwar
     case "sylo", "sylotinagri":           return .sylotiNagri
     case "syrc", "syriac":                return .syriac
     case "tagb", "tagbanwa":              return .tagbanwa
@@ -1054,7 +1066,9 @@ func classifyScriptProperty(
     case "tibt", "tibetan":               return .tibetan
     case "tirh", "tirhuta":               return .tirhuta
     case "tnsa", "tangsa":                return .tangsa
+    case "todr", "todhri":                return .todhri
     case "toto":                          return .toto
+    case "tutg", "tulutigalari":          return .tuluTigalari
     case "ugar", "ugaritic":              return .ugaritic
     case "vaii", "vai":                   return .vai
     case "vith", "vithkuqi":              return .vithkuqi

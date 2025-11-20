@@ -2,7 +2,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift6-
 
 extension Int {
-  func foo() -> Int {} // expected-note 2 {{'foo()' declared here}}
+  func foo() -> Int {} // expected-note 3 {{'foo()' declared here}}
   var bar: Int {
     get {}
   }
@@ -40,6 +40,12 @@ func test(i: Int) {
   // expected-swift6-error@-2 {{cannot specialize non-generic type 'Int'}}
 }
 
+func testOptionalChain(i: Int?) {
+  let _ = i?.foo<Int>()
+  // expected-swift5-warning@-1 {{cannot explicitly specialize instance method 'foo()'}}
+  // expected-swift6-error@-2 {{cannot explicitly specialize instance method 'foo()'}}
+}
+
 extension Bool {
   func foo<T>() -> T {} // expected-note {{'foo()' declared here}}
 }
@@ -64,4 +70,18 @@ do {
   _ = Test.init<Int>({ (_: Int) -> Void in })
   // expected-swift5-warning@-1 {{cannot explicitly specialize initializer 'init(_:)'}}
   // expected-swift6-error@-2 {{cannot explicitly specialize initializer 'init(_:)'}}
+}
+
+do {
+  // expected-error@+1:13 {{cannot specialize non-generic type 'module<Swift>'}}{{none}}
+  func f(_: Swift<Int>) {}
+}
+
+func overloadedGenericFn<T, U>(_ x: T, _ y: U) {} // expected-note {{found this candidate}}
+func overloadedGenericFn<T, U>(_ x: T, _ y: U, z: Int = 0) {} // expected-note {{found this candidate}}
+
+// Make sure we don't crash.
+func testSpecializedOverloaded() {
+  struct S<T> {}
+  _ = overloadedGenericFn<S, S> // expected-error {{no exact matches}}
 }

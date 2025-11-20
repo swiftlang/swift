@@ -1,7 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ImplicitLastExprResults -disable-availability-checking
 
-// Required for experimental features
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ImplicitLastExprResults
 
 let a = if .random() {
   print("hello")

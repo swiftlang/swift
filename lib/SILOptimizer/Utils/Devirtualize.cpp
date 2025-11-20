@@ -405,8 +405,6 @@ combineSubstitutionMaps(SubstitutionMap firstSubMap,
                         unsigned firstDepth,
                         unsigned secondDepth,
                         GenericSignature genericSig) {
-  auto &ctx = genericSig->getASTContext();
-
   return SubstitutionMap::get(
     genericSig,
     [&](SubstitutableType *type) {
@@ -414,12 +412,8 @@ combineSubstitutionMaps(SubstitutionMap firstSubMap,
       if (gp->getDepth() < firstDepth)
         return QuerySubstitutionMap{firstSubMap}(gp);
 
-      auto *replacement = GenericTypeParamType::get(
-          gp->getParamKind(),
-          gp->getDepth() + secondDepth - firstDepth,
-          gp->getIndex(),
-          gp->getValueType(),
-          ctx);
+      auto *replacement = gp->withDepth(
+          gp->getDepth() + secondDepth - firstDepth);
       return QuerySubstitutionMap{secondSubMap}(replacement);
     },
     // We might not have enough information in the substitution maps alone.
@@ -619,6 +613,10 @@ replaceBeginApplyInst(SILBuilder &builder, SILPassManager *pm, SILLocation loc,
   // Forward the token.
   oldBAI->getTokenResult()->replaceAllUsesWith(newBAI->getTokenResult());
 
+  if (auto *allocation = oldBAI->getCalleeAllocationResult()) {
+    allocation->replaceAllUsesWith(newBAI->getCalleeAllocationResult());
+  }
+
   auto oldYields = oldBAI->getYieldedValues();
   auto newYields = newBAI->getYieldedValues();
   assert(oldYields.size() == newYields.size());
@@ -629,24 +627,23 @@ replaceBeginApplyInst(SILBuilder &builder, SILPassManager *pm, SILLocation loc,
     // Insert any end_borrow if the yielded value before the token's uses.
     SmallVector<SILInstruction *, 4> users(
       makeUserIteratorRange(oldYield->getUses()));
-    auto yieldCastRes = castValueToABICompatibleType(
-      &builder, pm, loc, newYield, newYield->getType(), oldYield->getType(),
-      users);
-    oldYield->replaceAllUsesWith(yieldCastRes.first);
-    changedCFG |= yieldCastRes.second;
+    if (!users.empty()) {
+      auto yieldCastRes = castValueToABICompatibleType(
+        &builder, pm, loc, newYield, newYield->getType(), oldYield->getType(),
+        users);
+      oldYield->replaceAllUsesWith(yieldCastRes.first);
+      changedCFG |= yieldCastRes.second;
+    }
   }
 
   if (newArgBorrows.empty())
     return {newBAI, changedCFG};
 
-  SILValue token = newBAI->getTokenResult();
-
-  // The token will only be used by end_apply and abort_apply. Use that to
-  // insert the end_borrows we need /after/ those uses.
-  for (auto *use : token->getUses()) {
+  // Insert the end_borrows after end_apply and abort_apply users.
+  for (auto *use : newBAI->getEndApplyUses()) {
     SILBuilderWithScope borrowBuilder(
-        &*std::next(use->getUser()->getIterator()),
-        builder.getBuilderContext());
+      &*std::next(use->getUser()->getIterator()),
+      builder.getBuilderContext());
     for (SILValue borrow : newArgBorrows) {
       borrowBuilder.createEndBorrow(loc, borrow);
     }
@@ -715,7 +712,7 @@ void swift::deleteDevirtualizedApply(ApplySite old) {
   recursivelyDeleteTriviallyDeadInstructions(oldApply, true);
 }
 
-SILFunction *swift::getTargetClassMethod(SILModule &module, ClassDecl *cd,
+SILFunction *swift::getTargetClassMethod(SILModule &module, FullApplySite as, ClassDecl *cd,
                                          CanType classType, MethodInst *mi) {
   assert((isa<ClassMethodInst>(mi) || isa<SuperMethodInst>(mi)) &&
          "Only class_method and super_method instructions are supported");
@@ -724,6 +721,11 @@ SILFunction *swift::getTargetClassMethod(SILModule &module, ClassDecl *cd,
 
   SILType silType = SILType::getPrimitiveObjectType(classType);
   if (auto *vtable = module.lookUpSpecializedVTable(silType)) {
+    // We cannot de-virtualize a generic method call to a specialized method.
+    // This would result in wrong argument/return calling conventions.
+    if (as.getSubstitutionMap().hasAnySubstitutableParams())
+      return nullptr;
+
     return vtable->getEntry(module, member)->getImplementation();
   }
 
@@ -760,7 +762,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
   auto *mi = cast<MethodInst>(applySite.getCallee());
 
   // Find the implementation of the member which should be invoked.
-  auto *f = getTargetClassMethod(module, cd, classType, mi);
+  auto *f = getTargetClassMethod(module, applySite, cd, classType, mi);
 
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
@@ -806,6 +808,24 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
     return false;
   }
 
+  // A narrow fix for https://github.com/swiftlang/swift/issues/79318
+  // to make sure that uses of distributed requirement witnesses are
+  // not devirtualized because that results in a loss of the ad-hoc
+  // requirement infomation in the re-created substitution map.
+  //
+  // We have a similar check in `canSpecializeFunction` which presents
+  // specialization for exactly the same reason.
+  //
+  // TODO: A better way to fix this would be to record the ad-hoc conformance
+  // requirement in `RequirementEnvironment` and adjust IRGen to handle it.
+  if (f->hasLocation()) {
+    if (auto *funcDecl =
+            dyn_cast_or_null<FuncDecl>(f->getLocation().getAsDeclContext())) {
+      if (funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())
+        return false;
+    }
+  }
+
   return true;
 }
 
@@ -828,7 +848,7 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
   SILModule &module = applySite.getModule();
   auto *mi = cast<MethodInst>(applySite.getCallee());
 
-  auto *f = getTargetClassMethod(module, cd, classType, mi);
+  auto *f = getTargetClassMethod(module, applySite, cd, classType, mi);
 
   CanSILFunctionType genCalleeType = f->getLoweredFunctionTypeInContext(
       TypeExpansionContext(*applySite.getFunction()));
@@ -1035,19 +1055,16 @@ getWitnessMethodSubstitutions(
         }
 
         if (depth < baseDepth) {
-          paramType = GenericTypeParamType::get(paramType->getParamKind(),
-              depth, paramType->getIndex(), paramType->getValueType(), ctx);
-
+          paramType = paramType->withDepth(depth);
           return Type(paramType).subst(baseSubMap);
         }
 
         depth = depth - baseDepth + 1;
 
-        paramType = GenericTypeParamType::get(paramType->getParamKind(),
-            depth, paramType->getIndex(), paramType->getValueType(), ctx);
+        paramType = paramType->withDepth(depth);
         return Type(paramType).subst(origSubMap);
       },
-      [&](CanType type, Type substType, ProtocolDecl *proto) {
+      [&](InFlightSubstitution &IFS, Type type, ProtocolDecl *proto) {
         auto *paramType = type->getRootGenericParam();
         unsigned depth = paramType->getDepth();
 
@@ -1063,31 +1080,27 @@ getWitnessMethodSubstitutions(
 
         if (depth < baseDepth) {
           type = CanType(type.transformRec([&](TypeBase *t) -> std::optional<Type> {
-            if (t == paramType) {
-              return Type(GenericTypeParamType::get(paramType->getParamKind(),
-                  depth, paramType->getIndex(), paramType->getValueType(), ctx));
-            }
+            if (t == paramType)
+              return paramType->withDepth(depth);
 
             assert(!isa<GenericTypeParamType>(t));
             return std::nullopt;
           }));
 
-          return baseSubMap.lookupConformance(type, proto);
+          return baseSubMap.lookupConformance(type->getCanonicalType(), proto);
         }
 
         depth = depth - baseDepth + 1;
 
         type = CanType(type.transformRec([&](TypeBase *t) -> std::optional<Type> {
-          if (t == paramType) {
-            return Type(GenericTypeParamType::get(paramType->getParamKind(),
-                depth, paramType->getIndex(), paramType->getValueType(), ctx));
-          }
+          if (t == paramType)
+            return paramType->withDepth(depth);
 
           assert(!isa<GenericTypeParamType>(t));
           return std::nullopt;
         }));
 
-        return origSubMap.lookupConformance(type, proto);
+        return origSubMap.lookupConformance(type->getCanonicalType(), proto);
       });
 }
 

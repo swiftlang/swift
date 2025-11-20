@@ -29,9 +29,8 @@
 ///
 /// 2. The element in the PartitionOp that was asked to be alive.
 ///
-/// 3. The operand of the instruction that originally transferred the
-/// region. Can be used to get the immediate value transferred or the
-/// transferring instruction.
+/// 3. The operand of the instruction that originally sent the region. Can be
+/// used to get the immediate value sent or the sending instruction.
 PARTITION_OP_ERROR(LocalUseAfterSend)
 
 /// This is called if we detect a never sendable element that was actually sent.
@@ -53,11 +52,21 @@ PARTITION_OP_ERROR(InOutSendingNotInitializedAtExit)
 /// at end of function without being reinitialized with something disconnected.
 PARTITION_OP_ERROR(InOutSendingNotDisconnectedAtExit)
 
+/// This is emitted when a concrete inout sending parameter is returned.
+PARTITION_OP_ERROR(InOutSendingReturned)
+
 /// Used to signify an "unknown code pattern" has occured while performing
 /// dataflow.
 ///
 /// DISCUSSION: Our dataflow cannot emit errors itself so this is a callback
 /// to our user so that we can emit that error as we process.
 PARTITION_OP_ERROR(UnknownCodePattern)
+
+/// Used to signify that an isolation crossing function is returning a
+/// non-Sendable value.
+PARTITION_OP_ERROR(NonSendableIsolationCrossingResult)
+
+/// Used to signify that two 'inout sending' values are in the same region.
+PARTITION_OP_ERROR(InOutSendingParametersInSameRegion)
 
 #undef PARTITION_OP_ERROR

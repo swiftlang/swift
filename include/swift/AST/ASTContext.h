@@ -18,20 +18,22 @@
 #define SWIFT_AST_ASTCONTEXT_H
 
 #include "swift/AST/ASTAllocated.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/BlockList.h"
 #include "swift/Basic/CASOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
-#include "swift/Basic/BlockList.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Basic/DarwinSDKInfo.h"
@@ -66,9 +68,11 @@ namespace llvm {
 }
 
 namespace swift {
+  class ABIAttr;
   class AbstractFunctionDecl;
   class ASTContext;
   enum class Associativity : unsigned char;
+  class AvailabilityDomain;
   class AvailabilityMacroMap;
   class AvailabilityRange;
   class BoundGenericType;
@@ -266,13 +270,22 @@ class ASTContext final {
       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
-      SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      SerializationOptions &serializationOpts, SourceManager &SourceMgr,
+      DiagnosticEngine &Diags,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
 
 public:
   // Members that should only be used by ASTContext.cpp.
   struct Implementation;
   Implementation &getImpl() const;
+
+  struct GlobalCache;
+
+  /// Retrieve a reference to the global cache within this ASTContext,
+  /// which is a place where we can stash side tables without having to
+  /// recompile the world every time we add a side table. See
+  /// "swift/AST/ASTContextGlobalCache.h"
+  GlobalCache &getGlobalCache() const;
 
   friend ConstraintCheckerArenaRAII;
 
@@ -283,7 +296,8 @@ public:
       SILOptions &silOpts, SearchPathOptions &SearchPathOpts,
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
-      SourceManager &SourceMgr, DiagnosticEngine &Diags,
+      SerializationOptions &serializationOpts, SourceManager &SourceMgr,
+      DiagnosticEngine &Diags,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
   ~ASTContext();
 
@@ -313,6 +327,9 @@ public:
 
   /// The CAS options used by this AST context.
   const CASOptions &CASOpts;
+
+  /// Options for Serialization
+  const SerializationOptions &SerializationOpts;
 
   /// The source manager object.
   SourceManager &SourceMgr;
@@ -371,6 +388,11 @@ public:
   /// Should we globally ignore swiftmodule files adjacent to swiftinterface
   /// files?
   bool IgnoreAdjacentModules = false;
+
+  /// Accept recovering from more issues at deserialization, even if it can
+  /// lead to an inconsistent state. This is enabled for index-while-building
+  /// as it runs last and it can afford to read an AST with inconsistencies.
+  bool ForceExtendedDeserializationRecovery = false;
 
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
@@ -590,11 +612,19 @@ public:
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
 
+  /// getDollarIdentifier - Return the uniqued and AST-Context-owned version of
+  /// anonymous closure parameter (e.g. '$1') name by the index.
+  Identifier getDollarIdentifier(size_t Idx) const;
+
   /// Convert a given alias map to a map of Identifiers between module aliases and their actual names.
   /// For example, if '-module-alias Foo=X -module-alias Bar=Y' input is passed in, the aliases Foo and Bar are
   /// the names of the imported or referenced modules in source files in the main module, and X and Y
   /// are the real (physical) module names on disk.
-  void setModuleAliases(const llvm::StringMap<StringRef> &aliasMap);
+  void setModuleAliases(const llvm::StringMap<std::string> &aliasMap);
+
+  /// Adds a given alias to the map of Identifiers between module aliases and
+  /// their actual names.
+  void addModuleAlias(StringRef moduleAlias, StringRef realName);
 
   /// Look up option used in \c getRealModuleName when module aliasing is applied.
   enum class ModuleAliasLookupOption {
@@ -651,6 +681,11 @@ public:
 
   /// Retrieve the type Swift.Any as an existential type.
   CanType getAnyExistentialType() const;
+
+  /// Retrieve the existential type 'any ~Copyable & ~Escapable'.
+  ///
+  /// This is the most permissive existential type.
+  CanType getUnconstrainedAnyExistentialType() const;
 
   /// Retrieve the type Swift.AnyObject as a constraint.
   CanType getAnyObjectConstraint() const;
@@ -766,6 +801,9 @@ public:
   // Swift._stdlib_isOSVersionAtLeastOrVariantVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastOrVariantVersionAtLeast() const;
 
+  /// Retrieve the declaration of Swift._isSwiftRuntimeVersionAtLeast.
+  FuncDecl *getIsSwiftRuntimeVersionAtLeast() const;
+
   /// Look for the declaration with the given name within the
   /// passed in module.
   void lookupInModule(ModuleDecl *M, StringRef name,
@@ -874,7 +912,7 @@ public:
   AvailabilityRange getSwiftAvailability(unsigned major, unsigned minor) const;
 
   // For each feature defined in FeatureAvailability, define two functions;
-  // the latter, with the suffix RuntimeAvailabilty, is for use with
+  // the latter, with the suffix RuntimeAvailability, is for use with
   // AvailabilityRange::forRuntimeTarget(), and only looks at the Swift
   // runtime version.
 #define FEATURE(N, V)                                                          \
@@ -988,11 +1026,8 @@ public:
     return getMultiPayloadEnumTagSinglePayloadAvailability();
   }
 
-  /// Cache of the availability macros parsed from the command line arguments.
-  ///
-  /// This is an implementation detail, access via
-  /// \c Parser::parseAllAvailabilityMacroArguments.
-  AvailabilityMacroMap &getAvailabilityMacroCache() const;
+  /// Availability macros parsed from the command line arguments.
+  const AvailabilityMacroMap &getAvailabilityMacroMap() const;
 
   /// Test support utility for loading a platform remap file
   /// in case an SDK is not specified to the compilation.
@@ -1012,10 +1047,15 @@ public:
 
   // Builtin type and simple types that are used frequently.
   const CanType TheErrorType;             /// This is the ErrorType singleton.
-  const CanType TheUnresolvedType;        /// This is the UnresolvedType singleton.
   const CanType TheEmptyTupleType;        /// This is '()', aka Void
   const CanType TheEmptyPackType;
   const CanType TheAnyType;               /// This is 'Any', the empty protocol composition
+  const CanType TheUnconstrainedAnyType;  /// This is 'any ~Copyable & ~Escapable',
+                                          /// the empty protocol composition
+                                          /// without any implicit constraints.
+  const CanGenericTypeParamType TheSelfType; /// The protocol 'Self' type;
+                                             /// a generic parameter with
+                                             /// depth 0 index 0
 #define SINGLETON_TYPE(SHORT_ID, ID) \
   const CanType The##SHORT_ID##Type;
 #include "swift/AST/TypeNodes.def"
@@ -1034,6 +1074,9 @@ public:
   /// Does any proper bookkeeping to keep all module loaders up to date as well.
   void addSearchPath(StringRef searchPath, bool isFramework, bool isSystem);
 
+  /// Adds the path to the explicitly built module \c name.
+  void addExplicitModulePath(StringRef name, std::string path);
+
   /// Adds a module loader to this AST context.
   ///
   /// \param loader The new module loader, which will be added after any
@@ -1047,20 +1090,13 @@ public:
   ///                interface.
   void addModuleLoader(std::unique_ptr<ModuleLoader> loader,
                        bool isClang = false, bool isDWARF = false,
-                       bool IsInterface = false);
+                       bool IsInterface = false, bool IsExplicit = false);
 
   /// Add a module interface checker to use for this AST context.
   void addModuleInterfaceChecker(std::unique_ptr<ModuleInterfaceChecker> checker);
 
   /// Retrieve the module interface checker associated with this AST context.
   ModuleInterfaceChecker *getModuleInterfaceChecker() const;
-
-  /// Compute the extra implicit framework search paths on Apple platforms:
-  /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
-  std::vector<std::string> getDarwinImplicitFrameworkSearchPaths() const;
-
-  /// Return a set of all possible filesystem locations where modules can be found.
-  llvm::StringSet<> getAllModuleSearchPathsSet() const;
 
   /// Load extensions to the given nominal type from the external
   /// module loaders.
@@ -1116,6 +1152,16 @@ public:
       AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
       llvm::SetVector<AutoDiffConfig> &results);
 
+  /// Given `Optional<T>.TangentVector` type, retrieve the
+  /// `Optional<T>.TangentVector.init` declaration.
+  ConstructorDecl *getOptionalTanInitDecl(CanType optionalTanType);
+
+  /// Optional<T>.TangentVector is a struct with a single
+  /// Optional<T.TangentVector> `value` property. This is an implementation
+  /// detail of OptionalDifferentiation.swift. Retrieve `VarDecl` corresponding
+  /// to this property.
+  VarDecl *getOptionalTanValueDecl(CanType optionalTanType);
+
   /// Retrieve the next macro expansion discriminator within the given
   /// name and context.
   unsigned getNextMacroDiscriminator(MacroDiscriminatorContext context,
@@ -1147,12 +1193,14 @@ public:
   /// module is loaded in full.
   bool canImportModuleImpl(ImportPath::Module ModulePath, SourceLoc loc,
                            llvm::VersionTuple version, bool underlyingVersion,
-                           bool updateFailingList,
-                           llvm::VersionTuple &foundVersion) const;
+                           bool isSourceCanImport,
+                           llvm::VersionTuple &foundVersion,
+                           llvm::VersionTuple &foundUnderlyingClangVersion) const;
 
   /// Add successful canImport modules.
-  void addSucceededCanImportModule(StringRef moduleName, bool underlyingVersion,
-                                   const llvm::VersionTuple &versionInfo);
+  void addSucceededCanImportModule(StringRef moduleName,
+                                   const llvm::VersionTuple &versionInfo,
+                                   const llvm::VersionTuple &underlyingVersionInfo);
 
 public:
   namelookup::ImportCache &getImportCache() const;
@@ -1251,6 +1299,10 @@ public:
     return const_cast<ASTContext *>(this)->getStdlibModule(false);
   }
 
+  /// Names of underscored modules whose contents, if imported, should be
+  /// treated as separately-imported overlays of the standard library module.
+  ArrayRef<Identifier> StdlibOverlayNames;
+
   /// Insert an externally-sourced module into the set of known loaded modules
   /// in this context.
   void addLoadedModule(ModuleDecl *M);
@@ -1290,11 +1342,10 @@ public:
   getNormalConformance(Type conformingType,
                        ProtocolDecl *protocol,
                        SourceLoc loc,
+                       TypeRepr *inheritedTypeRepr,
                        DeclContext *dc,
                        ProtocolConformanceState state,
-                       bool isUnchecked,
-                       bool isPreconcurrency,
-                       SourceLoc preconcurrencyLoc = SourceLoc());
+                       ProtocolConformanceOptions options);
 
   /// Produce a self-conformance for the given protocol.
   SelfProtocolConformance *
@@ -1562,6 +1613,10 @@ public:
   }
 
 private:
+  friend class BuiltinGenericType;
+  GenericSignature &getCachedBuiltinGenericTypeSignature(TypeKind kind);
+
+private:
   friend Decl;
 
   std::optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);
@@ -1578,10 +1633,15 @@ private:
 public:
   clang::DarwinSDKInfo *getDarwinSDKInfo() const;
 
-  /// Returns the string to use in diagnostics when printing the platform being
-  /// targetted.
-  StringRef getTargetPlatformStringForDiagnostics() const;
+  /// Returns the availability domain corresponding to the target triple. If
+  /// there isn't a `PlatformKind` associated with the current target triple,
+  /// then this returns the universal domain (`*`).
+  AvailabilityDomain getTargetAvailabilityDomain() const;
 };
+
+inline SourceLoc extractNearestSourceLoc(const ASTContext *ctx) {
+  return SourceLoc();
+}
 
 } // end namespace swift
 

@@ -32,7 +32,7 @@ class SourceFile;
 /// itself. Related checks may also be performed.
 void checkAccessControl(Decl *D);
 
-/// Problematic origin of an exported type.
+/// Problematic origin of a decl that may restrict its exportability.
 ///
 /// This enum must be kept in sync with a number of diagnostics:
 ///   diag::inlinable_decl_ref_from_hidden_module
@@ -47,7 +47,12 @@ enum class DisallowedOriginKind : uint8_t {
   SPIOnly,
   MissingImport,
   FragileCxxAPI,
+
+  /// An import that is internal via the internally-imported bridging header.
+  InternalBridgingHeaderImport,
+
   NonPublicImport,
+  ImplementationOnlyMemoryLayout,
   None
 };
 

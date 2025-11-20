@@ -27,6 +27,7 @@
 #include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Version.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSFix.h"
@@ -184,9 +185,12 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
                                                   Type fromType, Type toType,
                                                   bool useConditionalCast,
                                                   ConstraintLocator *locator) {
-  // If any of the types has a type variable, don't add the fix.
-  if (fromType->hasTypeVariable() || toType->hasTypeVariable())
+  // If any of the types have type variables or placeholders, don't add the fix.
+  // `typeCheckCheckedCast` doesn't support checking such types.
+  if (fromType->hasTypeVariableOrPlaceholder() ||
+      toType->hasTypeVariableOrPlaceholder()) {
     return nullptr;
+  }
 
   auto anchor = locator->getAnchor();
   if (auto *assignExpr = getAsExpr<AssignExpr>(anchor))
@@ -218,7 +222,7 @@ TreatArrayLiteralAsDictionary *
 TreatArrayLiteralAsDictionary::attempt(ConstraintSystem &cs, Type dictionaryTy,
                                        Type arrayTy,
                                        ConstraintLocator *locator) {
-  if (!arrayTy->isArrayType())
+  if (!arrayTy->isArray())
     return nullptr;
 
   // Determine the ArrayExpr from the locator.
@@ -281,9 +285,29 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
   // We can only handle the downgrade for conversions.
   switch (constraintKind) {
   case ConstraintKind::Conversion:
-  case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Subtype:
     break;
+
+  case ConstraintKind::ArgumentConversion: {
+    if (!forSendable)
+      break;
+
+    // Passing a static member reference as an argument needs to be downgraded
+    // to a warning until future major mode to maintain source compatibility for
+    // code with non-Sendable metatypes.
+    if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(7)) {
+      auto *argLoc = cs.getConstraintLocator(locator);
+      if (auto *argument = getAsExpr(simplifyLocatorToAnchor(argLoc))) {
+        if (auto overload = cs.findSelectedOverloadFor(
+                argument->getSemanticsProvidingExpr())) {
+          auto *decl = overload->choice.getDeclOrNull();
+          if (decl && decl->isStatic())
+            return FixBehavior::DowngradeToWarning;
+        }
+      }
+    }
+    break;
+  }
 
   default:
     if (!cs.shouldAttemptFixes())
@@ -294,10 +318,16 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
 
   // For a @preconcurrency callee outside of a strict concurrency
   // context, ignore.
-  if (cs.hasPreconcurrencyCallee(locator) &&
-      !contextRequiresStrictConcurrencyChecking(
-          cs.DC, GetClosureType{cs}, ClosureIsolatedByPreconcurrency{cs}))
+  if (cs.hasPreconcurrencyCallee(locator)) {
+    // Preconcurrency failures are always downgraded to warnings, even in
+    // Swift 6 mode.
+    if (contextRequiresStrictConcurrencyChecking(
+            cs.DC, GetClosureType{cs}, ClosureIsolatedByPreconcurrency{cs})) {
+      return FixBehavior::DowngradeToWarning;
+    }
+
     return FixBehavior::Suppress;
+  }
 
   // Otherwise, warn until Swift 6.
   if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(6))
@@ -585,12 +615,16 @@ getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
     assert(locator->isLastElement<LocatorPathElt::ContextualType>() ||
            locator->isLastElement<LocatorPathElt::FunctionArgument>());
 
-    auto &cs = solution.getConstraintSystem();
     auto anchor = locator->getAnchor();
-    auto contextualType = cs.getContextualType(anchor, /*forConstraint=*/false);
-    auto exprType = cs.getType(anchor);
-    return std::make_tuple(contextualTypeElt->getPurpose(), exprType,
-                           contextualType);
+    auto contextualInfo = solution.getContextualTypeInfo(anchor);
+    // For some patterns the type could be empty and the entry is
+    // there to indicate the purpose only.
+    if (!contextualInfo || !contextualInfo->getType())
+      return std::nullopt;
+
+    auto exprType = solution.getType(anchor);
+    return std::make_tuple(contextualInfo->purpose, exprType,
+                           contextualInfo->getType());
   } else if (auto argApplyInfo = solution.getFunctionArgApplyInfo(locator)) {
     Type fromType = argApplyInfo->getArgType();
     Type toType = argApplyInfo->getParamType();
@@ -600,9 +634,8 @@ getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
       auto fromFnType = fromType->getAs<FunctionType>();
       auto toFnType = toType->getAs<FunctionType>();
       if (fromFnType && toFnType) {
-        auto &cs = solution.getConstraintSystem();
         return std::make_tuple(
-            cs.getContextualTypePurpose(locator->getAnchor()),
+            solution.getContextualTypePurpose(locator->getAnchor()),
             fromFnType->getResult(), toFnType->getResult());
       }
     }
@@ -795,17 +828,6 @@ GenericArgumentsMismatch *GenericArgumentsMismatch::create(
       GenericArgumentsMismatch(cs, actual, required, mismatches, locator);
 }
 
-bool AutoClosureForwarding::diagnose(const Solution &solution,
-                                     bool asNote) const {
-  AutoClosureForwardingFailure failure(solution, getLocator());
-  return failure.diagnose(asNote);
-}
-
-AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
-                                                     ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AutoClosureForwarding(cs, locator);
-}
-
 bool AllowAutoClosurePointerConversion::diagnose(const Solution &solution,
                                                  bool asNote) const {
   AutoClosurePointerConversionFailure failure(solution, getFromType(),
@@ -917,7 +939,11 @@ DefineMemberBasedOnUse::diagnoseForAmbiguity(CommonFixesArray commonFixes) const
     const auto *solution = solutionAndFix.first;
     const auto *fix = solutionAndFix.second->getAs<DefineMemberBasedOnUse>();
 
-    auto baseType = solution->simplifyType(fix->BaseType);
+    // Ignore differences in optionality since we can look through an optional
+    // to resolve an implicit member `.foo`.
+    auto baseType = solution->simplifyType(fix->BaseType)
+                        ->getMetatypeInstanceType()
+                        ->lookThroughAllOptionalTypes();
     if (!concreteBaseType)
       concreteBaseType = baseType;
 
@@ -1188,6 +1214,21 @@ AllowInaccessibleMember::create(ConstraintSystem &cs, Type baseType,
       AllowInaccessibleMember(cs, baseType, member, name, locator);
 }
 
+bool AllowMemberFromWrongModule::diagnose(const Solution &solution,
+                                          bool asNote) const {
+  MemberFromWrongModuleFailure failure(solution, getMemberName(), getMember(),
+                                       getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowMemberFromWrongModule *
+AllowMemberFromWrongModule::create(ConstraintSystem &cs, Type baseType,
+                                   ValueDecl *member, DeclNameRef name,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowMemberFromWrongModule(cs, baseType, member, name, locator);
+}
+
 bool AllowAnyObjectKeyPathRoot::diagnose(const Solution &solution,
                                          bool asNote) const {
   AnyObjectKeyPathRootFailure failure(solution, getLocator());
@@ -1231,7 +1272,15 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
                                         bool asNote) const {
   switch (Kind) {
   case RefKind::StaticMember: {
-    return false;
+    InvalidStaticMemberRefInKeyPath failure(solution, BaseType, Member,
+                                            getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::UnsupportedStaticMember: {
+    UnsupportedStaticMemberRefInKeyPath failure(solution, BaseType, Member,
+                                                getLocator());
+    return failure.diagnose(asNote);
   }
 
   case RefKind::EnumCase: {
@@ -1244,10 +1293,22 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
                                                      getLocator());
     return failure.diagnose(asNote);
   }
-
   case RefKind::Method:
   case RefKind::Initializer: {
-    InvalidMethodRefInKeyPath failure(solution, Member, getLocator());
+    UnsupportedMethodRefInKeyPath failure(solution, Member, getLocator());
+    return failure.diagnose(asNote);
+  }
+  case RefKind::MutatingMethod: {
+    InvalidMutatingMethodRefInKeyPath failure(solution, Member, getLocator());
+    return failure.diagnose(asNote);
+  }
+  case RefKind::AsyncOrThrowsMethod: {
+    InvalidAsyncOrThrowsMethodRefInKeyPath failure(solution, Member,
+                                                   getLocator());
+    return failure.diagnose(asNote);
+  }
+  case RefKind::TypeReference: {
+    InvalidTypeRefInKeyPath failure(solution, Member, getLocator());
     return failure.diagnose(asNote);
   }
   }
@@ -1281,29 +1342,29 @@ AllowInvalidRefInKeyPath *
 AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
                                  ValueDecl *member,
                                  ConstraintLocator *locator) {
+  if (member->isStatic() && !isa<FuncDecl>(member)) {
+    // References to static members are supported only for modules that
+    // are built with 6.1+ compilers, libraries produced by earlier
+    // compilers don't have required symbols.
+    if (auto *module = member->getDeclContext()->getParentModule()) {
+      if (module->isBuiltFromInterface()) {
+        auto compilerVersion = module->getSwiftInterfaceCompilerVersion();
+        if (!compilerVersion.isVersionAtLeast(6, 1))
+          return AllowInvalidRefInKeyPath::create(
+              cs, baseType, RefKind::UnsupportedStaticMember, member, locator);
+      }
+    }
 
-  if (!cs.getASTContext().LangOpts.hasFeature(
-          Feature::KeyPathWithStaticMembers) &&
-      member->isStatic())
-    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::StaticMember,
-                                            member, locator);
-
-  // Referencing (instance or static) methods in key path is
-  // not currently allowed.
-  if (isa<FuncDecl>(member))
-    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::Method,
-                                            member, locator);
+    if (!baseType->getRValueType()->is<AnyMetatypeType>())
+      return AllowInvalidRefInKeyPath::create(
+          cs, baseType, RefKind::StaticMember, member, locator);
+  }
 
   // Referencing enum cases in key path is not currently allowed.
   if (isa<EnumElementDecl>(member)) {
     return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::EnumCase,
                                             member, locator);
   }
-
-  // Referencing initializers in key path is not currently allowed.
-  if (isa<ConstructorDecl>(member))
-    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::Initializer,
-                                            member, locator);
 
   if (auto *storage = dyn_cast<AbstractStorageDecl>(member)) {
     // Referencing members with mutating getters in key path is not
@@ -1312,6 +1373,46 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
       return AllowInvalidRefInKeyPath::create(
           cs, baseType, RefKind::MutatingGetter, member, locator);
   }
+
+  if (cs.getASTContext().LangOpts.hasFeature(
+          Feature::KeyPathWithMethodMembers)) {
+    // Referencing mutating, throws or async method members is not currently
+    // allowed.
+    if (auto method = dyn_cast<FuncDecl>(member)) {
+      if (method->isAsyncContext())
+        return AllowInvalidRefInKeyPath::create(
+            cs, baseType, RefKind::AsyncOrThrowsMethod, member, locator);
+      if (auto methodType =
+              method->getInterfaceType()->getAs<AnyFunctionType>()) {
+        if (methodType->getResult()->getAs<AnyFunctionType>()->isThrowing())
+          return AllowInvalidRefInKeyPath::create(
+              cs, baseType, RefKind::AsyncOrThrowsMethod, member, locator);
+      }
+      if (method->isMutating())
+        return AllowInvalidRefInKeyPath::create(
+            cs, baseType, RefKind::MutatingMethod, member, locator);
+      return nullptr;
+    }
+
+    if (isa<ConstructorDecl>(member))
+      return nullptr;
+  }
+
+  // Referencing (instance or static) methods in key path is
+  // not currently allowed.
+  if (isa<FuncDecl>(member))
+    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::Method,
+                                            member, locator);
+
+  // Referencing initializers in key path is not currently allowed.
+  if (isa<ConstructorDecl>(member))
+    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::Initializer,
+                                            member, locator);
+
+  // Referencing types in key path is not currently allowed.
+  if (isa<TypeDecl>(member))
+    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::TypeReference,
+                                            member, locator);
 
   return nullptr;
 }
@@ -1350,19 +1451,19 @@ RemoveReturn *RemoveReturn::create(ConstraintSystem &cs, Type resultTy,
   return new (cs.getAllocator()) RemoveReturn(cs, resultTy, locator);
 }
 
-NotCompileTimeConst::NotCompileTimeConst(ConstraintSystem &cs, Type paramTy,
+NotCompileTimeLiteral::NotCompileTimeLiteral(ConstraintSystem &cs, Type paramTy,
                                          ConstraintLocator *locator):
-  ContextualMismatch(cs, FixKind::NotCompileTimeConst, paramTy,
+  ContextualMismatch(cs, FixKind::NotCompileTimeLiteral, paramTy,
                      cs.getASTContext().TheEmptyTupleType, locator,
                      FixBehavior::AlwaysWarning) {}
 
-NotCompileTimeConst *
-NotCompileTimeConst::create(ConstraintSystem &cs, Type paramTy,
+NotCompileTimeLiteral *
+NotCompileTimeLiteral::create(ConstraintSystem &cs, Type paramTy,
                             ConstraintLocator *locator) {
-  return new (cs.getAllocator()) NotCompileTimeConst(cs, paramTy, locator);
+  return new (cs.getAllocator()) NotCompileTimeLiteral(cs, paramTy, locator);
 }
 
-bool NotCompileTimeConst::diagnose(const Solution &solution, bool asNote) const {
+bool NotCompileTimeLiteral::diagnose(const Solution &solution, bool asNote) const {
   auto *locator = getLocator();
   if (auto *E = getAsExpr(locator->getAnchor())) {
     auto isAccepted = E->isSemanticallyConstExpr([&](Expr *E) {
@@ -1384,7 +1485,7 @@ bool NotCompileTimeConst::diagnose(const Solution &solution, bool asNote) const 
       return true;
   }
 
-  NotCompileTimeConstFailure failure(solution, locator);
+  NotCompileTimeLiteralFailure failure(solution, locator);
   return failure.diagnose(asNote);
 }
 
@@ -1714,7 +1815,10 @@ bool IgnoreAssignmentDestinationType::diagnoseForAmbiguity(
   if (!overload)
     return false;
 
-  auto memberName = overload->choice.getName().getBaseName();
+  auto declName = overload->choice.getName();
+  if (!declName)
+    return false;
+
   auto destType = solution.getType(assignment->getDest());
 
   auto &DE = cs.getASTContext().Diags;
@@ -1722,7 +1826,7 @@ bool IgnoreAssignmentDestinationType::diagnoseForAmbiguity(
   // for cases like this instead of using "contextual" one.
   DE.diagnose(assignment->getSrc()->getLoc(),
               diag::no_candidates_match_result_type,
-              memberName.userFacingName(),
+              declName.getBaseName().userFacingName(),
               solution.simplifyType(destType)->getRValueType());
 
   for (auto &entry : commonFixes) {
@@ -1738,6 +1842,21 @@ IgnoreAssignmentDestinationType::create(ConstraintSystem &cs, Type sourceTy,
                                         ConstraintLocator *locator) {
   return new (cs.getAllocator())
       IgnoreAssignmentDestinationType(cs, sourceTy, destTy, locator);
+}
+
+IgnoreNonMetatypeDynamicType *
+IgnoreNonMetatypeDynamicType::create(ConstraintSystem &cs, Type instanceTy,
+                                     Type metatypeTy,
+                                     ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreNonMetatypeDynamicType(cs, instanceTy, metatypeTy, locator);
+}
+
+bool IgnoreNonMetatypeDynamicType::diagnose(const Solution &solution,
+                                            bool asNote) const {
+  NonMetatypeDynamicTypeFailure failure(solution, getFromType(), getToType(),
+                                        getLocator());
+  return failure.diagnose(asNote);
 }
 
 bool AllowInOutConversion::diagnose(const Solution &solution,
@@ -1764,7 +1883,7 @@ ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
   if (!(argLoc && argLoc->getParameterFlags().isVariadic()))
     return nullptr;
 
-  auto elementType = argType->isArrayType();
+  auto elementType = argType->getArrayElementType();
   if (!elementType)
     return nullptr;
 
@@ -2105,7 +2224,10 @@ AllowKeyPathWithoutComponents::create(ConstraintSystem &cs,
 
 bool IgnoreInvalidResultBuilderBody::diagnose(const Solution &solution,
                                               bool asNote) const {
-  return true; // Already diagnosed by `matchResultBuilder`.
+  // This should already be diagnosed by `matchResultBuilder`, emit a fallback
+  // diagnostic if not.
+  FallbackDiagnostic diag(solution, getLocator());
+  return diag.diagnose(asNote);
 }
 
 IgnoreInvalidResultBuilderBody *
@@ -2116,7 +2238,10 @@ IgnoreInvalidResultBuilderBody::create(ConstraintSystem &cs,
 
 bool IgnoreInvalidASTNode::diagnose(const Solution &solution,
                                     bool asNote) const {
-  return true; // Already diagnosed by the producer of ErrorExpr or ErrorType.
+  // This should already be diagnosed by the producer of ErrorExpr or ErrorType,
+  // emit a fallback diagnostic if not.
+  FallbackDiagnostic diag(solution, getLocator());
+  return diag.diagnose(asNote);
 }
 
 IgnoreInvalidASTNode *IgnoreInvalidASTNode::create(ConstraintSystem &cs,
@@ -2223,10 +2348,15 @@ bool SpecifyBaseTypeForOptionalUnresolvedMember::diagnose(
 SpecifyBaseTypeForOptionalUnresolvedMember *
 SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
     ConstraintSystem &cs, ConstraintKind kind, Type baseTy,
-    DeclNameRef memberName, FunctionRefKind functionRefKind,
+    DeclNameRef memberName, FunctionRefInfo functionRefInfo,
     MemberLookupResult result, ConstraintLocator *locator) {
 
   if (kind != ConstraintKind::UnresolvedValueMember)
+    return nullptr;
+
+  // Only diagnose for UnresolvedMemberExprs.
+  // TODO: We ought to support diagnosing EnumElementPatterns too.
+  if (!isExpr<UnresolvedMemberExpr>(locator->getAnchor()))
     return nullptr;
 
   // None or only one viable candidate, there is no ambiguity.
@@ -2238,7 +2368,7 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
     return nullptr;
 
   // Don't diagnose for function members e.g. Foo? = .none(0).
-  if (functionRefKind != FunctionRefKind::Unapplied)
+  if (!functionRefInfo.isUnappliedBaseName())
     return nullptr;
 
   Type underlyingBaseType = baseTy->getMetatypeInstanceType();
@@ -2318,7 +2448,7 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
 
   MemberLookupResult unwrappedResult =
       cs.performMemberLookup(kind, memberName, MetatypeType::get(unwrappedType),
-                             functionRefKind, locator,
+                             functionRefInfo, locator,
                              /*includeInaccessibleMembers*/ false);
   SmallVector<OverloadChoice, 4> unwrappedViableCandidates;
   filterViableCandidates(unwrappedResult.ViableCandidates,
@@ -2701,4 +2831,45 @@ IgnoreKeyPathSubscriptIndexMismatch::create(ConstraintSystem &cs, Type argType,
                                             ConstraintLocator *locator) {
   return new (cs.getAllocator())
       IgnoreKeyPathSubscriptIndexMismatch(cs, argType, locator);
+}
+
+AllowInlineArrayLiteralCountMismatch *
+AllowInlineArrayLiteralCountMismatch::create(ConstraintSystem &cs, Type lhsCount,
+                                             Type rhsCount,
+                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInlineArrayLiteralCountMismatch(cs, lhsCount, rhsCount, locator);
+}
+
+bool AllowInlineArrayLiteralCountMismatch::diagnose(const Solution &solution,
+                                                    bool asNote) const {
+  IncorrectInlineArrayLiteralCount failure(solution, lhsCount, rhsCount,
+                                           getLocator());
+  return failure.diagnose(asNote);
+}
+
+TooManyDynamicMemberLookups *
+TooManyDynamicMemberLookups::create(ConstraintSystem &cs, DeclNameRef name,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator()) TooManyDynamicMemberLookups(cs, name, locator);
+}
+
+bool TooManyDynamicMemberLookups::diagnose(const Solution &solution,
+                                           bool asNote) const {
+  TooManyDynamicMemberLookupsFailure failure(solution, Name, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreIsolatedConformance *
+IgnoreIsolatedConformance::create(ConstraintSystem &cs,
+                                  ConstraintLocator *locator,
+                                  ProtocolConformance *conformance) {
+  return new (cs.getAllocator())
+      IgnoreIsolatedConformance(cs, locator, conformance);
+}
+
+bool IgnoreIsolatedConformance::diagnose(const Solution &solution,
+                                         bool asNote) const {
+  DisallowedIsolatedConformance failure(solution, conformance, getLocator());
+  return failure.diagnose(asNote);
 }

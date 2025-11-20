@@ -23,4 +23,10 @@ extension SomeProtocol {
     }
 }
 
-SomeClass().someProperty.x = 32
+func testit() {
+  let c = SomeClass()
+  c.someProperty.x = 32
+}
+
+testit()
+

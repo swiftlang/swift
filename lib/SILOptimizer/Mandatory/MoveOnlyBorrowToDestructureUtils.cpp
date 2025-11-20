@@ -143,17 +143,19 @@ struct AvailableValueStore {
                   liveness.getNumSubElements()),
         numBits(liveness.getNumSubElements()) {}
 
-  std::pair<AvailableValues *, bool> get(SILBasicBlock *block) {
+  std::pair<AvailableValues, bool> get(SILBasicBlock *block) {
     auto iter = blockToValues.try_emplace(block, AvailableValues());
 
     if (!iter.second) {
-      return {&iter.first->second, false};
+      return {iter.first->second, false};
     }
+
+    ASSERT(dataStore.size() >= (nextOffset + numBits) && "underallocated!");
 
     iter.first->second.values =
         MutableArrayRef<SILValue>(&dataStore[nextOffset], numBits);
     nextOffset += numBits;
-    return {&iter.first->second, true};
+    return {iter.first->second, true};
   }
 };
 
@@ -239,7 +241,7 @@ struct borrowtodestructure::Implementation {
 
   void cleanup();
 
-  AvailableValues &computeAvailableValues(SILBasicBlock *block);
+  AvailableValues computeAvailableValues(SILBasicBlock *block);
 
   /// Returns mark_unresolved_non_copyable_value if we are processing borrows or
   /// the enum argument if we are processing switch_enum.
@@ -296,11 +298,23 @@ bool Implementation::gatherUses(SILValue value) {
     case OperandOwnership::InstantaneousUse:
     case OperandOwnership::UnownedInstantaneousUse:
     case OperandOwnership::InteriorPointer:
+    case OperandOwnership::AnyInteriorPointer:
     case OperandOwnership::BitwiseEscape: {
       // Look through copy_value of a move only value. We treat copy_value of
       // copyable values as normal uses.
       if (auto *cvi = dyn_cast<CopyValueInst>(nextUse->getUser())) {
         if (cvi->getOperand()->getType().isMoveOnly()) {
+          // Borrow accessor's callsite consists of copy_value +
+          // mark_unresolved_non_copyable_value instructions.
+          // It's diagnostics are driven by the
+          // mark_unresolved_non_copyable_value instruction.
+          // Ignore the copy_value uses to avoid an incoherent error.
+          if (cvi->getOperand()->isBorrowAccessorResult()) {
+            assert(isa<MarkUnresolvedNonCopyableValueInst>(
+                cvi->getSingleConsumingUse()->getUser()));
+            continue;
+          }
+
           LLVM_DEBUG(llvm::dbgs() << "        Found copy value of move only "
                                      "field... looking through!\n");
           for (auto *use : cvi->getUses())
@@ -476,6 +490,9 @@ bool Implementation::gatherUses(SILValue value) {
                               false /*is lifetime ending*/);
       }
       // The liveness extends to the scope-ending uses of the borrow.
+      //
+      // FIXME: this ignores visitScopeEndingUses failure, which may result from
+      // unknown uses or dead borrows.
       BorrowingOperand(nextUse).visitScopeEndingUses([&](Operand *end) -> bool {
         if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
           return false;
@@ -687,23 +704,24 @@ static void dumpSmallestTypeAvailable(
 /// ensures that we match at the source level the assumption by users that they
 /// can use entire valid parts as late as possible. If we were to do it earlier
 /// we would emit errors too early.
-AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
+AvailableValues Implementation::computeAvailableValues(SILBasicBlock *block) {
   LLVM_DEBUG(llvm::dbgs() << "    Computing Available Values For bb"
                           << block->getDebugID() << '\n');
 
   // First grab our block. If we already have state for the block, just return
   // its available values. We already computed the available values and
   // potentially updated it with new destructured values for our block.
+  ASSERT(blockToAvailableValues.has_value());
   auto pair = blockToAvailableValues->get(block);
   if (!pair.second) {
     LLVM_DEBUG(llvm::dbgs()
                << "        Already have values! Returning them!\n");
-    LLVM_DEBUG(pair.first->print(llvm::dbgs(), "            "));
-    return *pair.first;
+    LLVM_DEBUG(pair.first.print(llvm::dbgs(), "            "));
+    return pair.first;
   }
 
   LLVM_DEBUG(llvm::dbgs() << "        No values computed! Initializing!\n");
-  auto &newValues = *pair.first;
+  AvailableValues newValues = pair.first;
 
   // Otherwise, we need to initialize our available values with predecessor
   // information.
@@ -810,7 +828,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
                  << "        Recursively loading its available values to "
                     "compute initial smallest type available for block bb"
                  << block->getDebugID() << '\n');
-      auto &predAvailableValues = computeAvailableValues(bb);
+      auto predAvailableValues = computeAvailableValues(bb);
       LLVM_DEBUG(
           llvm::dbgs()
           << "        Computing initial smallest type available for block bb"
@@ -837,7 +855,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
                               << bb->getDebugID() << '\n');
       LLVM_DEBUG(llvm::dbgs()
                  << "        Recursively loading its available values!\n");
-      auto &predAvailableValues = computeAvailableValues(bb);
+      auto predAvailableValues = computeAvailableValues(bb);
       for (unsigned i : range(predAvailableValues.size())) {
         if (!smallestTypeAvailable[i].has_value())
           continue;
@@ -873,12 +891,11 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
       llvm::dbgs()
       << "    Destructuring available values in preds to smallest size for bb"
       << block->getDebugID() << '\n');
-  auto *fn = block->getFunction();
   IntervalMapAllocator::Map typeSpanToValue(getAllocator());
   for (auto *predBlock : predsSkippingBackEdges) {
     SWIFT_DEFER { typeSpanToValue.clear(); };
 
-    auto &predAvailableValues = computeAvailableValues(predBlock);
+    auto predAvailableValues = computeAvailableValues(predBlock);
 
     // First go through our available values and initialize our interval map. We
     // should never fail to insert. We want to insert /all/ available values so
@@ -926,20 +943,10 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
       // smallest offset size could result in further destructuring that an
       // earlier value required. Instead, we do a final loop afterwards using
       // the interval map to update each available value.
-      auto iterType = iterValue->getType();
       auto loc = getSafeLoc(predBlock->getTerminator());
       SILBuilderWithScope builder(predBlock->getTerminator());
 
       while (smallestOffsetSize->first.size < iterOffsetSize.size) {
-        TypeOffsetSizePair childOffsetSize;
-        SILType childType;
-
-        // We are returned an optional here and should never fail... so use a
-        // force unwrap.
-        std::tie(childOffsetSize, childType) =
-            *iterOffsetSize.walkOneLevelTowardsChild(iterOffsetSize, iterType,
-                                                     fn);
-
         // Before we destructure ourselves, erase our entire value from the
         // map. We do not need to consider the possibility of there being holes
         // in our range since we always store values whole to their entire
@@ -1004,7 +1011,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
     // phis.
     SILValue sameValue;
     for (auto *predBlock : predsSkippingBackEdges) {
-      auto &predAvailableValues = computeAvailableValues(predBlock);
+      auto predAvailableValues = computeAvailableValues(predBlock);
       if (!sameValue) {
         sameValue = predAvailableValues[i];
       } else if (sameValue != predAvailableValues[i]) {
@@ -1025,7 +1032,7 @@ AvailableValues &Implementation::computeAvailableValues(SILBasicBlock *block) {
     }
 
     for (auto *predBlock : predsSkippingBackEdges) {
-      auto &predAvailableValues = computeAvailableValues(predBlock);
+      auto predAvailableValues = computeAvailableValues(predBlock);
       addNewEdgeValueToBranch(predBlock->getTerminator(), block,
                               predAvailableValues[i], deleter);
     }
@@ -1089,6 +1096,7 @@ static void insertEndBorrowsForNonConsumingUse(Operand *op,
     LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow after borrow scope:\n"
                                "    ";
                op->getUser()->print(llvm::dbgs()));
+    // FIXME: ignoring the visitScopeEndingUses result ignores unknown uses.
     bOp.visitScopeEndingUses([&](Operand *endScope) -> bool {
       auto *endScopeInst = endScope->getUser();
       LLVM_DEBUG(llvm::dbgs() << "       ";
@@ -1106,6 +1114,7 @@ static void insertEndBorrowsForNonConsumingUse(Operand *op,
     // End the borrow where the original borrow of the subject was ended.
     // TODO: handle if the switch isn't directly on a borrow?
     auto beginBorrow = cast<BeginBorrowInst>(swi->getOperand());
+    // FIXME: ignoring the visitScopeEndingUses result ignores unknown uses.
     BorrowingOperand(&beginBorrow->getOperandRef())
       .visitScopeEndingUses([&](Operand *endScope) -> bool {
         auto *endScopeInst = endScope->getUser();
@@ -1186,11 +1195,11 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
     // block.
     LLVM_DEBUG(llvm::dbgs()
                << "    Found needed bits! Propagating available values!\n");
-    auto &availableValues = computeAvailableValues(block);
+    auto availableValues = computeAvailableValues(block);
     LLVM_DEBUG(llvm::dbgs() << "    Computed available values for block bb"
                             << block->getDebugID() << '\n';
                availableValues.print(llvm::dbgs(), "        "));
-    // Then walk from the top to the bottom of the block rewriting as we go.
+    // Then walk from the beginning to the end of the block, rewriting as we go.
     for (auto ii = block->begin(), ie = block->end(); ii != ie;) {
       auto *inst = &*ii;
       ++ii;
@@ -1336,13 +1345,6 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 borrowBuilder.createGuaranteedMoveOnlyWrapperToCopyableValue(
                     loc, value);
           }
-          // NOTE: oldInst may be nullptr if our operand is a SILArgument
-          // which can happen with switch_enum.
-          auto *oldInst = operand.get()->getDefiningInstruction();
-          operand.set(value);
-          if (oldInst && deleter)
-            deleter->forceTrackAsDead(oldInst);
-
           // If we have a terminator that is a trivial use (e.x.: we
           // struct_extract a trivial value). Just put the end_borrow before the
           // terminator.
@@ -1351,7 +1353,7 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 operand.getOperandOwnership() == OperandOwnership::TrivialUse) {
               SILBuilderWithScope endBuilder(inst);
               endBuilder.createEndBorrow(getSafeLoc(inst), borrow);
-              continue;
+              goto update_operand;
             } else {
               // Otherwise, put the end_borrow.
               for (auto *succBlock : ti->getSuccessorBlocks()) {
@@ -1359,11 +1361,23 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 SILBuilderWithScope endBuilder(nextInst);
                 endBuilder.createEndBorrow(getSafeLoc(nextInst), borrow);
               }
-              continue;
+              goto update_operand;
             }
           }
 
           insertEndBorrowsForNonConsumingUse(&operand, borrow);
+update_operand:
+          // We update the operand after placing end_borrows, since we might
+          // need the original operand's lifetime to correctly delineate the
+          // new lifetime, such as if there is an InteriorPointerOperand.
+          
+          // NOTE: oldInst may be nullptr if our operand is a SILArgument
+          // which can happen with switch_enum.
+          auto *oldInst = operand.get()->getDefiningInstruction();
+          operand.set(value);
+          if (oldInst && deleter)
+            deleter->forceTrackAsDead(oldInst);
+
           continue;
         }
 
@@ -1390,8 +1404,8 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
 
           // Then walk one level towards our target type.
           std::tie(iterOffsetSize, iterType) =
-              *useOffsetSize.walkOneLevelTowardsChild(parentOffsetSize,
-                                                      iterType, fn);
+              *useOffsetSize.walkOneLevelTowardsChild(
+                  parentOffsetSize, iterType, unwrappedOperandType, fn);
 
           unsigned start = parentOffsetSize.startOffset;
           consumeBuilder.emitDestructureValueOperation(
@@ -1540,10 +1554,10 @@ static bool gatherBorrows(SILValue rootValue,
     // escape. Is it legal to canonicalize ForwardingUnowned?
     case OperandOwnership::ForwardingUnowned:
     case OperandOwnership::PointerEscape:
-      if (auto *md = dyn_cast<MarkDependenceInst>(use->getUser())) {
+      if (auto mdi = MarkDependenceInstruction(use->getUser())) {
         // mark_depenence uses only keep its base value alive; they do not use
         // the base value itself and are irrelevant for destructuring.
-        if (use == &md->getOperandRef(MarkDependenceInst::Base))
+        if (use->get() == mdi.getBase())
           continue;
       }
       return false;
@@ -1582,6 +1596,7 @@ static bool gatherBorrows(SILValue rootValue,
       }
       continue;
     case OperandOwnership::InteriorPointer:
+    case OperandOwnership::AnyInteriorPointer:
       // We don't care about these.
       continue;
     case OperandOwnership::GuaranteedForwarding:

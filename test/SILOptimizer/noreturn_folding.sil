@@ -1,12 +1,13 @@
-// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -noreturn-folding < %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -noreturn-folding -verify %s | %FileCheck %s
 
+import Swift
 import Builtin
 
-enum Never {}
-
-struct Int64 {
-  var value: Builtin.Int64
-}
+sil @exit : $@convention(thin) (Builtin.Int32) -> Never
+sil @returnNever : $@convention(thin) () -> Never
+sil @returnNeverThrows : $@convention(thin) () -> (Never, @error Error)
+sil @returnNeverCoroutine : $@yield_once @convention(thin) () -> @yields Never
+sil @doSomething : $@convention(thin) () -> ()
 
 // We used to crash on this IR. We would delete "%4" while there is still a
 // (dead) user "%7" around.
@@ -15,7 +16,7 @@ struct Int64 {
 // CHECK: %[[E:.+]] = function_ref @exit
 // CHECK: apply %[[E]]
 // CHECK: unreachable
-
+// CHECK: } // end sil function 'unreachable_outside_block_user'
 sil private @unreachable_outside_block_user : $@convention(thin) () -> Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int1, -1
@@ -23,7 +24,9 @@ bb0:
   // function_ref exit
   %2 = function_ref @exit : $@convention(thin) (Builtin.Int32) -> Never
   %3 = apply %2(%1) : $@convention(thin) (Builtin.Int32) -> Never
+  // expected-note @-1 {{a call to a never-returning function}}
   %4 = integer_literal $Builtin.Int64, 7
+  // expected-warning @-1 {{will never be executed}}
   cond_br %0, bb1, bb2
 
 bb1:
@@ -42,4 +45,35 @@ bb3 (%11: $Int64):
   return %11 : $Int64
 }
 
-sil @exit : $@convention(thin) (Builtin.Int32) -> Never
+// Make sure we do not emit any error here.
+sil @ignore_use_apply : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @returnNever : $@convention(thin) () -> Never
+  %1 = apply %0() : $@convention(thin) () -> Never
+  ignored_use %1 : $Never
+  unreachable
+}
+
+// Make sure we do not emit any error here.
+sil [ossa] @ignore_use_try_apply : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @returnNeverThrows : $@convention(thin) () -> (Never, @error Error)
+  try_apply %0() : $@convention(thin) () -> (Never, @error Error), normal bb1, error bb2
+
+bb1(%2 : $Never):
+  ignored_use %2 : $Never
+  unreachable
+
+bb2(%5 : @owned $Error):
+  %6 = builtin "unexpectedError"(%5 : $Error) : $()
+  unreachable
+}
+
+sil [ossa] @ignore_use_begin_apply : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @returnNeverCoroutine : $@yield_once @convention(thin) () -> @yields Never
+  (%1, %2) = begin_apply %0() : $@yield_once @convention(thin) () -> @yields Never
+  ignored_use %1
+  end_apply %2 as $()
+  unreachable
+}

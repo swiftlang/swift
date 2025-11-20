@@ -1,4 +1,4 @@
-// RUN: not %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
+// RUN: not %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
 
 // README: If you just added support for protocol composition to the
 // ClangTypeConverter, please update this test to use a different type that we
@@ -25,12 +25,12 @@ public protocol A { }
 public protocol B { }
 public protocol C { }
 
-// CHECK: error: unexpected error produced: could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'passThrough' could not be converted: any A & B
+// CHECK: function-templates.h{{.*}}: error: diagnostic produced elsewhere: could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'passThrough' could not be converted: any A & B
 public func caller1(x: A & B) -> A & B {
   return passThrough(x)
 }
 
-// CHECK: error: unexpected error produced: could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'addMixedTypeParams' could not be converted: any A & B, any A & C
+// CHECK: function-templates.h{{.*}}: error: diagnostic produced elsewhere: could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'addMixedTypeParams' could not be converted: any A & B, any A & C
 public func caller2(x: A & B, y: A & C) -> A & B {
   return addMixedTypeParams(x, y)
 }

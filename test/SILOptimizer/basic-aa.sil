@@ -665,6 +665,25 @@ bb0:
   %99 = tuple ()
   return %99 : $()
 }
+
+class Derived: X {}
+ 
+// CHECK-LABEL: @test_tail_addr_and_upcast
+// CHECK:       PAIR #10.
+// CHECK-NEXT:    %2 = ref_tail_addr %1 : $X, $Int32
+// CHECK-NEXT:    %3 = ref_tail_addr %0 : $Derived, $Int32
+// CHECK-NEXT:  MayAlias
+sil @test_tail_addr_and_upcast : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Derived
+  %1 = upcast %0 to $X
+  %2 = ref_tail_addr %1, $Int32
+  %3 = ref_tail_addr %0, $Int32
+  fix_lifetime %2
+  fix_lifetime %3
+  %r = tuple ()
+  return %r
+}
  
 class GenericClass<T> {
   var x : T

@@ -219,9 +219,11 @@ bool GlobalPropertyOpt::canAddressEscape(SILValue V, bool acceptStore) {
     
     // These instructions do not cause the address to escape.
     if (isa<LoadInst>(User) ||
+        isa<LoadBorrowInst>(User) ||
         isa<DebugValueInst>(User) ||
         isa<StrongReleaseInst>(User) ||
         isa<StrongRetainInst>(User) ||
+        isa<DestroyAddrInst>(User) ||
         isa<DeallocBoxInst>(User) ||
         isa<DeallocStackInst>(User))
       continue;
@@ -285,10 +287,11 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
       default:
         break;
     }
-  } else if (auto *LI = dyn_cast<LoadInst>(Inst)) {
+  } else if (isa<LoadInst>(Inst) || isa<LoadBorrowInst>(Inst)) {
+    auto *LI = cast<SingleValueInstruction>(Inst);
     if (isArrayType(LI->getType())) {
       // Add a dependency from the value at the address to the loaded value.
-      SILValue loadAddr = LI->getOperand();
+      SILValue loadAddr = LI->getOperand(0);
       assert(loadAddr->getType().isAddress());
       addDependency(getAddrEntry(loadAddr), getValueEntry(LI));
       return;

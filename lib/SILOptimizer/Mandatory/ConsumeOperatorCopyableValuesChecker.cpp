@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
@@ -32,7 +33,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 
 using namespace swift;
 
@@ -156,6 +157,11 @@ bool CheckerLivenessInfo::compute() {
               return false;
             }
           }
+        } else if (isa<StoreBorrowInst>(user)) {
+          if (liveness->updateForBorrowingOperand(use) !=
+              InnerBorrowKind::Contained) {
+            return false;
+          }
         }
         // FIXME: this ignores all other forms of Borrow ownership, such as
         // partial_apply [onstack] and mark_dependence [nonescaping].
@@ -174,7 +180,8 @@ bool CheckerLivenessInfo::compute() {
           return true;
         });
         break;
-      case OperandOwnership::InteriorPointer: {
+      case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer: {
         // An interior pointer user extends liveness until the end of the
         // interior pointer section.
         //
@@ -220,7 +227,7 @@ struct ConsumeOperatorCopyableValuesChecker {
   CheckerLivenessInfo livenessInfo;
   DominanceInfo *dominance;
   InstructionDeleter deleter;
-  CanonicalizeOSSALifetime canonicalizer;
+  OSSACanonicalizeOwned canonicalizer;
 
   ConsumeOperatorCopyableValuesChecker(
       SILFunction *fn, DominanceInfo *dominance,
@@ -558,8 +565,7 @@ static bool tryEmitCannotConsumeNonLocalMemoryError(MoveValueInst *mvi) {
     return false;
 
   auto &astContext = mvi->getModule().getASTContext();
-  if (auto *gai =
-          dyn_cast<GlobalAddrInst>(stripAccessMarkers(li->getOperand()))) {
+  if (isa<GlobalAddrInst>(stripAccessMarkers(li->getOperand()))) {
     auto diag = diag::sil_movekillscopyable_move_applied_to_nonlocal_memory;
     diagnose(astContext, mvi->getLoc().getSourceLoc(), diag, 0);
     mvi->setAllowsDiagnostics(false);

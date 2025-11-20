@@ -6,6 +6,7 @@
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
 
 var dict1: [Int: Int] = [1:10]
 var dict2: [Int: Int] = [1:20]

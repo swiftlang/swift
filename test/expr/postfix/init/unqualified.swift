@@ -7,7 +7,7 @@ class Aaron {
     func foo() {
       // Make sure we recover and assume 'self.init'.
       // expected-error@+2 {{initializer expression requires explicit access; did you mean to prepend it with 'self.'?}} {{11-11=self.}}
-      // expected-error@+1 {{type of expression is ambiguous without a type annotation}}
+      // expected-error@+1 {{failed to produce diagnostic for expression}}
       _ = init
     }
   }
@@ -48,7 +48,7 @@ class Theodosia: Aaron {
 
     // Make sure we recover and assume 'self.init'.
     // expected-error@+2 {{initializer expression requires explicit access; did you mean to prepend it with 'self.'?}} {{22-22=self.}}
-    // expected-error@+1 {{type of expression is ambiguous without a type annotation}}
+    // expected-error@+1 {{failed to produce diagnostic for expression}}
     func foo() { _ = init }
   }
 
@@ -62,7 +62,7 @@ class Theodosia: Aaron {
 
     // FIXME: We could optimistically parse this as an expression instead
     // expected-error@+2 {{initializers may only be declared within a type}}
-    // expected-error@+1 {{integer unexpectedly used in a type position}}
+    // expected-error@+1 {{expected parameter type following ':'}}
     init(z: 0)
   }
 
@@ -98,7 +98,7 @@ struct AaronStruct {
 
     // FIXME: We could optimistically parse this as an expression instead
     // expected-error@+2 {{initializers may only be declared within a type}}
-    // expected-error@+1 {{integer unexpectedly used in a type position}}
+    // expected-error@+1 {{expected parameter type following ':'}}
     init(y: 1)
   }
 

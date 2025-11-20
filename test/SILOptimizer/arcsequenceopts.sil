@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
-// RUN: %target-sil-opt -enable-sil-verify-all -arc-loop-opts  %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -arc-loop-opts  %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
 
 // REQUIRES: swift_in_compiler
 
@@ -2373,7 +2373,7 @@ sil_global hidden @$s4test12bufferMemorySpys5UInt8VGvp : $UnsafeMutablePointer<U
 // x
 sil_global hidden @$s4test1xypvp : $Any
 
-sil [serialized] [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+sil [serialized] [heuristic_always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
 
 // CHECK-LABEL: sil @testTsanInoutAccess : $@convention(thin) () -> () {
 // CHECK:   alloc_global @$s4test12bufferMemorySpys5UInt8VGvp

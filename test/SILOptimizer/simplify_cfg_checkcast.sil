@@ -539,7 +539,7 @@ bb7:
 // Simplify down to a single diamond.
 //
 // TODO: Simplify some of the obviously dead copy/destroy/borrows
-// on-the-fly after each simplify-cfg. Possible using CanonicalizeOSSALifetime.
+// on-the-fly after each simplify-cfg. Possible using OSSACanonicalizeOwned.
 //
 // TODO-CHECK-LABEL: sil [ossa] @redundant_checked_cast_br_rauw_guaranteed_to_owned_merge : $@convention(method) (@owned Base) -> () {
 // TODO-CHECK: bb0(%0 : @owned $Base):

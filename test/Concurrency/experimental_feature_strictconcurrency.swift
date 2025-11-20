@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-upcoming-feature StrictConcurrency -emit-sil -o /dev/null -verify %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_StrictConcurrency
 
 class C1 { } // expected-note{{class 'C1' does not conform to the 'Sendable' protocol}}
 class C2 { }

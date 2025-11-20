@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/GenericSpecializationMangler.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -41,8 +42,9 @@ public:
                                 NodePointer Parent) {
     DemangleInitRAII state(*this, MangledSpecialization, nullptr);
     if (!parseAndPushNodes()) {
-      llvm::errs() << "Can't demangle: " << MangledSpecialization << '\n';
-      abort();
+      ABORT([&](auto &out) {
+        out << "Can't demangle: " << MangledSpecialization;
+      });
     }
     for (Node *Nd : NodeStack) {
       addChild(Parent, Nd);
@@ -61,6 +63,12 @@ std::string SpecializationMangler::finalize() {
   StringRef FuncName = Function ? Function->getName() : StringRef(FunctionName);
   NodePointer FuncTopLevel = nullptr;
   if (FuncName.starts_with(MANGLING_PREFIX_STR)) {
+    // Demangling can fail, i.e. FuncTopLevel == nullptr, if the user provides
+    // a custom not-demangable `@_silgen_name` (but still containing the "$s"
+    // mangling prefix).
+    FuncTopLevel = D.demangleSymbol(FuncName);
+  }
+  else if (FuncName.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) {
     FuncTopLevel = D.demangleSymbol(FuncName);
     assert(FuncTopLevel);
   }
@@ -71,10 +79,10 @@ std::string SpecializationMangler::finalize() {
   for (NodePointer FuncChild : *FuncTopLevel) {
     TopLevel->addChild(FuncChild, D);
   }
-  auto mangling = Demangle::mangleNode(TopLevel);
+  auto mangling = Demangle::mangleNode(TopLevel, Flavor);
   assert(mangling.isSuccess());
   std::string mangledName = mangling.result();
-  verify(mangledName);
+  verify(mangledName, Flavor);
   return mangledName;
 }
 
@@ -83,14 +91,16 @@ std::string SpecializationMangler::finalize() {
 //===----------------------------------------------------------------------===//
 
 void GenericSpecializationMangler::
-appendSubstitutions(GenericSignature sig, SubstitutionMap subs) {
+appendSubstitutions(GenericSignature calleeSig,
+                    SubstitutionMap calleeSubs,
+                    GenericSignature callerSig) {
   bool First = true;
-  sig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
+  calleeSig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
     if (Canonical) {
       auto ty = Type(ParamType);
-      auto substTy = ty.subst(subs);
+      auto substTy = ty.subst(calleeSubs);
       auto canTy = substTy->getCanonicalType();
-      appendType(canTy, nullptr);
+      appendType(canTy, callerSig);
       appendListSeparator(First);
     }
   });
@@ -100,7 +110,7 @@ appendSubstitutions(GenericSignature sig, SubstitutionMap subs) {
 std::string GenericSpecializationMangler::
 manglePrespecialized(GenericSignature sig, SubstitutionMap subs) {
   beginMangling();
-  appendSubstitutions(sig, subs);
+  appendSubstitutions(sig, subs, GenericSignature());
   appendSpecializationOperator("Ts");
   return finalize();
 }
@@ -109,7 +119,7 @@ std::string GenericSpecializationMangler::
 mangleNotReabstracted(SubstitutionMap subs,
                       const SmallBitVector &paramsRemoved) {
   beginMangling();
-  appendSubstitutions(getGenericSignature(), subs);
+  appendSubstitutions(getGenericSignature(), subs, GenericSignature());
   appendOperator("T");
   appendRemovedParams(paramsRemoved);
   appendSpecializationOperator("G");
@@ -120,7 +130,7 @@ std::string GenericSpecializationMangler::
 mangleReabstracted(SubstitutionMap subs, bool alternativeMangling,
                    const SmallBitVector &paramsRemoved) {
   beginMangling();
-  appendSubstitutions(getGenericSignature(), subs);
+  appendSubstitutions(getGenericSignature(), subs, GenericSignature());
   appendOperator("T");
   appendRemovedParams(paramsRemoved);
 
@@ -139,9 +149,10 @@ void GenericSpecializationMangler::appendRemovedParams(const SmallBitVector &par
 }
 
 std::string GenericSpecializationMangler::
-mangleForDebugInfo(GenericSignature sig, SubstitutionMap subs, bool forInlining) {
+mangleForDebugInfo(GenericSignature calleeSig, SubstitutionMap calleeSubs,
+                   GenericSignature callerSig, bool forInlining) {
   beginMangling();
-  appendSubstitutions(sig, subs);
+  appendSubstitutions(calleeSig, calleeSubs, callerSig);
   appendSpecializationOperator(forInlining ? "Ti" : "TG");
   return finalize();
 }
@@ -165,18 +176,18 @@ getSubstitutionMapForPrespecialization(GenericSignature genericSig,
       [&](SubstitutableType *type) -> Type {
         auto SpecializedInterfaceTy =
             Type(type).subst(CalleeInterfaceToSpecializedInterfaceMap);
-        return SpecializedGenericEnv->mapTypeIntoContext(
+        return SpecializedGenericEnv->mapTypeIntoEnvironment(
             SpecializedInterfaceTy);
       },
       LookUpConformanceInModule());
   return subs;
 }
 
-std::string GenericSpecializationMangler::manglePrespecialization(
+std::string GenericSpecializationMangler::manglePrespecialization(ASTContext &Ctx,
     std::string unspecializedName, GenericSignature genericSig,
     GenericSignature specializedSig) {
   auto subs =
       getSubstitutionMapForPrespecialization(genericSig, specializedSig);
-  GenericSpecializationMangler mangler(unspecializedName);
+  GenericSpecializationMangler mangler(Ctx, unspecializedName);
   return mangler.manglePrespecialized(genericSig, subs);
 }

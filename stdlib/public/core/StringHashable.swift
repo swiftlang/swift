@@ -20,8 +20,8 @@ extension String: Hashable {
   ///   of this instance.
   public func hash(into hasher: inout Hasher) {
     if _fastPath(self._guts.isNFCFastUTF8) {
-      self._guts.withFastUTF8 {
-        hasher.combine(bytes: UnsafeRawBufferPointer($0))
+      unsafe self._guts.withFastUTF8 {
+        unsafe hasher.combine(bytes: UnsafeRawBufferPointer($0))
       }
       hasher.combine(0xFF as UInt8) // terminator
     } else {
@@ -47,8 +47,8 @@ extension _StringGutsSlice {
   @_effects(releasenone) @inline(never) // slow-path
   internal func _normalizedHash(into hasher: inout Hasher) {
     if self.isNFCFastUTF8 {
-      self.withFastUTF8 {
-        hasher.combine(bytes: UnsafeRawBufferPointer($0))
+      unsafe self.withFastUTF8 {
+        unsafe hasher.combine(bytes: UnsafeRawBufferPointer($0))
       }
     } else {
       _withNFCCodeUnits {

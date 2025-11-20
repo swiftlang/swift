@@ -28,6 +28,10 @@
 #include <os/log.h>
 #include <os/signpost.h>
 
+#if defined(__arm64__) && __has_include(<os/apt_private.h>)
+#include <os/apt_private.h>
+#endif
+
 // Compatibility notes:
 //
 // These signposts can be read by external software that isn't synced with the
@@ -130,7 +134,7 @@ inline void actor_enqueue(HeapObject *actor, Job *job) {
     ENSURE_LOGS();
     auto id = os_signpost_id_make_with_pointer(ActorLog, actor);
     os_signpost_event_emit(ActorLog, id, SWIFT_LOG_ACTOR_ENQUEUE_NAME,
-                           "actor=%p task=%" PRIx64, actor, task->getTaskId());
+                           "actor=%p task=%" PRId64, actor, task->getTaskId());
   }
 }
 
@@ -139,7 +143,7 @@ inline void actor_dequeue(HeapObject *actor, Job *job) {
     ENSURE_LOGS();
     auto id = os_signpost_id_make_with_pointer(ActorLog, actor);
     os_signpost_event_emit(ActorLog, id, SWIFT_LOG_ACTOR_DEQUEUE_NAME,
-                           "actor=%p task=%" PRIx64, actor, task->getTaskId());
+                           "actor=%p task=%" PRId64, actor, task->getTaskId());
   }
 }
 
@@ -182,36 +186,57 @@ inline void actor_note_job_queue(HeapObject *actor, Job *first,
 inline void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
                         AsyncLet *asyncLet, uint8_t jobPriority,
                         bool isChildTask, bool isFuture, bool isGroupChildTask,
-                        bool isAsyncLetTask) {
+                        bool isAsyncLetTask, bool isDiscardingTask,
+                        bool hasInitialTaskExecutorPreference,
+                        const char* taskName) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
   auto parentID = parent ? parent->getTaskId() : 0;
   os_signpost_interval_begin(
       TaskLog, id, SWIFT_LOG_TASK_LIFETIME_NAME,
-      "task=%" PRIx64
+      "task=%" PRId64
       " resumefn=%p jobPriority=%u isChildTask=%{bool}d, isFuture=%{bool}d "
-      "isGroupChildTask=%{bool}d isAsyncLetTask=%{bool}d parent=%" PRIx64
-      " group=%p asyncLet=%p",
+      "isGroupChildTask=%{bool}d isAsyncLetTask=%{bool}d parent=%" PRId64
+      " group=%p asyncLet=%p "
+      "isDiscardingTask=%{bool}d hasInitialTaskExecutorPreference=%{bool}d "
+      "taskName=%{public}s",
       task->getTaskId(), task->getResumeFunctionForLogging(true), jobPriority,
       isChildTask, isFuture, isGroupChildTask, isAsyncLetTask, parentID, group,
-      asyncLet);
+      asyncLet, isDiscardingTask, hasInitialTaskExecutorPreference, taskName);
 }
 
 inline void task_destroy(AsyncTask *task) {
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
   os_signpost_interval_end(TaskLog, id, SWIFT_LOG_TASK_LIFETIME_NAME,
-                           "task=%" PRIx64 "", task->getTaskId());
+                           "task=%" PRId64 "", task->getTaskId());
 }
 
 inline void task_status_changed(AsyncTask *task, uint8_t maxPriority,
                                 bool isCancelled, bool isEscalated,
-                                bool isStarting, bool isRunning, bool isEnqueued) {
+                                bool isStarting, bool isRunning,
+                                bool isEnqueued, bool wasRunning) {
+#if !TARGET_OS_SIMULATOR
+#if OS_APT_SPI_VERSION >= 20241023
+  uint64_t taskId = task->getTaskId();
+  if (isRunning) {
+    if (SWIFT_RUNTIME_WEAK_CHECK(os_apt_msg_async_task_running_4swift)) {
+      SWIFT_RUNTIME_WEAK_USE(os_apt_msg_async_task_running_4swift(taskId));
+    }
+  } else if (!isRunning && wasRunning) {
+#if OS_APT_SPI_VERSION >= 20250710
+    if (SWIFT_RUNTIME_WEAK_CHECK(os_apt_msg_async_task_stopped_4swift)) {
+      SWIFT_RUNTIME_WEAK_USE(os_apt_msg_async_task_stopped_4swift(taskId));
+    }
+#endif // OS_APT_SPI_VERSION >= 20250710
+  }
+#endif // OS_APT_SPI_VERSION >= 20241023
+#endif // !TARGET_OS_SIMULATOR
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
   os_signpost_event_emit(
       TaskLog, id, SWIFT_LOG_TASK_STATUS_CHANGED_NAME,
-      "task=%" PRIx64 " resumefn=%p "
+      "task=%" PRId64 " resumefn=%p "
       "maxPriority=%u, isCancelled=%{bool}d "
       "isEscalated=%{bool}d, isRunning=%{bool}d, isEnqueued=%{bool}d",
       task->getTaskId(), task->getResumeFunctionForLogging(isStarting), maxPriority,
@@ -225,7 +250,7 @@ inline void task_flags_changed(AsyncTask *task, uint8_t jobPriority,
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
   os_signpost_event_emit(
       TaskLog, id, SWIFT_LOG_TASK_FLAGS_CHANGED_NAME,
-      "task=%" PRIx64 " jobPriority=%u isChildTask=%{bool}d, isFuture=%{bool}d "
+      "task=%" PRId64 " jobPriority=%u isChildTask=%{bool}d, isFuture=%{bool}d "
                       "isGroupChildTask=%{bool}d isAsyncLetTask=%{bool}d",
       task->getTaskId(), jobPriority, isChildTask, isFuture, isGroupChildTask,
       isAsyncLetTask);
@@ -236,7 +261,7 @@ inline void task_wait(AsyncTask *task, AsyncTask *waitingOn, uintptr_t status) {
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
   auto waitingID = waitingOn ? waitingOn->getTaskId() : 0;
   os_signpost_interval_begin(TaskLog, id, SWIFT_LOG_TASK_WAIT_NAME,
-                             "task=%" PRIx64 " waitingOnTask=%" PRIx64
+                             "task=%" PRId64 " waitingOnTask=%" PRId64
                              " status=0x%" PRIxPTR,
                              task->getTaskId(), waitingID, status);
 }
@@ -244,7 +269,7 @@ inline void task_wait(AsyncTask *task, AsyncTask *waitingOn, uintptr_t status) {
 inline void task_resume(AsyncTask *task) {
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
   os_signpost_interval_end(TaskLog, id, SWIFT_LOG_TASK_WAIT_NAME,
-                           "task=%" PRIx64, task->getTaskId());
+                           "task=%" PRId64, task->getTaskId());
 }
 
 inline void task_continuation_init(AsyncTask *task,
@@ -252,7 +277,7 @@ inline void task_continuation_init(AsyncTask *task,
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, context);
   os_signpost_interval_begin(TaskLog, id, SWIFT_LOG_TASK_CONTINUATION,
-                             "task=%" PRIx64 " context=%p", task->getTaskId(),
+                             "task=%" PRId64 " context=%p", task->getTaskId(),
                              context);
 }
 
@@ -276,7 +301,7 @@ inline void job_enqueue_global(Job *job) {
     ENSURE_LOGS();
     auto id = os_signpost_id_make_with_pointer(TaskLog, job);
     os_signpost_event_emit(TaskLog, id, SWIFT_LOG_JOB_ENQUEUE_GLOBAL_NAME,
-                           "task=%" PRIx64, task->getTaskId());
+                           "task=%" PRId64, task->getTaskId());
   }
 }
 
@@ -286,7 +311,7 @@ inline void job_enqueue_global_with_delay(unsigned long long delay, Job *job) {
     auto id = os_signpost_id_make_with_pointer(TaskLog, job);
     os_signpost_event_emit(
         TaskLog, id, SWIFT_LOG_JOB_ENQUEUE_GLOBAL_WITH_DELAY_NAME,
-        "task=%" PRIx64 " delay=%llu", task->getTaskId(), delay);
+        "task=%" PRId64 " delay=%llu", task->getTaskId(), delay);
   }
 }
 
@@ -296,7 +321,7 @@ inline void job_enqueue_main_executor(Job *job) {
     auto id = os_signpost_id_make_with_pointer(TaskLog, job);
     os_signpost_event_emit(TaskLog, id,
                            SWIFT_LOG_JOB_ENQUEUE_MAIN_EXECUTOR_NAME,
-                           "task=%" PRIx64, task->getTaskId());
+                           "task=%" PRId64, task->getTaskId());
   }
 }
 
@@ -310,7 +335,7 @@ inline job_run_info job_run_begin(Job *job) {
     auto handle = os_signpost_id_generate(TaskLog);
     auto taskId = task->getTaskId();
     os_signpost_interval_begin(TaskLog, handle, SWIFT_LOG_JOB_RUN_NAME,
-                               "task=%" PRIx64, taskId);
+                               "task=%" PRId64, taskId);
     return { taskId, handle };
   }
   return invalidInfo();
@@ -320,7 +345,7 @@ inline void job_run_end(job_run_info info) {
   if (info.handle != OS_SIGNPOST_ID_INVALID) {
     ENSURE_LOGS();
     os_signpost_interval_end(TaskLog, info.handle, SWIFT_LOG_JOB_RUN_NAME,
-                             "task=%" PRIx64, info.taskId);
+                             "task=%" PRId64, info.taskId);
   }
 }
 

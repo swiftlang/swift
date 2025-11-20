@@ -116,8 +116,7 @@ func test009() {
   } catch Error4.E2(let i) {
     #^INSIDE_CATCH4?check=STMT,EXPLICIT_ERROR_PAYLOAD_I^#
   }
-// FIXME: we're getting parentheses around the type when it's unnamed...
-// EXPLICIT_ERROR_PAYLOAD_I-DAG: Decl[LocalVar]/Local: i[#(Int32)#]; name=i
+// EXPLICIT_ERROR_PAYLOAD_I-DAG: Decl[LocalVar]/Local: i[#Int32#]; name=i
 }
 func test010() {
   do {
@@ -169,8 +168,8 @@ func test015() {
   }
 }
 // Check that we can complete on the bound value; Not exhaustive..
-// INT_DOT-DAG: Decl[InstanceVar]/Super/IsSystem: bigEndian[#(Int32)#]; name=bigEndian
-// INT_DOT-DAG: Decl[InstanceVar]/Super/IsSystem: littleEndian[#(Int32)#]; name=littleEndian
+// INT_DOT-DAG: Decl[InstanceVar]/Super/IsSystem: bigEndian[#Int32#]; name=bigEndian
+// INT_DOT-DAG: Decl[InstanceVar]/Super/IsSystem: littleEndian[#Int32#]; name=littleEndian
 
 //===--- Inside catch body top-level
 do {
@@ -188,5 +187,21 @@ func test016() {
     try canThrowError4()
   } catch .E2(let i) {
     i.#^INSIDE_CATCH_TYPEDERR_DOT?check=INT_DOT^#
+  }
+}
+
+// https://github.com/swiftlang/swift/issues/85434
+func issue85434() throws {
+  func foo() throws(Error4) {}
+  do {
+    try foo()
+  } catch let error {
+    switch error {
+    case .#^SWITCH_INSIDE_CATCH^#
+      // SWITCH_INSIDE_CATCH-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: E1[#Error4#]; name=E1
+      // SWITCH_INSIDE_CATCH-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: E2({#Int32#})[#Error4#]; name=E2()
+    default:
+      throw error
+    }
   }
 }

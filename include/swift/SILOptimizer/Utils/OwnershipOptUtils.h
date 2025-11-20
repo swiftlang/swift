@@ -48,7 +48,7 @@ inline bool requiresOSSACleanup(SILValue v) {
 ///
 /// Precondition: lifetimeBoundary is a superset of ownedValue's current
 /// lifetime (therefore, none of the safety checks done during
-/// CanonicalizeOSSALifetime are needed here).
+/// OSSACanonicalizeOwned are needed here).
 void extendOwnedLifetime(SILValue ownedValue,
                          PrunedLivenessBoundary &lifetimeBoundary,
                          InstructionDeleter &deleter);
@@ -61,7 +61,7 @@ void extendOwnedLifetime(SILValue ownedValue,
 ///
 /// Precondition: guaranteedBoundary is a superset of beginBorrow's current
 /// scope (therefore, none of the safety checks done during
-/// CanonicalizeBorrowScope are needed here).
+/// OSSACanonicalizeGuaranteed are needed here).
 void extendLocalBorrow(BeginBorrowInst *beginBorrow,
                        PrunedLivenessBoundary &guaranteedBoundary,
                        InstructionDeleter &deleter);
@@ -78,11 +78,6 @@ void extendLocalBorrow(BeginBorrowInst *beginBorrow,
 /// Note: This may be called on partially invalid OSSA form, where multiple
 /// newly created phis do not yet have a borrow scope.
 bool createBorrowScopeForPhiOperands(SILPhiArgument *newPhi);
-
-SILValue
-makeGuaranteedValueAvailable(SILValue value, SILInstruction *user,
-                             DeadEndBlocks &deBlocks,
-                             InstModCallbacks callbacks = InstModCallbacks());
 
 /// Compute the liveness boundary for a guaranteed value. Returns true if no
 /// uses are pointer escapes. If pointer escapes are present, the liveness
@@ -279,6 +274,8 @@ public:
     return ctx->extraAddressFixupInfo.base;
   }
 
+  bool mayIntroduceUnoptimizableCopies();
+
   /// Perform OSSA fixup on newValue and return a fixed-up value based that can
   /// be used to replace all uses of oldValue.
   ///
@@ -308,6 +305,11 @@ private:
 /// Whether the provided uses lie within the current liveness of the
 /// specified lexical value.
 bool areUsesWithinLexicalValueLifetime(SILValue, ArrayRef<Operand *>);
+
+/// Whether the provided uses lie within the current liveness of the
+/// specified value.
+bool areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses,
+                                DeadEndBlocks *deBlocks);
 
 /// A utility composed ontop of OwnershipFixupContext that knows how to replace
 /// a single use of a value with another value with a different ownership. We
@@ -357,9 +359,17 @@ bool extendStoreBorrow(StoreBorrowInst *sbi,
                        DeadEndBlocks *deadEndBlocks,
                        InstModCallbacks callbacks = InstModCallbacks());
 
-void updateBorrowedFrom(SILPassManager *pm, SILFunction *f);
+/// Updates the reborrow flags and the borrowed-from instructions for all
+/// guaranteed phis in function `f`.
+void updateAllGuaranteedPhis(SILPassManager *pm, SILFunction *f);
 
-void updateBorrowedFromPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
+/// Updates the reborrow flags and the borrowed-from instructions for all `phis`.
+void updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
+
+/// Replaces phis with the unique incoming values if all incoming values are the same.
+void replacePhisWithIncomingValues(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
+
+bool hasOwnershipOperandsOrResults(SILInstruction *inst);
 
 } // namespace swift
 

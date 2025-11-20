@@ -118,6 +118,11 @@ bb0(%0: $MyArray<MyClass>):
   unreachable
 }
 
+sil public_external [_semantics "array.props.isNativeTypeChecked"] @arrayPropertyIsNativeGuaranteed : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool {
+bb0(%0: $MyArray<MyClass>):
+  unreachable
+}
+
 // Make sure we can handle try_apply when splitting edges. This test used to crash.
 
 sil @throwing_fun : $@convention(thin) () -> (MyBool, @error any Error)
@@ -409,3 +414,30 @@ bb12(%69 : $Builtin.Int64):
   %70 = struct $MyInt (%69 : $Builtin.Int64)
   return %70 : $MyInt
 }
+
+// CHECK-LABEL: sil @load_copy_within_loop : 
+// CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNativeGuaranteed : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+// CHECK: apply [[FUNC1]]
+// CHECK: [[FUNC2:%.*]] = function_ref @arrayPropertyIsNativeGuaranteed : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+// CHECK: apply [[FUNC2]]
+// CHECK-LABEL: } // end sil function 'load_copy_within_loop'
+sil @load_copy_within_loop : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> MyBool {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
+  br bb1
+
+bb1:
+  %3 = load %0
+  retain_value %3
+  %5 = load %1
+  %6 = function_ref @arrayPropertyIsNativeGuaranteed : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  %7 = apply %6(%3) : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  release_value %3
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  return %5
+}
+ 

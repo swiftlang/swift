@@ -19,6 +19,8 @@
 #define NOMINMAX
 #include <windows.h>
 
+#pragma comment(lib, "User32.Lib")
+
 #include <mutex>
 #endif
 
@@ -35,6 +37,9 @@
 #include "ImageInspection.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Atomic.h"
+#if defined(_WIN32)
+#include "swift/Runtime/Config.h"
+#endif
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Runtime/Win32.h"
@@ -330,7 +335,11 @@ reportOnCrash(uint32_t flags, const char *message)
     if (previous)
       swift_asprintf(&current, "%s%s", current, message);
     else
+#if defined(_WIN32)
+      current = ::_strdup(message);
+#else
       current = ::strdup(message);
+#endif
   } while (!std::atomic_compare_exchange_strong_explicit(&kFatalErrorMessage,
                                                          &previous,
                                                          static_cast<const char *>(current),
@@ -475,21 +484,23 @@ SWIFT_RUNTIME_EXPORT SWIFT_NORETURN void swift_deletedMethodError() {
 // FIXME: can't pass the object's address from InlineRefCounts without hacks
 void swift::swift_abortRetainOverflow() {
   swift::fatalError(FatalErrorFlags::ReportBacktrace,
-                    "Fatal error: Object was retained too many times");
+                    "Fatal error: Object was retained too many times\n");
 }
 
 // Crash due to an unowned retain count overflow.
 // FIXME: can't pass the object's address from InlineRefCounts without hacks
 void swift::swift_abortUnownedRetainOverflow() {
   swift::fatalError(FatalErrorFlags::ReportBacktrace,
-                    "Fatal error: Object's unowned reference was retained too many times");
+                    "Fatal error: Object's unowned reference was retained too "
+                    "many times\n");
 }
 
 // Crash due to a weak retain count overflow.
 // FIXME: can't pass the object's address from InlineRefCounts without hacks
 void swift::swift_abortWeakRetainOverflow() {
   swift::fatalError(FatalErrorFlags::ReportBacktrace,
-                    "Fatal error: Object's weak reference was retained too many times");
+                    "Fatal error: Object's weak reference was retained too "
+                    "many times\n");
 }
 
 // Crash due to retain of a dead unowned reference.
@@ -498,11 +509,11 @@ void swift::swift_abortRetainUnowned(const void *object) {
   if (object) {
     swift::fatalError(FatalErrorFlags::ReportBacktrace,
                       "Fatal error: Attempted to read an unowned reference but "
-                      "object %p was already deallocated", object);
+                      "object %p was already destroyed\n", object);
   } else {
     swift::fatalError(FatalErrorFlags::ReportBacktrace,
                       "Fatal error: Attempted to read an unowned reference but "
-                      "the object was already deallocated");
+                      "the object was already destroyed\n");
   }
 }
 
@@ -510,24 +521,33 @@ void swift::swift_abortRetainUnowned(const void *object) {
 void swift::swift_abortDynamicReplacementEnabling() {
   swift::fatalError(FatalErrorFlags::ReportBacktrace,
                     "Fatal error: trying to enable a dynamic replacement "
-                    "that is already enabled");
+                    "that is already enabled\n");
 }
 
 /// Halt due to disabling an already disabled dynamic replacement().
 void swift::swift_abortDynamicReplacementDisabling() {
   swift::fatalError(FatalErrorFlags::ReportBacktrace,
                     "Fatal error: trying to disable a dynamic replacement "
-                    "that is already disabled");
+                    "that is already disabled\n");
+}
+
+/// Halt due to a failure to allocate memory.
+void swift::swift_abortAllocationFailure(size_t size, size_t alignMask) {
+  swift::fatalError(FatalErrorFlags::ReportBacktrace,
+                    "Fatal error: failed to allocate %zu bytes of memory with "
+                    "alignment %zu\n", size, alignMask + 1);
 }
 
 /// Halt due to trying to use unicode data on platforms that don't have it.
 void swift::swift_abortDisabledUnicodeSupport() {
   swift::fatalError(FatalErrorFlags::ReportBacktrace,
-                    "Unicode normalization data is disabled on this platform");
+                    "Unicode normalization data is disabled on this "
+                    "platform\n");
 
 }
 
 #if defined(_WIN32)
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 // On Windows, exceptions may be swallowed in some cases and the
 // process may not terminate as expected on crashes. For example,
 // illegal instructions used by llvm.trap. Disable the exception
@@ -539,5 +559,5 @@ static void ConfigureExceptionPolicy() {
                             UOI_TIMERPROC_EXCEPTION_SUPPRESSION,
                             &Suppress, sizeof(Suppress));
 }
-
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 #endif

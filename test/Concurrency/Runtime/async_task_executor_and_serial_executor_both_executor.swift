@@ -3,16 +3,17 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %import-libdispatch %t/a.out
-// RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 %target-run %import-libdispatch %t/a.out
+// RUN: env %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %import-libdispatch %t/a.out
+// RUN: env %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 %target-run %import-libdispatch %t/a.out
 
 // TODO: Need to find out how to combine %env- and %target-run and %import-libdispatch reliably.
 // UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=freebsd
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: libdispatch
-// 
+//
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 

@@ -29,7 +29,7 @@ import C
 // CHECK:          "commandLine": [
 // CHECK:            "-fobjc-disable-direct-methods-for-testing"
 // CHECK:            "-o",
-// CHECK-NEXT:       "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule",
+// CHECK-NEXT:       "{{.*}}{{/|\\}}A-{{.*}}.swiftmodule"
 
             
 

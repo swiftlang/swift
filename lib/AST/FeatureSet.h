@@ -19,7 +19,8 @@
 
 namespace swift {
 
-using BasicFeatureSet = FixedBitSet<numFeatures(), Feature>;
+using BasicFeatureSet =
+    FixedBitSet<Feature::getNumFeatures(), Feature::InnerKind>;
 
 class FeatureSet {
   BasicFeatureSet required;
@@ -30,7 +31,7 @@ class FeatureSet {
   // This is the easiest way of letting us iterate from largest to
   // smallest, i.e. from the newest to the oldest feature, which is
   // the order in which we need to emit #if clauses.
-  using SuppressibleFeatureSet = FixedBitSet<numFeatures(), size_t>;
+  using SuppressibleFeatureSet = FixedBitSet<Feature::getNumFeatures(), size_t>;
   SuppressibleFeatureSet suppressible;
 
 public:
@@ -42,7 +43,7 @@ public:
 
   public:
     bool empty() const { return i == e; }
-    Feature next() { return Feature(numFeatures() - *i++); }
+    Feature next() { return Feature(Feature::getNumFeatures() - *i++); }
   };
 
   bool empty() const { return required.empty() && suppressible.empty(); }

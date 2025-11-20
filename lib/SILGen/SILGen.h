@@ -13,6 +13,8 @@
 #ifndef SILGEN_H
 #define SILGEN_H
 
+#define SWIFT_INCLUDED_IN_SILGEN_SOURCES
+
 #include "ASTVisitor.h"
 #include "Cleanup.h"
 #include "swift/AST/ASTContext.h"
@@ -83,6 +85,9 @@ public:
 
   /// Set of delayed conformances that have already been forced.
   llvm::DenseSet<NormalProtocolConformance *> forcedConformances;
+
+  /// Imported noncopyable types that we have seen.
+  llvm::DenseSet<NominalTypeDecl *> importedNontrivialNoncopyableTypes;
 
   size_t anonymousSymbolCounter = 0;
 
@@ -266,6 +271,7 @@ public:
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
   void visitMissingMemberDecl(MissingMemberDecl *d) {}
+  void visitUsingDecl(UsingDecl *) {}
 
   // Emitted as part of its storage.
   void visitAccessorDecl(AccessorDecl *ad) {}
@@ -273,7 +279,6 @@ public:
   void visitFuncDecl(FuncDecl *fd);
   void visitPatternBindingDecl(PatternBindingDecl *vd);
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td) {}
-  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD);
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
@@ -281,6 +286,8 @@ public:
   void visitMissingDecl(MissingDecl *d);
   void visitMacroDecl(MacroDecl *d);
   void visitMacroExpansionDecl(MacroExpansionDecl *d);
+
+  void visitImportedNontrivialNoncopyableType(NominalTypeDecl *nominal);
 
   // Same as AbstractStorageDecl::visitEmittedAccessors, but skips over skipped
   // (unavailable) decls.
@@ -334,6 +341,10 @@ public:
 
   /// Emits the backing initializer for a property with an attached wrapper.
   void emitPropertyWrapperBackingInitializer(VarDecl *var);
+
+  /// Emits an init accessor that contains a call to the backing storage
+  /// initializer for a property with an attached property wrapper
+  void emitPropertyWrappedFieldInitAccessor(VarDecl *var);
 
   /// Emits argument generators, including default argument generators and
   /// property wrapper argument generators, for the given parameter list.
@@ -390,6 +401,10 @@ public:
   /// Emit the default witness table for a resilient protocol.
   void emitDefaultWitnessTable(ProtocolDecl *protocol);
 
+  void emitDefaultOverrideTable(ClassDecl *decl);
+
+  SILFunction *emitDefaultOverride(SILDeclRef replacement, SILDeclRef original);
+
   /// Emit the self-conformance witness table for a protocol.
   void emitSelfConformanceWitnessTable(ProtocolDecl *protocol);
 
@@ -421,24 +436,17 @@ public:
   /// Is the self method of the given nonmutating method passed indirectly?
   bool isNonMutatingSelfIndirect(SILDeclRef method);
 
-  SILDeclRef getAccessorDeclRef(AccessorDecl *accessor,
-                                ResilienceExpansion expansion);
+  SILDeclRef getFuncDeclRef(FuncDecl *funcDecl, ResilienceExpansion expansion);
 
   bool canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
                                            ResilienceExpansion expansion);
 
-  KeyPathPatternComponent
-  emitKeyPathComponentForDecl(SILLocation loc,
-                              GenericEnvironment *genericEnv,
-                              ResilienceExpansion expansion,
-                              unsigned &baseOperand,
-                              bool &needsGenericContext,
-                              SubstitutionMap subs,
-                              AbstractStorageDecl *storage,
-                              ArrayRef<ProtocolConformanceRef> indexHashables,
-                              CanType baseTy,
-                              DeclContext *useDC,
-                              bool forPropertyDescriptor);
+  KeyPathPatternComponent emitKeyPathComponentForDecl(
+      SILLocation loc, GenericEnvironment *genericEnv,
+      ResilienceExpansion expansion, unsigned &baseOperand,
+      bool &needsGenericContext, SubstitutionMap subs, ValueDecl *decl,
+      ArrayRef<ProtocolConformanceRef> indexHashables, CanType baseTy,
+      DeclContext *useDC, bool forPropertyDescriptor, bool isApplied = false);
 
   /// Emit all differentiability witnesses for the given function, visiting its
   /// `@differentiable` and `@derivative` attributes.
@@ -517,14 +525,10 @@ public:
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();
 
-  /// Retrieve the _Concurrency._asyncLetStart intrinsic.
-  FuncDecl *getAsyncLetStart();
   /// Retrieve the _Concurrency._asyncLetGet intrinsic.
   FuncDecl *getAsyncLetGet();
   /// Retrieve the _Concurrency._asyncLetGetThrowing intrinsic.
   FuncDecl *getAsyncLetGetThrowing();
-  /// Retrieve the _Concurrency._asyncLetFinish intrinsic.
-  FuncDecl *getFinishAsyncLet();
 
   /// Retrieve the _Concurrency._taskFutureGet intrinsic.
   FuncDecl *getTaskFutureGet();
@@ -560,8 +564,19 @@ public:
   FuncDecl *getSwiftJobRun();
   /// Retrieve the _Concurrency._deinitOnExecutor intrinsic.
   FuncDecl *getDeinitOnExecutor();
+  /// Retrieve the _Concurrency._deinitOnExecutorMainActorBackDeploy intrinsic.
+  FuncDecl *getDeinitOnExecutorMainActorBackDeploy();
   // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
   FuncDecl *getExit();
+
+  /// Get the configured ExecutorFactory type.
+  Type getConfiguredExecutorFactory();
+
+  /// Get the DefaultExecutorFactory type.
+  Type getDefaultExecutorFactory();
+
+  /// Get the swift_createExecutors function.
+  FuncDecl *getCreateExecutors();
 
   SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
                                              KeyPathTypeKind typeKind);

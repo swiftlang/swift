@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -differentiation -enable-experimental-linear-map-transposition %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -differentiation -enable-experimental-linear-map-transposition %s | %FileCheck %s
 
 sil_stage raw
 

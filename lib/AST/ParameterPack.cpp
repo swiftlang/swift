@@ -113,7 +113,7 @@ struct PackReferenceCollector: TypeWalker {
     }
 
     if (auto *typeAliasType = dyn_cast<TypeAliasType>(t.getPointer())) {
-      if (typeAliasType->getDecl()->isGeneric()) {
+      if (typeAliasType->getDecl()->hasGenericParamList()) {
         if (auto parentType = typeAliasType->getParent())
           parentType.walk(*this);
 
@@ -168,7 +168,7 @@ void TypeBase::getTypeParameterPacks(
         auto *genericEnv = archetypeTy->getGenericEnvironment();
         auto paramTy = archetypeTy->getInterfaceType()->getRootGenericParam();
         rootParameterPacks.push_back(
-            genericEnv->mapTypeIntoContext(paramTy));
+            genericEnv->mapTypeIntoEnvironment(paramTy));
       }
     }
 
@@ -177,12 +177,7 @@ void TypeBase::getTypeParameterPacks(
 }
 
 bool TypeBase::isParameterPack() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->isRootParameterPack();
+  return getDependentMemberRoot()->isRootParameterPack();
 }
 
 bool TypeBase::isRootParameterPack() {
@@ -312,8 +307,6 @@ static CanPackType getReducedShapeOfPack(const ASTContext &ctx,
     }
 
     // Use () as a placeholder for scalar shape.
-    assert(!elt->template is<PackArchetypeType>() &&
-           "Pack archetype outside of a pack expansion");
     elts.push_back(ctx.TheEmptyTupleType);
   }
 
@@ -387,10 +380,11 @@ unsigned ParameterList::getOrigParamIndex(SubstitutionMap subMap,
     remappedIndex -= substCount;
   }
 
-  llvm::errs() << "Invalid substituted argument index: " << substIndex << "\n";
-  subMap.dump(llvm::errs());
-  dump(llvm::errs());
-  abort();
+  ABORT([&](auto &out) {
+    out << "Invalid substituted argument index: " << substIndex << "\n";
+    subMap.dump(out);
+    dump(out);
+  });
 }
 
 /// <T...> Foo<T, Pack{Int, String}> => Pack{T..., Int, String}
@@ -409,7 +403,7 @@ SmallVector<Type, 2> BoundGenericType::getExpandedGenericArgs() {
 
 /// <T...> Foo<T, Pack{Int, String}> => Pack{T..., Int, String}
 SmallVector<Type, 2> TypeAliasType::getExpandedGenericArgs() {
-  if (!getDecl()->isGeneric())
+  if (!getDecl()->hasGenericParamList())
     return SmallVector<Type, 2>();
 
   auto genericSig = getGenericSignature();

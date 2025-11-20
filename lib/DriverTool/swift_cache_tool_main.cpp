@@ -48,6 +48,7 @@ enum class SwiftCacheToolAction {
   ValidateOutputs,
   RenderDiags,
   PrintIncludeTreeList,
+  PrintCompileCacheKey,
 };
 
 struct OutputEntry {
@@ -64,12 +65,13 @@ enum ID {
 #undef OPTION
 };
 
-#define PREFIX(NAME, VALUE)                                                    \
-  constexpr llvm::StringLiteral NAME##_init[] = VALUE;                         \
-  constexpr llvm::ArrayRef<llvm::StringLiteral> NAME(                          \
-      NAME##_init, std::size(NAME##_init) - 1);
+#define OPTTABLE_STR_TABLE_CODE
 #include "SwiftCacheToolOptions.inc"
-#undef PREFIX
+#undef OPTTABLE_STR_TABLE_CODE
+
+#define OPTTABLE_PREFIXES_TABLE_CODE
+#include "SwiftCacheToolOptions.inc"
+#undef OPTTABLE_PREFIXES_TABLE_CODE
 
 static const OptTable::Info InfoTable[] = {
 #define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
@@ -79,7 +81,8 @@ static const OptTable::Info InfoTable[] = {
 
 class CacheToolOptTable : public llvm::opt::GenericOptTable {
 public:
-  CacheToolOptTable() : GenericOptTable(InfoTable) {}
+  CacheToolOptTable()
+      : GenericOptTable(OptionStrTable, OptionPrefixesTable, InfoTable) {}
 };
 
 class SwiftCacheToolInvocation {
@@ -146,12 +149,15 @@ public:
               .Case("render-diags", SwiftCacheToolAction::RenderDiags)
               .Case("print-include-tree-list",
                     SwiftCacheToolAction::PrintIncludeTreeList)
+              .Case("print-compile-cache-key",
+                    SwiftCacheToolAction::PrintCompileCacheKey)
               .Default(SwiftCacheToolAction::Invalid);
 
     if (ActionKind == SwiftCacheToolAction::Invalid) {
       llvm::errs()
           << "Invalid option specified for -cache-tool-action: "
-          << "print-base-key|print-output-keys|validate-outputs|render-diags\n";
+          << "print-base-key|print-output-keys|validate-outputs|render-diags|"
+          << "print-include-tree-list|print-compile-cache-key\n";
       return 1;
     }
 
@@ -170,6 +176,8 @@ public:
       return renderDiags();
     case SwiftCacheToolAction::PrintIncludeTreeList:
       return printIncludeTreeList();
+    case SwiftCacheToolAction::PrintCompileCacheKey:
+      return printCompileCacheKey();
     case SwiftCacheToolAction::Invalid:
       return 0; // No action. Probably just print help. Return.
     }
@@ -245,7 +253,8 @@ private:
     auto BaseKey = Instance.getCompilerBaseKey();
     if (!BaseKey) {
       Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
-                                   "Base Key doesn't exist");
+                                   "query base cache key",
+                                   "base cache key doesn't exist");
       return std::nullopt;
     }
 
@@ -271,6 +280,7 @@ private:
   int validateOutputs();
   int renderDiags();
   int printIncludeTreeList();
+  int printCompileCacheKey();
 };
 
 } // end anonymous namespace
@@ -518,6 +528,38 @@ int SwiftCacheToolInvocation::printIncludeTreeList() {
     if (auto err = fileList->print(llvm::outs()))
       return error(std::move(err));
   }
+
+  return 0;
+}
+
+int SwiftCacheToolInvocation::printCompileCacheKey() {
+  auto error = [](llvm::Error err) {
+    llvm::errs() << "cannot print cache key: " << llvm::toString(std::move(err))
+                 << "\n";
+    return 1;
+  };
+  if (Inputs.size() != 1) {
+    llvm::errs() << "expect 1 CASID as input\n";
+    return 1;
+  }
+  auto DB = CASOpts.getOrCreateDatabases();
+  if (!DB) {
+    return error(DB.takeError());
+  }
+  auto CAS = DB->first;
+  auto &input = Inputs.front();
+  auto ID = CAS->parseID(input);
+  if (!ID)
+    return error(ID.takeError());
+
+  auto Ref = CAS->getReference(*ID);
+  if (!Ref) {
+    llvm::errs() << "CAS object not found: " << input << "\n";
+    return 1;
+  }
+
+  if (auto err = swift::printCompileJobCacheKey(*CAS, *Ref, llvm::outs()))
+    return error(std::move(err));
 
   return 0;
 }

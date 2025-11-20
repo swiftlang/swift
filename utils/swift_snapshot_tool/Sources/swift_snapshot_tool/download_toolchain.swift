@@ -1,3 +1,15 @@
+//===--- download_toolchain.swift -----------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 import Foundation
 
 private let SWIFT_BASE_URL = "https://swift.org/builds"
@@ -116,7 +128,7 @@ func downloadToolchainAndRunTest(
   let fileType = platform.fileType
   let toolchainType = platform.toolchainType
 
-  let realBranch = branch != .development ? "swift-\(branch)-branch" : branch.rawValue
+  let realBranch = branch.urlBranchName
   let toolchainDir = "\(workspace)/\(tag.name)-\(platform)"
   let downloadPath = URL(fileURLWithPath: "\(workspace)/\(tag.name)-\(platform).\(fileType)")
   if !fileExists(toolchainDir) {
@@ -144,9 +156,13 @@ func downloadToolchainAndRunTest(
 
     let swiftcPath = "\(toolchainDir)/usr/bin/swiftc"
     let swiftFrontendPath = "\(toolchainDir)/usr/bin/swift-frontend"
+    // Just for now just support macosx.
+    let platform = "macosx"
+    let swiftLibraryPath = "\(toolchainDir)/usr/lib/swift/\(platform)"
     log(shell("\(swiftcPath) --version").stdout)
     let exitCode = shell(
-      "\(script)", environment: ["SWIFTC": swiftcPath, "SWIFT_FRONTEND": swiftFrontendPath],
+      "\(script)", environment: ["SWIFTC": swiftcPath, "SWIFT_FRONTEND": swiftFrontendPath,
+        "SWIFT_LIBRARY_PATH": swiftLibraryPath],
       mustSucceed: false,
       verbose: verbose,
       extraArgs: extraArgs

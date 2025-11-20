@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering -verify | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering -verify | %FileCheck %s
 
 // This test only tests mark_uninitialized [delegatingself]
 
@@ -143,6 +143,31 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
 
   destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
   dealloc_stack %2 : $*DerivedClassWithNontrivialStoredProperties
+
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_delegating_derived_with_upcast :
+// CHECK:       bb0([[ARG:%.*]] : @owned $DerivedClassWithNontrivialStoredProperties):
+// CHECK-NEXT:    [[SELFBOX:%[0-9]+]] = alloc_stack $DerivedClassWithNontrivialStoredProperties
+// CHECK-NEXT:    store [[ARG]] to [init] [[SELFBOX]]
+// CHECK-NEXT:    [[SELF:%[0-9]+]] = load [take] [[SELFBOX]]
+// CHECK-NEXT:    [[UC:%[0-9]+]] = upcast [[SELF]]
+// CHECK-NEXT:    [[DC:%[0-9]+]] = unchecked_ref_cast [[UC]]
+// CHECK-NEXT:    [[METATYPE:%[0-9]+]] = value_metatype $@thick DerivedClassWithNontrivialStoredProperties.Type, [[DC]] : $DerivedClassWithNontrivialStoredProperties
+// CHECK-NEXT:    dealloc_partial_ref [[DC]] : $DerivedClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick DerivedClassWithNontrivialStoredProperties.Type
+// CHECK-NEXT:    dealloc_stack [[SELFBOX]]
+sil [ossa] @test_delegating_derived_with_upcast : $@convention(method) (@owned DerivedClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
+  %1 = alloc_stack $DerivedClassWithNontrivialStoredProperties
+  %2 = mark_uninitialized [delegatingselfallocated] %1 : $*DerivedClassWithNontrivialStoredProperties
+  store %0 to [init] %2 : $*DerivedClassWithNontrivialStoredProperties
+  %4 = load [take] %2
+  %5 = upcast %4 to $RootClassWithNontrivialStoredProperties
+
+  destroy_value %5
+  dealloc_stack %1 : $*DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
   return %13 : $()

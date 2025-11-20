@@ -1,6 +1,7 @@
 
 add_swift_host_library(swiftSema STATIC
   AssociatedTypeInference.cpp
+  NonisolatedNonsendingByDefaultMigration.cpp
   BuilderTransform.cpp
   Comment.cpp
   CSApply.cpp
@@ -13,6 +14,7 @@ add_swift_host_library(swiftSema STATIC
   CSStep.cpp
   CSTrail.cpp
   CSFix.cpp
+  CSOptimizer.cpp
   CSDiagnostics.cpp
   CodeSynthesis.cpp
   CodeSynthesisDistributedActor.cpp
@@ -23,24 +25,26 @@ add_swift_host_library(swiftSema STATIC
   ConstraintSystem.cpp
   CompletionContextFinder.cpp
   DebuggerTestingTransform.cpp
-  DerivedConformanceActor.cpp
-  DerivedConformanceDistributedActor.cpp
-  DerivedConformanceAdditiveArithmetic.cpp
-  DerivedConformanceCaseIterable.cpp
-  DerivedConformanceCodable.cpp
-  DerivedConformanceCodingKey.cpp
-  DerivedConformanceDifferentiable.cpp
-  DerivedConformanceEquatableHashable.cpp
-  DerivedConformanceComparable.cpp
-  DerivedConformanceError.cpp
-  DerivedConformanceRawRepresentable.cpp
-  DerivedConformances.cpp
+  DerivedConformance/DerivedConformance.cpp
+  DerivedConformance/DerivedConformanceActor.cpp
+  DerivedConformance/DerivedConformanceAdditiveArithmetic.cpp
+  DerivedConformance/DerivedConformanceCaseIterable.cpp
+  DerivedConformance/DerivedConformanceCodable.cpp
+  DerivedConformance/DerivedConformanceCodingKey.cpp
+  DerivedConformance/DerivedConformanceComparable.cpp
+  DerivedConformance/DerivedConformanceDifferentiable.cpp
+  DerivedConformance/DerivedConformanceDistributedActor.cpp
+  DerivedConformance/DerivedConformanceEquatableHashable.cpp
+  DerivedConformance/DerivedConformanceError.cpp
+  DerivedConformance/DerivedConformanceRawRepresentable.cpp
   ImportResolution.cpp
   InstrumenterSupport.cpp
+  LegalConstExprVerifier.cpp
   LookupVisibleDecls.cpp
   MiscDiagnostics.cpp
   OpenedExistentials.cpp
   PCMacro.cpp
+  PerformanceHints.cpp
   PlaygroundTransform.cpp
   PreCheckTarget.cpp
   ResilienceDiagnostics.cpp
@@ -48,7 +52,9 @@ add_swift_host_library(swiftSema STATIC
   SyntacticElementTarget.cpp
   TypeOfReference.cpp
   TypeCheckAccess.cpp
+  TypeCheckAccessNotes.cpp
   TypeCheckAttr.cpp
+  TypeCheckAttrABI.cpp
   TypeCheckAvailability.cpp
   TypeCheckBitwise.cpp
   TypeCheckCaptures.cpp
@@ -64,6 +70,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckEffects.cpp
   TypeCheckExpr.cpp
   TypeCheckExprObjC.cpp
+  TypeCheckEmbedded.cpp
   TypeCheckGeneric.cpp
   TypeCheckInvertible.cpp
   TypeCheckMacros.cpp
@@ -77,6 +84,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckStorage.cpp
   TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp
+  TypeCheckUnsafe.cpp
   TypeChecker.cpp
   IDETypeCheckingRequests.cpp)
 if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)

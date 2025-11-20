@@ -24,7 +24,7 @@ public class A<X> {
   public func f11<T, U>(x: X, y: T) {} //expected-error{{generic parameter 'U' is not used in function signature}}
 }
 
-struct G<T> {} // expected-note {{generic type 'G' declared here}}
+struct G<T> {} // expected-note {{generic struct 'G' declared here}}
 
 struct GG<T, U> {}
 

@@ -223,10 +223,9 @@ bool ElementUseCollector::collectContainerUses(SILValue boxValue) {
         return false;
       continue;
     }
-    if (auto *md = dyn_cast<MarkDependenceInst>(user)) {
-      // Another value depends on the current in-memory value. Consider that a
-      // load.
-      if (md->getBase() == ui->get()) {
+    if (auto mdi = MarkDependenceInstruction(user)) {
+      // Another value depends on the current in-memory value.
+      if (mdi.getBase() == ui->get()) {
         Uses.emplace_back(user, PMOUseKind::DependenceBase);
         continue;
       }
@@ -286,9 +285,14 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       continue;
     }
 
+    auto &mod = User->getFunction()->getModule();
+    bool shouldScalarizeTuple =
+      !mod.getOptions().UseAggressiveReg2MemForCodeSize ||
+      shouldExpand(mod, PointeeType);
+
     // Loads are a use of the value.
     if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
-      if (PointeeType.is<TupleType>())
+      if (PointeeType.is<TupleType>() && shouldScalarizeTuple)
         UsesToScalarize.push_back(User);
       else
         Uses.emplace_back(User, PMOUseKind::Load);
@@ -300,7 +304,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       if (UI->getOperandNumber() == StoreInst::Dest) {
         if (auto tupleType = PointeeType.getAs<TupleType>()) {
           if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType) &&
-              !tupleType->containsPackExpansionType()) {
+              !tupleType->containsPackExpansionType() &&
+              shouldScalarizeTuple) {
             UsesToScalarize.push_back(User);
             continue;
           }
@@ -337,7 +342,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       // have an access that crosses elements.
       if (auto tupleType = PointeeType.getAs<TupleType>()) {
         if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType) &&
-            !tupleType->containsPackExpansionType()) {
+            !tupleType->containsPackExpansionType() &&
+            shouldScalarizeTuple) {
           UsesToScalarize.push_back(CAI);
           continue;
         }
@@ -464,23 +470,31 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
     if (User->isDebugInstruction())
       continue;
 
-    if (auto *md = dyn_cast<MarkDependenceInst>(User)) {
-      if (md->getBase() == UI->get()) {
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(User)) {
+      if (mdi->getBase() == UI->get()) {
         Uses.emplace_back(User, PMOUseKind::DependenceBase);
         continue;
       }
-      SILValue value = md->getValue();
-      assert(value == UI->get() && "missing mark_dependence use");
+      assert(mdi->getValue() == UI->get() && "missing mark_dependence use");
       // A mark_dependence creates a new dependent value in the same memory
       // location. Analogous to a load + init.
       Uses.emplace_back(User, PMOUseKind::Load);
       Uses.emplace_back(User, PMOUseKind::Initialization);
-      if (!collectUses(md))
+      // Follow a forwarding mark_dependence.
+      if (!collectUses(mdi))
         return false;
 
       continue;
     }
-
+    if (auto *mdi = dyn_cast<MarkDependenceAddrInst>(User)) {
+      if (mdi->getBase() == UI->get()) {
+        Uses.emplace_back(User, PMOUseKind::DependenceBase);
+        continue;
+      }
+      // Ignore the address use. It can be eliminated if the allocation is
+      // unused.
+      continue;
+    }
     // Otherwise, the use is something complicated, it escapes.
     Uses.emplace_back(User, PMOUseKind::Escape);
   }

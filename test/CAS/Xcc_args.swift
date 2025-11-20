@@ -5,7 +5,8 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/test.swift -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -Xcc -D_VERSION=1 \
 // RUN:   -Xcc -fmodule-map-file=%t/include/module.modulemap -Xcc -ivfsoverlay -Xcc %t/empty.yaml \
-// RUN:   -Xcc -I%t/empty.hmap -module-load-mode prefer-serialized
+// RUN:   -Xcc -I%t/empty.hmap -module-load-mode prefer-serialized \
+// RUN:   -file-compilation-dir %t
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shims.cmd
 // RUN: %swift_frontend_plain @%t/shims.cmd
@@ -20,6 +21,7 @@
 // RUN: %FileCheck %s --input-file=%t/MyApp.cmd
 
 // CHECK: "-direct-clang-cc1-module-build"
+// CHECK-NOT: "-fdebug-compilation-dir={{.*}}"
 // CHECK: "_VERSION=1"
 // CHECK-NOT: hmap.json
 // CHECK-NOT: -ivfsoverlay

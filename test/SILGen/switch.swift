@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name switch %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name switch %s | %FileCheck %s
 
 //////////////////
 // Declarations //
@@ -1254,6 +1254,7 @@ func testUninhabitedSwitchScrutinee() {
   func test5() {
     // CHECK: %0 = function_ref @$s6switch12myFatalErrorAA7MyNeverOyF : $@convention(thin) () -> MyNever
     // CHECK-NEXT: %1 = apply %0() : $@convention(thin) () -> MyNever
+    // CHECK-NEXT: ignored_use %1
     // CHECK-NEXT: unreachable
     switch myFatalError() {}
   }

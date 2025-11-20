@@ -67,15 +67,20 @@ bool useLegacySwiftObjCHashing();
 /// - `swift_task_isCurrentExecutorImpl` does not invoke `checkIsolated`
 /// - logging a warning on concurrency violation is allowed
 ///
-/// New behavior:
+/// Swift 6.0 behavior:
 /// - always fatal error in `swift_task_reportUnexpectedExecutor`
 /// - `swift_task_isCurrentExecutorImpl` will crash when it would have returned
 ///     false
 /// - `swift_task_isCurrentExecutorImpl` does invoke `checkIsolated` when other
 ///     checks failed
 ///
+/// Swift 6.2 behavior:
+/// - `swift_task_isCurrentExecutorImpl` will attempt to call the *non-crashing*
+///   `isIsolatingCurrentContext` and return its result
+/// - if not available, it will invoke the the *crashing* 'checkIsolated'
+///
 /// This can be overridden by using `SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=1`
-/// or `SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=crash|nocrash`
+/// or `SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=crash|nocrash|swift6|isIsolatingCurrentContext`
 SWIFT_RUNTIME_STDLIB_SPI
 bool swift_bincompat_useLegacyNonCrashingExecutorChecks();
 

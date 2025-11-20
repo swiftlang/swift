@@ -35,8 +35,8 @@ func testGlobal() {
 // GLOBAL_EXPR-DAG: Literal[Boolean]/None:              <name>false</name>; typename=<typeid.sys>Bool</typeid.sys>;
 // GLOBAL_EXPR-DAG: Literal[Nil]/None:                  <name>nil</name>; typename=;
 // GLOBAL_EXPR-DAG: Literal[String]/None:               &quot;<callarg><callarg.param>abc</callarg.param></callarg>&quot;; typename=<typeid.sys>String</typeid.sys>;
-// GLOBAL_EXPR-DAG: Literal[Array]/None:                [<callarg><callarg.param>values</callarg.param></callarg>]; typename=<typeid.sys>Array</typeid.sys>;
-// GLOBAL_EXPR-DAG: Literal[Dictionary]/None:           [<callarg><callarg.param>key</callarg.param></callarg>: <callarg><callarg.param>value</callarg.param></callarg>]; typename=<typeid.sys>Dictionary</typeid.sys>;
+// GLOBAL_EXPR-DAG: Literal[Array]/None:                [<callarg><callarg.param>values</callarg.param></callarg>]; typename=<typeid.sys>Array</typeid.sys>&lt;<typeid.sys>Element</typeid.sys>&gt;;
+// GLOBAL_EXPR-DAG: Literal[Dictionary]/None:           [<callarg><callarg.param>key</callarg.param></callarg>: <callarg><callarg.param>value</callarg.param></callarg>]; typename=<typeid.sys>Dictionary</typeid.sys>&lt;<typeid.sys>Key</typeid.sys>, <typeid.sys>Value</typeid.sys>&gt;;
 // GLOBAL_EXPR-DAG: Literal[_Color]/None:               <name>#colorLiteral</name>(<callarg><callarg.label>red</callarg.label>: <callarg.type><typeid.sys>Float</typeid.sys></callarg.type></callarg>, <callarg><callarg.label>green</callarg.label>: <callarg.type><typeid.sys>Float</typeid.sys></callarg.type></callarg>, <callarg><callarg.label>blue</callarg.label>: <callarg.type><typeid.sys>Float</typeid.sys></callarg.type></callarg>, <callarg><callarg.label>alpha</callarg.label>: <callarg.type><typeid.sys>Float</typeid.sys></callarg.type></callarg>); typename=;
 // GLOBAL_EXPR-DAG: Literal[_Image]/None:               <name>#imageLiteral</name>(<callarg><callarg.label>resourceName</callarg.label>: <callarg.type><typeid.sys>String</typeid.sys></callarg.type></callarg>); typename=;
 // GLOBAL_EXPR-DAG: Literal[Tuple]/None:                (<callarg><callarg.param>values</callarg.param></callarg>); typename=;

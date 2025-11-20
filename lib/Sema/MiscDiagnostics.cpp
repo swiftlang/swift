@@ -17,17 +17,21 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckEmbedded.h"
 #include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
@@ -38,8 +42,9 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/AST/DeclObjC.h"
@@ -97,10 +102,6 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
   public:
     DiagnoseWalker(const DeclContext *DC, bool isExprStmt)
         : IsExprStmt(isExprStmt), Ctx(DC->getASTContext()), DC(DC) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
 
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
       return Action::Continue();
@@ -308,6 +309,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
       }
 
+      // Performs checks on a closure.
+      if (auto *closure = dyn_cast<ClosureExpr>(E)) {
+        checkClosure(closure);
+      }
+
       // Specially diagnose some checked casts that are illegal.
       if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
         checkCheckedCastExpr(cast);
@@ -344,10 +350,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
           // Check for effects
           if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
-            if (auto getter = asd->getEffectfulGetAccessor()) {
+            if (asd->getEffectfulGetAccessor()) {
               Ctx.Diags.diagnose(component.getLoc(),
-                                 diag::effectful_keypath_component,
-                                 asd->getDescriptiveKind());
+                                 diag::effectful_keypath_component, asd,
+                                 /*dynamic member lookup*/ false);
               Ctx.Diags.diagnose(asd->getLoc(), diag::kind_declared_here,
                                  asd->getDescriptiveKind());
             }
@@ -384,6 +390,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           return;
         }
       }
+
+      // Embedded Swift places restrictions on dynamic casting.
+      diagnoseDynamicCastInEmbedded(DC, cast);
 
       // now, look for conditional casts to marker protocols.
 
@@ -469,6 +478,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             copyExpr->getLoc(),
             diag::copy_expression_cannot_be_used_with_noncopyable_types);
       }
+
+      /// FIXME: there really is no reason for the restriction on copy not being
+      ///   permitted on fields, other than needing tests to ensure it works.
+      if (Ctx.LangOpts.hasFeature(ManualOwnership))
+        return;
 
       // We only allow for copy_expr to be applied directly to lvalues. We do
       // not allow currently for it to be applied to fields.
@@ -635,8 +649,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     std::optional<MagicIdentifierLiteralExpr::Kind>
     getMagicIdentifierDefaultArgKind(const ParamDecl *param) {
       switch (param->getDefaultArgumentKind()) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-      case DefaultArgumentKind::NAME: \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
+      case DefaultArgumentKind::NAME:                                          \
         return MagicIdentifierLiteralExpr::Kind::NAME;
 #include "swift/AST/MagicIdentifierKinds.def"
 
@@ -809,9 +823,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         declParent = VD->getDeclContext()->getParentModule();
       }
 
-      Ctx.Diags.diagnose(DRE->getLoc(), diag::warn_unqualified_access,
-                         VD->getBaseIdentifier(),
-                         VD->getDescriptiveKind(),
+      Ctx.Diags.diagnose(DRE->getLoc(), diag::warn_unqualified_access, VD,
                          declParent);
       Ctx.Diags.diagnose(VD, diag::decl_declared_here, VD);
 
@@ -849,14 +861,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         topLevelDiag = diag::fix_unqualified_access_top_level_multi;
 
       for (const ModuleValuePair &pair : sortedResults) {
-        DescriptiveDeclKind k = pair.second->getDescriptiveKind();
-
         SmallString<32> namePlusDot = pair.first->getName().str();
         namePlusDot.push_back('.');
 
-        Ctx.Diags.diagnose(DRE->getLoc(), topLevelDiag,
-                           namePlusDot, k, pair.first->getName())
-          .fixItInsert(DRE->getStartLoc(), namePlusDot);
+        Ctx.Diags
+            .diagnose(DRE->getLoc(), topLevelDiag, namePlusDot, pair.second,
+                      pair.first)
+            .fixItInsert(DRE->getStartLoc(), namePlusDot);
       }
     }
     
@@ -1461,6 +1472,33 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
       }
     }
+
+    void checkClosure(ClosureExpr *closure) {
+      if (closure->isImplicit()) {
+        return;
+      }
+
+      auto attr = closure->getAttrs().getAttribute<ConcurrentAttr>();
+      if (!attr) {
+        return;
+      }
+
+      if (closure->getAsyncLoc().isValid()) {
+        return;
+      }
+
+      if (closure->getType()->castTo<AnyFunctionType>()->isAsync()) {
+        return;
+      }
+
+      // `@concurrent` is not allowed on synchronous closures, but this is
+      // likely to change, so diagnose this here, post solution application,
+      // instead of introducing an "implies `async`" inference rule that won't
+      // make sense in the nearish future.
+      Ctx.Diags.diagnose(attr->getLocation(),
+                         diag::execution_behavior_only_on_async_closure, attr);
+      attr->setInvalid();
+    }
   };
 
   DiagnoseWalker Walker(DC, isExprStmt);
@@ -1489,7 +1527,7 @@ DeferredDiags swift::findSyntacticErrorForConsume(
   bool partial = false;
   Expr *current = subExpr;
   while (current) {
-    if (auto *dre = dyn_cast<DeclRefExpr>(current)) {
+    if (isa<DeclRefExpr>(current)) {
       if (partial & !noncopyable)
         result.emplace_back(loc, diag::consume_expression_partial_copyable);
 
@@ -1510,10 +1548,10 @@ DeferredDiags swift::findSyntacticErrorForConsume(
         break;
       }
       partial = true;
-      AccessStrategy strategy = vd->getAccessStrategy(
-          mre->getAccessSemantics(), AccessKind::Read,
-          module, ResilienceExpansion::Minimal);
-      if (strategy.getKind() != AccessStrategy::Storage) {
+      auto isAccessedViaStorage = vd->isAccessedViaPhysicalStorage(
+          mre->getAccessSemantics(), AccessKind::Read, module,
+          ResilienceExpansion::Minimal);
+      if (!isAccessedViaStorage) {
         if (noncopyable) {
           result.emplace_back(loc, diag::consume_expression_non_storage);
           result.emplace_back(mre->getLoc(),
@@ -1565,7 +1603,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
   if (!var)  // Ignore subscripts
     return;
 
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     VarDecl *Var;
     const AccessorDecl *Accessor;
@@ -1579,10 +1617,6 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
       return DRE && DRE->isImplicit() && isa<VarDecl>(DRE->getDecl()) &&
              cast<VarDecl>(DRE->getDecl())->isSelfParameter();
-    }
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -1717,48 +1751,65 @@ static bool isImplicitSelf(const Expr *E) {
   return DRE->getDecl()->getName().isSimpleName(Ctx.Id_self);
 }
 
-/// Look for any property references in closures that lack a 'self.' qualifier.
-/// Within a closure, we require that the source code contain 'self.' explicitly
-/// (or that the closure explicitly capture 'self' in the capture list) because
-/// 'self' is captured, not the property value.  This is a common source of
-/// confusion, so we force an explicit self.
-static void diagnoseImplicitSelfUseInClosure(const Expr *E,
-                                             const DeclContext *DC) {
-  class DiagnoseWalker : public BaseDiagnosticWalker {
-    ASTContext &Ctx;
-    SmallVector<AbstractClosureExpr *, 4> Closures;
+namespace {
+class ImplicitSelfUsageChecker : public BaseDiagnosticWalker {
+  ASTContext &Ctx;
+  SmallVector<AbstractClosureExpr *, 4> Closures;
 
-    /// A list of "implicit self" exprs from shorthand conditions
-    /// like `if let self` or `guard let self`. These conditions
-    /// have an RHS 'self' decl that is implicit, but this is not
-    /// the sort of "implicit self" decl that should trigger
-    /// these diagnostics.
-    SmallPtrSet<Expr *, 16> UnwrapStmtImplicitSelfExprs;
+  /// A list of "implicit self" exprs from shorthand conditions
+  /// like `if let self` or `guard let self`. These conditions
+  /// have an RHS 'self' decl that is implicit, but this is not
+  /// the sort of "implicit self" decl that should trigger
+  /// these diagnostics.
+  SmallPtrSet<Expr *, 16> UnwrapStmtImplicitSelfExprs;
 
-  public:
-    explicit DiagnoseWalker(ASTContext &Ctx, AbstractClosureExpr *ACE)
-        : Ctx(Ctx), Closures() {
-      if (ACE)
-        Closures.push_back(ACE);
+  /// The number of parent macros.
+  unsigned MacroDepth = 0;
+
+public:
+  explicit ImplicitSelfUsageChecker(ASTContext &Ctx, AbstractClosureExpr *ACE)
+      : Ctx(Ctx), Closures() {
+    if (ACE)
+      Closures.push_back(ACE);
+  }
+
+  bool isInMacro() const { return MacroDepth > 0; }
+
+  static bool
+  implicitWeakSelfReferenceIsValid510(const DeclRefExpr *DRE,
+                                      const AbstractClosureExpr *inClosure) {
+    ASTContext &Ctx = DRE->getDecl()->getASTContext();
+
+    // Check if the implicit self decl refers to a var in a conditional stmt
+    LabeledConditionalStmt *conditionalStmt = nullptr;
+    if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
+      if (auto parentStmt = var->getParentPatternStmt()) {
+        conditionalStmt = dyn_cast<LabeledConditionalStmt>(parentStmt);
+      }
     }
 
-    static bool
-    implicitWeakSelfReferenceIsValid510(const DeclRefExpr *DRE,
-                                        const AbstractClosureExpr *inClosure) {
-      ASTContext &Ctx = DRE->getDecl()->getASTContext();
+    if (!conditionalStmt) {
+      return false;
+    }
 
-      // Check if the implicit self decl refers to a var in a conditional stmt
-      LabeledConditionalStmt *conditionalStmt = nullptr;
-      if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
-        if (auto parentStmt = var->getParentPatternStmt()) {
-          conditionalStmt = dyn_cast<LabeledConditionalStmt>(parentStmt);
-        }
-      }
-
-      if (!conditionalStmt) {
-        return false;
-      }
-
+    if (Ctx.LangOpts.hasFeature(Feature::ImmutableWeakCaptures)) {
+      // Require that the RHS of the `let self = self` condition
+      // refers to a variable defined in a capture list.
+      // This lets us reject invalid examples like:
+      //
+      //   var `self` = self ?? .somethingElse
+      //   guard let self = self else { return }
+      //   method() // <- implicit self is not allowed
+      //
+      // In 5.10, instead of this check, compiler was checking that RHS of the
+      // self binding is loaded from a mutable variable. This is incorrect, but
+      // before immutable weak captures compiler was trying to maintain this
+      // behavior in Swift 5 mode for source compatibility. With immutable weak
+      // captures this does not work anymore, because even in Swift 5 mode there
+      // is no `LoadExpr` to use.
+      //
+      return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ true);
+    } else {
       // Require `LoadExpr`s when validating the self binding.
       // This lets us reject invalid examples like:
       //
@@ -1769,757 +1820,810 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ false,
                                           /*requireLoadExpr*/ true);
     }
+  }
 
-    static bool
-    isEnclosingSelfReference510(VarDecl *var,
+  static bool
+  isEnclosingSelfReference510(VarDecl *var,
+                              const AbstractClosureExpr *inClosure) {
+    if (var->isSelfParameter())
+      return true;
+
+    // Capture variables have a DC of the parent function.
+    if (inClosure && var->isSelfParamCapture() &&
+        var->getDeclContext() != inClosure->getParent())
+      return true;
+
+    return false;
+  }
+
+  static bool
+  selfDeclAllowsImplicitSelf510(DeclRefExpr *DRE, Type ty,
                                 const AbstractClosureExpr *inClosure) {
-      if (var->isSelfParameter())
-        return true;
-
-      // Capture variables have a DC of the parent function.
-      if (inClosure && var->isSelfParamCapture() &&
-          var->getDeclContext() != inClosure->getParent())
-        return true;
-
-      return false;
+    // If this is an explicit `weak self` capture, then implicit self is
+    // allowed once the closure's self param is unwrapped. We need to validate
+    // that the unwrapped `self` decl specifically refers to an unwrapped copy
+    // of the closure's `self` param, and not something else like in `guard
+    // let self = .someOptionalVariable else { return }` or `let self =
+    // someUnrelatedVariable`. If self hasn't been unwrapped yet and is still
+    // an optional, we would have already hit an error elsewhere.
+    if (closureHasWeakSelfCapture(inClosure)) {
+      return implicitWeakSelfReferenceIsValid510(DRE, inClosure);
     }
 
-    static bool
-    selfDeclAllowsImplicitSelf510(DeclRefExpr *DRE, Type ty,
-                                  const AbstractClosureExpr *inClosure) {
-      // If this is an explicit `weak self` capture, then implicit self is
-      // allowed once the closure's self param is unwrapped. We need to validate
-      // that the unwrapped `self` decl specifically refers to an unwrapped copy
-      // of the closure's `self` param, and not something else like in `guard
-      // let self = .someOptionalVariable else { return }` or `let self =
-      // someUnrelatedVariable`. If self hasn't been unwrapped yet and is still
-      // an optional, we would have already hit an error elsewhere.
-      if (closureHasWeakSelfCapture(inClosure)) {
-        return implicitWeakSelfReferenceIsValid510(DRE, inClosure);
-      }
+    // Metatype self captures don't extend the lifetime of an object.
+    if (ty->is<MetatypeType>())
+      return true;
 
-      // Metatype self captures don't extend the lifetime of an object.
-      if (ty->is<MetatypeType>())
-        return true;
+    // If self does not have reference semantics, it is very unlikely that
+    // capturing it will create a reference cycle.
+    if (!ty->hasReferenceSemantics())
+      return true;
 
-      // If self does not have reference semantics, it is very unlikely that
-      // capturing it will create a reference cycle.
-      if (!ty->hasReferenceSemantics())
-        return true;
-
-      if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
-        if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
-          // If this capture is using the name `self` actually referring
-          // to some other variable (e.g. with `[self = "hello"]`)
-          // then implicit self is not allowed.
-          if (!selfDecl->isSelfParamCapture()) {
-            return false;
-          }
-        }
-      }
-
-      if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
-        if (!isEnclosingSelfReference510(var, inClosure)) {
-          return true;
-        }
-      }
-
-      return false;
-    }
-
-    /// Whether or not implicit self is allowed for self decl
-    static bool
-    selfDeclAllowsImplicitSelf(Expr *E, const AbstractClosureExpr *inClosure) {
-      if (!isImplicitSelf(E)) {
-        return true;
-      }
-
-      auto *DRE = cast<DeclRefExpr>(E);
-
-      // Defensive check for type. If the expression doesn't have type here, it
-      // should have been diagnosed somewhere else.
-      Type ty = DRE->getType();
-      assert(ty && "Implicit self parameter ref without type");
-      if (!ty)
-        return true;
-
-      // Prior to Swift 6, use the old validation logic.
-      auto &ctx = inClosure->getASTContext();
-      if (!ctx.isSwiftVersionAtLeast(6))
-        return selfDeclAllowsImplicitSelf510(DRE, ty, inClosure);
-
-      return selfDeclAllowsImplicitSelf(DRE->getDecl(), ty, inClosure,
-                                        /*validateParentClosures:*/ true,
-                                        /*validateSelfRebindings:*/ true);
-    }
-
-    /// Whether or not implicit self is allowed for this implicit self decl
-    static bool selfDeclAllowsImplicitSelf(const ValueDecl *selfDecl,
-                                           const Type captureType,
-                                           const AbstractClosureExpr *inClosure,
-                                           bool validateParentClosures,
-                                           bool validateSelfRebindings) {
-      ASTContext &ctx = inClosure->getASTContext();
-
-      auto requiresSelfQualification =
-          isClosureRequiringSelfQualification(inClosure);
-
-      // Metatype self captures don't extend the lifetime of an object.
-      if (captureType->is<MetatypeType>()) {
-        requiresSelfQualification = false;
-      }
-
-      // If self does not have reference semantics, it is very unlikely that
-      // capturing it will create a reference cycle.
-      if (!captureType->hasReferenceSemantics()) {
-        requiresSelfQualification = false;
-      }
-
-      if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
-        auto capturedSelfDecl = closureExpr->getCapturedSelfDecl();
-
-        // If this closure doesn't capture self explicitly, but this closure
-        // requires self qualification, then implicit self is disallowed.
-        if (!capturedSelfDecl && requiresSelfQualification) {
-          return false;
-        }
-
-        // If the closure has an explicit capture using the name `self` that
-        // actually refers to some other variable (e.g. `[self = "hello"]`)
+    if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
+      if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
+        // If this capture is using the name `self` actually referring
+        // to some other variable (e.g. with `[self = "hello"]`)
         // then implicit self is not allowed.
-        if (capturedSelfDecl && !isSimpleSelfCapture(capturedSelfDecl)) {
+        if (!selfDecl->isSelfParamCapture()) {
           return false;
         }
       }
+    }
 
-      // If the self decl comes from a conditional statement, validate
-      // that it is an allowed `guard let self` or `if let self` condition.
-      //  - Even if this closure doesn't have a `weak self` capture, it could
-      //    be a closure nested in some parent closure with a `weak self`
-      //    capture, so we should always validate the conditional statement
-      //    that defines self if present.
-      if (validateSelfRebindings) {
-        if (auto conditionalStmt = parentConditionalStmt(selfDecl)) {
-          if (!hasValidSelfRebinding(conditionalStmt, ctx)) {
-            return false;
-          }
-        }
+    if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
+      if (!isEnclosingSelfReference510(var, inClosure)) {
+        return true;
       }
+    }
 
-      // If this closure has a `weak self` capture, require that the
-      // closure unwraps self. If not, implicit self is not allowed
-      // in this closure or in any nested closure.
-      if (closureHasWeakSelfCapture(inClosure) &&
-          !hasValidSelfRebinding(parentConditionalStmt(selfDecl), ctx)) {
+    return false;
+  }
+
+  /// Whether or not implicit self is allowed for self decl
+  static bool selfDeclAllowsImplicitSelf(Expr *E,
+                                         const AbstractClosureExpr *inClosure) {
+    if (!isImplicitSelf(E)) {
+      return true;
+    }
+
+    auto *DRE = cast<DeclRefExpr>(E);
+
+    // Defensive check for type. If the expression doesn't have type here, it
+    // should have been diagnosed somewhere else.
+    Type ty = DRE->getType();
+    assert(ty && "Implicit self parameter ref without type");
+    if (!ty)
+      return true;
+
+    // Prior to Swift 6, use the old validation logic.
+    auto &ctx = inClosure->getASTContext();
+    if (!ctx.isSwiftVersionAtLeast(6))
+      return selfDeclAllowsImplicitSelf510(DRE, ty, inClosure);
+
+    return selfDeclAllowsImplicitSelf(DRE->getDecl(), ty, inClosure,
+                                      /*isValidatingParentClosures:*/ false);
+  }
+
+  /// Whether or not implicit self is allowed for this implicit self decl
+  static bool selfDeclAllowsImplicitSelf(const ValueDecl *selfDecl,
+                                         const Type captureType,
+                                         const AbstractClosureExpr *inClosure,
+                                         bool isValidatingParentClosures) {
+    ASTContext &ctx = inClosure->getASTContext();
+
+    auto requiresSelfQualification =
+        isClosureRequiringSelfQualification(inClosure);
+
+    // Metatype self captures don't extend the lifetime of an object.
+    if (captureType->is<MetatypeType>()) {
+      requiresSelfQualification = false;
+    }
+
+    // If self does not have reference semantics, it is very unlikely that
+    // capturing it will create a reference cycle.
+    if (!captureType->hasReferenceSemantics()) {
+      requiresSelfQualification = false;
+    }
+
+    if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
+      auto capturedSelfDecl = closureExpr->getCapturedSelfDecl();
+
+      // If this closure doesn't capture self explicitly, but this closure
+      // requires self qualification, then implicit self is disallowed.
+      if (!capturedSelfDecl && requiresSelfQualification) {
         return false;
       }
 
-      if (auto autoclosure = dyn_cast<AutoClosureExpr>(inClosure)) {
-        // Implicit self is always allowed in autoclosure thunks generated
-        // during type checking. An example of this is when storing an instance
-        // method as a closure (e.g. `let closure = someInstanceMethodOnSelf`).
-        auto thunkKind = autoclosure->getThunkKind();
-        if (thunkKind == AutoClosureExpr::Kind::SingleCurryThunk ||
-            thunkKind == AutoClosureExpr::Kind::DoubleCurryThunk) {
-          return true;
-        }
-
-        // Explicit self is required in escaping autoclosures
-        if (requiresSelfQualification) {
-          return false;
-        }
+      // If the closure has an explicit capture using the name `self` that
+      // actually refers to some other variable (e.g. `[self = "hello"]`)
+      // then implicit self is not allowed.
+      if (capturedSelfDecl && !isSimpleSelfCapture(capturedSelfDecl)) {
+        return false;
       }
+    }
 
-      // Lastly, validate that there aren't any parent closures
-      // with invalid self bindings that should disable implicit
-      // self for all nested closures.
-      //  - We have to do this for all closures, even closures that typically
-      //    don't require self qualificationm since an invalid self capture in
-      //    a parent closure still disallows implicit self in a nested closure.
-      if (validateParentClosures) {
-        return !implicitSelfDisallowedDueToInvalidParent(selfDecl, captureType,
-                                                         inClosure);
-      } else {
+    // If the self decl refers to a weak capture, then implicit self is not
+    // allowed. Self must be unwrapped in a `guard let self` / `if let self`
+    // condition first. This is usually enforced by the type checker, but
+    // isn't in some cases (e.g. when calling a method on `Optional<Self>`).
+    //  - When validating implicit self usage in a nested closure, it's not
+    //    necessary for self to be unwrapped in this parent closure. If self
+    //    isn't unwrapped correctly in the nested closure, we would have
+    //    already noticed when validating that closure.
+    if (selfDecl->getInterfaceType()->is<WeakStorageType>() &&
+        !isValidatingParentClosures) {
+      return false;
+    }
+
+    // If the self decl refers to an invalid unwrapping conditon like
+    // `guard let self = somethingOtherThanSelf`, then implicit self is always
+    // disallowed.
+    //  - Even if this closure doesn't have a `weak self` capture, it could
+    //    be a closure nested in some parent closure with a `weak self`
+    //    capture, so we should always validate the conditional statement
+    //    that defines self if present.
+    if (auto condStmt = parentConditionalStmt(selfDecl)) {
+      if (!hasValidSelfRebinding(condStmt, ctx)) {
+        return false;
+      }
+    }
+
+    if (auto autoclosure = dyn_cast<AutoClosureExpr>(inClosure)) {
+      // Implicit self is always allowed in autoclosure thunks generated
+      // during type checking. An example of this is when storing an instance
+      // method as a closure (e.g. `let closure = someInstanceMethodOnSelf`).
+      auto thunkKind = autoclosure->getThunkKind();
+      if (thunkKind == AutoClosureExpr::Kind::SingleCurryThunk ||
+          thunkKind == AutoClosureExpr::Kind::DoubleCurryThunk) {
         return true;
       }
+
+      // Explicit self is required in escaping autoclosures
+      if (requiresSelfQualification) {
+        return false;
+      }
     }
 
-    static bool implicitSelfDisallowedDueToInvalidParent(
-        const ValueDecl *selfDecl, const Type captureType,
-        const AbstractClosureExpr *inClosure) {
-      return parentClosureDisallowingImplicitSelf(selfDecl, captureType,
-                                                  inClosure) != nullptr;
+    // Lastly, validate that there aren't any parent closures
+    // with invalid self bindings that should disable implicit
+    // self for all nested closures.
+    //  - We have to do this for all closures, even closures that typically
+    //    don't require self qualificationm since an invalid self capture in
+    //    a parent closure still disallows implicit self in a nested closure.
+    if (!isValidatingParentClosures) {
+      return !implicitSelfDisallowedDueToInvalidParent(selfDecl, captureType,
+                                                       inClosure);
+    } else {
+      return true;
+    }
+  }
+
+  static bool implicitSelfDisallowedDueToInvalidParent(
+      const ValueDecl *selfDecl, const Type captureType,
+      const AbstractClosureExpr *inClosure) {
+    return parentClosureDisallowingImplicitSelf(selfDecl, captureType,
+                                                inClosure) != nullptr;
+  }
+
+  static const AbstractClosureExpr *
+  parentClosureDisallowingImplicitSelf(const ValueDecl *selfDecl,
+                                       const Type captureType,
+                                       const AbstractClosureExpr *inClosure) {
+    // Find the outer decl that determines what self refers to in this
+    // closure.
+    //  - If this is an escaping closure that captured self, then `selfDecl`
+    //    refers to the self capture.
+    //  - If this is a nonescaping closure then there is no capture,
+    //    so selfDecl already comes from an outer context.
+    const ValueDecl *outerSelfDecl = selfDecl;
+    if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
+      if (auto capturedSelfDecl = closureExpr->getCapturedSelfDecl()) {
+        // Retrieve the outer decl that the self capture refers to.
+        outerSelfDecl = getParentInitializerDecl(capturedSelfDecl);
+      }
     }
 
-    static const AbstractClosureExpr *
-    parentClosureDisallowingImplicitSelf(const ValueDecl *selfDecl,
-                                         const Type captureType,
-                                         const AbstractClosureExpr *inClosure) {
-      // Find the outer decl that determines what self refers to in this
-      // closure.
-      //  - If this is an escaping closure that captured self, then `selfDecl`
-      //    refers to the self capture.
-      //  - If this is a nonescaping closure then there is no capture,
-      //    so selfDecl already comes from an outer context.
-      const ValueDecl *outerSelfDecl = selfDecl;
-      if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
-        if (auto capturedSelfDecl = closureExpr->getCapturedSelfDecl()) {
-          // Retrieve the outer decl that the self capture refers to.
-          outerSelfDecl = getParentInitializerDecl(capturedSelfDecl);
+    if (!outerSelfDecl) {
+      return nullptr;
+    }
+
+    // Find the closest parent closure that contains the outer self decl,
+    // potentially also validating all intermediate closures.
+    auto outerClosure = inClosure;
+    bool validateIntermediateParents = true;
+    while (true) {
+      // We have to validate all intermediate parent closures
+      // to prevent cases like this from succeeding, which is
+      // invalid because the outer closure doesn't have an
+      // explicit self capture:
+      //
+      //   withEscaping {
+      //     withNonEscaping {
+      //       x += 1 // not allowed
+      //     }
+      //   }
+      //
+      // On the other hand, we need to support cases like this.
+      // As long as the inner closure has an explicit capture,
+      // it is not necessary for outer closures to also have
+      // an explicit self capture:
+      //
+      //   withEscaping {
+      //     withEscaping { [self] in
+      //       x += 1 // ok
+      //     }
+      //   }
+      //
+      // So if we reach a closure with an explicit self capture,
+      // we no longer need to validate each intermediate closure
+      // (but we still have to validate the outer closure that
+      // contains the outer self delf).
+      if (auto closureExpr = dyn_cast<ClosureExpr>(outerClosure)) {
+        if (closureExpr->getCapturedSelfDecl()) {
+          validateIntermediateParents = false;
         }
       }
 
-      if (!outerSelfDecl) {
+      outerClosure = parentClosure(outerClosure);
+
+      if (!outerClosure) {
+        // Once we reach a parent context that isn't a closure,
+        // the only valid self capture is the self parameter.
+        // This disallows cases like:
+        //
+        //   let `self` = somethingElse
+        //   withEscaping { [self] in
+        //     method()
+        //   }
+        //
+        auto VD = dyn_cast<VarDecl>(outerSelfDecl);
+        if (!VD) {
+          return inClosure;
+        }
+
+        if (!VD->isSelfParameter()) {
+          return inClosure;
+        }
+
         return nullptr;
       }
 
-      // Find the closest parent closure that contains the outer self decl,
-      // potentially also validating all intermediate closures.
-      auto outerClosure = inClosure;
-      bool validateIntermediateParents = true;
-      while (true) {
-        // We have to validate all intermediate parent closures
-        // to prevent cases like this from succeeding, which is
-        // invalid because the outer closure doesn't have an
-        // explicit self capture:
+      // Check if this closure contains the self decl.
+      //  - If the self decl is defined in the closure's body, its
+      //    decl context will be the closure itself.
+      //  - If the self decl is defined in the closure's capture list,
+      //    its parent capture list will reference the closure.
+      auto selfDeclInOuterClosureContext =
+          outerSelfDecl->getDeclContext() == outerClosure;
+
+      auto selfDeclInOuterClosureCaptureList = false;
+      if (auto selfVD = dyn_cast<VarDecl>(outerSelfDecl)) {
+        if (auto captureList = selfVD->getParentCaptureList()) {
+          selfDeclInOuterClosureCaptureList =
+              captureList->getClosureBody() == outerClosure;
+        }
+      }
+
+      // We can stop searching because we found the first outer closure
+      // that contains the outer self decl. Otherwise we continue searching
+      // any parent closures in the next loop iteration.
+      if (selfDeclInOuterClosureContext || selfDeclInOuterClosureCaptureList) {
+        // Check whether implicit self is disallowed due to this specific
+        // closure, or if its disallowed due to some parent of this closure,
+        // so we can return the specific closure that is invalid.
         //
-        //   withEscaping {
-        //     withNonEscaping {
-        //       x += 1 // not allowed
-        //     }
-        //   }
-        //
-        // On the other hand, we need to support cases like this.
-        // As long as the inner closure has an explicit capture,
-        // it is not necessary for outer closures to also have
-        // an explicit self capture:
-        //
-        //   withEscaping {
-        //     withEscaping { [self] in
-        //       x += 1 // ok
-        //     }
-        //   }
-        //
-        // So if we reach a closure with an explicit self capture,
-        // we no longer need to validate each intermediate closure
-        // (but we still have to validate the outer closure that
-        // contains the outer self delf).
-        if (auto closureExpr = dyn_cast<ClosureExpr>(outerClosure)) {
-          if (closureExpr->getCapturedSelfDecl()) {
-            validateIntermediateParents = false;
-          }
+        // If this is a `weak self` capture, we don't need to validate that
+        // that capture has been unwrapped in a `let self = self` binding
+        // within the parent closure. A self rebinding in this inner closure
+        // is sufficient to enable implicit self.
+        if (!selfDeclAllowsImplicitSelf(outerSelfDecl, captureType,
+                                        outerClosure,
+                                        /*isValidatingParentClosures:*/ true)) {
+          return outerClosure;
         }
 
-        outerClosure = parentClosure(outerClosure);
+        return parentClosureDisallowingImplicitSelf(outerSelfDecl, captureType,
+                                                    outerClosure);
+      }
 
-        if (!outerClosure) {
-          // Once we reach a parent context that isn't a closure,
-          // the only valid self capture is the self parameter.
-          // This disallows cases like:
-          //
-          //   let `self` = somethingElse
-          //   withEscaping { [self] in
-          //     method()
-          //   }
-          //
-          auto VD = dyn_cast<VarDecl>(outerSelfDecl);
-          if (!VD) {
-            return inClosure;
-          }
+      // Optionally validate this intermediate closure before continuing
+      // to search upwards. Since we're already validating the chain of
+      // parent closures, we don't need to do that separate for this closure.
+      if (validateIntermediateParents) {
+        if (!selfDeclAllowsImplicitSelf(selfDecl, captureType, outerClosure,
+                                        /*isValidatingParentClosures*/ true)) {
+          return outerClosure;
+        }
+      }
+    }
+  }
 
-          if (!VD->isSelfParameter()) {
-            return inClosure;
-          }
+  static bool
+  hasValidSelfRebinding(const LabeledConditionalStmt *conditionalStmt,
+                        ASTContext &ctx) {
+    if (!conditionalStmt) {
+      return false;
+    }
 
+    // Require that the RHS of the `let self = self` condition
+    // refers to a variable defined in a capture list.
+    // This lets us reject invalid examples like:
+    //
+    //   var `self` = self ?? .somethingElse
+    //   guard let self = self else { return }
+    //   method() // <- implicit self is not allowed
+    //
+    return conditionalStmt->rebindsSelf(ctx, /*requiresCaptureListRef*/ true);
+  }
+
+  /// The `LabeledConditionalStmt` that contains the given `ValueDecl` if
+  /// present
+  static LabeledConditionalStmt *
+  parentConditionalStmt(const ValueDecl *selfDecl) {
+    if (!selfDecl) {
+      return nullptr;
+    }
+
+    if (auto var = dyn_cast<VarDecl>(selfDecl)) {
+      if (auto parentStmt = var->getParentPatternStmt()) {
+        return dyn_cast<LabeledConditionalStmt>(parentStmt);
+      }
+    }
+
+    return nullptr;
+  }
+
+  /// Determines whether or not this is a simple self capture by retreiving
+  /// the `CaptureListEntry` that contains the `selfDecl`.
+  ///  - Unlike `selfDecl->isSelfParamCapture()`, this will return true
+  ///    for a simple `[weak self]` capture.
+  static bool isSimpleSelfCapture(const VarDecl *selfDecl) {
+    if (!selfDecl) {
+      return false;
+    }
+
+    auto captureList = selfDecl->getParentCaptureList();
+    if (!captureList) {
+      return false;
+    }
+
+    for (auto capture : captureList->getCaptureList()) {
+      if (capture.getVar() == selfDecl) {
+        return capture.isSimpleSelfCapture(/*excludeWeakCaptures:*/ false);
+      }
+    }
+
+    return false;
+  }
+
+  // Given a `self` decl that is a closure's `self` capture,
+  // retrieves and returns the decl that the capture refers to.
+  static ValueDecl *getParentInitializerDecl(const VarDecl *selfDecl) {
+    if (!selfDecl) {
+      return nullptr;
+    }
+
+    auto captureList = selfDecl->getParentCaptureList();
+    if (!captureList) {
+      return nullptr;
+    }
+
+    for (auto capture : captureList->getCaptureList()) {
+      if (capture.getVar() == selfDecl && capture.PBD) {
+        // We've found the `CaptureListEntry` that contains the `self`
+        // capture, now we can retrieve and inspect its parent initializer.
+        auto index = capture.PBD->getPatternEntryIndexForVarDecl(selfDecl);
+        auto parentInitializer = capture.PBD->getInit(index);
+
+        // Look through implicit conversions like `InjectIntoOptionalExpr`
+        if (auto implicitConversion =
+                dyn_cast_or_null<ImplicitConversionExpr>(parentInitializer)) {
+          parentInitializer = implicitConversion->getSubExpr();
+        }
+
+        auto DRE = dyn_cast_or_null<DeclRefExpr>(parentInitializer);
+        if (!DRE) {
           return nullptr;
         }
 
-        // Check if this closure contains the self decl.
-        //  - If the self decl is defined in the closure's body, its
-        //    decl context will be the closure itself.
-        //  - If the self decl is defined in the closure's capture list,
-        //    its parent capture list will reference the closure.
-        auto selfDeclInOuterClosureContext =
-            outerSelfDecl->getDeclContext() == outerClosure;
-
-        auto selfDeclInOuterClosureCaptureList = false;
-        if (auto selfVD = dyn_cast<VarDecl>(outerSelfDecl)) {
-          if (auto captureList = selfVD->getParentCaptureList()) {
-            selfDeclInOuterClosureCaptureList =
-                captureList->getClosureBody() == outerClosure;
-          }
-        }
-
-        // We can stop searching because we found the first outer closure
-        // that contains the outer self decl. Otherwise we continue searching
-        // any parent closures in the next loop iteration.
-        if (selfDeclInOuterClosureContext ||
-            selfDeclInOuterClosureCaptureList) {
-          // Check whether implicit self is disallowed due to this specific
-          // closure, or if its disallowed due to some parent of this closure,
-          // so we can return the specific closure that is invalid.
-          if (!selfDeclAllowsImplicitSelf(outerSelfDecl, captureType,
-                                          outerClosure,
-                                          /*validateParentClosures:*/ false,
-                                          /*validateSelfRebindings:*/ true)) {
-            return outerClosure;
-          }
-
-          return parentClosureDisallowingImplicitSelf(
-              outerSelfDecl, captureType, outerClosure);
-        }
-
-        // Optionally validate this intermediate closure before continuing
-        // to search upwards. Since we're already validating the chain of
-        // parent closures, we don't need to do that separate for this closure.
-        if (validateIntermediateParents) {
-          if (!selfDeclAllowsImplicitSelf(selfDecl, captureType, outerClosure,
-                                          /*validateParentClosures*/ false,
-                                          /*validateSelfRebindings*/ false)) {
-            return outerClosure;
-          }
-        }
+        return DRE->getDecl();
       }
     }
 
-    static bool
-    hasValidSelfRebinding(const LabeledConditionalStmt *conditionalStmt,
-                          ASTContext &ctx) {
-      if (!conditionalStmt) {
-        return false;
-      }
+    return nullptr;
+  }
 
-      // Require that the RHS of the `let self = self` condition
-      // refers to a variable defined in a capture list.
-      // This lets us reject invalid examples like:
-      //
-      //   var `self` = self ?? .somethingElse
-      //   guard let self = self else { return }
-      //   method() // <- implicit self is not allowed
-      //
-      return conditionalStmt->rebindsSelf(ctx, /*requiresCaptureListRef*/ true);
+  /// Return true if this is a closure expression that will require explicit
+  /// use or capture of "self." for qualification of member references.
+  static bool isClosureRequiringSelfQualification(const AbstractClosureExpr *CE,
+                                                  bool ignoreWeakSelf = false) {
+    if (!ignoreWeakSelf && closureHasWeakSelfCapture(CE)) {
+      return true;
     }
 
-    /// The `LabeledConditionalStmt` that contains the given `ValueDecl` if
-    /// present
-    static LabeledConditionalStmt *
-    parentConditionalStmt(const ValueDecl *selfDecl) {
-      if (!selfDecl) {
-        return nullptr;
-      }
-
-      if (auto var = dyn_cast<VarDecl>(selfDecl)) {
-        if (auto parentStmt = var->getParentPatternStmt()) {
-          return dyn_cast<LabeledConditionalStmt>(parentStmt);
-        }
-      }
-
-      return nullptr;
-    }
-
-    /// Determines whether or not this is a simple self capture by retreiving
-    /// the `CaptureListEntry` that contains the `selfDecl`.
-    ///  - Unlike `selfDecl->isSelfParamCapture()`, this will return true
-    ///    for a simple `[weak self]` capture.
-    static bool isSimpleSelfCapture(const VarDecl *selfDecl) {
-      if (!selfDecl) {
-        return false;
-      }
-
-      auto captureList = selfDecl->getParentCaptureList();
-      if (!captureList) {
-        return false;
-      }
-
-      for (auto capture : captureList->getCaptureList()) {
-        if (capture.getVar() == selfDecl) {
-          return capture.isSimpleSelfCapture(/*excludeWeakCaptures:*/ false);
-        }
-      }
-
+    // If the closure's type was inferred to be noescape, then it doesn't
+    // need qualification.
+    if (isNonEscaping(CE)) {
       return false;
     }
 
-    // Given a `self` decl that is a closure's `self` capture,
-    // retrieves and returns the decl that the capture refers to.
-    static ValueDecl *getParentInitializerDecl(const VarDecl *selfDecl) {
-      if (!selfDecl) {
-        return nullptr;
-      }
+    if (auto autoclosure = dyn_cast<AutoClosureExpr>(CE)) {
+      if (autoclosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet)
+        return false;
+    }
 
-      auto captureList = selfDecl->getParentCaptureList();
-      if (!captureList) {
-        return nullptr;
-      }
+    // If the closure was used in a context where it's explicitly stated
+    // that it does not need "self." qualification, don't require it.
+    if (auto closure = dyn_cast<ClosureExpr>(CE)) {
+      if (closure->allowsImplicitSelfCapture())
+        return false;
+    }
 
-      for (auto capture : captureList->getCaptureList()) {
-        if (capture.getVar() == selfDecl && capture.PBD) {
-          // We've found the `CaptureListEntry` that contains the `self`
-          // capture, now we can retrieve and inspect its parent initializer.
-          auto index = capture.PBD->getPatternEntryIndexForVarDecl(selfDecl);
-          auto parentInitializer = capture.PBD->getInit(index);
+    return true;
+  }
 
-          // Look through implicit conversions like `InjectIntoOptionalExpr`
-          if (auto implicitConversion =
-                  dyn_cast_or_null<ImplicitConversionExpr>(parentInitializer)) {
-            parentInitializer = implicitConversion->getSubExpr();
-          }
+  static bool isNonEscaping(const AbstractClosureExpr *ACE) {
+    if (auto funcTy = ACE->getType()->getAs<FunctionType>()) {
+      return funcTy->isNoEscape();
+    }
 
-          auto DRE = dyn_cast_or_null<DeclRefExpr>(parentInitializer);
-          if (!DRE) {
-            return nullptr;
-          }
+    return false;
+  }
 
-          return DRE->getDecl();
-        }
-      }
-
+  /// The closure that is a parent of this closure, if present
+  static const ClosureExpr *parentClosure(const AbstractClosureExpr *closure) {
+    auto parentContext = closure->getParent();
+    if (!parentContext) {
       return nullptr;
     }
 
-    /// Return true if this is a closure expression that will require explicit
-    /// use or capture of "self." for qualification of member references.
-    static bool
-    isClosureRequiringSelfQualification(const AbstractClosureExpr *CE,
-                                        bool ignoreWeakSelf = false) {
-      if (!ignoreWeakSelf && closureHasWeakSelfCapture(CE)) {
-        return true;
+    return parentContext->getInnermostClosureForCaptures();
+  }
+
+  bool shouldRecordClosure(const AbstractClosureExpr *E) {
+    // Record all closures in Swift 6 mode.
+    if (Ctx.isSwiftVersionAtLeast(6))
+      return true;
+
+    // Only record closures requiring self qualification prior to Swift 6
+    // mode.
+    return isClosureRequiringSelfQualification(E);
+  }
+
+  template <typename... ArgTypes>
+  InFlightDiagnostic diagnoseImplicitSelfUse(
+      SourceLoc loc, Expr *base, AbstractClosureExpr *closure,
+      Diag<ArgTypes...> ID,
+      typename detail::PassArgument<ArgTypes>::type... Args) {
+    std::optional<unsigned> warnUntilVersion;
+    // Prior to Swift 6, we may need to downgrade to a warning for compatibility
+    // with the 5.10 diagnostic behavior.
+    if (!Ctx.isSwiftVersionAtLeast(6) &&
+        invalidImplicitSelfShouldOnlyWarn510(base, closure)) {
+      warnUntilVersion.emplace(6);
+    }
+    // Prior to the next language mode, downgrade to a warning if we're in a
+    // macro to preserve compatibility with the Swift 6 diagnostic behavior
+    // where we previously skipped diagnosing.
+    auto futureVersion = version::Version::getFutureMajorLanguageVersion();
+    if (!Ctx.isSwiftVersionAtLeast(futureVersion) && isInMacro())
+      warnUntilVersion.emplace(futureVersion);
+
+    auto diag = Ctx.Diags.diagnose(loc, ID, std::move(Args)...);
+    if (warnUntilVersion)
+      diag.warnUntilSwiftVersion(*warnUntilVersion);
+
+    return diag;
+  }
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    if (isa<MacroExpansionExpr>(E))
+      MacroDepth += 1;
+
+    if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
+      if (shouldRecordClosure(CE))
+        Closures.push_back(CE);
+    }
+
+    // If we aren't in a closure, no diagnostics will be produced.
+    if (Closures.size() == 0)
+      return Action::Continue(E);
+
+    // Diagnostics should correct the innermost closure
+    auto *ACE = Closures[Closures.size() - 1];
+    assert(ACE);
+
+    auto &Diags = Ctx.Diags;
+
+    // If this is an "implicit self" expr from the RHS of a shorthand
+    // condition like `guard let self` or `if let self`, then this is
+    // always allowed and we shouldn't run any diagnostics.
+    if (UnwrapStmtImplicitSelfExprs.count(E)) {
+      return Action::Continue(E);
+    }
+
+    SourceLoc memberLoc = SourceLoc();
+    const DeclRefExpr *selfDRE = nullptr;
+    if (auto *MRE = dyn_cast<MemberRefExpr>(E))
+      if (!selfDeclAllowsImplicitSelf(MRE->getBase(), ACE)) {
+        selfDRE = dyn_cast_or_null<DeclRefExpr>(MRE->getBase());
+        auto baseName = MRE->getMember().getDecl()->getBaseName();
+        memberLoc = MRE->getLoc();
+        diagnoseImplicitSelfUse(
+            memberLoc, MRE->getBase(), ACE,
+            diag::property_use_in_closure_without_explicit_self,
+            baseName.getIdentifier());
       }
 
-      // If the closure's type was inferred to be noescape, then it doesn't
-      // need qualification.
-      if (isNonEscaping(CE)) {
-        return false;
+    // Handle method calls with a specific diagnostic + fixit.
+    if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
+      if (!selfDeclAllowsImplicitSelf(DSCE->getBase(), ACE) &&
+          isa<DeclRefExpr>(DSCE->getFn())) {
+        selfDRE = dyn_cast_or_null<DeclRefExpr>(DSCE->getBase());
+        auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
+        memberLoc = DSCE->getLoc();
+        diagnoseImplicitSelfUse(
+            memberLoc, DSCE->getBase(), ACE,
+            diag::method_call_in_closure_without_explicit_self,
+            MethodExpr->getDecl()->getBaseIdentifier());
       }
 
-      if (auto autoclosure = dyn_cast<AutoClosureExpr>(CE)) {
-        if (autoclosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet)
-          return false;
+    if (memberLoc.isValid()) {
+      const AbstractClosureExpr *parentDisallowingImplicitSelf = nullptr;
+      if (Ctx.isSwiftVersionAtLeast(6) && selfDRE && selfDRE->getDecl()) {
+        parentDisallowingImplicitSelf = parentClosureDisallowingImplicitSelf(
+            selfDRE->getDecl(), selfDRE->getType(), ACE);
       }
 
-      // If the closure was used in a context where it's explicitly stated
-      // that it does not need "self." qualification, don't require it.
-      if (auto closure = dyn_cast<ClosureExpr>(CE)) {
-        if (closure->allowsImplicitSelfCapture())
-          return false;
+      emitFixIts(Diags, memberLoc, parentDisallowingImplicitSelf, ACE);
+      return Action::SkipNode(E);
+    }
+
+    if (!selfDeclAllowsImplicitSelf(E, ACE)) {
+      diagnoseImplicitSelfUse(E->getLoc(), E, ACE,
+                              diag::implicit_use_of_self_in_closure);
+    }
+    return Action::Continue(E);
+  }
+
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    if (isa<MacroExpansionExpr>(E)) {
+      assert(isInMacro());
+      MacroDepth -= 1;
+    }
+
+    auto *ACE = dyn_cast<AbstractClosureExpr>(E);
+    if (!ACE) {
+      return Action::Continue(E);
+    }
+
+    if (shouldRecordClosure(ACE)) {
+      assert(Closures.size() > 0);
+      Closures.pop_back();
+    }
+    return Action::Continue(E);
+  }
+
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    if (isa<MacroExpansionDecl>(D))
+      MacroDepth += 1;
+
+    return BaseDiagnosticWalker::walkToDeclPre(D);
+  }
+
+  PostWalkAction walkToDeclPost(Decl *D) override {
+    if (isa<MacroExpansionDecl>(D)) {
+      assert(isInMacro());
+      MacroDepth -= 1;
+    }
+    return Action::Continue();
+  }
+
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+    /// Conditions like `if let self` or `guard let self`
+    /// have an RHS 'self' decl that is implicit, but this is not
+    /// the sort of "implicit self" decl that should trigger
+    /// these diagnostics. Track these DREs in a list so we can
+    /// avoid running diagnostics on them when we see them later.
+    auto conditionalStmt = dyn_cast<LabeledConditionalStmt>(S);
+    if (!conditionalStmt) {
+      return Action::Continue(S);
+    }
+
+    for (auto cond : conditionalStmt->getCond()) {
+      if (cond.getKind() != StmtConditionElement::CK_PatternBinding) {
+        continue;
+      }
+
+      if (auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
+        if (OSP->getSubPattern()->getBoundName() != Ctx.Id_self) {
+          continue;
+        }
+
+        auto E = cond.getInitializer();
+
+        // Peer through any implicit conversions like a LoadExpr
+        if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+          E = ICE->getSubExpr();
+        }
+
+        if (isImplicitSelf(E)) {
+          UnwrapStmtImplicitSelfExprs.insert(E);
+        }
+      }
+    }
+
+    return Action::Continue(S);
+  }
+
+  /// Emit any fix-its for this error.
+  void emitFixIts(DiagnosticEngine &Diags, SourceLoc memberLoc,
+                  const AbstractClosureExpr *parentDisallowingImplicitSelf,
+                  const AbstractClosureExpr *ACE) {
+    // These fix-its have to be diagnosed on the closure that requires,
+    // but is currently missing, self qualification. It's possible that
+    // ACE doesn't require self qualification (e.g. because it's
+    // non-escaping) but is nested inside a closure that does require self
+    // qualification. In that case we have to emit the fixit for the parent
+    // closure.
+    //  - Even if this closure requires self qualification, if there's an
+    //    invalid parent we emit the diagnostic on that parent first.
+    //    To enable implicit self you'd have to fix the parent anyway.
+    //    This lets us avoid bogus diagnostics on this closure when
+    //    it's actually _just_ the parent that's invalid.
+    auto closureForDiagnostics = ACE;
+    if (parentDisallowingImplicitSelf) {
+      // Don't do this for escaping autoclosures, which are never allowed
+      // to use implicit self, even after fixing any invalid parents.
+      auto isEscapingAutoclosure =
+          isa<AutoClosureExpr>(ACE) && isClosureRequiringSelfQualification(ACE);
+      if (!isEscapingAutoclosure) {
+        closureForDiagnostics = parentDisallowingImplicitSelf;
+      }
+    }
+
+    // This error can be fixed by either capturing self explicitly (if in an
+    // explicit closure), or referencing self explicitly.
+    if (auto *CE = dyn_cast<const ClosureExpr>(closureForDiagnostics)) {
+      if (diagnoseAlmostMatchingCaptures(Diags, memberLoc, CE)) {
+        // Bail on the rest of the diagnostics. Offering the option to
+        // capture 'self' explicitly will result in an error, and using
+        // 'self.' explicitly will be accessing something other than the
+        // self param.
+        return;
+      }
+      emitFixItsForExplicitClosure(Diags, memberLoc, CE);
+    } else {
+      // If this wasn't an explicit closure, just offer the fix-it to
+      // reference self explicitly.
+      Diags.diagnose(memberLoc, diag::note_reference_self_explicitly)
+          .fixItInsert(memberLoc, "self.");
+    }
+  }
+
+  /// Diagnose any captures which might have been an attempt to capture
+  /// \c self strongly, but do not actually enable implicit \c self. Returns
+  /// whether there were any such captures to diagnose.
+  bool diagnoseAlmostMatchingCaptures(DiagnosticEngine &Diags,
+                                      SourceLoc memberLoc,
+                                      const ClosureExpr *closureExpr) {
+    // If we've already captured something with the name "self" other than
+    // the actual self param, offer special diagnostics.
+    if (auto *VD = closureExpr->getCapturedSelfDecl()) {
+      if (!VD->getInterfaceType()->is<WeakStorageType>()) {
+        Diags.diagnose(VD->getLoc(), diag::note_other_self_capture);
       }
 
       return true;
     }
+    return false;
+  }
 
-    static bool isNonEscaping(const AbstractClosureExpr *ACE) {
-      if (auto funcTy = ACE->getType()->getAs<FunctionType>()) {
-        return funcTy->isNoEscape();
-      }
-
-      return false;
-    }
-
-    /// The closure that is a parent of this closure, if present
-    static const ClosureExpr *
-    parentClosure(const AbstractClosureExpr *closure) {
-      auto parentContext = closure->getParent();
-      if (!parentContext) {
-        return nullptr;
-      }
-
-      return parentContext->getInnermostClosureForSelfCapture();
-    }
-
-    bool shouldRecordClosure(const AbstractClosureExpr *E) {
-      // Record all closures in Swift 6 mode.
-      if (Ctx.isSwiftVersionAtLeast(6))
-        return true;
-
-      // Only record closures requiring self qualification prior to Swift 6
-      // mode.
-      return isClosureRequiringSelfQualification(E);
-    }
-
-    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
-        if (shouldRecordClosure(CE))
-          Closures.push_back(CE);
-      }
-
-      // If we aren't in a closure, no diagnostics will be produced.
-      if (Closures.size() == 0)
-        return Action::Continue(E);
-
-      // Diagnostics should correct the innermost closure
-      auto *ACE = Closures[Closures.size() - 1];
-      assert(ACE);
-
-      auto &Diags = Ctx.Diags;
-
-      // If this is an "implicit self" expr from the RHS of a shorthand
-      // condition like `guard let self` or `if let self`, then this is
-      // always allowed and we shouldn't run any diagnostics.
-      if (UnwrapStmtImplicitSelfExprs.count(E)) {
-        return Action::Continue(E);
-      }
-
-      SourceLoc memberLoc = SourceLoc();
-      const DeclRefExpr *selfDRE = nullptr;
-      if (auto *MRE = dyn_cast<MemberRefExpr>(E))
-        if (!selfDeclAllowsImplicitSelf(MRE->getBase(), ACE)) {
-          selfDRE = dyn_cast_or_null<DeclRefExpr>(MRE->getBase());
-          auto baseName = MRE->getMember().getDecl()->getBaseName();
-          memberLoc = MRE->getLoc();
-          Diags
-              .diagnose(memberLoc,
-                        diag::property_use_in_closure_without_explicit_self,
-                        baseName.getIdentifier())
-              .warnUntilSwiftVersionIf(
-                  invalidImplicitSelfShouldOnlyWarn510(MRE->getBase(), ACE), 6);
-        }
-
-      // Handle method calls with a specific diagnostic + fixit.
-      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
-        if (!selfDeclAllowsImplicitSelf(DSCE->getBase(), ACE) &&
-            isa<DeclRefExpr>(DSCE->getFn())) {
-          selfDRE = dyn_cast_or_null<DeclRefExpr>(DSCE->getBase());
-          auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
-          memberLoc = DSCE->getLoc();
-          Diags
-              .diagnose(DSCE->getLoc(),
-                        diag::method_call_in_closure_without_explicit_self,
-                        MethodExpr->getDecl()->getBaseIdentifier())
-              .warnUntilSwiftVersionIf(
-                  invalidImplicitSelfShouldOnlyWarn510(DSCE->getBase(), ACE),
-                  6);
-        }
-
-      if (memberLoc.isValid()) {
-        const AbstractClosureExpr *parentDisallowingImplicitSelf = nullptr;
-        if (Ctx.isSwiftVersionAtLeast(6) && selfDRE && selfDRE->getDecl()) {
-          parentDisallowingImplicitSelf = parentClosureDisallowingImplicitSelf(
-              selfDRE->getDecl(), selfDRE->getType(), ACE);
-        }
-
-        emitFixIts(Diags, memberLoc, parentDisallowingImplicitSelf, ACE);
-        return Action::SkipNode(E);
-      }
-
-      if (!selfDeclAllowsImplicitSelf(E, ACE)) {
-        Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure)
-            .warnUntilSwiftVersionIf(
-                invalidImplicitSelfShouldOnlyWarn510(E, ACE), 6);
-      }
-      return Action::Continue(E);
-    }
-
-    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
-      auto *ACE = dyn_cast<AbstractClosureExpr>(E);
-      if (!ACE) {
-        return Action::Continue(E);
-      }
-
-      if (shouldRecordClosure(ACE)) {
-        assert(Closures.size() > 0);
-        Closures.pop_back();
-      }
-      return Action::Continue(E);
-    }
-
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      /// Conditions like `if let self` or `guard let self`
-      /// have an RHS 'self' decl that is implicit, but this is not
-      /// the sort of "implicit self" decl that should trigger
-      /// these diagnostics. Track these DREs in a list so we can
-      /// avoid running diagnostics on them when we see them later.
-      auto conditionalStmt = dyn_cast<LabeledConditionalStmt>(S);
-      if (!conditionalStmt) {
-        return Action::Continue(S);
-      }
-
-      for (auto cond : conditionalStmt->getCond()) {
-        if (cond.getKind() != StmtConditionElement::CK_PatternBinding) {
-          continue;
-        }
-
-        if (auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
-          if (OSP->getSubPattern()->getBoundName() != Ctx.Id_self) {
-            continue;
-          }
-
-          auto E = cond.getInitializer();
-
-          // Peer through any implicit conversions like a LoadExpr
-          if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E)) {
-            E = ICE->getSubExpr();
-          }
-
-          if (isImplicitSelf(E)) {
-            UnwrapStmtImplicitSelfExprs.insert(E);
-          }
-        }
-      }
-
-      return Action::Continue(S);
-    }
-
-    /// Emit any fix-its for this error.
-    void emitFixIts(DiagnosticEngine &Diags, SourceLoc memberLoc,
-                    const AbstractClosureExpr *parentDisallowingImplicitSelf,
-                    const AbstractClosureExpr *ACE) {
-      // These fix-its have to be diagnosed on the closure that requires,
-      // but is currently missing, self qualification. It's possible that
-      // ACE doesn't require self qualification (e.g. because it's
-      // non-escaping) but is nested inside a closure that does require self
-      // qualification. In that case we have to emit the fixit for the parent
-      // closure.
-      //  - Even if this closure requires self qualification, if there's an
-      //    invalid parent we emit the diagnostic on that parent first.
-      //    To enable implicit self you'd have to fix the parent anyway.
-      //    This lets us avoid bogus diagnostics on this closure when
-      //    it's actually _just_ the parent that's invalid.
-      auto closureForDiagnostics = ACE;
-      if (parentDisallowingImplicitSelf) {
-        // Don't do this for escaping autoclosures, which are never allowed
-        // to use implicit self, even after fixing any invalid parents.
-        auto isEscapingAutoclosure =
-            isa<AutoClosureExpr>(ACE) &&
-            isClosureRequiringSelfQualification(ACE);
-        if (!isEscapingAutoclosure) {
-          closureForDiagnostics = parentDisallowingImplicitSelf;
-        }
-      }
-
-      // This error can be fixed by either capturing self explicitly (if in an
-      // explicit closure), or referencing self explicitly.
-      if (auto *CE = dyn_cast<const ClosureExpr>(closureForDiagnostics)) {
-        if (diagnoseAlmostMatchingCaptures(Diags, memberLoc, CE)) {
-          // Bail on the rest of the diagnostics. Offering the option to
-          // capture 'self' explicitly will result in an error, and using
-          // 'self.' explicitly will be accessing something other than the
-          // self param.
-          return;
-        }
-        emitFixItsForExplicitClosure(Diags, memberLoc, CE);
-      } else {
-        // If this wasn't an explicit closure, just offer the fix-it to
-        // reference self explicitly.
-        Diags.diagnose(memberLoc, diag::note_reference_self_explicitly)
-          .fixItInsert(memberLoc, "self.");
-      }
-    }
-
-    /// Diagnose any captures which might have been an attempt to capture
-    /// \c self strongly, but do not actually enable implicit \c self. Returns
-    /// whether there were any such captures to diagnose.
-    bool diagnoseAlmostMatchingCaptures(DiagnosticEngine &Diags,
-                                        SourceLoc memberLoc,
-                                        const ClosureExpr *closureExpr) {
-      // If we've already captured something with the name "self" other than
-      // the actual self param, offer special diagnostics.
-      if (auto *VD = closureExpr->getCapturedSelfDecl()) {
-        if (!VD->getInterfaceType()->is<WeakStorageType>()) {
-          Diags.diagnose(VD->getLoc(), diag::note_other_self_capture);
-        }
-        
-        return true;
-      }
-      return false;
-    }
-
-    /// Emit fix-its for invalid use of implicit \c self in an explicit closure.
-    /// The error can be solved by capturing self explicitly,
-    /// or by using \c self. explicitly.
-    void emitFixItsForExplicitClosure(DiagnosticEngine &Diags,
-                                      SourceLoc memberLoc,
-                                      const ClosureExpr *closureExpr) {
-      Diags.diagnose(memberLoc, diag::note_reference_self_explicitly)
+  /// Emit fix-its for invalid use of implicit \c self in an explicit closure.
+  /// The error can be solved by capturing self explicitly,
+  /// or by using \c self. explicitly.
+  void emitFixItsForExplicitClosure(DiagnosticEngine &Diags,
+                                    SourceLoc memberLoc,
+                                    const ClosureExpr *closureExpr) {
+    Diags.diagnose(memberLoc, diag::note_reference_self_explicitly)
         .fixItInsert(memberLoc, "self.");
-      auto diag = Diags.diagnose(closureExpr->getLoc(),
-                                 diag::note_capture_self_explicitly);
-      // There are four different potential fix-its to offer based on the
-      // closure signature:
-      //   1. There is an existing capture list which already has some
-      //      entries. We need to insert 'self' into the capture list along
-      //      with a separating comma.
-      //   2. There is an existing capture list, but it is empty (just '[]').
-      //      We can just insert 'self'.
-      //   3. Arguments or types are already specified in the signature,
-      //      but there is no existing capture list. We will need to insert
-      //      the capture list, but 'in' will already be present.
-      //   4. The signature empty so far. We must insert the full capture
-      //      list as well as 'in'.
-      const auto brackets = closureExpr->getBracketRange();
-      if (brackets.isValid()) {
-        emitInsertSelfIntoCaptureListFixIt(brackets, diag);
-      }
-      else {
-        emitInsertNewCaptureListFixIt(closureExpr, diag);
-      }
+    auto diag = Diags.diagnose(closureExpr->getLoc(),
+                               diag::note_capture_self_explicitly);
+    // There are four different potential fix-its to offer based on the
+    // closure signature:
+    //   1. There is an existing capture list which already has some
+    //      entries. We need to insert 'self' into the capture list along
+    //      with a separating comma.
+    //   2. There is an existing capture list, but it is empty (just '[]').
+    //      We can just insert 'self'.
+    //   3. Arguments or types are already specified in the signature,
+    //      but there is no existing capture list. We will need to insert
+    //      the capture list, but 'in' will already be present.
+    //   4. The signature empty so far. We must insert the full capture
+    //      list as well as 'in'.
+    const auto brackets = closureExpr->getBracketRange();
+    if (brackets.isValid()) {
+      emitInsertSelfIntoCaptureListFixIt(brackets, diag);
+    } else {
+      emitInsertNewCaptureListFixIt(closureExpr, diag);
+    }
+  }
+
+  /// Emit a fix-it for inserting \c self into in existing capture list, along
+  /// with a trailing comma if needed. The fix-it will be attached to the
+  /// provided diagnostic \c diag.
+  void emitInsertSelfIntoCaptureListFixIt(SourceRange brackets,
+                                          InFlightDiagnostic &diag) {
+    // Look for any non-comment token. If there's anything before the
+    // closing bracket, we assume that it is a valid capture list entry and
+    // insert 'self,'. If it wasn't a valid entry, then we will at least not
+    // be introducing any new errors/warnings...
+    const auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
+    const auto nextAfterBracket = Lexer::getTokenAtLocation(
+        Ctx.SourceMgr, locAfterBracket, CommentRetentionMode::None);
+    if (nextAfterBracket.getLoc() != brackets.End)
+      diag.fixItInsertAfter(brackets.Start, "self, ");
+    else
+      diag.fixItInsertAfter(brackets.Start, "self");
+  }
+
+  /// Emit a fix-it for inserting a capture list into a closure that does not
+  /// already have one, along with a trailing \c in if necessary. The fix-it
+  /// will be attached to the provided diagnostic \c diag.
+  void emitInsertNewCaptureListFixIt(const ClosureExpr *closureExpr,
+                                     InFlightDiagnostic &diag) {
+    if (closureExpr->getInLoc().isValid()) {
+      diag.fixItInsertAfter(closureExpr->getLoc(), " [self]");
+      return;
     }
 
-    /// Emit a fix-it for inserting \c self into in existing capture list, along
-    /// with a trailing comma if needed. The fix-it will be attached to the
-    /// provided diagnostic \c diag.
-    void emitInsertSelfIntoCaptureListFixIt(SourceRange brackets,
-                                            InFlightDiagnostic &diag) {
-      // Look for any non-comment token. If there's anything before the
-      // closing bracket, we assume that it is a valid capture list entry and
-      // insert 'self,'. If it wasn't a valid entry, then we will at least not
-      // be introducing any new errors/warnings...
-      const auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
-      const auto nextAfterBracket = Lexer::getTokenAtLocation(
-          Ctx.SourceMgr, locAfterBracket, CommentRetentionMode::None);
-      if (nextAfterBracket.getLoc() != brackets.End)
-        diag.fixItInsertAfter(brackets.Start, "self, ");
-      else
-        diag.fixItInsertAfter(brackets.Start, "self");
+    // If there's a (non-comment) token immediately following the
+    // opening brace of the closure, we may need to pad the fix-it
+    // with a space.
+    const auto nextLoc = closureExpr->getLoc().getAdvancedLoc(1);
+    const auto next = Lexer::getTokenAtLocation(Ctx.SourceMgr, nextLoc,
+                                                CommentRetentionMode::None);
+    std::string trailing = next.getLoc() == nextLoc ? " " : "";
+
+    diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
+  }
+
+  /// Whether or not this invalid usage of implicit self should be a warning
+  /// in Swift 5 mode, to preserve source compatibility.
+  bool invalidImplicitSelfShouldOnlyWarn510(Expr *selfRef,
+                                            AbstractClosureExpr *ACE) {
+    auto DRE = dyn_cast_or_null<DeclRefExpr>(selfRef);
+    if (!DRE)
+      return false;
+
+    auto selfDecl = dyn_cast_or_null<VarDecl>(DRE->getDecl());
+    if (!selfDecl)
+      return false;
+
+    // If this implicit self decl is from a closure that captured self
+    // weakly, then we should always emit an error, since implicit self was
+    // only allowed starting in Swift 5.8 and later.
+    if (closureHasWeakSelfCapture(ACE)) {
+      // Implicit self was incorrectly permitted for weak self captures
+      // in non-escaping closures in Swift 5.7, so in that case we can
+      // only warn until Swift 6.
+      return !isClosureRequiringSelfQualification(ACE,
+                                                  /*ignoreWeakSelf*/ true);
     }
 
-    /// Emit a fix-it for inserting a capture list into a closure that does not
-    /// already have one, along with a trailing \c in if necessary. The fix-it
-    /// will be attached to the provided diagnostic \c diag.
-    void emitInsertNewCaptureListFixIt(const ClosureExpr *closureExpr,
-                                       InFlightDiagnostic &diag) {
-      if (closureExpr->getInLoc().isValid()) {
-        diag.fixItInsertAfter(closureExpr->getLoc(), " [self]");
-        return;
-      }
+    return !selfDecl->isSelfParameter();
+  }
+};
+} // end anonymous namespace
 
-      // If there's a (non-comment) token immediately following the
-      // opening brace of the closure, we may need to pad the fix-it
-      // with a space.
-      const auto nextLoc = closureExpr->getLoc().getAdvancedLoc(1);
-      const auto next =
-      Lexer::getTokenAtLocation(Ctx.SourceMgr, nextLoc,
-                                CommentRetentionMode::None);
-      std::string trailing = next.getLoc() == nextLoc ? " " : "";
-
-      diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
-    }
-
-    /// Whether or not this invalid usage of implicit self should be a warning
-    /// in Swift 5 mode, to preserve source compatibility.
-    bool invalidImplicitSelfShouldOnlyWarn510(Expr *selfRef,
-                                              AbstractClosureExpr *ACE) {
-      auto DRE = dyn_cast_or_null<DeclRefExpr>(selfRef);
-      if (!DRE)
-        return false;
-
-      auto selfDecl = dyn_cast_or_null<VarDecl>(DRE->getDecl());
-      if (!selfDecl)
-        return false;
-
-      // If this implicit self decl is from a closure that captured self
-      // weakly, then we should always emit an error, since implicit self was
-      // only allowed starting in Swift 5.8 and later.
-      if (closureHasWeakSelfCapture(ACE)) {
-        // Implicit self was incorrectly permitted for weak self captures
-        // in non-escaping closures in Swift 5.7, so in that case we can
-        // only warn until Swift 6.
-        return !isClosureRequiringSelfQualification(ACE,
-                                                    /*ignoreWeakSelf*/ true);
-      }
-
-      return !selfDecl->isSelfParameter();
-    }
-  };
+/// Look for any property references in closures that lack a 'self.' qualifier.
+/// Within a closure, we require that the source code contain 'self.' explicitly
+/// (or that the closure explicitly capture 'self' in the capture list) because
+/// 'self' is captured, not the property value.  This is a common source of
+/// confusion, so we force an explicit self.
+static void diagnoseImplicitSelfUseInClosure(const Expr *E,
+                                             const DeclContext *DC) {
+  using DiagnoseWalker = ImplicitSelfUsageChecker;
 
   auto &ctx = DC->getASTContext();
   AbstractClosureExpr *ACE = nullptr;
@@ -2652,8 +2756,10 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     }
   }
 
+  ASSERT((numMissing + numExtra + numWrong > 0) &&
+         "Should not call this function with nothing to diagnose");
+
   // Emit the diagnostic.
-  assert(numMissing > 0 || numExtra > 0 || numWrong > 0);
   llvm::SmallString<16> haveBuffer; // note: diagOpt has references to this
   llvm::SmallString<16> expectedBuffer; // note: diagOpt has references to this
 
@@ -3061,11 +3167,11 @@ static bool fixItOverrideDeclarationTypesImpl(
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
-      auto resultType = method->mapTypeIntoContext(
+      auto resultType = method->mapTypeIntoEnvironment(
           method->getResultInterfaceType());
 
       auto *baseMethod = cast<FuncDecl>(base);
-      auto baseResultType = baseMethod->mapTypeIntoContext(
+      auto baseResultType = baseMethod->mapTypeIntoEnvironment(
           baseMethod->getResultInterfaceType());
 
       fixedAny |= checkType(resultType, ParamDecl::Specifier::Default,
@@ -3088,8 +3194,8 @@ static bool fixItOverrideDeclarationTypesImpl(
     }
 
     auto resultType =
-        subscript->mapTypeIntoContext(subscript->getElementInterfaceType());
-    auto baseResultType = baseSubscript->mapTypeIntoContext(
+        subscript->mapTypeIntoEnvironment(subscript->getElementInterfaceType());
+    auto baseResultType = baseSubscript->mapTypeIntoEnvironment(
         baseSubscript->getElementInterfaceType());
     fixedAny |= checkType(resultType, ParamDecl::Specifier::Default,
                           baseResultType, ParamDecl::Specifier::Default,
@@ -3121,7 +3227,7 @@ bool swift::computeFixitsForOverriddenDeclaration(
 }
 
 //===----------------------------------------------------------------------===//
-// Per func/init diagnostics
+// MARK: Per func/init diagnostics
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -3288,9 +3394,9 @@ public:
       // If this is a TopLevelCodeDecl, scan for global variables
       auto *body = TLCD->getBody();
       for (auto node : body->getElements()) {
-        if (node.is<Decl *>()) {
+        if (isa<Decl *>(node)) {
           // Flag all variables in a PatternBindingDecl
-          Decl *D = node.get<Decl *>();
+          Decl *D = cast<Decl *>(node);
           auto *PBD = dyn_cast<PatternBindingDecl>(D);
           if (!PBD) continue;
           for (auto idx : range(PBD->getNumPatternEntries())) {
@@ -3298,9 +3404,9 @@ public:
               VarDecls[VD] = RK_Read|RK_Written|RK_Defined;
             });
           }
-        } else if (node.is<Stmt *>()) {
+        } else if (isa<Stmt *>(node)) {
           // Flag all variables in guard statements
-          Stmt *S = node.get<Stmt *>();
+          Stmt *S = cast<Stmt *>(node);
           auto *GS = dyn_cast<GuardStmt>(S);
           if (!GS) continue;
           for (StmtConditionElement SCE : GS->getCond()) {
@@ -3362,7 +3468,7 @@ public:
 
     // Make sure that we setup our case body variables.
     if (auto *caseStmt = dyn_cast<CaseStmt>(S)) {
-      for (auto *vd : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
+      for (auto *vd : caseStmt->getCaseBodyVariables()) {
         VarDecls[vd] |= RK_Defined;
       }
     }
@@ -3375,7 +3481,6 @@ public:
 /// from its associated function body.
 class OpaqueUnderlyingTypeChecker : public ASTWalker {
   using Candidate = std::tuple<Expr *, SubstitutionMap, /*isUnique=*/bool>;
-  using AvailabilityContext = IfStmt *;
 
   ASTContext &Ctx;
   AbstractFunctionDecl *Implementation;
@@ -3385,16 +3490,16 @@ class OpaqueUnderlyingTypeChecker : public ASTWalker {
   /// A set of all candidates with unique signatures.
   SmallPtrSet<const void *, 4> UniqueSignatures;
 
-  /// Represents a current availability context. `nullptr` means that
-  /// there are no restrictions.
-  AvailabilityContext CurrentAvailability = nullptr;
+  /// The active `IfStmt` that restricts availability. `nullptr` means that
+  /// there are is no restriction.
+  IfStmt *CurrentIfStmt = nullptr;
 
   /// All of the candidates together with their availability.
   ///
   /// If a candidate is found in non-`if #available` context or
   /// `if #available` has other dynamic conditions, it covers 'all'
   /// versions and the context is set to `nullptr`.
-  SmallVector<std::pair<AvailabilityContext, Candidate>, 4> Candidates;
+  SmallVector<std::pair<IfStmt *, Candidate>, 4> Candidates;
 
   bool HasInvalidReturn = false;
 
@@ -3469,7 +3574,6 @@ public:
     }
 
     // Check whether all of the underlying type candidates match up.
-    // TODO [OPAQUE SUPPORT]: diagnose multiple opaque types
 
     // There is a single unique signature, which means that all returns
     // matched.
@@ -3481,14 +3585,40 @@ public:
       return;
     }
 
+    // Diagnose unsupported availability domains.
+    // FIXME: [availability] Support custom domains.
+    bool anyUnsupportedDomain = false;
+    for (const auto &entry : Candidates) {
+      IfStmt *stmt = entry.first;
+      if (!stmt) continue;
+
+      for (const auto &elt : stmt->getCond()) {
+        if (elt.getKind() != StmtConditionElement::CK_Availability)
+          continue;
+
+        auto poundAvailable = elt.getAvailability();
+        if (auto query = poundAvailable->getAvailabilityQuery()) {
+          if (query->getDomain().isCustom()) {
+            Ctx.Diags.diagnose(poundAvailable->getStartLoc(),
+                               diag::opaque_type_unsupported_availability,
+                               query->getDomain());
+            anyUnsupportedDomain = true;
+          }
+        }
+      }
+    }
+
+    if (anyUnsupportedDomain)
+      return;
+
     SmallVector<Candidate, 4> universallyUniqueCandidates;
 
     for (const auto &entry : Candidates) {
-      AvailabilityContext availability = entry.first;
+      IfStmt *stmt = entry.first;
       const auto &candidate = entry.second;
 
       // Unique candidate without availability context.
-      if (!availability && std::get<2>(candidate))
+      if (!stmt && std::get<2>(candidate))
         universallyUniqueCandidates.push_back(candidate);
     }
 
@@ -3558,83 +3688,85 @@ public:
     }
   }
 
-  bool isSelfReferencing(const Candidate &candidate) {
-    auto substitutions = std::get<1>(candidate);
-
-    // The underlying type can't be defined recursively
-    // in terms of the opaque type itself.
-    auto opaqueTypeInContext = Implementation->mapTypeIntoContext(
-        OpaqueDecl->getDeclaredInterfaceType());
-    for (auto genericParam : OpaqueDecl->getOpaqueGenericParams()) {
-      auto underlyingType = Type(genericParam).subst(substitutions);
-      auto isSelfReferencing = underlyingType.findIf(
-          [&](Type t) -> bool { return t->isEqual(opaqueTypeInContext); });
-
-      if (isSelfReferencing) {
-        Ctx.Diags.diagnose(std::get<0>(candidate)->getLoc(),
-                           diag::opaque_type_self_referential_underlying_type,
-                           underlyingType);
-        return true;
-      }
-    }
-
-    return false;
-  }
-
   // A single unique underlying substitution.
   void finalizeUnique(const Candidate &candidate) {
     // If we have one successful candidate, then save it as the underlying
     // substitutions of the opaque decl.
     OpaqueDecl->setUniqueUnderlyingTypeSubstitutions(
-        std::get<1>(candidate).mapReplacementTypesOutOfContext());
+        std::get<1>(candidate).mapReplacementTypesOutOfEnvironment());
   }
 
   // There is no clear winner here since there are candidates within
   // limited availability contexts.
   void finalizeOpaque(const Candidate &universallyAvailable) {
-    using AvailabilityCondition = OpaqueTypeDecl::AvailabilityCondition;
-
     SmallVector<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *, 4>
         conditionalSubstitutions;
+    SubstitutionMap universalSubstMap = std::get<1>(universallyAvailable);
 
     for (const auto &entry : Candidates) {
-      auto availabilityContext = entry.first;
+      auto stmt = entry.first;
       const auto &candidate = entry.second;
 
-      if (!availabilityContext)
+      if (!stmt)
         continue;
 
-      SmallVector<AvailabilityCondition, 4> conditions;
+      unsigned neverAvailableCount = 0, alwaysAvailableCount = 0;
+      SmallVector<AvailabilityQuery, 4> queries;
 
-      for (const auto &elt : availabilityContext->getCond()) {
-        auto condition = elt.getAvailability();
+      for (const auto &elt : stmt->getCond()) {
+        auto availabilityQuery = elt.getAvailability()->getAvailabilityQuery();
 
-        auto availabilityRange = condition->getAvailableRange();
-        // If there is no lower endpoint it means that the
-        // current platform is unrelated to this condition
-        // and we can ignore it.
-        if (!availabilityRange.hasLowerEndpoint())
+        // Type checking did not populate this query (it may be invalid).
+        // Treat the condition as if it were always true.
+        if (!availabilityQuery) {
+          alwaysAvailableCount++;
           continue;
+        }
 
-        conditions.push_back(
-            {availabilityRange, condition->isUnavailability()});
+        // If the query result is constant, then the corresponding type is
+        // either always available or never available at runtime.
+        if (auto constantResult = availabilityQuery->getConstantResult()) {
+          if (*constantResult) {
+            alwaysAvailableCount++;
+          } else {
+            neverAvailableCount++;
+          }
+          continue;
+        }
+
+        // FIXME: [availability] Add support for custom domains.
+        auto domain = availabilityQuery->getDomain();
+        ASSERT(domain.isPlatform());
+
+        queries.push_back(*availabilityQuery);
       }
 
-      if (conditions.empty())
+      // If there were any conditions that were always false, then this
+      // candidate is unreachable at runtime.
+      if (neverAvailableCount > 0)
         continue;
+
+      // If all the conditions were trivially true, then this candidate is
+      // effectively a universally available candidate and the rest of the
+      // candidates should be ignored since they are unreachable.
+      if (alwaysAvailableCount == stmt->getCond().size()) {
+        universalSubstMap = std::get<1>(candidate);
+        break;
+      }
+
+      ASSERT(queries.size() > 0);
 
       conditionalSubstitutions.push_back(
           OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-              Ctx, conditions,
-              std::get<1>(candidate).mapReplacementTypesOutOfContext()));
+              Ctx, queries,
+              std::get<1>(candidate).mapReplacementTypesOutOfEnvironment()));
     }
 
     // Add universally available choice as the last one.
     conditionalSubstitutions.push_back(
         OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-            Ctx, {{VersionRange::empty(), /*unavailable=*/false}},
-            std::get<1>(universallyAvailable)
-                .mapReplacementTypesOutOfContext()));
+            Ctx, {AvailabilityQuery::universallyConstant(true)},
+            universalSubstMap.mapReplacementTypesOutOfEnvironment()));
 
     OpaqueDecl->setConditionallyAvailableSubstitutions(
         conditionalSubstitutions);
@@ -3654,11 +3786,6 @@ public:
       auto candidate =
           std::make_tuple(underlyingToOpaque->getSubExpr(), subMap, isUnique);
 
-      if (isSelfReferencing(candidate)) {
-        HasInvalidReturn = true;
-        return Action::Stop();
-      }
-
       if (subMap.getRecursiveProperties().hasDynamicSelf()) {
         Ctx.Diags.diagnose(E->getLoc(),
                            diag::opaque_type_cannot_contain_dynamic_self);
@@ -3666,7 +3793,7 @@ public:
         return Action::Stop();
       }
 
-      Candidates.push_back({CurrentAvailability, candidate});
+      Candidates.push_back({CurrentIfStmt, candidate});
       return Action::SkipNode(E);
     }
 
@@ -3678,7 +3805,7 @@ public:
       if (Parent.getAsStmt() != Body) {
         // If this is not a top-level `if`, let's drop
         // contextual information that has been set previously.
-        CurrentAvailability = nullptr;
+        CurrentIfStmt = nullptr;
         return Action::Continue(S);
       }
 
@@ -3705,8 +3832,8 @@ public:
             // Note that we are about to walk into a return statement
             // that is located in a `if #available` without any other
             // conditions.
-            llvm::SaveAndRestore<AvailabilityContext> context(
-                CurrentAvailability, If);
+            llvm::SaveAndRestore<IfStmt *> context(
+                CurrentIfStmt, If);
 
             Return->getResult()->walk(*this);
           }
@@ -3729,71 +3856,6 @@ public:
         // a type or type has an error, checking opaque types is going
         // to produce incorrect diagnostics.
         HasInvalidReturn |= resultTy.isNull() || resultTy->hasError();
-      }
-    }
-
-    return Action::Continue(S);
-  }
-
-  // Don't descend into nested decls.
-  PreWalkAction walkToDeclPre(Decl *D) override {
-    return Action::SkipNode();
-  }
-};
-
-class ReturnTypePlaceholderReplacer : public ASTWalker {
-  FuncDecl *Implementation;
-  BraceStmt *Body;
-  SmallVector<Type, 4> Candidates;
-
-  bool HasInvalidReturn = false;
-
-public:
-  ReturnTypePlaceholderReplacer(FuncDecl *Implementation, BraceStmt *Body)
-      : Implementation(Implementation), Body(Body) {}
-
-  void check() {
-    auto *resultRepr = Implementation->getResultTypeRepr();
-    if (!resultRepr) {
-      return;
-    }
-
-    Implementation->getASTContext()
-        .Diags
-        .diagnose(resultRepr->getLoc(),
-                  diag::placeholder_type_not_allowed_in_return_type)
-        .highlight(resultRepr->getSourceRange());
-
-    Body->walk(*this);
-
-    // If given function has any invalid returns in the body
-    // let's not try to validate the types, since it wouldn't
-    // be accurate.
-    if (HasInvalidReturn)
-      return;
-
-    auto writtenType = Implementation->getResultInterfaceType();
-    llvm::SmallPtrSet<TypeBase *, 8> seenTypes;
-    for (auto candidate : Candidates) {
-      if (!seenTypes.insert(candidate.getPointer()).second) {
-        continue;
-      }
-      TypeChecker::notePlaceholderReplacementTypes(writtenType, candidate);
-    }
-  }
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::ArgumentsAndExpansion;
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override { return Action::Continue(E); }
-
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    if (auto *RS = dyn_cast<ReturnStmt>(S)) {
-      if (RS->hasResult()) {
-        auto resultTy = RS->getResult()->getType();
-        HasInvalidReturn |= resultTy.isNull() || resultTy->hasError();
-        Candidates.push_back(resultTy);
       }
     }
 
@@ -3887,14 +3949,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     if (!(access & RK_Defined))
       continue;
 
-    if (auto *caseStmt =
-            dyn_cast_or_null<CaseStmt>(var->getRecursiveParentPatternStmt())) {
-      // Only diagnose VarDecls from the first CaseLabelItem in CaseStmts, as
-      // the remaining items must match it anyway.
-      auto caseItems = caseStmt->getCaseLabelItems();
-      assert(!caseItems.empty() &&
-             "If we have any case stmt var decls, we should have a case item");
-      if (!caseItems.front().getPattern()->containsVarDecl(var))
+    if (isa_and_nonnull<CaseStmt>(var->getRecursiveParentPatternStmt())) {
+      // Only diagnose for the parent-most VarDecl.
+      if (var->getParentVarDecl())
         continue;
 
       auto *childVar = var->getCorrespondingCaseBodyVariable().get();
@@ -3935,9 +3992,12 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     
     // If this variable has WeakStorageType, then it can be mutated in ways we
     // don't know.
-    if (var->getInterfaceType()->is<WeakStorageType>())
+    if (var->getInterfaceType()->is<WeakStorageType>() &&
+        (access & RK_CaptureList) &&
+        !DC->getASTContext().LangOpts.hasFeature(
+            Feature::ImmutableWeakCaptures))
       access |= RK_Written;
-    
+
     // Diagnose variables that were never used (other than their
     // initialization).
     //
@@ -4108,10 +4168,28 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       if (isUsedInInactive(var))
         continue;
 
+      bool isWeak = var->getInterfaceType()->is<WeakStorageType>();
+
       // If this is a parameter explicitly marked 'var', remove it.
       if (FixItLoc.isInvalid()) {
-        Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
-                       var->getName(), true);
+        bool suggestCaseLet = false;
+        if (auto *stmt = var->getRecursiveParentPatternStmt()) {
+          // Suggest 'var' -> 'case let' conversion
+          // in case of 'for' loop and invalid because it's
+          // tuple variable.
+          suggestCaseLet = isa<ForEachStmt>(stmt);
+        }
+        if (suggestCaseLet)
+          Diags.diagnose(var->getLoc(),
+                         isWeak ? diag::weak_variable_tuple_elt_never_mutated
+                                : diag::variable_tuple_elt_never_mutated,
+                         var->getName(), var->getNameStr());
+        else
+          Diags.diagnose(var->getLoc(),
+                         isWeak ? diag::weak_variable_never_mutated
+                                : diag::variable_never_mutated,
+                         var->getName(), true);
+
       }
       else {
         bool suggestLet = true;
@@ -4122,7 +4200,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
           suggestLet = !isa<ForEachStmt>(stmt);
         }
 
-        auto diag = Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
+        auto diag = Diags.diagnose(var->getLoc(),
+                                   isWeak ? diag::weak_variable_never_mutated
+                                          : diag::variable_never_mutated,
                                    var->getName(), suggestLet);
 
         if (suggestLet)
@@ -4276,6 +4356,9 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     if (auto *expr = OpaqueValueMap[OVE])
       return markStoredOrInOutExpr(expr, Flags);
 
+  if (auto *ABIConv = dyn_cast<ABISafeConversionExpr>(E))
+    return markStoredOrInOutExpr(ABIConv->getSubExpr(), Flags);
+
   // If we don't know what kind of expression this is, assume it's a reference
   // and mark it as a read.
   E->walk(*this);
@@ -4397,92 +4480,60 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
         OpaqueUnderlyingTypeChecker(AFD, opaqueResultTy, body).check();
       }
     }
-  } else if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-    auto resultIFaceTy = FD->getResultInterfaceType();
-    // If the result has a placeholder, we need to try to use the contextual
-    // type inferred in the body to replace it.
-    if (resultIFaceTy && resultIFaceTy->hasPlaceholder()) {
-      ReturnTypePlaceholderReplacer(FD, body).check();
-    }
   }
 }
 
-static void
-diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
-                                    const DeclContext *DC,
-                                    Expr *subjectExpr) {
-  // For now, move-only types must use the `consume` operator to be
-  // pattern matched. Pattern matching is only implemented as a consuming
-  // operation today, but we don't want to be stuck with that as the default
-  // in the fullness of time when we get borrowing pattern matching later.
-  
-  // Don't bother if the subject wasn't given a valid type, or is a copyable
-  // type.
-  auto subjectType = subjectExpr->getType();
-  if (!subjectType
-      || subjectType->hasError()
-      || !subjectType->isNoncopyable()) {
+static void diagnoseCaseStmtAmbiguousWhereClause(const CaseStmt *CS,
+                                                 ASTContext &ctx) {
+  // The case statement can have multiple case items, each can have a where.
+  // If we find a "where", and there is a preceding item without a where, and
+  // if they are on the same source line, e.g
+  // "case .Foo, .Bar where 1 != 100:" then warn since it may be unexpected.
+  auto items = CS->getCaseLabelItems();
+
+  // Don't do any work for the vastly most common case.
+  if (items.size() == 1)
     return;
-  }
-}
 
-// Perform MiscDiagnostics on Switch Statements.
-static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt,
-                        DeclContext *DC) {
-  diagnoseMoveOnlyPatternMatchSubject(ctx, DC, stmt->getSubjectExpr());
-                        
-  // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
-  // clause only applies to the second case, and this is surprising.
-  for (auto cs : stmt->getCases()) {
-    TypeChecker::checkExistentialTypes(ctx, cs, DC);
+  // Ignore the first item, since it can't have preceding ones.
+  for (unsigned i = 1, e = items.size(); i != e; ++i) {
+    // Must have a where clause.
+    auto where = items[i].getGuardExpr();
+    if (!where)
+      continue;
 
-    // The case statement can have multiple case items, each can have a where.
-    // If we find a "where", and there is a preceding item without a where, and
-    // if they are on the same source line, then warn.
-    auto items = cs->getCaseLabelItems();
-    
-    // Don't do any work for the vastly most common case.
-    if (items.size() == 1) continue;
-    
-    // Ignore the first item, since it can't have preceding ones.
-    for (unsigned i = 1, e = items.size(); i != e; ++i) {
-      // Must have a where clause.
-      auto where = items[i].getGuardExpr();
-      if (!where)
-        continue;
-      
-      // Preceding item must not.
-      if (items[i-1].getGuardExpr())
-        continue;
-      
-      // Must be on the same source line.
-      auto prevLoc = items[i-1].getStartLoc();
-      auto thisLoc = items[i].getStartLoc();
-      if (prevLoc.isInvalid() || thisLoc.isInvalid())
-        continue;
-      
-      auto &SM = ctx.SourceMgr;
-      auto prevLineCol = SM.getLineAndColumnInBuffer(prevLoc);
-      if (SM.getLineAndColumnInBuffer(thisLoc).first != prevLineCol.first)
-        continue;
+    // Preceding item must not.
+    if (items[i - 1].getGuardExpr())
+      continue;
 
-      ctx.Diags.diagnose(items[i].getWhereLoc(), diag::where_on_one_item)
+    // Must be on the same source line.
+    auto prevLoc = items[i - 1].getStartLoc();
+    auto thisLoc = items[i].getStartLoc();
+    if (prevLoc.isInvalid() || thisLoc.isInvalid())
+      continue;
+
+    auto &SM = ctx.SourceMgr;
+    auto prevLineCol = SM.getLineAndColumnInBuffer(prevLoc);
+    if (SM.getLineAndColumnInBuffer(thisLoc).first != prevLineCol.first)
+      continue;
+
+    ctx.Diags
+        .diagnose(items[i].getWhereLoc(), diag::where_on_one_item,
+                  CS->getParentKind() == CaseParentKind::DoCatch)
         .highlight(items[i].getPattern()->getSourceRange())
         .highlight(where->getSourceRange());
-      
-      // Whitespace it out to the same column as the previous item.
-      std::string whitespace(prevLineCol.second-1, ' ');
-      ctx.Diags.diagnose(thisLoc, diag::add_where_newline)
-        .fixItInsert(thisLoc, "\n"+whitespace);
 
-      auto whereRange = SourceRange(items[i].getWhereLoc(),
-                                    where->getEndLoc());
-      auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, whereRange);
-      auto whereText = SM.extractText(charRange);
-      ctx.Diags.diagnose(prevLoc, diag::duplicate_where)
-        .fixItInsertAfter(items[i-1].getEndLoc(), " " + whereText.str())
-        .highlight(items[i-1].getSourceRange());
-    }
+    // Whitespace it out to the same column as the previous item.
+    std::string whitespace(prevLineCol.second - 1, ' ');
+    ctx.Diags.diagnose(thisLoc, diag::add_where_newline)
+        .fixItInsert(thisLoc, "\n" + whitespace);
+
+    auto whereRange = SourceRange(items[i].getWhereLoc(), where->getEndLoc());
+    auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, whereRange);
+    auto whereText = SM.extractText(charRange);
+    ctx.Diags.diagnose(prevLoc, diag::duplicate_where)
+        .fixItInsertAfter(items[i - 1].getEndLoc(), " " + whereText.str())
+        .highlight(items[i - 1].getSourceRange());
   }
 }
 
@@ -4530,7 +4581,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
   if (E == nullptr || isa<ErrorExpr>(E)) return;
 
   // Walk into expressions which might have invalid trailing closures
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
 
     void diagnoseIt(const CallExpr *E) {
@@ -4575,10 +4626,6 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
 
   public:
     DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) { }
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
 
     PreWalkResult<ArgumentList *>
     walkToArgumentListPre(ArgumentList *args) override {
@@ -4649,7 +4696,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
 
 namespace {
 
-class ObjCSelectorWalker : public ASTWalker {
+class ObjCSelectorWalker : public BaseDiagnosticWalker {
   ASTContext &Ctx;
   const DeclContext *DC;
   Type SelectorTy;
@@ -4698,10 +4745,6 @@ class ObjCSelectorWalker : public ASTWalker {
 public:
   ObjCSelectorWalker(const DeclContext *dc, Type selectorTy)
     : Ctx(dc->getASTContext()), DC(dc), SelectorTy(selectorTy) { }
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Expansion;
-  }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     auto *stringLiteral = dyn_cast<StringLiteralExpr>(expr);
@@ -4923,6 +4966,8 @@ public:
           case AccessorKind::Modify:
           case AccessorKind::Modify2:
           case AccessorKind::Init:
+          case AccessorKind::Borrow:
+          case AccessorKind::Mutate:
             llvm_unreachable("cannot be @objc");
           }
         } else {
@@ -5078,21 +5123,114 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
 /// was emitted.
 static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
                                           DeclContext *DC) {
+  if (info->isInvalid())
+    return false;
+
+  auto &diags = DC->getASTContext().Diags;
+  StringRef queryName =
+      info->isUnavailability() ? "#unavailable" : "#available";
+
+  bool hasValidSpecs = false;
+  bool wildcardRequiredInList = false;
+  std::optional<SourceLoc> wildcardLoc;
+  llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
+  for (auto spec : info->getSemanticAvailabilitySpecs(DC)) {
+    auto parsedSpec = spec.getParsedSpec();
+    if (spec.isWildcard()) {
+      wildcardLoc = parsedSpec->getStartLoc();
+      continue;
+    }
+
+    auto domain = spec.getDomain();
+    auto loc = parsedSpec->getStartLoc();
+    bool hasVersion = !spec.getVersion().empty();
+    bool mustBeSpecifiedAlone = domain.mustBeSpecifiedAlone();
+
+    if (!domain.supportsQueries()) {
+      diags.diagnose(loc, diag::availability_query_not_allowed, domain,
+                     hasVersion, queryName);
+      return true;
+    }
+
+    if (mustBeSpecifiedAlone && info->getQueries().size() > 1) {
+      diags.diagnose(loc, diag::availability_must_occur_alone, domain,
+                     hasVersion);
+      return true;
+    }
+
+    auto rawVersion = parsedSpec->getRawVersion();
+    if (hasVersion) {
+      if (!VersionRange::isValidVersion(rawVersion)) {
+        diags
+            .diagnose(loc, diag::availability_unsupported_version_number,
+                      rawVersion)
+            .highlight(parsedSpec->getVersionSrcRange());
+        return true;
+      }
+    }
+
+    if (domain.isVersioned()) {
+      if (!hasVersion) {
+        diags.diagnose(loc, diag::avail_query_expected_version_number);
+        return true;
+      }
+
+      if (!domain.isVersionValid(rawVersion)) {
+        diags.diagnose(loc,
+                       diag::availability_invalid_version_number_for_domain,
+                       rawVersion, domain);
+      }
+    } else if (hasVersion) {
+      diags.diagnose(loc, diag::availability_unexpected_version, domain)
+          .highlight(parsedSpec->getVersionSrcRange());
+      return true;
+    }
+
+    // Diagnose duplicate domains.
+    if (!seenDomains.insert(domain).second) {
+      diags.diagnose(loc, diag::availability_query_already_specified,
+                     domain.isVersioned(), domain);
+      return true;
+    }
+
+    // Check the availability of the domain decl.
+    if (auto *domainDecl = spec.getDomain().getDecl()) {
+      auto where = ExportContext::forFunctionBody(DC, loc);
+      diagnoseDeclAvailability(domainDecl, loc, nullptr, where);
+    }
+
+    hasValidSpecs = true;
+    if (!mustBeSpecifiedAlone)
+      wildcardRequiredInList = true;
+  }
+
+  if (info->isUnavailability()) {
+    if (wildcardLoc) {
+      diags
+          .diagnose(*wildcardLoc,
+                    diag::unavailability_query_wildcard_not_required)
+          .fixItRemove(*wildcardLoc);
+    }
+  } else if (!wildcardLoc && hasValidSpecs && wildcardRequiredInList) {
+    if (info->getQueries().size() > 0) {
+      auto insertLoc = info->getQueries().back()->getSourceRange().End;
+      diags.diagnose(insertLoc, diag::availability_query_wildcard_required)
+          .fixItInsertAfter(insertLoc, ", *");
+    }
+  }
+
   // Reject inlinable code using availability macros. In order to lift this
   // restriction, macros would need to either be expanded when printed in
   // swiftinterfaces or be parsable as macros by module clients.
   auto fragileKind = DC->getFragileFunctionKind();
-  if (fragileKind.kind != FragileFunctionKind::None) {
-    for (auto queries : info->getQueries()) {
-      if (auto availSpec =
-              dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries)) {
-        if (availSpec->getMacroLoc().isValid()) {
-          DC->getASTContext().Diags.diagnose(
-              availSpec->getMacroLoc(),
-              swift::diag::availability_macro_in_inlinable,
-              fragileKind.getSelector());
-          return true;
-        }
+  if (fragileKind.kind != FragileFunctionKind::None &&
+      fragileKind.kind != FragileFunctionKind::EmbeddedAlwaysEmitIntoClient) {
+    for (auto availSpec : info->getQueries()) {
+      if (availSpec->getMacroLoc().isValid()) {
+        diags.diagnose(availSpec->getMacroLoc(),
+                       swift::diag::availability_macro_in_inlinable,
+                       fragileKind.getSelector());
+        return true;
       }
     }
   }
@@ -5184,13 +5322,12 @@ static void checkLabeledStmtConditions(ASTContext &ctx,
 
     switch (elt.getKind()) {
     case StmtConditionElement::CK_Boolean:
-      break;
     case StmtConditionElement::CK_PatternBinding:
-      diagnoseMoveOnlyPatternMatchSubject(ctx, DC, elt.getInitializer());
       break;
     case StmtConditionElement::CK_Availability: {
       auto info = elt.getAvailability();
-      (void)diagnoseAvailabilityCondition(info, DC);
+      if (diagnoseAvailabilityCondition(info, DC))
+        info->setInvalid();
       break;
     }
     case StmtConditionElement::CK_HasSymbol: {
@@ -5209,7 +5346,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
-  class UnintendedOptionalBehaviorWalker : public ASTWalker {
+  class UnintendedOptionalBehaviorWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     SmallPtrSet<Expr *, 16> IgnoredExprs;
 
@@ -5291,7 +5428,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
       SmallString<16> coercionString;
       coercionString += " as ";
-      coercionString += destType->getWithoutParens()->getString();
+      coercionString += destType->getString();
 
       Ctx.Diags.diagnose(E->getLoc(), diag::silence_optional_to_any,
                          destType, coercionString.substr(1))
@@ -5470,7 +5607,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
               segment->getCalledValue(/*skipFunctionConversions=*/true), kind))
         if (auto firstArg =
                 getFirstArgIfUnintendedInterpolation(segment->getArgs(), kind))
-          diagnoseUnintendedInterpolation(firstArg, kind);
+          diagnoseUnintendedInterpolation(segment, firstArg, kind);
     }
 
     bool interpolationWouldBeUnintended(ConcreteDeclRef appendMethod,
@@ -5536,12 +5673,39 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       return firstArg;
     }
 
-    void diagnoseUnintendedInterpolation(Expr * arg, UnintendedInterpolationKind kind) {
+    std::string baseInterpolationTypeName(CallExpr *segment) {
+      if (auto selfApplyExpr = dyn_cast<SelfApplyExpr>(segment->getFn())) {
+        auto baseType = selfApplyExpr->getBase()->getType();
+        return baseType->getWithoutSpecifierType()->getString();
+      }
+      return "unknown";
+    }
+    
+    void diagnoseUnintendedInterpolation(CallExpr *segment,
+                                         Expr * arg,
+                                         UnintendedInterpolationKind kind) {
       Ctx.Diags
           .diagnose(arg->getStartLoc(),
                     diag::debug_description_in_string_interpolation_segment,
                     (bool)kind)
           .highlight(arg->getSourceRange());
+
+      if (kind == UnintendedInterpolationKind::Optional) {
+        auto wrappedArgType = arg->getType()->getRValueType()->getOptionalObjectType();
+        auto baseTypeName = baseInterpolationTypeName(segment);
+        
+        // Suggest using a default value parameter, but only for non-string values
+        // when the base interpolation type is the default.
+        if (!wrappedArgType->isString() && baseTypeName == "DefaultStringInterpolation")
+          Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_parameter)
+            .highlight(arg->getSourceRange())
+            .fixItInsertAfter(arg->getEndLoc(), ", default: <#default value#>");
+
+        // Suggest providing a default value using the nil-coalescing operator.
+        Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_to_any)
+          .highlight(arg->getSourceRange())
+          .fixItInsertAfter(arg->getEndLoc(), " ?? <#default value#>");
+      }
 
       // Suggest 'String(describing: <expr>)'.
       auto argStart = arg->getStartLoc();
@@ -5552,17 +5716,6 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
           .highlight(arg->getSourceRange())
           .fixItInsert(argStart, "String(describing: ")
           .fixItInsertAfter(arg->getEndLoc(), ")");
-
-      if (kind == UnintendedInterpolationKind::Optional) {
-        // Suggest inserting a default value.
-        Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_to_any)
-          .highlight(arg->getSourceRange())
-          .fixItInsertAfter(arg->getEndLoc(), " ?? <#default value#>");
-      }
-    }
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -5600,7 +5753,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
-  class DeprecatedWritableKeyPathWalker : public ASTWalker {
+  class DeprecatedWritableKeyPathWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     const DeclContext *DC;
 
@@ -5621,7 +5774,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
 
         assert(keyPathExpr->getComponents().size() > 0);
         auto &component = keyPathExpr->getComponents().back();
-        if (component.getKind() == KeyPathExpr::Component::Kind::Property) {
+        if (component.getKind() == KeyPathExpr::Component::Kind::Member) {
           auto *storage =
             cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
           if (!storage->isSettable(nullptr) ||
@@ -5632,10 +5785,6 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
           }
         }
       }
-    }
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -5661,7 +5810,7 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
 
 static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
                                                      const DeclContext *DC) {
-  class KVOObserveCallWalker : public ASTWalker {
+  class KVOObserveCallWalker : public BaseDiagnosticWalker {
     const ASTContext &C;
 
   public:
@@ -5701,7 +5850,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
       }
       for (auto *keyPathArg : keyPathArgs) {
         auto lastComponent = keyPathArg->getComponents().back();
-        if (lastComponent.getKind() != KeyPathExpr::Component::Kind::Property)
+        if (lastComponent.getKind() != KeyPathExpr::Component::Kind::Member)
           continue;
         auto property = lastComponent.getDeclRef().getDecl();
         if (!property)
@@ -5717,10 +5866,6 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
                     property->getName(), fn->getName())
           .highlight(lastComponent.getLoc());
       }
-    }
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -5743,7 +5888,7 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
 static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
                                                      const DeclContext *DC) {
 
-  class ExplicitLazyVarStorageAccessFinder : public ASTWalker {
+  class ExplicitLazyVarStorageAccessFinder : public BaseDiagnosticWalker {
     const ASTContext &C;
 
   public:
@@ -5770,10 +5915,6 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5792,7 +5933,7 @@ static void diagnoseExplicitUseOfLazyVariableStorage(const Expr *E,
 }
 
 static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
-  class ComparisonWithNaNFinder : public ASTWalker {
+  class ComparisonWithNaNFinder : public BaseDiagnosticWalker {
     const ASTContext &C;
 
   public:
@@ -5901,10 +6042,6 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       }
     }
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
         return Action::SkipNode(E);
@@ -5927,16 +6064,12 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
     const DeclContext *DC;
 
   public:
     DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()), DC(DC) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E || isa<ErrorExpr>(E) || !E->getType())
@@ -5990,7 +6123,7 @@ static void diagUnqualifiedAccessToMethodNamedSelf(const Expr *E,
 static void
 diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
                                              const DeclContext *DC) {
-  class DiagnoseWalker : public ASTWalker {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
     ASTContext &Ctx;
 
   private:
@@ -6089,10 +6222,6 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
   public:
     DiagnoseWalker(const DeclContext *DC) : Ctx(DC->getASTContext()) {}
 
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
-    }
-
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       const auto *DLE = dyn_cast_or_null<DictionaryExpr>(E);
       if (!DLE)
@@ -6141,9 +6270,9 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
         note.fixItRemove(duplicated.first->getSourceRange());
         if (duplicatedEltIdx < commanLocs.size()) {
           note.fixItRemove(commanLocs[duplicatedEltIdx]);
-        } else {
+        } else if (!commanLocs.empty()) {
           // For the last element remove the previous comma.
-          note.fixItRemove(commanLocs[duplicatedEltIdx - 1]);
+          note.fixItRemove(commanLocs[commanLocs.size() - 1]);
         }
       };
 
@@ -6186,35 +6315,173 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
       if (auto declRef = E->getReferencedDecl())
         checkDecl(declRef.getDecl(), E->getLoc());
 
+      if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
+        for (const auto &component : KPE->getComponents()) {
+          if (component.hasDeclRef())
+            checkDecl(component.getDeclRef().getDecl(), component.getLoc(),
+                      /*downgradeToWarning=*/true);
+        }
+      }
+
       return Action::Continue(E);
     }
 
-    void checkDecl(const ValueDecl *decl, SourceLoc loc) {
+    void checkDecl(const ValueDecl *decl, SourceLoc loc,
+                   bool downgradeToWarning = false) {
       // Only diagnose uses of members.
       if (!decl->getDeclContext()->isTypeContext())
         return;
 
       if (!dc->isDeclImported(decl))
-        maybeDiagnoseMissingImportForMember(decl, dc, loc);
+        maybeDiagnoseMissingImportForMember(
+            decl, dc, loc,
+            downgradeToWarning ? DiagnosticBehavior::Warning
+                               : DiagnosticBehavior::Unspecified);
     }
   };
 
   auto &ctx = DC->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility))
+  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                               /*allowMigration=*/true))
     return;
 
   DiagnoseWalker walker(DC);
   const_cast<Expr *>(E)->walk(walker);
 }
 
+static bool isReturningFRT(const clang::NamedDecl *ND,
+                           clang::QualType &outReturnType, ASTContext &Ctx) {
+  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
+    outReturnType = FD->getReturnType();
+  else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND))
+    outReturnType = MD->getReturnType();
+  else
+    return false;
+
+  clang::QualType pointeeType = outReturnType;
+  if (outReturnType->isPointerType() || outReturnType->isReferenceType())
+    pointeeType = outReturnType->getPointeeType();
+
+  const auto *recordDecl = pointeeType->getAsRecordDecl();
+  if (!recordDecl)
+    return false;
+
+  return !importer::hasImmortalAttrs(recordDecl) &&
+         evaluateOrDefault(Ctx.evaluator,
+                           CxxRecordSemantics({recordDecl, Ctx, nullptr}),
+                           {}) == CxxRecordSemanticsKind::Reference;
+}
+
+static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
+                                                 clang::QualType retType,
+                                                 ASTContext &Ctx) {
+
+  auto attrInfo = importer::ReturnOwnershipInfo(ND);
+  if (attrInfo.hasRetainAttr())
+    return false;
+
+  if (importer::matchSwiftAttrOnRecordPtr<bool>(
+          retType, {{"returned_as_unretained_by_default", true}}))
+    return false;
+
+  if (isa<clang::ObjCMethodDecl>(ND))
+    // All ObjCMethods can be annotated with ownership attrs
+    return true;
+
+  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
+    if (isa<clang::CXXDeductionGuideDecl>(FD))
+      // Deduction guides don't need ownership attrs because they aren't
+      // functions.
+      return false;
+
+    if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(FD)) {
+      if (isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl>(methodDecl))
+        // Ownership attrs are not yet supported for ctors and dtors if FRTs
+        return false;
+
+      if (methodDecl->isOverloadedOperator())
+        // Ownership attrs are not yet supported for overloaded operators
+        return false;
+
+      if (!methodDecl->isUserProvided())
+        // Implicitly defined methods don't need ownership attrs since users
+        // can't annotate them.
+        return false;
+    }
+
+    return true;
+  }
+
+  // Decls that aren't functions or ObjCMethods don't need ownership attrs.
+  return false;
+}
+
+// Diagnose calls to imported C++ functions that return `SWIFT_SHARED_REFERENCE`
+// types without explicit ownership annotations SWIFT_RETURNS_(UN)RETAINED
+static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
+  class DiagnoseWalker : public BaseDiagnosticWalker {
+    ASTContext &Ctx;
+
+  public:
+    explicit DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) {}
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (!E)
+        return Action::SkipNode(E);
+
+      auto *CE = dyn_cast<CallExpr>(E);
+      if (!CE)
+        return Action::Continue(E);
+
+      auto *func = CE->getCalledValue(/*skipFunctionConversions=*/true);
+      if (!func)
+        return Action::Continue(E);
+
+      auto *clangDecl = func->getClangDecl();
+      if (!clangDecl)
+        return Action::Continue(E);
+
+      auto *ND = dyn_cast<clang::NamedDecl>(clangDecl);
+      if (!ND)
+        return Action::Continue(E);
+
+      clang::QualType retType;
+      if (!isReturningFRT(ND, retType, Ctx))
+        return Action::Continue(E);
+
+      if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx)) {
+        SourceLoc diagnosticLoc = func->getLoc();
+        if (diagnosticLoc.isInvalid() && func->getClangDecl()) {
+          // FIXME: Remove the diagnosticLoc once the source locations of the
+          // objc method declarations are imported correctly.
+          diagnosticLoc = Ctx.getClangModuleLoader()->importSourceLocation(
+              ND->getLocation());
+        }
+
+        Ctx.Diags.diagnose(CE->getLoc(),
+                           diag::warn_unannotated_cxx_func_returning_frt, func);
+
+        Ctx.Diags.diagnose(diagnosticLoc,
+                           diag::note_unannotated_cxx_func_returning_frt, func);
+      }
+
+      return Action::Continue(E);
+    }
+  };
+
+  DiagnoseWalker walker(DC->getASTContext());
+  const_cast<Expr *>(E)->walk(walker);
+}
+
 //===----------------------------------------------------------------------===//
-// High-level entry points.
+// MARK: High-level entry points.
 //===----------------------------------------------------------------------===//
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
 void swift::performSyntacticExprDiagnostics(const Expr *E,
                                             const DeclContext *DC,
-                                            bool isExprStmt) {
+                                            bool isExprStmt,
+                                            bool isConstInitExpr) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
@@ -6231,9 +6498,11 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
+  diagnoseInvalidConstExpressions(E, DC, isConstInitExpr);
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
   diagnoseMissingMemberImports(E, DC);
+  diagnoseCxxFunctionCalls(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
@@ -6241,8 +6510,8 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
 
   TypeChecker::checkExistentialTypes(ctx, const_cast<Stmt *>(S), DC);
 
-  if (auto switchStmt = dyn_cast<SwitchStmt>(S))
-    checkSwitch(ctx, switchStmt, DC);
+  if (auto *CS = dyn_cast<CaseStmt>(S))
+    diagnoseCaseStmtAmbiguousWhereClause(CS, ctx);
 
   checkStmtConditionTrailingClosure(ctx, S);
 
@@ -6254,12 +6523,12 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
 }
 
 //===----------------------------------------------------------------------===//
-// Utility functions
+// MARK: Utility functions
 //===----------------------------------------------------------------------===//
 
 void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
                         AccessLevel desiredAccess, bool isForSetter,
-                        bool shouldUseDefaultAccess) {
+                        bool shouldUseDefaultAccess, bool updateAttr) {
   StringRef fixItString;
   switch (desiredAccess) {
   case AccessLevel::Private:      fixItString = "private ";      break;
@@ -6274,27 +6543,35 @@ void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
   AbstractAccessControlAttr *attr;
   if (isForSetter) {
     attr = attrs.getAttribute<SetterAccessAttr>();
-    cast<AbstractStorageDecl>(VD)->overwriteSetterAccess(desiredAccess);
+    if (updateAttr)
+      cast<AbstractStorageDecl>(VD)->overwriteSetterAccess(desiredAccess);
   } else {
     attr = attrs.getAttribute<AccessControlAttr>();
-    VD->overwriteAccess(desiredAccess);
+    if (updateAttr)
+      VD->overwriteAccess(desiredAccess);
 
     if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD)) {
-      if (auto *getter = ASD->getAccessor(AccessorKind::Get))
-        getter->overwriteAccess(desiredAccess);
+      if (auto *getter = ASD->getAccessor(AccessorKind::Get)) {
+        if (updateAttr)
+          getter->overwriteAccess(desiredAccess);
+      }
 
       if (auto *setterAttr = attrs.getAttribute<SetterAccessAttr>()) {
         if (setterAttr->getAccess() > desiredAccess)
-          fixItAccess(diag, VD, desiredAccess, true);
+          fixItAccess(diag, VD, desiredAccess, /*isForSetter=*/true,
+                      /*shouldUseDefaultAccess=*/false, updateAttr);
       } else {
-        ASD->overwriteSetterAccess(desiredAccess);
+        if (updateAttr)
+          ASD->overwriteSetterAccess(desiredAccess);
       }
     }
   }
 
   if (isForSetter && VD->getFormalAccess() == desiredAccess) {
     assert(attr);
-    attr->setInvalid();
+    if (updateAttr)
+      attr->setInvalid();
+
     // Remove the setter attribute.
     diag.fixItRemove(attr->Range);
 
@@ -6314,7 +6591,8 @@ void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
         // replace the "(set)" part of a setter attribute.
         diag.fixItReplace(attr->getLocation(), fixItString.drop_back());
       }
-      attr->setInvalid();
+      if (updateAttr)
+        attr->setInvalid();
     }
 
   } else if (auto *override = VD->getAttrs().getAttribute<OverrideAttr>()) {
@@ -6377,9 +6655,6 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
       type = newType;
       continue;
     }
-
-    // Look through parentheses.
-    type = type->getWithoutParens();
 
     // Look through optionals.
     if (auto optObjectTy = type->getOptionalObjectType()) {
@@ -6470,13 +6745,15 @@ TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   // Handle contextual type, result type, and returnsSelf.
   Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
   Type resultType;
-  bool returnsSelf = afd->hasDynamicSelfResult();
+  bool returnsSelf = false;
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
     resultType = func->getResultInterfaceType();
-    resultType = func->mapTypeIntoContext(resultType);
+    resultType = func->mapTypeIntoEnvironment(resultType);
+    returnsSelf = func->getResultInterfaceType()->hasDynamicSelfType();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;
+    returnsSelf = true;
   }
 
   // Figure out the first parameter name.

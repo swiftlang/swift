@@ -40,7 +40,7 @@ struct ShadowedTest {
     if let shadowedVar {
       // CHECK_LOCALS-NOT: [[@LINE+3]]:11 {{.*}} s:14swift_ide_test12ShadowedTestV11shadowedVarSiSgSgvp {{.*}}Ref
       // CHECK_LOCALS: [[@LINE+2]]:11 {{.*}} s:14swift_ide_test12ShadowedTestV06shadowE0yyF11shadowedVarL_SiSgvp {{.*}}Ref
-      // CHECK-NOT: [[@LINE+1]]:11 {{.*}} shadowedVar {{.*}}Ref
+      // CHECK: [[@LINE+1]]:11 | instance-property/Swift | shadowedVar | s:14swift_ide_test12ShadowedTestV11shadowedVarSiSgSgvp {{.*}}Ref
       _ = shadowedVar
 
       // CHECK_LOCALS: [[@LINE+4]]:14 {{.*}} s:14swift_ide_test12ShadowedTestV11shadowedVarSiSgSgvp {{.*}}Ref
@@ -49,7 +49,7 @@ struct ShadowedTest {
       // CHECK: [[@LINE+1]]:14 {{.*}} s:14swift_ide_test12ShadowedTestV11shadowedVarSiSgSgvp {{.*}}Ref
       if let shadowedVar {
         // CHECK_LOCALS: [[@LINE+2]]:13 {{.*}} s:14swift_ide_test12ShadowedTestV06shadowE0yyF11shadowedVarL0_Sivp {{.*}}Ref
-        // CHECK-NOT: [[@LINE+1]]:13 {{.*}} shadowedVar {{.*}}Ref
+        // CHECK: [[@LINE+1]]:13 | instance-property/Swift | shadowedVar | s:14swift_ide_test12ShadowedTestV11shadowedVarSiSgSgvp {{.*}}Ref
         _ = shadowedVar
       }
     }
@@ -60,7 +60,7 @@ struct ShadowedTest {
     // CHECK: [[@LINE+1]]:12 {{.*}} s:14swift_ide_test12ShadowedTestV11shadowedVarSiSgSgvp {{.*}}Ref
     _ = { [shadowedVar] in
       // CHECK_LOCALS: [[@LINE+2]]:11 {{.*}} s:14swift_ide_test12ShadowedTestV06shadowE0yyF11shadowedVarL1_SiSgSgvp {{.*}}Ref
-      // CHECK-NOT: [[@LINE+1]]:11 {{.*}} shadowedVar {{.*}}Ref
+      // CHECK: [[@LINE+1]]:11 | instance-property/Swift | shadowedVar | s:14swift_ide_test12ShadowedTestV11shadowedVarSiSgSgvp {{.*}}Ref
       _ = shadowedVar
 
       // CHECK_LOCALS: [[@LINE+4]]:14 {{.*}} s:14swift_ide_test12ShadowedTestV11shadowedVarSiSgSgvp {{.*}}Ref
@@ -69,7 +69,7 @@ struct ShadowedTest {
       // CHECK: [[@LINE+1]]:14 {{.*}} s:14swift_ide_test12ShadowedTestV11shadowedVarSiSgSgvp {{.*}}Ref
       _ = { [shadowedVar] in
         // CHECK_LOCALS: [[@LINE+2]]:13 {{.*}} s:14swift_ide_test12ShadowedTestV06shadowE0yyFyycfU_11shadowedVarL_SiSgSgvp {{.*}}Ref
-        // CHECK-NOT: [[@LINE+1]]:13 {{.*}} shadowedVar {{.*}}Ref
+        // CHECK: [[@LINE+1]]:13 | instance-property/Swift | shadowedVar | s:14swift_ide_test12ShadowedTestV11shadowedVarSiSgSgvp {{.*}}Ref
         _ = shadowedVar
       }
     }

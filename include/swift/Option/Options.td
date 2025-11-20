@@ -33,7 +33,7 @@ def ModuleWrapOption : OptionFlag;
 def NoDriverOption : OptionFlag;
 
 // Some options should not be available depending on whether this is the
-// interactive driver 'swift', or the batch compiler 'swiftc'.
+// interactive driver 'swift', or the aot compiler 'swiftc'.
 def NoInteractiveOption : OptionFlag;
 def NoBatchOption : OptionFlag;
 
@@ -173,12 +173,12 @@ def verify_incremental_dependencies :
   Flag<["-"], "verify-incremental-dependencies">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enable the dependency verifier for each frontend job">;
-  
+
 def strict_implicit_module_context :
   Flag<["-"], "strict-implicit-module-context">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enable the strict forwarding of compilation context to downstream implicit module dependencies">;
-  
+
 def no_strict_implicit_module_context :
   Flag<["-"], "no-strict-implicit-module-context">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -298,6 +298,13 @@ def language_mode : Separate<["-"], "language-mode">,
   MetaVarName<"<mode>">,
   Alias<swift_version>;
 
+def min_swift_runtime_version
+    : Separate<["-"], "min-swift-runtime-version">,
+      Flags<[FrontendOption, ModuleInterfaceOptionIgnorable]>,
+      HelpText<"The minimum Swift runtime version "
+               "that will be available at runtime">,
+      MetaVarName<"<vers>">;
+
 def package_description_version: Separate<["-"], "package-description-version">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
   HelpText<"The version number to be applied on the input for the PackageDescription availability kind">,
@@ -315,7 +322,7 @@ def tools_directory : Separate<["-"], "tools-directory">,
 
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
-  
+
 def e : Separate<["-"], "e">, Flags<[NewDriverOnlyOption]>,
   HelpText<"Executes a line of code provided on the command line">;
 
@@ -328,7 +335,7 @@ def F_EQ : Joined<["-"], "F=">, Flags<[FrontendOption, ArgumentIsPath]>,
 
 def Fsystem : Separate<["-"], "Fsystem">,
   Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
-         SwiftSynthesizeInterfaceOption]>,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Add directory to system framework search path">;
 
 def I : JoinedOrSeparate<["-"], "I">,
@@ -338,20 +345,54 @@ def I : JoinedOrSeparate<["-"], "I">,
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<I>;
 
+def Isystem : Separate<["-"], "Isystem">,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Add directory to the system import search path">;
+
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Implicitly imports the Objective-C half of a module">;
 
+def import_bridging_header : Separate<["-"], "import-bridging-header">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Implicitly imports a C header file">;
 def import_objc_header : Separate<["-"], "import-objc-header">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
-  HelpText<"Implicitly imports an Objective-C header file">;
-def import_bridging_header : Separate<["-"], "import-bridging-header">,
+  Alias<import_bridging_header>;
+
+def internal_import_bridging_header : Separate<["-"], "internal-import-bridging-header">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Implicitly imports a C header file as an internal import">;
+
+def import_pch : Separate<["-"], "import-pch">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
-  Alias<import_objc_header>;
+  HelpText<"Import bridging header PCH file">;
+
+def internal_import_pch : Separate<["-"], "internal-import-pch">,
+  Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
+  HelpText<"Import bridging header PCH file as internal">;
 
 def pch_output_dir: Separate<["-"], "pch-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Directory to persist automatically created precompiled bridging headers">;
+
+def sil_output_dir: Separate<["-"], "sil-output-dir">,
+  Flags<[ArgumentIsPath, SupplementaryOutput]>,
+  HelpText<"Output SIL files to directory <dir> as additional output during compilation">,
+  MetaVarName<"<dir>">;
+
+def ir_output_dir: Separate<["-"], "ir-output-dir">,
+  Flags<[ArgumentIsPath, SupplementaryOutput]>,
+  HelpText<"Output LLVM IR files to directory <dir> as additional output during compilation">,
+  MetaVarName<"<dir>">;
+
+def auto_bridging_header_chaining: Flag<["-"], "auto-bridging-header-chaining">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Automatically chaining all the bridging headers">;
+def no_auto_bridging_header_chaining: Flag<["-"], "no-auto-bridging-header-chaining">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Do not automatically chaining all the bridging headers">;
 
 // FIXME: Unhide this once it doesn't depend on an output file map.
 def incremental : Flag<["-"], "incremental">,
@@ -359,6 +400,8 @@ def incremental : Flag<["-"], "incremental">,
   HelpText<"Perform an incremental build if possible">;
 
 def nostdimport : Flag<["-"], "nostdimport">, Flags<[FrontendOption]>,
+  HelpText<"Don't search the standard library or toolchain import paths for modules">;
+def nostdlibimport : Flag<["-"], "nostdlibimport">, Flags<[FrontendOption]>,
   HelpText<"Don't search the standard library import path for modules">;
 
 def output_file_map : Separate<["-"], "output-file-map">,
@@ -554,6 +597,29 @@ def unavailable_decl_optimization_EQ : Joined<["-"], "unavailable-decl-optimizat
            "value may be 'none' (no optimization) or 'complete' (code is not "
            "generated at all unavailable declarations)">;
 
+def define_enabled_availability_domain : Separate<["-"], "define-enabled-availability-domain">,
+    Flags<[HelpHidden, FrontendOption, NoInteractiveOption, ModuleInterfaceOptionIgnorable]>,
+    HelpText<"Defines a custom availability domain that is available at compile time">,
+    MetaVarName<"<domain>">;
+
+def define_always_enabled_availability_domain
+    : Separate<["-"], "define-always-enabled-availability-domain">,
+      Flags<[HelpHidden, FrontendOption, NoInteractiveOption,
+             ModuleInterfaceOptionIgnorable]>,
+      HelpText<"Defines a custom availability domain that is available for all "
+               "deployments">,
+      MetaVarName<"<domain>">;
+
+def define_disabled_availability_domain : Separate<["-"], "define-disabled-availability-domain">,
+    Flags<[HelpHidden, FrontendOption, NoInteractiveOption, ModuleInterfaceOptionIgnorable]>,
+    HelpText<"Defines a custom availability domain that is unavailable at compile time">,
+    MetaVarName<"<domain>">;
+
+def define_dynamic_availability_domain : Separate<["-"], "define-dynamic-availability-domain">,
+    Flags<[HelpHidden, FrontendOption, NoInteractiveOption, ModuleInterfaceOptionIgnorable]>,
+    HelpText<"Defines a custom availability domain that can be enabled or disabled at runtime">,
+    MetaVarName<"<domain>">;
+
 def experimental_package_bypass_resilience : Flag<["-"], "experimental-package-bypass-resilience">,
   Flags<[FrontendOption]>,
   HelpText<"Deprecated; has no effect">;
@@ -586,6 +652,12 @@ def project_name : Separate<["-"], "project-name">,
 
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
+
+def debug_module_path : Separate<["-"], "debug-module-path">,
+  Flags<[FrontendOption]>,
+  HelpText<"Path to this module's binary swiftmodule artifact (required by debug info)">;
+def debug_module_path_EQ : Joined<["-"], "debug-module-path=">, Flags<[FrontendOption]>,
+  Alias<debug_module_path>;
 
 def module_alias : Separate<["-"], "module-alias">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
@@ -625,6 +697,11 @@ def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput, CacheInvariant]>,
   Alias<emit_module_path>;
+def emit_variant_module_path : Separate<["-"], "emit-variant-module-path">,
+  Flags<[NoInteractiveOption, ArgumentIsPath, SupplementaryOutput,
+         CacheInvariant, NewDriverOnlyOption]>,
+  MetaVarName<"<path>">,
+  HelpText<"Emit an importable module for the target variant at the specified path">;
 
 def emit_module_summary :
   Flag<["-"], "emit-module-summary">,
@@ -645,18 +722,45 @@ def emit_module_interface_path :
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
+def emit_variant_module_interface_path :
+  Separate<["-"], "emit-variant-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput, CacheInvariant, NewDriverOnlyOption]>,
+  MetaVarName<"<path>">, HelpText<"Output module interface file for the target variant to <path>">;
 
 def emit_private_module_interface_path :
   Separate<["-"], "emit-private-module-interface-path">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
          ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output private module interface file to <path>">;
+def emit_variant_private_module_interface_path :
+  Separate<["-"], "emit-variant-private-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput, CacheInvariant, NewDriverOnlyOption]>,
+  MetaVarName<"<path>">,
+  HelpText<"Output private module interface file for the target variant to <path>">;
 
 def emit_package_module_interface_path :
   Separate<["-"], "emit-package-module-interface-path">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
          ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output package module interface file to <path>">;
+def emit_variant_package_module_interface_path :
+  Separate<["-"], "emit-variant-package-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput, CacheInvariant, NewDriverOnlyOption]>,
+  MetaVarName<"<path>">,
+  HelpText<"Output package module interface file for the target variant to <path>">;
+
+def enable_module_selectors_in_module_interface :
+  Flag<["-"], "enable-module-selectors-in-module-interface">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"When emitting module interface files, use module selectors to avoid name collisions">;
+
+def disable_module_selectors_in_module_interface :
+  Flag<["-"], "disable-module-selectors-in-module-interface">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"When emitting module interface files, do not use module selectors to avoid name collisions">;
 
 def verify_emitted_module_interface :
   Flag<["-"], "verify-emitted-module-interface">,
@@ -676,8 +780,13 @@ def avoid_emit_module_source_info :
 def emit_module_source_info_path :
   Separate<["-"], "emit-module-source-info-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput]>,
+         SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output module source info file to <path>">;
+def emit_variant_module_source_info_path :
+  Separate<["-"], "emit-variant-module-source-info-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput, NewDriverOnlyOption, CacheInvariant]>,
+  MetaVarName<"<path>">, HelpText<"Output module source info file for the target variant to <path>">;
 
 def emit_parseable_module_interface :
   Flag<["-"], "emit-parseable-module-interface">,
@@ -708,6 +817,12 @@ def emit_api_descriptor_path :
          SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">,
   HelpText<"Output a JSON file describing the module's API to <path>">;
+def emit_variant_api_descriptor_path :
+  Separate<["-"], "emit-variant-api-descriptor-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput, CacheInvariant, NewDriverOnlyOption]>,
+  MetaVarName<"<path>">,
+  HelpText<"Output a JSON file describing the target variant module's API to <path>">;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
@@ -726,6 +841,11 @@ def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
   HelpText<"Emit an Objective-C and C++ header file to <path>">,
   Alias<emit_objc_header_path>;
 
+def emit_clang_header_min_access : Separate<["-"], "emit-clang-header-min-access">,
+  Flags<[FrontendOption, NoInteractiveOption, CacheInvariant]>,
+  MetaVarName<"<access-level>">,
+  HelpText<"The minimum access level of declarations to include in the emitted header">;
+
 def static : Flag<["-"], "static">,
   Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,
   HelpText<"Make this module statically linkable and make the output of -emit-library a static library.">;
@@ -733,10 +853,6 @@ def static : Flag<["-"], "static">,
 def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Recognize and import CF types as class types">;
-
-def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
-  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
 
 def solver_shrink_unsolved_threshold : Separate<["-"], "solver-shrink-unsolved-threshold">,
 Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
@@ -757,15 +873,6 @@ def enable_bridging_pch : Flag<["-"], "enable-bridging-pch">,
 def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Disable automatic generation of bridging PCH files">;
-
-def disable_print_package_name_for_non_package_interface :
-  Flag<["-"], "disable-print-package-name-for-non-package-interface">,
-  Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
-  HelpText<"No op; package name is only printed in package interface by default">;
-def print_package_name_in_non_package_interface :
-  Flag<["-"], "print-package-name-in-non-package-interface">,
-  Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
-  HelpText<"Print package name in public or private interface">;
 
 def lto : Joined<["-"], "lto=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
@@ -803,19 +910,19 @@ def enable_experimental_concise_pound_file : Flag<["-"],
 
 def enable_experimental_cxx_interop :
   Flag<["-"], "enable-experimental-cxx-interop">,
-  Flags<[NoDriverOption, FrontendOption, HelpHidden, ModuleInterfaceOption]>,
+  Flags<[NoDriverOption, FrontendOption, HelpHidden]>,
   HelpText<"Enable experimental C++ interop code generation and config directives">;
 
 def cxx_interoperability_mode :
   Joined<["-"], "cxx-interoperability-mode=">,
-  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
+  Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
          SwiftSynthesizeInterfaceOption]>,
   HelpText<"Enables C++ interoperability; pass 'default' to enable or 'off' to disable">;
 
 def experimental_c_foreign_reference_types :
   Flag<["-"], "experimental-c-foreign-reference-types">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
-  HelpText<"Enable experimental C foreign references types (with reference counting).">;
+  HelpText<"Enable experimental C foreign references types. Deprecated, has no effect.">;
 
 def experimental_hermetic_seal_at_link:
   Flag<["-"], "experimental-hermetic-seal-at-link">,
@@ -827,6 +934,10 @@ def experimental_package_interface_load:
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enables loading a package interface if in the same package specified with package-name">;
 
+def experimental_serialize_debug_info:
+  Flag<["-"], "experimental-serialize-debug-info">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enables serialization/deserialization of debug scopes">;
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
@@ -855,6 +966,10 @@ def Wwarning : Separate<["-"], "Wwarning">,
   Flags<[FrontendOption, HelpHidden]>,
   MetaVarName<"<diagnostic_group>">,
   HelpText<"Treat this warning group as warning">;
+
+def suppress_notes : Flag<["-"], "suppress-notes">,
+  Flags<[FrontendOption]>,
+  HelpText<"Suppress all notes">;
 
 def suppress_remarks : Flag<["-"], "suppress-remarks">,
   Flags<[FrontendOption]>,
@@ -925,15 +1040,43 @@ def strict_concurrency : Joined<["-"], "strict-concurrency=">,
            "concurrency model, or 'complete' ('Sendable' and other checking is "
            "enabled for all code in the module)">;
 
+def default_isolation : Separate<["-"], "default-isolation">,
+  Flags<[FrontendOption]>,
+  HelpText<"Specify the default actor isolation: MainActor or nonisolated. "
+  "Defaults to nonisolated.">,
+  MetaVarName<"MainActor|nonisolated">;
+def default_isolation_EQ :  Joined<["-"], "default-isolation=">,
+  Flags<[FrontendOption]>,
+  Alias<default_isolation>;
+
 def enable_experimental_feature :
   Separate<["-"], "enable-experimental-feature">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable an experimental feature">;
 
+def disable_experimental_feature :
+  Separate<["-"], "disable-experimental-feature">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"Disable an experimental feature">;
+
 def enable_upcoming_feature : Separate<["-"], "enable-upcoming-feature">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable a feature that will be introduced in an upcoming language "
            "version">;
+
+def disable_upcoming_feature : Separate<["-"], "disable-upcoming-feature">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"Disable a feature that will be introduced in an upcoming language "
+           "version">;
+
+def strict_memory_safety : Flag<["-"], "strict-memory-safety">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Enable strict memory safety checking">;
+def strict_memory_safety_migrate : Flag<["-"], "strict-memory-safety:migrate">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Enable migration to strict memory safety checking">;
 
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
@@ -953,7 +1096,7 @@ def save_optimization_record_EQ : Joined<["-"], "save-optimization-record=">,
            "(default: YAML)">, MetaVarName<"<format>">;
 def save_optimization_record_path :
   Separate<["-"], "save-optimization-record-path">,
-  Flags<[FrontendOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, ArgumentIsPath, CacheInvariant]>,
   HelpText<"Specify the file name of any generated optimization record">;
 def save_optimization_record_passes :
   Separate<["-"], "save-optimization-record-passes">,
@@ -1069,13 +1212,17 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
+def ExperimentalPackageCMOAbortOnDeserializationFail : Flag<["-"], "experimental-package-cmo-abort-on-deserialization-fail">,
+  Flags<[FrontendOption]>,
+  HelpText<"Abort if a deserialization error is found while package optimization is enabled">;
+
 def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
   Flags<[FrontendOption]>,
   HelpText<"Deprecated; use -package-cmo instead">;
 
 def PackageCMO : Flag<["-"], "package-cmo">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable optimization to perform defalut CMO within a package boundary">;
+  HelpText<"Enable optimization to perform default CMO within a package boundary">;
 
 def EnableDefaultCMO : Flag<["-"], "enable-default-cmo">,
   Flags<[HelpHidden, FrontendOption]>,
@@ -1287,6 +1434,8 @@ def emit_sil : Flag<["-"], "emit-sil">,
   HelpText<"Emit canonical SIL file(s)">, ModeOpt;
 def emit_silgen : Flag<["-"], "emit-silgen">,
   HelpText<"Emit raw SIL file(s)">, ModeOpt;
+def emit_lowered_sil : Flag<["-"], "emit-lowered-sil">,
+  HelpText<"Emit lowered SIL file(s)">, ModeOpt;
 def emit_sib : Flag<["-"], "emit-sib">,
   HelpText<"Emit serialized AST + canonical SIL file(s)">, ModeOpt;
 def emit_sibgen : Flag<["-"], "emit-sibgen">,
@@ -1332,6 +1481,12 @@ def emit_parse : Flag<["-"], "emit-parse">, Alias<dump_parse>,
 def dump_ast : Flag<["-"], "dump-ast">,
   HelpText<"Parse and type-check input file(s) and dump AST(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def dump_ast_format : Separate<["-"], "dump-ast-format">,
+  HelpText<"Desired format for -dump-ast output "
+           "('default', 'json', or 'json-zlib'); no format is guaranteed "
+           "stable across different compiler versions">,
+  MetaVarName<"<format>">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def emit_ast : Flag<["-"], "emit-ast">, Alias<dump_ast>,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_scope_maps : Separate<["-"], "dump-scope-maps">,
@@ -1339,11 +1494,7 @@ def dump_scope_maps : Separate<["-"], "dump-scope-maps">,
   MetaVarName<"<expanded-or-list-of-line:column>">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def dump_type_refinement_contexts :
-  Flag<["-"], "dump-type-refinement-contexts">,
-  HelpText<"Type-check input file(s) and dump type refinement contexts(s)">,
-  ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+
 def dump_type_info : Flag<["-"], "dump-type-info">,
   HelpText<"Output YAML dump of fixed-size types from all imported modules">,
   ModeOpt,
@@ -1410,7 +1561,7 @@ def Xcc : Separate<["-"], "Xcc">,
   HelpText<"Pass <arg> to the C/C++/Objective-C compiler">;
 
 def Xclang_linker : Separate<["-"], "Xclang-linker">, Flags<[HelpHidden]>,
-  MetaVarName<"<arg>">, HelpText<"Pass <arg> to Clang when it is use for linking.">;
+  MetaVarName<"<arg>">, HelpText<"Pass <arg> to Clang when it is used for linking.">;
 
 def Xllvm : Separate<["-"], "Xllvm">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -1433,6 +1584,13 @@ def target_legacy_spelling : Joined<["--"], "target=">,
 def print_target_info : Flag<["-"], "print-target-info">,
     Flags<[FrontendOption]>,
     HelpText<"Print target information for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
+def print_static_build_config : Flag<["-"], "print-static-build-config">,
+    Flags<[FrontendOption]>,
+    HelpText<"Print static build configuration that can be used to evaluate #ifs in Swift source code">;
+
+def print_supported_features : Flag<["-"], "print-supported-features">,
+    Flags<[FrontendOption]>,
+    HelpText<"Print information about features supported by the compiler">;
 
 def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Generate code for a particular CPU variant">;
@@ -1446,6 +1604,11 @@ def clang_target : Separate<["-"], "clang-target">,
   Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Separately set the target we should use for internal Clang instance">;
+def clang_target_variant : Separate<["-"], "clang-target-variant">,
+  Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Separately set the target we should use for internal Clang instance"
+           " for the 'zippered' code for macCatalyst">;
 
 def disable_clang_target : Flag<["-"], "disable-clang-target">,
   Flags<[NewDriverOnlyOption]>,
@@ -1462,6 +1625,10 @@ def explain_module_dependency_detailed : Separate<["-"], "explain-module-depende
 def explicit_auto_linking : Flag<["-"], "explicit-auto-linking">,
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Instead of linker-load directives, have the driver specify all link dependencies on the linker invocation. Requires '-explicit-module-build'.">;
+  
+def experimental_emit_variant_module : Flag<["-"], "experimental-emit-variant-module">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"When a target variant triple is specified, the same driver invocation will emit two Swift modules, one for the primary target and one for the variant.">;
 
 def min_inlining_target_version : Separate<["-"], "target-min-inlining-version">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
@@ -1477,6 +1644,10 @@ def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate instrumented code to collect execution counts">;
 
+def debug_info_for_profiling : Flag<["-"], "debug-info-for-profiling">,
+  Flags<[FrontendOption, NoInteractiveOption, NewDriverOnlyOption]>,
+  HelpText<"Emit extra debug info (DWARF discriminators) to make sampling-based profiling more accurate">;
+
 def profile_use : CommaJoined<["-"], "profile-use=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
   MetaVarName<"<profdata>">,
@@ -1485,6 +1656,34 @@ def profile_use : CommaJoined<["-"], "profile-use=">,
 def profile_coverage_mapping : Flag<["-"], "profile-coverage-mapping">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate coverage data for use with profiled execution counts">;
+
+def profile_sample_use : Joined<["-"], "profile-sample-use=">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath, NewDriverOnlyOption]>,
+  MetaVarName<"<profile data>">,
+  HelpText<"Supply sampling-based profiling data from llvm-profdata to enable profile-guided optimization">;
+
+def cs_profile_generate : Flag<["-"], "cs-profile-generate">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Generate instrumented code to collect context sensitive execution counts into default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def cs_profile_generate_EQ : Joined<["-"], "cs-profile-generate=">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  MetaVarName<"<directory>">,
+  HelpText<"Generate instrumented code to collect context sensitive execution counts into <directory>/default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def ir_profile_generate: Flag<["-"], "ir-profile-generate">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Generate instrumented code to collect execution counts into default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def ir_profile_generate_EQ : Joined<["-"], "ir-profile-generate=">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  MetaVarName<"<directory>">,
+  HelpText<"Generate instrumented code to collect execution counts into <directory>/default.profraw (overridden by LLVM_PROFILE_FILE env var)">;
+
+def ir_profile_use : CommaJoined<["-"], "ir-profile-use=">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
+  MetaVarName<"<profdata>">,
+  HelpText<"Supply an IR-level PGO profdata file to enable profile-guided optimization">;
 
 def embed_bitcode : Flag<["-"], "embed-bitcode">,
   Flags<[FrontendOption, NoInteractiveOption]>,
@@ -1536,9 +1735,13 @@ def scan_dependencies : Flag<["-"], "scan-dependencies">,
   HelpText<"Scan dependencies of the given Swift sources">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
-def emit_supported_features : Flag<["-"], "emit-supported-features">,
-  HelpText<"Emit a JSON file including all supported compiler features">, ModeOpt,
+def emit_supported_arguments : Flag<["-"], "emit-supported-arguments">,
+  HelpText<"Emit a JSON file including all supported compiler arguments">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_supported_features : Flag<["-"], "emit-supported-features">,
+  HelpText<"This is a compatibility alias for '-emit-supported-arguments'">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild, HelpHidden]>,
+  Alias<emit_supported_arguments>;
 
 def enable_incremental_imports :
   Flag<["-"], "enable-incremental-imports">,
@@ -1552,6 +1755,18 @@ def disable_incremental_imports :
   HelpText<"Disable cross-module incremental build metadata and "
            "driver scheduling for Swift modules">;
 
+def enable_incremental_file_hashing :
+  Flag<["-"], "enable-incremental-file-hashing">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Enable hashing of input and dependency file data "
+           "that can prevent unnecessary invalidation">;
+
+def disable_incremental_file_hashing :
+  Flag<["-"], "disable-incremental-file-hashing">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Disable hashing of input and dependency file data "
+           "that can prevent unnecessary invalidation">;
+
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
@@ -1563,6 +1778,10 @@ def index_file_path : Separate<["-"], "index-file-path">,
 def index_store_path : Separate<["-"], "index-store-path">,
   Flags<[FrontendOption, ArgumentIsPath, CacheInvariant]>, MetaVarName<"<path>">,
   HelpText<"Store indexing data to <path>">;
+  
+def index_store_compress : Flag<["-"], "index-store-compress">,
+  Flags<[FrontendOption]>,
+  HelpText<"Compress the unit and record files in the index store">;
 
 def index_unit_output_path : Separate<["-"], "index-unit-output-path">,
   Flags<[FrontendOption, ArgumentIsPath, CacheInvariant]>, MetaVarName<"<path>">,
@@ -1641,14 +1860,37 @@ def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
 
 def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput, HelpHidden]>,
+         SupplementaryOutput, HelpHidden, CacheInvariant]>,
   HelpText<"Emit a symbol graph to directory <dir>">,
   MetaVarName<"<dir>">;
+
+def symbol_graph_pretty_print: Flag<["-"], "symbol-graph-pretty-print">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
+  HelpText<"Pretty-print the output symbol graph JSON">;
+
+def symbol_graph_skip_inherited_docs: Flag<["-"], "symbol-graph-skip-inherited-docs">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
+  HelpText<"Skip emitting doc comments for members inherited through classes or "
+           "default implementations">;
+
+def symbol_graph_skip_synthesized_members: Flag<["-"], "symbol-graph-skip-synthesized-members">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, SupplementaryOutput]>,
+  HelpText<"Skip members inherited through classes or default implementations">;
 
 def symbol_graph_minimum_access_level: Separate<["-"], "symbol-graph-minimum-access-level">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Include symbols with this access level or more when emitting a symbol graph">,
   MetaVarName<"<level>">;
+
+def symbol_graph_allow_availability_platforms: Separate<["-"], "symbol-graph-allow-availability-platforms">,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Restrict availability metadata to the given platforms, e.g. 'macOS,Swift'">,
+  MetaVarName<"<platforms>">;
+
+def symbol_graph_block_availability_platforms: Separate<["-"], "symbol-graph-block-availability-platforms">,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Remove the given platforms from symbol graph availability metadata, e.g. 'macOS,Swift'">,
+  MetaVarName<"<platforms>">;
 
 def pretty_print: Flag<["-"], "pretty-print">,
   Flags<[SwiftSymbolGraphExtractOption]>,
@@ -1663,6 +1905,25 @@ def omit_extension_block_symbols: Flag<["-"], "omit-extension-block-symbols">,
   Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Directly associate members and conformances with the extended nominal when generating symbol graphs instead of emitting 'swift.extension' symbols for extensions to external types">;
+
+def allow_availability_platforms: Separate<["-"], "allow-availability-platforms">,
+  Flags<[SwiftSymbolGraphExtractOption]>,
+  HelpText<"Restrict availability metadata to the given platforms, e.g. 'macOS,Swift'">,
+  MetaVarName<"<platforms>">;
+
+def block_availability_platforms: Separate<["-"], "block-availability-platforms">,
+  Flags<[SwiftSymbolGraphExtractOption]>,
+  HelpText<"Remove the given platforms from symbol graph availability metadata, e.g. 'macOS,Swift'">,
+  MetaVarName<"<platforms>">;
+
+// swift-synthesize-interface-only options
+def include_submodules : Flag<["-"], "include-submodules">,
+  Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Also print the declarations synthesized for any Clang submodules">;
+
+def print_fully_qualified_types : Flag<["-"], "print-fully-qualified-types">,
+  Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Always print fully qualified type names">;
 
 // swift-symbolgraph-extract-only options
 def output_dir : Separate<["-"], "output-dir">,
@@ -1699,6 +1960,11 @@ def skip_protocol_implementations : Flag<["-"], "skip-protocol-implementations">
   Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
          NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Skip emitting symbols that are implementations of protocol requirements or inherited from protocol extensions">;
+
+def symbol_graph_shorten_output_names : Flag<["-"], "symbol-graph-shorten-output-names">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Shorten the symbol graph output file names by hashing the module name; outputs an additional JSON file with the map of hash to original name">;
 
 // swift-api-digester-only options
 def dump_sdk: Flag<["-", "--"], "dump-sdk">,
@@ -1759,6 +2025,10 @@ def input_paths: Separate<["-", "--"], "input-paths">,
 def compiler_style_diags: Flag<["-", "--"], "compiler-style-diags">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Print compiler style diagnostics to stderr.">;
+
+def error_on_abi_breakage: Flag<["-", "--"], "error-on-abi-breakage">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Always treat ABI checker issues as errors">;
 
 def json: Flag<["-", "--"], "json">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
@@ -1829,10 +2099,6 @@ def BI : JoinedOrSeparate<["-"], "BI">,
 def BI_EQ : Joined<["-"], "BI=">, Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   Alias<BI>;
 
-def iframework : JoinedOrSeparate<["-"], "iframework">,
-  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
-  HelpText<"add a directory to the clang importer system framework search path">;
-
 def baseline_path : JoinedOrSeparate<["-"], "baseline-path">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
   HelpText<"The path to the Json file that we should use as the baseline">;
@@ -1863,6 +2129,11 @@ def use_interface_for_module: Separate<["-", "--"], "use-interface-for-module">,
   HelpText<"Prefer loading these modules via interface">,
   MetaVarName<"<name>">;
 
+def load_pass_plugin_EQ : Joined<["-"], "load-pass-plugin=">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Load LLVM pass plugin from a dynamic shared object file.">,
+  MetaVarName<"<path>">;
+
 // ONLY SUPPORTED IN NEW DRIVER
 
 // These flags only exist here so that the old driver doesn't fail with unknown
@@ -1880,6 +2151,11 @@ def driver_explicit_module_build:
   Flags<[HelpHidden, NewDriverOnlyOption]>,
   HelpText<"Prebuild module dependencies to make them explicit">;
 
+def incremental_dependency_scan:
+  Flag<["-"], "incremental-dependency-scan">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Re-use/validate prior build dependency scan artifacts">;
+
 def driver_experimental_explicit_module_build:
   Flag<["-"], "experimental-explicit-module-build">,
   Flags<[HelpHidden, NewDriverOnlyOption]>,
@@ -1891,6 +2167,11 @@ def driver_scan_dependencies_non_lib:
   Flags<[HelpHidden, NewDriverOnlyOption]>,
   HelpText<"Use calls to `swift-frontend -scan-dependencies` instead of "
            "dedicated dependency scanning library">;
+
+def always_rebuild_module_dependencies:
+  Flag<["-"], "always-rebuild-module-dependencies">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Always rebuild module dependencies">;
 
 def driver_warn_unused_options:
   Flag<["-"], "driver-warn-unused-options">,
@@ -1922,6 +2203,13 @@ def emit_module_serialize_diagnostics_path:
   Separate<["-"], "emit-module-serialize-diagnostics-path">,
   Flags<[ArgumentIsPath, SupplementaryOutput, NewDriverOnlyOption]>,
   HelpText<"Emit a serialized diagnostics file for the emit-module task to "
+           "<path>">,
+  MetaVarName<"<path>">;
+
+def dependency_scan_serialize_diagnostics_path:
+  Separate<["-"], "dependency-scan-serialize-diagnostics-path">,
+  Flags<[ArgumentIsPath, SupplementaryOutput, NewDriverOnlyOption]>,
+  HelpText<"Emit a serialized diagnostics file for the dependency scanning task to "
            "<path>">,
   MetaVarName<"<path>">;
 
@@ -1997,7 +2285,7 @@ def digester_mode:
 def nostartfiles:
   Flag<["-"], "nostartfiles">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, NoInteractiveOption,
-         HelpHidden, NewDriverOnlyOption]>,
+         HelpHidden]>,
   HelpText<"Do not link in the Swift language startup routines">;
 
 def gcc_toolchain: Separate<["-"], "gcc-toolchain">,
@@ -2013,6 +2301,10 @@ def experimental_clang_importer_direct_cc1_scan:
 def cache_compile_job:  Flag<["-"], "cache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Enable compiler caching">;
+
+def no_cache_compile_job:  Flag<["-"], "no-cache-compile-job">,
+  Flags<[FrontendOption, NoDriverOption, HelpHidden]>,
+  HelpText<"Disable compiler caching">;
 
 def cache_remarks:  Flag<["-"], "Rcache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
@@ -2038,6 +2330,14 @@ def clang_scanner_module_cache_path : Separate<["-"], "clang-scanner-module-cach
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the Clang dependency scanner module cache path">;
 
+def sdk_module_cache_path : Separate<["-"], "sdk-module-cache-path">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Specifies the module cache path for explicitly-built SDK modules">;
+
+def scanner_prefix_map_paths : MultiArg<["-"], "scanner-prefix-map-paths", 2>,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix> <replacement>">;
+
 def scanner_prefix_map : Separate<["-"], "scanner-prefix-map">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix=replacement>">;
@@ -2050,9 +2350,14 @@ def scanner_prefix_map_toolchain : Separate<["-"], "scanner-prefix-map-toolchain
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Remap paths within toolchain directory reported by dependency scanner">, MetaVarName<"<path>">;
 
-def cache_replay_prefix_map: Separate<["-"], "cache-replay-prefix-map">,
+def cache_replay_prefix_map: MultiArg<["-"], "cache-replay-prefix-map", 2>,
   Flags<[FrontendOption, NoDriverOption, CacheInvariant]>,
-  HelpText<"Remap paths when replaying outputs from cache">, MetaVarName<"<prefix=replacement>">;
+  HelpText<"Remap paths when replaying outputs from cache">, MetaVarName<"<prefix> <replacement>">;
+
+def register_module_dependency : Separate<["-"], "register-module-dependency">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Register module for dependency scan without importing in the frontend">;
+
 
 // END ONLY SUPPORTED IN NEW DRIVER
 
@@ -2067,10 +2372,14 @@ def external_plugin_path : Separate<["-"], "external-plugin-path">, Group<plugin
   Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Add directory to the plugin search path with a plugin server executable">,
   MetaVarName<"<path>#<plugin-server-path>">;
-  
+
 def cas_backend: Flag<["-"], "cas-backend">,
   Flags<[FrontendOption, NoDriverOption]>,
   HelpText<"Enable using CASBackend for object file output">;
+
+def debug_callsite_info: Flag<["-"], "debug-callsite-info">,
+  Flags<[FrontendOption, NoDriverOption]>,
+  HelpText<"Generate callsite information in debug info">;
 
 def cas_backend_mode: Joined<["-"], "cas-backend-mode=">,
   Flags<[FrontendOption, NoDriverOption]>,
@@ -2095,6 +2404,18 @@ def load_plugin_executable:
            "of module names where the macro types are declared">,
   MetaVarName<"<path>#<module-names>">;
 
+def load_resolved_plugin:
+  Separate<["-"], "load-resolved-plugin">, Group<plugin_search_Group>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  HelpText<"Path to resolved plugin configuration and a comma-separated list "
+           "of module names where the macro types are declared. Library path "
+           "and executable path can be empty if not used">,
+  MetaVarName<"<library-path>#<executable-path>#<module-names>">;
+
+def resolved_plugin_verification : Flag<["-"], "resolved-plugin-verification">,
+                                   Flags<[FrontendOption, NoDriverOption]>,
+                                   HelpText<"verify resolved plugins">;
+
 def in_process_plugin_server_path : Separate<["-"], "in-process-plugin-server-path">,
   Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Path to dynamic library plugin server">;
@@ -2103,5 +2424,10 @@ def disable_sandbox:
   Flag<["-"], "disable-sandbox">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Disable using the sandbox when executing subprocesses">;
+
+def enable_deterministic_check :
+  Flag<["-"], "enable-deterministic-check">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, CacheInvariant]>,
+  HelpText<"Check compiler output determinism by running it twice">;
 
 include "FrontendOptions.td"

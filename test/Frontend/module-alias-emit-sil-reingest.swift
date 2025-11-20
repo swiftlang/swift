@@ -7,13 +7,13 @@
 // RUN: %target-swift-frontend -module-name Tea %t/FileTea.swift -emit-module -emit-module-path %t/Tea.swiftmodule
 
 /// Emit SIL with module aliasing
-// RUN: %target-swift-frontend -emit-sil %t/FileBar.swift  -module-alias Coffee=Tea -I %t -o %t/Bar-output1.sil
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %t/FileBar.swift  -module-alias Coffee=Tea -I %t -o %t/Bar-output1.sil
 
 /// Verify the module real name 'Tea' is contained in the generated SIL
 // RUN: %FileCheck %s -input-file %t/Bar-output1.sil
 
 /// Reingest the SIL file and verify it contains the same result
-// RUN: %target-sil-opt -enable-sil-verify-all %t/Bar-output1.sil -I %t -o %t/Bar-output2.sil
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %t/Bar-output1.sil -I %t -o %t/Bar-output2.sil
 // RUN: %FileCheck %s -input-file %t/Bar-output2.sil
 
 // CHECK: sil_stage canonical

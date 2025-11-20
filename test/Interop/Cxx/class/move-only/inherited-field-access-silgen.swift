@@ -26,8 +26,8 @@ testSetX(2)
 
 // CHECK: sil shared [transparent] @$sSo024NonCopyableHolderDerivedD0V1xSo0aB0Vvlu : $@convention(method) (@{{(in_)?}}guaranteed NonCopyableHolderDerivedDerived) -> UnsafePointer<NonCopyable>
 // CHECK: {{.*}}(%[[SELF_VAL:.*]] : ${{(\*)?}}NonCopyableHolderDerivedDerived):
-// CHECK: function_ref @{{.*}}__synthesizedBaseCall___synthesizedBaseGetterAccessor{{.*}} : $@convention(cxx_method) (@in_guaranteed NonCopyableHolderDerivedDerived) -> UnsafePointer<NonCopyable>
+// CHECK: function_ref @$sSo024NonCopyableHolderDerivedD0V41____synthesizedBaseGetterAccessor_xUnsafeSPySo0aB0VGyFTo : $@convention(cxx_method) (@in_guaranteed NonCopyableHolderDerivedDerived) -> UnsafePointer<NonCopyable>
 // CHECK-NEXT: apply %{{.*}}
 
 // CHECK: sil shared [transparent] @$sSo024NonCopyableHolderDerivedD0V1xSo0aB0Vvau : $@convention(method) (@inout NonCopyableHolderDerivedDerived) -> UnsafeMutablePointer<NonCopyable>
-// CHECK: function_ref @{{.*}}__synthesizedBaseCall___synthesizedBaseSetterAccessor{{.*}} : $@convention(cxx_method) (@inout NonCopyableHolderDerivedDerived) -> UnsafeMutablePointer<NonCopyable>
+// CHECK: function_ref @$sSo024NonCopyableHolderDerivedD0V41____synthesizedBaseSetterAccessor_xUnsafeSpySo0aB0VGyFTo : $@convention(cxx_method) (@inout NonCopyableHolderDerivedDerived) -> UnsafeMutablePointer<NonCopyable>

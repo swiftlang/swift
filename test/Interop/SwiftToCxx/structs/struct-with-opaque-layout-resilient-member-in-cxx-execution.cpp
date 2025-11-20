@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend %S/resilient-struct-in-cxx.swift -enable-library-evolution -module-name Structs -emit-module -emit-module-path %t/Structs.swiftmodule
 
-// RUN: %target-swift-frontend %S/struct-with-opaque-layout-resilient-member-in-cxx.swift -typecheck -module-name UseStructs -clang-header-expose-decls=all-public -emit-clang-header-path %t/useStructs.h -I %t
+// RUN: %target-swift-frontend %S/struct-with-opaque-layout-resilient-member-in-cxx.swift -module-name UseStructs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/useStructs.h -I %t
 
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-structs-execution.o

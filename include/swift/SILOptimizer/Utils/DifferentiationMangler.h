@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_UTILS_DIFFERENTIATIONMANGLER_H
 #define SWIFT_SIL_UTILS_DIFFERENTIATIONMANGLER_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/Basic/NullablePtr.h"
@@ -25,7 +26,7 @@ namespace Mangle {
 /// A mangler for generated differentiation functions.
 class DifferentiationMangler : public ASTMangler {
 public:
-  DifferentiationMangler() {}
+  DifferentiationMangler(const ASTContext &Ctx) : ASTMangler(Ctx) {}
   /// Returns the mangled name for a differentiation function of the given kind.
   std::string mangleAutoDiffFunction(StringRef originalName,
                                      Demangle::AutoDiffFunctionKind kind,

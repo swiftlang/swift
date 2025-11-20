@@ -1,20 +1,25 @@
 add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
   ASTGen.swift
   ASTGen+CompilerBuildConfiguration.swift
+  Availability.swift
   Bridge.swift
+  BuiltinPound.swift
   CompilerBuildConfiguration.swift
   DeclAttrs.swift
   Decls.swift
   Diagnostics.swift
   DiagnosticsBridge.swift
+  EmbeddedSupport.swift
   Exprs.swift
+  Fingerprint.swift
   Generics.swift
-  LegacyParse.swift
+  LexicalLookup.swift
   Literals.swift
   ParameterClause.swift
   Patterns.swift
   Regex.swift
   SourceFile.swift
+  StableHasher.swift
   Stmts.swift
   TypeAttrs.swift
   Types.swift
@@ -22,12 +27,15 @@ add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
   DEPENDENCIES
     swiftAST
   SWIFT_DEPENDENCIES
+    _CompilerSwiftCompilerPluginMessageHandling
     _CompilerRegexParser
     _CompilerSwiftSyntax
     _CompilerSwiftIfConfig
+    _CompilerSwiftLexicalLookup
     _CompilerSwiftOperators
     _CompilerSwiftSyntaxBuilder
     _CompilerSwiftParser
     _CompilerSwiftParserDiagnostics
     _CompilerSwiftDiagnostics
+    swiftBasicSwift
 )

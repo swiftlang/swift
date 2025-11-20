@@ -135,14 +135,14 @@ GenericSignature swift::buildGenericSignatureWithCapturedEnvironments(
     case GenericEnvironment::Kind::Opaque:
       break;
 
-    case GenericEnvironment::Kind::OpenedExistential: {
+    case GenericEnvironment::Kind::Existential: {
       auto existentialTy = genericEnv->maybeApplyOuterContextSubstitutions(
           genericEnv->getOpenedExistentialType())
-              ->mapTypeOutOfContext();
+              ->mapTypeOutOfEnvironment();
       collector.addOpenedExistential(existentialTy);
       continue;
     }
-    case GenericEnvironment::Kind::OpenedElement: {
+    case GenericEnvironment::Kind::Element: {
       collector.addOpenedElement(
           genericEnv->getOpenedElementShapeClass());
       continue;
@@ -183,13 +183,18 @@ Type MapLocalArchetypesOutOfContext::getInterfaceType(
     ++depth;
   }
 
-  llvm::errs() << "Fell off the end:\n";
-  interfaceTy->dump(llvm::errs());
-  abort();
+  ABORT([&](auto &out) {
+    out << "Fell off the end:\n";
+    interfaceTy->dump(out);
+  });
 }
 
 Type MapLocalArchetypesOutOfContext::operator()(SubstitutableType *type) const {
-  auto *archetypeTy = cast<ArchetypeType>(type);
+  // Local archetypes can appear in interface types alongside generic param
+  // types, ignore them here.
+  auto *archetypeTy = dyn_cast<ArchetypeType>(type);
+  if (!archetypeTy)
+    return type;
 
   // Primary archetypes just map out of context.
   if (isa<PrimaryArchetypeType>(archetypeTy) ||
@@ -209,7 +214,7 @@ Type swift::mapLocalArchetypesOutOfContext(
     GenericSignature baseGenericSig,
     ArrayRef<GenericEnvironment *> capturedEnvs) {
   return type.subst(MapLocalArchetypesOutOfContext(baseGenericSig, capturedEnvs),
-                    MakeAbstractConformanceForGenericType(),
+                    LookUpConformanceInModule(),
                     SubstFlags::PreservePackExpansionLevel |
                     SubstFlags::SubstitutePrimaryArchetypes |
                     SubstFlags::SubstituteLocalArchetypes);
@@ -224,7 +229,7 @@ static Type mapIntoLocalContext(GenericTypeParamType *param, unsigned baseDepth,
   auto localInterfaceType = capturedEnv->getGenericSignature()
       .getInnermostGenericParams()[param->getIndex()];
   assert(localInterfaceType->getIndex() == param->getIndex());
-  return capturedEnvs[envIndex]->mapTypeIntoContext(localInterfaceType);
+  return capturedEnvs[envIndex]->mapTypeIntoEnvironment(localInterfaceType);
 }
 
 Type MapIntoLocalArchetypeContext::operator()(SubstitutableType *type) const {
@@ -234,7 +239,7 @@ Type MapIntoLocalArchetypeContext::operator()(SubstitutableType *type) const {
   if (param->getDepth() >= baseDepth)
     return mapIntoLocalContext(param, baseDepth, capturedEnvs);
 
-  return baseGenericEnv->mapTypeIntoContext(param);
+  return baseGenericEnv->mapTypeIntoEnvironment(param);
 }
 
 /// Given a substitution map for a call to a local function or closure, extend
@@ -262,10 +267,10 @@ swift::buildSubstitutionMapWithCapturedEnvironments(
         return mapIntoLocalContext(param, baseDepth, capturedEnvs);
       return Type(type).subst(baseSubMap);
     },
-    [&](CanType origType, Type substType,
-        ProtocolDecl *proto) -> ProtocolConformanceRef {
+    [&](InFlightSubstitution &IFS, Type origType, ProtocolDecl *proto)
+          -> ProtocolConformanceRef {
       if (origType->getRootGenericParam()->getDepth() >= baseDepth)
-        return ProtocolConformanceRef(proto);
-      return baseSubMap.lookupConformance(origType, proto);
+        return ProtocolConformanceRef::forAbstract(origType.subst(IFS), proto);
+      return baseSubMap.lookupConformance(origType->getCanonicalType(), proto);
     });
 }

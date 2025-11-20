@@ -34,6 +34,12 @@
 // Xcode inserting a runpath search path of /usr/lib/swift based on the deployment target being less than
 // SupportedTargets[target][SwiftConcurrencyMinimumDeploymentTarget] in SDKSettings.plist.
 
+// Clients can back deploy to OS versions that predate Concurrency as an embedded library, and conditionally
+// use it behind an #availability check. Such clients will still need to link the embedded library instead
+// of the OS version. To support that, set the start version to Swift's first supported versions: macOS (née
+// OS X) 10.9, iOS 7.0, watchOS 2.0, tvOS 9.0 rather than Concurrency's first supported versions listed
+// above.
+
 // The linker uses a specially formatted symbol to do the back deployment:
 // $ld$previous$<install-name>$<compatibility-version>$<platform>$<start-version>$<end-version>$<symbol-name>$
 // compatibility-version and symbol-name are left off to apply to all library versions and symbols.
@@ -49,25 +55,25 @@
   RPATH_PREVIOUS_DIRECTIVE_IMPL(SWIFT_TARGET_LIBRARY_NAME, platform, startVersion, endVersion)
 
 #if TARGET_OS_OSX || TARGET_OS_MACCATALYST
-RPATH_PREVIOUS_DIRECTIVE(PLATFORM_MACOS, 10.15, 12.0)
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_MACOS, 10.9, 12.0)
 RPATH_PREVIOUS_DIRECTIVE(PLATFORM_MACCATALYST, 13.1, 15.0)
 #elif TARGET_OS_IOS && !TARGET_OS_VISION
 #if TARGET_OS_SIMULATOR
-RPATH_PREVIOUS_DIRECTIVE(PLATFORM_IOSSIMULATOR, 13.0, 15.0)
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_IOSSIMULATOR, 7.0, 15.0)
 #else
-RPATH_PREVIOUS_DIRECTIVE(PLATFORM_IOS, 13.0, 15.0)
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_IOS, 7.0, 15.0)
 #endif
 #elif TARGET_OS_WATCH
 #if TARGET_OS_SIMULATOR
-RPATH_PREVIOUS_DIRECTIVE(PLATFORM_WATCHOSSIMULATOR, 6.0, 8.0)
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_WATCHOSSIMULATOR, 2.0, 8.0)
 #else
-RPATH_PREVIOUS_DIRECTIVE(PLATFORM_WATCHOS, 6.0, 8.0)
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_WATCHOS, 2.0, 8.0)
 #endif
 #elif TARGET_OS_TV
 #if TARGET_OS_SIMULATOR
-RPATH_PREVIOUS_DIRECTIVE(PLATFORM_TVOSSIMULATOR, 13.0, 15.0)
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_TVOSSIMULATOR, 9.0, 15.0)
 #else
-RPATH_PREVIOUS_DIRECTIVE(PLATFORM_TVOS, 13.0, 15.0)
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_TVOS, 9.0, 15.0)
 #endif
 #endif
 // Concurrency wasn't supported as an embedded library in any other OS, so no need to create back deployment

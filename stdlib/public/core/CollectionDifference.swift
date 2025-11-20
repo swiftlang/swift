@@ -386,6 +386,7 @@ extension CollectionDifference where ChangeElement: Hashable {
   }
 }
 
+#if !$Embedded
 @available(SwiftStdlib 5.1, *)
 extension CollectionDifference.Change: Codable where ChangeElement: Codable {
   private enum _CodingKeys: String, CodingKey {
@@ -449,6 +450,7 @@ extension CollectionDifference: Codable where ChangeElement: Codable {
     try container.encode(removals, forKey: .removals)
   }
 }
+#endif
 
 @available(SwiftStdlib 5.1, *)
 extension CollectionDifference: Sendable where ChangeElement: Sendable { }

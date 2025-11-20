@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature ReferenceBindings -o - %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -sil-verify-all -enable-experimental-feature ReferenceBindings -o - %s | %FileCheck -check-prefix=SIL %s
 
+// REQUIRES: swift_feature_ReferenceBindings
+
 class Klass {}
 struct S {
   var k = Klass()
@@ -62,11 +64,9 @@ func testBindToVar() {
 // SIL: bb0([[ARG:%.*]] : $*String):
 // SIL:   [[STACK:%.*]] = alloc_stack [var_decl] $String
 // SIL:   [[ACCESS:%.*]] = begin_access [modify] [static] [[ARG]]
-// SIL:   [[VAL:%.*]] = load [[ACCESS]]
-// SIL:   store [[VAL]] to [[STACK]]
+// SIL:   copy_addr [take] [[ACCESS]] to [init] [[STACK]]
 // SIL:   apply {{%.*}}
-// SIL:   [[VAL:%.*]] = load [[STACK]]
-// SIL:   store [[VAL]] to [[ACCESS]]
+// SIL:   copy_addr [take] [[STACK]] to [init] [[ACCESS]]
 // SIL:   end_access [[ACCESS]]
 // SIL:   dealloc_stack [[STACK]]
 // SIL: } // end sil function '$s18reference_bindings15testBindToInOutyySSzF'

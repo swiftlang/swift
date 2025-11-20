@@ -1,6 +1,6 @@
 // RUN: %target-swift-emit-ir -parse-as-library -module-name main -verify %s -enable-experimental-feature Embedded -wmo
 
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 protocol ClassBound: AnyObject {
   func foo()
@@ -22,7 +22,6 @@ func test(existential: any ClassBound & OtherProtocol) {
 @main
 struct Main {
   static func main() {
-    test(existential: MyClass()) // expected-error {{cannot use a value of protocol type 'any ClassBound & OtherProtocol' in embedded Swift}}
-                                 // expected-note@-4 {{called from here}}
+    test(existential: MyClass()) // expected-error {{cannot use a value of protocol type 'any OtherProtocol' in embedded Swift}}
   }
 }

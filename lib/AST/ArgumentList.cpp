@@ -45,7 +45,7 @@ bool Argument::isInOut() const {
   return ArgExpr->isSemanticallyInOutExpr();
 }
 
-bool Argument::isConst() const {
+bool Argument::isCompileTimeLiteral() const {
   return ArgExpr->isSemanticallyConstExpr();
 }
 
@@ -239,7 +239,7 @@ Expr *ArgumentList::packIntoImplicitTupleOrParen(
   if (auto *unary = getUnlabeledUnaryExpr()) {
     auto *paren = new (ctx) ParenExpr(getLParenLoc(), unary, getRParenLoc());
     if (auto ty = getType(unary))
-      paren->setType(ParenType::get(ctx, ty));
+      paren->setType(ty);
     paren->setImplicit();
     return paren;
   }

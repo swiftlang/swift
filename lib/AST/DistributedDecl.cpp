@@ -15,12 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DistributedDecl.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessRequests.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTWalker.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignAsyncConvention.h"
@@ -29,7 +30,6 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -39,9 +39,10 @@
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
-#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h" // FIXME: Bad dependency
 #include "clang/Lex/MacroInfo.h"
@@ -51,7 +52,6 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
-#include "swift/Basic/StringExtras.h"
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
@@ -130,8 +130,7 @@ swift::getDistributedActorAsActorConformanceRef(ASTContext &C) {
   auto distributedActorAsActorConformance =
       getDistributedActorAsActorConformance(C);
 
-  auto actorProto = C.getProtocol(KnownProtocolKind::Actor);
-  return ProtocolConformanceRef(actorProto, distributedActorAsActorConformance);
+  return ProtocolConformanceRef(distributedActorAsActorConformance);
 }
 NormalProtocolConformance *
 swift::getDistributedActorAsActorConformance(ASTContext &C) {
@@ -170,7 +169,7 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(
   }
 
   /// === Maybe the value is declared in a protocol?
-  if (auto protocol = DC->getSelfProtocolDecl()) {
+  if (DC->getSelfProtocolDecl()) {
     GenericSignature signature;
     if (auto *genericContext = anyValue->getAsGenericContext()) {
       signature = genericContext->getGenericSignature();
@@ -199,12 +198,12 @@ Type swift::getDistributedActorSystemType(NominalTypeDecl *actor) {
 
   auto DA = C.getDistributedActorDecl();
   if (!DA)
-    return ErrorType::get(C); // FIXME(distributed): just use Type()
+    return ErrorType::get(C);
 
   // Dig out the actor system type.
   Type selfType = actor->getSelfInterfaceType();
   auto conformance = lookupConformance(selfType, DA);
-  return conformance.getTypeWitnessByName(selfType, C.Id_ActorSystem);
+  return conformance.getTypeWitnessByName(C.Id_ActorSystem);
 }
 
 Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
@@ -221,7 +220,7 @@ static Type getTypeWitnessByName(NominalTypeDecl *type, ProtocolDecl *protocol,
   auto conformance = lookupConformance(selfType, protocol);
   if (!conformance || conformance.isInvalid())
     return Type();
-  return conformance.getTypeWitnessByName(selfType, member);
+  return conformance.getTypeWitnessByName(member);
 }
 
 Type swift::getDistributedActorSerializationType(
@@ -230,17 +229,16 @@ Type swift::getDistributedActorSerializationType(
   auto resultTy = getAssociatedTypeOfDistributedSystemOfActor(
       actorOrExtension,
       ctx.Id_SerializationRequirement);
+  if (resultTy->hasError())
+    return resultTy;
 
   // Protocols are allowed to either not provide a `SerializationRequirement`
   // at all or provide it in a conformance requirement.
-  if ((!resultTy || resultTy->hasDependentMember()) &&
+  if (resultTy->hasDependentMember() &&
       actorOrExtension->getSelfProtocolDecl()) {
     auto sig = actorOrExtension->getGenericSignatureOfContext();
 
     auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
-    if (!actorProtocol)
-      return Type();
-
     auto serializationTy =
         actorProtocol->getAssociatedType(ctx.Id_SerializationRequirement)
             ->getDeclaredInterfaceType();
@@ -302,8 +300,7 @@ Type swift::getDistributedSerializationRequirementType(
   if (conformance.isInvalid())
     return Type();
 
-  return conformance.getTypeWitnessByName(selfType,
-                                          ctx.Id_SerializationRequirement);
+  return conformance.getTypeWitnessByName(ctx.Id_SerializationRequirement);
 }
 
 AbstractFunctionDecl *
@@ -333,29 +330,40 @@ swift::getAssociatedDistributedInvocationDecoderDecodeNextArgumentFunction(
 Type swift::getAssociatedTypeOfDistributedSystemOfActor(
     DeclContext *actorOrExtension, Identifier member) {
   auto &ctx = actorOrExtension->getASTContext();
+  auto getLoc = [&]() { return extractNearestSourceLoc(actorOrExtension); };
 
   auto actorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
-  if (!actorProtocol)
-    return Type();
+  if (!actorProtocol) {
+    ctx.Diags.diagnose(getLoc(), diag::broken_stdlib_type, "DistributedActor");
+    return ErrorType::get(ctx);
+  }
 
   AssociatedTypeDecl *actorSystemDecl =
       actorProtocol->getAssociatedType(ctx.Id_ActorSystem);
-  if (!actorSystemDecl)
-    return Type();
+  if (!actorSystemDecl) {
+    ctx.Diags.diagnose(getLoc(), diag::broken_distributed_actor_requirement);
+    return ErrorType::get(ctx);
+  }
 
   auto actorSystemProtocol = ctx.getDistributedActorSystemDecl();
-  if (!actorSystemProtocol)
-    return Type();
+  if (!actorSystemProtocol) {
+    ctx.Diags.diagnose(getLoc(), diag::broken_stdlib_type,
+                       "DistributedActorSystem");
+    return ErrorType::get(ctx);
+  }
 
   AssociatedTypeDecl *memberTypeDecl =
       actorSystemProtocol->getAssociatedType(member);
-  if (!memberTypeDecl)
-    return Type();
+  if (!memberTypeDecl) {
+    ctx.Diags.diagnose(getLoc(),
+                       diag::broken_distributed_actor_system_requirement);
+    return ErrorType::get(ctx);
+  }
 
   Type memberTy = DependentMemberType::get(
-    DependentMemberType::get(actorProtocol->getSelfInterfaceType(),
-                             actorSystemDecl),
-    memberTypeDecl);
+      DependentMemberType::get(actorProtocol->getSelfInterfaceType(),
+                               actorSystemDecl),
+      memberTypeDecl);
 
   auto sig = actorOrExtension->getGenericSignatureOfContext();
 
@@ -366,11 +374,10 @@ Type swift::getAssociatedTypeOfDistributedSystemOfActor(
   auto actorConformance =
       lookupConformance(
           actorType->getDeclaredInterfaceType(), actorProtocol);
-  if (!actorConformance || actorConformance.isInvalid())
-    return Type();
+  if (actorConformance.isInvalid())
+    return ErrorType::get(ctx);
 
-  auto subs = SubstitutionMap::getProtocolSubstitutions(
-      actorProtocol, actorType->getDeclaredInterfaceType(), actorConformance);
+  auto subs = SubstitutionMap::getProtocolSubstitutions(actorConformance);
 
   memberTy = memberTy.subst(subs);
 
@@ -435,11 +442,7 @@ swift::getDistributedSerializationRequirements(
 }
 
 bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
-    ASTContext &C,
-    Type type) {
-  if (!type)
-    return false;
-
+    ASTContext &C, Type type) {
   if (type->hasError())
     return false;
 
@@ -456,21 +459,6 @@ bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
       std::count(protocols.begin(), protocols.end(), decodable) == 1;
 }
 
-// TODO(distributed): probably can be removed?
-llvm::ArrayRef<ValueDecl *>
-AbstractFunctionDecl::getDistributedMethodWitnessedProtocolRequirements() const {
-  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
-
-  // Only a 'distributed' decl can witness 'distributed' protocol
-  if (!isDistributed()) {
-    return llvm::ArrayRef<ValueDecl *>();
-  }
-
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      GetDistributedMethodWitnessedProtocolRequirements(mutableThis), {});
-}
-
 /******************************************************************************/
 /********************* Ad-hoc protocol requirement checks *********************/
 /******************************************************************************/
@@ -479,7 +467,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   auto &C = getASTContext();
   auto *DC = getDeclContext();
 
-  if (!DC->isTypeContext() || !isGeneric())
+  if (!DC->isTypeContext() || !hasGenericParamList())
     return false;
 
   // === Check the name
@@ -489,8 +477,10 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   // === Must be declared in a 'DistributedActorSystem' conforming type
-  ProtocolDecl *systemProto =
-      C.getDistributedActorSystemDecl();
+  ProtocolDecl *systemProto = C.getDistributedActorSystemDecl();
+  if (!systemProto) {
+    return false;
+  }
 
   auto systemNominal = DC->getSelfNominalTypeDecl();
   auto distSystemConformance = lookupConformance(
@@ -522,7 +512,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   // === Check generics
-  if (!isGeneric()) {
+  if (!hasGenericParamList()) {
     return false;
   }
 
@@ -598,7 +588,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   //            Act.ID == Self.ActorID
   GenericTypeParamDecl *ActParam = genericParams->getParams()[0];
   auto ActConformance = lookupConformance(
-      mapTypeIntoContext(ActParam->getDeclaredInterfaceType()),
+      mapTypeIntoEnvironment(ActParam->getDeclaredInterfaceType()),
       C.getProtocol(KnownProtocolKind::DistributedActor));
   if (ActConformance.isInvalid()) {
     return false;
@@ -607,7 +597,7 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   // --- Check: Err: Error
   GenericTypeParamDecl *ErrParam = genericParams->getParams()[1];
   auto ErrConformance = lookupConformance(
-      mapTypeIntoContext(ErrParam->getDeclaredInterfaceType()),
+      mapTypeIntoEnvironment(ErrParam->getDeclaredInterfaceType()),
       C.getProtocol(KnownProtocolKind::Error));
   if (ErrConformance.isInvalid()) {
     return false;
@@ -670,9 +660,9 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   } else if (ResParam) {
     assert(ResParam && "Non void function, yet no Res generic parameter found");
     if (auto func = dyn_cast<FuncDecl>(this)) {
-      auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType())
+      auto resultType = func->mapTypeIntoEnvironment(func->getResultInterfaceType())
                             ->getMetatypeInstanceType();
-      auto resultParamType = func->mapTypeIntoContext(
+      auto resultParamType = func->mapTypeIntoEnvironment(
           ResParam->getDeclaredInterfaceType());
       // The result of the function must be the `Res` generic argument.
       if (!resultType->isEqual(resultParamType)) {
@@ -795,6 +785,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
   // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
   ProtocolDecl *encoderProto =
       C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+  if (!encoderProto) {
+    return false;
+  }
 
   auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
   auto protocolConformance = lookupConformance(
@@ -816,7 +809,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
     }
 
     // === Check generics
-    if (!isGeneric()) {
+    if (!hasGenericParamList()) {
       return false;
     }
 
@@ -860,7 +853,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
     }
 
     auto argumentTy = argumentParam->getInterfaceType();
-    auto argumentInContextTy = mapTypeIntoContext(argumentTy);
+    auto argumentInContextTy = mapTypeIntoEnvironment(argumentTy);
     if (argumentInContextTy->getAnyNominal() == C.getRemoteCallArgumentDecl()) {
       auto argGenericParams = argumentInContextTy->getStructOrBoundGenericStruct()
           ->getGenericParams()->getParams();
@@ -870,9 +863,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordArgument() const
 
       // the <Value> of the RemoteCallArgument<Value>
       auto remoteCallArgValueGenericTy =
-          mapTypeIntoContext(argGenericParams[0]->getDeclaredInterfaceType());
+          mapTypeIntoEnvironment(argGenericParams[0]->getDeclaredInterfaceType());
       // expected (the <Value> from the recordArgument<Value>)
-      auto expectedGenericParamTy = mapTypeIntoContext(
+      auto expectedGenericParamTy = mapTypeIntoEnvironment(
           ArgumentParam->getDeclaredInterfaceType());
 
       if (!remoteCallArgValueGenericTy->isEqual(expectedGenericParamTy)) {
@@ -926,6 +919,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
   ProtocolDecl *encoderProto =
       C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+  if (!encoderProto) {
+    return false;
+  }
 
   auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
   auto protocolConformance = lookupConformance(
@@ -953,7 +949,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   }
 
   // === Check generics
-  if (!isGeneric()) {
+  if (!hasGenericParamList()) {
     return false;
   }
 
@@ -1009,10 +1005,10 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordReturnType() con
   // conforms_to: Argument Encodable
   // ...
 
-  auto resultType = func->mapTypeIntoContext(argumentParam->getInterfaceType())
+  auto resultType = func->mapTypeIntoEnvironment(argumentParam->getInterfaceType())
                         ->getMetatypeInstanceType();
 
-  auto resultParamType = func->mapTypeIntoContext(
+  auto resultParamType = func->mapTypeIntoEnvironment(
       ArgumentParam->getDeclaredInterfaceType());
 
   // The result of the function must be the `Res` generic argument.
@@ -1052,6 +1048,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
     ProtocolDecl *encoderProto =
         C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+    if (!encoderProto) {
+      return false;
+    }
 
     auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
     auto protocolConformance = lookupConformance(
@@ -1079,7 +1078,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     }
 
     // === Check generics
-    if (!isGeneric()) {
+    if (!hasGenericParamList()) {
       return false;
     }
 
@@ -1119,7 +1118,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordErrorType() cons
     // --- Check: Err: Error
     GenericTypeParamDecl *ErrParam = genericParams->getParams()[0];
     auto ErrConformance = lookupConformance(
-        mapTypeIntoContext(ErrParam->getDeclaredInterfaceType()),
+        mapTypeIntoEnvironment(ErrParam->getDeclaredInterfaceType()),
         C.getProtocol(KnownProtocolKind::Error));
     if (ErrConformance.isInvalid()) {
       return false;
@@ -1159,7 +1158,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
     // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
     ProtocolDecl *decoderProto =
         C.getProtocol(KnownProtocolKind::DistributedTargetInvocationDecoder);
-
+    if (!decoderProto) {
+      return false;
+    }
     auto decoderNominal = getDeclContext()->getSelfNominalTypeDecl();
     auto protocolConformance = lookupConformance(
         decoderNominal->getDeclaredInterfaceType(), decoderProto);
@@ -1187,7 +1188,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
 
 
     // === Check generics
-    if (!isGeneric()) {
+    if (!hasGenericParamList()) {
       return false;
     }
 
@@ -1215,9 +1216,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationDecoderDecodeNextArgument() c
     // === Check generic parameters in detail
     // --- Check: Argument: SerializationRequirement
     GenericTypeParamDecl *ArgumentParam = genericParams->getParams()[0];
-    auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType())
+    auto resultType = func->mapTypeIntoEnvironment(func->getResultInterfaceType())
                           ->getMetatypeInstanceType();
-    auto resultParamType = func->mapTypeIntoContext(
+    auto resultParamType = func->mapTypeIntoEnvironment(
         ArgumentParam->getDeclaredInterfaceType());
     // The result of the function must be the `Res` generic argument.
     if (!resultType->isEqual(resultParamType)) {
@@ -1252,6 +1253,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
     // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
     ProtocolDecl *decoderProto =
         C.getProtocol(KnownProtocolKind::DistributedTargetInvocationResultHandler);
+    if (!decoderProto) {
+      return false;
+    }
 
     auto decoderNominal = getDeclContext()->getSelfNominalTypeDecl();
     auto protocolConformance = lookupConformance(
@@ -1278,7 +1282,7 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
     }
 
     // === Check generics
-    if (!isGeneric()) {
+    if (!hasGenericParamList()) {
       return false;
     }
 
@@ -1312,9 +1316,9 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
     // === Check generic parameters in detail
     // --- Check: Argument: SerializationRequirement
     GenericTypeParamDecl *ArgumentParam = genericParams->getParams()[0];
-    auto argumentType = func->mapTypeIntoContext(
+    auto argumentType = func->mapTypeIntoEnvironment(
         valueParam->getInterfaceType()->getMetatypeInstanceType());
-    auto resultParamType = func->mapTypeIntoContext(
+    auto resultParamType = func->mapTypeIntoEnvironment(
         ArgumentParam->getDeclaredInterfaceType());
     // The result of the function must be the `Res` generic argument.
     if (!argumentType->isEqual(resultParamType)) {
@@ -1352,6 +1356,42 @@ bool ValueDecl::isDistributedGetAccessor() const {
   }
 
   return false;
+}
+
+std::optional<SpecialDistributedActorProperty>
+ValueDecl::isSpecialDistributedActorProperty(bool onlyCheckName) const {
+  if (!isa<VarDecl>(this))
+    return std::nullopt;
+
+  auto *DC = getDeclContext();
+  auto &ctx = DC->getASTContext();
+
+  auto kind = [&]() -> std::optional<SpecialDistributedActorProperty> {
+    auto name = getName();
+    if (name.isSimpleName(ctx.Id_id))
+      return SpecialDistributedActorProperty::Id;
+    if (name.isSimpleName(ctx.Id_actorSystem))
+      return SpecialDistributedActorProperty::ActorSystem;
+
+    return std::nullopt;
+  }();
+  if (!kind || onlyCheckName)
+    return kind;
+
+  // The properties can only be synthesized in the nominal itself.
+  auto *CD = dyn_cast<ClassDecl>(DC);
+  if (!CD || !CD->isDistributedActor())
+    return std::nullopt;
+
+  // The synthesized bit doesn't get preserved by serialization or module
+  // interfaces, we only need to check it when compiling a SourceFile though
+  // since we'll diagnose any conflicting user-defined versions.
+  if (!isSynthesized() && DC->getParentSourceFile() &&
+      !DC->isInSwiftinterface()) {
+    return std::nullopt;
+  }
+
+  return kind;
 }
 
 ConstructorDecl *

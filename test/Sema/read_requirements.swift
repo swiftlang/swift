@@ -3,6 +3,8 @@
 // RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN:     -debug-diagnostic-names
 
+// REQUIRES: swift_feature_CoroutineAccessors
+
 // A read requirement may be satisfied by
 // - a stored property
 // - a _read accessor

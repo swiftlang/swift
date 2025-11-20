@@ -1,8 +1,10 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -verify-additional-prefix ni-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s -emit-sil -o /dev/null -verify -verify-additional-prefix ni-ns- -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 // REQUIRES: asserts
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 import Foundation
 
@@ -17,7 +19,7 @@ final class B: NSObject, Sendable {
 class C { } // expected-note{{class 'C' does not conform to the 'Sendable' protocol}}
 
 final class D: NSObject, Sendable {
-  let c: C = C() // expected-warning{{stored property 'c' of 'Sendable'-conforming class 'D' has non-sendable type 'C'}}
+  let c: C = C() // expected-warning{{stored property 'c' of 'Sendable'-conforming class 'D' has non-Sendable type 'C'}}
 }
 
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name test %s | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name test %s | %FileCheck %s --enable-var-scope
 
 class Retainable {}
 

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown
 
 // Structs with computed members should get synthesized conformance to Codable,
 // but their lazy and computed members should be skipped as part of the

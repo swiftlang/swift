@@ -6,7 +6,7 @@
     {
       key.kind: source.lang.swift.decl.class,
       key.accessibility: source.lang.swift.accessibility.internal,
-      key.name: "<#MyCls#>",
+      key.name: "`<#MyCls#>`",
       key.offset: 0,
       key.length: 35,
       key.nameoffset: 6,
@@ -29,7 +29,7 @@
     {
       key.kind: source.lang.swift.decl.function.free,
       key.accessibility: source.lang.swift.accessibility.internal,
-      key.name: "<#test1#>()",
+      key.name: "`<#test1#>`()",
       key.offset: 37,
       key.length: 52,
       key.nameoffset: 42,
@@ -56,7 +56,7 @@
           key.substructure: [
             {
               key.kind: source.lang.swift.decl.var.local,
-              key.name: "<#name#>",
+              key.name: "`<#name#>`",
               key.offset: 63,
               key.length: 8,
               key.nameoffset: 63,

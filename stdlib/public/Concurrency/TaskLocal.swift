@@ -100,6 +100,7 @@ public macro TaskLocal() =
 ///     func enter() {
 ///         Example.$traceID.withValue("1234") {
 ///             read() // always "1234", regardless if enter() was called from inside a task or not:
+///         }    
 ///     }
 ///    
 ///     func read() -> String {
@@ -157,7 +158,7 @@ public macro TaskLocal() =
 ///       }
 ///     }
 ///
-/// - SeeAlso: ``TaskLocal-macro``
+/// - SeeAlso: ``TaskLocal()-macro``
 @available(SwiftStdlib 5.1, *)
 public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible {
   let defaultValue: Value
@@ -168,7 +169,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 
   @_alwaysEmitIntoClient
   var key: Builtin.RawPointer {
-    unsafeBitCast(self, to: Builtin.RawPointer.self)
+    unsafe unsafeBitCast(self, to: Builtin.RawPointer.self)
   }
 
   /// Gets the value currently bound to this task-local from the current task.
@@ -177,14 +178,14 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// or if the task-local has no value bound, this will return the `defaultValue`
   /// of the task local.
   public func get() -> Value {
-    guard let rawValue = _taskLocalValueGet(key: key) else {
+    guard let rawValue = unsafe _taskLocalValueGet(key: key) else {
       return self.defaultValue
     }
 
     // Take the value; The type should be correct by construction
     let storagePtr =
-        rawValue.bindMemory(to: Value.self, capacity: 1)
-    return UnsafeMutablePointer<Value>(mutating: storagePtr).pointee
+        unsafe rawValue.bindMemory(to: Value.self, capacity: 1)
+    return unsafe UnsafeMutablePointer<Value>(mutating: storagePtr).pointee
   }
 
   /// Binds the task-local to the specific value for the duration of the asynchronous operation.
@@ -234,22 +235,22 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 
   /// Implementation for withValue that consumes valueDuringOperation.
   ///
-  /// Because _taskLocalValuePush and _taskLocalValuePop involve calls to
-  /// swift_task_alloc/swift_task_dealloc respectively unbeknownst to the
-  /// compiler, compiler-emitted calls to swift_task_de/alloc must be avoided
-  /// in a function that calls them.
+  /// Because Builtin.taskLocalValuePush and Builtin.taskLocalValuePop involve
+  /// calls to swift_task_alloc/swift_task_dealloc respectively unbeknownst to
+  /// the compiler, compiler-emitted calls to swift_task_de/alloc must be
+  /// avoided in a function that calls them.
   ///
   /// A copy of valueDuringOperation is required because withValue borrows its
-  /// argument but _taskLocalValuePush consumes its.  Because
+  /// argument but Builtin.taskLocalValuePush consumes its.  Because
   /// valueDuringOperation is of generic type, its size is not generally known,
   /// so such a copy entails a stack allocation and a copy to that allocation.
   /// That stack traffic gets lowered to calls to
   /// swift_task_alloc/swift_task_deallloc.
   ///
-  /// Split the calls _taskLocalValuePush/Pop from the compiler-emitted calls
+  /// Split the calls Builtin.taskLocalValuePush/Pop from the compiler-emitted calls
   /// to swift_task_de/alloc for the copy as follows:
   /// - withValue contains the compiler-emitted calls swift_task_de/alloc.
-  /// - withValueImpl contains the calls to _taskLocalValuePush/Pop
+  /// - withValueImpl contains the calls to Builtin.taskLocalValuePush/Pop
   @inlinable
   @discardableResult
   @available(SwiftStdlib 5.1, *)
@@ -258,8 +259,8 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
                                  operation: () async throws -> R,
                                  isolation: isolated (any Actor)?,
                                  file: String = #fileID, line: UInt = #line) async rethrows -> R {
-    _taskLocalValuePush(key: key, value: consume valueDuringOperation)
-    defer { _taskLocalValuePop() }
+    Builtin.taskLocalValuePush(key, consume valueDuringOperation)
+    defer { Builtin.taskLocalValuePop() }
 
     return try await operation()
   }
@@ -274,8 +275,8 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     operation: () async throws -> R,
     file: String = #fileID, line: UInt = #line
   ) async rethrows -> R {
-    _taskLocalValuePush(key: key, value: consume valueDuringOperation)
-    defer { _taskLocalValuePop() }
+    Builtin.taskLocalValuePush(key, consume valueDuringOperation)
+    defer { Builtin.taskLocalValuePop() }
 
     return try await operation()
   }
@@ -298,8 +299,8 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @discardableResult
   public func withValue<R>(_ valueDuringOperation: Value, operation: () throws -> R,
                            file: String = #fileID, line: UInt = #line) rethrows -> R {
-    _taskLocalValuePush(key: key, value: valueDuringOperation)
-    defer { _taskLocalValuePop() }
+    Builtin.taskLocalValuePush(key, valueDuringOperation)
+    defer { Builtin.taskLocalValuePop() }
 
     return try operation()
   }
@@ -311,7 +312,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 
     @available(*, unavailable, message: "use '$myTaskLocal.withValue(_:do:)' instead")
     set {
-      fatalError("Illegal attempt to set a \(Self.self) value, use `withValue(...) { ... }` instead.")
+      fatalError("Illegal attempt to set a TaskLocal value, use `withValue(...) { ... }` instead.")
     }
   }
 
@@ -344,19 +345,6 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 // ==== ------------------------------------------------------------------------
 
 @available(SwiftStdlib 5.1, *)
-@usableFromInline
-@_silgen_name("swift_task_localValuePush")
-func _taskLocalValuePush<Value>(
-  key: Builtin.RawPointer/*: Key*/,
-  value: __owned Value
-) // where Key: TaskLocal
-
-@available(SwiftStdlib 5.1, *)
-@usableFromInline
-@_silgen_name("swift_task_localValuePop")
-func _taskLocalValuePop()
-
-@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_localValueGet")
 func _taskLocalValueGet(
   key: Builtin.RawPointer/*Key*/
@@ -375,8 +363,8 @@ func _taskLocalsCopy(
 @available(*, deprecated, message: "The situation diagnosed by this is not handled gracefully rather than by crashing")
 func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String, line: UInt) {
   if _taskHasTaskGroupStatusRecord() {
-    file.withCString { _fileStart in
-      _reportIllegalTaskLocalBindingWithinWithTaskGroup(
+    unsafe file.withCString { _fileStart in
+      unsafe _reportIllegalTaskLocalBindingWithinWithTaskGroup(
           _fileStart, file.count, true, line)
     }
   }

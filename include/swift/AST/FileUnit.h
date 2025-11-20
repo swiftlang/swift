@@ -39,7 +39,8 @@ class FileUnit : public DeclContext, public ASTAllocated<FileUnit> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
 
-  // The pointer is FileUnit insted of SynthesizedFileUnit to break circularity.
+  /// The pointer is FileUnit insted of SynthesizedFileUnit to break
+  /// circularity.
   llvm::PointerIntPair<FileUnit *, 3, FileUnitKind> SynthesizedFileAndKind;
 
 protected:
@@ -125,6 +126,21 @@ public:
                             const ModuleDecl *importedModule,
                             llvm::SmallSetVector<Identifier, 4> &spiGroups) const {};
 
+  /// Returns true if any import of \p importedModule has the `@preconcurrency`
+  /// attribute.
+  virtual bool
+  isModuleImportedPreconcurrency(const ModuleDecl *importedModule) const {
+    return false;
+  };
+
+  /// Find all availability domains defined in this module with the given
+  /// identifier.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  virtual void lookupAvailabilityDomains(
+      Identifier identifier,
+      SmallVectorImpl<AvailabilityDomain> &results) const {};
+
   virtual std::optional<Fingerprint>
   loadFingerprint(const IterableDeclContext *IDC) const {
     return std::nullopt;
@@ -194,8 +210,6 @@ public:
   /// identifier.
   virtual Identifier
   getDiscriminatorForPrivateDecl(const Decl *D) const = 0;
-
-  virtual bool shouldCollectDisplayDecls() const { return true; }
 
   /// Finds all top-level decls in this file.
   ///
@@ -347,7 +361,7 @@ public:
 
   /// Returns the version of the Swift compiler used to create generate
   /// .swiftinterface file if this file is produced from one.
-  virtual llvm::VersionTuple getSwiftInterfaceCompilerVersion() const {
+  virtual version::Version getSwiftInterfaceCompilerVersion() const {
     return {};
   }
 
@@ -486,9 +500,11 @@ void simple_display(llvm::raw_ostream &out, const FileUnit *file);
 inline FileUnit &ModuleDecl::getMainFile(FileUnitKind expectedKind) const {
   assert(expectedKind != FileUnitKind::Source &&
          "must use specific source kind; see getMainSourceFile");
-  assert(!Files.empty() && "No files added yet");
-  assert(Files.front()->getKind() == expectedKind);
-  return *Files.front();
+
+  auto files = getFiles();
+  assert(!files.empty() && "No files in module");
+  assert(files.front()->getKind() == expectedKind);
+  return *files.front();
 }
 
 } // end namespace swift

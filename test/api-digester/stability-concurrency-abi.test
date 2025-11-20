@@ -75,6 +75,9 @@ Protocol GlobalActor has added inherited protocol Escapable
 Protocol SerialExecutor has added inherited protocol Copyable
 Protocol SerialExecutor has added inherited protocol Escapable
 Protocol AsyncSequence is now without @rethrows
+Protocol Actor has added inherited protocol SendableMetatype
+Protocol Executor has added inherited protocol SendableMetatype
+Protocol SerialExecutor has added inherited protocol SendableMetatype
 
 // #isolated adoption in with...Continuation
 // api-digester is not aware of silgen_name trickery we do to keep this ABI compatible
@@ -108,7 +111,7 @@ Func SerialExecutor.enqueue(_:) has been added as a protocol requirement
 // while adding a new overload that accepts `Job` with new availability.
 // The ABI checker seems to be confused by this case.
 // rdar://106833284 (ABI checker confused with overload getting deprecated)
-Func Executor.enqueue(_:) is a new API without @available attribute
+Func Executor.enqueue(_:) is a new API without '@available'
 
 // Adopt #isolation in TaskLocal.withValue APIs
 Func TaskLocal.withValue(_:operation:file:line:) has been renamed to Func withValue(_:operation:isolation:file:line:)
@@ -124,6 +127,8 @@ Func withThrowingTaskGroup(of:returning:body:) has mangled name changing from '_
 Func withThrowingTaskGroup(of:returning:body:) has parameter 2 type change from (inout _Concurrency.ThrowingTaskGroup<τ_0_0, any Swift.Error>) async throws -> τ_0_1 to (any _Concurrency.Actor)?
 Func withTaskGroup(of:returning:body:) has been renamed to Func withTaskGroup(of:returning:isolation:body:)
 Func withTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.TaskGroup<A>) async -> B) async -> B' to '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.TaskGroup<A>) async -> B) async -> B'
+
+Func pthread_main_np() is a new API without '@available'
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 

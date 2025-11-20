@@ -81,7 +81,7 @@ public:
     assert(box && "buffer never emitted before activating cleanup?!");
     auto theBox = box;
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
-      if (auto *bbi = cast<BeginBorrowInst>(theBox)) {
+      if (auto *bbi = dyn_cast<BeginBorrowInst>(theBox)) {
         SGF.B.createEndBorrow(loc, bbi);
         theBox = bbi->getOperand();
       }
@@ -225,14 +225,14 @@ public:
 /// reabstracting it.  The value can actually be a tuple if the
 /// abstraction is opaque.
 class ScalarResultPlan final : public ResultPlan {
-  std::unique_ptr<TemporaryInitialization> temporary;
+  TemporaryInitializationPtr temporary;
   AbstractionPattern origType;
   CanType substType;
   Initialization *init;
   SILFunctionTypeRepresentation rep;
 
 public:
-  ScalarResultPlan(std::unique_ptr<TemporaryInitialization> &&temporary,
+  ScalarResultPlan(TemporaryInitializationPtr &&temporary,
                    AbstractionPattern origType, CanType substType,
                    Initialization *init,
                    SILFunctionTypeRepresentation rep)
@@ -339,13 +339,13 @@ class InitValueFromTemporaryResultPlan final : public ResultPlan {
   Initialization *init;
   CanType substType;
   ResultPlanPtr subPlan;
-  std::unique_ptr<TemporaryInitialization> temporary;
+  TemporaryInitializationPtr temporary;
 
 public:
   InitValueFromTemporaryResultPlan(
       Initialization *init, CanType substType,
       ResultPlanPtr &&subPlan,
-      std::unique_ptr<TemporaryInitialization> &&temporary)
+      TemporaryInitializationPtr &&temporary)
       : init(init), substType(substType), subPlan(std::move(subPlan)),
         temporary(std::move(temporary)) {}
 
@@ -524,6 +524,7 @@ public:
     // Loop over the pack, initializing each value with the appropriate
     // element.
     SGF.emitDynamicPackLoop(loc, FormalPackType, ComponentIndex, openedEnv,
+                            []() -> SILBasicBlock * { return nullptr; },
                             [&](SILValue indexWithinComponent,
                                 SILValue expansionIndex,
                                 SILValue packIndex) {
@@ -541,11 +542,9 @@ public:
           if (!eltTL.isAddressOnly()) {
             auto load = eltTL.emitLoad(SGF.B, loc, eltAddr,
                                        LoadOwnershipQualifier::Take);
-            eltMV = SGF.emitManagedRValueWithCleanup(load, eltTL);
-          } else {
-            eltMV = SGF.emitManagedBufferWithCleanup(eltAddr, eltTL);
+            return SGF.emitManagedRValueWithCleanup(load, eltTL);
           }
-          return eltMV;
+          return SGF.emitManagedBufferWithCleanup(eltAddr, eltTL);
         }();
 
         // Finish in the normal way for scalar results.
@@ -752,34 +751,32 @@ public:
               ->getCanonicalType();
     }
 
-    auto blockStorageTy = SILBlockStorageType::get(
-        checkedBridging ? ctx.TheAnyType : continuationTy);
+    auto blockStorageTy = SILBlockStorageType::get(ctx.TheAnyType);
     auto blockStorage = SGF.emitTemporaryAllocation(
         loc, SILType::getPrimitiveAddressType(blockStorageTy));
 
     auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
 
     // Stash continuation in a buffer for a block object.
+    auto conformances =
+        collectExistentialConformances(continuationTy, ctx.TheAnyType);
+
+    // In this case block storage captures `Any` which would be initialized
+    // with a continuation.
+    auto underlyingContinuationAddr = SGF.B.createInitExistentialAddr(
+        loc, continuationAddr, continuationTy,
+        SGF.getLoweredType(continuationTy), conformances);
 
     if (checkedBridging) {
       auto createIntrinsic =
           throws ? SGF.SGM.getCreateCheckedThrowingContinuation()
                  : SGF.SGM.getCreateCheckedContinuation();
-
-      auto conformances = collectExistentialConformances(
-          continuationTy, ctx.TheAnyType);
-
-      // In this case block storage captures `Any` which would be initialized
-      // with an checked continuation.
-      auto underlyingContinuationAddr =
-          SGF.B.createInitExistentialAddr(loc, continuationAddr, continuationTy,
-                                          SGF.getLoweredType(continuationTy),
-                                          conformances);
-
-      auto subs = SubstitutionMap::get(createIntrinsic->getGenericSignature(),
-                                       {calleeTypeInfo.substResultType},
-                                       conformances);
-
+    auto conformances =
+        collectExistentialConformances(calleeTypeInfo.substResultType,
+                                       ctx.TheAnyType);
+      auto subs =
+          SubstitutionMap::get(createIntrinsic->getGenericSignature(),
+                               {calleeTypeInfo.substResultType}, conformances);
       InitializationPtr underlyingInit(
           new KnownAddressInitialization(underlyingContinuationAddr));
       auto continuationMV =
@@ -787,18 +784,18 @@ public:
       SGF.emitApplyOfLibraryIntrinsic(loc, createIntrinsic, subs,
                                       {continuationMV}, SGFContext())
           .forwardInto(SGF, loc, underlyingInit.get());
+      SGF.enterDestroyCleanup(underlyingContinuationAddr);
     } else {
-      SGF.B.createStore(loc, wrappedContinuation, continuationAddr,
+      SGF.B.createStore(loc, wrappedContinuation, underlyingContinuationAddr,
                         StoreOwnershipQualifier::Trivial);
     }
 
     return std::make_tuple(blockStorage, blockStorageTy, continuationTy);
   }
 
-  ManagedValue
-  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
-                                    AbstractionPattern origFormalType,
-                                    SILLocation loc) override {
+  ManagedValue emitForeignAsyncCompletionHandler(
+      SILGenFunction &SGF, AbstractionPattern origFormalType, ManagedValue self,
+      SILLocation loc) override {
     // Get the current continuation for the task.
     bool throws =
         calleeTypeInfo.foreign.async->completionHandlerErrorParamIndex()
@@ -810,6 +807,12 @@ public:
 
     std::tie(blockStorage, blockStorageTy, continuationTy) =
         emitBlockStorage(SGF, loc, throws);
+
+    // Add a merge_isolation_region from the continuation result buffer
+    // (resumeBuf) onto the block storage so it is in the same region as the
+    // block storage despite the intervening Sendable continuation wrapping that
+    // disguises this fact from the region isolation checker.
+    SGF.B.createMergeIsolationRegion(loc, {blockStorage, resumeBuf});
 
     // Get the block invocation function for the given completion block type.
     auto completionHandlerIndex = calleeTypeInfo.foreign.async
@@ -832,9 +835,9 @@ public:
     SILFunction *impl =
         SGF.SGM.getOrCreateForeignAsyncCompletionHandlerImplFunction(
             cast<SILFunctionType>(
-                impFnTy->mapTypeOutOfContext()->getReducedType(sig)),
-            blockStorageTy->mapTypeOutOfContext()->getReducedType(sig),
-            continuationTy->mapTypeOutOfContext()->getReducedType(sig),
+                impFnTy->mapTypeOutOfEnvironment()->getReducedType(sig)),
+            blockStorageTy->mapTypeOutOfEnvironment()->getReducedType(sig),
+            continuationTy->mapTypeOutOfEnvironment()->getReducedType(sig),
             origFormalType, sig, calleeTypeInfo);
     auto impRef = SGF.B.createFunctionRef(loc, impl);
 
@@ -842,7 +845,14 @@ public:
     SILValue block = SGF.B.createInitBlockStorageHeader(loc, blockStorage,
                           impRef, SILType::getPrimitiveObjectType(impFnTy),
                           SGF.getForwardingSubstitutionMap());
-    
+
+    // If our block is Sendable, we have lost the connection in between self and
+    // blockStorage. We need to restore that connection by using a merge
+    // isolation region.
+    if (self && block->getType().isSendable(&SGF.F)) {
+      SGF.B.createMergeIsolationRegion(loc, {self.getValue(), blockStorage});
+    }
+
     // Wrap it in optional if the callee expects it.
     if (handlerIsOptional) {
       block = SGF.B.createOptionalSome(loc, block, impTy);
@@ -917,11 +927,11 @@ public:
             SGF.B.createProjectBlockStorage(loc, blockStorage);
 
         ManagedValue continuation;
-        if (checkedBridging) {
+        {
           FormalEvaluationScope scope(SGF);
 
           auto underlyingValueTy =
-              OpenedArchetypeType::get(ctx.TheAnyType);
+              ExistentialArchetypeType::get(ctx.TheAnyType);
 
           auto underlyingValueAddr = SGF.emitOpenExistential(
               loc, ManagedValue::forTrivialAddressRValue(continuationAddr),
@@ -930,15 +940,15 @@ public:
           continuation = SGF.B.createUncheckedAddrCast(
               loc, underlyingValueAddr,
               SILType::getPrimitiveAddressType(continuationTy));
-        } else {
-          auto continuationVal = SGF.B.createLoad(
-              loc, continuationAddr, LoadOwnershipQualifier::Trivial);
-          continuation =
-              ManagedValue::forObjectRValueWithoutOwnership(continuationVal);
+
+          // If we are calling the unsafe variant, we always pass the value in
+          // registers.
+          if (!checkedBridging)
+            continuation = SGF.B.createLoadTrivial(loc, continuation);
         }
 
         auto mappedOutContinuationTy =
-            continuationTy->mapTypeOutOfContext()->getCanonicalType();
+            continuationTy->mapTypeOutOfEnvironment()->getCanonicalType();
         auto resumeType =
             cast<BoundGenericType>(mappedOutContinuationTy).getGenericArgs()[0];
 
@@ -948,7 +958,7 @@ public:
                 : SGF.SGM.getResumeUnsafeThrowingContinuationWithError();
 
         Type replacementTypes[] = {
-            SGF.F.mapTypeIntoContext(resumeType)->getCanonicalType()};
+            SGF.F.mapTypeIntoEnvironment(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
                                          LookUpConformanceInModule());
@@ -1088,11 +1098,11 @@ public:
     subPlan->gatherIndirectResultAddrs(SGF, loc, outList);
   }
 
-  ManagedValue
-  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
-                                    AbstractionPattern origFormalType,
-                                    SILLocation loc) override {
-    return subPlan->emitForeignAsyncCompletionHandler(SGF, origFormalType, loc);
+  ManagedValue emitForeignAsyncCompletionHandler(
+      SILGenFunction &SGF, AbstractionPattern origFormalType, ManagedValue self,
+      SILLocation loc) override {
+    return subPlan->emitForeignAsyncCompletionHandler(SGF, origFormalType, self,
+                                                      loc);
   }
 
   std::optional<std::pair<ManagedValue, ManagedValue>>
@@ -1240,7 +1250,7 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
   }
 
   // Create a temporary if the result is indirect.
-  std::unique_ptr<TemporaryInitialization> temporary;
+  TemporaryInitializationPtr temporary;
   if (SGF.silConv.isSILIndirect(result)) {
     auto &resultTL = SGF.getTypeLowering(result.getReturnValueType(
         SGF.SGM.M, calleeTy, SGF.getTypeExpansionContext()));
@@ -1304,6 +1314,7 @@ ResultPlanBuilder::buildPackExpansionIntoPack(SILValue packAddr,
   // we can emit a dynamic loop to do that now.
   if (init->canPerformInPlacePackInitialization(openedEnv, eltTy)) {
     SGF.emitDynamicPackLoop(loc, formalPackType, componentIndex, openedEnv,
+                            []() -> SILBasicBlock * { return nullptr; },
                             [&](SILValue indexWithinComponent,
                                 SILValue expansionPackIndex,
                                 SILValue packIndex) {
@@ -1325,6 +1336,7 @@ ResultPlanBuilder::buildPackExpansionIntoPack(SILValue packAddr,
                                     SILType::getPrimitiveObjectType(tupleTy));
 
   SGF.emitDynamicPackLoop(loc, formalPackType, componentIndex, openedEnv,
+                          []() -> SILBasicBlock * { return nullptr; },
                           [&](SILValue indexWithinComponent,
                               SILValue expansionPackIndex,
                               SILValue packIndex) {

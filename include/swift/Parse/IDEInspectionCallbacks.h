@@ -29,14 +29,19 @@ enum class ObjCSelectorContext {
   SetterSelector
 };
 
-/// Attributes that have syntax which can't be modelled using a function call.
-/// This can't be \c DeclAttrKind because '@freestandig' and '@attached' have
+/// Parameterized attributes that have code completion.
+/// This can't be \c DeclAttrKind because '@freestanding' and '@attached' have
 /// the same attribute kind but take different macro roles as arguemnts.
-enum class CustomSyntaxAttributeKind {
+enum class ParameterizedDeclAttributeKind {
+  AccessControl,
+  Nonisolated,
+  Unowned,
   Available,
   FreestandingMacro,
   AttachedMacro,
-  StorageRestrictions
+  StorageRestrictions,
+  InheritActorContext,
+  Nonexhaustive,
 };
 
 /// A bit of a hack. When completing inside the '@storageRestrictions'
@@ -204,6 +209,9 @@ public:
   /// Complete a given \c type-simple when there is no trailing dot.
   virtual void completeTypeSimpleWithoutDot(TypeRepr *TR){};
 
+  /// Complete a given \c type-simple following a \c ~ prefix.
+  virtual void completeTypeSimpleInverted() {};
+
   /// Complete the beginning of a case statement at the top of switch stmt.
   virtual void completeCaseStmtKeyword() {};
 
@@ -225,7 +233,7 @@ public:
   /// @available.
   /// If `HasLabel` is `true`, then the argument already has a label specified,
   /// e.g. we're completing after `names: ` in a macro declaration.
-  virtual void completeDeclAttrParam(CustomSyntaxAttributeKind DK, int Index,
+  virtual void completeDeclAttrParam(ParameterizedDeclAttributeKind DK, int Index,
                                      bool HasLabel){};
 
   /// Complete 'async' and 'throws' at effects specifier position.
@@ -247,6 +255,10 @@ public:
   /// Complete the import decl with importable modules.
   virtual void
   completeImportDecl(ImportPath::Builder &Path) {};
+
+  /// Complete the 'using' decl with supported specifiers.
+  virtual void
+  completeUsingDecl() {};
 
   /// Complete unresolved members after dot.
   virtual void completeUnresolvedMember(CodeCompletionExpr *E,
@@ -284,15 +296,14 @@ public:
   virtual void completeStmtLabel(StmtKind ParentKind) {};
 
   virtual
-  void completeForEachPatternBeginning(bool hasTry, bool hasAwait) {};
+  void completeForEachPatternBeginning(
+      bool hasTry, bool hasAwait, bool hasUnsafe) {};
 
   virtual void completeTypeAttrBeginning() {};
 
   virtual void completeTypeAttrInheritanceBeginning() {};
 
   virtual void completeOptionalBinding(){};
-
-  virtual void completeWithoutConstraintType(){};
 };
 
 class DoneParsingCallback {

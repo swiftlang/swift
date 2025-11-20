@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle %s -emit-sil -emit-verbose-sil -g -o - | %FileCheck --check-prefixes=CHECK-SIL %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle %s -Xllvm -sil-print-types -emit-sil -emit-verbose-sil -g -o - | %FileCheck --check-prefixes=CHECK-SIL %s
 import StdlibUnittest
 
 class Obj {}

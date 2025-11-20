@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -enable-experimental-feature MoveOnlyClasses
 
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_MoveOnlyClasses
 
 class CopyableKlass {}
 

@@ -153,7 +153,9 @@ public:
   ~SILBasicBlock();
 
   enum { numCustomBits = std::numeric_limits<CustomBitsType>::digits };
-  enum { maxBitfieldID = std::numeric_limits<uint64_t>::max() };
+
+  constexpr static const uint64_t maxBitfieldID =
+      std::numeric_limits<uint64_t>::max();
 
   /// Gets the ID (= index in the function's block list) of the block.
   ///
@@ -366,8 +368,6 @@ public:
   const SILArgument *getArgument(unsigned i) const { return ArgumentList[i]; }
   SILArgument *getArgument(unsigned i) { return ArgumentList[i]; }
 
-  void cloneArgumentList(SILBasicBlock *Other);
-
   void moveArgumentList(SILBasicBlock *from);
 
   /// Erase a specific argument from the arg list.
@@ -554,6 +554,9 @@ public:
 
   /// Pretty-print the SILBasicBlock.
   void dump() const;
+
+  /// Pretty-print the SILBasicBlock with Debug Info.
+  void dump(bool DebugInfo) const;
 
   /// Pretty-print the SILBasicBlock with the designated stream.
   void print(llvm::raw_ostream &OS) const;

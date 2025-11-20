@@ -181,12 +181,14 @@ internal class _AnySequenceBox<Element> {
   @inlinable
   internal var _underestimatedCount: Int { _abstract() }
 
+#if !$Embedded
   @inlinable
   internal func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
     _abstract()
   }
+#endif
 
   @inlinable
   internal func _filter(
@@ -534,12 +536,16 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   internal override var _underestimatedCount: Int {
     return _base.underestimatedCount
   }
+
+#if !$Embedded
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
     try _base.map(transform)
   }
+#endif
+
   @inlinable
   internal override func _filter(
     _ isIncluded: (Element) throws -> Bool
@@ -566,7 +572,7 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   internal override func __copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _base._copyContents(initializing: buf)
+    let (it,idx) = unsafe _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 
@@ -627,12 +633,14 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   internal override var _underestimatedCount: Int {
     return _base.underestimatedCount
   }
+#if !$Embedded
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
     try _base.map(transform)
   }
+#endif
   @inlinable
   internal override func _filter(
     _ isIncluded: (Element) throws -> Bool
@@ -659,7 +667,7 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   internal override func __copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _base._copyContents(initializing: buf)
+    let (it,idx) = unsafe _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 
@@ -822,12 +830,14 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   internal override var _underestimatedCount: Int {
     return _base.underestimatedCount
   }
+#if !$Embedded
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
     try _base.map(transform)
   }
+#endif
   @inlinable
   internal override func _filter(
     _ isIncluded: (Element) throws -> Bool
@@ -854,7 +864,7 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   internal override func __copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _base._copyContents(initializing: buf)
+    let (it,idx) = unsafe _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 
@@ -1035,12 +1045,14 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   internal override var _underestimatedCount: Int {
     return _base.underestimatedCount
   }
+#if !$Embedded
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) throws -> [T] {
     try _base.map(transform)
   }
+#endif
   @inlinable
   internal override func _filter(
     _ isIncluded: (Element) throws -> Bool
@@ -1067,7 +1079,7 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   internal override func __copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _base._copyContents(initializing: buf)
+    let (it,idx) = unsafe _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 
@@ -1322,6 +1334,7 @@ extension AnySequence {
     return _box._underestimatedCount
   }
 
+#if !$Embedded
   @inlinable
   @_alwaysEmitIntoClient
   public func map<T, E>(
@@ -1345,6 +1358,7 @@ extension AnySequence {
   ) throws -> [T] {
     try map(transform)
   }
+#endif
 
   @inlinable
   public __consuming func filter(
@@ -1393,7 +1407,7 @@ extension AnySequence {
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _box.__copyContents(initializing: buf)
+    let (it,idx) = unsafe _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 }
@@ -1426,6 +1440,7 @@ extension AnyCollection {
     return _box._underestimatedCount
   }
 
+#if !$Embedded
   @inlinable
   @_alwaysEmitIntoClient
   public func map<T, E>(
@@ -1449,6 +1464,7 @@ extension AnyCollection {
   ) throws -> [T] {
     try map(transform)
   }
+#endif
 
   @inlinable
   public __consuming func filter(
@@ -1499,7 +1515,7 @@ extension AnyCollection {
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _box.__copyContents(initializing: buf)
+    let (it,idx) = unsafe _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 }
@@ -1536,6 +1552,7 @@ extension AnyBidirectionalCollection {
     return _box._underestimatedCount
   }
 
+#if !$Embedded
   @inlinable
   @_alwaysEmitIntoClient
   public func map<T, E>(
@@ -1559,6 +1576,7 @@ extension AnyBidirectionalCollection {
   ) throws -> [T] {
     try map(transform)
   }
+#endif
 
   @inlinable
   public __consuming func filter(
@@ -1611,7 +1629,7 @@ extension AnyBidirectionalCollection {
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _box.__copyContents(initializing: buf)
+    let (it,idx) = unsafe _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 }
@@ -1648,6 +1666,7 @@ extension AnyRandomAccessCollection {
     return _box._underestimatedCount
   }
 
+#if !$Embedded
   @inlinable
   @_alwaysEmitIntoClient
   public func map<T, E>(
@@ -1671,6 +1690,7 @@ extension AnyRandomAccessCollection {
   ) throws -> [T] {
     try map(transform)
   }
+#endif
 
   @inlinable
   public __consuming func filter(
@@ -1723,7 +1743,7 @@ extension AnyRandomAccessCollection {
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _box.__copyContents(initializing: buf)
+    let (it,idx) = unsafe _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 }
@@ -1755,7 +1775,7 @@ internal final class _IndexBox<BaseIndex: Comparable>: _AnyIndexBox {
 
   @inlinable
   internal func _unsafeUnbox(_ other: _AnyIndexBox) -> BaseIndex {
-    return unsafeDowncast(other, to: _IndexBox.self)._base
+    return unsafe unsafeDowncast(other, to: _IndexBox.self)._base
   }
 
   @inlinable

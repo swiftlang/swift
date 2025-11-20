@@ -19,14 +19,17 @@ extension Optional: Differentiable where Wrapped: Differentiable {
 
     public var value: Wrapped.TangentVector?
 
+    @inlinable
     public init(_ value: Wrapped.TangentVector?) {
       self.value = value
     }
 
+    @inlinable
     public static var zero: Self {
       return Self(.zero)
     }
 
+    @inlinable
     public static func + (lhs: Self, rhs: Self) -> Self {
       switch (lhs.value, rhs.value) {
       case (nil, nil): return Self(nil)
@@ -36,6 +39,7 @@ extension Optional: Differentiable where Wrapped: Differentiable {
       }
     }
 
+    @inlinable
     public static func - (lhs: Self, rhs: Self) -> Self {
       switch (lhs.value, rhs.value) {
       case (nil, nil): return Self(nil)
@@ -45,6 +49,7 @@ extension Optional: Differentiable where Wrapped: Differentiable {
       }
     }
 
+    @inlinable
     public mutating func move(by offset: TangentVector) {
       if let value = offset.value {
         self.value?.move(by: value)
@@ -52,6 +57,7 @@ extension Optional: Differentiable where Wrapped: Differentiable {
     }
   }
 
+  @inlinable
   public mutating func move(by offset: TangentVector) {
     if let value = offset.value {
       self?.move(by: value)
@@ -63,4 +69,17 @@ extension Optional.TangentVector: CustomReflectable {
   public var customMirror: Mirror {
     return value.customMirror
   }
+}
+
+@derivative(of: ??)
+@_transparent
+@_alwaysEmitIntoClient
+func _vjpNilCoalescing<T: Differentiable>(optional: T?, defaultValue: @autoclosure () throws -> T)
+ rethrows -> (value: T, pullback: (T.TangentVector) -> Optional<T>.TangentVector) {
+  let hasValue = optional != nil
+  let value = try optional ?? defaultValue()
+  func pullback(_ v: T.TangentVector) -> Optional<T>.TangentVector {
+    return hasValue ? .init(v) : .zero
+  }
+  return (value, pullback)
 }

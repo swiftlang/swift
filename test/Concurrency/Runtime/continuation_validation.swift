@@ -12,7 +12,7 @@
 // UNSUPPORTED: back_deploy_concurrency
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: freestanding
-// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: OS=wasip1
 
 import StdlibUnittest
 

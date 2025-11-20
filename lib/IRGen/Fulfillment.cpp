@@ -69,7 +69,7 @@ static bool isLeafTypeMetadata(CanType type) {
 
   // Type parameters are statically opaque.
   case TypeKind::PrimaryArchetype:
-  case TypeKind::OpenedArchetype:
+  case TypeKind::ExistentialArchetype:
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::PackArchetype:
   case TypeKind::ElementArchetype:
@@ -178,35 +178,44 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
                                      source, std::move(path), keys);
   }
 
-  if (auto tupleType = dyn_cast<TupleType>(type)) {
-    if (tupleType->getNumElements() == 1 &&
-        isa<PackExpansionType>(tupleType.getElementType(0))) {
-
-      bool hadFulfillment = false;
-      auto packType = tupleType.getInducedPackType();
-
-      {
-        auto argPath = path;
-        argPath.addTuplePackComponent();
-        hadFulfillment |= searchTypeMetadataPack(IGM, packType,
-                                                 isExact, metadataState, source,
-                                                 std::move(argPath), keys);
-      }
-
-      {
-        auto argPath = path;
-        argPath.addTupleShapeComponent();
-        hadFulfillment |= searchShapeRequirement(IGM, packType, source,
-                                                 std::move(argPath));
-
-      }
-
-      return hadFulfillment;
-    }
-  }
-
   // TODO: functions
   // TODO: metatypes
+
+  return false;
+}
+
+/// Metadata fulfillment in a tuple conformance witness thunks.
+///
+/// \return true if any fulfillments were added by this search.
+bool FulfillmentMap::searchTupleTypeMetadata(IRGenModule &IGM, CanTupleType tupleType,
+                                             IsExact_t isExact,
+                                             MetadataState metadataState,
+                                             unsigned source, MetadataPath &&path,
+                                             const InterestingKeysCallback &keys) {
+  if (tupleType->getNumElements() == 1 &&
+      isa<PackExpansionType>(tupleType.getElementType(0))) {
+
+    bool hadFulfillment = false;
+    auto packType = tupleType.getInducedPackType();
+
+    {
+      auto argPath = path;
+      argPath.addTuplePackComponent();
+      hadFulfillment |= searchTypeMetadataPack(IGM, packType,
+                                               isExact, metadataState, source,
+                                               std::move(argPath), keys);
+    }
+
+    {
+      auto argPath = path;
+      argPath.addTupleShapeComponent();
+      hadFulfillment |= searchShapeRequirement(IGM, packType, source,
+                                               std::move(argPath));
+
+    }
+
+    return hadFulfillment;
+  }
 
   return false;
 }
@@ -371,7 +380,24 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
 
   for (unsigned reqtIndex : indices(requirements.getRequirements())) {
     auto requirement = requirements.getRequirements()[reqtIndex];
-    auto arg = requirement.getTypeParameter().subst(subs)->getCanonicalType();
+
+    // FIXME: The correct fix is to pass down the substitution map's
+    // output generic signature and reduce the result of subst() with
+    // this signature before forming the lookup key.
+    //
+    // Once that's fixed, change the below back to this:
+    // auto arg = requirement.getTypeParameter().subst(subs)->getCanonicalType();
+
+    auto arg = requirement.getTypeParameter().subst(
+      QuerySubstitutionMap{subs},
+      [&](InFlightSubstitution &IFS, Type origType, ProtocolDecl *proto)
+            -> ProtocolConformanceRef {
+        auto substType = origType.subst(IFS);
+        if (substType->isTypeParameter())
+          return ProtocolConformanceRef::forAbstract(substType, proto);
+
+        return subs.lookupConformance(origType->getCanonicalType(), proto);
+      })->getCanonicalType();
 
     // Skip uninteresting type arguments.
     if (!keys.hasInterestingType(arg))

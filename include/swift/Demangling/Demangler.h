@@ -20,6 +20,7 @@
 #define SWIFT_DEMANGLING_DEMANGLER_H
 
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/NamespaceMacros.h"
 
 //#define NODE_FACTORY_DEBUGGING
@@ -248,6 +249,12 @@ public:
   /// Creates a node of kind \p K with an \p Index payload.
   NodePointer createNode(Node::Kind K, Node::IndexType Index);
 
+  /// Creates a node of kind \p K with a \p RemoteAddress payload.
+  ///
+  /// These nodes are created and consumed by the reflection library.
+  NodePointer createNode(Node::Kind K, uint64_t RemoteAddress,
+                         uint8_t AddressSpace);
+
   /// Creates a node of kind \p K with a \p Text payload.
   ///
   /// The \p Text string must be already allocated with the Factory and therefore
@@ -404,6 +411,8 @@ protected:
   /// labels attached to it, instead of having them
   /// as part of the name.
   bool IsOldFunctionTypeMangling = false;
+
+  Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default;
 
   Vector<NodePointer> NodeStack;
   Vector<NodePointer> Substitutions;
@@ -567,6 +576,8 @@ protected:
   NodePointer demangleImplParamConvention(Node::Kind ConvKind);
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
   NodePointer demangleImplParameterSending();
+  NodePointer demangleImplParameterIsolated();
+  NodePointer demangleImplParameterImplicitLeading();
   NodePointer demangleImplParameterResultDifferentiability();
   NodePointer demangleImplFunctionType();
   NodePointer demangleClangType();
@@ -593,6 +604,7 @@ protected:
   NodePointer demangleDependentProtocolConformanceInherited();
   NodePointer popDependentAssociatedConformance();
   NodePointer demangleDependentProtocolConformanceAssociated();
+  NodePointer demangleDependentProtocolConformanceOpaque();
   NodePointer demangleThunkOrSpecialization();
   NodePointer demangleGenericSpecialization(Node::Kind SpecKind,
                                             NodePointer droppedArguments);

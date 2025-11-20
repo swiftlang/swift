@@ -1,11 +1,9 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -strict-concurrency=targeted %s
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -strict-concurrency=complete %s
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation %s
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
-// REQUIRES: asserts
 
 import Foundation
 
@@ -14,7 +12,7 @@ import Foundation
     func track(event: String) async // expected-note {{protocol requires function 'track(event:)' with type '(String) async -> ()'}}
 }
 class Dog: NSObject, Tracker { // expected-error {{type 'Dog' does not conform to protocol 'Tracker'}} expected-note {{add stubs for conformance}}
-    func track(event: String) {} // expected-note {{candidate is not 'async', but @objc protocol requirement is}}
+    func track(event: String) {} // expected-note {{candidate is not 'async', but '@objc' protocol requirement is}}
 }
 
 // sync objc requirement, async witness
@@ -22,7 +20,7 @@ class Dog: NSObject, Tracker { // expected-error {{type 'Dog' does not conform t
     func run(event: String) // expected-note {{protocol requires function 'run(event:)' with type '(String) -> ()'}}
 }
 class Athlete: NSObject, Runner { // expected-error {{type 'Athlete' does not conform to protocol 'Runner'}} expected-note {{add stubs for conformance}}
-    func run(event: String) async {} // expected-note {{candidate is 'async', but @objc protocol requirement is not}}
+    func run(event: String) async {} // expected-note {{candidate is 'async', but '@objc' protocol requirement is not}}
 }
 
 

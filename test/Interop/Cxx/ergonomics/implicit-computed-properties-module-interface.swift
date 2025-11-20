@@ -263,9 +263,9 @@
 
 // CHECK:      struct PrivatePropertyWithSameName {
 // CHECK-NEXT:    init()
-// CHECK-NEXT:    var value: Int32
 // CHECK-NEXT:    func getValue() -> Int32
 // CHECK-NEXT:    mutating func setValue(_ i: Int32)
+// CHECK-NEXT:    var value: Int32
 // CHECK-NEXT: }
 
 // CHECK:      struct SnakeCaseGetterSetter {

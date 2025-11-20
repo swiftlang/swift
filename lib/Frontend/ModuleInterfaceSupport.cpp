@@ -124,16 +124,14 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
         !Opts.PackageFlags.IgnorableFlags.empty())
       ignorableFlags.push_back(Opts.PackageFlags.IgnorableFlags);
 
-    ignorableFlags.push_back("-interface-compiler-version");
-    ignorableFlags.push_back(version::getCompilerVersion());
+    out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": ";
 
-    if (!ignorableFlags.empty()) {
-      out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": ";
-      llvm::interleave(
-          ignorableFlags, [&out](StringRef str) { out << str; },
-          [&out] { out << " "; });
-      out << "\n";
-    }
+    llvm::interleave(
+        ignorableFlags, [&out](StringRef str) { out << str; },
+        [&out] { out << " "; });
+
+    out << " -interface-compiler-version " << version::getCompilerVersion();
+    out << "\n";
   }
 }
 
@@ -211,7 +209,8 @@ diagnoseIfModuleImportsShadowingDecl(ModuleInterfaceOptions const &Opts,
   using namespace namelookup;
 
   SmallVector<ValueDecl *, 4> decls;
-  lookupInModule(importedModule, importingModule->getName(), decls,
+  lookupInModule(importedModule, importingModule->getName(),
+                 /*hasModuleSelector=*/false, decls,
                  NLKind::UnqualifiedLookup, ResolutionKind::TypesOnly,
                  importedModule, SourceLoc(),
                  NL_UnqualifiedDefault | NL_IncludeUsableFromInline);
@@ -273,6 +272,9 @@ static void printImports(raw_ostream &out,
       ModuleDecl::ImportFilterKind::Default,
       ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay};
 
+  // FIXME: Scan over all imports in the module once to build up the attribute
+  // set for printed imports, instead of repeatedly doing linear scans for each
+  // kind of attribute.
   using ImportSet = llvm::SmallSet<ImportedModule, 8, ImportedModule::Order>;
   auto getImports = [M](ModuleDecl::ImportFilter filter) -> ImportSet {
     SmallVector<ImportedModule, 8> matchingImports;
@@ -341,11 +343,6 @@ static void printImports(raw_ostream &out,
       continue;
     }
 
-    if (llvm::count(Opts.ModulesToSkipInPublicInterface,
-                    importedModule->getName().str())) {
-      continue;
-    }
-
     llvm::SmallSetVector<Identifier, 4> spis;
     M->lookupImportedSPIGroups(importedModule, spis);
 
@@ -361,6 +358,9 @@ static void printImports(raw_ostream &out,
       for (auto spiName : spis)
         out << "@_spi(" << spiName << ") ";
     }
+
+    if (M->isModuleImportedPreconcurrency(importedModule))
+      out << "@preconcurrency ";
 
     if (Opts.printPackageInterface() &&
         !publicImportSet.count(import) &&
@@ -429,12 +429,12 @@ namespace {
 class InheritedProtocolCollector {
   static const StringLiteral DummyProtocolName;
 
-  using AvailableAttrList = TinyPtrVector<const AvailableAttr *>;
+  using AvailableAttrList = SmallVector<SemanticAvailableAttr>;
   using OriginallyDefinedInAttrList =
       TinyPtrVector<const OriginallyDefinedInAttr *>;
   using ProtocolAndAvailability =
-      std::tuple<ProtocolDecl *, AvailableAttrList, bool /*isUnchecked*/,
-                 OriginallyDefinedInAttrList>;
+      std::tuple<ProtocolDecl *, AvailableAttrList,
+                 ProtocolConformanceOptions, OriginallyDefinedInAttrList>;
 
   /// Protocols that will be included by the ASTPrinter without any extra work.
   SmallVector<ProtocolDecl *, 8> IncludedProtocols;
@@ -453,13 +453,14 @@ class InheritedProtocolCollector {
 
     cache.emplace();
     while (D) {
-      for (auto *nextAttr : D->getAttrs().getAttributes<AvailableAttr>()) {
+      for (auto nextAttr : D->getSemanticAvailableAttrs()) {
         // FIXME: This is just approximating the effects of nested availability
         // attributes for the same platform; formally they'd need to be merged.
-        bool alreadyHasMoreSpecificAttrForThisPlatform =
-            llvm::any_of(*cache, [nextAttr](const AvailableAttr *existingAttr) {
-          return existingAttr->Platform == nextAttr->Platform;
-        });
+        // FIXME: [availability] This should compare availability domains.
+        bool alreadyHasMoreSpecificAttrForThisPlatform = llvm::any_of(
+            *cache, [nextAttr](SemanticAvailableAttr existingAttr) {
+              return existingAttr.getPlatform() == nextAttr.getPlatform();
+            });
         if (alreadyHasMoreSpecificAttrForThisPlatform)
           continue;
         cache->push_back(nextAttr);
@@ -487,10 +488,16 @@ class InheritedProtocolCollector {
     return isPublicOrUsableFromInline(type);
   }
 
-  static bool isUncheckedConformance(ProtocolConformance *conformance) {
+  static ProtocolConformanceOptions filterOptions(ProtocolConformanceOptions options) {
+    options -= ProtocolConformanceFlags::Preconcurrency;
+    options -= ProtocolConformanceFlags::Retroactive;
+    return options;
+  }
+
+  static ProtocolConformanceOptions getConformanceOptions(ProtocolConformance *conformance) {
     if (auto normal = dyn_cast<NormalProtocolConformance>(conformance->getRootConformance()))
-      return normal->isUnchecked();
-    return false;
+      return filterOptions(normal->getOptions());
+    return {};
   }
 
   /// For each type in \p directlyInherited, classify the protocols it refers to
@@ -522,7 +529,8 @@ class InheritedProtocolCollector {
         else
           ExtraProtocols.push_back(ProtocolAndAvailability(
               protoDecl, getAvailabilityAttrs(D, availableAttrs),
-              inherited.isUnchecked(), getOriginallyDefinedInAttrList(D)));
+              filterOptions(inherited.getOptions()),
+              getOriginallyDefinedInAttrList(D)));
       }
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.
@@ -541,7 +549,7 @@ class InheritedProtocolCollector {
           continue;
         ExtraProtocols.push_back(ProtocolAndAvailability(
             conf->getProtocol(), getAvailabilityAttrs(D, availableAttrs),
-            isUncheckedConformance(conf), getOriginallyDefinedInAttrList(D)));
+            getConformanceOptions(conf), getOriginallyDefinedInAttrList(D)));
       }
     }
   }
@@ -687,10 +695,11 @@ public:
     if (!printOptions.shouldPrint(nominal))
       return;
 
-    /// is this nominal specifically an 'actor'?
-    bool actorClass = false;
-    if (auto klass = dyn_cast<ClassDecl>(nominal))
-      actorClass = klass->isActor();
+    /// is this nominal specifically an 'actor' or 'distributed actor'?
+    bool anyActorClass = false;
+    if (auto klass = dyn_cast<ClassDecl>(nominal)) {
+      anyActorClass = klass->isAnyActor();
+    }
 
     SmallPtrSet<ProtocolDecl *, 16> handledProtocols;
 
@@ -703,8 +712,9 @@ public:
 
     // Preserve the behavior of previous implementations which formatted of
     // empty extensions compactly with '{}' on the same line.
-    PrintOptions extensionPrintOptions = printOptions;
-    extensionPrintOptions.PrintEmptyMembersOnSameLine = true;
+    PrintOptions::OverrideScope extensionPrintingScope(printOptions);
+    OVERRIDE_PRINT_OPTION(extensionPrintingScope,
+                          PrintEmptyMembersOnSameLine, true);
 
     // Then walk the remaining ones, and see what we need to print.
     // FIXME: This will pick the availability attributes from the first sight
@@ -724,9 +734,11 @@ public:
         // There is a special restriction on the Actor protocol in that
         // it is only valid to conform to Actor on an 'actor' decl,
         // not extensions of that 'actor'.
-        if (actorClass &&
-            inherited->isSpecificProtocol(KnownProtocolKind::Actor))
-          return TypeWalker::Action::SkipNode;
+        if (anyActorClass) {
+          if (inherited->isSpecificProtocol(KnownProtocolKind::Actor) ||
+              inherited->isSpecificProtocol(KnownProtocolKind::DistributedActor))
+            return TypeWalker::Action::SkipNode;
+        }
 
         // Do not synthesize an extension to print a conformance to an
         // invertible protocol, as their conformances are always re-inferred
@@ -743,7 +755,7 @@ public:
             !M->isImportedImplementationOnly(inherited->getParentModule())) {
           auto protoAndAvailability = ProtocolAndAvailability(
               inherited, availability, isUnchecked, otherAttrs);
-          printSynthesizedExtension(out, extensionPrintOptions, M, nominal,
+          printSynthesizedExtension(out, printOptions, M, nominal,
                                     protoAndAvailability);
           return TypeWalker::Action::SkipNode;
         }
@@ -763,15 +775,13 @@ public:
 
     auto proto = std::get<0>(protoAndAvailability);
     auto availability = std::get<1>(protoAndAvailability);
-    auto isUnchecked = std::get<2>(protoAndAvailability);
+    auto options = std::get<2>(protoAndAvailability);
     auto originallyDefinedInAttrs = std::get<3>(protoAndAvailability);
 
     // Create a synthesized ExtensionDecl for the conformance.
     ASTContext &ctx = M->getASTContext();
     auto inherits = ctx.AllocateCopy(llvm::ArrayRef(InheritedEntry(
-        TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), isUnchecked,
-        /*isRetroactive=*/false,
-        /*isPreconcurrency=*/false)));
+        TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()), options)));
     auto extension =
         ExtensionDecl::create(ctx, SourceLoc(), nullptr, inherits,
                               nominal->getModuleScopeContext(), nullptr);
@@ -779,8 +789,9 @@ public:
 
     // Build up synthesized DeclAttributes for the extension.
     TinyPtrVector<const DeclAttribute *> clonedAttrs;
-    for (auto *attr : availability) {
-      clonedAttrs.push_back(attr->clone(ctx, /*implicit*/ true));
+    for (auto attr : availability) {
+      clonedAttrs.push_back(
+          attr.getParsedAttr()->clone(ctx, /*implicit*/ true));
     }
     for (auto *attr : proto->getAttrs().getAttributes<SPIAccessControlAttr>()) {
       clonedAttrs.push_back(attr->clone(ctx, /*implicit*/ true));
@@ -794,13 +805,12 @@ public:
     // the order in which previous implementations printed these attributes.
     for (auto attr = clonedAttrs.rbegin(), end = clonedAttrs.rend();
          attr != end; ++attr) {
-      extension->getAttrs().add(const_cast<DeclAttribute *>(*attr));
+      extension->addAttribute(const_cast<DeclAttribute *>(*attr));
     }
 
     ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
                               nominal->getDeclaredType());
-    ctx.evaluator.cacheOutput(ExtendedNominalRequest{extension},
-                              const_cast<NominalTypeDecl *>(nominal));
+    extension->setExtendedNominal(const_cast<NominalTypeDecl *>(nominal));
 
     extension->print(printer, printOptions);
     printer << "\n";
@@ -874,13 +884,22 @@ bool swift::emitSwiftInterface(raw_ostream &out,
 
   printImports(out, Opts, M, aliasModuleNamesTargets);
 
-  bool useExportedModuleNames = Opts.printPublicInterface();
+  // Apply module selector blocklist.
+  bool useModuleSelectors = Opts.UseModuleSelectors;
+  if (useModuleSelectors && M->getASTContext().blockListConfig
+        .hasBlockListAction(M->getNameStr(), BlockListKeyKind::ModuleName,
+                            BlockListAction::
+                              DisableModuleSelectorsInModuleInterface))
+    useModuleSelectors = false;
 
+  bool useExportedModuleNames = Opts.printPublicInterface();
   const PrintOptions printOptions = PrintOptions::printSwiftInterfaceFile(
-      M, Opts.PreserveTypesAsWritten, Opts.PrintFullConvention,
+      M, useModuleSelectors, Opts.PreserveTypesAsWritten,
+      Opts.PrintFullConvention,
       Opts.InterfaceContentMode,
       useExportedModuleNames,
-      Opts.AliasModuleNames, &aliasModuleNamesTargets, Opts.ABIComments);
+      Opts.AliasModuleNames, &aliasModuleNamesTargets);
+
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;
@@ -899,7 +918,8 @@ bool swift::emitSwiftInterface(raw_ostream &out,
     D->print(out, printOptions);
     out << "\n";
 
-    diagnoseIfDeclShadowsKnownModule(Opts, const_cast<Decl *>(D), M);
+    if (!useModuleSelectors)
+      diagnoseIfDeclShadowsKnownModule(Opts, const_cast<Decl *>(D), M);
   }
 
   // Print dummy extensions for any protocols that were indirectly conformed to.

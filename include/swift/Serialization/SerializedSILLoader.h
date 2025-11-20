@@ -42,6 +42,7 @@ class SILDifferentiabilityWitness;
 /// on each SILDeserializer.
 class SerializedSILLoader {
 private:
+  ASTContext &Context;
   std::vector<std::unique_ptr<SILDeserializer>> LoadedSILSections;
 
   explicit SerializedSILLoader(
@@ -61,13 +62,18 @@ public:
 
   SILFunction *lookupSILFunction(SILFunction *Callee, bool onlyUpdateLinkage);
   SILFunction *lookupSILFunction(StringRef Name,
-                                 std::optional<SILLinkage> linkage);
+                                 std::optional<SILLinkage> linkage,
+                                 bool byAsmName = false);
+  SILGlobalVariable *lookupSILGlobalVariable(StringRef Name,
+                                             bool byAsmName = false);
   bool hasSILFunction(StringRef Name,
                       std::optional<SILLinkage> linkage = std::nullopt);
   SILVTable *lookupVTable(const ClassDecl *C);
   SILMoveOnlyDeinit *lookupMoveOnlyDeinit(const NominalTypeDecl *nomDecl);
   SILWitnessTable *lookupWitnessTable(SILWitnessTable *C);
   SILDefaultWitnessTable *lookupDefaultWitnessTable(SILDefaultWitnessTable *C);
+  SILDefaultOverrideTable *
+  lookupDefaultOverrideTable(SILDefaultOverrideTable *);
   SILDifferentiabilityWitness *
   lookupDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
 
@@ -103,6 +109,9 @@ public:
 
   /// Deserialize all DefaultWitnessTables in all SILModules.
   void getAllDefaultWitnessTables();
+
+  /// Deserialize all DefaultOverrideTables in all SILModules.
+  void getAllDefaultOverrideTables();
 
   /// Deserialize all Properties in all SILModules.
   void getAllProperties();

@@ -1458,6 +1458,45 @@ bb0:
   return %2 : $X
 }
 
+// CHECK-LABEL: Escape information for test_unchecked_ref_cast_from_optional_to_non_optional:
+// CHECK: return[]: %0 = alloc_ref $Derived
+// CHECK:  -    :   %2 = alloc_ref $Derived
+// CHECK: End function test_unchecked_ref_cast_from_optional_to_non_optional
+sil @test_unchecked_ref_cast_from_optional_to_non_optional : $@convention(thin) () -> @owned X {
+bb0:
+  %0 = alloc_ref $Derived
+  %1 = enum $Optional<Derived>, #Optional.some!enumelt, %0 : $Derived
+  %2 = alloc_ref $Derived
+  %3 = enum $Optional<Derived>, #Optional.some!enumelt, %2 : $Derived
+  %4 = unchecked_ref_cast %1 : $Optional<Derived> to $X
+  %5 = unchecked_ref_cast %3 : $Optional<Derived> to $X
+  return %4 : $X
+}
+
+// CHECK-LABEL: Escape information for test_unchecked_ref_cast_from_optional_to_non_optional_2:
+// CHECK-NEXT: End function test_unchecked_ref_cast_from_optional_to_non_optional_2
+sil @test_unchecked_ref_cast_from_optional_to_non_optional_2 : $@convention(thin) () -> @owned X {
+bb0:
+  %0 = enum $Optional<Derived>, #Optional.none!enumelt
+  %1 = enum $Optional<Derived>, #Optional.none!enumelt
+  %2 = unchecked_ref_cast %0 : $Optional<Derived> to $X
+  %3 = unchecked_ref_cast %1 : $Optional<Derived> to $X
+  return %2 : $X
+}
+
+// CHECK-LABEL: Escape information for test_unchecked_ref_cast_from_non_optional_to_optional:
+// CHECK: return[e1]: %0 = alloc_ref $Derived
+// CHECK:  -    :   %1 = alloc_ref $Derived
+// CHECK: End function test_unchecked_ref_cast_from_non_optional_to_optional
+sil @test_unchecked_ref_cast_from_non_optional_to_optional : $@convention(thin) () -> @owned Optional<X> {
+bb0:
+  %0 = alloc_ref $Derived
+  %1 = alloc_ref $Derived
+  %2 = unchecked_ref_cast %0 : $Derived to $Optional<X>
+  %3 = unchecked_ref_cast %1 : $Derived to $Optional<X>
+  return %2 : $Optional<X>
+}
+
 // CHECK-LABEL: Escape information for test_unchecked_addr_cast:
 // CHECK: global:   %1 = alloc_ref $X
 // CHECK: End function test_unchecked_addr_cast
@@ -1470,4 +1509,22 @@ bb0:
   %4 = load %3 : $*Builtin.RawPointer
   dealloc_stack %0 : $*X
   return %4 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: Escape information for test_vector_base_addr_escaping:
+// CHECK:       return[]:   %1 = alloc_ref $X
+// CHECK:       End function test_vector_base_addr_escaping
+sil @test_vector_base_addr_escaping : $@convention(thin) () -> @owned X {
+bb0:
+  %0 = alloc_stack $Builtin.FixedArray<10, X>
+  %1 = alloc_ref $X
+  %2 = vector_base_addr %0
+  %3 = integer_literal $Builtin.Int64, 1
+  %4 = index_addr %2, %3
+  store %1 to %4
+  %6 = vector_base_addr %0
+  %7 = index_addr %6, %3
+  %8 = load %4
+  dealloc_stack %0
+  return %8
 }

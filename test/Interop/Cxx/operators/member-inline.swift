@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-5.9)
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-6)
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++23 -D CPP23)
 //
 // REQUIRES: executable_test
 
@@ -184,6 +184,20 @@ OperatorsTestSuite.test("ReadWriteIntArray.subscript (inline)") {
   let resultAfter = arr[1]
   expectEqual(234, resultAfter)
 }
+
+#if CPP23
+OperatorsTestSuite.test("Subscript operators with parameter number != 1") {
+  var ns = NullarySubscript()
+  expectEqual(42, ns[])
+  ns[] = 5
+  expectEqual(5, ns.field)
+
+  var bs = BinarySubscript()
+  expectEqual(10, bs[3, 7])
+  bs[1, 2] = 6
+  expectEqual(6, bs.field)
+}
+#endif
 
 OperatorsTestSuite.test("DerivedFromReadWriteIntArray.subscript (inline, base class)") {
   var arr = DerivedFromReadWriteIntArray()
@@ -462,6 +476,12 @@ OperatorsTestSuite.test("HasStaticOperatorCallWithConstOperator.call") {
   expectEqual(9, res)
   let res2 = h(3, 5)
   expectEqual(8, res2)
+}
+
+OperatorsTestSuite.test("UnnamedParameterInOperator.equal") {
+  let lhs = ClassWithOperatorEqualsParamUnnamed()
+  let rhs = ClassWithOperatorEqualsParamUnnamed()
+  expectFalse(lhs == rhs)
 }
 
 runAllTests()

@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserASTGen -DDISCARDABLE -DNONSENDABLE -swift-version 6
-/// -enable-experimental-feature requires an asserts build
-// REQUIRES: asserts
+
+// REQUIRES: swift_feature_ParserASTGen
 
 #if NOT_SET
 func f { } // expected-error{{expected parameter clause in function signature}}

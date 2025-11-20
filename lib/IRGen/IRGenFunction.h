@@ -45,11 +45,12 @@ namespace swift {
   class SILType;
   class SourceLoc;
   enum class MetadataState : size_t;
+  enum class CoroAllocatorKind : uint8_t;
 
-namespace Lowering {
+  namespace Lowering {
   class TypeConverter;
-}
-  
+  }
+
 namespace irgen {
   class DynamicMetadataRequest;
   class Explosion;
@@ -65,6 +66,11 @@ namespace irgen {
   class TypeInfo;
   enum class ValueWitness : unsigned;
 
+enum AllowsTaskAlloc_t : bool {
+  DoesNotAllowTaskAlloc = false,
+  AllowsTaskAlloc = true,
+};
+
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
 class IRGenFunction {
@@ -76,6 +82,9 @@ public:
   /// function attribute.
   OptimizationMode OptMode;
   bool isPerformanceConstraint;
+
+  // Destination basic blocks for condfail traps.
+  llvm::SmallVector<llvm::BasicBlock *, 8> FailBBs;
 
   llvm::Function *const CurFn;
   ModuleDecl *getSwiftModule() const;
@@ -102,7 +111,8 @@ public:
   Explosion collectParameters();
   void emitScalarReturn(SILType returnResultType, SILType funcResultType,
                         Explosion &scalars, bool isSwiftCCReturn,
-                        bool isOutlined);
+                        bool isOutlined, bool mayPeepholeLoad = false,
+                        SILType errorType = {});
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
   
   void emitBBForReturn();
@@ -141,6 +151,8 @@ public:
   Address getCalleeTypedErrorResultSlot(SILType errorType);
   void setCalleeTypedErrorResultSlot(Address addr);
 
+  llvm::ConstantInt* getMallocTypeId();
+
   /// Are we currently emitting a coroutine?
   bool isCoroutine() {
     return CoroutineHandle != nullptr;
@@ -149,12 +161,25 @@ public:
     assert(isCoroutine());
     return CoroutineHandle;
   }
+  bool isCalleeAllocatedCoroutine() { return CoroutineAllocator != nullptr; }
+  llvm::Value *getCoroutineAllocator() {
+    assert(isCoroutine());
+    return CoroutineAllocator;
+  }
 
   void setCoroutineHandle(llvm::Value *handle) {
     assert(CoroutineHandle == nullptr && "already set handle");
     assert(handle != nullptr && "setting a null handle");
     CoroutineHandle = handle;
   }
+
+  void setCoroutineAllocator(llvm::Value *allocator) {
+    assert(CoroutineAllocator == nullptr && "already set allocator");
+    assert(allocator != nullptr && "setting a null allocator");
+    CoroutineAllocator = allocator;
+  }
+
+  std::optional<CoroAllocatorKind> getDefaultCoroutineAllocatorKind();
 
   llvm::BasicBlock *getCoroutineExitBlock() const {
     return CoroutineExitBlock;
@@ -179,6 +204,7 @@ public:
 
   llvm::Value *emitAsyncResumeProjectContext(llvm::Value *callerContextAddr);
   llvm::Function *getOrCreateResumePrjFn();
+  llvm::Value *popAsyncContext(llvm::Value *calleeContext);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Value *> args);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
@@ -225,6 +251,7 @@ private:
   Address CallerTypedErrorResultSlot;
   Address CalleeTypedErrorResultSlot;
   llvm::Value *CoroutineHandle = nullptr;
+  llvm::Value *CoroutineAllocator = nullptr;
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
 
@@ -280,11 +307,15 @@ public:
                        const llvm::Twine &name = "");
 
   StackAddress emitDynamicAlloca(SILType type, const llvm::Twine &name = "");
-  StackAddress emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize,
-                                 Alignment align, bool allowTaskAlloc = true,
-                                 const llvm::Twine &name = "");
+  StackAddress
+  emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize, Alignment align,
+                    AllowsTaskAlloc_t allowTaskAlloc = AllowsTaskAlloc,
+                    llvm::Value *mallocTypeId = nullptr,
+                    const llvm::Twine &name = "");
   void emitDeallocateDynamicAlloca(StackAddress address,
-                                   bool allowTaskDealloc = true);
+                                   bool allowTaskDealloc = true,
+                                   bool useTaskDeallocThrough = false,
+                                   bool forCalleeCoroutineFrame = false);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
@@ -301,7 +332,6 @@ public:
   void emitMemCpy(Address dest, Address src, llvm::Value *size);
 
   llvm::Value *emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
-                                 llvm::Type *objectType,
                                  const llvm::Twine &name = "");
   Address emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
                             const TypeInfo &type,
@@ -373,9 +403,8 @@ public:
 
   // Emit a call to the given generic type metadata access function.
   MetadataResponse emitGenericTypeMetadataAccessFunctionCall(
-                                          llvm::Function *accessFunction,
-                                          ArrayRef<llvm::Value *> args,
-                                          DynamicMetadataRequest request);
+      llvm::Function *accessFunction, ArrayRef<llvm::Value *> args,
+      DynamicMetadataRequest request, bool hasPacks = false);
 
   // Emit a reference to the canonical type metadata record for the given AST
   // type. This can be used to identify the type at runtime. For types with
@@ -436,6 +465,8 @@ public:
   void recordStackPackWitnessTableAlloc(StackAddress addr, llvm::Value *shape);
   void eraseStackPackWitnessTableAlloc(StackAddress addr, llvm::Value *shape);
 
+  void withLocalStackPackAllocs(llvm::function_ref<void()> fn);
+
   /// Emit a load of a reference to the given Objective-C selector.
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);
 
@@ -452,6 +483,9 @@ public:
 
   /// Emit a non-mergeable trap call, optionally followed by a terminator.
   void emitTrap(StringRef failureMessage, bool EmitUnreachable);
+
+  void emitConditionalTrap(llvm::Value *condition, StringRef failureMessage,
+                           const SILDebugScope *debugScope = nullptr);
 
   /// Given at least a src address to a list of elements, runs body over each
   /// element passing its address. An optional destination address can be
@@ -592,6 +626,9 @@ public:
   void emitNativeStrongRelease(llvm::Value *value, Atomicity atomicity);
   void emitNativeSetDeallocating(llvm::Value *value);
 
+  // Routines to deal with box (embedded) runtime calls.
+  void emitReleaseBox(llvm::Value *value);
+
   // Routines for the ObjC reference-counting style.
   void emitObjCStrongRetain(llvm::Value *value);
   llvm::Value *emitObjCRetainCall(llvm::Value *value);
@@ -628,6 +665,7 @@ public:
   Address emitTaskAlloc(llvm::Value *size,
                         Alignment alignment);
   void emitTaskDealloc(Address address);
+  void emitTaskDeallocThrough(Address address);
 
   llvm::Value *alignUpToMaximumAlignment(llvm::Type *sizeTy, llvm::Value *val);
 
@@ -734,7 +772,7 @@ public:
   void bindLocalTypeDataFromSelfWitnessTable(
                 const ProtocolConformance *conformance,
                 llvm::Value *selfTable,
-                llvm::function_ref<CanType (CanType)> mapTypeIntoContext);
+                llvm::function_ref<CanType (CanType)> mapTypeIntoEnvironment);
 
   void setDominanceResolver(DominanceResolverFunction resolver) {
     assert(DominanceResolver == nullptr);

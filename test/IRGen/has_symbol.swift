@@ -159,6 +159,9 @@ public func testStruct(_ s: S) {
   // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper1SV6memberSivpTwS"()
   if #_hasSymbol(s.member) {}
 
+  // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper1SV12staticMemberSivpZTwS"()
+  if #_hasSymbol(S.staticMember) {}
+
   // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper1SV6method4withySi_tFTwS"()
   if #_hasSymbol(s.method(with:)) {}
 }
@@ -172,6 +175,15 @@ public func testStruct(_ s: S) {
 // CHECK:   [[V4:%.*]] = and i1 [[V2]], [[V3]]
 // CHECK:   [[V5:%.*]] = icmp ne ptr @"$s17has_symbol_helper1SV6memberSivM", null
 // CHECK:   [[RES:%.*]] = and i1 [[V4]], [[V5]]
+// CHECK:   ret i1 [[RES]]
+
+// --- S.staticMember ---
+// CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1SV12staticMemberSivpZTwS"()
+// CHECK:   [[V0:%.*]] = icmp ne ptr @"$s17has_symbol_helper1SV12staticMemberSivgZ", null
+// CHECK:   [[V1:%.*]] = icmp ne ptr @"$s17has_symbol_helper1SV12staticMemberSivsZ", null
+// CHECK:   [[V2:%.*]] = and i1 [[V0]], [[V1]]
+// CHECK:   [[V3:%.*]] = icmp ne ptr @"$s17has_symbol_helper1SV12staticMemberSivMZ", null
+// CHECK:   [[RES:%.*]] = and i1 [[V2]], [[V3]]
 // CHECK:   ret i1 [[RES]]
 
 // --- S.method(with:) ---

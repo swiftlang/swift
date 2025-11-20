@@ -13,7 +13,7 @@
 import SwiftShims
 
 // Macros are disabled when Swift is built without swift-syntax.
-#if $Macros && $DebugDescriptionMacro && hasAttribute(attached)
+#if $Macros && hasAttribute(attached)
 
 /// Converts description definitions to a debugger Type Summary.
 ///
@@ -130,7 +130,7 @@ public enum _DebuggerSupport {
 
   private static func asObjectAddress(_ value: Any) -> String {
     let address = checkValue(value,
-      ifClass: { return unsafeBitCast($0, to: Int.self) },
+      ifClass: { return unsafe unsafeBitCast($0, to: Int.self) },
       otherwise: { return 0 })
     return String(address, radix: 16, uppercase: false)
   }
@@ -158,7 +158,7 @@ public enum _DebuggerSupport {
       default:
         return value.map(String.init(reflecting:))
       }
-    case .`class`?:
+    case .`class`?, .foreignReference?:
       switch value {
       case let x as CustomDebugStringConvertible:
         return x.debugDescription
@@ -328,6 +328,38 @@ public enum _DebuggerSupport {
 
     return target
   }
+
+  // Print an object or value without the caller having a concrete type.
+  //
+  // For simplicity of data handling in LLDB avoids using an enum return type,
+  // using (Bool, String) instead of Optional<String>.
+  @available(SwiftStdlib 6.3, *)
+  public static func stringForPrintObject(_ pointer: UnsafeRawPointer?, mangledTypeName: String) -> (Bool, String) {
+    guard let pointer = unsafe pointer else {
+      return (false, "invalid pointer")
+    }
+
+    guard let type =
+      unsafe _getTypeByMangledNameInContext(
+        mangledTypeName,
+        UInt(mangledTypeName.count),
+        genericContext: nil,
+        genericArguments: nil)
+      else {
+        return (false, "type not found for mangled name: \(mangledTypeName)")
+      }
+
+    func loadPointer<T>(type: T.Type) -> Any {
+      if type is AnyObject.Type {
+        unsafe unsafeBitCast(pointer, to: T.self)
+      } else {
+        unsafe pointer.load(as: T.self)
+      }
+    }
+
+    let anyValue = _openExistential(type, do: loadPointer)
+    return (true, stringForPrintObject(anyValue))
+  }
 }
 
 public func _stringForPrintObject(_ value: Any) -> String {
@@ -344,8 +376,8 @@ internal func _withHeapObject<R>(
   _ body: (UnsafeMutableRawPointer) -> R
 ) -> R {
   defer { _fixLifetime(object) }
-  let unmanaged = Unmanaged.passUnretained(object)
-  return body(unmanaged.toOpaque())
+  let unmanaged = unsafe Unmanaged.passUnretained(object)
+  return unsafe body(unmanaged.toOpaque())
 }
 
 @_extern(c, "swift_retainCount") @usableFromInline
@@ -358,18 +390,18 @@ internal func _swift_weakRetainCount(_: UnsafeMutableRawPointer) -> Int
 // Utilities to get refcount(s) of class objects.
 @_alwaysEmitIntoClient
 public func _getRetainCount(_ object: AnyObject) -> UInt {
-  let count = _withHeapObject(of: object) { _swift_retainCount($0) }
+  let count = unsafe _withHeapObject(of: object) { unsafe _swift_retainCount($0) }
   return UInt(bitPattern: count)
 }
 
 @_alwaysEmitIntoClient
 public func _getUnownedRetainCount(_ object: AnyObject) -> UInt {
-  let count = _withHeapObject(of: object) { _swift_unownedRetainCount($0) }
+  let count = unsafe _withHeapObject(of: object) { unsafe _swift_unownedRetainCount($0) }
   return UInt(bitPattern: count)
 }
 
 @_alwaysEmitIntoClient
 public func _getWeakRetainCount(_ object: AnyObject) -> UInt {
-  let count = _withHeapObject(of: object) { _swift_weakRetainCount($0) }
+  let count = unsafe _withHeapObject(of: object) { unsafe _swift_weakRetainCount($0) }
   return UInt(bitPattern: count)
 }

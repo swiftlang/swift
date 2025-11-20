@@ -55,9 +55,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
 }
 
 UnsafeMutableRawPointerExtraTestSuite.test("initializeMemorySingleElement")
-.skip(.custom({
-   if #available(SwiftStdlib 5.8, *) { return false } else { return true }
- }, reason: "Requires standard library from Swift 5.8"))
+.require(.stdlib_5_8)
 .code {
   Missile.missilesLaunched = 0
   let p1 = UnsafeMutableRawPointer.allocate(
@@ -112,10 +110,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("load/store") {
 }
 
 UnsafeMutableRawPointerExtraTestSuite.test("load.unaligned")
-.skip(.custom({
-  if #available(SwiftStdlib 5.7, *) { return false }
-  return true
-}, reason: "Requires Swift 5.7's stdlib"))
+.require(.stdlib_5_7)
 .code {
   guard #available(SwiftStdlib 5.7, *) else { return }
   var data: [UInt8] = [0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0x0]
@@ -158,10 +153,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("load.invalid.mutable")
 #endif
 
 UnsafeMutableRawPointerExtraTestSuite.test("store.unaligned")
-.skip(.custom({
-  if #available(SwiftStdlib 5.7, *) { return false }
-  return true
-}, reason: "Requires Swift 5.7's stdlib"))
+.require(.stdlib_5_7)
 .code {
   let count = MemoryLayout<UInt>.stride * 2
   let p1 = UnsafeMutableRawPointer.allocate(
@@ -190,10 +182,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("store.unaligned")
 UnsafeMutableRawPointerExtraTestSuite.test("store.invalid")
 .skip(.custom({ !_isDebugAssertConfiguration() },
               reason: "This tests a debug precondition.."))
-.skip(.custom({
-  if #available(SwiftStdlib 5.7, *) { return false }
-  return true
-}, reason: "Requires Swift 5.7's stdlib"))
+.require(.stdlib_5_7)
 .code {
   Missile.missilesLaunched = 0
   let m = Missile(0)

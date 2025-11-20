@@ -1,4 +1,6 @@
 // RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -parse-as-library)
+// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
@@ -12,7 +14,7 @@
 // UNSUPPORTED: back_deploy_concurrency
 
 // Crash expectations can't be implemented on WASI/WebAssembly.
-// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: OS=wasip1
 
 // This test makes sure that we properly save/restore access when we
 // synchronously launch a task from a serial executor. The access from the task

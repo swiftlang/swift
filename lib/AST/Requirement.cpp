@@ -82,7 +82,9 @@ ProtocolDecl *Requirement::getProtocolDecl() const {
 
 CheckRequirementResult Requirement::checkRequirement(
     SmallVectorImpl<Requirement> &subReqs,
-    bool allowMissing) const {
+    bool allowMissing,
+    SmallVectorImpl<ProtocolConformanceRef> *isolatedConformances
+) const {
   if (hasError())
     return CheckRequirementResult::SubstitutionFailure;
 
@@ -121,6 +123,15 @@ CheckRequirementResult Requirement::checkRequirement(
         firstType, proto, allowMissing);
     if (!conformance)
       return CheckRequirementResult::RequirementFailure;
+
+    // Collect isolated conformances.
+    if (isolatedConformances) {
+      conformance.forEachIsolatedConformance(
+          [&](ProtocolConformanceRef isolatedConformance) {
+            isolatedConformances->push_back(isolatedConformance);
+            return false;
+          });
+    }
 
     auto condReqs = conformance.getConditionalRequirements();
     if (condReqs.empty())
@@ -244,10 +255,11 @@ int Requirement::compare(const Requirement &other) const {
 
   // We should only have multiple conformance requirements.
   if (getKind() != RequirementKind::Conformance) {
-    llvm::errs() << "Unordered generic requirements\n";
-    llvm::errs() << "LHS: "; dump(llvm::errs()); llvm::errs() << "\n";
-    llvm::errs() << "RHS: "; other.dump(llvm::errs()); llvm::errs() << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "Unordered generic requirements\n";
+      out << "LHS: "; dump(out); out << "\n";
+      out << "RHS: "; other.dump(out);
+    });
   }
 
   int compareProtos =
@@ -267,28 +279,24 @@ checkRequirementsImpl(ArrayRef<Requirement> requirements,
   while (!worklist.empty()) {
     auto req = worklist.pop_back_val();
 
-  // Check preconditions.
-#ifndef NDEBUG
-  {
+    // Check preconditions.
     auto firstType = req.getFirstType();
-    assert((allowTypeParameters || !firstType->hasTypeParameter())
+    ASSERT((allowTypeParameters || !firstType->hasTypeParameter())
            && "must take a contextual type. if you really are ok with an "
             "indefinite answer (and usually YOU ARE NOT), then consider whether "
             "you really, definitely are ok with an indefinite answer, and "
             "use `checkRequirementsWithoutContext` instead");
-    assert(!firstType->hasTypeVariable());
+    ASSERT(!firstType->hasTypeVariable());
 
     if (req.getKind() != RequirementKind::Layout) {
       auto secondType = req.getSecondType();
-      assert((allowTypeParameters || !secondType->hasTypeParameter())
+      ASSERT((allowTypeParameters || !secondType->hasTypeParameter())
              && "must take a contextual type. if you really are ok with an "
               "indefinite answer (and usually YOU ARE NOT), then consider whether "
               "you really, definitely are ok with an indefinite answer, and "
               "use `checkRequirementsWithoutContext` instead");
-      assert(!secondType->hasTypeVariable());
+      ASSERT(!secondType->hasTypeVariable());
     }
-  }
-#endif
 
     switch (req.checkRequirement(worklist, /*allowMissing=*/true)) {
     case CheckRequirementResult::Success:

@@ -23,19 +23,19 @@ extension Atomic where Value == UInt32 {
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specific error value.
   internal borrowing func _futexLock() -> UInt32 {
-    _swift_stdlib_futex_lock(.init(_rawAddress))
+    unsafe _swift_stdlib_futex_lock(.init(_rawAddress))
   }
 
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specific error value.
   internal borrowing func _futexTryLock() -> UInt32 {
-    _swift_stdlib_futex_trylock(.init(_rawAddress))
+    unsafe _swift_stdlib_futex_trylock(.init(_rawAddress))
   }
 
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specific error value.
   internal borrowing func _futexUnlock() -> UInt32 {
-    _swift_stdlib_futex_unlock(.init(_rawAddress))
+    unsafe _swift_stdlib_futex_unlock(.init(_rawAddress))
   }
 }
 
@@ -235,8 +235,7 @@ extension _MutexHandle {
 
     // EDEADLK - "The futex word at uaddr is already locked by the caller."
     case 35:
-      // TODO: Replace with a colder function / one that takes a StaticString
-      fatalError("Attempt to try to lock Mutex in already acquired thread")
+      return false
 
     // This handles all of the following errors which generally aren't
     // applicable to this implementation:

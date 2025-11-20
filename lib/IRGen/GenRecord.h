@@ -138,7 +138,7 @@ protected:
         NumFields(fields.size()),
         AreFieldsABIAccessible(fieldsABIAccessible) {
     std::uninitialized_copy(fields.begin(), fields.end(),
-                            this->template getTrailingObjects<FieldImpl>());
+                            this->getTrailingObjects());
   }
 
   void fillWithZerosIfSensitive(IRGenFunction &IGF, Address address, SILType T) const {
@@ -157,12 +157,19 @@ public:
     return new(buffer) Impl(fields, std::forward<As>(args)...);
   }
 
+  void operator delete(void *ptr) {
+    const auto *pThis = static_cast<RecordTypeInfoImpl *>(ptr);
+    const size_t count = pThis->NumFields;
+    const size_t size = Impl::template totalSizeToAlloc<FieldImpl>(count);
+    ::operator delete(ptr, size);
+  }
+
   bool areFieldsABIAccessible() const {
     return AreFieldsABIAccessible;
   }
 
   ArrayRef<FieldImpl> getFields() const {
-    return {this->template getTrailingObjects<FieldImpl>(), NumFields};
+    return this->getTrailingObjects(NumFields);
   }
 
   /// The standard schema is just all the fields jumbled together.

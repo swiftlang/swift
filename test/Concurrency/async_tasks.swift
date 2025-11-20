@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -strict-concurrency=targeted -target %target-swift-5.1-abi-triple %s -o /dev/null -verify -emit-sil  -DALLOW_TYPECHECKER_ERRORS -verify-additional-prefix typechecker-
 // RUN: %target-swift-frontend -strict-concurrency=complete -target %target-swift-5.1-abi-triple %s -o /dev/null -verify -emit-sil -DALLOW_TYPECHECKER_ERRORS -verify-additional-prefix typechecker-
-// RUN: %target-swift-frontend -strict-concurrency=complete -target %target-swift-5.1-abi-triple %s -o /dev/null -verify -emit-sil -verify-additional-prefix tns-
+// RUN: %target-swift-frontend -strict-concurrency=complete -target %target-swift-5.1-abi-triple %s -o /dev/null -verify -emit-sil -verify-additional-prefix complete-
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -140,9 +140,9 @@ func test_detached_throwing() async -> String {
 
 // ==== Detached Tasks with inout Params---------------------------------------
 @available(SwiftStdlib 5.1, *)
-func printOrderNumber(n: inout Int) async { // expected-tns-note {{parameter 'n' is declared 'inout'}}
-  Task.detached { // expected-tns-error {{escaping closure captures 'inout' parameter 'n'}}
-      n+=1 // expected-tns-note {{captured here}}
-      print(n) // expected-tns-note {{captured here}}
+func printOrderNumber(n: inout Int) async { // expected-complete-note {{parameter 'n' is declared 'inout'}}
+  Task.detached { // expected-complete-error {{escaping closure captures 'inout' parameter 'n'}}
+      n+=1 // expected-complete-note {{captured here}}
+      print(n) // expected-complete-note {{captured here}}
   }
 }

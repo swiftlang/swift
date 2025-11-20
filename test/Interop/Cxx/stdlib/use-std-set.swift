@@ -16,6 +16,7 @@
 //
 // Enable this everywhere once we have a solution for modularizing other C++ stdlibs: rdar://87654514
 // REQUIRES: OS=macosx || OS=linux-gnu
+// UNSUPPORTED: LinuxDistribution=fedora-41
 
 import StdlibUnittest
 #if !BRIDGING_HEADER
@@ -161,6 +162,24 @@ StdSetTestSuite.test("UnorderedSetOfCInt.erase") {
     s.erase(2)
     expectFalse(s.contains(2))
     s.erase(2)
+    expectFalse(s.contains(2))
+}
+
+StdSetTestSuite.test("SetOfCInt.remove") {
+    var s = initSetOfCInt()
+    expectTrue(s.contains(1))
+    expectEqual(s.remove(1), 1)
+    expectFalse(s.contains(1))
+    expectEqual(s.remove(1), nil)
+    expectFalse(s.contains(1))
+}
+
+StdSetTestSuite.test("UnorderedSetOfCInt.remove") {
+    var s = initUnorderedSetOfCInt()
+    expectTrue(s.contains(2))
+    expectEqual(s.remove(2), 2)
+    expectFalse(s.contains(2))
+    expectEqual(s.remove(2), nil)
     expectFalse(s.contains(2))
 }
 

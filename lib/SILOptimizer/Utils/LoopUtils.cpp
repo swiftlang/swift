@@ -17,6 +17,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
@@ -217,9 +218,21 @@ bool swift::canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI) {
   return MadeChange;
 }
 
-bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
+bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBlocks *deb) {
   SinkAddressProjections sinkProj;
   for (auto res : I->getResults()) {
+    // If a guaranteed value is used in a dead-end exit block and the enclosing value
+    // is _not_ destroyed in this block, we end up missing the enclosing value as
+    // phi-argument after duplicating the loop.
+    // TODO: once we have complete lifetimes we can remove this check
+    if (res->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      for (Operand *use : res->getUses()) {
+        SILBasicBlock *useBlock = use->getUser()->getParent();
+        if (!L->contains(useBlock) && deb->isDeadEnd(useBlock))
+          return false;
+      }
+    }
+
     if (!res->getType().isAddress()) {
       continue;
     }
@@ -263,11 +276,11 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
       return false;
     }
   }
-  // Like partial_apply [onstack], mark_dependence [nonescaping] creates a
-  // borrow scope. We currently assume that a set of dominated scope-ending uses
-  // can be found.
+  // Like partial_apply [onstack], mark_dependence [nonescaping] on values
+  // creates a borrow scope. We currently assume that a set of dominated
+  // scope-ending uses can be found.
   if (auto *MD = dyn_cast<MarkDependenceInst>(I)) {
-    return !MD->isNonEscaping();
+    return !MD->isNonEscaping() || MD->getType().isAddress();
   }
   // CodeGen can't build ssa for objc methods.
   if (auto *Method = dyn_cast<MethodInst>(I)) {
@@ -308,8 +321,8 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
   // contains an end_apply or abort_apply of an external begin_apply ---
   // because that wouldn't be structurally valid in the first place.
   if (auto BAI = dyn_cast<BeginApplyInst>(I)) {
-    for (auto UI : BAI->getTokenResult()->getUses()) {
-      auto User = UI->getUser();
+    for (auto *Use : BAI->getEndApplyUses()) {
+      auto *User = Use->getUser();
       assert(isa<EndApplyInst>(User) || isa<AbortApplyInst>(User) ||
              isa<EndBorrowInst>(User));
       if (!L->contains(User))
@@ -330,6 +343,17 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
   if (isa<AwaitAsyncContinuationInst>(I) ||
       isa<GetAsyncContinuationAddrInst>(I) || isa<GetAsyncContinuationInst>(I))
     return false;
+
+  // Bail if there are any begin-borrow instructions which have no corresponding
+  // end-borrow uses. This is the case if the control flow ends in a dead-end block.
+  // After duplicating such a block, the re-borrow flags cannot be recomputed
+  // correctly for inserted phi arguments.
+  if (auto *svi  = dyn_cast<SingleValueInstruction>(I)) {
+    if (auto bv = BorrowedValue(lookThroughBorrowedFromDef(svi))) {
+      if (!bv.hasLocalScopeEndingUses())
+        return false;
+    }
+  }
 
   // Some special cases above that aren't considered isTriviallyDuplicatable
   // return true early.

@@ -25,7 +25,7 @@ struct
     __attribute__((swift_attr("release:badRelease")))
 BadRetainRelease {};
 
-int badRetain(BadRetainRelease *v);
+float badRetain(BadRetainRelease *v);
 void badRelease(BadRetainRelease *v, int i);
 
 struct
@@ -45,6 +45,15 @@ GoodRetainRelease {};
 
 void goodRetain(GoodRetainRelease *v);
 void goodRelease(GoodRetainRelease *v);
+
+struct
+    __attribute__((swift_attr("import_reference")))
+    __attribute__((swift_attr("retain:goodRetainWithRetainReturningSelf")))
+    __attribute__((swift_attr("release:goodReleaseWithRetainReturningSelf")))
+GoodRetainReleaseWithRetainReturningSelf {};
+
+GoodRetainReleaseWithRetainReturningSelf *goodRetainWithRetainReturningSelf(GoodRetainReleaseWithRetainReturningSelf *v);
+void goodReleaseWithRetainReturningSelf(GoodRetainReleaseWithRetainReturningSelf *v);
 
 struct
     __attribute__((swift_attr("import_reference")))
@@ -226,7 +235,7 @@ public func test(x: NonExistent) { }
 @available(macOS 13.3, *)
 public func test(x: NoRetainRelease) { }
 
-// CHECK: error: specified retain function 'badRetain' is invalid; retain function must have 'void' return type
+// CHECK: error: specified retain function 'badRetain' is invalid; retain function must either return have 'void', the reference count as an integer, or the parameter type
 // CHECK: error: specified release function 'badRelease' is invalid; release function must have exactly one argument of type 'BadRetainRelease'
 @available(macOS 13.3, *)
 public func test(x: BadRetainRelease) { }
@@ -238,6 +247,9 @@ public func test(x: BadRetainReleaseWithNullabilityAnnotations) { }
 
 @available(macOS 13.3, *)
 public func test(x: GoodRetainRelease) { }
+
+@available(macOS 13.3, *)
+public func test(x: GoodRetainReleaseRetainReturningSelf) { }
 
 @available(macOS 13.3, *)
 public func test(x: GoodRetainReleaseWithNullabilityAnnotations) { }

@@ -1,8 +1,7 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature ThenStatements %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature ThenStatements %s | %FileCheck %s
 // RUN: %target-swift-emit-ir -enable-experimental-feature ThenStatements %s
 
-// Needed for experimental features
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ThenStatements
 
 func foo() -> Int {
   switch Bool.random() {
@@ -301,6 +300,12 @@ struct TestPropertyInit {
     default:
       2
   }
+}
+
+// https://github.com/swiftlang/swift/issues/75294
+func testAsyncLet(_ x: Int?) async {
+  async let _ = switch x { case let i?: i default: 0 }
+  // CHECK-LABEL: sil private [ossa] @$s11switch_expr12testAsyncLetyySiSgYaFSiyYaYbcfu_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (Optional<Int>) -> (@out τ_0_0, @error any Error) for <Int>
 }
 
 func testNested(_ e: E) throws -> Int {

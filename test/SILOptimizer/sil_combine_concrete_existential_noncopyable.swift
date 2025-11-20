@@ -11,7 +11,7 @@ public struct S: P {
 }
 
 // CHECK-LABEL: sil @$s44sil_combine_concrete_existential_noncopyable1gyyF : $@convention(thin) () -> () {
-// CHECK: [[S_ADDR:%.*]] =  alloc_stack $S
+// CHECK: [[S_ADDR:%.*]] =  alloc_stack [lexical] [var_decl] $S
 // CHECK: [[INIT_FN:%.*]] = function_ref @$s44sil_combine_concrete_existential_noncopyable1SVACycfC : $@convention(method) (@thin S.Type) -> S
 // CHECK: [[S:%.*]] = apply [[INIT_FN]]({{%.*}}) : $@convention(method) (@thin S.Type) -> S
 // CHECK: store [[S]] to [[S_ADDR]]

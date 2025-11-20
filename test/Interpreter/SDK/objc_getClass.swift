@@ -256,17 +256,25 @@ testSuite.test("NotPresent") {
   // Swift.Int is not a class type.
   expectNil(NSClassFromString("Si"))
 
-  // Mangled names with byte sequences that look like symbolic references
-  // should not be demangled.
-  expectNil(NSClassFromString("\u{1}badnews"));
-  expectNil(NSClassFromString("$s\u{1}badnews"));
-  expectNil(NSClassFromString("_T\u{1}badnews"));
+  if #available(StdlibDeploymentTarget 5.3, *) {
+    // Mangled names with byte sequences that look like symbolic references
+    // should not be demangled. Use indirect references to test. Direct
+    // references often resolve to readable memory, and then the data there
+    // often looks like a descriptor with an unknown kind and the lookup code
+    // then fails gracefully. With an indirect reference, the indirected pointer
+    // is typically garbage and dereferencing it will crash.
+    expectNil(NSClassFromString("\u{2}badnews"));
+    expectNil(NSClassFromString("$s\u{2}badnews"));
+    expectNil(NSClassFromString("_T\u{2}badnews"));
+  }
 
-  // Correct mangled names with additional text afterwards should not resolve.
-  expectNil(NSClassFromString("_TtC4main20MangledSwiftSubclass_"))
-  expectNil(NSClassFromString("_TtC4main22MangledSwiftSuperclassXYZ"))
-  expectNil(NSClassFromString("_TtC4main19MangledObjCSubclass123"))
-  expectNil(NSClassFromString("_TtC4main21MangledObjCSuperclasswhee"))
+  if #available(StdlibDeploymentTarget 5.3, *) {
+    // Correct mangled names with additional text afterwards should not resolve.
+    expectNil(NSClassFromString("_TtC4main20MangledSwiftSubclass_"))
+    expectNil(NSClassFromString("_TtC4main22MangledSwiftSuperclassXYZ"))
+    expectNil(NSClassFromString("_TtC4main19MangledObjCSubclass123"))
+    expectNil(NSClassFromString("_TtC4main21MangledObjCSuperclasswhee"))
+  }
 }
 
 runAllTests()

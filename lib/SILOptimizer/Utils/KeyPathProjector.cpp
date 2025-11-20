@@ -221,10 +221,10 @@ public:
            component.getKind() ==
            KeyPathPatternComponent::Kind::SettableProperty);
     assert(accessType == AccessType::Get && "property is not settable");
-    
+
     parent->project(accessType, [&](SILValue parentValue) {
-      auto getter = component.getComputedPropertyGetter();
-      
+      auto getter = component.getComputedPropertyForGettable();
+
       // The callback expects a memory address it can read from,
       // so allocate a buffer.
       auto &function = builder.getFunction();
@@ -248,7 +248,6 @@ public:
       builder.createDestroyAddr(loc, addr);
       builder.createDeallocStack(loc, addr);
     });
-    
   }
 protected:
   KeyPathInst *keyPath;
@@ -256,7 +255,7 @@ protected:
   BeginAccessInst *&beginAccess;
   
   void assertHasNoContext() {
-    assert(component.getSubscriptIndices().empty() &&
+    assert(component.getArguments().empty() &&
            component.getExternalSubstitutions().empty() &&
            "cannot yet optimize key path component with external context; "
            "we should have checked for this before trying to project");
@@ -298,11 +297,11 @@ public:
         } else {
             parentAccessType = AccessType::Get;
         }
-        
+
         parent->project(parentAccessType, [&](SILValue parentValue) {
-          auto getter = component.getComputedPropertyGetter();
-          auto setter = component.getComputedPropertySetter();
-          
+          auto getter = component.getComputedPropertyForGettable();
+          auto setter = component.getComputedPropertyForSettable();
+
           // The callback expects a memory address it can write to,
           // so allocate a writeback buffer.
           auto &function = builder.getFunction();
@@ -642,6 +641,7 @@ private:
             (comp, std::move(parent), loc, builder);
         break;
       case KeyPathPatternComponent::Kind::GettableProperty:
+      case KeyPathPatternComponent::Kind::Method:
         projector = std::make_unique<GettablePropertyProjector>
             (keyPath, comp, std::move(parent), keyPath->getSubstitutions(),
              beginAccess, loc, builder);
@@ -674,8 +674,8 @@ private:
 
 KeyPathInst *
 KeyPathProjector::getLiteralKeyPath(SILValue keyPath) {
-  while (auto *upCast = dyn_cast<UpcastInst>(keyPath)) {
-    keyPath = lookThroughOwnershipInsts(upCast->getOperand());
+  while (isa<UpcastInst>(keyPath) || isa<OpenExistentialRefInst>(keyPath)) {
+    keyPath = lookThroughOwnershipInsts(cast<SingleValueInstruction>(keyPath)->getOperand(0));
   }
 
   return dyn_cast<KeyPathInst>(keyPath);
@@ -696,7 +696,7 @@ KeyPathProjector::create(SILValue keyPath, SILValue root,
       case KeyPathPatternComponent::Kind::GettableProperty:
       case KeyPathPatternComponent::Kind::SettableProperty:
         if (!comp.getExternalSubstitutions().empty() ||
-            !comp.getSubscriptIndices().empty()) {
+            !comp.getArguments().empty()) {
           // TODO: right now we can't optimize computed properties that require
           // additional context for subscript indices or generic environment
           // See https://github.com/apple/swift/pull/28799#issuecomment-570299845

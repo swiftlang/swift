@@ -148,7 +148,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     GenericParams.push_back(Param);
 
     // Attach attributes.
-    Param->getAttrs() = attributes;
+    Param->attachParsedAttrs(attributes);
 
     // Parse the comma, if the list continues.
     HasComma = consumeIf(tok::comma);
@@ -317,7 +317,9 @@ ParserStatus Parser::parseGenericWhereClause(
 
     // Parse the leading type. It doesn't necessarily have to be just a type
     // identifier if we're dealing with a same-type constraint.
-    ParserResult<TypeRepr> FirstType = parseType();
+    //
+    // Note: This can be a value type, e.g. '123 == N' or 'N == 123'.
+    ParserResult<TypeRepr> FirstType = parseTypeOrValue();
 
     if (FirstType.hasCodeCompletion()) {
       Status.setHasCodeCompletionAndIsError();
@@ -349,6 +351,8 @@ ParserStatus Parser::parseGenericWhereClause(
         if (!AllowLayoutConstraints && !isInSILMode()) {
           diagnose(LayoutLoc,
                    diag::layout_constraints_only_inside_specialize_attr);
+          Status.setIsParseError();
+          break;
         } else {
           // Add the layout requirement.
           Requirements.push_back(RequirementRepr::getLayoutConstraint(
@@ -377,7 +381,9 @@ ParserStatus Parser::parseGenericWhereClause(
       SourceLoc EqualLoc = consumeToken();
 
       // Parse the second type.
-      ParserResult<TypeRepr> SecondType = parseType();
+      //
+      // Note: This can be a value type, e.g. '123 == N' or 'N == 123'.
+      ParserResult<TypeRepr> SecondType = parseTypeOrValue();
       Status |= SecondType;
       if (SecondType.isNull())
         SecondType = makeParserResult(ErrorTypeRepr::create(Context, PreviousLoc));

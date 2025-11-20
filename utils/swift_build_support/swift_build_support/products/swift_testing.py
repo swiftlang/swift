@@ -51,7 +51,7 @@ class SwiftTesting(product.Product):
         return False
 
     def should_install(self, host_target):
-        return self.args.install_swift_testing_macros
+        return self.args.install_swift_testing
 
     def _cmake_product(self, host_target):
         build_root = os.path.dirname(self.build_dir)
@@ -112,6 +112,8 @@ class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
 
         self.cmake_options.define('CMAKE_BUILD_TYPE', self.args.build_variant)
 
+        self.cmake_options.define('CMAKE_Swift_COMPILATION_MODE', 'wholemodule')
+
         # FIXME: If we build macros for the builder, specify the path.
         self.cmake_options.define('SwiftTesting_MACRO', 'NO')
 
@@ -125,3 +127,11 @@ class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
         install_prefix = install_destdir + self.args.install_prefix
 
         self.install_with_cmake(['install'], install_prefix)
+
+    @classmethod
+    def is_build_script_impl_product(cls):
+        return False
+
+    @classmethod
+    def is_before_build_script_impl_product(cls):
+        return False

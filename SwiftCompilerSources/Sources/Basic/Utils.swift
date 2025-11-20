@@ -79,10 +79,14 @@ public extension NoReflectionChildren {
 //                              StringRef
 //===----------------------------------------------------------------------===//
 
-public struct StringRef : CustomStringConvertible, NoReflectionChildren {
+public struct StringRef : CustomStringConvertible, NoReflectionChildren, ExpressibleByStringLiteral {
   public let _bridged: BridgedStringRef
 
   public init(bridged: BridgedStringRef) { self._bridged = bridged }
+
+  public init(stringLiteral: StaticString) {
+    self._bridged = BridgedStringRef(data: stringLiteral.utf8Start, count: stringLiteral.utf8CodeUnitCount)
+  }
 
   public var string: String { String(_bridged)  }
   public var description: String { string }
@@ -96,6 +100,20 @@ public struct StringRef : CustomStringConvertible, NoReflectionChildren {
     return buffer[index]
   }
 
+  public func startsWith(_ prefix: StaticString) -> Bool {
+    return prefix.withUTF8Buffer { (prefixBuffer: UnsafeBufferPointer<UInt8>) in
+      if count < prefixBuffer.count {
+        return false
+      }
+      let buffer = UnsafeBufferPointer<UInt8>(start: _bridged.data, count: prefixBuffer.count)
+      return buffer.elementsEqual(prefixBuffer, by: ==)
+    }
+  }
+
+  /// This overload is disfavored to make sure that it's only used for cases that don't involve literals, for that
+  /// `==(StringRef, StaticString) -> Bool` is preferred. Otherwise these overloads are
+  /// going to be ambiguous because both StringRef, StaticString conform to `ExpressibleByStringLiteral`.
+  @_disfavoredOverload
   public static func ==(lhs: StringRef, rhs: StringRef) -> Bool {
     let lhsBuffer = UnsafeBufferPointer<UInt8>(start: lhs._bridged.data, count: lhs.count)
     let rhsBuffer = UnsafeBufferPointer<UInt8>(start: rhs._bridged.data, count: rhs.count)
@@ -173,7 +191,7 @@ extension Optional where Wrapped == UnsafeMutablePointer<BridgedSwiftObject> {
 
 extension BridgedArrayRef {
   public func withElements<T, R>(ofType ty: T.Type, _ c: (UnsafeBufferPointer<T>) -> R) -> R {
-    let start = data?.bindMemory(to: ty, capacity: count)
+    let start = data?.assumingMemoryBound(to: ty)
     let buffer = UnsafeBufferPointer(start: start, count: count)
     return c(buffer)
   }

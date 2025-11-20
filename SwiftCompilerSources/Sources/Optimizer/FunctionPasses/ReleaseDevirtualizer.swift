@@ -34,47 +34,18 @@ import SIL
 let releaseDevirtualizerPass = FunctionPass(name: "release-devirtualizer") {
   (function: Function, context: FunctionPassContext) in
 
-  for block in function.blocks {
-    // The last `release_value`` or `strong_release`` instruction before the
-    // deallocation.
-    var lastRelease: RefCountingInst?
-
-    for instruction in block.instructions {
-      switch instruction {
-      case let dealloc as DeallocStackRefInst:
-        if let lastRel = lastRelease {
-          // We only do the optimization for stack promoted object, because for
-          // these we know that they don't have associated objects, which are
-          // _not_ released by the deinit method.
-          if !context.continueWithNextSubpassRun(for: lastRel) {
-            return
-          }
-          tryDevirtualizeRelease(of: dealloc.allocRef, lastRelease: lastRel, context)
-          lastRelease = nil
-        }
-      case let strongRelease as StrongReleaseInst:
-        lastRelease = strongRelease
-      case let releaseValue as ReleaseValueInst where releaseValue.value.type.containsSingleReference(in: function):
-        lastRelease = releaseValue
-      case is DeallocRefInst, is BeginDeallocRefInst:
-        lastRelease = nil
-      default:
-        if instruction.mayRelease {
-          lastRelease = nil
-        }
+  for inst in function.instructions {
+    if let dealloc = inst as? DeallocStackRefInst {
+      if !context.continueWithNextSubpassRun(for: dealloc) {
+        return
       }
+      tryDevirtualizeRelease(of: dealloc, context)
     }
   }
 }
 
-/// Tries to de-virtualize the final release of a stack-promoted object.
-private func tryDevirtualizeRelease(
-  of allocRef: AllocRefInstBase,
-  lastRelease: RefCountingInst,
-  _ context: FunctionPassContext
-) {
-  var downWalker = FindReleaseWalker(release: lastRelease)
-  guard let pathToRelease = downWalker.getPathToRelease(from: allocRef) else {
+private func tryDevirtualizeRelease(of dealloc: DeallocStackRefInst, _ context: FunctionPassContext) {
+  guard let (lastRelease, pathToRelease) = findLastRelease(of: dealloc, context) else {
     return
   }
 
@@ -82,6 +53,7 @@ private func tryDevirtualizeRelease(
     return
   }
 
+  let allocRef = dealloc.allocRef
   var upWalker = FindAllocationWalker(allocation: allocRef)
   if upWalker.walkUp(value: lastRelease.operand.value, path: pathToRelease) == .abortWalk {
     return
@@ -120,21 +92,60 @@ private func tryDevirtualizeRelease(
   context.erase(instruction: lastRelease)
 }
 
+private func findLastRelease(
+  of dealloc: DeallocStackRefInst,
+  _ context: FunctionPassContext
+) -> (lastRelease: RefCountingInst, pathToRelease: SmallProjectionPath)? {
+  let allocRef = dealloc.allocRef
+
+  // Search for the final release in the same basic block of the dealloc.
+  for instruction in ReverseInstructionList(first: dealloc.previous) {
+    switch instruction {
+    case let strongRelease as StrongReleaseInst:
+      if let pathToRelease = getPathToRelease(from: allocRef, to: strongRelease) {
+        return (strongRelease, pathToRelease)
+      }
+    case let releaseValue as ReleaseValueInst:
+      if releaseValue.value.type.containsSingleReference(in: dealloc.parentFunction) {
+        if let pathToRelease = getPathToRelease(from: allocRef, to: releaseValue) {
+          return (releaseValue, pathToRelease)
+        }
+      }
+    case is BeginDeallocRefInst, is DeallocRefInst:
+      // Check if the last release was already de-virtualized.
+      if allocRef.escapes(to: instruction, context) {
+        return nil
+      }
+    default:
+      break
+    }
+    if instruction.mayRelease && allocRef.escapes(to: instruction, context) {
+      // This instruction may release the allocRef, which means that any release we find
+      // earlier in the block is not guaranteed to be the final release.
+      return nil
+    }
+  }
+  return nil
+}
+
+// If the release is a release_value it might release a struct which _contains_ the allocated object.
+// Return a projection path to the contained object in this case.
+private func getPathToRelease(from allocRef: AllocRefInstBase, to release: RefCountingInst) -> SmallProjectionPath? {
+  var downWalker = FindReleaseWalker(release: release)
+  if downWalker.walkDownUses(ofValue: allocRef, path: SmallProjectionPath()) == .continueWalk {
+    return downWalker.result
+  }
+  return nil
+}
+
 private struct FindReleaseWalker : ValueDefUseWalker {
   private let release: RefCountingInst
-  private var result: SmallProjectionPath? = nil
+  private(set) var result: SmallProjectionPath? = nil
 
   var walkDownCache = WalkerCache<SmallProjectionPath>()
 
   init(release: RefCountingInst) {
     self.release = release
-  }
-
-  mutating func getPathToRelease(from allocRef: AllocRefInstBase) -> SmallProjectionPath? {
-    if walkDownUses(ofValue: allocRef, path: SmallProjectionPath()) == .continueWalk {
-      return result
-    }
-    return nil
   }
 
   mutating func leafUse(value: Operand, path: SmallProjectionPath) -> WalkResult {
@@ -144,6 +155,23 @@ private struct FindReleaseWalker : ValueDefUseWalker {
       } else {
         result = path
       }
+    }
+    return .continueWalk
+  }
+}
+
+private extension AllocRefInstBase {
+  func escapes(to instruction: Instruction, _ context: FunctionPassContext) -> Bool {
+    return self.isEscaping(using: EscapesToInstructionVisitor(target: instruction), context)
+  }
+}
+
+private struct EscapesToInstructionVisitor : EscapeVisitor {
+  let target: Instruction
+
+  mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
+    if operand.instruction == target {
+      return .abort
     }
     return .continueWalk
   }

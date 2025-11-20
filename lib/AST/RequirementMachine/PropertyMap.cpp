@@ -364,14 +364,14 @@ PropertyMap::getOrCreateProperties(Term key) {
   Entries.push_back(props);
   auto oldProps = Trie.insert(key.rbegin(), key.rend(), props);
   if (oldProps) {
-    llvm::errs() << "Duplicate property map entry for " << key << "\n";
-    llvm::errs() << "Old:\n";
-    (*oldProps)->dump(llvm::errs());
-    llvm::errs() << "\n";
-    llvm::errs() << "New:\n";
-    props->dump(llvm::errs());
-    llvm::errs() << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "Duplicate property map entry for " << key << "\n";
+      out << "Old:\n";
+      (*oldProps)->dump(out);
+      out << "\n";
+      out << "New:\n";
+      props->dump(out);
+    });
   }
 
   return props;

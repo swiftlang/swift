@@ -1,3 +1,15 @@
+//===--- github_repository.swift ------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 import ArgumentParser
 
 enum Platform: String, EnumerableFlag {
@@ -11,8 +23,8 @@ enum Platform: String, EnumerableFlag {
     case .osx:
       return "pkg"
     case .ubuntu1404,
-      .ubuntu1604,
-      .ubuntu1804:
+         .ubuntu1604,
+         .ubuntu1804:
       return "tar.gz"
     }
   }
@@ -22,8 +34,8 @@ enum Platform: String, EnumerableFlag {
     case .osx:
       return "xcode"
     case .ubuntu1404,
-      .ubuntu1604,
-      .ubuntu1804:
+         .ubuntu1604,
+         .ubuntu1804:
       return self.rawValue
     }
   }
@@ -31,6 +43,25 @@ enum Platform: String, EnumerableFlag {
 
 enum Branch: String, EnumerableFlag {
   case development
-  case release50 = "5.0"
-  case release60 = "6.0"
+  case release_5_0 = "5.0"
+  case release_6_0 = "6.0"
+  case release_6_2 = "6.2"
+
+  var tagPrefix: String {
+    switch self {
+    case .development:
+      "swift-\(rawValue.uppercased())"
+    default:
+      "swift-\(rawValue.uppercased())-DEVELOPMENT"
+    }
+  }
+
+  var urlBranchName: String {
+    switch self {
+    case .development:
+      return self.rawValue
+    default:
+      return "swift-\(self.rawValue)-branch"
+    }
+  }
 }

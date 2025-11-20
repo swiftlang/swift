@@ -44,7 +44,7 @@
 // RUN: %{python} %S/../Inputs/process_fine_grained_swiftdeps_with_fingerprints.py %swift-dependency-tool %t/test.swiftdeps > %t/test-processed.swiftdeps
 // RUN: %FileCheck %s --check-prefix=SWIFTDEPS --input-file=%t/test-processed.swiftdeps
 // SWIFTDEPS: A.swiftinterface
-// SWIFTDEPS: B.swiftmdoule
+// SWIFTDEPS: B.swiftmodule
 
 
 //--- main.swift

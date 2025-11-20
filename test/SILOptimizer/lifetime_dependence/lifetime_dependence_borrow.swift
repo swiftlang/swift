@@ -3,12 +3,10 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -disable-experimental-parser-round-trip
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
+// RUN:   -enable-experimental-feature Lifetimes
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Lifetimes
 
 // Some container-ish thing.
 struct CN: ~Copyable {
@@ -23,7 +21,7 @@ struct BV : ~Escapable {
 
   public var isEmpty: Bool { i == 0 }
 
-  @lifetime(borrow p)
+  @_lifetime(borrow p)
   init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
@@ -40,16 +38,17 @@ struct MBV : ~Escapable, ~Copyable {
   let p: UnsafeRawPointer
   let i: Int
   
-  @lifetime(borrow p)
+  @_lifetime(borrow p)
   init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
   }
 
   // Requires a borrow.
-  @lifetime(self)
+  @_lifetime(copy self)
   borrowing func getBV() -> BV {
-    BV(p, i)
+    let bv = BV(p, i)
+    return _overrideLifetime(bv, copying: self)
   }
 }
 
@@ -57,31 +56,32 @@ struct MBV : ~Escapable, ~Copyable {
 struct NEBV : ~Escapable {
   var bv: BV
 
+  @_lifetime(copy bv)
   init(_ bv: consuming BV) {
     self.bv = bv
   }
 }
 
 // Propagate a borrow.
-@lifetime(container)
+@_lifetime(copy container)
 func bv_get_borrow(container: borrowing MBV) -> BV {
   container.getBV()
 }
 
 // Copy a borrow.
-@lifetime(container)
+@_lifetime(copy container)
 func bv_get_copy(container: borrowing MBV) -> BV {
   return container.getBV()
 }
 
 // Recognize nested accesses as part of the same dependence scope.
-@lifetime(container)
+@_lifetime(copy container)
 func bv_get_mutate(container: inout MBV) -> BV {
   container.getBV()
 }
 
 // Create and decompose a nonescapable aggregate.
-@lifetime(borrow cn)
+@_lifetime(borrow cn)
 func ne_wrap_and_extract_member(cn: borrowing CN) -> BV {
   let bv = BV(cn)
   let ne = NEBV(bv)

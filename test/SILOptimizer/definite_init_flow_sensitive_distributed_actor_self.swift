@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -module-name test -swift-version 5 -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s -module-name test -swift-version 5 -sil-verify-all | %FileCheck %s
 // REQUIRES: concurrency, distributed
 
 import Distributed
@@ -13,6 +13,9 @@ distributed actor NotCodableDA<ActorSystem>
 
   // CHECK-LABEL: sil hidden{{.*}}@$s4test12NotCodableDAC11actorSystemACyxGx_tYacfc : $@convention(method) @async <ActorSystem where ActorSystem : DistributedActorSystem, ActorSystem.SerializationRequirement == any Decodable & Encodable> (@in ActorSystem, @sil_isolated @owned NotCodableDA<ActorSystem>) -> @owned NotCodableDA<ActorSystem> {
   init(actorSystem: ActorSystem) async {
+    // CHECK: [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+    // CHECK: hop_to_executor [[ISOLATION]]
+
     self.actorSystem = actorSystem
 
     // First use of #isolation, which is replaced by 'nil'.

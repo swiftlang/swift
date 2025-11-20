@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -emit-module -enable-experimental-feature RawLayout -module-name raw_layout_fred -o %t %S/Inputs/raw_layout.swift
 // RUN: %target-swift-frontend -I %t -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -emit-ir %s -verify | %FileCheck %s
 
+// REQUIRES: swift_feature_RawLayout
+
 import raw_layout_fred
 import RawLayoutCXX
 
@@ -16,8 +18,8 @@ import RawLayoutCXX
 // CHECK-SAME:  , {{i64|i32}} 1
 // stride
 // CHECK-SAME:  , {{i64|i32}} 1
-// flags: not copyable, not bitwise takable, not pod, not inline
-// CHECK-SAME:  , i32 9633792
+// flags: addressable for dependencies, not copyable, not bitwise takable, not pod, not inline
+// CHECK-SAME:  , i32 43188224
 struct WeirdCXXTypeCell: ~Copyable {
   let cell: CellThatMovesLike<NonBitwiseTakableCXXType>
 }

@@ -83,15 +83,17 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
     // This and all following kinds (we'll add in the future) cannot have a field index.
     case tailElements   =    0x07 // (0 << 3) | 0x7    A tail allocated element of a class: syntax `ct`
     case existential    =    0x0f // (1 << 3) | 0x7    A concrete value projected out of an existential: synatx 'x'
-    case anyClassField  =    0x17 // (2 << 3) | 0x7    Any class field, including tail elements: syntax `c*`
-    case anyIndexedElement = 0x1f // (3 << 3) | 0x7    An unknown offset into an array of elements.
+    case vectorBase     =    0x17 // (2 << 3) | 0x7    The base element of a vector: synatx 'b'
+    case anyClassField  =    0x1f // (3 << 3) | 0x7    Any class field, including tail elements: syntax `c*`
+    case anyIndexedElement = 0x27 // (4 << 3) | 0x7    An unknown offset into an array of elements.
                                   // There must not be two successive element indices in the path.
-    case anyValueFields =    0x27 // (4 << 3) | 0x7    Any number of any value fields (struct, tuple, enum): syntax `v**`
-    case anything       =    0x2f // (5 << 3) | 0x7    Any number of any fields: syntax `**`
+    case anyValueFields =    0x2f // (5 << 3) | 0x7    Any number of any value fields (struct, tuple, enum): syntax `v**`
+    case anything       =    0x37 // (6 << 3) | 0x7    Any number of any fields: syntax `**`
 
     public var isValueField: Bool {
       switch self {
-        case .anyValueFields, .structField, .tupleField, .enumCase, .indexedElement, .anyIndexedElement, .existential:
+        case .structField, .tupleField, .enumCase, .indexedElement, .existential, .vectorBase,
+             .anyValueFields, .anyIndexedElement:
           return true
         case .root, .anything, .anyClassField, .classField, .tailElements:
           return false
@@ -102,7 +104,8 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
       switch self {
         case .anyClassField, .classField, .tailElements:
           return true
-        case .root, .anything, .anyValueFields, .structField, .tupleField, .enumCase, .indexedElement, .anyIndexedElement, .existential:
+        case .root, .anything, .anyValueFields, .structField, .tupleField, .enumCase, .indexedElement,
+             .anyIndexedElement, .existential, .vectorBase:
           return false
       }
     }
@@ -140,6 +143,7 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
       case .classField:     s = "c\(idx)"
       case .tailElements:   s = "ct"
       case .existential:    s = "x"
+      case .vectorBase:     s = "b"
       case .indexedElement: s = "i\(idx)"
       case .anyIndexedElement: s = "i*"
       case .anything:       s = "**"
@@ -186,7 +190,7 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
 
   /// Pops \p numBits from the path.
   private func pop(numBits: Int) -> SmallProjectionPath {
-    return Self(bytes: bytes &>> numBits)
+    return Self(bytes: bytes >> numBits)
   }
 
   /// Pops and returns the first path component included the resulting path
@@ -210,7 +214,7 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
           // Ignore zero indices
           return self
         }
-        if k == .indexedElement {
+        if k == .indexedElement && index &+ i >= 0 {
           // "Merge" two constant successive indexed elements
           return pop(numBits: numBits).push(.indexedElement, index: index + i)
         }
@@ -398,7 +402,7 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
         return subPath.matches(pattern: subPattern)
       case .anyIndexedElement:
         return popIndexedElements().matches(pattern: subPattern)
-      case .structField, .tupleField, .enumCase, .classField, .tailElements, .indexedElement, .existential:
+      case .structField, .tupleField, .enumCase, .classField, .tailElements, .indexedElement, .existential, .vectorBase:
         let (kind, index, subPath) = pop()
         if kind != patternKind || index != patternIdx { return false }
         return subPath.matches(pattern: subPattern)
@@ -478,8 +482,18 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
     }
     if (lhsKind == rhsKind && lhsIdx == rhsIdx) ||
        (lhsKind == .anyClassField && rhsKind.isClassField) ||
-       (lhsKind.isClassField && rhsKind == .anyClassField) {
-      return pop(numBits: lhsBits).mayOverlap(with: rhs.pop(numBits: rhsBits))
+       (lhsKind.isClassField && rhsKind == .anyClassField)
+    {
+      let poppedPath = pop(numBits: lhsBits)
+      let rhsPoppedPath = rhs.pop(numBits: rhsBits)
+      // Check for the case of overlapping the first element of a vector with another element.
+      // Note that the index of `.indexedElement` cannot be 0.
+      if (poppedPath.isEmpty && rhsPoppedPath.pop().kind == .indexedElement) ||
+         (rhsPoppedPath.isEmpty && poppedPath.pop().kind == .indexedElement)
+      {
+        return false
+      }
+      return poppedPath.mayOverlap(with: rhsPoppedPath)
     }
     return false
   }
@@ -496,7 +510,7 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
     switch lhsKind {
     case .root:
       return rhs
-    case .classField, .tailElements, .structField, .tupleField, .enumCase, .existential, .indexedElement:
+    case .classField, .tailElements, .structField, .tupleField, .enumCase, .existential, .indexedElement, .vectorBase:
       let (rhsKind, rhsIdx, rhsBits) = rhs.top
       if lhsKind == rhsKind && lhsIdx == rhsIdx {
         return pop(numBits: lhsBits).subtract(from: rhs.pop(numBits: rhsBits))
@@ -516,6 +530,18 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
       return true
     case .structField, .tupleField:
       return subPath.isMaterializable
+    default:
+      return false
+    }
+  }
+  
+  public var isConstant: Bool {
+    let (kind, _, subPath) = pop()
+    switch kind {
+    case .root:
+      return true
+    case .structField, .tupleField, .enumCase, .classField, .existential, .indexedElement:
+      return subPath.isConstant
     default:
       return false
     }
@@ -601,6 +627,8 @@ extension StringParser {
         entries.append((.tailElements, 0))
       } else if consume("x") {
         entries.append((.existential, 0))
+      } else if consume("b") {
+        entries.append((.vectorBase, 0))
       } else if consume("c") {
         guard let idx = consumeInt(withWhiteSpace: false) else {
           try throwError("expected class field index")
@@ -652,278 +680,307 @@ extension StringParser {
 //                               Unit Tests
 //===----------------------------------------------------------------------===//
 
-extension SmallProjectionPath {
-  public static func runUnitTests() {
-  
-    basicPushPop()
-    parsing()
-    merging()
-    subtracting()
-    matching()
-    overlapping()
-    predicates()
-    path2path()
-  
-    func basicPushPop() {
-      let p1 = SmallProjectionPath(.structField, index: 3)
-                        .push(.classField, index: 12345678)
-      let (k2, i2, p2) = p1.pop()
-      assert(k2 == .classField && i2 == 12345678)
-      let (k3, i3, p3) = p2.pop()
-      assert(k3 == .structField && i3 == 3)
-      assert(p3.isEmpty)
-      let (k4, i4, _) = p2.push(.enumCase, index: 876).pop()
-      assert(k4 == .enumCase && i4 == 876)
-      let p5 = SmallProjectionPath(.anything)
-      assert(p5.pop().path.isEmpty)
-      let p6 = SmallProjectionPath(.indexedElement, index: 1).push(.indexedElement, index: 2)
-      let (k6, i6, p7) = p6.pop()
-      assert(k6 == .indexedElement && i6 == 3 && p7.isEmpty)
-      let p8 = SmallProjectionPath(.indexedElement, index: 0)
-      assert(p8.isEmpty)
-      let p9 = SmallProjectionPath(.indexedElement, index: 1).push(.anyIndexedElement)
-      let (k9, i9, p10) = p9.pop()
-      assert(k9 == .anyIndexedElement && i9 == 0 && p10.isEmpty)
-      let p11 = SmallProjectionPath(.anyIndexedElement).push(.indexedElement, index: 1)
-      let (k11, i11, p12) = p11.pop()
-      assert(k11 == .anyIndexedElement && i11 == 0 && p12.isEmpty)
-    }
-    
-    func parsing() {
-      testParse("v**.c*", expect: SmallProjectionPath(.anyClassField)
-                                         .push(.anyValueFields))
-      testParse("s3.c*.v**.s1", expect: SmallProjectionPath(.structField, index: 1)
-                                         .push(.anyValueFields)
-                                         .push(.anyClassField)
-                                         .push(.structField, index: 3))
-      testParse("2.c*.e6.ct.**", expect: SmallProjectionPath(.anything)
-                                         .push(.tailElements)
-                                         .push(.enumCase, index: 6)
-                                         .push(.anyClassField)
-                                         .push(.tupleField, index: 2))
-      testParse("i3.x.i*", expect: SmallProjectionPath(.anyIndexedElement)
-                                         .push(.existential)
-                                         .push(.indexedElement, index: 3))
+let smallProjectionPathTest = Test("small_projection_path") {
+  function, arguments, context in
 
-      do {
-        var parser = StringParser("c*.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.**")
-        _ = try parser.parseProjectionPathFromSIL()
-        fatalError("too long path not detected")
-      } catch {
-      }
-      do {
-        var parser = StringParser("**.s0")
-        _ = try parser.parseProjectionPathFromSIL()
-        fatalError("wrong '**' not detected")
-      } catch {
-      }
-    }
+  basicPushPop()
+  parsing()
+  merging()
+  subtracting()
+  matching()
+  overlapping()
+  predicates()
+  path2path()
+  indexedElements()
 
-    func testParse(_ pathStr: String, expect: SmallProjectionPath) {
-      var parser = StringParser(pathStr)
-      let path = try! parser.parseProjectionPathFromSIL()
-      assert(path == expect)
-      let str = path.description
-      assert(str == pathStr)
-    }
-   
-    func merging() {
-      testMerge("c1.c0",    "c0",     expect: "c*.**")
-      testMerge("c2.c1",    "c2",     expect: "c2.**")
-      testMerge("s3.c0",    "v**.c0", expect: "v**.c0")
-      testMerge("c0",       "s2.c1",  expect: "v**.c*")
-      testMerge("s1.s1.c2", "s1.c2",  expect: "s1.v**.c2")
-      testMerge("s1.s0",    "s2.s0",  expect: "v**")
-      testMerge("ct",       "c2",     expect: "c*")
-      testMerge("i1",       "i2",     expect: "i*")
-      testMerge("i*",       "i2",     expect: "i*")
-      testMerge("s0.i*.e3", "s0.e3",  expect: "s0.i*.e3")
-      testMerge("i*",       "v**",    expect: "v**")
+  func basicPushPop() {
+    let p1 = SmallProjectionPath(.structField, index: 3)
+                      .push(.classField, index: 12345678)
+    let (k2, i2, p2) = p1.pop()
+    assert(k2 == .classField && i2 == 12345678)
+    let (k3, i3, p3) = p2.pop()
+    assert(k3 == .structField && i3 == 3)
+    assert(p3.isEmpty)
+    let (k4, i4, _) = p2.push(.enumCase, index: 876).pop()
+    assert(k4 == .enumCase && i4 == 876)
+    let p5 = SmallProjectionPath(.anything)
+    assert(p5.pop().path.isEmpty)
+    let p6 = SmallProjectionPath(.indexedElement, index: 1).push(.indexedElement, index: 2)
+    let (k6, i6, p7) = p6.pop()
+    assert(k6 == .indexedElement && i6 == 3 && p7.isEmpty)
+    let p8 = SmallProjectionPath(.indexedElement, index: 0)
+    assert(p8.isEmpty)
+    let p9 = SmallProjectionPath(.indexedElement, index: 1).push(.anyIndexedElement)
+    let (k9, i9, p10) = p9.pop()
+    assert(k9 == .anyIndexedElement && i9 == 0 && p10.isEmpty)
+    let p11 = SmallProjectionPath(.anyIndexedElement).push(.indexedElement, index: 1)
+    let (k11, i11, p12) = p11.pop()
+    assert(k11 == .anyIndexedElement && i11 == 0 && p12.isEmpty)
+  }
 
-      testMerge("ct.s0.e0.v**.c0", "ct.s0.e0.v**.c0", expect: "ct.s0.e0.v**.c0")
-      testMerge("ct.s0.s0.c0",     "ct.s0.e0.s0.c0",  expect: "ct.s0.v**.c0")
-    }
+  func parsing() {
+    testParse("v**.c*", expect: SmallProjectionPath(.anyClassField)
+                                       .push(.anyValueFields))
+    testParse("s3.c*.v**.s1", expect: SmallProjectionPath(.structField, index: 1)
+                                       .push(.anyValueFields)
+                                       .push(.anyClassField)
+                                       .push(.structField, index: 3))
+    testParse("2.c*.e6.ct.**", expect: SmallProjectionPath(.anything)
+                                       .push(.tailElements)
+                                       .push(.enumCase, index: 6)
+                                       .push(.anyClassField)
+                                       .push(.tupleField, index: 2))
+    testParse("i3.x.b.i*", expect: SmallProjectionPath(.anyIndexedElement)
+                                       .push(.vectorBase)
+                                       .push(.existential)
+                                       .push(.indexedElement, index: 3))
 
-    func testMerge(_ lhsStr: String, _ rhsStr: String,
-                   expect expectStr: String) {
-      var lhsParser = StringParser(lhsStr)
-      let lhs = try! lhsParser.parseProjectionPathFromSIL()
-      var rhsParser = StringParser(rhsStr)
-      let rhs = try! rhsParser.parseProjectionPathFromSIL()
+    do {
+      var parser = StringParser("c*.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.s123.s3.**")
+      _ = try parser.parseProjectionPathFromSIL()
+      fatalError("too long path not detected")
+    } catch {
+    }
+    do {
+      var parser = StringParser("**.s0")
+      _ = try parser.parseProjectionPathFromSIL()
+      fatalError("wrong '**' not detected")
+    } catch {
+    }
+  }
+
+  func testParse(_ pathStr: String, expect: SmallProjectionPath) {
+    var parser = StringParser(pathStr)
+    let path = try! parser.parseProjectionPathFromSIL()
+    assert(path == expect)
+    let str = path.description
+    assert(str == pathStr)
+  }
+
+  func merging() {
+    testMerge("c1.c0",    "c0",     expect: "c*.**")
+    testMerge("c2.c1",    "c2",     expect: "c2.**")
+    testMerge("s3.c0",    "v**.c0", expect: "v**.c0")
+    testMerge("c0",       "s2.c1",  expect: "v**.c*")
+    testMerge("s1.s1.c2", "s1.c2",  expect: "s1.v**.c2")
+    testMerge("s1.s0",    "s2.s0",  expect: "v**")
+    testMerge("ct",       "c2",     expect: "c*")
+    testMerge("i1",       "i2",     expect: "i*")
+    testMerge("i*",       "i2",     expect: "i*")
+    testMerge("s0.i*.e3", "s0.e3",  expect: "s0.i*.e3")
+    testMerge("i*",       "v**",    expect: "v**")
+    testMerge("s0.b.i1",  "s0.b.i0", expect: "s0.b.i*")
+    testMerge("s0.b",     "s0.1",   expect: "s0.v**")
+
+    testMerge("ct.s0.e0.v**.c0", "ct.s0.e0.v**.c0", expect: "ct.s0.e0.v**.c0")
+    testMerge("ct.s0.s0.c0",     "ct.s0.e0.s0.c0",  expect: "ct.s0.v**.c0")
+  }
+
+  func testMerge(_ lhsStr: String, _ rhsStr: String,
+                 expect expectStr: String) {
+    var lhsParser = StringParser(lhsStr)
+    let lhs = try! lhsParser.parseProjectionPathFromSIL()
+    var rhsParser = StringParser(rhsStr)
+    let rhs = try! rhsParser.parseProjectionPathFromSIL()
+    var expectParser = StringParser(expectStr)
+    let expect = try! expectParser.parseProjectionPathFromSIL()
+
+    let result = lhs.merge(with: rhs)
+    assert(result == expect)
+    let result2 = rhs.merge(with: lhs)
+    assert(result2 == expect)
+  }
+
+  func subtracting() {
+    testSubtract("s0",           "s0.s1",        expect: "s1")
+    testSubtract("s0",           "s1",           expect: nil)
+    testSubtract("s0.s1",        "s0.s1",        expect: "")
+    testSubtract("i*.s1",        "i*.s1",        expect: nil)
+    testSubtract("ct.s1.0.i3.x", "ct.s1.0.i3.x", expect: "")
+    testSubtract("c0.s1.0.i3",   "c0.s1.0.i3.x", expect: "x")
+    testSubtract("s1.0.i3.x",    "s1.0.i3",      expect: nil)
+    testSubtract("v**.s1",       "v**.s1",       expect: nil)
+    testSubtract("i*",           "i*",           expect: nil)
+  }
+
+  func testSubtract(_ lhsStr: String, _ rhsStr: String, expect expectStr: String?) {
+    var lhsParser = StringParser(lhsStr)
+    let lhs = try! lhsParser.parseProjectionPathFromSIL()
+    var rhsParser = StringParser(rhsStr)
+    let rhs = try! rhsParser.parseProjectionPathFromSIL()
+
+    let result = lhs.subtract(from: rhs)
+
+    if let expectStr = expectStr {
       var expectParser = StringParser(expectStr)
       let expect = try! expectParser.parseProjectionPathFromSIL()
-
-      let result = lhs.merge(with: rhs)
-      assert(result == expect)
-      let result2 = rhs.merge(with: lhs)
-      assert(result2 == expect)
+      assert(result! == expect)
+    } else {
+      assert(result == nil)
     }
-   
-    func subtracting() {
-      testSubtract("s0",           "s0.s1",        expect: "s1")
-      testSubtract("s0",           "s1",           expect: nil)
-      testSubtract("s0.s1",        "s0.s1",        expect: "")
-      testSubtract("i*.s1",        "i*.s1",        expect: nil)
-      testSubtract("ct.s1.0.i3.x", "ct.s1.0.i3.x", expect: "")
-      testSubtract("c0.s1.0.i3",   "c0.s1.0.i3.x", expect: "x")
-      testSubtract("s1.0.i3.x",    "s1.0.i3",      expect: nil)
-      testSubtract("v**.s1",       "v**.s1",       expect: nil)
-      testSubtract("i*",           "i*",           expect: nil)
+  }
+
+  func matching() {
+    testMatch("ct", "c*",  expect: true)
+    testMatch("c1", "c*",  expect: true)
+    testMatch("s2", "v**", expect: true)
+    testMatch("1",  "v**", expect: true)
+    testMatch("e1", "v**", expect: true)
+    testMatch("c*", "c1",  expect: false)
+    testMatch("c*", "ct",  expect: false)
+    testMatch("v**", "s0", expect: false)
+    testMatch("i1", "i1",  expect: true)
+    testMatch("i1", "i*",  expect: true)
+    testMatch("i*", "i1",  expect: false)
+
+    testMatch("s0.s1", "s0.s1",     expect: true)
+    testMatch("s0.s2", "s0.s1",     expect: false)
+    testMatch("s0", "s0.v**",       expect: true)
+    testMatch("s0.s1", "s0.v**",    expect: true)
+    testMatch("s0.1.e2", "s0.v**",  expect: true)
+    testMatch("s0.v**.x.e2", "v**", expect: true)
+    testMatch("s0.v**", "s0.s1",    expect: false)
+    testMatch("s0.s1.c*", "s0.v**", expect: false)
+    testMatch("s0.v**", "s0.**",    expect: true)
+    testMatch("s1.v**", "s0.**",    expect: false)
+    testMatch("s0.**", "s0.v**",    expect: false)
+    testMatch("s0.s1", "s0.i*.s1",  expect: true)
+    testMatch("s0.b.s1", "s0.b.i*.s1",  expect: true)
+  }
+
+  func testMatch(_ lhsStr: String, _ rhsStr: String, expect: Bool) {
+    var lhsParser = StringParser(lhsStr)
+    let lhs = try! lhsParser.parseProjectionPathFromSIL()
+    var rhsParser = StringParser(rhsStr)
+    let rhs = try! rhsParser.parseProjectionPathFromSIL()
+    let result = lhs.matches(pattern: rhs)
+    assert(result == expect)
+  }
+
+  func overlapping() {
+    testOverlap("s0.s1.s2", "s0.s1.s2",     expect: true)
+    testOverlap("s0.s1.s2", "s0.s2.s2",     expect: false)
+    testOverlap("s0.s1.s2", "s0.e1.s2",     expect: false)
+    testOverlap("s0.s1.s2", "s0.s1",        expect: true)
+    testOverlap("s0.s1.s2", "s1.s2",        expect: false)
+
+    testOverlap("s0.c*.s2", "s0.ct.s2",     expect: true)
+    testOverlap("s0.c*.s2", "s0.c1.s2",     expect: true)
+    testOverlap("s0.c*.s2", "s0.c1.c2.s2",  expect: false)
+    testOverlap("s0.c*.s2", "s0.s2",        expect: false)
+
+    testOverlap("s0.v**.s2", "s0.s3.x",     expect: true)
+    testOverlap("s0.v**.s2.c2", "s0.s3.c1", expect: false)
+    testOverlap("s0.v**.s2", "s1.s3",       expect: false)
+    testOverlap("s0.v**.s2", "s0.v**.s3",   expect: true)
+
+    testOverlap("s0.**", "s0.s3.c1",        expect: true)
+    testOverlap("**", "s0.s3.c1",           expect: true)
+
+    testOverlap("i1", "i*",                 expect: true)
+    testOverlap("i1", "v**",                expect: true)
+    testOverlap("s0.i*.s1", "s0.s1",        expect: true)
+    testOverlap("s0.b.s1", "s0.b.i*.s1",    expect: true)
+    testOverlap("s0.b.i0.s1", "s0.b.i1.s1", expect: false)
+    testOverlap("s0.b.i2.s1", "s0.b.i1.s1", expect: false)
+    testOverlap("s0.b.s1", "s0.b.i0.s1",    expect: true)
+    testOverlap("s0.b", "s0.b.i1",          expect: false)
+    testOverlap("s0.b.i1", "s0.b",          expect: false)
+    testOverlap("s0.b.i1", "s0",            expect: true)
+  }
+
+  func testOverlap(_ lhsStr: String, _ rhsStr: String, expect: Bool) {
+    var lhsParser = StringParser(lhsStr)
+    let lhs = try! lhsParser.parseProjectionPathFromSIL()
+    var rhsParser = StringParser(rhsStr)
+    let rhs = try! rhsParser.parseProjectionPathFromSIL()
+    let result = lhs.mayOverlap(with: rhs)
+    assert(result == expect)
+    let reversedResult = rhs.mayOverlap(with: lhs)
+    assert(reversedResult == expect)
+  }
+
+  func predicates() {
+    testPredicate("v**",           \.hasClassProjection, expect: false)
+    testPredicate("v**.c0.s1.v**", \.hasClassProjection, expect: true)
+    testPredicate("c0.**",         \.hasClassProjection, expect: true)
+    testPredicate("c0.c1",         \.hasClassProjection, expect: true)
+    testPredicate("ct",            \.hasClassProjection, expect: true)
+    testPredicate("s0",            \.hasClassProjection, expect: false)
+
+    testPredicate("v**", \.mayHaveClassProjection, expect: false)
+    testPredicate("c0",  \.mayHaveClassProjection, expect: true)
+    testPredicate("1",   \.mayHaveClassProjection, expect: false)
+    testPredicate("**",  \.mayHaveClassProjection, expect: true)
+
+    testPredicate("v**", \.mayHaveTwoClassProjections, expect: false)
+    testPredicate("c0",  \.mayHaveTwoClassProjections, expect: false)
+    testPredicate("**",  \.mayHaveTwoClassProjections, expect: true)
+    testPredicate("v**.c*.s2.1.c0",   \.mayHaveTwoClassProjections, expect: true)
+    testPredicate("c*.s2.1.c0.v**",   \.mayHaveTwoClassProjections, expect: true)
+    testPredicate("v**.c*.**",        \.mayHaveTwoClassProjections, expect: true)
+  }
+
+  func testPredicate(_ pathStr: String, _ property: (SmallProjectionPath) -> Bool, expect: Bool) {
+    var parser = StringParser(pathStr)
+    let path = try! parser.parseProjectionPathFromSIL()
+    let result = property(path)
+    assert(result == expect)
+  }
+
+  func path2path() {
+    testPath2Path("s0.b.e2.3.c4.s1", { $0.popAllValueFields() }, expect: "c4.s1")
+    testPath2Path("v**.c4.s1",     { $0.popAllValueFields() }, expect: "c4.s1")
+    testPath2Path("**",            { $0.popAllValueFields() }, expect: "**")
+
+    testPath2Path("s0.e2.3.c4.s1.e2.v**.**", { $0.popLastClassAndValuesFromTail() }, expect: "s0.e2.3.c4.s1.e2.v**.**")
+    testPath2Path("s0.c2.3.c4.s1",           { $0.popLastClassAndValuesFromTail() }, expect: "s0.c2.3")
+    testPath2Path("v**.c*.s1",               { $0.popLastClassAndValuesFromTail() }, expect: "v**")
+    testPath2Path("s1.ct.v**",               { $0.popLastClassAndValuesFromTail() }, expect: "s1")
+    testPath2Path("c0.c1.c2",                { $0.popLastClassAndValuesFromTail() }, expect: "c0.c1")
+    testPath2Path("**",                      { $0.popLastClassAndValuesFromTail() }, expect: "**")
+
+    testPath2Path("v**.c3", { $0.popIfMatches(.anyValueFields) }, expect: "v**.c3")
+    testPath2Path("**",     { $0.popIfMatches(.anyValueFields) }, expect: "**")
+    testPath2Path("s0.c3",  { $0.popIfMatches(.anyValueFields) }, expect: nil)
+
+    testPath2Path("c0.s3",  { $0.popIfMatches(.anyClassField) }, expect: nil)
+    testPath2Path("**",     { $0.popIfMatches(.anyClassField) }, expect: "**")
+    testPath2Path("c*.e3",  { $0.popIfMatches(.anyClassField) }, expect: "e3")
+
+    testPath2Path("i*.e3.s0", { $0.popIfMatches(.enumCase, index: 3) }, expect: "s0")
+    testPath2Path("i1.e3.s0", { $0.popIfMatches(.enumCase, index: 3) }, expect: nil)
+    testPath2Path("i*.e3.s0", { $0.popIfMatches(.indexedElement, index: 0) }, expect: "i*.e3.s0")
+  }
+
+  func testPath2Path(_ pathStr: String, _ transform: (SmallProjectionPath) -> SmallProjectionPath?, expect: String?) {
+    var parser = StringParser(pathStr)
+    let path = try! parser.parseProjectionPathFromSIL()
+    let result = transform(path)
+    if let expect = expect {
+      var expectParser = StringParser(expect)
+      let expectPath = try! expectParser.parseProjectionPathFromSIL()
+      assert(result == expectPath)
+    } else {
+      assert(result == nil)
     }
+  }
 
-    func testSubtract(_ lhsStr: String, _ rhsStr: String, expect expectStr: String?) {
-      var lhsParser = StringParser(lhsStr)
-      let lhs = try! lhsParser.parseProjectionPathFromSIL()
-      var rhsParser = StringParser(rhsStr)
-      let rhs = try! rhsParser.parseProjectionPathFromSIL()
+  func indexedElements() {
+    let p1 = SmallProjectionPath(.indexedElement, index: 1)
+    let (k1, i1, s1) = p1.pop()
+    assert(k1 == .indexedElement && i1 == 1 && s1.isEmpty)
 
-      let result = lhs.subtract(from: rhs)
+    let p2 = SmallProjectionPath(.indexedElement, index: -1)
+    let (k2, _, s2) = p2.pop()
+    assert(k2 == .anything && s2.isEmpty)
 
-      if let expectStr = expectStr {
-        var expectParser = StringParser(expectStr)
-        let expect = try! expectParser.parseProjectionPathFromSIL()
-        assert(result! == expect)
-      } else {
-        assert(result == nil)
-      }
-    }
+    let p3 = SmallProjectionPath(.indexedElement, index: 0xfffffffffffff)
+    let (k3, i3, s3) = p3.pop()
+    assert(k3 == .indexedElement && i3 == 0xfffffffffffff && s3.isEmpty)
 
-    func matching() {
-      testMatch("ct", "c*",  expect: true)
-      testMatch("c1", "c*",  expect: true)
-      testMatch("s2", "v**", expect: true)
-      testMatch("1",  "v**", expect: true)
-      testMatch("e1", "v**", expect: true)
-      testMatch("c*", "c1",  expect: false)
-      testMatch("c*", "ct",  expect: false)
-      testMatch("v**", "s0", expect: false)
-      testMatch("i1", "i1",  expect: true)
-      testMatch("i1", "i*",  expect: true)
-      testMatch("i*", "i1",  expect: false)
-
-      testMatch("s0.s1", "s0.s1",     expect: true)
-      testMatch("s0.s2", "s0.s1",     expect: false)
-      testMatch("s0", "s0.v**",       expect: true)
-      testMatch("s0.s1", "s0.v**",    expect: true)
-      testMatch("s0.1.e2", "s0.v**",  expect: true)
-      testMatch("s0.v**.x.e2", "v**", expect: true)
-      testMatch("s0.v**", "s0.s1",    expect: false)
-      testMatch("s0.s1.c*", "s0.v**", expect: false)
-      testMatch("s0.v**", "s0.**",    expect: true)
-      testMatch("s1.v**", "s0.**",    expect: false)
-      testMatch("s0.**", "s0.v**",    expect: false)
-      testMatch("s0.s1", "s0.i*.s1",  expect: true)
-    }
-
-    func testMatch(_ lhsStr: String, _ rhsStr: String, expect: Bool) {
-      var lhsParser = StringParser(lhsStr)
-      let lhs = try! lhsParser.parseProjectionPathFromSIL()
-      var rhsParser = StringParser(rhsStr)
-      let rhs = try! rhsParser.parseProjectionPathFromSIL()
-      let result = lhs.matches(pattern: rhs)
-      assert(result == expect)
-    }
-
-    func overlapping() {
-      testOverlap("s0.s1.s2", "s0.s1.s2",     expect: true)
-      testOverlap("s0.s1.s2", "s0.s2.s2",     expect: false)
-      testOverlap("s0.s1.s2", "s0.e1.s2",     expect: false)
-      testOverlap("s0.s1.s2", "s0.s1",        expect: true)
-      testOverlap("s0.s1.s2", "s1.s2",        expect: false)
-
-      testOverlap("s0.c*.s2", "s0.ct.s2",     expect: true)
-      testOverlap("s0.c*.s2", "s0.c1.s2",     expect: true)
-      testOverlap("s0.c*.s2", "s0.c1.c2.s2",  expect: false)
-      testOverlap("s0.c*.s2", "s0.s2",        expect: false)
-
-      testOverlap("s0.v**.s2", "s0.s3.x",     expect: true)
-      testOverlap("s0.v**.s2.c2", "s0.s3.c1", expect: false)
-      testOverlap("s0.v**.s2", "s1.s3",       expect: false)
-      testOverlap("s0.v**.s2", "s0.v**.s3",   expect: true)
-
-      testOverlap("s0.**", "s0.s3.c1",        expect: true)
-      testOverlap("**", "s0.s3.c1",           expect: true)
-
-      testOverlap("i1", "i*",                 expect: true)
-      testOverlap("i1", "v**",                expect: true)
-      testOverlap("s0.i*.s1", "s0.s1",        expect: true)
-    }
-
-    func testOverlap(_ lhsStr: String, _ rhsStr: String, expect: Bool) {
-      var lhsParser = StringParser(lhsStr)
-      let lhs = try! lhsParser.parseProjectionPathFromSIL()
-      var rhsParser = StringParser(rhsStr)
-      let rhs = try! rhsParser.parseProjectionPathFromSIL()
-      let result = lhs.mayOverlap(with: rhs)
-      assert(result == expect)
-      let reversedResult = rhs.mayOverlap(with: lhs)
-      assert(reversedResult == expect)
-    }
-
-    func predicates() {
-      testPredicate("v**",           \.hasClassProjection, expect: false)
-      testPredicate("v**.c0.s1.v**", \.hasClassProjection, expect: true)
-      testPredicate("c0.**",         \.hasClassProjection, expect: true)
-      testPredicate("c0.c1",         \.hasClassProjection, expect: true)
-      testPredicate("ct",            \.hasClassProjection, expect: true)
-      testPredicate("s0",            \.hasClassProjection, expect: false)
-
-      testPredicate("v**", \.mayHaveClassProjection, expect: false)
-      testPredicate("c0",  \.mayHaveClassProjection, expect: true)
-      testPredicate("1",   \.mayHaveClassProjection, expect: false)
-      testPredicate("**",  \.mayHaveClassProjection, expect: true)
-
-      testPredicate("v**", \.mayHaveTwoClassProjections, expect: false)
-      testPredicate("c0",  \.mayHaveTwoClassProjections, expect: false)
-      testPredicate("**",  \.mayHaveTwoClassProjections, expect: true)
-      testPredicate("v**.c*.s2.1.c0",   \.mayHaveTwoClassProjections, expect: true)
-      testPredicate("c*.s2.1.c0.v**",   \.mayHaveTwoClassProjections, expect: true)
-      testPredicate("v**.c*.**",        \.mayHaveTwoClassProjections, expect: true)
-    }
-
-    func testPredicate(_ pathStr: String, _ property: (SmallProjectionPath) -> Bool, expect: Bool) {
-      var parser = StringParser(pathStr)
-      let path = try! parser.parseProjectionPathFromSIL()
-      let result = property(path)
-      assert(result == expect)
-    }
-    
-    func path2path() {
-      testPath2Path("s0.e2.3.c4.s1", { $0.popAllValueFields() }, expect: "c4.s1")
-      testPath2Path("v**.c4.s1",     { $0.popAllValueFields() }, expect: "c4.s1")
-      testPath2Path("**",            { $0.popAllValueFields() }, expect: "**")
-
-      testPath2Path("s0.e2.3.c4.s1.e2.v**.**", { $0.popLastClassAndValuesFromTail() }, expect: "s0.e2.3.c4.s1.e2.v**.**")
-      testPath2Path("s0.c2.3.c4.s1",           { $0.popLastClassAndValuesFromTail() }, expect: "s0.c2.3")
-      testPath2Path("v**.c*.s1",               { $0.popLastClassAndValuesFromTail() }, expect: "v**")
-      testPath2Path("s1.ct.v**",               { $0.popLastClassAndValuesFromTail() }, expect: "s1")
-      testPath2Path("c0.c1.c2",                { $0.popLastClassAndValuesFromTail() }, expect: "c0.c1")
-      testPath2Path("**",                      { $0.popLastClassAndValuesFromTail() }, expect: "**")
-
-      testPath2Path("v**.c3", { $0.popIfMatches(.anyValueFields) }, expect: "v**.c3")
-      testPath2Path("**",     { $0.popIfMatches(.anyValueFields) }, expect: "**")
-      testPath2Path("s0.c3",  { $0.popIfMatches(.anyValueFields) }, expect: nil)
-      
-      testPath2Path("c0.s3",  { $0.popIfMatches(.anyClassField) }, expect: nil)
-      testPath2Path("**",     { $0.popIfMatches(.anyClassField) }, expect: "**")
-      testPath2Path("c*.e3",  { $0.popIfMatches(.anyClassField) }, expect: "e3")
-
-      testPath2Path("i*.e3.s0", { $0.popIfMatches(.enumCase, index: 3) }, expect: "s0")
-      testPath2Path("i1.e3.s0", { $0.popIfMatches(.enumCase, index: 3) }, expect: nil)
-      testPath2Path("i*.e3.s0", { $0.popIfMatches(.indexedElement, index: 0) }, expect: "i*.e3.s0")
-    }
-
-    func testPath2Path(_ pathStr: String, _ transform: (SmallProjectionPath) -> SmallProjectionPath?, expect: String?) {
-      var parser = StringParser(pathStr)
-      let path = try! parser.parseProjectionPathFromSIL()
-      let result = transform(path)
-      if let expect = expect {
-        var expectParser = StringParser(expect)
-        let expectPath = try! expectParser.parseProjectionPathFromSIL()
-        assert(result == expectPath)
-      } else {
-        assert(result == nil)
-      }
-    }
+    let p4 = p3.push(.indexedElement, index: Int.max)
+    let (k4, _, s4) = p4.pop()
+    assert(k4 == .anyIndexedElement && s4.isEmpty)
   }
 }

@@ -46,7 +46,7 @@ macro am1()
 
 @attached(
   accessor,
-  overloaded, // expected-error{{@attached argument is missing label 'names'}}
+  overloaded, // expected-error{{'@attached' argument is missing label 'names'}}
   unknown, // expected-error{{unknown introduced name kind 'unknown'}}
   named, // expected-error{{introduced name kind 'named' requires a single argument '(name)'}}
   arbitrary(a) // expected-error{{introduced name kind 'arbitrary' must not have an argument}}

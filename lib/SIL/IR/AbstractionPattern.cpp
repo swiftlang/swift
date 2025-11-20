@@ -15,6 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Types.h"
+#include "llvm/ADT/SmallVector.h"
 #define DEBUG_TYPE "libsil"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -95,7 +97,7 @@ TypeConverter::getAbstractionPattern(VarDecl *var, bool isNonObjC) {
 
   if (auto clangDecl = var->getClangDecl()) {
     auto clangType = getClangType(clangDecl);
-    auto contextType = var->getDeclContext()->mapTypeIntoContext(swiftType);
+    auto contextType = var->getDeclContext()->mapTypeIntoEnvironment(swiftType);
     swiftType =
         getLoweredBridgedType(AbstractionPattern(sig, swiftType, clangType),
                               contextType, getClangDeclBridgeability(clangDecl),
@@ -322,7 +324,7 @@ bool AbstractionPattern::conformsToKnownProtocol(
     // that ensures the type conforms.
     auto type = getType();
     if (hasGenericSignature() && getType()->hasTypeParameter()) {
-      type = GenericEnvironment::mapTypeIntoContext(
+      type = GenericEnvironment::mapTypeIntoEnvironment(
         getGenericSignature().getGenericEnvironment(), getType())
         ->getReducedType(getGenericSignature());
     }
@@ -1366,7 +1368,14 @@ AbstractionPattern::getFunctionThrownErrorType(
     if (!substErrorType)
       return std::nullopt;
 
-    return std::make_pair(AbstractionPattern(*substErrorType),
+    // FIXME: This is actually unsound. The most opaque form of
+    // `(T) throws(U) -> V` should actually be
+    // `(T) throws(any Error) -> V`.
+    auto pattern = ((*substErrorType)->isErrorExistentialType()
+                    ? AbstractionPattern(*substErrorType)
+                    : AbstractionPattern::getOpaque());
+
+    return std::make_pair(pattern,
                           (*substErrorType)->getCanonicalType());
   }
 
@@ -1647,6 +1656,87 @@ ParameterTypeFlags
 AbstractionPattern::getFunctionParamFlags(unsigned index) const {
   return cast<AnyFunctionType>(getType()).getParams()[index]
            .getParameterFlags();
+}
+
+bool
+AbstractionPattern::isFunctionParamAddressable(unsigned index) const {
+  switch (getKind()) {
+  case Kind::Invalid:
+  case Kind::Tuple:
+    llvm_unreachable("not any kind of function!");
+  case Kind::Opaque:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    // If the function abstraction pattern is completely opaque, assume we
+    // may need to preserve the address for dependencies.
+    return false;
+
+  case Kind::ClangType:
+  case Kind::ObjCCompletionHandlerArgumentsType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::ObjCMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::Type:
+  case Kind::Discard: {
+    auto type = getType();
+    
+    if (type->isTypeParameter() || type->is<ArchetypeType>()) {
+      return false;
+    }
+  
+    auto fnTy = cast<AnyFunctionType>(getType());
+  
+    // The parameter might directly be marked addressable.
+    return fnTy.getParams()[index].getParameterFlags().isAddressable();
+  }
+  }
+  llvm_unreachable("bad kind");
+}
+
+ArrayRef<LifetimeDependenceInfo>
+AbstractionPattern::getLifetimeDependencies() const {
+  switch (getKind()) {
+  case Kind::Invalid:
+  case Kind::Tuple:
+    llvm_unreachable("not any kind of function!");
+  case Kind::Opaque:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    // If the function abstraction pattern is completely opaque, assume we
+    // may need to preserve the address for dependencies.
+    return {};
+
+  case Kind::ClangType:
+  case Kind::ObjCCompletionHandlerArgumentsType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::ObjCMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::Type:
+  case Kind::Discard: {
+    auto type = getType();
+    
+    if (type->isTypeParameter() || type->is<ArchetypeType>()) {
+      return {};
+    }
+  
+    auto fnTy = cast<AnyFunctionType>(getType());
+  
+    return fnTy->getExtInfo().getLifetimeDependencies();
+  }
+  }
+  llvm_unreachable("bad kind");
 }
 
 unsigned AbstractionPattern::getNumFunctionParams() const {
@@ -2342,7 +2432,8 @@ public:
       paramKind = GenericTypeParamKind::Pack;
     }
 
-    auto gp = GenericTypeParamType::get(paramKind, 0, paramIndex, Type(),
+    auto gp = GenericTypeParamType::get(paramKind, /*depth=*/0, paramIndex,
+                                        /*weight=*/0, /*valueType=*/Type(),
                                         TC.Context);
     substGenericParams.push_back(gp);
 
@@ -2584,32 +2675,38 @@ public:
     // Otherwise, there are no structural type parameters to visit.
     return nom;
   }
-  
-  CanType visitBuiltinFixedArrayType(CanBuiltinFixedArrayType bfa,
-                                     AbstractionPattern pattern) {
-    auto orig = pattern.getAs<BuiltinFixedArrayType>();
+
+  CanType visitBuiltinGenericType(CanBuiltinGenericType bga,
+                                  AbstractionPattern pattern) {
+    auto orig = pattern.getAs<BuiltinGenericType>();
 
     // If there are no loose type parameters in the pattern here, we don't need
     // to do a recursive visit at all.
     if (!orig->hasTypeParameter()
         && !orig->hasArchetype()
         && !orig->hasOpaqueArchetype()) {
-      return bfa;
+      return bga;
     }
-    
-    CanType newSize = visit(bfa->getSize(),
-                         AbstractionPattern(pattern.getGenericSubstitutions(),
-                                            pattern.getGenericSignatureOrNull(),
-                                            orig->getSize()));
-    CanType newElement = visit(bfa->getElementType(),
-                         AbstractionPattern(pattern.getGenericSubstitutions(),
-                                            pattern.getGenericSignatureOrNull(),
-                                            orig->getElementType()));
-                                
-    return BuiltinFixedArrayType::get(newSize, newElement)
-      ->getCanonicalType();
+
+    SmallVector<Type, 2> newReplacements;
+
+    for (unsigned i : indices(bga->getSubstitutions().getReplacementTypes())) {
+      CanType newReplacement
+        = visit(CanType(bga->getSubstitutions().getReplacementTypes()[i]),
+                AbstractionPattern(pattern.getGenericSubstitutions(),
+                 pattern.getGenericSignatureOrNull(),
+                 CanType(orig->getSubstitutions().getReplacementTypes()[i])));
+      newReplacements.push_back(newReplacement);
+    }
+
+    // TODO: handle conformances. no generic builtins currently have protocol
+    // requirements.
+    auto newSubs = SubstitutionMap::get(bga->getGenericSignature(),
+                                        newReplacements,
+                                        ArrayRef<ProtocolConformanceRef>{});
+    return bga->getWithSubstitutions(newSubs);
   }
-  
+
   CanType visitBoundGenericType(CanBoundGenericType bgt,
                                 AbstractionPattern pattern) {
     return handleGenericNominalType(pattern, bgt);

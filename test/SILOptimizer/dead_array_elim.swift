@@ -1,12 +1,7 @@
-// RUN: %target-swift-frontend -O -emit-sil -primary-file %s | grep -v debug_value | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -emit-sil -primary-file %s | grep -v debug_value | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: swift_in_compiler
-// XFAIL: OS=linux-androideabi
-
-// Test needs to be updated for 32bit.
-// rdar://74810823
-// UNSUPPORTED: PTRSIZE=32
 
 // These tests check whether DeadObjectElimination pass runs as a part of the
 // optimization pipeline and eliminates dead array literals in Swift code.

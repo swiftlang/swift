@@ -1,4 +1,0 @@
-// RUN: %target-sil-opt %s -run-unit-tests -o /dev/null
-
-// REQUIRES: swift_in_compiler
-

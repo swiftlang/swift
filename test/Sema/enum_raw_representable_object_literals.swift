@@ -13,7 +13,7 @@ enum Foo: FooLiteral { // expected-error {{raw type 'FooLiteral' is not expressi
   typealias RawValue = Never
   var rawValue: Never { fatalError() }
   init(rawValue: Never) { fatalError() }
-  case bar1 = #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)
-  case bar2 = #imageLiteral(resourceName: "hello.png")
-  case bar3 = #fileLiteral(resourceName: "what.txt")
+  case bar1 = #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1) // expected-error {{raw value for enum case must be a literal}}
+  case bar2 = #imageLiteral(resourceName: "hello.png") // expected-error {{raw value for enum case must be a literal}}
+  case bar3 = #fileLiteral(resourceName: "what.txt") // expected-error {{raw value for enum case must be a literal}}
 }

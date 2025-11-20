@@ -14,6 +14,18 @@ if (5 + 5) == 9 {
 // CHECK: } else {
 // CHECK: }
 
+if #available(macOS 11, iOS 17, *) {
+} else if #unavailable(watchOS 11) {
+}
+// CHECK: if #available(macOS 11, iOS 17, *) {
+// CHECK: } else if #unavailable(watchOS 11) {
+// CHECK: }
+
+if #_hasSymbol(Int.self) {
+}
+// CHECK: if #_hasSymbol(Int.self) {
+// CHECK: }
+
 guard (5 + 5) == 10 else {
 }
 // CHECK: guard (5 + 5) == 10 else {
@@ -38,7 +50,7 @@ repeat {
 // CHECK: } while b < 10
 
 var p = (17 > 7 ? true : false)
-// CHECK: @_hasInitialValue internal var p: (Bool) = (17 > 7 ? true : false)
+// CHECK: @_hasInitialValue internal var p: Bool = (17 > 7 ? true : false)
 
 var x: Int = 3
 var y: Bool = x is Int

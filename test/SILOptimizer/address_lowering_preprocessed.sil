@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t) 
-// RUN: %target-sil-opt -test-runner -address-lowering -enable-sil-opaque-values -sil-disable-input-verify -emit-sorted-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -test-runner -address-lowering -enable-sil-opaque-values -sil-disable-input-verify -emit-sorted-sil %s | %FileCheck %s
 
 import Builtin
 import Swift

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -module-name Swift -enable-sil-verify-all -semantic-arc-opts %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

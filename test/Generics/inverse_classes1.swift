@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN:   -enable-experimental-feature MoveOnlyClasses
 
+// REQUIRES: swift_feature_MoveOnlyClasses
+
 class KlassModern: ~Copyable {}
 
 class Konditional<T: ~Copyable> {}

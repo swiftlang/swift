@@ -3,12 +3,10 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -disable-experimental-parser-round-trip
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
+// RUN:   -enable-experimental-feature Lifetimes
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Lifetimes
 
 struct Span<T>: ~Escapable {
   private var base: UnsafePointer<T>
@@ -20,7 +18,7 @@ struct Span<T>: ~Escapable {
     self.count = count
   }
 
-  @lifetime(borrow generic)
+  @_lifetime(borrow generic)
   init<S>(base: UnsafePointer<T>, count: Int, generic: borrowing S) {
     self.base = base
     self.count = count
@@ -30,6 +28,7 @@ struct Span<T>: ~Escapable {
 struct Wrapper<T: BitwiseCopyable>: ~Escapable {
   private let span: Span<T>
 
+  @_lifetime(copy span)
   init(span: borrowing Span<T>) {
     self.span = copy span
   }
@@ -43,6 +42,7 @@ struct SuperWrapper<T: BitwiseCopyable>: ~Escapable {
 
   // Make sure that LocalVariableUtils can successfully analyze 'self'. That's required to determine that the assignment
   // of `wrapper` is returned without escaping
+  @_lifetime(copy span)
   init(span: borrowing Span<T>) {
     self.wrapper = Wrapper(span: span)
   }

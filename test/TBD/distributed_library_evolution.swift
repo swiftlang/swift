@@ -9,6 +9,7 @@
 // RUN:     -enable-library-evolution                                          \
 // RUN:     -disable-availability-checking                                     \
 // RUN:     -emit-ir -o %t/test.ll -emit-tbd                                   \
+// RUN:     -validate-tbd-against-ir=all                                       \
 // RUN:     -emit-tbd-path %t/library.tbd -I %t -tbd-install_name protocol
 
 // RUN: %target-swift-frontend %t/library.swift                                \
@@ -18,20 +19,23 @@
 // RUN:     -package-name Package                                              \
 // RUN:     -module-name Library                                               \
 // RUN:     -emit-module-path %t/Library.swiftmodule                           \
+// RUN:     -validate-tbd-against-ir=all                                       \
 // RUN:     -emit-module-interface-path %t/Library.swiftinterface
 
-// RUN: %target-swift-frontend %t/actor.swift -enable-library-evolution \
+// RUN: %target-swift-frontend %t/actor.swift -enable-library-evolution     \
+// RUN:     -enable-library-evolution                                       \
 // RUN:     -disable-availability-checking -emit-ir -o %t/test.ll -emit-tbd \
 // RUN:     -emit-tbd-path %t/actor.tbd -I %t -tbd-install_name actor
 
-// RUN: %target-swift-frontend %t/actor.swift  \
-// RUN:     -I %t                   \
-// RUN:     -disable-availability-checking \
+// RUN: %target-swift-frontend %t/actor.swift                              \
+// RUN:     -I %t                                                          \
+// RUN:     -disable-availability-checking                                 \
 // RUN:     -emit-module                                                   \
 // RUN:     -package-name Package                                          \
 // RUN:     -enable-library-evolution                                      \
 // RUN:     -module-name Client                                            \
-// RUN:     -emit-module-path %t/Client.swiftmodule                       \
+// RUN:     -emit-module-path %t/Client.swiftmodule                        \
+// RUN:     -validate-tbd-against-ir=all                                   \
 // RUN:     -emit-module-interface-path %t/Client.swiftinterface
 
 

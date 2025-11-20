@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -target %target-swift-5.1-abi-triple -enable-experimental-feature IsolatedDeinit -o %t/voucher_propagation
+// RUN: %target-build-swift %s -target %target-swift-5.1-abi-triple -o %t/voucher_propagation
 // RUN: %target-codesign %t/voucher_propagation
-// RUN: MallocStackLogging=1 %target-run %t/voucher_propagation
+// RUN: env MallocStackLogging=1 %target-run %t/voucher_propagation
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -75,6 +75,7 @@ actor Counter {
   func get() -> Int { n }
 }
 
+@available(SwiftStdlib 6.1, *)
 actor ActorWithSelfIsolatedDeinit {
   let expectedVoucher: voucher_t?
   let group: DispatchGroup
@@ -101,6 +102,7 @@ actor ActorWithSelfIsolatedDeinit {
   }
 }
 
+@available(SwiftStdlib 6.1, *)
 actor ActorWithDeinitIsolatedOnAnother {
   let expectedVoucher: voucher_t?
   let group: DispatchGroup
@@ -120,6 +122,7 @@ actor ActorWithDeinitIsolatedOnAnother {
   }
 }
 
+@available(SwiftStdlib 6.1, *)
 class ClassWithIsolatedDeinit {
   let expectedVoucher: voucher_t?
   let group: DispatchGroup
@@ -225,7 +228,7 @@ func withVouchers(call: @Sendable @escaping (voucher_t?, voucher_t?, voucher_t?)
 
       // Clear any voucher that the call adopted.
       adopt(voucher: nil)
-      group.leave() // expected-complete-tns-warning {{capture of 'group' with non-sendable type 'DispatchGroup' in a `@Sendable` closure}}
+      group.leave() // expected-complete-tns-warning {{capture of 'group' with non-Sendable type 'DispatchGroup' in a '@Sendable' closure}}
     }
     group.wait()
 
@@ -264,14 +267,6 @@ func withVouchers(call: @Sendable @escaping (voucher_t?, voucher_t?, voucher_t?)
 // and handles the memory management around voucher_adopt.
 func adopt(voucher: voucher_t?) {
   os_release(voucher_adopt(os_retain(voucher)))
-}
-
-// Dummy global variable to suppress stack propagation
-// TODO: Remove it after disabling allocation on stack for classes with isolated deinit
-var x: AnyObject? = nil
-func preventAllocationOnStack(_ object: AnyObject) {
-  x = object
-  x = nil
 }
 
 let tests = TestSuite("Voucher Propagation")
@@ -422,7 +417,7 @@ if #available(SwiftStdlib 5.1, *) {
            _ = await (g, add)
 
            if await n.get() >= limit {
-             group.leave() // expected-warning 2{{capture of 'group' with non-sendable type 'DispatchGroup' in a `@Sendable` closure}}
+             group.leave() // expected-warning 2{{capture of 'group' with non-Sendable type 'DispatchGroup' in a '@Sendable' closure}}
            } else {
              await n.increment()
              await detachedTask()
@@ -434,47 +429,49 @@ if #available(SwiftStdlib 5.1, *) {
      group.wait()
    }
   }
-  
-  tests.test("voucher propagation in isolated deinit [fast path]") {
-    withVouchers { v1, v2, v3 in
-      let group = DispatchGroup()
-      group.enter()
-      group.enter()
-      group.enter()
-      Task {
-        await AnotherActor.shared.performTesting {
-          adopt(voucher: v1)
-          preventAllocationOnStack(ClassWithIsolatedDeinit(expectedVoucher: v1, group: group))
+
+  if #available(SwiftStdlib 6.1, *) {
+    tests.test("voucher propagation in isolated deinit [fast path]") {
+      withVouchers { v1, v2, v3 in
+        let group = DispatchGroup()
+        group.enter()
+        group.enter()
+        group.enter()
+        Task {
+          await AnotherActor.shared.performTesting {
+            adopt(voucher: v1)
+            _ = ClassWithIsolatedDeinit(expectedVoucher: v1, group: group)
+          }
+          await AnotherActor.shared.performTesting {
+            adopt(voucher: v2)
+            _ = ActorWithSelfIsolatedDeinit(expectedVoucher: v2, group: group)
+          }
+          await AnotherActor.shared.performTesting {
+            adopt(voucher: v3)
+            _ = ActorWithDeinitIsolatedOnAnother(expectedVoucher: v3, group: group)
+          }
         }
-        await AnotherActor.shared.performTesting {
-          adopt(voucher: v2)
-          preventAllocationOnStack(ActorWithSelfIsolatedDeinit(expectedVoucher: v2, group: group))
-        }
-        await AnotherActor.shared.performTesting {
-          adopt(voucher: v3)
-          preventAllocationOnStack(ActorWithDeinitIsolatedOnAnother(expectedVoucher: v3, group: group))
-        }
+        group.wait()
       }
-      group.wait()
     }
-  }
-  
-  tests.test("voucher propagation in isolated deinit [slow path]") {
-    withVouchers { v1, v2, v3 in
-      let group = DispatchGroup()
-      group.enter()
-      group.enter()
-      Task {
-        do {
-          adopt(voucher: v1)
-          preventAllocationOnStack(ActorWithDeinitIsolatedOnAnother(expectedVoucher: v1, group: group))
+
+    tests.test("voucher propagation in isolated deinit [slow path]") {
+      withVouchers { v1, v2, v3 in
+        let group = DispatchGroup()
+        group.enter()
+        group.enter()
+        Task {
+          do {
+            adopt(voucher: v1)
+            _ = ActorWithDeinitIsolatedOnAnother(expectedVoucher: v1, group: group)
+          }
+          do {
+            adopt(voucher: v2)
+            _ = ClassWithIsolatedDeinit(expectedVoucher: v2, group: group)
+          }
         }
-        do {
-          adopt(voucher: v2)
-          preventAllocationOnStack(ClassWithIsolatedDeinit(expectedVoucher: v2, group: group))
-        }
+        group.wait()
       }
-      group.wait()
     }
   }
 }

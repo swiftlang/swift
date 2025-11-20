@@ -182,7 +182,7 @@ func emitNameAliases(_ data: [(UInt32, String)], into result: inout String) {
 }
 
 func generateNameAliasProp(into result: inout String) {
-  let nameAliases = readFile("Data/NameAliases.txt")
+  let nameAliases = readFile("Data/16/NameAliases.txt")
   
   var data: [(UInt32, String)] = []
   

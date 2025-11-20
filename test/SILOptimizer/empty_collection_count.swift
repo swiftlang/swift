@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -Osize %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -Osize %s | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: swift_in_compiler

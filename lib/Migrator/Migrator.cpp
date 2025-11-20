@@ -21,7 +21,7 @@
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Edit/EditedSource.h"
-#include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "llvm/ADT/RewriteBuffer.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 
@@ -191,11 +191,11 @@ bool Migrator::performSyntacticPasses(SyntacticPassOptions Opts) {
   llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs> DummyClangDiagIDs {
     new clang::DiagnosticIDs()
   };
-  auto ClangDiags =
-    std::make_unique<clang::DiagnosticsEngine>(DummyClangDiagIDs,
-                                                new clang::DiagnosticOptions,
-                                                new clang::DiagnosticConsumer(),
-                                                /*ShouldOwnClient=*/true);
+
+  clang::DiagnosticOptions diagOpts;
+  auto ClangDiags = std::make_unique<clang::DiagnosticsEngine>(
+      DummyClangDiagIDs, diagOpts, new clang::DiagnosticConsumer(),
+      /*ShouldOwnClient=*/true);
 
   clang::SourceManager ClangSourceManager { *ClangDiags, ClangFileManager };
   clang::LangOptions ClangLangOpts;

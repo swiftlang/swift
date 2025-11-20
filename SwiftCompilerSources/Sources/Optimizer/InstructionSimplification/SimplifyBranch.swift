@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BranchInst : OnoneSimplifyable {
+extension BranchInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     tryMergeWithTargetBlock(context)
   }
@@ -53,8 +53,7 @@ private extension BranchInst {
       if let phi = Phi(arg),
          let bfi = phi.borrowedFrom
       {
-        bfi.uses.replaceAll(with: op.value, context)
-        context.erase(instruction: bfi)
+        bfi.replace(with: op.value, context)
       } else {
         arg.uses.replaceAll(with: op.value, context)
       }

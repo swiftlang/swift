@@ -7,10 +7,10 @@
 // RUN:   -swift-version 5 \
 // RUN:   -strict-concurrency=complete \
 // RUN:   -enable-experimental-feature SendableCompletionHandlers \
-// RUN:   -module-name main -I %t -verify
+// RUN:   -module-name main -I %t -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SendableCompletionHandlers
 
 //--- Test.h
 #define SWIFT_SENDABLE __attribute__((__swift_attr__("@Sendable")))
@@ -63,6 +63,11 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 -(void) testComposition:(SWIFT_SENDABLE MyValue *)composition;
 -(void) test:(NSDictionary<NSString *, SWIFT_SENDABLE id> *)options;
 -(void) testWithCallback:(NSString *)name handler:(MAIN_ACTOR void (^)(NSDictionary<NSString *, SWIFT_SENDABLE id> *, NSError * _Nullable))handler;
+@end
+
+@interface SwiftImpl : NSObject
+-(id)initWithCallback:  (void (^ SWIFT_SENDABLE)(void)) callback;
+-(void)computeWithCompletionHandler: (void (^)(void)) handler;
 @end
 
 #pragma clang assume_nonnull end
@@ -152,4 +157,12 @@ class TestConformanceWithoutStripping : InnerSendableTypes {
 
   func test(withCallback name: String, handler: @escaping @MainActor ([String : any Sendable], (any Error)?) -> Void) { // Ok
   }
+}
+
+@objc @implementation extension SwiftImpl {
+  @objc public required init(callback: @escaping () -> Void) {}
+  // expected-error@-1 {{initializer 'init(callback:)' should not be 'required' to match initializer declared by the header}}
+  
+  @objc func compute(completionHandler: @escaping () -> Void) {}
+  // expected-warning@-1 {{sendability of function types in instance method 'compute(completionHandler:)' of type '(@escaping () -> Void) -> ()' does not match type '(@escaping @Sendable () -> Void) -> Void' declared by the header}}
 }

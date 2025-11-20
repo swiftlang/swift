@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend %S/swift-subclass-of-resilient-class-virtual-method-dispatch.swift -D RESILIENT_MODULE -module-name Class -emit-module -emit-module-path %t/Class.swiftmodule -enable-library-evolution -clang-header-expose-decls=all-public -emit-clang-header-path %t/class.h
 
-// RUN: %target-swift-frontend %S/swift-subclass-of-resilient-class-virtual-method-dispatch.swift -I %t -typecheck -module-name UseClass -clang-header-expose-decls=all-public -emit-clang-header-path %t/useclass.h
+// RUN: %target-swift-frontend %S/swift-subclass-of-resilient-class-virtual-method-dispatch.swift -I %t -module-name UseClass -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/useclass.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-class-execution.o
 

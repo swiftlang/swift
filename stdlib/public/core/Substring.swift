@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -483,7 +483,7 @@ extension Substring: StringProtocol {
   /// - Parameter nullTerminatedUTF8: A pointer to a sequence of contiguous,
   ///   UTF-8 encoded bytes ending just before the first zero byte.
   public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
-    self.init(String(cString: nullTerminatedUTF8))
+    unsafe self.init(String(cString: nullTerminatedUTF8))
   }
 
   /// Creates a string from the null-terminated sequence of bytes at the given
@@ -500,7 +500,7 @@ extension Substring: StringProtocol {
     decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as sourceEncoding: Encoding.Type
   ) {
-    self.init(
+    unsafe self.init(
       String(decodingCString: nullTerminatedCodeUnits, as: sourceEncoding))
   }
 
@@ -522,7 +522,7 @@ extension Substring: StringProtocol {
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
-    return try String(self).withCString(body)
+    return try unsafe String(self).withCString(body)
   }
 
   /// Calls the given closure with a pointer to the contents of the string,
@@ -548,7 +548,7 @@ extension Substring: StringProtocol {
   ) rethrows -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
-    return try String(self).withCString(encodedAs: targetEncoding, body)
+    return try unsafe String(self).withCString(encodedAs: targetEncoding, body)
   }
 }
 
@@ -621,7 +621,9 @@ extension Substring: CustomDebugStringConvertible {
 
 extension Substring: LosslessStringConvertible {
   public init(_ content: String) {
-    let range = Range(_uncheckedBounds: (content.startIndex, content.endIndex))
+    let range = unsafe Range(
+      _uncheckedBounds: (content.startIndex, content.endIndex)
+    )
     self.init(_unchecked: Slice(base: content, bounds: range))
   }
 }
@@ -708,7 +710,7 @@ extension Substring.UTF8View: BidirectionalCollection {
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return try _slice.withContiguousStorageIfAvailable(body)
+    return try unsafe _slice.withContiguousStorageIfAvailable(body)
   }
 
   @inlinable
@@ -747,6 +749,139 @@ extension Substring.UTF8View: BidirectionalCollection {
   }
 }
 
+@available(SwiftStdlib 6.2, *)
+extension Substring.UTF8View {
+
+  @lifetime(borrow self)
+  private borrowing func _underlyingSpan() -> Span<UTF8.CodeUnit> {
+#if _runtime(_ObjC)
+    // handle non-UTF8 Objective-C bridging cases here
+    if !_wholeGuts.isFastUTF8, _wholeGuts._object.hasObjCBridgeableObject {
+      let base: String.UTF8View = self._base
+      let first = base._foreignDistance(from: base.startIndex, to: startIndex)
+      let count = base._foreignDistance(from: startIndex, to: endIndex)
+      let span = base._underlyingSpan().extracting(first..<(first &+ count))
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
+#endif // _runtime(_ObjC)
+    let first = _slice._startIndex._encodedOffset
+    let end = _slice._endIndex._encodedOffset
+    if _wholeGuts.isSmall {
+      let a = Builtin.addressOfBorrow(self)
+      let offset = first &+ (2 &* MemoryLayout<String.Index>.stride)
+      let start = unsafe UnsafePointer<UTF8.CodeUnit>(a).advanced(by: offset)
+      let span = unsafe Span(_unsafeStart: start, count: end &- first)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
+    let isFastUTF8 = _wholeGuts.isFastUTF8
+    _precondition(isFastUTF8, "Substring must be contiguous UTF8")
+    var span = unsafe Span(_unsafeElements: _wholeGuts._object.fastUTF8)
+    span = span.extracting(first..<end)
+    return unsafe _overrideLifetime(span, borrowing: self)
+  }
+
+#if !(os(watchOS) && _pointerBitWidth(_32))
+  /// A span over the UTF8 code units that make up this substring.
+  ///
+  /// - Note: In the case of bridged UTF16 String instances (on Apple
+  /// platforms,) this property needs to transcode the code units every time
+  /// it is called.
+  /// For example, if `string` has the bridged UTF16 representation,
+  ///     for word in string.split(separator: " ") {
+  ///         useSpan(word.span)
+  ///     }
+  ///  is accidentally quadratic because of this issue. A workaround is to
+  ///  explicitly convert the string into its native UTF8 representation:
+  ///      var nativeString = consume string
+  ///      nativeString.makeContiguousUTF8()
+  ///      for word in nativeString.split(separator: " ") {
+  ///          useSpan(word.span)
+  ///      }
+  ///  This second option has linear time complexity, as expected.
+  ///
+  ///  Returns: a `Span` over the UTF8 code units of this Substring.
+  ///
+  ///  Complexity: O(1) for native UTF8 Strings, O(n) for bridged UTF16 Strings.
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<UTF8.CodeUnit> {
+    @lifetime(borrow self)
+    borrowing get {
+      _underlyingSpan()
+    }
+  }
+
+  /// A span over the UTF8 code units that make up this substring.
+  ///
+  /// - Note: In the case of bridged UTF16 String instances (on Apple
+  /// platforms,) this property needs to transcode the code units every time
+  /// it is called.
+  /// For example, if `string` has the bridged UTF16 representation,
+  ///     for word in string.split(separator: " ") {
+  ///         useSpan(word.span)
+  ///     }
+  ///  is accidentally quadratic because of this issue. A workaround is to
+  ///  explicitly convert the string into its native UTF8 representation:
+  ///      var nativeString = consume string
+  ///      nativeString.makeContiguousUTF8()
+  ///      for word in nativeString.split(separator: " ") {
+  ///          useSpan(word.span)
+  ///      }
+  ///  This second option has linear time complexity, as expected.
+  ///
+  ///  Returns: a `Span` over the UTF8 code units of this Substring.
+  ///
+  ///  Complexity: O(1) for native UTF8 Strings, O(n) for bridged UTF16 Strings.
+  @available(SwiftStdlib 6.2, *)
+  public var _span: Span<UTF8.CodeUnit>? {
+    @_alwaysEmitIntoClient @inline(__always)
+    @lifetime(borrow self)
+    borrowing get {
+      span
+    }
+  }
+#else // !(os(watchOS) && _pointerBitWidth(_32))
+  @available(watchOS, unavailable)
+  public var span: Span<UTF8.CodeUnit> {
+    fatalError("\(#function) unavailable on 32-bit watchOS")
+  }
+
+  /// A span over the UTF8 code units that make up this substring.
+  ///
+  /// - Note: In the case of bridged UTF16 String instances (on Apple
+  /// platforms,) this property needs to transcode the code units every time
+  /// it is called.
+  /// For example, if `string` has the bridged UTF16 representation,
+  ///     for word in string.split(separator: " ") {
+  ///         useSpan(word.span)
+  ///     }
+  ///  is accidentally quadratic because of this issue. A workaround is to
+  ///  explicitly convert the string into its native UTF8 representation:
+  ///      var nativeString = consume string
+  ///      nativeString.makeContiguousUTF8()
+  ///      for word in nativeString.split(separator: " ") {
+  ///          useSpan(word.span)
+  ///      }
+  ///  This second option has linear time complexity, as expected.
+  ///
+  ///  Returns: a `Span` over the UTF8 code units of this Substring, or `nil`
+  ///           if the Substring does not have a contiguous representation.
+  ///
+  ///  Complexity: O(1) for native UTF8 Strings, O(n) for bridged UTF16 Strings.
+  @available(SwiftStdlib 6.2, *)
+  public var _span: Span<UTF8.CodeUnit>? {
+    @lifetime(borrow self)
+    borrowing get {
+      if _wholeGuts.isSmall,
+         _wholeGuts.count > _SmallString.contiguousCapacity() {
+        // substring is spannable only when the whole string is spannable.
+        return nil
+      }
+      return _underlyingSpan()
+    }
+  }
+#endif // !(os(watchOS) && _pointerBitWidth(_32))
+}
+
 extension Substring {
   @inlinable
   public var utf8: UTF8View {
@@ -767,7 +902,7 @@ extension Substring {
     // scalar aligned.
     let lower = content._wholeGuts.scalarAlign(content.startIndex)
     let upper = content._wholeGuts.scalarAlign(content.endIndex)
-    let bounds = Range(_uncheckedBounds: (lower, upper))
+    let bounds = unsafe Range(_uncheckedBounds: (lower, upper))
     self.init(_unchecked: content._wholeGuts, bounds: bounds)
   }
 }
@@ -922,7 +1057,7 @@ extension Substring {
     // scalar aligned.
     let lower = content._wholeGuts.scalarAlign(content.startIndex)
     let upper = content._wholeGuts.scalarAlign(content.endIndex)
-    let bounds = Range(_uncheckedBounds: (lower, upper))
+    let bounds = unsafe Range(_uncheckedBounds: (lower, upper))
     self.init(_unchecked: content._wholeGuts, bounds: bounds)
   }
 }
@@ -965,7 +1100,9 @@ extension Substring {
     internal init(_ base: String.UnicodeScalarView, _bounds: Range<Index>) {
       let start = base._guts.scalarAlign(_bounds.lowerBound)
       let end = base._guts.scalarAlign(_bounds.upperBound)
-      _slice = Slice(base: base, bounds: Range(_uncheckedBounds: (start, end)))
+      _slice = Slice(
+        base: base, bounds: unsafe Range(_uncheckedBounds: (start, end))
+      )
     }
   }
 }
@@ -1233,7 +1370,7 @@ extension String {
     // we don't need to compare against the `endIndex` -- those aren't nearly as
     // critical.
     if r.lowerBound._encodedOffset == 0 {
-      r = Range(_uncheckedBounds:
+      r = unsafe Range(_uncheckedBounds:
         (r.lowerBound._characterAligned, r.upperBound))
     }
 

@@ -33,6 +33,13 @@
 #define HAS_OS_FEATURE 1
 #endif
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <ShlWapi.h>
+#include <Windows.h>
+#endif
+
 using namespace swift;
 
 static bool prespecializedLoggingEnabled = false;
@@ -67,10 +74,42 @@ static bool environmentProcessListContainsProcess(const char *list,
 }
 
 static bool isThisProcessEnabled(const LibPrespecializedData<InProcess> *data) {
+#if defined(_WIN32)
+  DWORD dwSize = MAX_PATH;
+  DWORD dwResult;
+  std::unique_ptr<WCHAR[]> pwszBuffer(new WCHAR[dwSize]);
+  while (true) {
+    dwResult = GetModuleFileNameW(nullptr, pwszBuffer.get(), dwSize);
+    if (dwResult == 0)
+      return true;
+    if (dwResult < dwSize)
+      break;
+    if (dwResult == dwSize && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+      pwszBuffer.reset(new WCHAR[dwSize <<= 1]);
+  }
+
+  PCWSTR pwszBaseName = PathFindFileNameW(pwszBuffer.get());
+
+  DWORD cchLength =
+      WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS | WC_NO_BEST_FIT_CHARS,
+                          pwszBaseName, -1, nullptr, 0, nullptr, nullptr);
+  if (cchLength == 0)
+    return true;
+
+  std::unique_ptr<char[]> pszBaseName{new char[cchLength]};
+  cchLength = WideCharToMultiByte(
+      CP_UTF8, WC_ERR_INVALID_CHARS | WC_NO_BEST_FIT_CHARS, pwszBaseName, -1,
+      pszBaseName.get(), cchLength, nullptr, nullptr);
+  if (cchLength == 0)
+    return true;
+
+  const char *__progname = pszBaseName.get();
+#else
   extern const char *__progname;
 
   if (!__progname)
     return true;
+#endif
 
   auto envEnabledProcesses =
       runtime::environment::SWIFT_DEBUG_LIB_PRESPECIALIZED_ENABLED_PROCESSES();
@@ -421,7 +460,7 @@ getMetadataFromNameKeyedMap(const LibPrespecializedState &state,
                       "tree for generic type lookup.",
                       ref);
   };
-  auto mangling = Demangle::mangleNode(mangleNode, resolver, dem);
+  auto mangling = Demangle::mangleNode(mangleNode, resolver, dem, Mangle::ManglingFlavor::Default);
   if (!mangling.isSuccess()) {
     swift::warning(0,
                    "Mangling for prespecialized metadata failed with code %d",
@@ -567,7 +606,7 @@ swift::getLibPrespecializedTypeDescriptor(Demangle::NodePointer node) {
   ExpandResolvedSymbolicReferences resolver{dem};
 
   if (SWIFT_UNLIKELY(prespecializedLoggingEnabled)) {
-    auto mangling = Demangle::mangleNode(node, resolver, dem);
+    auto mangling = Demangle::mangleNode(node, resolver, dem, Mangle::ManglingFlavor::Default);
     if (!mangling.isSuccess()) {
       LOG("Failed to build demangling for node %p.", node);
       return {LibPrespecializedLookupResult::NonDefinitiveNotFound, nullptr};
@@ -585,7 +624,7 @@ swift::getLibPrespecializedTypeDescriptor(Demangle::NodePointer node) {
     return {LibPrespecializedLookupResult::NonDefinitiveNotFound, nullptr};
   }
 
-  auto simplifiedMangling = Demangle::mangleNode(simplifiedNode, resolver, dem);
+  auto simplifiedMangling = Demangle::mangleNode(simplifiedNode, resolver, dem, Mangle::ManglingFlavor::Default);
   if (!simplifiedMangling.isSuccess()) {
     LOG("Failed to build demangling for simplified node %p.\n", node);
     return {LibPrespecializedLookupResult::NonDefinitiveNotFound, nullptr};
@@ -686,7 +725,7 @@ void _swift_validatePrespecializedMetadata() {
 
     auto result = swift_getTypeByMangledName(MetadataState::Complete,
                                              mangledName, nullptr, {}, {});
-    if (auto *error = result.getError()) {
+    if (result.getError()) {
       fprintf(stderr,
               "Prespecializations library validation: unable to build metadata "
               "for mangled name '%s'\n",

@@ -11,6 +11,7 @@
   #define NONSENDABLE __attribute__((__swift_attr__("@_nonSendable")))
   #define ASSUME_NONSENDABLE_BEGIN _Pragma("clang attribute ASSUME_NONSENDABLE.push (__attribute__((swift_attr(\"@_nonSendable(_assumed)\"))), apply_to = any(objc_interface, record, enum))")
   #define ASSUME_NONSENDABLE_END _Pragma("clang attribute ASSUME_NONSENDABLE.pop")
+  #define ASYNC_NAME(NAME) __attribute__((swift_async_name(#NAME)))
 #else
   // If we take this #else, we should see minor failures of some subtests,
   // but not systematic failures of everything that uses this header.
@@ -18,6 +19,7 @@
   #define NONSENDABLE
   #define ASSUME_NONSENDABLE_BEGIN
   #define ASSUME_NONSENDABLE_END
+  #define ASYNC_NAME(NAME)
 #endif
 
 #define NS_ENUM(_type, _name) enum _name : _type _name; \
@@ -123,6 +125,19 @@ typedef void (^NonsendableCompletionHandler)(NSString * _Nullable, NSString * _N
     __attribute__((swift_async_error(zero_argument, 3)));
 - (void)getIceCreamFlavorWithCompletionHandler:
     (void (^)(Flavor flavor, NSError *__nullable error))completionHandler;
+
+@property(class, strong, readonly) SlowServer *standardServer;
+- (void)getValueWithKey:(NSString *)valueIdentifier
+             completion:(void (^)(NSString *__nullable value,
+                                  NSError *__nullable error))completionHandler;
+- (void)getMainActorValueWithKey:(NSString *)valueIdentifier
+                      completion:
+                          (void (^)(NSString *__nullable value,
+                                    NSError *__nullable error))completionHandler
+    MAIN_ACTOR;
+
+- (void)startAt:(__nullable NSDate *)value
+     completion:(void (^_Nonnull)(void))completion;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>
@@ -179,7 +194,7 @@ typedef void ( ^ObjCErrorHandler )( NSError * _Nullable inError );
   - (void) myMethod:(NSInteger)value1 foo:(NSInteger)value2;
 @end
 
-@interface GenericObject<T> : NSObject
+@interface GenericObject<T> : NSObject // expected-note {{generic class 'GenericObject' does not conform to the 'Sendable' protocol}}
 - (void)doSomethingWithCompletionHandler:(void (^)(T _Nullable_result, NSError * _Nullable))completionHandler;
 - (void)doAnotherThingWithCompletionHandler:(void (^)(GenericObject<T> *_Nullable))completionHandler;
 @end
@@ -218,7 +233,7 @@ MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor"))) @protocol Tr
 
 SENDABLE @interface SendableClass : NSObject @end
 
-NONSENDABLE @interface NonSendableClass : NSObject @end
+NONSENDABLE @interface NonSendableClass : NSObject @end // expected-note {{class 'NonSendableClass' does not conform to the 'Sendable' protocol}}
 
 ASSUME_NONSENDABLE_BEGIN
 
@@ -232,14 +247,14 @@ SENDABLE @protocol SendableProtocol @end
 typedef NS_ENUM(unsigned, SendableEnum) {
   SendableEnumFoo, SendableEnumBar
 };
-typedef NS_ENUM(unsigned, NonSendableEnum) {
+typedef NS_ENUM(unsigned, NonSendableEnum) { // expected-note {{enum 'NonSendableEnum' does not conform to the 'Sendable' protocol}}
   NonSendableEnumFoo, NonSendableEnumBar
 } NONSENDABLE;
 
 typedef NS_OPTIONS(unsigned, SendableOptions) {
   SendableOptionsFoo = 1 << 0, SendableOptionsBar = 1 << 1
 };
-typedef NS_OPTIONS(unsigned, NonSendableOptions) {
+typedef NS_OPTIONS(unsigned, NonSendableOptions) { // expected-note {{struct 'NonSendableOptions' does not conform to the 'Sendable' protocol}}
   NonSendableOptionsFoo = 1 << 0, NonSendableOptionsBar = 1 << 1
 } NONSENDABLE;
 
@@ -250,7 +265,7 @@ typedef NS_ERROR_ENUM(unsigned, SendableErrorCode, SendableErrorDomain) {
 typedef NS_ERROR_ENUM(unsigned, NonSendableErrorCode, NonSendableErrorDomain) {
   NonSendableErrorCodeFoo, NonSendableErrorCodeBar
 } NONSENDABLE;
-// expected-warning@-3 {{cannot make error code type 'NonSendableErrorCode' non-sendable because Swift errors are always sendable}}
+// expected-warning@-3 {{cannot make error code type 'NonSendableErrorCode' non-Sendable because Swift errors are always sendable}}
 
 UI_ACTOR
 @interface PictureFrame : NSObject
@@ -264,10 +279,10 @@ UI_ACTOR
 @end
 
 typedef NSString *SendableStringEnum NS_STRING_ENUM;
-typedef NSString *NonSendableStringEnum NS_STRING_ENUM NONSENDABLE;
+typedef NSString *NonSendableStringEnum NS_STRING_ENUM NONSENDABLE; // expected-note {{struct 'NonSendableStringEnum' does not conform to the 'Sendable' protocol}}
 
 typedef NSString *SendableStringStruct NS_EXTENSIBLE_STRING_ENUM;
-typedef NSString *NonSendableStringStruct NS_EXTENSIBLE_STRING_ENUM NONSENDABLE;
+typedef NSString *NonSendableStringStruct NS_EXTENSIBLE_STRING_ENUM NONSENDABLE; // expected-note {{struct 'NonSendableStringStruct' does not conform to the 'Sendable' protocol}}
 
 SENDABLE
 typedef struct {
@@ -362,6 +377,19 @@ MAIN_ACTOR
 @protocol FloatLoader
 @optional
 - (void)loadFloatWithCompletionHandler:(void (^)(float))completionHandler;
+@end
+
+@protocol FailableFloatLoader
+- (void)loadFloatOrThrowWithCompletionHandler:(void (^)(float, NSError* __nullable)) completionHandler;
+@end
+
+NONSENDABLE
+@interface ImportObjCAsyncGetter : NSObject
+
+- (void)getSendableClassesWithCompletionHandler:
+    (void (^SENDABLE)(NSArray<SendableClass *> *myClasses))handler
+    ASYNC_NAME(getter:sendableClasses());
+
 @end
 
 #pragma clang assume_nonnull end

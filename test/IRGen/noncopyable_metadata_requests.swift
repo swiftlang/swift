@@ -15,6 +15,7 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
+// UNSUPPORTED: back_deployment_runtime || use_os_stdlib
 
 
 // This type's generic parameter is noncopyable, so older runtimes can't

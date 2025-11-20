@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s  -disable-availability-checking -package-name myPkg -enable-experimental-feature IsolatedDeinit
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %s  -disable-availability-checking -package-name myPkg
 // REQUIRES: concurrency
 
 actor SomeActor { }
@@ -98,7 +98,7 @@ struct Container {
 // Redundant attributes
 // -----------------------------------------------------------------------
 extension SomeActor {
-  @GA1 nonisolated func conflict1() { } // expected-error 3{{instance method 'conflict1()' has multiple actor-isolation attributes ('nonisolated' and 'GA1')}}
+  @GA1 nonisolated func conflict1() { } // expected-error {{instance method 'conflict1()' has multiple actor-isolation attributes (@GA1 and 'nonisolated')}}
 }
 
 
@@ -156,11 +156,11 @@ do {
     var test1: Int {
       get { 42 }
       @GA1
-      set { } // expected-warning {{setter cannot have a global actor}} {{158:7-11=}}
-      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{156:5-5=@GA1}}
+      set { } // expected-warning {{setter cannot have a global actor}} {{-1:7-11=}}
+      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{-3:5-5=@GA1}}
 
       @GA1 _modify { fatalError() } // expected-warning {{_modify accessor cannot have a global actor}} {{7-12=}}
-      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{156:5-5=@GA1}}
+      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{-6:5-5=@GA1}}
     }
 
     func local() {
@@ -182,22 +182,22 @@ do {
     var test1: Int {
       get { 42 }
       @GA1
-      set { } // expected-warning {{setter cannot have a global actor}} {{184:7-11=}}
-      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{182:5-5=@GA1}}
+      set { } // expected-warning {{setter cannot have a global actor}} {{-1:7-11=}}
+      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{-3:5-5=@GA1}}
       @GA1 _modify { fatalError() } // expected-warning {{_modify accessor cannot have a global actor}} {{7-12=}}
-      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{182:5-5=@GA1}}
+      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{-5:5-5=@GA1}}
     }
 
     var test2: Int {
       @GA1 willSet { // expected-warning {{willSet observer cannot have a global actor}} {{7-12=}}
-        // expected-note@-1 {{move global actor attribute to property 'test2'}} {{191:5-5=@GA1}}
+        // expected-note@-1 {{move global actor attribute to property 'test2'}} {{-1:5-5=@GA1}}
       }
     }
 
     subscript(x: Int) -> Bool {
       get { true }
       @GA1 set { } // expected-warning {{setter cannot have a global actor}} {{7-12=}}
-      // expected-note@-1 {{move global actor attribute to subscript 'subscript(_:)'}} {{197:5-5=@GA1}}
+      // expected-note@-1 {{move global actor attribute to subscript 'subscript(_:)'}} {{-2:5-5=@GA1}}
     }
 
     @GA1 subscript(y: Bool) -> String {

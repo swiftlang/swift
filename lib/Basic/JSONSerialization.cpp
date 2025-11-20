@@ -140,6 +140,7 @@ bool Output::bitSetMatch(const char *Str, bool Matches) {
     }
     llvm::StringRef StrRef(Str);
     scalarString(StrRef, true);
+    NeedBitValueComma = true;
   }
   return false;
 }

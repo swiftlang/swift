@@ -37,6 +37,7 @@ extension P {
 
 public struct S {
   public var member: Int
+  public static var staticMember: Int = 0
 
   public init(member: Int) {
     self.member = member

@@ -49,6 +49,15 @@
 #include <string.h>
 #include <unistd.h>
 
+#define DEBUG_MEMSERVER 0
+
+#if DEBUG_MEMSERVER
+#include <stdio.h>
+#define memserver_error(x) perror(x)
+#else
+#define memserver_error(x)
+#endif
+
 #include "swift/Runtime/Backtrace.h"
 
 #include <cstring>
@@ -76,7 +85,6 @@ uint32_t currently_paused();
 void wait_paused(uint32_t expected, const struct timespec *timeout);
 int  memserver_start();
 int  memserver_entry(void *);
-bool run_backtracer(int fd);
 
 ssize_t safe_read(int fd, void *buf, size_t len) {
   uint8_t *ptr = (uint8_t *)buf;
@@ -87,8 +95,8 @@ ssize_t safe_read(int fd, void *buf, size_t len) {
     ssize_t ret;
     do {
       ret = read(fd, buf, len);
-    } while (ret < 0 && errno == EINTR);
-    if (ret < 0)
+    } while (ret <= 0 && errno == EINTR);
+    if (ret <= 0)
       return ret;
     total += ret;
     ptr += ret;
@@ -107,8 +115,8 @@ ssize_t safe_write(int fd, const void *buf, size_t len) {
     ssize_t ret;
     do {
       ret = write(fd, buf, len);
-    } while (ret < 0 && errno == EINTR);
-    if (ret < 0)
+    } while (ret <= 0 && errno == EINTR);
+    if (ret <= 0)
       return ret;
     total += ret;
     ptr += ret;
@@ -261,13 +269,13 @@ handle_fatal_signal(int signum,
   _swift_displayCrashMessage(signum, pc);
 
   // Actually start the backtracer
-  if (!run_backtracer(fd)) {
+  if (!_swift_spawnBacktracer(&crashInfo, fd)) {
     const char *message = _swift_backtraceSettings.color == OnOffTty::On
       ? " failed\n\n" : " failed ***\n\n";
-    if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
-      write(STDERR_FILENO, message, strlen(message));
-    else
+    if (_swift_backtraceSettings.outputTo == OutputTo::Stdout)
       write(STDOUT_FILENO, message, strlen(message));
+    else
+      write(STDERR_FILENO, message, strlen(message));
   }
 
 #if !MEMSERVER_USE_PROCESS
@@ -647,7 +655,6 @@ wait_paused(uint32_t expected, const struct timespec *timeout)
 char memserver_stack[4096] __attribute__((aligned(SWIFT_PAGE_SIZE)));
 char memserver_buffer[4096];
 int memserver_fd;
-bool memserver_has_ptrace;
 sigjmp_buf memserver_fault_buf;
 pid_t memserver_pid;
 
@@ -658,20 +665,28 @@ memserver_start()
   int fds[2];
 
   ret = socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
-  if (ret < 0)
+  if (ret < 0) {
+    memserver_error("memserver_start: socketpair failed");
     return ret;
+  }
 
   memserver_fd = fds[0];
   ret = clone(memserver_entry, memserver_stack + sizeof(memserver_stack),
 #if MEMSERVER_USE_PROCESS
               0,
 #else
-              CLONE_THREAD | CLONE_VM | CLONE_FILES
-              | CLONE_FS | CLONE_IO | CLONE_SIGHAND,
+              #ifndef __musl__
+              // Can't use CLONE_THREAD on musl because the clone() function
+              // there returns EINVAL if we do.
+              CLONE_THREAD | CLONE_SIGHAND |
+              #endif
+              CLONE_VM | CLONE_FILES | CLONE_FS | CLONE_IO,
 #endif
               NULL);
-  if (ret < 0)
+  if (ret < 0) {
+    memserver_error("memserver_start: clone failed");
     return ret;
+  }
 
 #if MEMSERVER_USE_PROCESS
   memserver_pid = ret;
@@ -696,21 +711,18 @@ memserver_fault(int sig) {
 
 ssize_t __attribute__((noinline))
 memserver_read(void *to, const void *from, size_t len) {
-  if (memserver_has_ptrace) {
-// This won't run for older Android APIs anyway, but it can't be compiled
-// either, as process_vm_readv() isn't available.
-#if !(defined(__ANDROID_API__) && __ANDROID_API__ < 23)
-    struct iovec local = { to, len };
-    struct iovec remote = { const_cast<void *>(from), len };
-    return process_vm_readv(memserver_pid, &local, 1, &remote, 1, 0);
-#endif
+  /* Earlier versions of this code tried to use process_vm_readv() if they
+     detected that CAP_SYS_PTRACE was enabled.  This is theoretically
+     slightly safer than using signals and memcpy(), but in practice it
+     turns out that some kernels don't support process_vm_readv() even
+     when CAP_SYS_PTRACE is enabled.
+
+     It seems simpler just to use the signal handlers instead. */
+  if (!sigsetjmp(memserver_fault_buf, 1)) {
+    memcpy(to, from, len);
+    return len;
   } else {
-    if (!sigsetjmp(memserver_fault_buf, 1)) {
-      memcpy(to, from, len);
-      return len;
-    } else {
-      return -1;
-    }
+    return -1;
   }
 }
 
@@ -719,33 +731,26 @@ memserver_entry(void *dummy __attribute__((unused))) {
   int fd = memserver_fd;
   int result = 1;
 
-#if MEMSERVER_USE_PROCESS
+#if MEMSERVER_USE_PROCESS || defined(__musl__)
   prctl(PR_SET_NAME, "[backtrace]");
 #endif
 
-// process_vm_readv() is not available for older Android APIs.
-#if defined(__ANDROID_API__) && __ANDROID_API__ < 23
-  memserver_has_ptrace = false;
-#else
-  memserver_has_ptrace = !!prctl(PR_CAPBSET_READ, CAP_SYS_PTRACE);
-#endif
-
-  if (!memserver_has_ptrace) {
-    struct sigaction sa;
-    sigfillset(&sa.sa_mask);
-    sa.sa_handler = memserver_fault;
-    sa.sa_flags = SA_NODEFER;
-    sigaction(SIGSEGV, &sa, NULL);
-    sigaction(SIGBUS, &sa, NULL);
-  }
+  struct sigaction sa;
+  sigfillset(&sa.sa_mask);
+  sa.sa_handler = memserver_fault;
+  sa.sa_flags = SA_NODEFER;
+  sigaction(SIGSEGV, &sa, NULL);
+  sigaction(SIGBUS, &sa, NULL);
 
   for (;;) {
     struct memserver_req req;
     ssize_t ret;
 
     ret = safe_read(fd, &req, sizeof(req));
-    if (ret != sizeof(req))
+    if (ret != sizeof(req)) {
+      memserver_error("memserver: terminating because safe_read() returned wrong size");
       break;
+    }
 
     uint64_t addr = req.addr;
     uint64_t bytes = req.len;
@@ -762,15 +767,19 @@ memserver_entry(void *dummy __attribute__((unused))) {
       resp.len = ret;
 
       ret = safe_write(fd, &resp, sizeof(resp));
-      if (ret != sizeof(resp))
+      if (ret != sizeof(resp)) {
+        memserver_error("memserver: terminating because safe_write() failed");
         goto fail;
+      }
 
       if (resp.len < 0)
         break;
 
       ret = safe_write(fd, memserver_buffer, resp.len);
-      if (ret != resp.len)
+      if (ret != resp.len) {
+        memserver_error("memserver: terminating because safe_write() failed (2)");
         goto fail;
+      }
 
       addr += resp.len;
       bytes -= resp.len;
@@ -784,183 +793,6 @@ memserver_entry(void *dummy __attribute__((unused))) {
   return result;
 }
 
-// .. Starting the backtracer ..................................................
-
-char addr_buf[18];
-char timeout_buf[22];
-char limit_buf[22];
-char top_buf[22];
-const char *backtracer_argv[] = {
-  "swift-backtrace",            // 0
-  "--unwind",                   // 1
-  "precise",                    // 2
-  "--demangle",                 // 3
-  "true",                       // 4
-  "--interactive",              // 5
-  "true",                       // 6
-  "--color",                    // 7
-  "true",                       // 8
-  "--timeout",                  // 9
-  timeout_buf,                  // 10
-  "--preset",                   // 11
-  "friendly",                   // 12
-  "--crashinfo",                // 13
-  addr_buf,                     // 14
-  "--threads",                  // 15
-  "preset",                     // 16
-  "--registers",                // 17
-  "preset",                     // 18
-  "--images",                   // 19
-  "preset",                     // 20
-  "--limit",                    // 21
-  limit_buf,                    // 22
-  "--top",                      // 23
-  top_buf,                      // 24
-  "--sanitize",                 // 25
-  "preset",                     // 26
-  "--cache",                    // 27
-  "true",                       // 28
-  "--output-to",                // 29
-  "stdout",                     // 30
-  "--symbolicate",              // 31
-  "full",                       // 32
-  NULL
-};
-
-const char *
-trueOrFalse(bool b) {
-  return b ? "true" : "false";
-}
-
-const char *
-trueOrFalse(OnOffTty oot) {
-  return trueOrFalse(oot == OnOffTty::On);
-}
-
-bool
-run_backtracer(int memserver_fd)
-{
-  // Set-up the backtracer's command line arguments
-  switch (_swift_backtraceSettings.algorithm) {
-  case UnwindAlgorithm::Fast:
-    backtracer_argv[2] = "fast";
-    break;
-  default:
-    backtracer_argv[2] = "precise";
-    break;
-  }
-
-  // (The TTY option has already been handled at this point, so these are
-  //  all either "On" or "Off".)
-  backtracer_argv[4] = trueOrFalse(_swift_backtraceSettings.demangle);
-  backtracer_argv[6] = trueOrFalse(_swift_backtraceSettings.interactive);
-  backtracer_argv[8] = trueOrFalse(_swift_backtraceSettings.color);
-
-  switch (_swift_backtraceSettings.threads) {
-  case ThreadsToShow::Preset:
-    backtracer_argv[16] = "preset";
-    break;
-  case ThreadsToShow::All:
-    backtracer_argv[16] = "all";
-    break;
-  case ThreadsToShow::Crashed:
-    backtracer_argv[16] = "crashed";
-    break;
-  }
-
-  switch (_swift_backtraceSettings.registers) {
-  case RegistersToShow::Preset:
-    backtracer_argv[18] = "preset";
-    break;
-  case RegistersToShow::None:
-    backtracer_argv[18] = "none";
-    break;
-  case RegistersToShow::All:
-    backtracer_argv[18] = "all";
-    break;
-  case RegistersToShow::Crashed:
-    backtracer_argv[18] = "crashed";
-    break;
-  }
-
-  switch (_swift_backtraceSettings.images) {
-  case ImagesToShow::Preset:
-    backtracer_argv[20] = "preset";
-    break;
-  case ImagesToShow::None:
-    backtracer_argv[20] = "none";
-    break;
-  case ImagesToShow::All:
-    backtracer_argv[20] = "all";
-    break;
-  case ImagesToShow::Mentioned:
-    backtracer_argv[20] = "mentioned";
-    break;
-  }
-
-  switch (_swift_backtraceSettings.preset) {
-  case Preset::Friendly:
-    backtracer_argv[12] = "friendly";
-    break;
-  case Preset::Medium:
-    backtracer_argv[12] = "medium";
-    break;
-  default:
-    backtracer_argv[12] = "full";
-    break;
-  }
-
-  switch (_swift_backtraceSettings.sanitize) {
-  case SanitizePaths::Preset:
-    backtracer_argv[26] = "preset";
-    break;
-  case SanitizePaths::Off:
-    backtracer_argv[26] = "false";
-    break;
-  case SanitizePaths::On:
-    backtracer_argv[26] = "true";
-    break;
-  }
-
-  switch (_swift_backtraceSettings.outputTo) {
-  case OutputTo::Stdout:
-    backtracer_argv[30] = "stdout";
-    break;
-  case OutputTo::Auto: // Shouldn't happen, but if it does pick stderr
-  case OutputTo::Stderr:
-    backtracer_argv[30] = "stderr";
-    break;
-  }
-
-  backtracer_argv[28] = trueOrFalse(_swift_backtraceSettings.cache);
-
-  switch (_swift_backtraceSettings.symbolicate) {
-  case Symbolication::Off:
-    backtracer_argv[32] = "off";
-    break;
-  case Symbolication::Fast:
-    backtracer_argv[32] = "fast";
-    break;
-  case Symbolication::Full:
-    backtracer_argv[32] = "full";
-    break;
-  }
-
-  _swift_formatUnsigned(_swift_backtraceSettings.timeout, timeout_buf);
-
-  if (_swift_backtraceSettings.limit < 0)
-    std::strcpy(limit_buf, "none");
-  else
-    _swift_formatUnsigned(_swift_backtraceSettings.limit, limit_buf);
-
-  _swift_formatUnsigned(_swift_backtraceSettings.top, top_buf);
-  _swift_formatAddress(&crashInfo, addr_buf);
-
-  // Actually execute it
-  return _swift_spawnBacktracer(backtracer_argv, memserver_fd);
-}
-
 } // namespace
 
 #endif // __linux__
-

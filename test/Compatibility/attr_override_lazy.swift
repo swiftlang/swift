@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 4 -emit-silgen %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -swift-version 4 -Xllvm -sil-print-types -emit-silgen %s -verify | %FileCheck %s
 
 class Base {
   var foo: Int { return 0 } // expected-note {{attempt to override property here}}

@@ -311,19 +311,19 @@ class DependentTypeInClosure<Data: DataType> {
 func testDependentTypeInClosure() {
   let _: DependentTypeInClosure = .#^DEPENDENT_IN_CLOSURE_3^#
 // DEPENDENT_IN_CLOSURE_3: Begin completions, 2 items
-// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal: init({#(arg): DataType#}, {#fn: (DataType.Content) -> Void##(DataType.Content) -> Void#})[#DependentTypeInClosure<DataType>#];
-// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal: init({#arg: DataType#}, {#fn: () -> DataType.Content##() -> DataType.Content#})[#DependentTypeInClosure<DataType>#];
+// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#(arg): DataType#}, {#fn: (Data.Content) -> Void##(Data.Content) -> Void#})[#DependentTypeInClosure<DataType>#];
+// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#arg: DataType#}, {#fn: () -> Data.Content##() -> Data.Content#})[#DependentTypeInClosure<DataType>#];
 
   let _ = DependentTypeInClosure(#^DEPENDENT_IN_CLOSURE_1^#)
-// DEPENDENT_IN_CLOSURE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#(arg): DataType#}, {#fn: (_) -> Void##(_) -> Void#}[')'][#DependentTypeInClosure<DataType>#];
-// DEPENDENT_IN_CLOSURE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg: DataType#}, {#fn: () -> _##() -> _#}[')'][#DependentTypeInClosure<DataType>#];
+// DEPENDENT_IN_CLOSURE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#(arg): DataType#}, {#fn: (Data.Content) -> Void##(Data.Content) -> Void#}[')'][#DependentTypeInClosure<DataType>#];
+// DEPENDENT_IN_CLOSURE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg: DataType#}, {#fn: () -> Data.Content##() -> Data.Content#}[')'][#DependentTypeInClosure<DataType>#];
 
   let _ = DependentTypeInClosure.#^DEPENDENT_IN_CLOSURE_2^#
 // DEPENDENT_IN_CLOSURE_2: Begin completions, 4 items
-// DEPENDENT_IN_CLOSURE_2-DAG: Keyword[self]/CurrNominal:          self[#DependentTypeInClosure<_>.Type#]; name=self
-// DEPENDENT_IN_CLOSURE_2-DAG: Keyword/CurrNominal:                Type[#DependentTypeInClosure<_>.Type#]; name=Type
-// DEPENDENT_IN_CLOSURE_2-DAG: Decl[Constructor]/CurrNominal:      init({#(arg): _#}, {#fn: (_.Content) -> Void##(_.Content) -> Void#})[#DependentTypeInClosure<_>#]; name=init(:fn:)
-// DEPENDENT_IN_CLOSURE_2-DAG: Decl[Constructor]/CurrNominal:      init({#arg: _#}, {#fn: () -> _.Content##() -> _.Content#})[#DependentTypeInClosure<_>#]; name=init(arg:fn:)
+// DEPENDENT_IN_CLOSURE_2-DAG: Keyword[self]/CurrNominal:          self[#DependentTypeInClosure<Data>.Type#]; name=self
+// DEPENDENT_IN_CLOSURE_2-DAG: Keyword/CurrNominal:                Type[#DependentTypeInClosure<Data>.Type#]; name=Type
+// DEPENDENT_IN_CLOSURE_2-DAG: Decl[Constructor]/CurrNominal:      init({#(arg): Data#}, {#fn: (Data.Content) -> Void##(Data.Content) -> Void#})[#DependentTypeInClosure<Data>#]; name=init(:fn:)
+// DEPENDENT_IN_CLOSURE_2-DAG: Decl[Constructor]/CurrNominal:      init({#arg: Data#}, {#fn: () -> Data.Content##() -> Data.Content#})[#DependentTypeInClosure<Data>#]; name=init(arg:fn:)
 }
 struct InitWithUnresolved<Data: DataType> where Data.Content: Comparable {
   init(arg: Data, fn: (Data.Content) -> Void) {}
@@ -334,7 +334,7 @@ extension InitWithUnresolved where Self.Data: Comparable {
 func testInitWithUnresolved() {
   let _ = InitWithUnresolved(#^INIT_WITH_UNRESOLVEDTYPE_1^#
 // INIT_WITH_UNRESOLVEDTYPE_1: Begin completions, 2 items
-// INIT_WITH_UNRESOLVEDTYPE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg: DataType#}, {#fn: (_) -> Void##(_) -> Void#}[')'][#InitWithUnresolved<DataType>#];
+// INIT_WITH_UNRESOLVEDTYPE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg: DataType#}, {#fn: (Data.Content) -> Void##(Data.Content) -> Void#}[')'][#InitWithUnresolved<DataType>#];
 // INIT_WITH_UNRESOLVEDTYPE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg2: DataType#}[')'][#InitWithUnresolved<DataType>#];
 }
 
@@ -348,6 +348,6 @@ func testIgnoreGenericArgsAfterCompletionToken() {
   func deserializeRecord() throws -> HostRecord<IPv4> {
     var position = 42
     return try #^IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN^#HostRecord<IPv4>(position: &position)
-// IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN-DAG: Decl[Struct]/Local: HostRecord[#HostRecord#];
+// IGNORE_GENERIC_ARGS_AFTER_COMPLETION_TOKEN-DAG: Decl[Struct]/Local: HostRecord[#HostRecord<IPType>#];
   }
 }

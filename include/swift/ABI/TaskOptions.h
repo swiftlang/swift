@@ -131,6 +131,26 @@ public:
   }
 };
 
+class InitialTaskNameTaskOptionRecord
+    : public TaskOptionRecord {
+
+  const char* TaskName;
+
+public:
+  InitialTaskNameTaskOptionRecord(
+      const char* taskName)
+      : TaskOptionRecord(TaskOptionRecordKind::InitialTaskName),
+        TaskName(taskName) {}
+
+  const char* getTaskName() const {
+    return TaskName;
+  }
+
+  static bool classof(const TaskOptionRecord *record) {
+    return record->getKind() == TaskOptionRecordKind::InitialTaskName;
+  }
+};
+
 /// Task option to specify the initial serial executor for the task.
 class InitialSerialExecutorTaskOptionRecord : public TaskOptionRecord {
   const SerialExecutorRef Executor;
@@ -143,25 +163,6 @@ public:
 
   static bool classof(const TaskOptionRecord *record) {
     return record->getKind() == TaskOptionRecordKind::InitialSerialExecutor;
-  }
-};
-
-/// DEPRECATED. AsyncLetWithBufferTaskOptionRecord is used instead.
-/// Task option to specify that the created task is for an 'async let'.
-class AsyncLetTaskOptionRecord : public TaskOptionRecord {
-  AsyncLet *asyncLet;
-
-public:
-  AsyncLetTaskOptionRecord(AsyncLet *asyncLet)
-    : TaskOptionRecord(TaskOptionRecordKind::AsyncLet),
-      asyncLet(asyncLet) {}
-
-  AsyncLet *getAsyncLet() const {
-    return asyncLet;
-  }
-
-  static bool classof(const TaskOptionRecord *record) {
-    return record->getKind() == TaskOptionRecordKind::AsyncLet;
   }
 };
 
@@ -179,7 +180,7 @@ public:
   AsyncLet *getAsyncLet() const {
     return asyncLet;
   }
-  
+
   void *getResultBuffer() const {
     return resultBuffer;
   }
@@ -194,9 +195,17 @@ class ResultTypeInfoTaskOptionRecord : public TaskOptionRecord {
  public:
   size_t size;
   size_t alignMask;
-  void (*initializeWithCopy)(OpaqueValue *, OpaqueValue *);
-  void (*storeEnumTagSinglePayload)(OpaqueValue *, unsigned, unsigned);
-  void (*destroy)(OpaqueValue *);
+
+  OpaqueValue *(*__ptrauth_swift_value_witness_function_pointer(
+      SpecialPointerAuthDiscriminators::InitializeWithCopy)
+            initializeWithCopy)(OpaqueValue *, OpaqueValue *, void *);
+
+  void (*__ptrauth_swift_value_witness_function_pointer(
+      SpecialPointerAuthDiscriminators::StoreEnumTagSinglePayload)
+            storeEnumTagSinglePayload)(OpaqueValue *, unsigned, unsigned, void *);
+
+  void (*__ptrauth_swift_value_witness_function_pointer(
+      SpecialPointerAuthDiscriminators::Destroy) destroy)(OpaqueValue *, void *);
 
   static bool classof(const TaskOptionRecord *record) {
     return record->getKind() == TaskOptionRecordKind::ResultTypeInfo;

@@ -92,6 +92,11 @@ PrintTests.test("StringInterpolation") {
   
   let s2 = "aaa\(1)bbb\(2 as Any)"
   expectEqual("aaa1bbb2", s2)
+  
+  let x: Int? = 1
+  let y: Int? = nil
+  let s3 = "aaa\(x, default: "NONE")bbb\(y, default: "NONE")"
+  expectEqual("aaa1bbbNONE", s3)
 }
 
 PrintTests.test("SubstringInterpolation") {
@@ -100,6 +105,11 @@ PrintTests.test("SubstringInterpolation") {
   
   let s2 = "aaa\(1)bbb\(2 as Any)" as Substring
   expectEqual("aaa1bbb2", s2)
+  
+  let x: Int? = 1
+  let y: Int? = nil
+  let s3 = "aaa\(x, default: "NONE")bbb\(y, default: "NONE")" as Substring
+  expectEqual("aaa1bbbNONE", s3)
 }
 
 PrintTests.test("CustomStringInterpolation") {
@@ -116,6 +126,11 @@ PrintTests.test("AutoCustomStringInterpolation") {
   
   let s2 = ("aaa\(1)bbb\(2 as Any)" as MySimpleString).value
   expectEqual("aaa1bbb2", s2)
+  
+  let x: Int? = 1
+  let y: Int? = nil
+  let s3 = ("aaa\(x, default: "NONE")bbb\(y, default: "NONE")" as MySimpleString).value
+  expectEqual("aaa1bbbNONE", s3)
 }
 
 PrintTests.test("CustomStringInterpolationExtra") {

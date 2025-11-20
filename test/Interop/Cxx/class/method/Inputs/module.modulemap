@@ -1,3 +1,8 @@
+module DeducingThis {
+  header "deducing-this.h"
+  requires cplusplus23
+}
+
 module Methods {
   header "methods.h"
   requires cplusplus

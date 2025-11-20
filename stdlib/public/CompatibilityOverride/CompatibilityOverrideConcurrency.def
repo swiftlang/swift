@@ -206,6 +206,17 @@ OVERRIDE_TASK(task_removeCancellationHandler, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               (CancellationNotificationStatusRecord *record), (record))
 
+OVERRIDE_TASK(task_addPriorityEscalationHandler,
+              EscalationNotificationStatusRecord *,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (EscalationNotificationStatusRecord::FunctionType handler,
+               void *context),
+              (handler, context))
+
+OVERRIDE_TASK(task_removePriorityEscalationHandler, void,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (EscalationNotificationStatusRecord *record), (record))
+
 OVERRIDE_TASK(task_createNullaryContinuationJob, NullaryContinuationJob *,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               (size_t priority,
@@ -234,28 +245,6 @@ OVERRIDE_TASK(continuation_await, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
               swift::, (ContinuationAsyncContext *context),
               (context))
-
-OVERRIDE_ASYNC_LET(asyncLet_wait, void, SWIFT_EXPORT_FROM(swift_Concurrency),
-                   SWIFT_CC(swiftasync), swift::,
-                   (OpaqueValue *result,
-                       SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
-                       AsyncLet *alet, TaskContinuationFunction *resumeFn,
-                       AsyncContext *callContext),
-                   (result, callerContext, alet, resumeFn, callContext))
-
-OVERRIDE_ASYNC_LET(asyncLet_wait_throwing, void,
-                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
-                   swift::,
-                   (OpaqueValue *result,
-                       SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
-                       AsyncLet *alet,
-                       ThrowingTaskFutureWaitContinuationFunction *resume,
-                       AsyncContext *callContext),
-                   (result, callerContext, alet, resume, callContext))
-
-OVERRIDE_ASYNC_LET(asyncLet_end, void,
-                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                   swift::, (AsyncLet *alet), (alet))
 
 OVERRIDE_ASYNC_LET(asyncLet_get, void,
                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
@@ -426,6 +415,12 @@ OVERRIDE_TASK_STATUS(task_popTaskExecutorPreference, void,
 OVERRIDE_TASK(task_startOnMainActor, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
               swift::, (AsyncTask *task), (task))
+
+// In ACTOR since we need ExecutorTracking info
+OVERRIDE_ACTOR(task_immediate, void,
+               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+               swift::, (AsyncTask *task, SerialExecutorRef targetExecutor),
+               (task, targetExecutor))
 
 #undef OVERRIDE
 #undef OVERRIDE_ACTOR

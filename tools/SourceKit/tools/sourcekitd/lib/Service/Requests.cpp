@@ -19,6 +19,7 @@
 #include "sourcekitd/Service.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/VariableTypeArray.h"
+#include "sourcekitd/plugin.h"
 
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
@@ -35,6 +36,7 @@
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
+#include "swift/IDE/SignatureHelpFormatter.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -43,6 +45,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/VirtualFileSystem.h"
@@ -51,6 +54,7 @@
 #include <optional>
 
 // FIXME: Portability.
+#include <Block.h>
 #include <dispatch/dispatch.h>
 
 using namespace sourcekitd;
@@ -104,6 +108,53 @@ static void fillDiagnosticInfo(ResponseBuilder::Dictionary ParentElem,
 
 static SourceKit::Context *GlobalCtx = nullptr;
 
+namespace SourceKit {
+class PluginSupport {
+  std::vector<sourcekitd_cancellable_request_handler_t> RequestHandlers;
+  std::vector<sourcekitd_cancellation_handler_t> CancellationHandlers;
+  llvm::sys::Mutex Mtx;
+
+public:
+  ~PluginSupport() {
+    for (auto &Handler : RequestHandlers) {
+      Block_release(Handler);
+    }
+    RequestHandlers.clear();
+  }
+
+  void addRequestHandler(sourcekitd_cancellable_request_handler_t Handler) {
+    RequestHandlers.push_back(Block_copy(Handler));
+  }
+
+  /// Register a cancellation handler that will be called when a request is
+  /// cancelled.
+  void addCancellationHandler(sourcekitd_cancellation_handler_t Handler) {
+    CancellationHandlers.push_back(Block_copy(Handler));
+  }
+
+  bool handleRequest(sourcekitd_object_t Req,
+                     sourcekitd_request_handle_t Handle, ResponseReceiver Rec) {
+    auto ReceiverWrapper = ^void(sourcekitd_response_t Response) {
+      Rec(Response);
+    };
+    for (auto &Handler : RequestHandlers) {
+      if (Handler(Req, Handle, ReceiverWrapper)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Inform all cancellation handlers in the plugins that the request with the
+  /// given handle has been cancelled.
+  void cancelRequest(sourcekitd_request_handle_t Handle) {
+    for (auto &CancellationHandler : CancellationHandlers) {
+      CancellationHandler(Handle);
+    }
+  }
+};
+} // end namespace SourceKit
+
 // NOTE: if we had a connection context, these stats should move into it.
 static Statistic numRequests(UIdentFromSKDUID(KindStatNumRequests),
                              "# of requests (total)");
@@ -112,14 +163,15 @@ static Statistic numSemaRequests(UIdentFromSKDUID(KindStatNumSemaRequests),
 
 void sourcekitd::initializeService(
     llvm::StringRef swiftExecutablePath, StringRef runtimeLibPath,
-    StringRef diagnosticDocumentationPath,
     std::function<void(sourcekitd_response_t)> postNotification) {
   INITIALIZE_LLVM();
   initializeSwiftModules();
   llvm::EnablePrettyStackTrace();
   GlobalCtx = new SourceKit::Context(swiftExecutablePath, runtimeLibPath,
-                                     diagnosticDocumentationPath,
-                                     SourceKit::createSwiftLangSupport);
+                                     SourceKit::createSwiftLangSupport,
+                                     [](SourceKit::Context &Ctx) {
+                                       return std::make_shared<PluginSupport>();
+                                     });
   auto noteCenter = GlobalCtx->getNotificationCenter();
 
   noteCenter->addDocumentUpdateNotificationReceiver([postNotification](StringRef DocumentName) {
@@ -260,6 +312,11 @@ static sourcekitd_response_t conformingMethodList(
     ArrayRef<const char *> ExpectedTypes, std::optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken);
 
+static sourcekitd_response_t
+signatureHelp(StringRef PrimaryFilePath, int64_t Offset,
+              ArrayRef<const char *> Args, std::optional<VFSOptions> vfsOptions,
+              SourceKitCancellationToken CancellationToken);
+
 static sourcekitd_response_t editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                         SKEditorConsumerOptions Opts,
                                         ArrayRef<const char *> Args,
@@ -279,6 +336,7 @@ editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
 static void
 editorOpenSwiftSourceInterface(StringRef Name, StringRef SourceName,
                                ArrayRef<const char *> Args,
+                               bool CancelOnSubsequentRequest,
                                SourceKitCancellationToken CancellationToken,
                                ResponseReceiver Rec, bool EnableDeclarations);
 
@@ -402,6 +460,9 @@ void sourcekitd::handleRequest(sourcekitd_object_t Req,
 }
 
 void sourcekitd::cancelRequest(SourceKitCancellationToken CancellationToken) {
+  // Inform all plugins that the request has been cancelled, even if the request
+  // wasn't handled by a plugin.
+  getGlobalContext().getPlugins()->cancelRequest(CancellationToken);
   getGlobalContext().getRequestTracker()->cancel(CancellationToken);
 }
 
@@ -998,8 +1059,13 @@ static void handleRequestEditorOpenSwiftSourceInterface(
     // Reporting the declarations array is off by default
     bool EnableDeclarations =
         Req.getOptionalInt64(KeyEnableDeclarations).value_or(false);
+    // For backwards compatibility, the default is 1.
+    int64_t CancelOnSubsequentRequest = 1;
+    Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
+                 /*isOptional=*/true);
     return editorOpenSwiftSourceInterface(
-        *Name, *FileName, Args, CancellationToken, Rec, EnableDeclarations);
+        *Name, *FileName, Args, CancelOnSubsequentRequest, CancellationToken,
+        Rec, EnableDeclarations);
   }
 }
 
@@ -1412,6 +1478,35 @@ handleRequestConformingMethodList(const RequestDict &Req,
   });
 }
 
+static void
+handleRequestSignatureHelp(const RequestDict &Req,
+                           SourceKitCancellationToken CancellationToken,
+                           ResponseReceiver Rec) {
+  handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
+    std::optional<VFSOptions> vfsOptions = getVFSOptions(Req);
+    std::optional<StringRef> PrimaryFilePath =
+        getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
+      return;
+
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+    if (!InputBufferName.empty())
+      return Rec(createErrorRequestInvalid(
+          "'key.primary_file' and 'key.sourcefile' can't be different"));
+
+    SmallVector<const char *, 8> Args;
+    if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
+      return;
+
+    int64_t Offset;
+    if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
+      return Rec(createErrorRequestInvalid("missing 'key.offset'"));
+
+    return Rec(signatureHelp(*PrimaryFilePath, Offset, Args,
+                             std::move(vfsOptions), CancellationToken));
+  });
+}
+
 static void handleRequestIndex(const RequestDict &Req,
                                SourceKitCancellationToken CancellationToken,
                                ResponseReceiver Rec) {
@@ -1450,6 +1545,10 @@ getIndexStoreOpts(const RequestDict &Req, ResponseReceiver Rec) {
 
   if (auto IncludeLocals = Req.getOptionalInt64(KeyIncludeLocals)) {
     Opts.IncludeLocals = IncludeLocals.value() > 0;
+  }
+  
+  if (auto Compress = Req.getOptionalInt64(KeyCompress)) {
+    Opts.Compress = Compress.value() > 0;
   }
 
   if (auto IgnoreClangModules = Req.getOptionalInt64(KeyIgnoreClangModules)) {
@@ -1650,8 +1749,15 @@ handleRequestSemanticRefactoring(const RequestDict &Req,
         Info.Line = Line;
         Info.Column = Column;
         Info.Length = Length;
+
+        // For backwards compatibility, the default is 1.
+        int64_t CancelOnSubsequentRequest = 1;
+        Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
+                     /*isOptional=*/true);
+
         return Lang.semanticRefactoring(
-            *PrimaryFilePath, Info, Args, CancellationToken,
+            *PrimaryFilePath, Info, Args, CancelOnSubsequentRequest,
+            CancellationToken,
             [Rec](const RequestResult<ArrayRef<CategorizedEdits>> &Result) {
               Rec(createCategorizedEditsResponse(Result));
             });
@@ -1727,9 +1833,15 @@ handleRequestCollectVariableType(const RequestDict &Req,
                          [](int64_t v) -> unsigned { return v; });
     int64_t FullyQualified = false;
     Req.getInt64(KeyFullyQualified, FullyQualified, /*isOptional=*/true);
+
+    // For backwards compatibility, the default is 1.
+    int64_t CancelOnSubsequentRequest = 1;
+    Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
+                 /*isOptional=*/true);
+
     return Lang.collectVariableTypes(
         *PrimaryFilePath, InputBufferName, Args, Offset, Length, FullyQualified,
-        CancellationToken,
+        CancelOnSubsequentRequest, CancellationToken,
         [Rec](const RequestResult<VariableTypesInFile> &Result) {
           reportVariableTypeInfo(Result, Rec);
         });
@@ -1759,9 +1871,15 @@ handleRequestFindLocalRenameRanges(const RequestDict &Req,
       return Rec(createErrorRequestInvalid("'key.column' is required"));
     Req.getInt64(KeyLength, Length, /*isOptional=*/true);
 
+    // For backwards compatibility, the default is 1.
+    int64_t CancelOnSubsequentRequest = 1;
+    Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
+                 /*isOptional=*/true);
+
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
     return Lang.findLocalRenameRanges(
-        *PrimaryFilePath, Line, Column, Length, Args, CancellationToken,
+        *PrimaryFilePath, Line, Column, Length, Args, CancelOnSubsequentRequest,
+        CancellationToken,
         [Rec](const CancellableResult<std::vector<CategorizedRenameRanges>>
                   &Result) {
           Rec(createCategorizedRenameRangesResponse(Result));
@@ -2065,6 +2183,12 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
                        ResponseReceiver Rec) {
   ++numRequests;
 
+  if (getGlobalContext().getPlugins()->handleRequest(ReqObj, CancellationToken,
+                                                     Rec)) {
+    // Handled by plugin.
+    return;
+  }
+
   RequestDict Req(ReqObj);
 
   if (auto SimulateLongRequestDuration =
@@ -2147,6 +2271,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   HANDLE_REQUEST(RequestCodeCompleteUpdate, handleRequestCodeCompleteUpdate)
   HANDLE_REQUEST(RequestTypeContextInfo, handleRequestTypeContextInfo)
   HANDLE_REQUEST(RequestConformingMethodList, handleRequestConformingMethodList)
+  HANDLE_REQUEST(RequestSignatureHelp, handleRequestSignatureHelp)
 
   HANDLE_REQUEST(RequestIndex, handleRequestIndex)
   HANDLE_REQUEST(RequestIndexToStore, handleRequestIndexToStore)
@@ -3504,6 +3629,86 @@ static sourcekitd_response_t conformingMethodList(
 }
 
 //===----------------------------------------------------------------------===//
+// Signature Help
+//===----------------------------------------------------------------------===//
+
+static sourcekitd_response_t
+signatureHelp(StringRef PrimaryFilePath, int64_t Offset,
+              ArrayRef<const char *> Args, std::optional<VFSOptions> vfsOptions,
+              SourceKitCancellationToken CancellationToken) {
+  ResponseBuilder RespBuilder;
+
+  class Consumer : public SignatureHelpConsumer {
+    ResponseBuilder::Dictionary SKResult;
+    std::optional<std::string> ErrorDescription;
+    bool WasCancelled = false;
+
+  public:
+    Consumer(ResponseBuilder Builder) : SKResult(Builder.getDictionary()) {}
+
+    void
+    handleResult(const swift::ide::FormattedSignatureHelp &Result) override {
+      SKResult.set(KeyActiveSignature, Result.ActiveSignature);
+
+      auto Signatures = SKResult.setArray(KeySignatures);
+
+      for (auto Signature : Result.Signatures) {
+        auto SignatureElem = Signatures.appendDictionary();
+
+        SignatureElem.set(KeyName, Signature.Text);
+
+        if (auto ActiveParam = Signature.ActiveParam)
+          SignatureElem.set(KeyActiveParameter, ActiveParam.value());
+
+        if (!Signature.DocComment.empty())
+          SignatureElem.set(KeyDocComment, Signature.DocComment);
+
+        auto Params = SignatureElem.setArray(KeyParameters);
+
+        for (auto Param : Signature.Params) {
+          auto ParamElem = Params.appendDictionary();
+
+          if (!Param.Name.empty())
+            ParamElem.set(KeyName, Param.Name);
+
+          ParamElem.set(KeyNameOffset, Param.Offset);
+          ParamElem.set(KeyNameLength, Param.Length);
+        }
+      }
+    }
+
+    void setReusingASTContext(bool flag) override {
+      if (flag)
+        SKResult.setBool(KeyReusingASTContext, flag);
+    }
+
+    void failed(StringRef ErrDescription) override {
+      ErrorDescription = ErrDescription.str();
+    }
+
+    void cancelled() override { WasCancelled = true; }
+
+    bool wasCancelled() const { return WasCancelled; }
+    bool isError() const { return ErrorDescription.has_value(); }
+    const char *getErrorDescription() const {
+      return ErrorDescription->c_str();
+    }
+  } Consumer(RespBuilder);
+
+  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+  Lang.getSignatureHelp(PrimaryFilePath, Offset, Args, CancellationToken,
+                        Consumer, std::move(vfsOptions));
+
+  if (Consumer.wasCancelled()) {
+    return createErrorRequestCancelled();
+  }
+  if (Consumer.isError()) {
+    return createErrorRequestFailed(Consumer.getErrorDescription());
+  }
+  return RespBuilder.createResponse();
+}
+
+//===----------------------------------------------------------------------===//
 // Editor
 //===----------------------------------------------------------------------===//
 
@@ -3625,6 +3830,7 @@ static sourcekitd_response_t editorOpenInterface(
 static void
 editorOpenSwiftSourceInterface(StringRef Name, StringRef HeaderName,
                                ArrayRef<const char *> Args,
+                               bool CancelOnSubsequentRequest,
                                SourceKitCancellationToken CancellationToken,
                                ResponseReceiver Rec, bool EnableDeclarations) {
   SKEditorConsumerOptions Opts;
@@ -3633,8 +3839,9 @@ editorOpenSwiftSourceInterface(StringRef Name, StringRef HeaderName,
   Opts.EnableDeclarations = EnableDeclarations;
   auto EditC = std::make_shared<SKEditorConsumer>(Rec, Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.editorOpenSwiftSourceInterface(Name, HeaderName, Args, CancellationToken,
-                                      EditC);
+  Lang.editorOpenSwiftSourceInterface(Name, HeaderName, Args,
+                                      CancelOnSubsequentRequest,
+                                      CancellationToken, EditC);
 }
 
 static void
@@ -3966,12 +4173,16 @@ fillDictionaryForDiagnosticInfo(ResponseBuilder::Dictionary Elem,
   UIdent SeverityUID;
   static UIdent UIDKindDiagWarning(KindDiagWarning.str());
   static UIdent UIDKindDiagError(KindDiagError.str());
+  static UIdent UIDKindDiagRemark(KindDiagRemark.str());
   switch (Info.Severity) {
   case DiagnosticSeverityKind::Warning:
     SeverityUID = UIDKindDiagWarning;
     break;
   case DiagnosticSeverityKind::Error:
     SeverityUID = UIDKindDiagError;
+    break;
+  case DiagnosticSeverityKind::Remark:
+    SeverityUID = UIDKindDiagRemark;
     break;
   }
 
@@ -4356,4 +4567,20 @@ static void enableCompileNotifications(bool value) {
   } else {
     trace::unregisterConsumer(&compileConsumer);
   }
+}
+
+void sourcekitd::pluginRegisterRequestHandler(
+    sourcekitd_cancellable_request_handler_t handler) {
+  getGlobalContext().getPlugins()->addRequestHandler(handler);
+}
+
+void sourcekitd::pluginRegisterCancellationHandler(
+    sourcekitd_cancellation_handler_t handler) {
+  getGlobalContext().getPlugins()->addCancellationHandler(handler);
+}
+
+void *sourcekitd::pluginGetOpaqueSwiftIDEInspectionInstance() {
+  return getGlobalContext()
+      .getSwiftLangSupport()
+      .getOpaqueSwiftIDEInspectionInstance();
 }

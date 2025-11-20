@@ -231,7 +231,7 @@ const {
 
   // Empty payload addresses can be left undefined.
   if (payloadI == ElementsWithPayload.end()) {
-    auto payloadTy = elt->getParentEnum()->mapTypeIntoContext(
+    auto payloadTy = elt->getParentEnum()->mapTypeIntoEnvironment(
       elt->getPayloadInterfaceType());
     return IGF.getTypeInfoForUnlowered(payloadTy)
       .getUndefAddress();
@@ -254,7 +254,7 @@ const {
 
   // Empty payload addresses can be left undefined.
   if (payloadI == ElementsWithPayload.end()) {
-    auto payloadTy = Case->getParentEnum()->mapTypeIntoContext(
+    auto payloadTy = Case->getParentEnum()->mapTypeIntoEnvironment(
       Case->getPayloadInterfaceType());
     return IGF.getTypeInfoForUnlowered(payloadTy)
       .getUndefAddress();
@@ -324,13 +324,13 @@ EnumImplStrategy::emitOutlinedGetEnumTag(IRGenFunction &IGF, SILType T,
                             .getAddress());
 
   auto outlinedFn = [T, &IGF] () -> llvm::Constant* {
-    IRGenMangler mangler;
+    IRGenMangler mangler(T.getASTContext());
     auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
     auto funcName = mangler.mangleOutlinedEnumGetTag(manglingBits.first,
                                                      manglingBits.second);
 
     const TypeInfo &ti = IGF.getTypeInfo(T);
-    auto ptrTy = ti.getStorageType()->getPointerTo();
+    auto *ptrTy = IGF.IGM.PtrTy;
     llvm::SmallVector<llvm::Type *, 4> paramTys;
     paramTys.push_back(ptrTy);
 
@@ -736,8 +736,8 @@ namespace {
 
       // Pre swift-5.1 runtimes were missing the initialization of the
       // the extraInhabitantCount field. Do it here instead.
-      auto payloadRef = IGF.Builder.CreateBitOrPointerCast(
-          payloadLayout, IGF.IGM.TypeLayoutTy->getPointerTo());
+      auto payloadRef =
+          IGF.Builder.CreateBitOrPointerCast(payloadLayout, IGM.PtrTy);
       auto payloadExtraInhabitantCount =
           IGF.Builder.CreateLoad(IGF.Builder.CreateStructGEP(
               Address(payloadRef, IGF.IGM.TypeLayoutTy, Alignment(1)), 3,
@@ -774,8 +774,8 @@ namespace {
       // Pre swift-5.1 runtimes were missing the initialization of the
       // the extraInhabitantCount field. Do it here instead.
       auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
-      auto payloadRef = IGF.Builder.CreateBitOrPointerCast(
-          payloadLayout, IGF.IGM.TypeLayoutTy->getPointerTo());
+      auto payloadRef =
+          IGF.Builder.CreateBitOrPointerCast(payloadLayout, IGM.PtrTy);
       auto payloadExtraInhabitantCount =
           IGF.Builder.CreateLoad(IGF.Builder.CreateStructGEP(
               Address(payloadRef, IGF.IGM.TypeLayoutTy, Alignment(1)), 3,
@@ -1430,10 +1430,7 @@ namespace {
   // types other than i1 or power-of-two-byte sizes like i8, i16, etc. inhibit
   // FastISel and expose backend bugs.
   static unsigned getIntegerBitSizeForTag(unsigned tagBits) {
-    // i1 is used to represent bool in C so is fairly well supported.
-    if (tagBits == 1)
-      return 1;
-    // Otherwise, round the physical size in bytes up to the next power of two.
+    // Round the physical size in bytes up to the next power of two.
     unsigned tagBytes = (tagBits + 7U)/8U;
     if (!llvm::isPowerOf2_32(tagBytes))
       tagBytes = llvm::NextPowerOf2(tagBytes);
@@ -1864,7 +1861,7 @@ namespace {
 
     llvm::Function *
     emitCopyEnumFunction(IRGenModule &IGM, SILType theEnumType) const {
-      IRGenMangler Mangler;
+      IRGenMangler Mangler(IGM.Context);
       auto manglingBits =
         getTypeAndGenericSignatureForManglingOutlineFunction(theEnumType);
       std::string name =
@@ -1922,7 +1919,7 @@ namespace {
     llvm::Function *
     emitConsumeEnumFunction(IRGenModule &IGM, SILType theEnumType,
                             OutliningMetadataCollector &collector) const {
-      IRGenMangler Mangler;
+      IRGenMangler Mangler(IGM.Context);
       auto manglingBits =
         getTypeAndGenericSignatureForManglingOutlineFunction(theEnumType);
       std::string name =
@@ -2074,8 +2071,7 @@ namespace {
       auto PayloadT = getPayloadType(IGF.IGM, T);
 
       auto &fixedTI = getFixedPayloadTypeInfo();
-      auto addr = IGF.Builder.CreateBitCast(
-          enumAddr.getAddress(), fixedTI.getStorageType()->getPointerTo());
+      auto addr = IGF.Builder.CreateBitCast(enumAddr.getAddress(), IGM.PtrTy);
       return fixedTI.getEnumTagSinglePayload(IGF, numEmptyCases,
                                              fixedTI.getAddressForPointer(addr),
                                              PayloadT, /*isOutlined*/ false);
@@ -2221,15 +2217,9 @@ namespace {
       // If any tag bits are present, they must match.
       llvm::Value *tagResult = nullptr;
       if (tagBits) {
-        if (ExtraTagBitCount == 1) {
-          if (extraTag == 1)
-            tagResult = tagBits;
-          else
-            tagResult = IGF.Builder.CreateNot(tagBits);
-        } else {
-          tagResult = IGF.Builder.CreateICmpEQ(tagBits,
-                    llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), extraTag));
-        }
+        tagResult = IGF.Builder.CreateICmpEQ(
+            tagBits,
+            llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), extraTag));
       }
       
       if (tagResult && payloadResult)
@@ -2311,7 +2301,9 @@ namespace {
             oneDest = llvm::BasicBlock::Create(C);
             tagBitBlocks.push_back(oneDest);
           }
-          IGF.Builder.CreateCondBr(tagBits, oneDest, zeroDest);
+          auto isOne = IGF.Builder.CreateICmpEQ(
+              tagBits, llvm::ConstantInt::get(tagBits->getType(), 1));
+          IGF.Builder.CreateCondBr(isOne, oneDest, zeroDest);
         } else {
           auto swi = SwitchBuilder::create(IGF, tagBits,
                            SwitchDefaultDest(unreachableBB, IsUnreachable),
@@ -2587,14 +2579,9 @@ namespace {
       // If we have extra tag bits, they will be zero if we contain a payload.
       if (ExtraTagBitCount > 0) {
         assert(extraBits);
-        llvm::Value *isNonzero;
-        if (ExtraTagBitCount == 1) {
-          isNonzero = extraBits;
-        } else {
-          llvm::Value *zero = llvm::ConstantInt::get(extraBits->getType(), 0);
-          isNonzero = IGF.Builder.CreateICmp(llvm::CmpInst::ICMP_NE,
-                                         extraBits, zero);
-        }
+        llvm::Value *zero = llvm::ConstantInt::get(extraBits->getType(), 0);
+        llvm::Value *isNonzero =
+            IGF.Builder.CreateICmp(llvm::CmpInst::ICMP_NE, extraBits, zero);
 
         auto *zeroBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
         IGF.Builder.CreateCondBr(isNonzero, nonzeroBB, zeroBB);
@@ -3799,7 +3786,7 @@ namespace {
     }
 
     llvm::Function *emitCopyEnumFunction(IRGenModule &IGM, SILType type) const {
-      IRGenMangler Mangler;
+      IRGenMangler Mangler(IGM.Context);
       auto manglingBits =
         getTypeAndGenericSignatureForManglingOutlineFunction(type);
       std::string name =
@@ -3831,7 +3818,7 @@ namespace {
     llvm::Function *
     emitConsumeEnumFunction(IRGenModule &IGM, SILType type,
                             OutliningMetadataCollector &collector) const {
-      IRGenMangler Mangler;
+      IRGenMangler Mangler(IGM.Context);
       auto manglingBits =
         getTypeAndGenericSignatureForManglingOutlineFunction(type);
       std::string name =
@@ -6480,7 +6467,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     // parameters, then we additionally need to constrain any layout
     // optimizations we perform to things that are reproducible by the runtime.
     Type origPayloadType = elt->getPayloadInterfaceType();
-    origPayloadType = theEnum->mapTypeIntoContext(origPayloadType);
+    origPayloadType = theEnum->mapTypeIntoEnvironment(origPayloadType);
 
     auto origArgLoweredTy = TC.IGM.getLoweredType(origPayloadType);
     auto *origArgTI = &TC.getCompleteTypeInfo(origArgLoweredTy.getASTType());
@@ -6549,8 +6536,9 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
         std::move(elementsWithPayload), std::move(elementsWithNoPayload)));
   }
 
-  // Enums imported from Clang or marked with @objc use C-compatible layout.
-  if (theEnum->hasClangNode() || theEnum->isObjC()) {
+  // Enums imported from Clang or marked with @objc or @c use a
+  // C-compatible layout.
+  if (theEnum->hasClangNode() || theEnum->isCCompatibleEnum()) {
     assert(elementsWithPayload.empty() && "C enum with payload?!");
     assert(alwaysFixedSize == IsFixedSize && "C enum with resilient payload?!");
     return std::unique_ptr<EnumImplStrategy>(
@@ -6838,6 +6826,14 @@ namespace {
                           IsABIAccessible_t abiAccessible)
       : EnumTypeInfoBase(strategy, irTy, copyable, abiAccessible) {}
   };
+
+  class BitwiseCopyableEnumTypeInfo
+      : public EnumTypeInfoBase<BitwiseCopyableTypeInfo> {
+  public:
+    BitwiseCopyableEnumTypeInfo(EnumImplStrategy &strategy, llvm::Type *irTy,
+                                IsABIAccessible_t abiAccessible)
+        : EnumTypeInfoBase(strategy, irTy, abiAccessible) {}
+  };
 } // end anonymous namespace
 
 const EnumImplStrategy &
@@ -6987,7 +6983,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                     llvm::StructType *enumTy){
   // The type should have come from Clang or be @objc,
   // and should have a raw type.
-  assert((theEnum->hasClangNode() || theEnum->isObjC())
+  assert((theEnum->hasClangNode() || theEnum->isCCompatibleEnum())
          && "c-compatible enum didn't come from clang!");
   assert(theEnum->hasRawType()
          && "c-compatible enum doesn't have raw type!");
@@ -7383,7 +7379,8 @@ ResilientEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
           KnownProtocolKind::BitwiseCopyable);
   if (bitwiseCopyableProtocol &&
       checkConformance(Type.getASTType(), bitwiseCopyableProtocol)) {
-    return BitwiseCopyableTypeInfo::create(enumTy, abiAccessible);
+    return registerEnumTypeInfo(
+        new BitwiseCopyableEnumTypeInfo(*this, enumTy, abiAccessible));
   }
   return registerEnumTypeInfo(
                        new ResilientEnumTypeInfo(*this, enumTy, cp,
@@ -7551,16 +7548,15 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestructiveProjectDataForLoad(
                               SILType T, const TypeInfo &ti,
                               EnumElementDecl *theCase,
                               unsigned caseIdx) {
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
     mangler.mangleOutlinedEnumProjectDataForLoadFunction(manglingBits.first,
                                                          manglingBits.second,
                                                          caseIdx);
 
-  auto ptrTy = ti.getStorageType()->getPointerTo();
   llvm::SmallVector<llvm::Type *, 4> paramTys;
-  paramTys.push_back(ptrTy);
+  paramTys.push_back(PtrTy);
 
   return getOrCreateHelperFunction(funcName, PtrTy, paramTys,
       [&](IRGenFunction &IGF) {
@@ -7627,15 +7623,14 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedEnumTagStoreFunction(
                               SILType T, const TypeInfo &ti,
                               EnumElementDecl *theCase,
                               unsigned caseIdx) {
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName = mangler.mangleOutlinedEnumTagStoreFunction(manglingBits.first,
                                                              manglingBits.second,
                                                              caseIdx);
 
-  auto ptrTy = ti.getStorageType()->getPointerTo();
   llvm::SmallVector<llvm::Type *, 4> paramTys;
-  paramTys.push_back(ptrTy);
+  paramTys.push_back(PtrTy);
 
   return getOrCreateHelperFunction(funcName, VoidTy, paramTys,
       [&](IRGenFunction &IGF) {

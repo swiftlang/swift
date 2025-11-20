@@ -1,5 +1,9 @@
 // RUN: %target-swift-emit-sil %s -O -sil-verify-all -verify -enable-experimental-feature MoveOnlyPartialReinitialization -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses
 
+// REQUIRES: swift_feature_MoveOnlyClasses
+// REQUIRES: swift_feature_MoveOnlyPartialReinitialization
+// REQUIRES: swift_feature_NoImplicitCopy
+
 //////////////////
 // Declarations //
 //////////////////

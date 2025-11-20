@@ -1,7 +1,9 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature RawLayout)
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_RawLayout
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: CPU=arm64e
 
 import Synchronization
 

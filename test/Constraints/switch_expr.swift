@@ -819,3 +819,28 @@ func builderInClosure() {
     }
   }
 }
+
+// https://github.com/swiftlang/swift/issues/79395
+_ = {
+  switch Bool.random() {
+  case true:
+    struct S: Error {}
+    throw S()
+  case false:
+    1
+  }
+}
+_ = {
+  switch Bool.random() {
+  case true:
+    switch Bool.random() {
+    case true:
+      struct S: Error {}
+      throw S()
+    case false:
+      0
+    }
+  case false:
+    1
+  }
+}

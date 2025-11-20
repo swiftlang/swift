@@ -1,5 +1,3 @@
-import SwiftOnoneSupport
-
 public func fromA()
 
 
@@ -28,191 +26,175 @@ public func other(x: A.From_ABAdditionsType)
 
 [
   {
-    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
     key.offset: 0,
     key.length: 6
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 7,
-    key.length: 17
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 26,
-    key.length: 6
-  },
-  {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 33,
+    key.offset: 7,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 38,
+    key.offset: 12,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 48,
+    key.offset: 22,
     key.length: 23
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment.mark,
-    key.offset: 51,
+    key.offset: 25,
     key.length: 19
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 72,
+    key.offset: 46,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 79,
+    key.offset: 53,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 82,
+    key.offset: 56,
     key.length: 39
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 121,
+    key.offset: 95,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 128,
+    key.offset: 102,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 135,
+    key.offset: 109,
     key.length: 20
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 161,
+    key.offset: 135,
     key.length: 39
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 200,
+    key.offset: 174,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 207,
+    key.offset: 181,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 212,
+    key.offset: 186,
     key.length: 16
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 233,
+    key.offset: 207,
     key.length: 29
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment.mark,
-    key.offset: 236,
+    key.offset: 210,
     key.length: 25
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 263,
+    key.offset: 237,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 270,
+    key.offset: 244,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 273,
+    key.offset: 247,
     key.length: 46
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 319,
+    key.offset: 293,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 326,
+    key.offset: 300,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 331,
+    key.offset: 305,
     key.length: 27
   },
   {
     key.kind: source.lang.swift.syntaxtype.comment,
-    key.offset: 362,
+    key.offset: 336,
     key.length: 46
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 408,
+    key.offset: 382,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 415,
+    key.offset: 389,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 420,
+    key.offset: 394,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 426,
+    key.offset: 400,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 429,
+    key.offset: 403,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 431,
+    key.offset: 405,
     key.length: 20
   }
 ]
 [
   {
     key.kind: source.lang.swift.ref.module,
-    key.offset: 7,
-    key.length: 17,
-    key.is_system: 1
-  },
-  {
-    key.kind: source.lang.swift.ref.module,
-    key.offset: 79,
+    key.offset: 53,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.module,
-    key.offset: 270,
+    key.offset: 244,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.module,
-    key.offset: 429,
+    key.offset: 403,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 431,
+    key.offset: 405,
     key.length: 20
   }
 ]
@@ -221,13 +203,13 @@ public func other(x: A.From_ABAdditionsType)
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "fromA()",
-    key.offset: 33,
+    key.offset: 7,
     key.length: 12,
-    key.nameoffset: 38,
+    key.nameoffset: 12,
     key.namelength: 7,
     key.attributes: [
       {
-        key.offset: 26,
+        key.offset: 0,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -237,15 +219,15 @@ public func other(x: A.From_ABAdditionsType)
     key.kind: source.lang.swift.decl.struct,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "From_ABAdditionsType",
-    key.offset: 128,
+    key.offset: 102,
     key.length: 31,
-    key.nameoffset: 135,
+    key.nameoffset: 109,
     key.namelength: 20,
-    key.bodyoffset: 157,
+    key.bodyoffset: 131,
     key.bodylength: 1,
     key.attributes: [
       {
-        key.offset: 121,
+        key.offset: 95,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -255,13 +237,13 @@ public func other(x: A.From_ABAdditionsType)
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "from_ABAdditions()",
-    key.offset: 207,
+    key.offset: 181,
     key.length: 23,
-    key.nameoffset: 212,
+    key.nameoffset: 186,
     key.namelength: 18,
     key.attributes: [
       {
-        key.offset: 200,
+        key.offset: 174,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -271,13 +253,13 @@ public func other(x: A.From_ABAdditionsType)
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "from__ABAdditionsCAdditions()",
-    key.offset: 326,
+    key.offset: 300,
     key.length: 34,
-    key.nameoffset: 331,
+    key.nameoffset: 305,
     key.namelength: 29,
     key.attributes: [
       {
-        key.offset: 319,
+        key.offset: 293,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -287,13 +269,13 @@ public func other(x: A.From_ABAdditionsType)
     key.kind: source.lang.swift.decl.function.free,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "other(x:)",
-    key.offset: 415,
+    key.offset: 389,
     key.length: 37,
-    key.nameoffset: 420,
+    key.nameoffset: 394,
     key.namelength: 32,
     key.attributes: [
       {
-        key.offset: 408,
+        key.offset: 382,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -302,10 +284,10 @@ public func other(x: A.From_ABAdditionsType)
       {
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "x",
-        key.offset: 426,
+        key.offset: 400,
         key.length: 25,
         key.typename: "A.From_ABAdditionsType",
-        key.nameoffset: 426,
+        key.nameoffset: 400,
         key.namelength: 1
       }
     ]

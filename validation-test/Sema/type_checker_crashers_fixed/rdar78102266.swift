@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -typecheck
+// RUN: %target-swift-emit-silgen %s
 
 struct Info {
 }

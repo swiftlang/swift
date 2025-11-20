@@ -5,11 +5,12 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 protocol ClassBound: AnyObject {
     func foo()
     func bar()
+    func predicate() -> Bool
 }
 
 class MyClass {}
@@ -156,6 +157,98 @@ struct S: P2 {
   }
 }
 
+protocol Q3 {
+  func bar()
+}
+
+protocol P3<T>: AnyObject {
+  associatedtype T: Q3
+
+  var t: T { get }
+
+  func foo()
+}
+
+extension P3 {
+  func foo() {
+    t.bar()
+  }
+}
+
+final class C3<T: Q3>: P3 {
+  var t: T
+
+
+  init(t: T) { self.t = t }
+}
+
+struct S3<I: BinaryInteger>: Q3 {
+  var x: I
+
+  func bar() {
+    print(x)
+  }
+}
+
+@inline(never)
+func testP3() -> any P3 {
+  return C3(t: S3(x: 102))
+}
+
+protocol P4<T>: AnyObject {
+  associatedtype T: Q
+
+  var t: T { get }
+
+  func foo()
+}
+
+extension P4 {
+  func foo() {
+    t.bar()
+  }
+}
+
+final class C4<T: Q>: P4 {
+  var t: T
+
+
+  init(t: T) { self.t = t }
+}
+
+class K4<I: BinaryInteger>: Q {
+  var x: I
+
+  init(x: I) { self.x = x }
+
+  func bar() {
+    print(x)
+  }
+}
+
+@inline(never)
+func testP4() -> any P4 {
+  return C4(t: K4(x: 437))
+}
+
+var gg: any ClassBound = MyClass()
+
+extension ClassBound {
+  public func isSame(_ rhs: some ClassBound) -> Bool {
+    if let rhs = rhs as? Self {
+      return rhs.predicate()
+    }
+    return false 
+  }
+  public func predicate() -> Bool { true }
+}
+
+@inline(never)
+func testIsSame(_ p: any ClassBound) -> Bool {
+  return p.isSame(gg)
+}
+
+
 @main
 struct Main {
     static func main() {
@@ -181,6 +274,15 @@ struct Main {
         // CHECK: Derived2.bar()
         testConditionalConformance(t: S(i: 27))
         // CHECK: 27
+        testP3().foo()
+        // CHECK: 102
+        testP4().foo()
+        // CHECK: 437
+
+        print(testIsSame(MyClass()))
+        // CHECK: true
+        print(testIsSame(MyOtherClass()))
+        // CHECK: false
     }
 }
 

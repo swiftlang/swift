@@ -49,6 +49,16 @@ public let benchmarks = [
     runFunction: { diff($0, from: unabridgedLorem, to: loremIpsum) },
     tags: t,
     setUpFunction: { blackHole((unabridgedLorem, loremIpsum)) }),
+  BenchmarkInfo(
+    name: "Diffing.Large.Similar",
+    runFunction: { diff($0, from: bigUnabridgedLorem, to: bigLoremIpsum) },
+    tags: t + [.skip],
+    setUpFunction: { blackHole((bigUnabridgedLorem, bigLoremIpsum)) }),
+  BenchmarkInfo(
+    name: "Diffing.Large.Disparate",
+    runFunction: { diff($0, from: bigNumbersAndSymbols, to: bigAlphabets) },
+    tags: t + [.skip],
+    setUpFunction: { blackHole((bigNumbersAndSymbols, bigAlphabets)) }),
 ]
 
 let numbersAndSymbols = Array("0123456789`~!@#$%^&*()+=_-\"'?/<,>.\\{}'")
@@ -59,6 +69,10 @@ let typingPangram = Array("The quick brown fox jumps over the lazy dog")
 let loremIpsum = Array("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.")
 let unabridgedLorem = Array("Lorem ipsum, quia dolor sit amet consectetur adipisci[ng] velit, sed quia non-numquam [do] eius modi tempora inci[di]dunt, ut labore et dolore magnam aliqua.")
 let loremReversed = Array(loremIpsum.reversed())
+let bigLoremIpsum = Array(repeatElement(loremIpsum, count: 100).joined())
+let bigUnabridgedLorem = Array(repeatElement(unabridgedLorem, count: 100).joined())
+let bigNumbersAndSymbols = Array(repeatElement(numbersAndSymbols, count: 250).joined())
+let bigAlphabets = Array(repeatElement(alphabets, count: 250).joined())
 
 @inline(never) func diff(_ n: Int, from older: [Character], to newer: [Character]) {
   if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {

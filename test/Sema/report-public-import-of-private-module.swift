@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // REQUIRES: VENDOR=apple
+// REQUIRES: swift_feature_InternalImportsByDefault
 
 /// Prepare the SDK.
 // RUN: cp -r %S/Inputs/public-private-sdk %t/sdk

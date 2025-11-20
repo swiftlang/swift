@@ -8,6 +8,11 @@ module ClassTemplateWithPrimitiveArgument {
   requires cplusplus
 }
 
+module ClassTemplateWithEnumParameter {
+  header "class-template-with-enum-parameter.h"
+  requires cplusplus
+}
+
 module ClassTemplateWithFunctionParameter {
   header "class-template-with-function-parameter.h"
   requires cplusplus
@@ -165,5 +170,20 @@ module UnevaluatedContext {
 
 module ManySpecializations {
   header "many-specializations.h"
+  requires cplusplus
+}
+
+module UninstantiatableSpecialMembers {
+  header "uninstantiatable-special-members.h"
+  requires cplusplus
+}
+
+module VariableTemplate {
+  header "variable-template.h"
+  requires cplusplus
+}
+
+module ForwardDeclaredSpecialization {
+  header "ForwardDeclaredSpecialization.h"
   requires cplusplus
 }

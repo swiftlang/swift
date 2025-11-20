@@ -283,12 +283,12 @@ bool RenameRangeDetailCollector::renameLabelsLenient(
     LabelRanges = LabelRanges.take_front(*FirstTrailingLabel);
 
     for (auto LabelIndex : llvm::reverse(indices(TrailingLabels))) {
+      if (OldNames.empty())
+        return true;
+
       CharSourceRange Label = TrailingLabels[LabelIndex];
 
       if (Label.getByteLength()) {
-        if (OldNames.empty())
-          return true;
-
         while (!labelRangeMatches(Label, LabelRangeType::CompoundName,
                                   OldNames.back())) {
           if ((OldNames = OldNames.drop_back()).empty())
@@ -302,9 +302,6 @@ bool RenameRangeDetailCollector::renameLabelsLenient(
 
       // empty labelled trailing closure label
       if (LabelIndex) {
-        if (OldNames.empty())
-          return true;
-
         while (!OldNames.back().empty()) {
           if ((OldNames = OldNames.drop_back()).empty())
             return true;
@@ -330,6 +327,8 @@ bool RenameRangeDetailCollector::renameLabelsLenient(
 
       // first name pos
       if (!NameIndex) {
+        if (NameIndex >= OldNames.size())
+          return true;
         while (!OldNames[NameIndex].empty()) {
           if (++NameIndex >= OldNames.size())
             return true;

@@ -38,7 +38,9 @@
 ///     fails. The default is the line number where `assert(_:_:file:line:)`
 ///     is called.
 @_transparent
-@_unavailableInEmbedded
+#if $Embedded
+@_disfavoredOverload
+#endif
 public func assert(
   _ condition: @autoclosure () -> Bool,
   _ message: @autoclosure () -> String = String(),
@@ -98,7 +100,9 @@ public func assert(
 ///     fails. The default is the line number where
 ///     `precondition(_:_:file:line:)` is called.
 @_transparent
-@_unavailableInEmbedded
+#if $Embedded
+@_disfavoredOverload
+#endif
 public func precondition(
   _ condition: @autoclosure () -> Bool,
   _ message: @autoclosure () -> String = String(),
@@ -161,7 +165,9 @@ public func precondition(
 ///     line number where `assertionFailure(_:file:line:)` is called.
 @inlinable
 @inline(__always)
-@_unavailableInEmbedded
+#if $Embedded
+@_disfavoredOverload
+#endif
 public func assertionFailure(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
@@ -220,7 +226,9 @@ public func assertionFailure(
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `preconditionFailure(_:file:line:)` is called.
 @_transparent
-@_unavailableInEmbedded
+#if $Embedded
+@_disfavoredOverload
+#endif
 public func preconditionFailure(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
@@ -263,13 +271,26 @@ public func preconditionFailure(
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `fatalError(_:file:line:)` is called.
 @_transparent
-@_unavailableInEmbedded
+#if $Embedded
+@_disfavoredOverload
+#endif
 public func fatalError(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
+#if !$Embedded
   _assertionFailure("Fatal error", message(), file: file, line: line,
     flags: _fatalErrorFlags())
+#else
+  if _isDebugAssertConfiguration() {
+    _assertionFailure("Fatal error", message(), file: file, line: line,
+      flags: _fatalErrorFlags())
+  } else {
+    Builtin.condfail_message(true._value,
+      StaticString("fatal error").unsafeRawPointer)
+    Builtin.unreachable()
+  }
+#endif
 }
 
 #if $Embedded

@@ -207,6 +207,9 @@ syn match swiftTupleIndexNumber contains=swiftDecimal
 syn match swiftDecimal contained
       \ /[0-9]\+/
 
+" This is a superset of the Preproc macros below, so it must come FIRST
+syn match swiftFreestandingMacro
+      \ /#\<[A-Za-z_][A-Za-z_0-9]*\>/
 syn match swiftPreproc
       \ /#\(\<column\>\|\<dsohandle\>\|\<file\>\|\<line\>\|\<function\>\)/
 syn match swiftPreproc
@@ -271,6 +274,7 @@ hi def link swiftLabel Operator
 hi def link swiftMutating Statement
 hi def link swiftPreproc PreCondit
 hi def link swiftPreprocFalse Comment
+hi def link swiftFreestandingMacro Macro
 hi def link swiftAttribute Type
 hi def link swiftTodo Todo
 hi def link swiftNil Constant

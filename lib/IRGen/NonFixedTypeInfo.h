@@ -54,8 +54,7 @@ private:
   /// Bit-cast the given pointer to the right type and assume it as an
   /// address of this type.
   Address getAsBitCastAddress(IRGenFunction &IGF, llvm::Value *addr) const {
-    addr = IGF.Builder.CreateBitCast(addr,
-                                     this->getStorageType()->getPointerTo());
+    addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.PtrTy);
     return this->getAddressForPointer(addr);
   }
 
@@ -70,12 +69,6 @@ public:
     IGF.Builder.CreateLifetimeStart(alloca.getAddressPointer());
     return alloca.withAddress(
              getAsBitCastAddress(IGF, alloca.getAddressPointer()));
-  }
-
-  StackAddress allocateVector(IRGenFunction &IGF, SILType T,
-                              llvm::Value *capacity,
-                              const Twine &name) const override {
-    llvm_unreachable("not implemented, yet");
   }
 
   void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
@@ -136,6 +129,8 @@ class BitwiseCopyableTypeInfo
     : public WitnessSizedTypeInfo<BitwiseCopyableTypeInfo> {
   using Self = BitwiseCopyableTypeInfo;
   using Super = WitnessSizedTypeInfo<Self>;
+
+protected:
   BitwiseCopyableTypeInfo(llvm::Type *type, IsABIAccessible_t abiAccessible)
       : Super(type, Alignment(1), IsNotTriviallyDestroyable,
               IsNotBitwiseTakable, IsCopyable, abiAccessible) {}

@@ -21,8 +21,10 @@
 // CMD-NEXT: "C"
 // CMD-NEXT: "1.0"
 // CMD-NEXT: "0"
-// CMD-NEXT: "-module-can-import"
+// CMD-NEXT: "-module-can-import-version"
 // CMD-NEXT: "D"
+// CMD-NEXT: "1.0"
+// CMD-NEXT: "0"
 // CMD-NEXT: "-module-can-import-version"
 // CMD-NEXT: "Simple"
 // CMD-NEXT: "0"
@@ -110,6 +112,11 @@ public func c() { }
 // swift-interface-format-version: 1.0
 // swift-module-flags: -module-name D -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -user-module-version 1.0
 public func d() { }
+
+//--- include/Simple.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name Simple -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib
+public func simple() { }
 
 //--- frameworks/Simple.framework/Modules/module.modulemap
 framework module Simple {

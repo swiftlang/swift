@@ -151,16 +151,15 @@ AddressUseKind ScopedAddressValue::updateTransitiveLiveness(
   return addressKind;
 }
 
-void ScopedAddressValue::createScopeEnd(SILBasicBlock::iterator insertPt,
-                                        SILLocation loc) const {
+SILInstruction *
+ScopedAddressValue::createScopeEnd(SILBasicBlock::iterator insertPt,
+                                   SILLocation loc) const {
   switch (kind) {
   case ScopedAddressValueKind::StoreBorrow: {
-    SILBuilderWithScope(insertPt).createEndBorrow(loc, value);
-    return;
+    return SILBuilderWithScope(insertPt).createEndBorrow(loc, value);
   }
   case ScopedAddressValueKind::BeginAccess: {
-    SILBuilderWithScope(insertPt).createEndAccess(loc, value, false);
-    return;
+    return SILBuilderWithScope(insertPt).createEndAccess(loc, value, false);
   }
   case ScopedAddressValueKind::Invalid:
     llvm_unreachable("Using invalid case?!");

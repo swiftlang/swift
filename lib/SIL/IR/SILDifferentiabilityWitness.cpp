@@ -29,7 +29,7 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDeclaration(
       derivativeGenSig, /*jvp*/ nullptr, /*vjp*/ nullptr,
       /*isDeclaration*/ true, /*isSerialized*/ false, attribute);
   // Register the differentiability witness in the module.
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(module.getASTContext());
   auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
       diffWitness->getOriginalFunction()->getName(),
       diffWitness->getKind(), diffWitness->getConfig());
@@ -53,7 +53,7 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDefinition(
       derivativeGenSig, jvp, vjp, /*isDeclaration*/ false, isSerialized,
       attribute);
   // Register the differentiability witness in the module.
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(module.getASTContext());
   auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
       diffWitness->getOriginalFunction()->getName(),
       diffWitness->getKind(), diffWitness->getConfig());

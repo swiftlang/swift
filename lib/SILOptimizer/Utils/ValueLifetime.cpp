@@ -45,10 +45,10 @@ void ValueLifetimeBoundary::visitInsertionPoints(
 }
 
 void ValueLifetimeAnalysis::propagateLiveness() {
-  bool defIsInstruction = defValue.is<SILInstruction *>();
+  bool defIsInstruction = isa<SILInstruction *>(defValue);
   assert(liveBlocks.empty() && "frontier computed twice");
   assert(
-      (!defIsInstruction || !userSet.count(defValue.get<SILInstruction *>())) &&
+      (!defIsInstruction || !userSet.count(cast<SILInstruction *>(defValue))) &&
       "definition cannot be its own use");
 
   // Compute the def block only if we have a SILInstruction. If we have a
@@ -69,13 +69,13 @@ void ValueLifetimeAnalysis::propagateLiveness() {
     if (defIsInstruction && userBlock == defBB)
       ++numUsersBeforeDef;
   }
-  assert((defValue.is<SILInstruction *>() || (numUsersBeforeDef == 0)) &&
+  assert((isa<SILInstruction *>(defValue) || (numUsersBeforeDef == 0)) &&
          "Non SILInstruction defValue with users before the def?!");
 
   // Don't count any users in the defBB which are actually located _after_ the
   // defValue.
   if (defIsInstruction) {
-    auto instIter = defValue.get<SILInstruction *>()->getIterator();
+    auto instIter = cast<SILInstruction *>(defValue)->getIterator();
     while (numUsersBeforeDef > 0 && ++instIter != defBB->end()) {
       if (userSet.count(&*instIter))
         --numUsersBeforeDef;
@@ -143,7 +143,7 @@ void ValueLifetimeAnalysis::computeLifetime(
           //
           // This should never happen if we have a SILArgument since the
           // SILArgument can not have any uses before it in a block.
-          assert(defValue.is<SILInstruction *>() &&
+          assert(isa<SILInstruction *>(defValue) &&
                  "SILArguments dominate all instructions in their defining "
                  "blocks");
           usedAndRedefinedInSucc = true;
@@ -154,7 +154,7 @@ void ValueLifetimeAnalysis::computeLifetime(
       // Here, the basic block bb uses the value and later redefines the value.
       // Therefore, this value's lifetime ends after its last use preceding the
       // re-definition of the value.
-      auto ii = defValue.get<SILInstruction *>()->getReverseIterator();
+      auto ii = cast<SILInstruction *>(defValue)->getReverseIterator();
       for (; ii != bb->rend(); ++ii) {
         if (userSet.count(&*ii)) {
           visitLastUser(&*ii);
@@ -393,7 +393,7 @@ void ValueLifetimeAnalysis::dump() const {
   if (auto *ii = defValue.dyn_cast<SILInstruction *>()) {
     llvm::errs() << *ii;
   } else {
-    llvm::errs() << *defValue.get<SILArgument *>();
+    llvm::errs() << *cast<SILArgument *>(defValue);
   }
   for (SILInstruction *use : userSet) {
     llvm::errs() << "  use: " << *use;

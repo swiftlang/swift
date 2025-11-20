@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -global-property-opt %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -global-property-opt %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -33,7 +33,7 @@ struct DepStruct {
   private var depField2: [X]
 }
 
-// CHECK-LABEL: sil @test_alloc_stack
+// CHECK-LABEL: sil @test_alloc_stack :
 // CHECK: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
 // CHECK: [[R:%[0-9]+]] = struct $Bool ([[I]] : $Builtin.Int1)
 // CHECK: return [[R]]
@@ -54,7 +54,30 @@ bb0:
   return %10 : $Bool
 }
 
-// CHECK-LABEL: sil @test_alloc_stack_escapes
+// CHECK-LABEL: sil [ossa] @test_alloc_stack_ossa :
+// CHECK: [[I:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK: [[R:%[0-9]+]] = struct $Bool ([[I]] : $Builtin.Int1)
+// CHECK: return [[R]]
+sil [ossa] @test_alloc_stack_ossa : $@convention(thin) () -> Bool {
+bb0:
+  %1 = alloc_stack $Array<X>
+  %3 = function_ref @_array_X_init : $@convention(thin) () -> @owned Array<X>
+  %4 = apply %3() : $@convention(thin) () -> @owned Array<X>
+  store %4 to [init] %1 : $*Array<X>
+
+  %m1 = function_ref @_array_X_mutate : $@convention(method) (@inout Array<X>) -> ()
+  %m2 = apply %m1(%1) : $@convention(method) (@inout Array<X>) -> ()
+
+  %5 = load_borrow %1 : $*Array<X>
+  %6 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
+  %10 = apply %6(%5) : $@convention(method) (@guaranteed Array<X>) -> Bool
+  end_borrow %5
+  destroy_addr %1
+  dealloc_stack %1 : $*Array<X>
+  return %10 : $Bool
+}
+
+// CHECK-LABEL: sil @test_alloc_stack_escapes :
 // CHECK: [[F:%[0-9]+]] = function_ref @_is_native_X_no_type_check
 // CHECK: [[R:%[0-9]+]] = apply [[F]]
 // CHECK: return [[R]]
@@ -71,6 +94,29 @@ bb0:
   %5 = load %1 : $*Array<X>
   %6 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
   %10 = apply %6(%5) : $@convention(method) (@guaranteed Array<X>) -> Bool
+  dealloc_stack %1 : $*Array<X>
+  return %10 : $Bool
+}
+
+// CHECK-LABEL: sil [ossa] @test_alloc_stack_escapes_ossa :
+// CHECK: [[F:%[0-9]+]] = function_ref @_is_native_X_no_type_check
+// CHECK: [[R:%[0-9]+]] = apply [[F]]
+// CHECK: return [[R]]
+sil [ossa] @test_alloc_stack_escapes_ossa : $@convention(thin) () -> Bool {
+bb0:
+  %1 = alloc_stack $Array<X>
+  %3 = function_ref @_array_X_init : $@convention(thin) () -> @owned Array<X>
+  %4 = apply %3() : $@convention(thin) () -> @owned Array<X>
+  store %4 to [init] %1 : $*Array<X>
+
+  %m1 = function_ref @_take_array_addr : $@convention(method) (@inout Array<X>) -> ()
+  %m2 = apply %m1(%1) : $@convention(method) (@inout Array<X>) -> ()
+
+  %5 = load_borrow %1 : $*Array<X>
+  %6 = function_ref @_is_native_X_no_type_check : $@convention(method) (@guaranteed Array<X>) -> Bool
+  %10 = apply %6(%5) : $@convention(method) (@guaranteed Array<X>) -> Bool
+  end_borrow %5
+  destroy_addr %1
   dealloc_stack %1 : $*Array<X>
   return %10 : $Bool
 }

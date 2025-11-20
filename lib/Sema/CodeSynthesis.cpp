@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,6 +16,7 @@
 
 #include "CodeSynthesis.h"
 
+#include "DerivedConformance/DerivedConformance.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckObjC.h"
@@ -23,7 +24,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
@@ -229,10 +230,12 @@ static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
     // memberwise initializer will be in terms of the backing storage
     // type.
     if (var->isPropertyMemberwiseInitializedWithWrappedType()) {
-      varInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
+      if (auto initTy = var->getPropertyWrapperInitValueInterfaceType()) {
+        varInterfaceType = initTy;
 
-      auto initInfo = var->getPropertyWrapperInitializerInfo();
-      isAutoClosure = initInfo.getWrappedValuePlaceholder()->isAutoClosure();
+        auto initInfo = var->getPropertyWrapperInitializerInfo();
+        isAutoClosure = initInfo.getWrappedValuePlaceholder()->isAutoClosure();
+      }
     } else {
       varInterfaceType = backingPropertyType;
     }
@@ -265,9 +268,9 @@ static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
   // Attach a result builder attribute if needed.
   if (resultBuilderType) {
     auto typeExpr = TypeExpr::createImplicit(resultBuilderType, ctx);
-    auto attr =
-        CustomAttr::create(ctx, SourceLoc(), typeExpr, /*implicit=*/true);
-    arg->getAttrs().add(attr);
+    auto attr = CustomAttr::create(ctx, SourceLoc(), typeExpr, /*owner*/ arg,
+                                   /*implicit=*/true);
+    arg->addAttribute(attr);
   }
 
   maybeAddMemberwiseDefaultArg(arg, var, ctx);
@@ -331,8 +334,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*ThrownType=*/TypeLoc(), paramList, /*GenericParams=*/nullptr, decl,
-      /*LifetimeDependentTypeRepr*/ nullptr);
+      /*ThrownType=*/TypeLoc(), paramList, /*GenericParams=*/nullptr, decl);
 
   // Mark implicit.
   ctor->setImplicit();
@@ -403,15 +405,10 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
                   decl->getDeclaredType(), existingIsolation, isolation)
                 .warnUntilSwiftVersion(6);
               if (previousVar) {
-                previousVar->diagnose(
-                    diag::property_requires_actor,
-                    previousVar->getDescriptiveKind(),
-                    previousVar->getName(), existingIsolation);
+                previousVar->diagnose(diag::property_requires_actor,
+                                      previousVar, existingIsolation);
               }
-              var->diagnose(
-                  diag::property_requires_actor,
-                  var->getDescriptiveKind(),
-                  var->getName(), isolation);
+              var->diagnose(diag::property_requires_actor, var, isolation);
               hasError = true;
               return false;
             }
@@ -445,7 +442,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   // 'override' attribute.
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     if (classDecl->getSuperclass())
-      ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/true));
+      ctor->addAttribute(new (ctx) OverrideAttr(/*IsImplicit=*/true));
   }
 
   return ctor;
@@ -592,25 +589,32 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
     if (superclassCtor->getAttrs().hasAttribute<InlinableAttr>()) {
       // Inherit the @inlinable attribute.
       auto *clonedAttr = new (ctx) InlinableAttr(/*implicit=*/true);
-      ctor->getAttrs().add(clonedAttr);
-
+      ctor->addAttribute(clonedAttr);
+    } else if (superclassCtor->getAttrs().hasAttribute<InlineAttr>() &&
+               superclassCtor->getAttrs().getAttribute<InlineAttr>()->getKind()
+               == InlineKind::Always) {
+      // Inherit the @inline(always) attribute.
+      auto *clonedAttr = new (ctx) InlineAttr(SourceLoc(), SourceRange(),
+                                              InlineKind::Always,
+                                              /*implicit=*/true);
+      ctor->addAttribute(clonedAttr);
     } else if (access == AccessLevel::Internal && !superclassCtor->isDynamic()){
       // Inherit the @usableFromInline attribute.
       auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-      ctor->getAttrs().add(clonedAttr);
+      ctor->addAttribute(clonedAttr);
     }
   }
 
   // Inherit the @discardableResult attribute.
   if (superclassCtor->getAttrs().hasAttribute<DiscardableResultAttr>()) {
     auto *clonedAttr = new (ctx) DiscardableResultAttr(/*implicit=*/true);
-    ctor->getAttrs().add(clonedAttr);
+    ctor->addAttribute(clonedAttr);
   }
 
   // Inherit the rethrows attribute.
   if (superclassCtor->getAttrs().hasAttribute<RethrowsAttr>()) {
     auto *clonedAttr = new (ctx) RethrowsAttr(/*implicit=*/true);
-    ctor->getAttrs().add(clonedAttr);
+    ctor->addAttribute(clonedAttr);
   }
 
   // If the superclass has its own availability, make sure the synthesized
@@ -633,18 +637,18 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
   ctor->setOverriddenDecl(superclassCtor);
 
   if (superclassCtor->isRequired())
-    ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/false));
+    ctor->addAttribute(new (ctx) RequiredAttr(/*IsImplicit=*/false));
   else
-    ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/false));
+    ctor->addAttribute(new (ctx) OverrideAttr(/*IsImplicit=*/false));
 
   // If the superclass constructor is @objc but the subclass constructor is
   // not representable in Objective-C, add @nonobjc implicitly.
   std::optional<ForeignAsyncConvention> asyncConvention;
   std::optional<ForeignErrorConvention> errorConvention;
   if (superclassCtor->isObjC() &&
-      !isRepresentableInObjC(ctor, ObjCReason::MemberOfObjCSubclass,
-                             asyncConvention, errorConvention))
-    ctor->getAttrs().add(new (ctx) NonObjCAttr(/*isImplicit=*/true));
+      !isRepresentableInLanguage(ctor, ObjCReason::MemberOfObjCSubclass,
+                                 asyncConvention, errorConvention))
+    ctor->addAttribute(new (ctx) NonObjCAttr(/*isImplicit=*/true));
 }
 
 static std::pair<BraceStmt *, bool>
@@ -666,7 +670,9 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
       .subst(subs);
   ConcreteDeclRef ctorRef(superclassCtor, subs);
 
-  auto type = superclassCtor->getInitializerInterfaceType().subst(subs);
+  auto type = superclassCtor->getInitializerInterfaceType();
+  if (auto *genericFnType = type->getAs<GenericFunctionType>())
+    type = genericFnType->substGenericArgs(subs);
   auto *ctorRefExpr =
       new (ctx) OtherConstructorDeclRefExpr(ctorRef, DeclNameLoc(),
                                             IsImplicit, type);
@@ -686,7 +692,7 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
     type = funcTy->getResult();
   superclassCallExpr->setType(type);
   if (auto thrownInterfaceType = ctor->getEffectiveThrownErrorType()) {
-    Type superThrownType = ctor->mapTypeIntoContext(*thrownInterfaceType);
+    Type superThrownType = ctor->mapTypeIntoEnvironment(*thrownInterfaceType);
     superclassCallExpr->setThrows(
         ThrownErrorDestination::forMatchingContextType(superThrownType));
   } else {
@@ -780,7 +786,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
         superclassCtorSig.getRequirements(),
         [&](Type type) -> Type {
           auto substType = type.subst(subMap);
-          return GenericEnvironment::mapTypeIntoContext(genericEnv, substType);
+          return GenericEnvironment::mapTypeIntoEnvironment(genericEnv, substType);
         });
     if (checkResult != CheckRequirementsResult::Success)
       return nullptr;
@@ -817,17 +823,16 @@ createDesignatedInitOverride(ClassDecl *classDecl,
 
   // Create the initializer declaration, inheriting the name,
   // failability, and throws from the superclass initializer.
-  auto implCtx = classDecl->getImplementationContext()->getAsGenericContext();
+  auto implCtx = classDecl->getImplementationContext();
   auto ctor = new (ctx) ConstructorDecl(
-      superclassCtor->getName(), classDecl->getBraces().Start,
+      superclassCtor->getName(), implCtx->getBraces().Start,
       superclassCtor->isFailable(),
       /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/superclassCtor->hasAsync(),
       /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/superclassCtor->hasThrows(),
       /*ThrowsLoc=*/SourceLoc(), TypeLoc::withoutLoc(thrownType), bodyParams,
-      genericParams, implCtx,
-      /*LifetimeDependentTypeRepr*/ nullptr);
+      genericParams, implCtx->getAsGenericContext());
 
   ctor->setImplicit();
 
@@ -1177,7 +1182,7 @@ static void collectNonOveriddenSuperclassInits(
       continue;
 
     // Skip unavailable superclass initializers.
-    if (AvailableAttr::isUnavailable(superclassCtor))
+    if (superclassCtor->isUnavailable())
       continue;
 
     if (!overriddenInits.count(superclassCtor))
@@ -1334,9 +1339,8 @@ static bool shouldAttemptInitializerSynthesis(const NominalTypeDecl *decl) {
     return false;
 
   // Don't add implicit constructors in module interfaces.
-  if (auto *SF = decl->getParentSourceFile())
-    if (SF->Kind == SourceFileKind::Interface)
-      return false;
+  if (decl->getDeclContext()->isInSwiftinterface())
+    return false;
 
   // Don't attempt if we know the decl is invalid.
   if (decl->isInvalid())
@@ -1369,6 +1373,8 @@ evaluator::SideEffect
 ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *target,
                                        ImplicitMemberAction action) const {
+  ASSERT(!isa<ProtocolDecl>(target));
+
   // FIXME: This entire request is a layering violation made of smaller,
   // finickier layering violations. See rdar://56844567
 
@@ -1443,20 +1449,6 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     TypeChecker::addImplicitConstructors(target);
     auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
     (void)evaluateTargetConformanceTo(decodableProto);
-  }
-    break;
-  case ImplicitMemberAction::ResolveDistributedActor:
-  case ImplicitMemberAction::ResolveDistributedActorSystem:
-  case ImplicitMemberAction::ResolveDistributedActorID: {
-    // init(transport:) and init(resolve:using:) may be synthesized as part of
-    // derived conformance to the DistributedActor protocol.
-    // If the target should conform to the DistributedActor protocol, check the
-    // conformance here to attempt synthesis.
-    // FIXME(distributed): invoke the requirement adding explicitly here
-     TypeChecker::addImplicitConstructors(target);
-    auto *distributedActorProto =
-        Context.getProtocol(KnownProtocolKind::DistributedActor);
-    (void)evaluateTargetConformanceTo(distributedActorProto);
     break;
   }
   }
@@ -1728,14 +1720,63 @@ bool swift::hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   });
 }
 
+/// Determine whether a synthesized requirement for the given conformance
+/// should be explicitly marked as 'nonisolated'.
+static bool synthesizedRequirementIsNonIsolated(
+    const NormalProtocolConformance *conformance) {
+  // @preconcurrency suppresses this.
+  if (conformance->isPreconcurrency())
+    return false;
+
+  // Explicit global actor isolation suppresses this.
+  if (conformance->hasExplicitGlobalActorIsolation())
+    return false;
+
+  // Explicit nonisolated forces this.
+  if (conformance->getOptions()
+          .contains(ProtocolConformanceFlags::Nonisolated))
+    return true;
+
+  // When we are inferring conformance isolation, only add nonisolated if
+  // either
+  //   (1) the protocol inherits from SendableMetatype, or
+  //   (2) the conforming type is nonisolated.
+  ASTContext &ctx = conformance->getDeclContext()->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::InferIsolatedConformances))
+    return true;
+
+  // Check inheritance from SendableMetatype, which implies that the conformance
+  // will be nonisolated.
+  auto sendableMetatypeProto =
+      ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+  if (sendableMetatypeProto &&
+      conformance->getProtocol()->inheritsFrom(sendableMetatypeProto))
+    return true;
+
+  auto nominalType = conformance->getType()->getAnyNominal();
+  if (!nominalType)
+    return true;
+
+  return !getActorIsolation(nominalType).isMainActor();
+}
+
+bool swift::addNonIsolatedToSynthesized(DerivedConformance &derived,
+                                        ValueDecl *value) {
+  if (auto *conformance = derived.Conformance) {
+    if (!synthesizedRequirementIsNonIsolated(conformance))
+      return false;
+  }
+
+  return addNonIsolatedToSynthesized(derived.Nominal, value);
+}
+
 bool swift::addNonIsolatedToSynthesized(NominalTypeDecl *nominal,
                                         ValueDecl *value) {
   if (!getActorIsolation(nominal).isActorIsolated())
     return false;
 
   ASTContext &ctx = nominal->getASTContext();
-  value->getAttrs().add(
-      new (ctx) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
+  value->addAttribute(NonisolatedAttr::createImplicit(ctx));
   return true;
 }
 
@@ -1748,5 +1789,5 @@ void swift::applyInferredSPIAccessControlAttr(Decl *decl,
 
   auto spiAttr =
       SPIAccessControlAttr::create(ctx, SourceLoc(), SourceRange(), spiGroups);
-  decl->getAttrs().add(spiAttr);
+  decl->addAttribute(spiAttr);
 }

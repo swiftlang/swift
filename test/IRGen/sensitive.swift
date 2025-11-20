@@ -16,6 +16,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s
 //
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_Sensitive
 // UNSUPPORTED: use_os_stdlib
 
 var checkBuffer: UnsafeBufferPointer<UInt32>?

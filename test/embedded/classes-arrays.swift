@@ -1,12 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature Embedded -c -o %t/main.o
-// RUN: %target-clang %t/main.o -o %t/a.out -dead_strip
-// RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Embedded -wmo) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 class MyClass {
   init() { print("MyClass.init") }
@@ -56,7 +54,7 @@ struct Main {
       // CHECK: MySubSubClass.foo
     }
     print("")
-    
+
     print("5") // CHECK: 5
     objects = []
     // CHECK: MyClass.deinit

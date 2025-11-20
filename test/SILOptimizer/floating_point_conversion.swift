@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -module-name=test -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -module-name=test -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
 func convert<
   T: BinaryFloatingPoint, U: BinaryFloatingPoint

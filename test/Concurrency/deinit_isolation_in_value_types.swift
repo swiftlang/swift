@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-feature IsolatedDeinit -parse-as-library -emit-silgen -verify %s
+// RUN: %target-swift-frontend -target %target-future-triple -parse-as-library -emit-silgen -verify %s
+
 
 @globalActor final actor FirstActor {
   static let shared = FirstActor()
@@ -18,7 +19,7 @@ struct CS: ~Copyable {
 }
 
 struct DS: ~Copyable {
-  nonisolated deinit {} // expected-error {{only classes and actors can have isolated deinit}}
+  nonisolated deinit {}
 }
 
 struct ES: ~Copyable {
@@ -46,7 +47,7 @@ enum CE: ~Copyable {
 enum DE: ~Copyable {
   case dummy
   // expected-error@+1 {{deinitializers are not yet supported on noncopyable enums}}
-  nonisolated deinit {} // expected-error {{only classes and actors can have isolated deinit}}
+  nonisolated deinit {}
 }
 
 enum EE: ~Copyable {

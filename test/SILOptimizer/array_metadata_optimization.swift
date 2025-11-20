@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -target x86_64-apple-macosx99.99 -parse-as-library -O -module-name=test %s -emit-sil | %FileCheck %s
-// RUN: %target-swift-frontend -target x86_64-apple-macosx12.3 -parse-as-library -O -module-name=test %s -emit-sil | %FileCheck %s --check-prefix=NOOPTCLASS
+// RUN: %target-swift-frontend -target x86_64-apple-macosx99.99 -parse-as-library -O -module-name=test %s -Xllvm -sil-print-types -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -target x86_64-apple-macosx12.3 -parse-as-library -O -module-name=test %s -Xllvm -sil-print-types -emit-sil | %FileCheck %s --check-prefix=NOOPTCLASS
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: OS=macosx

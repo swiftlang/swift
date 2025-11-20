@@ -50,14 +50,6 @@
 // RUN: diff %t5.casid %t6.casid
 // RUN: not diff %t5.casid %t7.casid
 
-/// Check switching CAS plugin path.
-// RUN: %cache-tool -cas-path %t/cas -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext -cache-tool-action print-base-key -- \
-// RUN:   %target-swift-frontend -cache-compile-job %t/a.swift -c @%t/MyApp.cmd -cas-path %t/cas -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext > %t8.casid
-// RUN: ln -s %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext %t/libCASPluginTest%llvm_plugin_ext
-// RUN: %cache-tool -cas-path %t/cas -cas-plugin-path %t/libCASPluginTest%llvm_plugin_ext -cache-tool-action print-base-key -- \
-// RUN:   %target-swift-frontend -cache-compile-job %t/a.swift -c @%t/MyApp.cmd -cas-path %t/cas -cas-plugin-path %t/libCASPluginTest%llvm_plugin_ext > %t9.casid
-// RUN: diff %t8.casid %t9.casid
-
 /// Test output keys.
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
 // RUN:   %target-swift-frontend -cache-compile-job %t/a.swift -emit-module -c -emit-dependencies \
@@ -66,18 +58,32 @@
 /// Test plugin CAS.
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
-// RUN:   %t/a.swift -o %t/plugin_deps.json -cache-compile-job -cas-path %t/cas -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext \
+// RUN:   %t/a.swift -o %t/plugin_deps.json -cache-compile-job -cas-path %t/cas-plugin -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext \
 // RUN:   -cas-plugin-option first-prefix=myfirst-
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/plugin_deps.json > %t/plugin_map.json
 // RUN: llvm-cas --cas %t/cas --make-blob --data %t/plugin_map.json > %t/map.casid
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/plugin_deps.json Test > %t/plugin_MyApp.cmd
-// RUN: %cache-tool -cas-path %t/cas -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext \
+// RUN: %cache-tool -cas-path %t/cas-plugin -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext \
 // RUN:   -cas-plugin-option first-prefix=myfirst- -cache-tool-action print-output-keys -- \
 // RUN:   %target-swift-frontend -cache-compile-job %t/a.swift -emit-module -c -emit-dependencies \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -emit-tbd -emit-tbd-path %t/test.tbd -o %t/test.o @%t/plugin_MyApp.cmd | %FileCheck %s --check-prefix=CHECK --check-prefix=PLUGIN
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/plugin_deps.json Test > %t/MyApp-plugin.cmd
+// RUN: echo "\"-disable-implicit-string-processing-module-import\"" >> %t/MyApp-plugin.cmd
+// RUN: echo "\"-disable-implicit-concurrency-module-import\"" >> %t/MyApp-plugin.cmd
+// RUN: echo "\"-parse-stdlib\"" >> %t/MyApp-plugin.cmd
+
+/// Check switching CAS plugin path.
+// RUN: %cache-tool -cas-path %t/cas-plugin -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext -cas-plugin-option first-prefix=myfirst- -cache-tool-action print-base-key -- \
+// RUN:   %target-swift-frontend -cache-compile-job %t/a.swift -c @%t/MyApp-plugin.cmd -cas-path %t/cas-plugin -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext > %t8.casid
+// RUN: ln -s %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext %t/libCASPluginTest%llvm_plugin_ext
+// RUN: %cache-tool -cas-path %t/cas-plugin -cas-plugin-path %t/libCASPluginTest%llvm_plugin_ext -cas-plugin-option first-prefix=myfirst- -cache-tool-action print-base-key -- \
+// RUN:   %target-swift-frontend -cache-compile-job %t/a.swift -c @%t/MyApp-plugin.cmd -cas-path %t/cas-plugin -cas-plugin-path %t/libCASPluginTest%llvm_plugin_ext > %t9.casid
+// RUN: diff %t8.casid %t9.casid
+
 
 // CHECK: "Input": "{{.*}}{{/|\\}}a.swift"
 // CHECK-NEXT: "CacheKey"

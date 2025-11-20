@@ -41,45 +41,6 @@ using namespace swift;
 using namespace ide;
 
 //===----------------------------------------------------------------------===//
-// typeCheckContextAt(DeclContext, SourceLoc)
-//===----------------------------------------------------------------------===//
-
-void swift::ide::typeCheckContextAt(TypeCheckASTNodeAtLocContext TypeCheckCtx,
-                                    SourceLoc Loc) {
-  // Make sure the extension has been bound.
-  auto DC = TypeCheckCtx.getDeclContext();
-  // Even if the extension is invalid (e.g. nested in a function or another
-  // type), we want to know the "intended nominal" of the extension so that
-  // we can know the type of 'Self'.
-  SmallVector<ExtensionDecl *, 1> extensions;
-  for (auto typeCtx = DC->getInnermostTypeContext(); typeCtx != nullptr;
-       typeCtx = typeCtx->getParent()->getInnermostTypeContext()) {
-    if (auto *ext = dyn_cast<ExtensionDecl>(typeCtx))
-      extensions.push_back(ext);
-  }
-  while (!extensions.empty()) {
-    extensions.back()->computeExtendedNominal();
-    extensions.pop_back();
-  }
-
-  // If the completion happens in the inheritance clause of the extension,
-  // 'DC' is the parent of the extension. We need to iterate the top level
-  // decls to find it. In theory, we don't need the extended nominal in the
-  // inheritance clause, but ASTScope lookup requires that. We don't care
-  // unless 'DC' is not 'SourceFile' because non-toplevel extensions are
-  // 'canNeverBeBound()' anyway.
-  if (auto *SF = dyn_cast<SourceFile>(DC)) {
-    auto &SM = DC->getASTContext().SourceMgr;
-    for (auto *decl : SF->getTopLevelDecls())
-      if (auto *ext = dyn_cast<ExtensionDecl>(decl))
-        if (SM.rangeContainsTokenLoc(ext->getSourceRange(), Loc))
-          ext->computeExtendedNominal();
-  }
-
-  swift::typeCheckASTNodeAtLoc(TypeCheckCtx, Loc);
-}
-
-//===----------------------------------------------------------------------===//
 // findParsedExpr(DeclContext, Expr)
 //===----------------------------------------------------------------------===//
 

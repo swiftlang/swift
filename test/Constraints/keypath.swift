@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -verify %S/Inputs/keypath.swift -primary-file %s
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %S/Inputs/keypath.swift -primary-file %s
+// REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 struct S {
   let i: Int
@@ -33,7 +34,7 @@ class Demo {
 
 let some = Some(keyPath: \Demo.here)
 // expected-error@-1 {{cannot convert value of type 'KeyPath<Demo, (() -> Void)?>' to expected argument type 'KeyPath<Demo, ((V) -> Void)?>'}}
-// expected-note@-2 {{arguments to generic parameter 'Value' ('(() -> Void)?' and '((V) -> Void)?') are expected to be equal}}
+// expected-note@-2 {{arguments to generic parameter 'Wrapped' ('() -> Void' and '(V) -> Void') are expected to be equal}}
 // expected-error@-3 {{generic parameter 'V' could not be inferred}}
 // expected-note@-4 {{explicitly specify the generic arguments to fix this issue}}
 
@@ -41,8 +42,10 @@ let some = Some(keyPath: \Demo.here)
 func testFunc() {
   let _: (S) -> Int = \.i
   _ = ([S]()).map(\.i)
-  _ = \S.init // expected-error {{key path cannot refer to initializer 'init()'}}
-  _ = ([S]()).map(\.init) // expected-error {{key path cannot refer to initializer 'init()'}}
+  _ = \S.Type.init
+  _ = \S.init // expected-error {{static member 'init()' cannot be used on instance of type 'S'}}
+  _ = ([S.Type]()).map(\.init)
+  _ = ([S]()).map(\.init) // expected-error {{static member 'init()' cannot be used on instance of type 'S'}}
 
   let kp = \S.i
   let _: KeyPath<S, Int> = kp // works, because type defaults to KeyPath nominal
@@ -287,7 +290,7 @@ func test_invalid_argument_to_keypath_subscript() {
   // The diagnostic should point out that `ambiguous` is indeed ambiguous and that `5` is not a valid argument
   // for a key path subscript.
   ambiguous {
-    // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
+    // expected-error@-1 {{failed to produce diagnostic for expression}}
     $0[keyPath: 5]
   }
 
@@ -317,4 +320,25 @@ extension Collection {
 // https://github.com/apple/swift/issues/56393
 func keypathToFunctionWithOptional() {
   _ = Array("").prefix(1...4, while: \.isNumber) // Ok
+}
+
+func test_new_key_path_type_requirements() {
+  struct V: ~Copyable {
+  }
+
+  struct S: ~Copyable {
+    var x: Int
+    var v: V
+  }
+
+  _ = \S.x // expected-error {{key path cannot refer to noncopyable type 'S'}}
+  _ = \S.v
+  // expected-error@-1 {{key path cannot refer to noncopyable type 'S'}}
+  // expected-error@-2 {{key path cannot refer to noncopyable type 'V'}}
+
+  func test<R>(_: KeyPath<R, Int>) {} // expected-note {{'where R: Copyable' is implicit here}}
+
+  test(\S.x)
+  // expected-error@-1 {{key path cannot refer to noncopyable type 'S'}}
+  // expected-error@-2 {{local function 'test' requires that 'S' conform to 'Copyable'}}
 }

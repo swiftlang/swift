@@ -603,6 +603,13 @@ public:
   /// params in AbstractFunctionDecl and NominalTypeDecl.
   virtual bool shouldWalkIntoGenericParams() { return false; }
 
+  /// Whether the walker should walk into any attached CustomAttrs.
+  virtual bool shouldWalkIntoCustomAttrs() const {
+    // Default to false currently since some walkers don't handle this case
+    // well.
+    return false;
+  }
+
   /// This method configures how the walker should walk the initializers of
   /// lazy variables. These initializers are semantically different from other
   /// initializers in their context and so sometimes should be visited as part
@@ -615,6 +622,11 @@ public:
   virtual MacroWalking getMacroWalkingBehavior() const {
     return MacroWalking::ArgumentsAndExpansion;
   }
+
+  /// This method determines whether the given declaration should be
+  /// considered to be in a macro expansion context. It can be configured
+  /// by subclasses.
+  virtual bool isDeclInMacroExpansion(Decl *decl) const;
 
   /// Determine whether we should walk macro arguments (as they appear in
   /// source) and the expansion (which is semantically part of the program).

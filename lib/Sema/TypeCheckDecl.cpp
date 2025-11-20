@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,7 +16,7 @@
 
 #include "TypeCheckDecl.h"
 #include "CodeSynthesis.h"
-#include "DerivedConformances.h"
+#include "DerivedConformance/DerivedConformance.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
@@ -34,6 +34,8 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -46,16 +48,17 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Bridging/ASTGen.h"
-#include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APSInt.h"
@@ -386,6 +389,9 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
     return false;
   case AccessorKind::Init:
     return false;
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
+    return false;
   }
   llvm_unreachable("covered switch");
 }
@@ -570,8 +576,8 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
         auto loc = declRef->getLoc();
         if (name.isSimpleName(ctx.Id_self)) {
           auto *otherSelfDecl =
-            ASTScope::lookupSingleLocalDecl(Decl->getParentSourceFile(),
-                                            name.getFullName(), loc);
+            ASTScope::lookupSingleLocalDecl(Decl->getParentSourceFile(), name,
+                                            loc);
           if (otherSelfDecl == Decl->getImplicitSelfDecl())
             myKind = BodyInitKind::Delegating;
         }
@@ -872,7 +878,9 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           case AccessorKind::Modify:
           case AccessorKind::Get:
           case AccessorKind::DistributedGet:
-          case AccessorKind::Set: {
+          case AccessorKind::Set:
+          case AccessorKind::Borrow:
+          case AccessorKind::Mutate: {
             // Coroutines and accessors are final if their storage is.
             auto storage = accessor->getStorage();
             if (storage->isFinal())
@@ -934,6 +942,11 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
 
 bool
 IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  // ABI-only decls get this from their API decl.
+  auto abiRole = ABIRoleInfo(decl);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->isDynamic();
+
   // If we can't infer dynamic here, don't.
   if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Dynamic, decl))
     return false;
@@ -1158,7 +1171,7 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   assert(rawTy && "Cannot compute value kind without raw type!");
   
   if (ED->getGenericEnvironmentOfContext() != nullptr)
-    rawTy = ED->mapTypeIntoContext(rawTy);
+    rawTy = ED->mapTypeIntoEnvironment(rawTy);
 
   // Swift enums require that the raw type is convertible from one of the
   // primitive literal protocols.
@@ -1197,8 +1210,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   // values are intentionally omitted from them (unless the enum is @objc).
   // Without bailing here, incorrect raw values can be automatically generated
   // and incorrect diagnostics may be omitted for some decls.
-  SourceFile *Parent = ED->getDeclContext()->getParentSourceFile();
-  if (Parent && Parent->Kind == SourceFileKind::Interface && !ED->isObjC())
+  if (ED->getDeclContext()->isInSwiftinterface() && !ED->isObjC())
     return std::make_tuple<>();
 
   if (!computeAutomaticEnumValueKind(ED)) {
@@ -1206,7 +1218,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   }
 
   if (ED->getGenericEnvironmentOfContext() != nullptr)
-    rawTy = ED->mapTypeIntoContext(rawTy);
+    rawTy = ED->mapTypeIntoEnvironment(rawTy);
   if (rawTy->hasError())
     return std::make_tuple<>();
 
@@ -1296,15 +1308,6 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     SourceLoc diagLoc = uncheckedRawValueOf(elt)->isImplicit()
                             ? elt->getLoc()
                             : uncheckedRawValueOf(elt)->getLoc();
-    if (auto magicLiteralExpr =
-            dyn_cast<MagicIdentifierLiteralExpr>(prevValue)) {
-      auto kindString =
-          magicLiteralExpr->getKindString(magicLiteralExpr->getKind());
-      Diags.diagnose(diagLoc, diag::enum_raw_value_magic_literal, kindString);
-      elt->setInvalid();
-      continue;
-    }
-
     // Check that the raw value is unique.
     RawValueKey key{prevValue};
     RawValueSource source{elt, lastExplicitValueElt};
@@ -1646,6 +1649,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
     case AccessorKind::Read2:
+    case AccessorKind::Borrow:
       break;
 
     case AccessorKind::Init:
@@ -1653,6 +1657,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::Set:
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
+    case AccessorKind::Mutate:
       if (AD->isInstanceMember() && AD->getDeclContext()->hasValueSemantics())
         return SelfAccessKind::Mutating;
       break;
@@ -1669,64 +1674,6 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   }
 
   return SelfAccessKind::NonMutating;
-}
-
-bool TypeChecker::isAvailabilitySafeForConformance(
-    const ProtocolDecl *proto, const ValueDecl *requirement,
-    const ValueDecl *witness, const DeclContext *dc,
-    AvailabilityRange &requirementInfo) {
-
-  // We assume conformances in
-  // non-SourceFiles have already been checked for availability.
-  if (!dc->getParentSourceFile())
-    return true;
-
-  auto &Context = proto->getASTContext();
-  assert(dc->getSelfNominalTypeDecl() &&
-         "Must have a nominal or extension context");
-
-  // Make sure that any access of the witness through the protocol
-  // can only occur when the witness is available. That is, make sure that
-  // on every version where the conforming declaration is available, if the
-  // requirement is available then the witness is available as well.
-  // We do this by checking that (an over-approximation of) the intersection of
-  // the requirement's available range with both the conforming declaration's
-  // available range and the protocol's available range is fully contained in
-  // (an over-approximation of) the intersection of the witnesses's available
-  // range with both the conforming type's available range and the protocol
-  // declaration's available range.
-  AvailabilityRange witnessInfo =
-      AvailabilityInference::availableRange(witness);
-  requirementInfo = AvailabilityInference::availableRange(requirement);
-
-  AvailabilityRange infoForConformingDecl =
-      overApproximateAvailabilityAtLocation(dc->getAsDecl()->getLoc(), dc);
-
-  // Relax the requirements for @_spi witnesses by treating the requirement as
-  // if it were introduced at the deployment target. This is not strictly sound
-  // since clients of SPI do not necessarily have the same deployment target as
-  // the module declaring the requirement. However, now that the public
-  // declarations in API libraries are checked according to the minimum possible
-  // deployment target of their clients this relaxation is needed for source
-  // compatibility with some existing code and is reasonably safe for the
-  // majority of cases.
-  if (witness->isSPI()) {
-    AvailabilityRange deploymentTarget =
-        AvailabilityRange::forDeploymentTarget(Context);
-    requirementInfo.constrainWith(deploymentTarget);
-  }
-
-  // Constrain over-approximates intersection of version ranges.
-  witnessInfo.constrainWith(infoForConformingDecl);
-  requirementInfo.constrainWith(infoForConformingDecl);
-
-  AvailabilityRange infoForProtocolDecl =
-      overApproximateAvailabilityAtLocation(proto->getLoc(), proto);
-
-  witnessInfo.constrainWith(infoForProtocolDecl);
-  requirementInfo.constrainWith(infoForProtocolDecl);
-
-  return requirementInfo.isContainedIn(witnessInfo);
 }
 
 // Returns 'nullptr' if this is the 'newValue' or 'oldValue' parameter;
@@ -1909,7 +1856,7 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
                      operatorName, dc->getDeclaredInterfaceType())
           .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
                        "final ");
-        FD->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
+        FD->addAttribute(new (C) FinalAttr(/*IsImplicit=*/true));
       }
     }
   } else if (!dc->isModuleScopeContext()) {
@@ -1958,11 +1905,11 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
       if (isPostfix) {
         insertionText = "postfix ";
         op = postfixOp;
-        FD->getAttrs().add(new (C) PostfixAttr(/*implicit*/false));
+        FD->addAttribute(new (C) PostfixAttr(/*implicit*/ false));
       } else {
         insertionText = "prefix ";
         op = prefixOp;
-        FD->getAttrs().add(new (C) PrefixAttr(/*implicit*/false));
+        FD->addAttribute(new (C) PrefixAttr(/*implicit*/ false));
       }
 
       // Emit diagnostic with the Fix-It.
@@ -2100,6 +2047,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     // For getters, set the result type to the value type.
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
+    case AccessorKind::Borrow:
       return storage->getValueInterfaceType();
 
     // For setters and observers, set the old/new value parameter's type
@@ -2109,6 +2057,9 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case AccessorKind::Set:
     case AccessorKind::Init:
       return TupleType::getEmpty(ctx);
+
+    case AccessorKind::Mutate:
+      return storage->getValueInterfaceType();
 
     // Addressor result types can get complicated because of the owner.
     case AccessorKind::Address:
@@ -2144,11 +2095,11 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     // Mark the imported Swift function as unavailable.
     // That will ensure that the function will not be
     // usable from Swift, even though it is imported.
-    if (!decl->getAttrs().isUnavailable(ctx)) {
+    if (!decl->isUnavailable()) {
       StringRef unavailabilityMsgRef = "return type is unavailable in Swift";
-      auto ua =
-          AvailableAttr::createPlatformAgnostic(ctx, unavailabilityMsgRef);
-      decl->getAttrs().add(ua);
+      auto ua = AvailableAttr::createUniversallyUnavailable(
+          ctx, unavailabilityMsgRef);
+      decl->addAttribute(ua);
     }
 
     return ctx.getNeverType();
@@ -2171,7 +2122,7 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto *const dc = decl->getInnermostDeclContext();
   return TypeResolution::forInterface(dc, options,
                                       /*unboundTyOpener*/ nullptr,
-                                      PlaceholderType::get,
+                                      /*placeholderOpener*/ nullptr,
                                       /*packElementOpener*/ nullptr)
       .resolveType(resultTyRepr);
 }
@@ -2231,8 +2182,21 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   }
 
   auto typeRepr = param->getTypeRepr();
-  assert(typeRepr != nullptr && "Should call setSpecifier() on "
-         "synthesized parameter declarations");
+
+  if (!typeRepr) {
+    if (!param->isImplicit()) {
+      // Untyped closure parameter.
+      return ParamSpecifier::Default;
+    }
+
+    if (param->isInvalid()) {
+      // Invalid parse.
+      return ParamSpecifier::Default;
+    }
+
+    ASSERT(false && "Should call setSpecifier() on "
+           "synthesized parameter declarations");
+  }
 
   // Look through top-level pack expansions.  These specifiers are
   // part of what's repeated.
@@ -2248,6 +2212,10 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
 
   if (auto *lifetime = dyn_cast<LifetimeDependentTypeRepr>(nestedRepr)) {
     nestedRepr = lifetime->getBase();
+  }
+
+  if (auto callerIsolated = dyn_cast<CallerIsolatedTypeRepr>(nestedRepr)) {
+    nestedRepr = callerIsolated->getBase();
   }
 
   if (auto sending = dyn_cast<SendingTypeRepr>(nestedRepr)) {
@@ -2272,7 +2240,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     }
     return ownershipRepr->getSpecifier();
   }
-  
+
   return ParamSpecifier::Default;
 }
 
@@ -2282,16 +2250,14 @@ static Type validateParameterType(ParamDecl *decl) {
 
   TypeResolutionOptions options(std::nullopt);
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
+  HandlePlaceholderTypeReprFn placeholderOpener = nullptr;
   if (isa<AbstractClosureExpr>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::ClosureExpr);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    unboundTyOpener = [](auto unboundTy) {
-      // FIXME: Don't let unbound generic types escape type resolution.
-      // For now, just return the unbound generic type.
-      return unboundTy;
-    };
-    // FIXME: Don't let placeholder types escape type resolution.
-    // For now, just return the placeholder type.
+    unboundTyOpener = TypeResolution::defaultUnboundTypeOpener;
+    // FIXME: Don't let placeholder types escape type resolution. For now, just
+    // return the placeholder type, which we open in `inferClosureType`.
+    placeholderOpener = PlaceholderType::get;
   } else if (isa<AbstractFunctionDecl>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::AbstractFunctionDecl);
   } else if (isa<SubscriptDecl>(dc)) {
@@ -2342,10 +2308,10 @@ static Type validateParameterType(ParamDecl *decl) {
 
   const auto resolution =
       TypeResolution::forInterface(dc, options, unboundTyOpener,
-                                   PlaceholderType::get,
+                                   placeholderOpener,
                                    /*packElementOpener*/ nullptr);
 
-  if (auto *varargTypeRepr = dyn_cast<VarargTypeRepr>(nestedRepr)) {
+  if (isa<VarargTypeRepr>(nestedRepr)) {
     Ty = resolution.resolveType(nestedRepr);
 
     // Monovariadic types (T...) for <T> resolve to [T].
@@ -2383,6 +2349,13 @@ static void maybeAddParameterIsolation(AnyFunctionType::ExtInfoBuilder &infoBuil
     infoBuilder = infoBuilder.withIsolation(FunctionTypeIsolation::forParameter());
 }
 
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+getLifetimeDependencies(ASTContext &context, EnumElementDecl *enumElemDecl) {
+  return evaluateOrDefault(context.evaluator,
+                           LifetimeDependenceInfoRequest{enumElemDecl},
+                           std::nullopt);
+}
+
 Type
 InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   auto &Context = D->getASTContext();
@@ -2399,12 +2372,12 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::PrecedenceGroup:
-  case DeclKind::PoundDiagnostic:
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::Module:
   case DeclKind::OpaqueType:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     llvm_unreachable("should not get here");
     return Type();
 
@@ -2431,16 +2404,18 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::TypeAlias: {
     auto typeAlias = cast<TypeAliasDecl>(D);
 
-    auto genericSig = typeAlias->getGenericSignature();
-    SubstitutionMap subs;
-    if (genericSig)
-      subs = genericSig->getIdentitySubstitutionMap();
+    SmallVector<Type, 2> genericArgs;
+    if (auto *params = typeAlias->getGenericParams()) {
+      for (auto *param : *params) {
+        genericArgs.push_back(param->getDeclaredInterfaceType());
+      }
+    }
 
     Type parent;
     auto parentDC = typeAlias->getDeclContext();
     if (parentDC->isTypeContext())
       parent = parentDC->getSelfInterfaceType();
-    auto sugaredType = TypeAliasType::get(typeAlias, parent, subs,
+    auto sugaredType = TypeAliasType::get(typeAlias, parent, genericArgs,
                                           typeAlias->getUnderlyingType());
     return MetatypeType::get(sugaredType, Context);
   }
@@ -2452,7 +2427,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::BuiltinTuple: {
     auto nominal = cast<NominalTypeDecl>(D);
     Type declaredInterfaceTy = nominal->getDeclaredInterfaceType();
-    // FIXME: For a protocol, this returns a MetatypeType wrapping a ProtocolType, but should be a MetatypeType wrapping an ExistentialType ('(any P).Type', not 'P.Type').
+    // FIXME: For a protocol, this returns a MetatypeType wrapping a
+    // ProtocolType, but should be a MetatypeType wrapping an
+    // ExistentialType ('(any P).Type', not 'P.Type').
     return MetatypeType::get(declaredInterfaceTy, Context);
   }
 
@@ -2503,7 +2480,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     Type interfaceType = namingPattern->getType();
     if (interfaceType->hasArchetype())
-      interfaceType = interfaceType->mapTypeOutOfContext();
+      interfaceType = interfaceType->mapTypeOutOfEnvironment();
 
     // In SIL mode, VarDecls are written as having reference storage types.
     if (!interfaceType->is<ReferenceStorageType>()) {
@@ -2538,8 +2515,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     if (thrownTy) {
       thrownTy = AFD->getThrownInterfaceType();
       ProtocolDecl *errorProto = Context.getErrorDecl();
-      if (thrownTy && errorProto) {
-        Type thrownTyInContext = AFD->mapTypeIntoContext(thrownTy);
+      if (thrownTy && !thrownTy->hasError() && errorProto) {
+        Type thrownTyInContext = AFD->mapTypeIntoEnvironment(thrownTy);
         if (!checkConformance(thrownTyInContext, errorProto)) {
           SourceLoc loc;
           if (auto thrownTypeRepr = AFD->getThrownTypeRepr())
@@ -2583,7 +2560,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
           infoBuilder = infoBuilder.withSendingResult();
       }
 
-      if (lifetimeDependenceInfo.has_value()) {
+      // Lifetime dependencies only apply to the outer function type.
+      if (!hasSelf && lifetimeDependenceInfo.has_value()) {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
@@ -2607,7 +2585,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         selfInfoBuilder =
             selfInfoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
-
+      auto *accessor = dyn_cast<AccessorDecl>(AFD);
+      if (accessor && accessor->isMutateAccessor()) {
+        selfInfoBuilder = selfInfoBuilder.withHasInOutResult();
+      }
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       auto selfInfo = selfInfoBuilder.build();
       if (sig) {
@@ -2630,6 +2611,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     AnyFunctionType::ExtInfoBuilder infoBuilder;
     maybeAddParameterIsolation(infoBuilder, argTy);
+
+    if (auto typeRepr = SD->getElementTypeRepr())
+      if (isa<SendingTypeRepr>(typeRepr))
+        infoBuilder = infoBuilder.withSendingResult();
 
     Type funcTy;
     // FIXME: Verify ExtInfo state is correct, not working by accident.
@@ -2663,13 +2648,25 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       resultTy = FunctionType::get(argTy, resultTy, info);
     }
 
+    auto lifetimeDependenceInfo = getLifetimeDependencies(Context, EED);
+
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     if (auto genericSig = ED->getGenericSignature()) {
-      GenericFunctionType::ExtInfo info;
-      resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy, info);
+      GenericFunctionType::ExtInfoBuilder infoBuilder;
+      if (lifetimeDependenceInfo.has_value()) {
+        infoBuilder =
+            infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
+      }
+      resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy,
+                                          infoBuilder.build());
+
     } else {
-      FunctionType::ExtInfo info;
-      resultTy = FunctionType::get({selfTy}, resultTy, info);
+      FunctionType::ExtInfoBuilder infoBuilder;
+      if (lifetimeDependenceInfo.has_value()) {
+        infoBuilder =
+            infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
+      }
+      resultTy = FunctionType::get({selfTy}, resultTy, infoBuilder.build());
     }
 
     return resultTy;
@@ -2729,7 +2726,19 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
   }
 
   if (!namingPattern) {
-    if (auto parentStmt = VD->getParentPatternStmt()) {
+    if (auto parentStmt = VD->getRecursiveParentPatternStmt()) {
+      // We have a parent stmt. This should only ever be the case for completion
+      // or lazy type-checking, regular type-checking should go through the
+      // StmtChecker and assign types before querying this, otherwise we could
+      // end up double-type-checking.
+      //
+      // FIXME: We ought to be able to enable the following assert once we've
+      // fixed cases where we currently allow forward references to variables to
+      // kick interface type requests
+      // (https://github.com/swiftlang/swift/pull/85141).
+      // ASSERT(Context.SourceMgr.hasIDEInspectionTargetBuffer() ||
+      //        Context.TypeCheckerOpts.EnableLazyTypecheck);
+
       // Try type checking parent control statement.
       if (auto condStmt = dyn_cast<LabeledConditionalStmt>(parentStmt)) {
         // The VarDecl is defined inside a condition of a `if` or `while` stmt.
@@ -2755,18 +2764,20 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
         assert(foundVarDecl && "VarDecl not declared in its parent?");
         (void) foundVarDecl;
       } else {
-        // We have some other parent stmt. Type check it completely.
+        // We have some other statement, e.g a switch or some kind of loop. We
+        // need to type-check it to get the type of the bound variable. We
+        // generally want to skip type-checking any BraceStmts, the only
+        // exception being do-catch bodies since we need to compute the thrown
+        // error type for catch clauses.
+        // FIXME: Rather than going through `typeCheckASTNode` and trying to
+        // exclude type-checker work, we ought to do more granular requests.
+        auto braceCheck = BraceStmtChecking::OnlyDoCatchBody;
+
         if (auto CS = dyn_cast<CaseStmt>(parentStmt))
           parentStmt = CS->getParentStmt();
 
-        bool LeaveBodyUnchecked = true;
-        // type-checking 'catch' patterns depends on the type checked body.
-        if (isa<DoCatchStmt>(parentStmt))
-          LeaveBodyUnchecked = false;
-
         ASTNode node(parentStmt);
-        TypeChecker::typeCheckASTNode(node, VD->getDeclContext(),
-                                      LeaveBodyUnchecked);
+        TypeChecker::typeCheckASTNode(node, VD->getDeclContext(), braceCheck);
       }
       namingPattern = VD->getCanonicalVarDecl()->NamingPattern;
     }
@@ -2899,7 +2910,7 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     }
   }
 
-  if (nominal) {
+  if (nominal && !isa<ProtocolDecl>(nominal)) {
     // If the type conforms to Encodable or Decodable, even via an extension,
     // the CodingKeys enum is synthesized as a member of the type itself.
     // Force it into existence.
@@ -2908,6 +2919,10 @@ static ArrayRef<Decl *> evaluateMembersRequest(
       ResolveImplicitMemberRequest{nominal,
                  ImplicitMemberAction::ResolveCodingKeys},
       {});
+
+    // Synthesize distributed actor 'id' and 'actorSystem' if needed.
+    (void)nominal->getDistributedActorIDProperty();
+    (void)nominal->getDistributedActorSystemProperty();
   }
 
   // Expand synthesized member macros.
@@ -2943,14 +2958,11 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     if (auto *vd = dyn_cast<ValueDecl>(member)) {
       // Add synthesized members to a side table and sort them by their mangled
       // name, since they could have been added to the class in any order.
-      if (vd->isSynthesized() &&
-          // FIXME: IRGen requires the distributed actor synthesized
-          // properties to be in a specific order that is different
-          // from ordering by their mangled name, so preserve the order
-          // they were added in.
-          !(nominal &&
-            (vd == nominal->getDistributedActorIDProperty() ||
-             vd == nominal->getDistributedActorSystemProperty()))) {
+      // FIXME: IRGen requires the distributed actor synthesized properties to
+      // be in a specific order that is different from ordering by their
+      // mangled name, so preserve the order
+      // they were added in.
+      if (vd->isSynthesized() && !vd->isSpecialDistributedActorProperty()) {
         synthesizedMembers.add(vd);
         return;
       }
@@ -2991,7 +3003,7 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
   // Check that the nominal type and the typealias are either both generic
   // at this level or neither are.
-  if (nominal->isGeneric() != typealias->isGeneric())
+  if (nominal->hasGenericParamList() != typealias->hasGenericParamList())
     return false;
 
   // Make sure either both have generic signatures or neither do.
@@ -3016,7 +3028,8 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
     return false;
 
   // If neither is generic at this level, we have a pass-through typealias.
-  if (!typealias->isGeneric()) return true;
+  if (!typealias->hasGenericParamList())
+    return true;
 
   if (typealias->getUnderlyingType()->isEqual(
         nominal->getSelfInterfaceType())) {
@@ -3028,9 +3041,11 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
 Type
 ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
-  auto error = [&ext]() {
+  auto &ctx = ext->getASTContext();
+
+  auto error = [&]() {
     ext->setInvalid();
-    return ErrorType::get(ext->getASTContext());
+    return ErrorType::get(ctx);
   };
 
   // If we didn't parse a type, fill in an error type and bail out.
@@ -3042,7 +3057,7 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   if (ext->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
-  const auto resolution = TypeResolution::forStructural(
+  const auto resolution = TypeResolution::forInterface(
       ext->getDeclContext(), options, nullptr,
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
@@ -3053,6 +3068,15 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
 
   if (extendedType->hasError())
     return error();
+
+  auto &diags = ctx.Diags;
+
+  // Cannot extend types who contain placeholders.
+  if (extendedType->hasPlaceholder()) {
+    diags.diagnose(ext->getLoc(), diag::extension_placeholder)
+      .highlight(extendedRepr->getSourceRange());
+    return error();
+  }
 
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
@@ -3071,12 +3095,17 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     }
   }
 
-  auto &diags = ext->getASTContext().Diags;
-
   // Cannot extend a metatype.
   if (extendedType->is<AnyMetatypeType>()) {
     diags.diagnose(ext->getLoc(), diag::extension_metatype, extendedType)
          .highlight(extendedRepr->getSourceRange());
+    return error();
+  }
+
+  // Tuple extensions are experimental.
+  if (extendedType->is<TupleType>() &&
+      !ctx.LangOpts.hasFeature(Feature::TupleConformances)) {
+    diags.diagnose(ext, diag::experimental_tuple_extension);
     return error();
   }
 
@@ -3086,13 +3115,6 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
       !extendedType->is<ParameterizedProtocolType>()) {
     diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
          .highlight(extendedRepr->getSourceRange());
-    return error();
-  }
-
-  // Cannot extend types who contain placeholders.
-  if (extendedType->hasPlaceholder()) {
-    diags.diagnose(ext->getLoc(), diag::extension_placeholder)
-      .highlight(extendedRepr->getSourceRange());
     return error();
   }
 
@@ -3118,7 +3140,7 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
 
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
-                                        AbstractFunctionDecl *decl) const {
+                                        ValueDecl *decl) const {
   return LifetimeDependenceInfo::get(decl);
 }
 
@@ -3190,25 +3212,6 @@ SourceFile::getIfConfigClausesWithin(SourceRange outer) const {
         return SM.isBeforeInBuffer(loc, range.getStartLoc());
       });
   return llvm::ArrayRef(lower, upper - lower);
-}
-
-//----------------------------------------------------------------------------//
-// IsUnsafeRequest
-//----------------------------------------------------------------------------//
-
-bool IsUnsafeRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
-  // If it's marked @unsafe, it's unsafe.
-  if (decl->getAttrs().hasAttribute<UnsafeAttr>())
-    return true;
-
-  // Inference: A member of an @unsafe type is also unsafe.
-  if (auto enclosingDC = decl->getDeclContext()) {
-    if (auto enclosingNominal = enclosingDC->getSelfNominalTypeDecl())
-      if (enclosingNominal->isUnsafe())
-        return true;
-  }
-
-  return false;
 }
 
 //----------------------------------------------------------------------------//

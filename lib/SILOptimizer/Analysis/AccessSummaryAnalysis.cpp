@@ -220,7 +220,7 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
     return llvm::all_of(cast<MoveValueInst>(user)->getUses(),
                         hasExpectedUsesOfNoEscapePartialApply);
 
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::DestroyValueInst:
     // @block_storage is passed by storing it to the stack. We know this is

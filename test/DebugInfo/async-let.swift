@@ -3,6 +3,7 @@
 // RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK
 
 // REQUIRES: concurrency
+// REQUIRES: CPU=x86_64 || CPU=arm64
 
 public actor Alice {
   let bob = Bob()
@@ -17,7 +18,7 @@ public actor Alice {
   // CHECK:   load ptr, ptr {{.*}} !dbg ![[LET_HOP0:[0-9]+]]
 
   // CHECK: define {{.*}}$s1M5AliceC4callyyYaFSiyYaYbcfu_TY2_{{.*}} !dbg ![[LET_SCOPE1:[0-9]+]]
-  // CHECK:   load ptr, ptr {{.*}} !dbg ![[LET_HOP1:[0-9]+]]
+  // CHECK:   store i64 %{{.*}} !dbg ![[LET_HOP1:[0-9]+]]
   public func call() async {
     // CHECK: ![[SCOPE0]] = distinct !DISubprogram({{.*}}line: [[@LINE-1]]
     // CHECK: ![[HOP0]] = !DILocation(line: [[@LINE+1]], column: 11

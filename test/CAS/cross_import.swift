@@ -32,11 +32,11 @@
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 // RUN: %FileCheck %s --input-file=%t/MyApp.cmd --check-prefix CMD
 // CMD: -swift-module-cross-import
-// CMD-NEXT: B
-// CMD-NEXT: A.swiftoverlay
-// CMD-NEXT: -swift-module-cross-import
-// CMD-NEXT: C
-// CMD-NEXT: A.swiftoverlay
+// CMD-NEXT: [[CMI1:[B|C]]]
+// CMD-NEXT: [[CMI1]].swiftcrossimport{{/|\\}}A.swiftoverlay
+// CMD: -swift-module-cross-import
+// CMD-NEXT: [[CMI2:[B|C]]]
+// CMD-NEXT: [[CMI2]].swiftcrossimport{{/|\\}}A.swiftoverlay
 
 // RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule  \
 // RUN:   -emit-module-interface-path %t/Test.swiftinterface \

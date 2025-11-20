@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver -module-name devirt_single_module_in_multiple_files -O  %s %S/Inputs/BaseProblem.swift %S/Inputs/Problems.swift -parse-as-library -Xllvm -sil-disable-pass=inline -Xllvm -sil-disable-pass=function-signature-opts -emit-sil 2>&1 | %FileCheck %s
+// RUN: %target-swiftc_driver -module-name devirt_single_module_in_multiple_files -O  %s %S/Inputs/BaseProblem.swift %S/Inputs/Problems.swift -parse-as-library -Xllvm -sil-disable-pass=inline -Xllvm -sil-disable-pass=function-signature-opts -Xllvm -sil-print-types -emit-sil 2>&1 | %FileCheck %s
 
 public func test() {
   let e = Evaluator()

@@ -12,7 +12,7 @@
 
 import SIL
 
-extension DestroyValueInst : OnoneSimplifyable, SILCombineSimplifyable {
+extension DestroyValueInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if destroyedValue.ownership == .none {
       context.erase(instruction: self)

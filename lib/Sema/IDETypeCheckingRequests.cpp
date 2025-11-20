@@ -13,6 +13,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
@@ -142,7 +143,7 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   // For check on specializable archetype see comment on
   // ContainsSpecializableArchetype.
   if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType() ||
-      BaseTy->hasUnresolvedType() || BaseTy->hasError() ||
+      BaseTy->hasError() ||
       ContainsSpecializableArchetype::check(DC, BaseTy))
     return true;
 
@@ -150,7 +151,7 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
     return true;
 
   ProtocolDecl *BaseTypeProtocolDecl = nullptr;
-  if (auto opaqueType = dyn_cast<OpaqueTypeArchetypeType>(BaseTy)) {
+  if (auto *opaqueType = BaseTy->getAs<OpaqueTypeArchetypeType>()) {
     if (opaqueType->getConformsTo().size() == 1) {
       BaseTypeProtocolDecl = opaqueType->getConformsTo().front();
     }
@@ -180,7 +181,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   // We can't leak type variables into another constraint system.
   // We can't do anything if the base type has unbound generic parameters.
   if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType()||
-      BaseTy->hasUnresolvedType() || BaseTy->hasError())
+      BaseTy->hasError())
     return true;
 
   if (isa<TypeAliasDecl>(VD) && BaseTy->is<ProtocolType>()) {
@@ -208,7 +209,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
 
   // The innermost generic parameters are mapped to error types.
   unsigned innerDepth = genericSig->getMaxDepth();
-  if (!genericDecl->isGeneric())
+  if (!genericDecl->hasGenericParamList())
     ++innerDepth;
 
   // We treat substitution failure as success, to ignore requirements
@@ -257,15 +258,11 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
 TypePair
 RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
                                               SubscriptDecl *subscript) const {
-  if (!isValidKeyPathDynamicMemberLookup(subscript))
-    return TypePair();
-
-  const auto *param = subscript->getIndices()->get(0);
-  auto keyPathType = param->getTypeInContext()->getAs<BoundGenericType>();
+  auto keyPathType = getKeyPathTypeForDynamicMemberLookup(subscript);
   if (!keyPathType)
     return TypePair();
+
   auto genericArgs = keyPathType->getGenericArgs();
-  assert(!genericArgs.empty() && genericArgs.size() == 2 &&
-         "invalid keypath dynamic member");
+  assert(genericArgs.size() == 2 && "invalid keypath dynamic member");
   return TypePair(genericArgs[0], genericArgs[1]);
 }

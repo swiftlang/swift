@@ -34,10 +34,8 @@ namespace {
 
   public:
     ClangDiagRenderer(const clang::LangOptions &langOpts,
-                      clang::DiagnosticOptions *diagOpts,
-                      decltype(callback) fn)
-       : DiagnosticNoteRenderer(langOpts, diagOpts),
-         callback(fn) {}
+                      clang::DiagnosticOptions &diagOpts, decltype(callback) fn)
+        : DiagnosticNoteRenderer(langOpts, diagOpts), callback(fn) {}
 
   private:
     /// Is this a diagnostic that doesn't do the user any good to show if it
@@ -51,7 +49,7 @@ namespace {
       if (auto *activeDiag = info.dyn_cast<const clang::Diagnostic *>())
         ID = activeDiag->getID();
       else
-        ID = info.get<const clang::StoredDiagnostic *>()->getID();
+        ID = cast<const clang::StoredDiagnostic *>(info)->getID();
       return ID == clang::diag::note_module_import_here ||
              ID == clang::diag::err_module_not_built;
     }
@@ -107,10 +105,9 @@ namespace {
 
 ClangDiagnosticConsumer::ClangDiagnosticConsumer(
     ClangImporter::Implementation &impl,
-    clang::DiagnosticOptions &clangDiagOptions,
-    bool dumpToStderr)
-  : TextDiagnosticPrinter(llvm::errs(), &clangDiagOptions),
-    ImporterImpl(impl), DumpToStderr(dumpToStderr) {}
+    clang::DiagnosticOptions &clangDiagOptions, bool dumpToStderr)
+    : TextDiagnosticPrinter(llvm::errs(), clangDiagOptions), ImporterImpl(impl),
+      DumpToStderr(dumpToStderr) {}
 
 void ClangDiagnosticConsumer::HandleDiagnostic(
     clang::DiagnosticsEngine::Level clangDiagLevel,
@@ -179,7 +176,7 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
     assert(clangDiag.hasSourceManager());
     auto clangCI = ImporterImpl.getClangInstance();
     ClangDiagRenderer renderer(clangCI->getLangOpts(),
-                               &clangCI->getDiagnosticOpts(), emitDiag);
+                               clangCI->getDiagnosticOpts(), emitDiag);
     clang::FullSourceLoc clangDiagLoc(clangDiag.getLocation(),
                                       clangDiag.getSourceManager());
     renderer.emitDiagnostic(clangDiagLoc, clangDiagLevel, message,

@@ -1,0 +1,165 @@
+{
+  key.offset: 0,
+  key.length: 246,
+  key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+  key.substructure: [
+    {
+      key.kind: source.lang.swift.decl.struct,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "`A.B`",
+      key.offset: 0,
+      key.length: 115,
+      key.nameoffset: 7,
+      key.namelength: 3,
+      key.bodyoffset: 14,
+      key.bodylength: 100,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "`foo bar`(`a b`:c:`$`:)",
+          key.offset: 17,
+          key.length: 50,
+          key.nameoffset: 22,
+          key.namelength: 42,
+          key.bodyoffset: 66,
+          key.bodylength: 0,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "`a b`",
+              key.offset: 32,
+              key.length: 10,
+              key.typename: "Int",
+              key.nameoffset: 32,
+              key.namelength: 3
+            },
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "c",
+              key.offset: 44,
+              key.length: 6,
+              key.typename: "Int",
+              key.nameoffset: 44,
+              key.namelength: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "`$`",
+              key.offset: 52,
+              key.length: 11,
+              key.typename: "String",
+              key.nameoffset: 52,
+              key.namelength: 1
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "`3four`()",
+          key.offset: 70,
+          key.length: 17,
+          key.nameoffset: 75,
+          key.namelength: 9,
+          key.bodyoffset: 86,
+          key.bodylength: 0
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "baz(x:)",
+          key.offset: 90,
+          key.length: 23,
+          key.nameoffset: 95,
+          key.namelength: 15,
+          key.bodyoffset: 112,
+          key.bodylength: 0,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "x",
+              key.offset: 101,
+              key.length: 8,
+              key.typename: "Int",
+              key.nameoffset: 101,
+              key.namelength: 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.name: "`A.B`",
+      key.offset: 116,
+      key.length: 18,
+      key.nameoffset: 126,
+      key.namelength: 5,
+      key.bodyoffset: 133,
+      key.bodylength: 0
+    },
+    {
+      key.kind: source.lang.swift.decl.struct,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "Outer",
+      key.offset: 136,
+      key.length: 34,
+      key.nameoffset: 143,
+      key.namelength: 5,
+      key.bodyoffset: 150,
+      key.bodylength: 19,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.struct,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "Inner",
+          key.offset: 153,
+          key.length: 15,
+          key.nameoffset: 160,
+          key.namelength: 5,
+          key.bodyoffset: 167,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.name: "Outer.Inner",
+      key.offset: 171,
+      key.length: 24,
+      key.nameoffset: 181,
+      key.namelength: 11,
+      key.bodyoffset: 194,
+      key.bodylength: 0
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "+(_:_:)",
+      key.offset: 197,
+      key.length: 48,
+      key.typename: "`A.B`",
+      key.nameoffset: 202,
+      key.namelength: 26,
+      key.bodyoffset: 239,
+      key.bodylength: 5,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "lhs",
+          key.offset: 205,
+          key.length: 10,
+          key.typename: "`A.B`"
+        },
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "rhs",
+          key.offset: 217,
+          key.length: 10,
+          key.typename: "`A.B`"
+        }
+      ]
+    }
+  ]
+}

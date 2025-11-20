@@ -121,7 +121,10 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::OnFastPath:
     case BuiltinValueKind::ExtractElement:
     case BuiltinValueKind::InsertElement:
+    case BuiltinValueKind::Select:
     case BuiltinValueKind::ShuffleVector:
+    case BuiltinValueKind::Interleave:
+    case BuiltinValueKind::Deinterleave:
     case BuiltinValueKind::StaticReport:
     case BuiltinValueKind::AssertConf:
     case BuiltinValueKind::StringObjectOr:
@@ -134,6 +137,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::IsNegative:
     case BuiltinValueKind::WordAtIndex:
     case BuiltinValueKind::ZeroInitializer:
+    case BuiltinValueKind::PrepareInitialization:
     case BuiltinValueKind::Once:
     case BuiltinValueKind::OnceWithContext:
     case BuiltinValueKind::GetObjCTypeEncoding:
@@ -149,7 +153,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::GetCurrentAsyncTask:
     case BuiltinValueKind::GetCurrentExecutor:
     case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
-    case BuiltinValueKind::EndAsyncLet:
     case BuiltinValueKind::EndAsyncLetLifetime:
     case BuiltinValueKind::CreateTaskGroup:
     case BuiltinValueKind::CreateTaskGroupWithFlags:
@@ -189,10 +192,10 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AssignCopyArrayBackToFront:
     case BuiltinValueKind::AssignTakeArray:
     case BuiltinValueKind::CancelAsyncTask:
-    case BuiltinValueKind::StartAsyncLet:
     case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::TaskRunInline:
     case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
+    case BuiltinValueKind::FinishAsyncLet:
     case BuiltinValueKind::ConvertTaskToJob:
     case BuiltinValueKind::InitializeDefaultActor:
     case BuiltinValueKind::DestroyDefaultActor:
@@ -211,6 +214,12 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AddressOfBorrowOpaque:
     case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
     case BuiltinValueKind::DistributedActorAsAnyActor:
+    case BuiltinValueKind::TaskAddCancellationHandler:
+    case BuiltinValueKind::TaskRemoveCancellationHandler:
+    case BuiltinValueKind::TaskAddPriorityEscalationHandler:
+    case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
+    case BuiltinValueKind::TaskLocalValuePush:
+    case BuiltinValueKind::TaskLocalValuePop:
       return true;
     }
   }

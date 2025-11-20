@@ -204,6 +204,10 @@ static DestructorEffects doesDestructorHaveSideEffects(AllocRefInstBase *ARI) {
         continue;
       }
 
+      if (isa<BeginBorrowInst>(I) || isa<EndBorrowInst>(I) || isa<EndLifetimeInst>(I)) {
+        continue;
+      }
+
       // dealloc_ref on self can be ignored, but dealloc_ref on anything else
       // cannot be eliminated.
       if (auto *DeallocRef = dyn_cast<DeallocRefInst>(&I)) {
@@ -314,7 +318,8 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
   // The value form of zero init is not a user of any operand. The address
   // form however is easily zappable because it's always a trivial store.
   if (auto bi = dyn_cast<BuiltinInst>(Inst)) {
-    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer) {
+    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer ||
+        bi->getBuiltinKind() == BuiltinValueKind::PrepareInitialization) {
       return true;
     }
   }
@@ -346,6 +351,8 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
 
   // Check if the destroyArray destroys the tail elements of allocRef.
   auto destroyPath = AccessPath::compute(destroyArray->getArguments()[1]);
+  if (!destroyPath.isValid())
+    return false;
   AccessStorage storage = destroyPath.getStorage();
   if (auto *beginDealloc = dyn_cast<BeginDeallocRefInst>(storage.getRoot())) {
     destroyPath = AccessPath(
@@ -604,7 +611,8 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
 
     // Lifetime endpoints that don't allow the address to escape.
     if (isa<RefCountingInst>(User) || isa<DebugValueInst>(User) ||
-        isa<FixLifetimeInst>(User) || isa<DestroyValueInst>(User)) {
+        isa<FixLifetimeInst>(User) || isa<DestroyValueInst>(User) ||
+        isa<EndBorrowInst>(User)) {
       AllUsers.insert(User);
       continue;
     }
@@ -627,6 +635,13 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     }
     if (auto *MDI = dyn_cast<MarkDependenceInst>(User)) {
       if (!recursivelyCollectInteriorUses(MDI, AddressNode,
+                                          IsInteriorAddress)) {
+        return false;
+      }
+      continue;
+    }
+    if (auto *bb = dyn_cast<BeginBorrowInst>(User)) {
+      if (!recursivelyCollectInteriorUses(bb, AddressNode,
                                           IsInteriorAddress)) {
         return false;
       }
@@ -673,7 +688,7 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
         continue;
       }
       ArraySemanticsCall AS(svi);
-      if (AS.getKind() == swift::ArrayCallKind::kArrayFinalizeIntrinsic) {
+      if (AS.getKind() == ArrayCallKind::kArrayFinalizeIntrinsic) {
         if (!recursivelyCollectInteriorUses(svi, AddressNode, IsInteriorAddress))
           return false;
         continue;

@@ -13,12 +13,13 @@
 #define DEBUG_TYPE "sil-function"
 
 #include "swift/SIL/SILFunction.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/CFG.h"
@@ -32,7 +33,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILProfiler.h"
 #include "clang/AST/Decl.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
@@ -194,6 +194,14 @@ SILFunction *SILFunction::create(
   else
     M.functions.push_back(fn);
 
+  auto iter = M.pendingSpecializeAttrs.find(name);
+  if (iter != M.pendingSpecializeAttrs.end()) {
+    for (auto *attr : iter->second) {
+      fn->addSpecializeAttr(attr);
+    }
+    M.pendingSpecializeAttrs.erase(iter);
+  }
+
   return fn;
 }
 
@@ -206,6 +214,7 @@ static BridgedFunction::CopyEffectsFn copyEffectsFunction = nullptr;
 static BridgedFunction::GetEffectInfoFn getEffectInfoFunction = nullptr;
 static BridgedFunction::GetMemBehaviorFn getMemBehvaiorFunction = nullptr;
 static BridgedFunction::ArgumentMayReadFn argumentMayReadFunction = nullptr;
+static BridgedFunction::IsDeinitBarrierFn isDeinitBarrierFunction = nullptr;
 
 SILFunction::SILFunction(
     SILModule &Module, SILLinkage Linkage, StringRef Name,
@@ -433,6 +442,16 @@ bool SILFunction::hasForeignBody() const {
   return SILDeclRef::isClangGenerated(getClangNode());
 }
 
+void SILFunction::setAsmName(StringRef value) {
+  ASSERT((AsmName.empty() || value == AsmName) && "Cannot change asmname");
+  AsmName = value;
+
+  if (!value.empty()) {
+    // Update the function-by-asm-name-table.
+    getModule().FunctionByAsmNameTable.insert({AsmName, this});
+  }
+}
+
 const SILFunction *SILFunction::getOriginOfSpecialization() const {
   if (!isSpecialization())
     return nullptr;
@@ -490,7 +509,7 @@ bool SILFunction::shouldOptimize() const {
   return getEffectiveOptimizationMode() != OptimizationMode::NoOptimization;
 }
 
-Type SILFunction::mapTypeIntoContext(Type type) const {
+Type SILFunction::mapTypeIntoEnvironment(Type type) const {
   assert(!type->hasPrimaryArchetype());
 
   if (GenericEnv) {
@@ -498,7 +517,7 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
     // type, which might contain element archetypes, if it was the interface type
     // of a closure or local variable.
     if (type->hasElementArchetype())
-      return GenericEnv->mapTypeIntoContext(type);
+      return GenericEnv->mapTypeIntoEnvironment(type);
 
     // Otherwise, assume we have an interface type for the "combined" captured
     // environment.
@@ -511,7 +530,7 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
   return type;
 }
 
-SILType SILFunction::mapTypeIntoContext(SILType type) const {
+SILType SILFunction::mapTypeIntoEnvironment(SILType type) const {
   assert(!type.hasPrimaryArchetype());
 
   if (GenericEnv) {
@@ -527,7 +546,7 @@ SILType SILFunction::mapTypeIntoContext(SILType type) const {
   return type;
 }
 
-SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
+SILType GenericEnvironment::mapTypeIntoEnvironment(SILModule &M,
                                                SILType type) const {
   assert(!type.hasPrimaryArchetype());
 
@@ -544,6 +563,28 @@ bool SILFunction::isNoReturnFunction(TypeExpansionContext context) const {
       .isNoReturnFunction(getModule(), context);
 }
 
+bool SILFunction::hasNonUniqueDefinition() const {
+  // Non-uniqueness is a property of the Embedded linkage model.
+  if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  // If this function is the entrypoint, it is unique.
+  if (getName() == getASTContext().getEntryPointFunctionName())
+    return false;
+
+  // If this is for a declaration, ask it.
+  if (auto declRef = getDeclRef()) {
+    return declRef.hasNonUniqueDefinition();
+  }
+
+  // If this function is from a different module than the one we are emitting
+  // code for, then it must have a non-unique definition.
+  if (getParentModule() != getModule().getSwiftModule())
+    return true;
+
+  return false;
+}
+
 ResilienceExpansion SILFunction::getResilienceExpansion() const {
   // If a function definition is in another module, and
   // it was serialized due to package serialization opt,
@@ -557,8 +598,24 @@ ResilienceExpansion SILFunction::getResilienceExpansion() const {
           : ResilienceExpansion::Maximal);
 }
 
+SILTypeProperties
+SILFunction::getTypeProperties(AbstractionPattern orig, Type subst) const {
+  return getModule().Types.getTypeProperties(orig, subst,
+                                             TypeExpansionContext(*this));
+}
+
+SILTypeProperties SILFunction::getTypeProperties(Type subst) const {
+  return getModule().Types.getTypeProperties(subst,
+                                             TypeExpansionContext(*this));
+}
+
+SILTypeProperties SILFunction::getTypeProperties(SILType type) const {
+  return getModule().Types.getTypeProperties(type,
+                                             TypeExpansionContext(*this));
+}
+
 const TypeLowering &
-SILFunction::getTypeLowering(AbstractionPattern orig, Type subst) {
+SILFunction::getTypeLowering(AbstractionPattern orig, Type subst) const {
   return getModule().Types.getTypeLowering(orig, subst,
                                            TypeExpansionContext(*this));
 }
@@ -610,7 +667,8 @@ bool SILFunction::isWeakImported(ModuleDecl *module) const {
 
   // For imported functions check the Clang declaration.
   if (ClangNodeOwner)
-    return ClangNodeOwner->getClangDecl()->isWeakImported();
+    return ClangNodeOwner->getClangDecl()->isWeakImported(
+        getASTContext().LangOpts.getMinPlatformVersion());
 
   // For native functions check a flag on the SILFunction
   // itself.
@@ -990,6 +1048,21 @@ bool SILFunction::hasValidLinkageForFragileRef(SerializedKind_t callerSerialized
   return hasPublicOrPackageVisibility(getLinkage(), /*includePackage*/ true);
 }
 
+bool SILFunction::isSwiftRuntimeFunction(
+    StringRef name, const ModuleDecl *module) {
+  if (!name.starts_with("swift_") && !name.starts_with("_swift_"))
+    return false;
+
+  return !module ||
+      module->getName().str() == "Swift" ||
+      module->getName().str() == "_Concurrency";
+}
+
+bool SILFunction::isSwiftRuntimeFunction() const {
+  return isSwiftRuntimeFunction(asmName(), getParentModule()) ||
+    isSwiftRuntimeFunction(getName(), getParentModule());
+}
+
 bool
 SILFunction::isPossiblyUsedExternally() const {
   auto linkage = getLinkage();
@@ -1010,6 +1083,18 @@ SILFunction::isPossiblyUsedExternally() const {
   if (markedAsUsed())
     return true;
 
+  // If this function is exposed to a foreign language, it can be used
+  // externally (by that language).
+  if (auto decl = getDeclRef().getDecl()) {
+    if (SILDeclRef::declExposedToForeignLanguage(decl))
+      return true;
+  }
+
+  // If this function was explicitly placed in a section or given a WebAssembly
+  // export, it can be used externally.
+  if (!Section.empty() || !WasmExportName.empty())
+    return true;
+
   if (shouldBePreservedForDebugger())
     return true;
 
@@ -1018,6 +1103,11 @@ SILFunction::isPossiblyUsedExternally() const {
   // has to be kept alive to emit opaque type metadata descriptor.
   if (markedAsAlwaysEmitIntoClient() &&
       hasOpaqueResultTypeWithAvailabilityConditions())
+    return true;
+
+  // All Swift runtime functions can be used externally.
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      isSwiftRuntimeFunction())
     return true;
 
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
@@ -1167,7 +1257,8 @@ void BridgedFunction::registerBridging(SwiftMetatype metatype,
             CopyEffectsFn copyEffectsFn,
             GetEffectInfoFn effectInfoFn,
             GetMemBehaviorFn memBehaviorFn,
-            ArgumentMayReadFn argumentMayReadFn) {
+            ArgumentMayReadFn argumentMayReadFn,
+            IsDeinitBarrierFn isDeinitBarrierFn) {
   functionMetatype = metatype;
   initFunction = initFn;
   destroyFunction = destroyFn;
@@ -1177,6 +1268,7 @@ void BridgedFunction::registerBridging(SwiftMetatype metatype,
   getEffectInfoFunction = effectInfoFn;
   getMemBehvaiorFunction = memBehaviorFn;
   argumentMayReadFunction = argumentMayReadFn;
+  isDeinitBarrierFunction = isDeinitBarrierFn;
 }
 
 std::pair<const char *, int>  SILFunction::
@@ -1276,6 +1368,13 @@ bool SILFunction::argumentMayRead(Operand *argOp, SILValue addr) {
     return true;
 
   return argumentMayReadFunction({this}, {argOp}, {addr});
+}
+
+bool SILFunction::isDeinitBarrier() {
+  if (!isDeinitBarrierFunction)
+    return true;
+
+  return isDeinitBarrierFunction({this});
 }
 
 SourceFile *SILFunction::getSourceFile() const {

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name access_marker_gen -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name access_marker_gen -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked %s | %FileCheck %s
 
 func modify<T>(_ x: inout T) {}
 

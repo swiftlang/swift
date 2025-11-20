@@ -53,8 +53,15 @@ protected:
       return;
     }
     if (fixedSize == 1) {
-      // only one element to operate on
-      return body(addrs);
+      auto zero = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0);
+      // only one element to operate on; index to it in each array
+      SmallVector<Address, 2> eltAddrs;
+      eltAddrs.reserve(addrs.size());
+      for (auto index : indices(addrs)) {
+        eltAddrs.push_back(Element.indexArray(IGF, addrs[index], zero,
+                                              getElementSILType(IGF.IGM, T)));
+      }
+      return body(eltAddrs);
     }
     
     auto arraySize = getArraySize(IGF, T);
@@ -94,16 +101,21 @@ protected:
     }
     
     body(eltAddrs);
-    
+
+    // The just ran body may have generated new blocks. Get the current
+    // insertion block which will become the other incoming block to the phis
+    // we've generated.
+    predBB = IGF.Builder.GetInsertBlock();
+
     for (unsigned i : indices(addrPhis)) {
       addrPhis[i]->addIncoming(Element.indexArray(IGF, eltAddrs[i], one,
                                                   getElementSILType(IGF.IGM, T))
                                       .getAddress(),
-                               loopBB);
+                               predBB);
     }
 
     auto nextCount = IGF.Builder.CreateSub(countPhi, one);
-    countPhi->addIncoming(nextCount, loopBB);
+    countPhi->addIncoming(nextCount, predBB);
     
     auto done = IGF.Builder.CreateICmpEQ(nextCount, zero);
     IGF.Builder.CreateCondBr(done, endBB, loopBB);
@@ -168,6 +180,14 @@ public:
                           Element.destroy(IGF, elt[0], eltTy, isOutlined);
                         }, {address});
   }
+
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    auto &IGM = collector.IGF.IGM;
+    auto elementTy = getElementSILType(IGM, T);
+    IGM.getTypeInfo(elementTy).collectMetadataForOutlining(collector,
+                                                           elementTy);
+  }
 };
 
 template<typename BaseTypeInfo>
@@ -206,10 +226,15 @@ protected:
       uint64_t paddingBytes = elementTI.getFixedStride().getValue()
         - elementTI.getFixedSize().getValue();
       auto byteTy = llvm::IntegerType::get(LLVMContext, 8);
-      elementTy = llvm::StructType::get(LLVMContext,
-        {elementTy,
-         llvm::ArrayType::get(byteTy, paddingBytes)},
-        /*packed*/ true);
+      auto paddingArrayTy = llvm::ArrayType::get(byteTy, paddingBytes);
+
+      if (elementTI.getFixedSize() == Size(0)) {
+        elementTy = paddingArrayTy;
+      } else {
+        elementTy = llvm::StructType::get(LLVMContext,
+          {elementTy, paddingArrayTy},
+          /*packed*/ true);
+      }
     }
     
     return llvm::ArrayType::get(elementTy, arraySize);
@@ -223,9 +248,15 @@ protected:
     
     // Take spare bits from the first element only.
     SpareBitVector result = elementTI.getSpareBits();
+
     // We can use the padding to the next element as spare bits too.
-    result.appendSetBits(getArraySize(arraySize, elementTI).getValueInBits()
-                           - result.size());
+    auto padding = elementTI.getFixedStride() - elementTI.getFixedSize();
+    result.appendSetBits(padding.getValueInBits());
+
+    // spare bits of any other elements should not be considered
+    result.appendClearBits(
+        getArraySize(arraySize - 1, elementTI).getValueInBits());
+
     return result;
   }
   
@@ -613,12 +644,6 @@ public:
     auto alloca = IGF.emitDynamicAlloca(T, name);
     IGF.Builder.CreateLifetimeStart(alloca.getAddressPointer());
     return alloca.withAddress(getAddressForPointer(alloca.getAddressPointer()));
-  }
-
-  StackAddress allocateVector(IRGenFunction &IGF, SILType T,
-                              llvm::Value *capacity,
-                              const Twine &name) const override {
-    llvm_unreachable("not implemented, yet");
   }
 
   void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,

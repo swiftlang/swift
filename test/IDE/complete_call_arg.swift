@@ -789,7 +789,7 @@ func testClosurePlaceholderContainsInternalParameterNamesIfPresentInSignature() 
   func sortWithParensAroundClosureType(callback: ((_ left: Int, _ right: Int) -> Bool)) {}
   sortWithParensAroundClosureType(#^CLOSURE_PARAM_WITH_PARENS^#)
 // CLOSURE_PARAM_WITH_PARENS: Begin completions, 1 item
-// CLOSURE_PARAM_WITH_PARENS-DAG: Decl[FreeFunction]/Local/Flair[ArgLabels]:           ['(']{#callback: ((Int, Int) -> Bool)##(_ left: Int, _ right: Int) -> Bool#}[')'][#Void#];
+// CLOSURE_PARAM_WITH_PARENS-DAG: Decl[FreeFunction]/Local/Flair[ArgLabels]:           ['(']{#callback: (Int, Int) -> Bool##(_ left: Int, _ right: Int) -> Bool#}[')'][#Void#];
 
   func sortWithOptionalClosureType(callback: ((_ left: Int, _ right: Int) -> Bool)?) {}
   sortWithOptionalClosureType(#^OPTIONAL_CLOSURE_PARAM^#)
@@ -1441,5 +1441,16 @@ struct NestedCallsWithoutClosingParen {
 
   func testInTuple() {
     _ = (foo(#^IN_TUPLE?check=NESTED_CALL_WITHOUT_TYPE_RELATION^#, 1)
+  }
+}
+
+func testUnboundContextualType() {
+  struct S<T> {
+    func bar(x: Int) -> Self { self }
+  }
+
+  func foo(x: S<Int>) {
+    let _: S = x.bar(#^ARG_WITH_UNBOUND_CONTEXTUAL_TY^#
+    // ARG_WITH_UNBOUND_CONTEXTUAL_TY: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#x: Int#}[')'][#S<Int>#]; name=x:
   }
 }

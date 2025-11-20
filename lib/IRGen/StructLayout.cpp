@@ -190,12 +190,23 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
     }
   } else {
+    // A heap object containing an empty but non-trivially-destroyable
+    // noncopyable type needs to exist in order to run deinits when the
     bool nonEmpty = builder.addFields(Elements, strategy);
+
+    IsKnownTriviallyDestroyable
+      = triviallyDestroyable & builder.isTriviallyDestroyable();
+    IsKnownCopyable = copyable & builder.isCopyable();
 
     // Special-case: there's nothing to store.
     // In this case, produce an opaque type;  this tends to cause lovely
     // assertions.
-    if (!nonEmpty) {
+    //
+    // If a heap object contains an empty but non-trivially-destroyable type,
+    // then we still want to create a non-empty heap object, since the heap
+    // object's destructor will run deinits for the value.
+    if (!nonEmpty
+        && (IsKnownTriviallyDestroyable || !requiresHeapHeader(layoutKind))) {
       assert(!builder.empty() == requiresHeapHeader(layoutKind));
       MinimumAlign = Alignment(1);
       MinimumSize = Size(0);
@@ -203,10 +214,8 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       SpareBits.clear();
       IsFixedLayout = true;
       IsLoadable = true;
-      IsKnownTriviallyDestroyable = triviallyDestroyable & builder.isTriviallyDestroyable();
       IsKnownBitwiseTakable = builder.isBitwiseTakable();
       IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
-      IsKnownCopyable = copyable & builder.isCopyable();
       Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
     } else {
       MinimumAlign = builder.getAlignment();
@@ -215,10 +224,8 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       SpareBits = builder.getSpareBits();
       IsFixedLayout = builder.isFixedLayout();
       IsLoadable = builder.isLoadable();
-      IsKnownTriviallyDestroyable = triviallyDestroyable & builder.isTriviallyDestroyable();
       IsKnownBitwiseTakable = bitwiseTakable & builder.isBitwiseTakable();
       IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
-      IsKnownCopyable = copyable & builder.isCopyable();
       if (typeToFill) {
         builder.setAsBodyOfStruct(typeToFill);
         Ty = typeToFill;
@@ -284,8 +291,7 @@ llvm::Constant *StructLayout::emitAlignMask(IRGenModule &IGM) const {
 Address StructLayout::emitCastTo(IRGenFunction &IGF,
                                  llvm::Value *ptr,
                                  const llvm::Twine &name) const {
-  llvm::Value *addr =
-    IGF.Builder.CreateBitCast(ptr, getType()->getPointerTo(), name);
+  llvm::Value *addr = IGF.Builder.CreateBitCast(ptr, IGF.IGM.PtrTy, name);
   return Address(addr, getType(), getAlignment());
 }
 
@@ -582,6 +588,22 @@ unsigned irgen::getNumFields(const NominalTypeDecl *target) {
   return numFields;
 }
 
+bool irgen::isExportableField(Field field) {
+  if (field.getKind() == Field::Kind::Var) {
+    if (field.getVarDecl()->getClangDecl() &&
+        field.getVarDecl()->getFormalAccess() == AccessLevel::Private)
+      return false;
+    // We should not be able to refer to anonymous types.
+    if (const auto *vd = dyn_cast_or_null<clang::ValueDecl>(
+            field.getVarDecl()->getClangDecl()))
+      if (const auto *rd = vd->getType()->getAsRecordDecl())
+        if (rd->isAnonymousStructOrUnion())
+          return false;
+  }
+  // All other fields are exportable
+  return true;
+}
+
 void irgen::forEachField(IRGenModule &IGM, const NominalTypeDecl *typeDecl,
                          llvm::function_ref<void(Field field)> fn) {
   auto classDecl = dyn_cast<ClassDecl>(typeDecl);
@@ -601,6 +623,17 @@ void irgen::forEachField(IRGenModule &IGM, const NominalTypeDecl *typeDecl,
       fn(cast<MissingMemberDecl>(decl));
     }
   }
+}
+
+unsigned irgen::countExportableFields(IRGenModule &IGM,
+                                      const NominalTypeDecl *type) {
+  // Don't count private C++ fields that were imported as private Swift fields
+  unsigned exportableFieldCount = 0;
+  forEachField(IGM, type, [&](Field field) {
+    if (isExportableField(field))
+      ++exportableFieldCount;
+  });
+  return exportableFieldCount;
 }
 
 SILType Field::getType(IRGenModule &IGM, SILType baseType) const {

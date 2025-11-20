@@ -41,11 +41,7 @@ public:
   BAD_MEMBER(Operator)
   BAD_MEMBER(PrecedenceGroup)
   BAD_MEMBER(Macro)
-
-  // These decls are disregarded.
-  RetTy visitPoundDiagnosticDecl(PoundDiagnosticDecl *D) {
-    return RetTy();
-  }
+  BAD_MEMBER(Using)
 
   RetTy visitMacroExpansionDecl(MacroExpansionDecl *D) {
     // Expansion already visited as auxiliary decls.

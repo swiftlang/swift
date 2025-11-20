@@ -275,15 +275,15 @@ SupplementaryOutputPathsComputer::computeOutputPaths() const {
 
   if (InputsAndOutputs.hasPrimaryInputs())
     assert(OutputFiles.size() == pathsFromUser->size());
-  else if (InputsAndOutputs.isSingleThreadedWMO())
-    assert(OutputFiles.size() == pathsFromUser->size() &&
-           pathsFromUser->size() == 1);
   else {
-    // Multi-threaded WMO is the exception
-    assert(OutputFiles.size() == InputsAndOutputs.inputCount() &&
-           pathsFromUser->size() == (InputsAndOutputs.hasInputs() ? 1 : 0));
+    if (!InputsAndOutputs.isSingleThreadedWMO()) {
+      assert(OutputFiles.size() == InputsAndOutputs.inputCount());
+    }
+    assert(pathsFromUser->size() == 1 ||
+           pathsFromUser->size() == InputsAndOutputs.inputCount());
   }
 
+  // For other cases, process the paths normally
   std::vector<SupplementaryOutputPaths> outputPaths;
   unsigned i = 0;
   bool hadError = InputsAndOutputs.forEachInputProducingSupplementaryOutput(
@@ -298,6 +298,47 @@ SupplementaryOutputPathsComputer::computeOutputPaths() const {
       });
   if (hadError)
     return std::nullopt;
+
+  // In WMO mode compute supplementary output paths for optimization record
+  // data (opt-remarks). We need one path per LLVMModule that will be created as
+  // part of wmo.
+  if (!InputsAndOutputs.hasPrimaryInputs()) {
+    unsigned i = 0;
+    InputsAndOutputs.forEachInput([&](const InputFile &input) -> bool {
+      // First input is already computed.
+      if (InputsAndOutputs.firstInput().getFileName() == input.getFileName()) {
+        ++i;
+        return false;
+      }
+      SupplementaryOutputPaths outputs;
+
+      // Compute auxiliar opt record paths.
+      if(OutputFiles.size() > 1) {
+        StringRef defaultSupplementaryOutputPathExcludingExtension =
+            deriveDefaultSupplementaryOutputPathExcludingExtension(
+              OutputFiles[i], input);
+
+        auto YAMLOptRecordPath = determineSupplementaryOutputFilename(
+          options::OPT_save_optimization_record,
+          "",
+          file_types::TY_YAMLOptRecord, "",
+          defaultSupplementaryOutputPathExcludingExtension, true);
+        outputs.YAMLOptRecordPath = YAMLOptRecordPath;
+
+        auto bitstreamOptRecordPath = determineSupplementaryOutputFilename(
+          options::OPT_save_optimization_record,
+          "",
+          file_types::TY_BitstreamOptRecord, "",
+          defaultSupplementaryOutputPathExcludingExtension, true);
+
+        outputs.BitstreamOptRecordPath = bitstreamOptRecordPath;
+      }
+
+      outputPaths.emplace_back(std::move(outputs));
+      ++i;
+      return false;
+    });
+  }
   return outputPaths;
 }
 
@@ -317,8 +358,6 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_reference_dependencies_path);
   auto serializedDiagnostics = getSupplementaryFilenamesFromArguments(
       options::OPT_serialize_diagnostics_path);
-  auto fixItsOutput = getSupplementaryFilenamesFromArguments(
-      options::OPT_emit_fixits_path);
   auto loadedModuleTrace = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_loaded_module_trace_path);
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
@@ -341,40 +380,78 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_module_semantic_info_path);
   auto optRecordOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_save_optimization_record_path);
+  auto silOutput =
+      getSupplementaryFilenamesFromArguments(options::OPT_sil_output_path);
+  auto irOutput =
+      getSupplementaryFilenamesFromArguments(options::OPT_ir_output_path);
   if (!clangHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
-      !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
-      !moduleInterfaceOutput || !privateModuleInterfaceOutput || !packageModuleInterfaceOutput ||
-      !moduleSourceInfoOutput || !moduleSummaryOutput || !abiDescriptorOutput ||
-      !moduleSemanticInfoOutput || !optRecordOutput) {
+      !serializedDiagnostics || !loadedModuleTrace || !TBD ||
+      !moduleInterfaceOutput || !privateModuleInterfaceOutput ||
+      !packageModuleInterfaceOutput || !moduleSourceInfoOutput ||
+      !moduleSummaryOutput || !abiDescriptorOutput ||
+      !moduleSemanticInfoOutput || !optRecordOutput || !silOutput ||
+      !irOutput) {
     return std::nullopt;
   }
   std::vector<SupplementaryOutputPaths> result;
 
-  const unsigned N =
-      InputsAndOutputs.countOfFilesProducingSupplementaryOutput();
+  // In WMO mode with multiple IR output paths, we need to create one
+  // SupplementaryOutputPaths per input file, not just one for the module
+  unsigned N = InputsAndOutputs.countOfFilesProducingSupplementaryOutput();
+  if (!InputsAndOutputs.hasPrimaryInputs() && irOutput->size() > 1) {
+    // WMO mode with multiple IR outputs: use input count instead of 1
+    N = InputsAndOutputs.inputCount();
+  }
+
+  // Find the index of SIL output path matching module name
+  auto findSILIndexForModuleName = [&]() -> unsigned {
+    if (!InputsAndOutputs.hasPrimaryInputs() && silOutput->size() > 1) {
+      // In WMO mode with multiple SIL output paths, find the one whose matches
+      // module name
+      for (unsigned i = 0; i < silOutput->size(); ++i) {
+        StringRef silPath = (*silOutput)[i];
+        if (!silPath.empty()) {
+          StringRef basename = llvm::sys::path::stem(silPath);
+          if (basename == ModuleName) {
+            return i;
+          }
+        }
+      }
+      // If no match found, fall back to first
+      return 0;
+    }
+    return 0;
+  };
+
+  unsigned silOutputIndex = findSILIndexForModuleName();
+
   for (unsigned i = 0; i < N; ++i) {
     SupplementaryOutputPaths sop;
-    sop.ClangHeaderOutputPath = (*clangHeaderOutput)[i];
-    sop.ModuleOutputPath = (*moduleOutput)[i];
-    sop.ModuleDocOutputPath = (*moduleDocOutput)[i];
-    sop.DependenciesFilePath = (*dependenciesFile)[i];
-    sop.ReferenceDependenciesFilePath = (*referenceDependenciesFile)[i];
-    sop.SerializedDiagnosticsPath = (*serializedDiagnostics)[i];
-    sop.FixItsOutputPath = (*fixItsOutput)[i];
-    sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
-    sop.TBDPath = (*TBD)[i];
-    sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[i];
-    sop.PrivateModuleInterfaceOutputPath = (*privateModuleInterfaceOutput)[i];
-    sop.PackageModuleInterfaceOutputPath = (*packageModuleInterfaceOutput)[i];
-    sop.ModuleSourceInfoOutputPath = (*moduleSourceInfoOutput)[i];
-    sop.ModuleSummaryOutputPath = (*moduleSummaryOutput)[i];
-    sop.ABIDescriptorOutputPath = (*abiDescriptorOutput)[i];
-    sop.APIDescriptorOutputPath = (*apiDescriptorOutput)[i];
-    sop.ConstValuesOutputPath = (*constValuesOutput)[i];
-    sop.ModuleSemanticInfoOutputPath = (*moduleSemanticInfoOutput)[i];
-    sop.YAMLOptRecordPath = (*optRecordOutput)[i];
-    sop.BitstreamOptRecordPath = (*optRecordOutput)[i];
+    // In multi-threaded WMO with multiple IR outputs, most supplementary outputs
+    // are per-module (size 1), only IR is per-file. Use index 0 for module outputs.
+    unsigned moduleIndex = (!InputsAndOutputs.hasPrimaryInputs() && irOutput->size() > 1) ? 0 : i;
+    sop.ClangHeaderOutputPath = (*clangHeaderOutput)[moduleIndex];
+    sop.ModuleOutputPath = (*moduleOutput)[moduleIndex];
+    sop.ModuleDocOutputPath = (*moduleDocOutput)[moduleIndex];
+    sop.DependenciesFilePath = (*dependenciesFile)[moduleIndex];
+    sop.ReferenceDependenciesFilePath = (*referenceDependenciesFile)[moduleIndex];
+    sop.SerializedDiagnosticsPath = (*serializedDiagnostics)[moduleIndex];
+    sop.LoadedModuleTracePath = (*loadedModuleTrace)[moduleIndex];
+    sop.TBDPath = (*TBD)[moduleIndex];
+    sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[moduleIndex];
+    sop.PrivateModuleInterfaceOutputPath = (*privateModuleInterfaceOutput)[moduleIndex];
+    sop.PackageModuleInterfaceOutputPath = (*packageModuleInterfaceOutput)[moduleIndex];
+    sop.ModuleSourceInfoOutputPath = (*moduleSourceInfoOutput)[moduleIndex];
+    sop.ModuleSummaryOutputPath = (*moduleSummaryOutput)[moduleIndex];
+    sop.ABIDescriptorOutputPath = (*abiDescriptorOutput)[moduleIndex];
+    sop.APIDescriptorOutputPath = (*apiDescriptorOutput)[moduleIndex];
+    sop.ConstValuesOutputPath = (*constValuesOutput)[moduleIndex];
+    sop.ModuleSemanticInfoOutputPath = (*moduleSemanticInfoOutput)[moduleIndex];
+    sop.YAMLOptRecordPath = (*optRecordOutput)[moduleIndex];
+    sop.BitstreamOptRecordPath = (*optRecordOutput)[moduleIndex];
+    sop.SILOutputPath = (*silOutput)[silOutputIndex];
+    sop.LLVMIROutputPath = (*irOutput)[i];
     result.push_back(sop);
   }
   return result;
@@ -401,6 +478,15 @@ SupplementaryOutputPathsComputer::getSupplementaryFilenamesFromArguments(
       paths.emplace_back();
     return paths;
   }
+  // Special handling for SIL and IR output paths: allow multiple paths per file
+  // type
+  else if ((pathID == options::OPT_sil_output_path ||
+            pathID == options::OPT_ir_output_path) &&
+           paths.size() > N) {
+    // For parallel compilation, we can have multiple SIL/IR output paths
+    // so return all the paths.
+    return paths;
+  }
 
   if (paths.empty())
     return std::vector<std::string>(N, std::string());
@@ -409,6 +495,50 @@ SupplementaryOutputPathsComputer::getSupplementaryFilenamesFromArguments(
                  Args.getLastArg(pathID)->getOption().getPrefixedName(), N,
                  paths.size());
   return std::nullopt;
+}
+
+static bool shouldEmitFineModuleTrace(FrontendOptions::ActionType action) {
+  // Only full compilation jobs should emit fine module tracing file.
+  // Other partial compilation jobs, such as emitting modules, only typecheck partially
+  // so walking into every function bodies may be risky.
+  switch(action) {
+  case swift::FrontendOptions::ActionType::Typecheck:
+  case swift::FrontendOptions::ActionType::EmitSILGen:
+  case swift::FrontendOptions::ActionType::EmitSIL:
+  case swift::FrontendOptions::ActionType::EmitAssembly:
+  case swift::FrontendOptions::ActionType::EmitLoweredSIL:
+  case swift::FrontendOptions::ActionType::EmitIRGen:
+  case swift::FrontendOptions::ActionType::EmitIR:
+  case swift::FrontendOptions::ActionType::EmitBC:
+  case swift::FrontendOptions::ActionType::EmitObject:
+    return true;
+  case swift::FrontendOptions::ActionType::NoneAction:
+  case swift::FrontendOptions::ActionType::Parse:
+  case swift::FrontendOptions::ActionType::ResolveImports:
+  case swift::FrontendOptions::ActionType::DumpParse:
+  case swift::FrontendOptions::ActionType::DumpInterfaceHash:
+  case swift::FrontendOptions::ActionType::DumpAST:
+  case swift::FrontendOptions::ActionType::PrintAST:
+  case swift::FrontendOptions::ActionType::PrintASTDecl:
+  case swift::FrontendOptions::ActionType::DumpScopeMaps:
+  case swift::FrontendOptions::ActionType::EmitImportedModules:
+  case swift::FrontendOptions::ActionType::EmitPCH:
+  case swift::FrontendOptions::ActionType::EmitModuleOnly:
+  case swift::FrontendOptions::ActionType::MergeModules:
+  case swift::FrontendOptions::ActionType::CompileModuleFromInterface:
+  case swift::FrontendOptions::ActionType::TypecheckModuleFromInterface:
+  case swift::FrontendOptions::ActionType::EmitSIBGen:
+  case swift::FrontendOptions::ActionType::EmitSIB:
+  case swift::FrontendOptions::ActionType::Immediate:
+  case swift::FrontendOptions::ActionType::REPL:
+  case swift::FrontendOptions::ActionType::DumpTypeInfo:
+  case swift::FrontendOptions::ActionType::EmitPCM:
+  case swift::FrontendOptions::ActionType::DumpPCM:
+  case swift::FrontendOptions::ActionType::ScanDependencies:
+  case swift::FrontendOptions::ActionType::PrintVersion:
+  case swift::FrontendOptions::ActionType::PrintArguments:
+    return false;
+  }
 }
 
 std::optional<SupplementaryOutputPaths>
@@ -454,6 +584,26 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       OPT_emit_loaded_module_trace, pathsFromArguments.LoadedModuleTracePath,
       file_types::TY_ModuleTrace, "",
       defaultSupplementaryOutputPathExcludingExtension);
+
+  // We piggy-back on the loadedModuleTracePath to decide (1) whether
+  // to emit the fine module Trace file, and (2) where to emit the fine module
+  // trace file if the path isn't explicitly given by
+  // SWIFT_COMPILER_FINE_GRAINED_TRACE_PATH.
+  // FIXME: we probably need to move this to a frontend argument.
+  llvm::SmallString<128> FineModuleTracePath;
+  if (!loadedModuleTracePath.empty() &&
+      shouldEmitFineModuleTrace(RequestedAction) &&
+      !Args.hasArg(OPT_disable_fine_module_tracing)) {
+    if (const char *P = ::getenv("SWIFT_COMPILER_FINE_GRAINED_TRACE_PATH")) {
+      StringRef FilePath = P;
+      llvm::sys::path::append(FineModuleTracePath, FilePath);
+    } else {
+      llvm::sys::path::append(FineModuleTracePath, loadedModuleTracePath);
+      llvm::sys::path::remove_filename(FineModuleTracePath);
+      llvm::sys::path::append(FineModuleTracePath,
+                              ".SWIFT_FINE_DEPENDENCY_TRACE.json");
+    }
+  }
 
   auto tbdPath = determineSupplementaryOutputFilename(
       OPT_emit_tbd, pathsFromArguments.TBDPath, file_types::TY_TBD, "",
@@ -503,13 +653,16 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       defaultSupplementaryOutputPathExcludingExtension);
 
   auto YAMLOptRecordPath = determineSupplementaryOutputFilename(
-      OPT_save_optimization_record_path, pathsFromArguments.YAMLOptRecordPath,
+      OPT_save_optimization_record, pathsFromArguments.YAMLOptRecordPath,
       file_types::TY_YAMLOptRecord, "",
       defaultSupplementaryOutputPathExcludingExtension);
   auto bitstreamOptRecordPath = determineSupplementaryOutputFilename(
-      OPT_save_optimization_record_path, pathsFromArguments.BitstreamOptRecordPath,
+      OPT_save_optimization_record, pathsFromArguments.BitstreamOptRecordPath,
       file_types::TY_BitstreamOptRecord, "",
       defaultSupplementaryOutputPathExcludingExtension);
+
+  auto SILOutputPath = pathsFromArguments.SILOutputPath;
+  auto LLVMIROutputPath = pathsFromArguments.LLVMIROutputPath;
 
   SupplementaryOutputPaths sop;
   sop.ClangHeaderOutputPath = clangHeaderOutputPath;
@@ -520,6 +673,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.SerializedDiagnosticsPath = serializedDiagnosticsPath;
   sop.FixItsOutputPath = fixItsOutputPath;
   sop.LoadedModuleTracePath = loadedModuleTracePath;
+  sop.FineModuleTracePath = FineModuleTracePath.str().str();
   sop.TBDPath = tbdPath;
   sop.ModuleInterfaceOutputPath = ModuleInterfaceOutputPath;
   sop.PrivateModuleInterfaceOutputPath = PrivateModuleInterfaceOutputPath;
@@ -532,6 +686,8 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.ModuleSemanticInfoOutputPath = ModuleSemanticInfoOutputPath;
   sop.YAMLOptRecordPath = YAMLOptRecordPath;
   sop.BitstreamOptRecordPath = bitstreamOptRecordPath;
+  sop.SILOutputPath = SILOutputPath;
+  sop.LLVMIROutputPath = LLVMIROutputPath;
   return sop;
 }
 
@@ -552,21 +708,45 @@ std::string
 SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
     options::ID emitOpt, std::string pathFromArguments, file_types::ID type,
     StringRef mainOutputIfUsable,
-    StringRef defaultSupplementaryOutputPathExcludingExtension) const {
+    StringRef defaultSupplementaryOutputPathExcludingExtension,
+    bool forceDefaultSupplementaryOutputPathExcludingExtension) const {
+
+  auto hasEmitOptArg = [&] () -> bool {
+    if (Args.hasArg(emitOpt))
+      return true;
+    if (emitOpt == options::OPT_save_optimization_record &&
+        Args.hasArg(options::OPT_save_optimization_record_EQ))
+      return true;
+    return false;
+  };
+
+  auto computeDefaultSupplementaryOutputPathExcludingExtension =
+    [&] () -> std::string {
+      llvm::SmallString<128> path(
+        defaultSupplementaryOutputPathExcludingExtension);
+
+      llvm::sys::path::replace_extension(path, file_types::getExtension(type));
+      return path.str().str();
+    };
+
+  if (forceDefaultSupplementaryOutputPathExcludingExtension) {
+    if (!hasEmitOptArg()) {
+      return std::string();
+    }
+    return computeDefaultSupplementaryOutputPathExcludingExtension();
+  }
 
   if (!pathFromArguments.empty())
     return pathFromArguments;
 
-  if (!Args.hasArg(emitOpt))
+  if (!hasEmitOptArg())
     return std::string();
 
   if (!mainOutputIfUsable.empty()) {
     return mainOutputIfUsable.str();
   }
 
-  llvm::SmallString<128> path(defaultSupplementaryOutputPathExcludingExtension);
-  llvm::sys::path::replace_extension(path, file_types::getExtension(type));
-  return path.str().str();
+  return computeDefaultSupplementaryOutputPathExcludingExtension();
 }
 
 void SupplementaryOutputPathsComputer::deriveModulePathParameters(
@@ -614,18 +794,18 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
 
 std::optional<std::vector<SupplementaryOutputPaths>>
 SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
-  if (Arg *A = Args.getLastArg(options::OPT_emit_objc_header_path,
-                               options::OPT_emit_module_path,
-                               options::OPT_emit_module_doc_path,
-                               options::OPT_emit_dependencies_path,
-                               options::OPT_emit_reference_dependencies_path,
-                               options::OPT_serialize_diagnostics_path,
-                               options::OPT_emit_loaded_module_trace_path,
-                               options::OPT_emit_module_interface_path,
-                               options::OPT_emit_private_module_interface_path,
-                               options::OPT_emit_package_module_interface_path,
-                               options::OPT_emit_module_source_info_path,
-                               options::OPT_emit_tbd_path)) {
+  if (Arg *A = Args.getLastArg(
+          options::OPT_emit_objc_header_path, options::OPT_emit_module_path,
+          options::OPT_emit_module_doc_path,
+          options::OPT_emit_dependencies_path,
+          options::OPT_emit_reference_dependencies_path,
+          options::OPT_serialize_diagnostics_path,
+          options::OPT_emit_loaded_module_trace_path,
+          options::OPT_emit_module_interface_path,
+          options::OPT_emit_private_module_interface_path,
+          options::OPT_emit_package_module_interface_path,
+          options::OPT_emit_module_source_info_path, options::OPT_emit_tbd_path,
+          options::OPT_sil_output_path, options::OPT_ir_output_path)) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_have_supplementary_outputs,
                    A->getSpelling(), "-supplementary-output-file-map");

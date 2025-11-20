@@ -438,7 +438,13 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
     // Legacy behavior: Don't proxy to Swift Hashable or Equatable
     return NO; // We know the ids are different
   }
-
+  if (isObjCTaggedPointer(other)) {
+    // Swift class types cannot be tagged, and a Swift Equatable conformance
+    // cannot validly be called for an object of a different type, so this can
+    // only be incorrect if someone has an Equatable that's invalid in an
+    // extremely specific way (unsafeBitCasting `other` to an unrelated type)
+    return NO;
+  }
 
   // Get Swift type for self and other
   auto selfMetadata = _swift_getClassOfAllocated(self);
@@ -689,13 +695,9 @@ void *swift::swift_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
   if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return object;
-#endif
 
-  auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
-
-#if SWIFT_OBJC_INTEROP
   if (!isNonNative_unTagged_bridgeObject(object)) {
-    return swift_retain(static_cast<HeapObject *>(objectRef));
+    return swift_retain(static_cast<HeapObject *>(object));
   }
 
   // Put the call to objc_retain in a separate function, tail-called here. This
@@ -706,10 +708,9 @@ void *swift::swift_bridgeObjectRetain(void *object) {
   // bit set.
   SWIFT_MUSTTAIL return objcRetainAndReturn(object);
 #else
-  // No tail call here. When !SWIFT_OBJC_INTEROP, the value of objectRef may be
-  // different from that of object, e.g. on Linux ARM64.
-  swift_retain(static_cast<HeapObject *>(objectRef));
-  return object;
+  // swift_retain will mask off any extra bits in object, and return the
+  // original value, so we can tail call it here.
+  return swift_retain(static_cast<HeapObject *>(object));
 #endif
 }
 
@@ -1380,11 +1381,19 @@ id swift_dynamicCastObjCProtocolConditional(id object,
   return object;
 }
 
+#if OBJC_SUPPORTSLAZYREALIZATION_DEFINED
+static bool checkObjCSupportsLazyRealization() {
+  if (!SWIFT_RUNTIME_WEAK_CHECK(_objc_supportsLazyRealization))
+    return false;
+  return SWIFT_RUNTIME_WEAK_USE(_objc_supportsLazyRealization());
+}
+#endif
+
 // Check whether the current ObjC runtime supports lazy realization. If it does,
 // then we can avoid forcing realization of classes before we use them.
 static bool objcSupportsLazyRealization() {
 #if OBJC_SUPPORTSLAZYREALIZATION_DEFINED
-  return SWIFT_LAZY_CONSTANT(_objc_supportsLazyRealization());
+  return SWIFT_LAZY_CONSTANT(checkObjCSupportsLazyRealization());
 #else
   return false;
 #endif
@@ -1619,6 +1628,13 @@ bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
           .errorType = "escaping-closure-violation",
           .currentStackDescription = "Closure has escaped",
           .framesToSkip = 1,
+          .memoryAddress = nullptr,
+          .numExtraThreads = 0,
+          .threads = nullptr,
+          .numFixIts = 0,
+          .fixIts = nullptr,
+          .numNotes = 0,
+          .notes = nullptr,
       };
       _swift_reportToDebugger(RuntimeErrorFlagFatal, log, &details);
     }
@@ -1720,7 +1736,13 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   RuntimeErrorDetails details = {
     .version = RuntimeErrorDetails::currentVersion,
     .errorType = "implicit-objc-entrypoint",
+    .currentStackDescription = nullptr,
     .framesToSkip = 1,
+    .memoryAddress = nullptr,
+    .numExtraThreads = 0,
+    .threads = nullptr,
+    .numFixIts = 0,
+    .fixIts = nullptr,
     .numNotes = 1,
     .notes = &note
   };

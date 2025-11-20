@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -strict-concurrency=complete -disable-availability-checking -parse-as-library
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
@@ -21,12 +23,12 @@ class NotSendable {}
 @MainActor func testWarnings() {
   var x = 0
   _ = AsyncStream {
-    x += 1 // expected-warning {{mutation of captured var 'x' in concurrently-executing code; this is an error in the Swift 6 language mode}}
+    x += 1 // expected-warning {{mutation of captured var 'x' in concurrently-executing code}}
     return 0
   }
 
   _ = AsyncThrowingStream {
-    x += 1 // expected-warning {{mutation of captured var 'x' in concurrently-executing code; this is an error in the Swift 6 language mode}}
+    x += 1 // expected-warning {{mutation of captured var 'x' in concurrently-executing code}}
     return
   }
 }
@@ -433,6 +435,24 @@ class NotSendable {}
         scopedLifetime(expectation)
 
         expectTrue(expectation.fulfilled)
+      }
+
+      tests.test("continuation equality") {
+        let (_, continuation1) = AsyncStream<Int>.makeStream()
+        let (_, continuation2) = AsyncStream<Int>.makeStream()
+        expectTrue(continuation1 == continuation1)
+        expectTrue(continuation1 != continuation2)
+        expectTrue(continuation1.hashValue == continuation1.hashValue)
+        expectTrue(continuation1.hashValue != continuation2.hashValue)
+      }
+
+      tests.test("throwing continuation equality") {
+        let (_, continuation1) = AsyncThrowingStream<Int, Error>.makeStream()
+        let (_, continuation2) = AsyncThrowingStream<Int, Error>.makeStream()
+        expectTrue(continuation1 == continuation1)
+        expectTrue(continuation1 != continuation2)
+        expectTrue(continuation1.hashValue == continuation1.hashValue)
+        expectTrue(continuation1.hashValue != continuation2.hashValue)
       }
 
       // MARK: - Multiple consumers

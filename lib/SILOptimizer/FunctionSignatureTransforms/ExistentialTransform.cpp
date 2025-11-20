@@ -43,10 +43,8 @@ using llvm::SmallVectorImpl;
 /// Create a SILCloner for Existential Specilizer.
 namespace {
 class ExistentialSpecializerCloner
-    : public TypeSubstCloner<ExistentialSpecializerCloner,
-                             SILOptFunctionBuilder> {
-  using SuperTy =
-      TypeSubstCloner<ExistentialSpecializerCloner, SILOptFunctionBuilder>;
+    : public TypeSubstCloner<ExistentialSpecializerCloner> {
+  using SuperTy = TypeSubstCloner<ExistentialSpecializerCloner>;
   friend class SILInstructionVisitor<ExistentialSpecializerCloner>;
   friend class SILCloner<ExistentialSpecializerCloner>;
 
@@ -143,7 +141,7 @@ void ExistentialSpecializerCloner::cloneArguments(
       // Clone arguments that are not rewritten.
       auto Ty = params[ArgDesc.Index].getArgumentType(
           M, NewFTy, NewF.getTypeExpansionContext());
-      auto LoweredTy = NewF.getLoweredType(NewF.mapTypeIntoContext(Ty));
+      auto LoweredTy = NewF.getLoweredType(NewF.mapTypeIntoEnvironment(Ty));
       auto MappedTy =
           LoweredTy.getCategoryType(ArgDesc.Arg->getType().getCategory());
       auto *NewArg =
@@ -155,7 +153,7 @@ void ExistentialSpecializerCloner::cloneArguments(
     // Create the generic argument.
     GenericTypeParamType *GenericParam = iter->second;
     SILType GenericSILType =
-        NewF.getLoweredType(NewF.mapTypeIntoContext(GenericParam));
+        NewF.getLoweredType(NewF.mapTypeIntoEnvironment(GenericParam));
     GenericSILType = GenericSILType.getCategoryType(
                                           ArgDesc.Arg->getType().getCategory());
     auto *NewArg = ClonedEntryBB->createFunctionArgument(
@@ -221,6 +219,10 @@ void ExistentialSpecializerCloner::cloneArguments(
             NewFBuilder.emitLoadValueOperation(InsertLoc, NewArg, qual);
       }
 
+      if (NewFBuilder.hasOwnership() &&
+          NewArg->getOwnershipKind() == OwnershipKind::Unowned) {
+        NewArgValue = NewFBuilder.emitCopyValueOperation(InsertLoc, NewArg);
+      }
       ///  Simple case: Create an init_existential.
       /// %5 = init_existential_ref %0 : $T : $T, $P
       SILValue InitRef = NewFBuilder.createInitExistentialRef(
@@ -228,6 +230,10 @@ void ExistentialSpecializerCloner::cloneArguments(
           NewArg->getType().getASTType(),
           NewArgValue, Conformances);
 
+      if (NewFBuilder.hasOwnership() &&
+          NewArg->getOwnershipKind() == OwnershipKind::Unowned) {
+        CleanupValues.push_back(InitRef);
+      }
       // If we don't have an object and we are in ossa, the store will consume
       // the InitRef.
       if (!NewArg->getType().isObject()) {
@@ -375,7 +381,7 @@ void ExistentialTransform::populateThunkBody() {
   SILModule &M = F->getModule();
 
   F->setThunk(IsSignatureOptimizedThunk);
-  F->setInlineStrategy(AlwaysInline);
+  F->setInlineStrategy(HeuristicAlwaysInline);
 
   /// Remove original body of F.
   for (auto It = F->begin(), End = F->end(); It != End;) {
@@ -427,7 +433,7 @@ void ExistentialTransform::populateThunkBody() {
       ExistentialTransformArgumentDescriptor &ETAD = it->second;
       auto OrigOperand = ThunkBody->getArgument(ArgDesc.Index);
       auto SwiftType = ArgDesc.Arg->getType().getASTType();
-      auto OpenedType = OpenedArchetypeType::getAny(SwiftType)
+      auto OpenedType = ExistentialArchetypeType::getAny(SwiftType)
               ->getCanonicalType();
       auto OpenedSILType = NewF->getLoweredType(OpenedType);
       SILValue archetypeValue;
@@ -437,7 +443,7 @@ void ExistentialTransform::populateThunkBody() {
       switch (ExistentialRepr) {
       case ExistentialRepresentation::Opaque: {
         archetypeValue = Builder.createOpenExistentialAddr(
-            Loc, OrigOperand, OpenedSILType, it->second.AccessType);
+            Loc, OrigOperand, OpenedSILType.getAddressType(), it->second.AccessType);
         SILValue calleeArg = archetypeValue;
         if (OriginallyConsumed) {
           // open_existential_addr projects a borrowed address into the
@@ -527,7 +533,7 @@ void ExistentialTransform::populateThunkBody() {
           return type;
         }
       },
-      MakeAbstractConformanceForGenericType());
+      LookUpConformanceInModule());
 
   /// Perform the substitutions.
   auto SubstCalleeType = GenCalleeType->substGenericArgs(
@@ -631,7 +637,7 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
     SubstitutionMap Subs = SubstitutionMap::get(
       NewFGenericSig,
       [&](SubstitutableType *type) -> Type {
-        return NewFGenericEnv->mapTypeIntoContext(type);
+        return NewFGenericEnv->mapTypeIntoEnvironment(type);
       },
       LookUpConformanceInModule());
     ExistentialSpecializerCloner cloner(F, NewF, Subs, ArgumentDescList,

@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules -application-extension %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules -application-extension-library %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated -I %S/Inputs/custom-modules %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated -I %S/Inputs/custom-modules -application-extension %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated -I %S/Inputs/custom-modules -application-extension-library %s
 
 // REQUIRES: OS=macosx
 
@@ -29,7 +29,7 @@ func bezierPathElementToInteger(_ e: NSBezierPathElement) -> Int {
 }
 
 func integerToBezierPathElement(_ i: Int) -> NSBezierPathElement {
-  // expected-note@-1 2 {{add @available attribute to enclosing global function}}
+  // expected-note@-1 2 {{add '@available' attribute to enclosing global function}}
   switch i {
   case 1:
     return .moveTo

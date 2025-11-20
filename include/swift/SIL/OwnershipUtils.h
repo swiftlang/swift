@@ -57,14 +57,6 @@ bool canOpcodeForwardInnerGuaranteedValues(SILValue value);
 /// the operation may be trivially rewritten with Guaranteed ownership.
 bool canOpcodeForwardInnerGuaranteedValues(Operand *use);
 
-bool computeIsScoped(SILArgument *arg);
-
-bool computeIsReborrow(SILArgument *arg);
-
-// This is the use-def equivalent of use->getOperandOwnership() ==
-// OperandOwnership::GuaranteedForwarding.
-bool computeIsGuaranteedForwarding(SILValue value);
-
 /// Is the opcode that produces \p value capable of forwarding owned values?
 ///
 /// This may be true even if the current instance of the instruction is not a
@@ -370,9 +362,17 @@ struct BorrowingOperand {
   /// Returns false and early exits if the \p visitScopeEnd or \p
   /// visitUnknownUse returns false.
   ///
+  /// This only calls 'visitScopeEnd` when getScopeIntroducingUserResult() is
+  /// valid. Otherwise, it immediate calls visitUnknownUse on the current
+  /// operand.
+  ///
   /// For an instantaneous borrow, such as apply, this visits no uses. For
   /// begin_apply it visits the end_apply uses. For borrow introducers, it
   /// visits the end of the introduced borrow scope.
+  ///
+  /// For borrows that don't introduce a separate borrow scope, this calls
+  /// visitUnknownUse on the current operand. The client may need to check each
+  /// unknown operand to avoid infinite recursion.
   bool visitScopeEndingUses(function_ref<bool(Operand *)> visitScopeEnd,
                             function_ref<bool(Operand *)> visitUnknownUse
                             = [](Operand *){ return false; })
@@ -432,41 +432,32 @@ struct BorrowingOperand {
   /// cannot be reborrowed.
   ///
   /// If true, getBorrowIntroducingUserResult() can be called to acquire the
-  /// BorrowedValue that introduces a new borrow scope.
+  /// SILValue that introduces a new borrow scope.
   bool hasBorrowIntroducingUser() const {
-    // TODO: Can we derive this by running a borrow introducer check ourselves?
-    switch (kind) {
-    case BorrowingOperandKind::Invalid:
-      llvm_unreachable("Using invalid case?!");
-    case BorrowingOperandKind::BeginBorrow:
-    case BorrowingOperandKind::BorrowedFrom:
-    case BorrowingOperandKind::Branch:
-      return true;
-    case BorrowingOperandKind::StoreBorrow:
-    case BorrowingOperandKind::BeginApply:
-    case BorrowingOperandKind::Apply:
-    case BorrowingOperandKind::TryApply:
-    case BorrowingOperandKind::Yield:
-    case BorrowingOperandKind::PartialApplyStack:
-    case BorrowingOperandKind::MarkDependenceNonEscaping:
-    case BorrowingOperandKind::BeginAsyncLet:
-      return false;
-    }
-    llvm_unreachable("Covered switch isn't covered?!");
+    return getBorrowIntroducingUserResult() != SILValue();
   }
 
-  /// If this operand's user has a borrowed value result return a valid
-  /// BorrowedValue instance.
-  BorrowedValue getBorrowIntroducingUserResult() const;
+  /// If this operand's user has a single result that introduces the borrow
+  /// scope, return the result value. If the result is scoped (begin_borrow)
+  /// then it can be used to initialize a BorrowedValue. Some results, like
+  /// guaranteed forwarding phis, are not scoped.
+  SILValue getBorrowIntroducingUserResult() const;
 
-  /// Return the borrowing operand's value.
-  SILValue getScopeIntroducingUserResult();
-
-  /// Compute the implicit uses that this borrowing operand "injects" into the
-  /// set of its operands uses.
+  /// Return the borrowing operand's value if it is a scoped operation,
+  /// such as partial_apply, mark_dependence, store_borrow, begin_async_let.
   ///
-  /// E.x.: end_apply uses.
-  void getImplicitUses(SmallVectorImpl<Operand *> &foundUses) const;
+  /// This is meant to be equivalent to BeginBorrowValue in
+  /// SwiftCompilerSources.
+  SILValue getScopeIntroducingUserResult() const;
+
+  // Return the dependent value of borrowed-from or mark_dependence.
+  //
+  // This only returns a valid result when getScopeIntroducingUserResult()
+  // returns an invalid result. Ideally, we would convert BorrowingOperand into
+  // an enum to partition the kinds of borrows.
+  //
+  // This may be a guaranteed, trivial, or owned non-escapable value.
+  SILValue getDependentUserResult() const;
 
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
@@ -626,12 +617,33 @@ struct BorrowedValue {
   /// BorrowScopeIntroducingValue::isLocalScope().
   bool visitLocalScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
 
+  /// Returns false if the value has no scope-ending uses because all control flow
+  /// paths end in dead-end blocks.
+  bool hasLocalScopeEndingUses() const {
+    return !visitLocalScopeEndingUses([](Operand *) { return false; });
+  }
+
   bool isLocalScope() const { return kind.isLocalScope(); }
 
   /// Add this scope's live blocks into the PrunedLiveness result. This
   /// includes reborrow scopes that are reachable from this borrow scope but not
   /// necessarilly dominated by the borrow scope.
   void computeTransitiveLiveness(MultiDefPrunedLiveness &liveness) const;
+
+  /// Whether \p insts are completely within this borrow introducer's local
+  /// scope.
+  ///
+  /// Precondition: \p insts are dominated by the local borrow introducer.
+  ///
+  /// This ignores reborrows. The assumption is that, since \p insts are
+  /// dominated by this local scope, checking the extended borrow scope should
+  /// not be necessary to determine they are within the scope.
+  ///
+  /// \p deadEndBlocks is optional during transition. It will be completely
+  /// removed in an upcoming commit.
+  template <typename Instructions>
+  bool areWithinExtendedScope(Instructions insts,
+                              DeadEndBlocks *deadEndBlocks) const;
 
   /// Returns true if \p uses are completely within this borrow introducer's
   /// local scope.
@@ -825,6 +837,7 @@ public:
     RefTailAddr,
     OpenExistentialBox,
     ProjectBox,
+    MarkDependenceNonEscaping,
   };
 
 private:
@@ -853,6 +866,12 @@ public:
       return Kind::OpenExistentialBox;
     case SILInstructionKind::ProjectBoxInst:
       return Kind::ProjectBox;
+    case SILInstructionKind::MarkDependenceInst: {
+      auto *mdi = cast<MarkDependenceInst>(use->getUser());
+      return mdi->isNonEscaping() && mdi->getType().isAddress()
+                 ? Kind::MarkDependenceNonEscaping
+                 : Kind::Invalid;
+    }
     }
   }
 
@@ -871,6 +890,12 @@ public:
       return Kind::OpenExistentialBox;
     case ValueKind::ProjectBoxInst:
       return Kind::ProjectBox;
+    case ValueKind::MarkDependenceInst: {
+      auto *mdi = cast<MarkDependenceInst>(value->getDefiningInstruction());
+      return mdi->isNonEscaping() && mdi->getType().isAddress()
+                 ? Kind::MarkDependenceNonEscaping
+                 : Kind::Invalid;
+    }
     }
   }
 
@@ -882,9 +907,6 @@ public:
 /// object with guaranteed ownership. All transitive address uses of the
 /// interior pointer must be within the lifetime of the guaranteed lifetime. As
 /// such, these must be treated as implicit uses of the parent guaranteed value.
-///
-/// FIXME: This should probably also handle project_box once we support
-/// borrowing a box.
 struct InteriorPointerOperand {
   Operand *operand;
   InteriorPointerOperandKind kind;
@@ -933,6 +955,13 @@ struct InteriorPointerOperand {
           &cast<SingleValueInstruction>(resultValue)->getAllOperands()[0];
       return InteriorPointerOperand(op, kind);
     }
+    case InteriorPointerOperandKind::MarkDependenceNonEscaping: {
+      auto *mdi =
+          cast<MarkDependenceInst>(resultValue->getDefiningInstruction());
+      assert(mdi->isNonEscaping() && mdi->getType().isAddress());
+      return InteriorPointerOperand(
+          &mdi->getAllOperands()[MarkDependenceInst::Base], kind);
+    }
     }
     llvm_unreachable("covered switch");
   }
@@ -970,6 +999,8 @@ struct InteriorPointerOperand {
       return cast<OpenExistentialBoxInst>(operand->getUser());
     case InteriorPointerOperandKind::ProjectBox:
       return cast<ProjectBoxInst>(operand->getUser());
+    case InteriorPointerOperandKind::MarkDependenceNonEscaping:
+      return cast<MarkDependenceInst>(operand->getUser());
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }
@@ -1029,7 +1060,9 @@ struct AddressOwnership {
 
   AddressOwnership(AccessBase base) : base(base) {}
 
-  operator bool() const { return bool(base); }
+  operator bool() const {
+    return bool(base) && base.getKind() != AccessRepresentation::Unidentified;
+  }
 
   bool operator==(const AddressOwnership &other) const {
     return base.hasIdenticalAccessInfo(other.base);
@@ -1403,6 +1436,47 @@ bool isNestedLexicalBeginBorrow(BeginBorrowInst *bbi);
 /// - escaping
 /// then the move_value is redundant.
 bool isRedundantMoveValue(MoveValueInst *mvi);
+
+/// Sets the reborrow flags for all transitively incoming phi-arguments of
+/// `forEndBorrowValue`, which is the operand value of an `end_borrow`.
+void updateReborrowFlags(SILValue forEndBorrowValue);
+
+/// A location at which a value is used.  Abstracts over explicit uses
+/// (operands) and implicit uses (instructions).
+struct UsePoint {
+  using Value = llvm::PointerUnion<SILInstruction *, Operand *>;
+  Value value;
+
+  UsePoint(Operand *op) : value(op) {}
+  UsePoint(SILInstruction *inst) : value(inst) {}
+  UsePoint(Value value) : value(value) {}
+
+  SILInstruction *getInstruction() const {
+    if (auto *op = dyn_cast<Operand *>(value)) {
+      return op->getUser();
+    }
+    return cast<SILInstruction *>(value);
+  }
+
+  Operand *getOperandOrNull() const { return dyn_cast<Operand *>(value); }
+
+  Operand *getOperand() const { return cast<Operand *>(value); }
+};
+
+struct UsePointToInstruction {
+  SILInstruction *operator()(const UsePoint point) const {
+    return point.getInstruction();
+  }
+};
+
+using UsePointInstructionRange =
+    TransformRange<ArrayRef<UsePoint>, UsePointToInstruction>;
+
+struct PointToOperand {
+  Operand *operator()(const UsePoint point) const { return point.getOperand(); }
+};
+
+using PointOperandRange = TransformRange<ArrayRef<UsePoint>, PointToOperand>;
 
 } // namespace swift
 

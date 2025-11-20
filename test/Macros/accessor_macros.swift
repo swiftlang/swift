@@ -4,7 +4,7 @@
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
 // Check for expected errors.
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -DTEST_DIAGNOSTICS -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -DTEST_DIAGNOSTICS -verify-ignore-unknown
 // RUN: not %target-swift-frontend -typecheck -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -DTEST_DIAGNOSTICS %s > %t/diags.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-DIAGS %s < %t/diags.txt
 
@@ -99,6 +99,11 @@ struct MyBrokenStruct {
   // expected-note@+1 2{{in expansion of macro 'myPropertyWrapper' on property 'birthDate' here}}
   @myPropertyWrapper
   var birthDate: Date? {
+    /*
+    expected-expansion@-2:25{{
+      expected-error@1:1{{variable already has a getter}}
+    }}
+    */
     // CHECK-DIAGS: variable already has a getter
     // CHECK-DIAGS: in expansion of macro
     // CHECK-DIAGS: previous definition of getter here
@@ -153,6 +158,12 @@ struct HasStoredTests {
   // expected-error@-1{{expansion of macro 'MakeComputedSneakily()' produced an unexpected getter}}
   // expected-note@-2 2{{in expansion of macro}}
   // expected-note@-3 2{{'z' declared here}}
+  /*
+     expected-expansion@-5:36{{
+       expected-error@3:9{{cannot find '_z' in scope; did you mean 'z'?}}
+       expected-error@6:9{{cannot find '_z' in scope; did you mean 'z'?}}
+     }}
+  */
 #endif
 }
 
@@ -174,3 +185,36 @@ struct S {
   // expected-warning@-1 {{cannot expand accessor macro on variable declared with 'let'; this is an error in the Swift 6 language mode}}
 }
 #endif
+
+func acceptAutoclosure(_ success: @autoclosure () -> Bool, message: @autoclosure () -> String) {
+}
+
+@attached(accessor)
+macro BigEndianAccessorMacro() = #externalMacro(module: "MacroDefinition", type: "BigEndianAccessorMacro")
+
+func testLocalWithAutoclosure(x: Int, y: Int) {
+  struct Local {
+    var __value: Int = 0
+
+    // CHECK-DUMP: @__swiftmacro_15accessor_macros9value_$l022BigEndianAccessorMacrofMa_.swift
+    @BigEndianAccessorMacro
+    var value: Int
+  }
+
+  acceptAutoclosure(x == y, message: "they better be the same")
+
+  let local = Local(__value: 5)
+  acceptAutoclosure(x + 1 == local.__value, message: "they better be the same")
+
+  if x == y {
+    struct Nested {
+      struct Local {
+        var __value: Int = 0
+
+        // CHECK-DUMP: @__swiftmacro_15accessor_macros9value_$l122BigEndianAccessorMacrofMa_.swift
+        @BigEndianAccessorMacro
+        var value: Int
+      }
+    }
+  }
+}

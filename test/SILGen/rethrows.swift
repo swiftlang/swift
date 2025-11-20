@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-sil -module-name rethrows -Xllvm -sil-disable-pass=simplification -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -module-name rethrows -Xllvm -sil-disable-pass=simplification -verify %s | %FileCheck %s
 
 @discardableResult
 func rethrower(_ fn: () throws -> Int) rethrows -> Int {
@@ -64,6 +64,7 @@ func test1() throws {
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:  return [[RESULT]]
 // CHECK:     [[ERROR]]([[T0:%.*]] : $any Error):
+// CHECK-NEXT:  strong_release [[T0]]
 // CHECK-NEXT:  unreachable
 func test2() {
   rethrower(nonthrower)

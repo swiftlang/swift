@@ -1,5 +1,4 @@
 include(CMakeParseArguments)
-include(SwiftXcodeSupport)
 
 include(CheckCXXCompilerFlag)
 
@@ -39,13 +38,8 @@ macro(swift_common_standalone_build_config_llvm product)
   mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
 
   precondition(LLVM_TOOLS_BINARY_DIR)
-  escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${LLVM_TOOLS_BINARY_DIR}" LLVM_TOOLS_BINARY_DIR)
-
   precondition_translate_flag(LLVM_BUILD_LIBRARY_DIR LLVM_LIBRARY_DIR)
-  escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${LLVM_LIBRARY_DIR}" LLVM_LIBRARY_DIR)
-
   precondition(LLVM_LIBRARY_DIRS)
-  escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${LLVM_LIBRARY_DIRS}" LLVM_LIBRARY_DIRS)
 
   # This could be computed using ${CMAKE_CFG_INTDIR} if we want to link Swift
   # against a matching LLVM build configuration.  However, we usually want to be
@@ -53,10 +47,6 @@ macro(swift_common_standalone_build_config_llvm product)
   set(LLVM_RUNTIME_OUTPUT_INTDIR "${LLVM_BINARY_DIR}")
   set(LLVM_BINARY_OUTPUT_INTDIR "${LLVM_TOOLS_BINARY_DIR}")
   set(LLVM_LIBRARY_OUTPUT_INTDIR "${LLVM_LIBRARY_DIR}")
-
-  if(XCODE)
-    fix_imported_targets_for_xcode("${LLVM_EXPORTED_TARGETS}")
-  endif()
 
   if(NOT CMAKE_CROSSCOMPILING)
     set(${product}_NATIVE_LLVM_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
@@ -175,7 +165,6 @@ macro(swift_common_standalone_build_config_llvm product)
     "Version number that will be placed into the libclang library , in the form XX.YY")
 
   foreach(INCLUDE_DIR ${LLVM_INCLUDE_DIRS})
-    escape_path_for_xcode("${LLVM_BUILD_TYPE}" "${INCLUDE_DIR}" INCLUDE_DIR)
     include_directories(${INCLUDE_DIR})
   endforeach ()
 
@@ -184,9 +173,6 @@ macro(swift_common_standalone_build_config_llvm product)
   link_directories("${LLVM_LIBRARY_DIR}")
 
   set(LIT_ARGS_DEFAULT "-sv")
-  if(XCODE)
-    set(LIT_ARGS_DEFAULT "${LIT_ARGS_DEFAULT} --no-progress-bar")
-  endif()
   set(LLVM_LIT_ARGS "${LIT_ARGS_DEFAULT}" CACHE STRING "Default options for lit")
 
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
@@ -207,10 +193,6 @@ macro(swift_common_standalone_build_config_clang product)
 
   if (NOT CMAKE_CROSSCOMPILING AND NOT SWIFT_PREBUILT_CLANG)
     set(${product}_NATIVE_CLANG_TOOLS_PATH "${LLVM_TOOLS_BINARY_DIR}")
-  endif()
-
-  if(XCODE)
-    fix_imported_targets_for_xcode("${CLANG_EXPORTED_TARGETS}")
   endif()
 
   include_directories(${CLANG_INCLUDE_DIRS})
@@ -276,7 +258,7 @@ macro(swift_common_unified_build_config product)
   set(LLVM_CMAKE_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
   set(CLANG_INCLUDE_DIRS
     "${LLVM_EXTERNAL_CLANG_SOURCE_DIR}/include"
-    "${CMAKE_BINARY_DIR}/tools/clang/include")
+    "${LLVM_BINARY_DIR}/tools/clang/include")
 
   include_directories(${CLANG_INCLUDE_DIRS})
 
@@ -295,7 +277,9 @@ macro(swift_common_cxx_warnings)
 
     if(MSVC)
       check_cxx_compiler_flag("/we4062" CXX_SUPPORTS_WE4062)
-      add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/we4062>)
+      if(CXX_SUPPORTS_WE4062)
+        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/we4062>)
+      endif()
     endif()
   endif()
 
@@ -325,9 +309,15 @@ macro(swift_common_cxx_warnings)
   # dynamic libraries with this flag.
   check_cxx_compiler_flag("-fapplication-extension" CXX_SUPPORTS_FAPPLICATION_EXTENSION)
 
-  # Disable C4068: unknown pragma. This means that MSVC doesn't report hundreds of warnings across
-  # the repository for IDE features such as #pragma mark "Title".
+  # Disable C4067: expected tokens following preprocessor directive - expected a
+  # newline.
+  #
+  # Disable C4068: unknown pragma.
+  #
+  # This means that MSVC doesn't report hundreds of warnings across the
+  # repository for IDE features such as #pragma mark "Title".
   if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/wd4067>)
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/wd4068>)
 
     check_cxx_compiler_flag("/permissive-" CXX_SUPPORTS_PERMISSIVE_FLAG)
@@ -369,3 +359,35 @@ function(swift_common_llvm_config target)
     llvm_config("${target}" ${ARGN})
   endif()
 endfunction()
+
+# Set sanitizer options to all Swift compiler flags. Similar options are added to C/CXX compiler in 'HandleLLVMOptions'
+macro(swift_common_sanitizer_config)
+  if(LLVM_USE_SANITIZER)
+    if(LLVM_USE_SANITIZER STREQUAL "Address")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=address -Xclang-linker -fsanitize=address")
+    elseif(LLVM_USE_SANITIZER STREQUAL "HWAddress")
+      # Not supported?
+    elseif(LLVM_USE_SANITIZER MATCHES "Memory(WithOrigins)?")
+      # Not supported
+      if(LLVM_USE_SANITIZER STREQUAL "MemoryWithOrigins")
+        # Not supported
+      endif()
+    elseif(LLVM_USE_SANITIZER STREQUAL "Undefined")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=undefined -Xclang-linker -fsanitize=undefined")
+    elseif(LLVM_USE_SANITIZER STREQUAL "Thread")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=thread -Xclang-linker -fsanitize=thread")
+    elseif(LLVM_USE_SANITIZER STREQUAL "DataFlow")
+      # Not supported
+    elseif(LLVM_USE_SANITIZER STREQUAL "Address;Undefined" OR
+           LLVM_USE_SANITIZER STREQUAL "Undefined;Address")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=address -sanitize=undefined -Xclang-linker -fsanitize=address -Xclang-linker -fsanitize=undefined")
+    elseif(LLVM_USE_SANITIZER STREQUAL "Leaks")
+      # Not supported
+    else()
+      message(SEND_ERROR "unsupported value for LLVM_USE_SANITIZER: ${LLVM_USE_SANITIZER}")
+    endif()
+
+    set(CMAKE_Swift_FLAGS "${CMAKE_Swift_FLAGS} ${_Swift_SANITIZER_FLAGS}")
+
+  endif()
+endmacro()

@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_ASTMANGLER_H
 #define SWIFT_AST_ASTMANGLER_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
 #include "swift/AST/SILThunkKind.h"
@@ -44,6 +45,7 @@ enum class DestructorKind {
 /// The mangler for AST declarations.
 class ASTMangler : public Mangler {
 protected:
+  const ASTContext &Context;
   ModuleDecl *Mod = nullptr;
 
   /// Optimize out protocol names if a type only conforms to one protocol.
@@ -103,6 +105,12 @@ protected:
   /// because lldb wants to find declarations in the modules they're currently
   /// defined in.
   bool RespectOriginallyDefinedIn = true;
+
+  /// Whether to always mangle using the declaration's API, ignoring e.g
+  /// attached `@abi` attributes. This is necessary for USR mangling since for
+  /// semantic functionality we're only concerned about the API entity, and need
+  /// to be able to do name lookups to find the original decl based on the USR.
+  bool UseAPIMangling = false;
 
 public:
   class SymbolicReferent {
@@ -185,13 +193,27 @@ public:
     HasSymbolQuery,
   };
 
-  /// lldb overrides the defaulted argument to 'true'.
-  ASTMangler(bool DWARFMangling = false) {
+  /// lldb overrides \p DWARFMangling to 'true'.
+  ASTMangler(const ASTContext &Ctx, bool DWARFMangling = false,
+             bool UseAPIMangling = false)
+      : Context(Ctx) {
     if (DWARFMangling) {
-      DWARFMangling = true;
+      this->DWARFMangling = true;
       RespectOriginallyDefinedIn = false;
     }
+    this->UseAPIMangling = UseAPIMangling;
+    Flavor = Ctx.LangOpts.hasFeature(Feature::Embedded)
+                 ? ManglingFlavor::Embedded
+                 : ManglingFlavor::Default;
   }
+
+  /// Create an ASTMangler suitable for mangling a USR for use in semantic
+  /// functionality.
+  static ASTMangler forUSR(const ASTContext &Ctx) {
+    return ASTMangler(Ctx, /*DWARFMangling*/ true, /*UseAPIMangling*/ true);
+  }
+
+  const ASTContext &getASTContext() { return Context; }
 
   void addTypeSubstitution(Type type, GenericSignature sig) {
     type = dropProtocolsFromAssociatedTypes(type, sig);
@@ -202,6 +224,14 @@ public:
     return tryMangleSubstitution(type.getPointer());
   }
 
+protected:
+  using Mangler::addSubstitution;
+  void addSubstitution(const Decl *decl);
+
+  using Mangler::tryMangleSubstitution;
+  bool tryMangleSubstitution(const Decl *decl);
+
+public:
   std::string mangleClosureEntity(const AbstractClosureExpr *closure,
                                   SymbolKind SKind);
 
@@ -231,6 +261,8 @@ public:
   std::string mangleInitializerEntity(const VarDecl *var, SymbolKind SKind);
   std::string mangleBackingInitializerEntity(const VarDecl *var,
                                              SymbolKind SKind = SymbolKind::Default);
+  std::string manglePropertyWrappedFieldInitAccessorEntity(
+      const VarDecl *var, SymbolKind SKind = SymbolKind::Default);
   std::string mangleInitFromProjectedValueEntity(const VarDecl *var,
                                                  SymbolKind SKind = SymbolKind::Default);
 
@@ -331,16 +363,20 @@ public:
                                      AutoDiffLinearMapKind linearMapKind,
                                      const AutoDiffConfig &config);
 
-  std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
-                                             GenericSignature signature,
-                                             CanType baseType,
-                                             SubstitutionMap subs,
-                                             ResilienceExpansion expansion);
+  std::string mangleKeyPathGetterThunkHelper(
+      const AbstractStorageDecl *property, GenericSignature signature,
+      CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion);
   std::string mangleKeyPathSetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature signature,
                                              CanType baseType,
                                              SubstitutionMap subs,
                                              ResilienceExpansion expansion);
+  std::string mangleKeyPathUnappliedMethodThunkHelper(
+      const AbstractFunctionDecl *method, GenericSignature signature,
+      CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion);
+  std::string mangleKeyPathAppliedMethodThunkHelper(
+      const AbstractFunctionDecl *method, GenericSignature signature,
+      CanType baseType, SubstitutionMap subs, ResilienceExpansion expansion);
   std::string mangleKeyPathEqualsHelper(ArrayRef<CanType> indices,
                                         GenericSignature signature,
                                         ResilienceExpansion expansion);
@@ -371,9 +407,8 @@ public:
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
   void appendAnyDecl(const ValueDecl *Decl);
-  std::string mangleAnyDecl(const ValueDecl *Decl, bool prefix,
-                            bool respectOriginallyDefinedIn = false);
-  std::string mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix);
+  std::string mangleAnyDecl(const ValueDecl *decl, bool addPrefix);
+  std::string mangleDeclWithPrefix(const ValueDecl *decl, StringRef prefix);
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         const AbstractStorageDecl *decl,
@@ -393,8 +428,18 @@ public:
   std::string mangleMacroExpansion(const FreestandingMacroExpansion *expansion);
   std::string mangleAttachedMacroExpansion(
       const Decl *decl, CustomAttr *attr, MacroRole role);
+  std::string mangleAttachedMacroExpansion(
+      ClosureExpr *attachedTo, CustomAttr *attr, MacroDecl *macro);
 
-  void appendMacroExpansionContext(SourceLoc loc, DeclContext *origDC);
+  void appendMacroExpansion(const FreestandingMacroExpansion *expansion);
+  void appendMacroExpansionContext(SourceLoc loc, DeclContext *origDC,
+                                   Identifier macroName,
+                                   unsigned discriminator);
+
+  void appendMacroExpansion(ClosureExpr *attachedTo,
+                            CustomAttr *attr,
+                            MacroDecl *macro);
+
   void appendMacroExpansionOperator(
       StringRef macroName, MacroRole role, unsigned discriminator);
 
@@ -424,7 +469,8 @@ protected:
                   const ValueDecl *forDecl = nullptr);
   
   void appendDeclName(
-      const ValueDecl *decl, DeclBaseName name = DeclBaseName());
+      const ValueDecl *decl, DeclBaseName name = DeclBaseName(),
+      bool skipLocalDiscriminator = false);
 
   GenericTypeParamType *appendAssocType(DependentMemberType *DepTy,
                                         GenericSignature sig,
@@ -692,6 +738,7 @@ protected:
 
   void appendInitializerEntity(const VarDecl *var);
   void appendBackingInitializerEntity(const VarDecl *var);
+  void appendPropertyWrappedFieldInitAccessorEntity(const VarDecl *var);
   void appendInitFromProjectedValueEntity(const VarDecl *var);
 
   CanType getDeclTypeForMangling(const ValueDecl *decl,
@@ -758,6 +805,28 @@ protected:
                                     const ValueDecl *forDecl);
 
   void appendLifetimeDependence(LifetimeDependenceInfo info);
+
+  void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
+                                     ParameterizedProtocolType *PPT) const;
+
+  /// Extracts a list of inverse requirements from a PCT serving as the
+  /// constraint type of an existential.
+  void extractExistentialInverseRequirements(
+      SmallVectorImpl<InverseRequirement> &inverses,
+      ProtocolCompositionType *PCT) const;
+
+  template <typename DeclType>
+  DeclType *getABIDecl(DeclType *D) const {
+    if (!D || UseAPIMangling)
+      return nullptr;
+
+    auto abiRole = ABIRoleInfo(D);
+    if (!abiRole.providesABI())
+      return abiRole.getCounterpart();
+    return nullptr;
+  }
+
+  std::optional<SymbolicReferent> getABIDecl(SymbolicReferent ref) const;
 };
 
 } // end namespace Mangle

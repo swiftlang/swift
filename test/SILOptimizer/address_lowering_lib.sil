@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -address-lowering -emit-sorted-sil -enable-sil-opaque-values -sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -address-lowering -emit-sorted-sil -enable-sil-opaque-values -sil-verify-all %s | %FileCheck %s
 //
 import Builtin
 import Swift

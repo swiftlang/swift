@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -module-name test
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -module-name test
 
 struct X {
   typealias MyInt = Int
@@ -66,9 +66,6 @@ do {
   let _: CheckTypes<Dictionary<Int, S>.Element, [Int : S].Element>.Match
 
   // Invalid examples.
-
-  let _: Int!.Wrapped // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}
-  let _: (Int!).Wrapped // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}
 
   let _: Any.Undef // expected-error {{'Undef' is not a member type of type 'Any'}}
   let _: Int.Type.Undef // expected-error {{'Undef' is not a member type of type 'Swift.Int.Type'}}

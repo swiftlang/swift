@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -g %s | %FileCheck %s
-// RUN: %target-swift-frontend -DADDRESS_ONLY -emit-sil -g %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -g %s | %FileCheck %s
+// RUN: %target-swift-frontend -DADDRESS_ONLY -Xllvm -sil-print-types -emit-sil -g %s | %FileCheck %s
 
 struct Foo: ~Copyable {
 #if ADDRESS_ONLY

@@ -11,4 +11,8 @@ ClosureTestSuite.test("ConvertToFunctionPointer") {
   cfunc2({N in})
 }
 
+ClosureTestSuite.test("Pass FRT to function pointer") {
+  cppGo({N in })
+}
+
 runAllTests()

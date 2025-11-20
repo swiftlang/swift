@@ -62,7 +62,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint8_t _swift_stdlib_getGraphemeBreakProperty(__swift_uint32_t scalar);
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_bool _swift_stdlib_isLinkingConsonant(__swift_uint32_t scalar);
+__swift_bool _swift_stdlib_isInCB_Consonant(__swift_uint32_t scalar);
 
 //===----------------------------------------------------------------------===//
 // Word Breaking

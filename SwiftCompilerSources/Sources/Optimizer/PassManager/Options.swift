@@ -20,6 +20,10 @@ struct Options {
     _bridged.enableStackProtection()
   }
 
+  var useAggressiveReg2MemForCodeSize : Bool {
+    _bridged.useAggressiveReg2MemForCodeSize()
+  }
+
   var enableMoveInoutStackProtection: Bool {
     _bridged.enableMoveInoutStackProtection()
   }
@@ -28,8 +32,24 @@ struct Options {
     _bridged.enableSimplificationFor(inst.bridged)
   }
 
+  func enableAddressDependencies() -> Bool {
+    _bridged.enableAddressDependencies()
+  }
+
+  var noAllocations: Bool {
+    _bridged.noAllocations()
+  }
+
   var enableEmbeddedSwift: Bool {
-    _bridged.hasFeature(.Embedded)
+    hasFeature(.Embedded)
+  }
+
+  var enableEmbeddedSwiftExistentials: Bool {
+    hasFeature(.EmbeddedExistentials)
+  }
+
+  var enableMergeableTraps: Bool {
+    _bridged.enableMergeableTraps()
   }
 
   func hasFeature(_ feature: BridgedFeature) -> Bool {

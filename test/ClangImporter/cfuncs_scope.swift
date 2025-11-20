@@ -8,10 +8,7 @@ func testLocalVsFileScope() {
 
   theFunctionInQuestion()
   // CHECK: :[[@LINE-1]]:25: error: missing argument
-  // CHECK: LocalVsFileScope.theFunctionInQuestion:1:{{[0-9]+}}: note:
-  // This is not a wonderful test because it's relying on the diagnostic
-  // engine's synthesis of fake declarations to figure out what module the
-  // importer assigned the function to. But, well, that's what we get.
+  // CHECK: LocalVsFileScope.h:{{[0-9]+}}:{{[0-9]+}}: note:
 
   aFunctionInBase() // just make sure it's imported
   // CHECK-NOT: :[[@LINE-1]]:{{[0-9]+}}:

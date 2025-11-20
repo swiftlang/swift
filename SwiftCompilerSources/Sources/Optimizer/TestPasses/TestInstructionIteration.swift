@@ -62,6 +62,14 @@ private func handle(instruction: Instruction, _ context: FunctionPassContext) {
         deleteAllInstructions(ofType: BranchInst.self, in: instruction.parentBlock, context)
       case "split_block":
         _ = context.splitBlock(before: instruction)
+      case "print_uses":
+        for use in sl.uses {
+          print("use: \(use)")
+        }
+      case "delete_first_user":
+        deleteUser(of: sl, at: 0, context)
+      case "delete_second_user":
+        deleteUser(of: sl, at: 1, context)
       default:
         break
     }
@@ -74,4 +82,14 @@ private func deleteAllInstructions<InstType: Instruction>(ofType: InstType.Type,
       context.erase(instruction: inst)
     }
   }
+}
+
+private func deleteUser(of value: Value, at deleteIndex: Int, _ context: FunctionPassContext) {
+  for (idx, use) in value.uses.enumerated() {
+    if idx == deleteIndex {
+      context.erase(instruction: use.instruction)
+    } else {
+      print("use: \(use)")
+    }
+  }  
 }

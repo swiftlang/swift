@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name implicitly_unwrapped_optional -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name implicitly_unwrapped_optional -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 
 func foo(f f: (() -> ())!) {
   var f: (() -> ())! = f

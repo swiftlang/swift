@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -target %target-swift-5.1-abi-triple | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -target %target-swift-5.1-abi-triple | %FileCheck %s
 
 // REQUIRES: concurrency
 
@@ -73,7 +73,7 @@ actor DeferInsideInitActor {
   init(foo: ()) async throws {
     // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation20DeferInsideInitActorC3fooACyt_tYaKcfc6$deferL_yyF : $@convention(thin) () -> () {
     defer {}
-    try self.init()
+    self.init()
   }
 }
 

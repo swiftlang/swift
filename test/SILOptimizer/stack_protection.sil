@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -wmo -stack-protection -enable-sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=MODULE
-// RUN: %target-sil-opt -function-stack-protection -enable-sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=FUNCTION
-// RUN: %target-sil-opt -wmo -stack-protection -enable-move-inout-stack-protector -enable-sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=MOVE
+// RUN: %target-sil-opt -sil-print-types -wmo -stack-protection -enable-sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=MODULE
+// RUN: %target-sil-opt -sil-print-types -function-stack-protection -enable-sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=FUNCTION
+// RUN: %target-sil-opt -sil-print-types -wmo -stack-protection -enable-move-inout-stack-protector -enable-sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=MOVE
 
 // REQUIRES: swift_in_compiler
 

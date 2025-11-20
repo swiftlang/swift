@@ -14,7 +14,7 @@ import SIL
 
 /// Dumps the results of escape analysis.
 ///
-/// Dumps the EscapeInfo query results for all `alloc_stack` instructions in a function.
+/// Dumps the EscapeInfo query results for all `alloc_ref` instructions in a function.
 ///
 /// This pass is used for testing EscapeInfo.
 let escapeInfoDumper = FunctionPass(name: "dump-escape-info") {
@@ -26,7 +26,7 @@ let escapeInfoDumper = FunctionPass(name: "dump-escape-info") {
     var result: Set<String> =  Set()
     
     mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
-      if operand.instruction is ReturnInst {
+      if operand.instruction is ReturnInstruction {
         result.insert("return[\(path.projectionPath)]")
         return .ignore
       }
@@ -94,7 +94,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info") {
       if user == apply {
         return .abort
       }
-      if user is ReturnInst {
+      if user is ReturnInstruction {
         // Anything which is returned cannot escape to an instruction inside the function.
         return .ignore
       }
@@ -109,7 +109,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info") {
   for value in valuesToCheck {
     print("value:\(value)")
     for apply in applies {
-      if value.allContainedAddresss.isEscaping(using: Visitor(apply: apply), context) {
+      if value.allContainedAddresses.isEscaping(using: Visitor(apply: apply), context) {
         print("  ==> \(apply)")
       } else {
         print("  -   \(apply)")
@@ -127,8 +127,8 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info") {
         print(lhs)
         print(rhs)
 
-        let projLhs = lhs.allContainedAddresss
-        let projRhs = rhs.allContainedAddresss
+        let projLhs = lhs.allContainedAddresses
+        let projRhs = rhs.allContainedAddresses
         let mayAlias = projLhs.canAddressAlias(with: projRhs, context)
         if mayAlias != projRhs.canAddressAlias(with: projLhs, context) {
           fatalError("canAddressAlias(with:) must be symmetric")

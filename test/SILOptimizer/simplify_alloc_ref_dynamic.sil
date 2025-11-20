@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=alloc_ref_dynamic | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=alloc_ref_dynamic | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

@@ -30,6 +30,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/Support/Compiler.h"
 
@@ -264,6 +265,20 @@ bool ASTScopeImpl::lookupLocalsOrMembers(DeclConsumer) const {
   return false; // many kinds of scopes have none
 }
 
+bool AbstractFunctionDeclScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
+  // Special case: if we're within a function inside a type context, but the
+  // parent context is within a Clang module unit, we need to make sure to
+  // look for members in it.
+  auto dc = decl->getDeclContext();
+  if (!dc->isTypeContext())
+    return false;
+
+  if (!isa<ClangModuleUnit>(dc->getModuleScopeContext()))
+    return false;
+
+  return consumer.lookInMembers(cast<GenericContext>(dc->getAsDecl()));
+}
+
 bool GenericTypeOrExtensionScope::lookupLocalsOrMembers(
     ASTScopeImpl::DeclConsumer consumer) const {
   return portion->lookupMembersOf(this, consumer);
@@ -363,10 +378,10 @@ bool CaseLabelItemScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
 }
 
 bool CaseStmtBodyScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  for (auto *var : stmt->getCaseBodyVariablesOrEmptyArray())
+  for (auto *var : stmt->getCaseBodyVariables()) {
     if (consumer.consume({var}))
-        return true;
-
+      return true;
+  }
   return false;
 }
 
@@ -474,8 +489,13 @@ bool ASTScopeImpl::lookupLocalBindingsInPattern(const Pattern *p,
     return false;
   bool isDone = false;
   p->forEachVariable([&](VarDecl *var) {
-    if (!isDone)
-      isDone = consumer.consume({var});
+    if (!isDone) {
+      SmallVector<ValueDecl *, 2> vars = { var };
+      auto abiRole = ABIRoleInfo(var);
+      if (!abiRole.providesABI())
+        vars.push_back(abiRole.getCounterpart());
+      isDone = consumer.consume(vars);
+    }
   });
   return isDone;
 }
@@ -666,42 +686,41 @@ void ASTScopeImpl::lookupEnclosingMacroScope(
   } while ((scope = scope->getParent().getPtrOrNull()));
 }
 
-static std::pair<CatchNode, const BraceStmtScope *>
-getCatchNodeBody(const ASTScopeImpl *scope, CatchNode node) {
-  const auto &children = scope->getChildren();
-  if (children.empty())
-    return { CatchNode(), nullptr };
+ABIAttr *ASTScopeImpl::
+lookupEnclosingABIAttributeScope(SourceFile *sourceFile, SourceLoc loc) {
+  if (!sourceFile || loc.isInvalid())
+    return nullptr;
 
-  auto stmt = dyn_cast<BraceStmtScope>(children[0]);
-  if (!stmt || stmt->getStmt()->empty())
-    return { CatchNode(), nullptr };
-
-  return std::make_pair(node, stmt);
+  auto *fileScope = sourceFile->getScope().impl;
+  auto *scope = fileScope->findInnermostEnclosingScope(
+      sourceFile->getParentModule(), loc, nullptr);
+  do {
+    if (auto abiAttrScope = dyn_cast<ABIAttributeScope>(scope)) {
+      return abiAttrScope->attr;
+    }
+  } while ((scope = scope->getParent().getPtrOrNull()));
+  
+  return nullptr;
 }
 
 /// Retrieve the catch node associated with this scope, if any.
-static std::pair<CatchNode, const BraceStmtScope *>
-getCatchNode(const ASTScopeImpl *scope) {
+static CatchNode getCatchNode(const ASTScopeImpl *scope) {
   // Closures introduce a catch scope for errors initiated in their body.
   if (auto closureParams = dyn_cast<ClosureParametersScope>(scope)) {
-    if (auto closure = dyn_cast<ClosureExpr>(closureParams->closureExpr)) {
-      return getCatchNodeBody(scope, const_cast<ClosureExpr *>(closure));
-    }
+    if (auto closure = dyn_cast<ClosureExpr>(closureParams->closureExpr))
+      return closure;
   }
 
   // Functions introduce a catch scope for errors initiated in their body.
-  if (auto function = dyn_cast<FunctionBodyScope>(scope)) {
-    return getCatchNodeBody(
-        scope, const_cast<AbstractFunctionDecl *>(function->decl));
-  }
+  if (auto function = dyn_cast<FunctionBodyScope>(scope))
+    return function->decl;
 
   // Do..catch blocks introduce a catch scope for errors initiated in the `do`
   // body.
-  if (auto doCatch = dyn_cast<DoCatchStmtScope>(scope)) {
-    return getCatchNodeBody(scope, const_cast<DoCatchStmt *>(doCatch->stmt));
-  }
+  if (auto doCatch = dyn_cast<DoCatchStmtScope>(scope))
+    return doCatch->stmt;
 
-  return { CatchNode(), nullptr };
+  return CatchNode();
 }
 
 /// Check whether the given location precedes the start of the catch location
@@ -730,15 +749,22 @@ CatchNode ASTScopeImpl::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
   ASTScopeAssert(innermost->getWasExpanded(),
                  "If looking in a scope, it must have been expanded.");
 
-  // Look for a body scope that's the
+  // Look for a body scope that's the direct descendent of a catch node.
   const BraceStmtScope *innerBodyScope = nullptr;
   for (auto scope = innermost; scope; scope = scope->getParent().getPtrOrNull()) {
     // If we are at a catch node and in the body of the region from which that
     // node catches thrown errors, we have our result.
-    auto caught = getCatchNode(scope);
-    if (caught.first && caught.second == innerBodyScope &&
-        !locationIsPriorToStartOfCatchScope(loc, caught.first)) {
-      return caught.first;
+    if (innerBodyScope && innerBodyScope->getParent() == scope) {
+      // For a macro expansion, we may have an intermediate source file scope,
+      // we can look through it.
+      auto catchScope = scope;
+      if (auto *sfScope = dyn_cast<ASTSourceFileScope>(catchScope)) {
+        if (auto parent = sfScope->getParent())
+          catchScope = parent.get();
+      }
+      auto caught = getCatchNode(catchScope);
+      if (caught && !locationIsPriorToStartOfCatchScope(loc, caught))
+          return caught;
     }
 
     // If this is a try scope for a try! or try?, it catches the error.

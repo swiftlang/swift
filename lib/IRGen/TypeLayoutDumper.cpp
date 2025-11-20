@@ -67,7 +67,7 @@ public:
 } // end anonymous namespace
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(type->getASTContext());
   return Mangler.mangleTypeAsContextUSR(type);
 }
 

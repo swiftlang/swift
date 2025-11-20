@@ -14,5 +14,9 @@
 // CHECK:    }
 // CHECK-NEXT:    static var kNestedA: ns.nestedNS.EnumInNestedNS { get }
 // CHECK-NEXT:    static var kNestedB: ns.nestedNS.EnumInNestedNS { get }
+// CHECK-NEXT:         struct EnumInNS : Hashable, Equatable, RawRepresentable {
+// CHECK:    }
+// CHECK-NEXT:    static var kA: ns.nestedNS.EnumInNS { get }
+// CHECK-NEXT:    static var kB: ns.nestedNS.EnumInNS { get }
 // CHECK-NEXT:  }
 // CHECK-NEXT:}

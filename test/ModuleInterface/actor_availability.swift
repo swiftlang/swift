@@ -39,6 +39,20 @@ public actor UnavailableActor {
   // CHECK-NEXT: }
 }
 
+// CHECK:      @_hasMissingDesignatedInitializers @available(*, deprecated, message: "Will be unavailable Swift 6")
+// CHECK-NEXT: @available(swift, obsoleted: 6)
+// CHECK-NEXT: public actor DeprecatedAndObsoleteInSwift6Actor {
+@available(*, deprecated, message: "Will be unavailable Swift 6")
+@available(swift, obsoleted: 6)
+public actor DeprecatedAndObsoleteInSwift6Actor {
+  // CHECK:      @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+  // CHECK-NEXT: @available(*, deprecated, message: "Will be unavailable Swift 6")
+  // CHECK-NEXT: @available(swift, obsoleted: 6)
+  // CHECK-NEXT: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
+  // CHECK-NEXT:   get
+  // CHECK-NEXT: }
+}
+
 // CHECK: @available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
 // CHECK-NEXT: public enum Enum {
 @available(SwiftStdlib 5.2, *)

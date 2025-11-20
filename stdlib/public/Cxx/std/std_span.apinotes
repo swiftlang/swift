@@ -1,0 +1,14 @@
+Name: std_span
+Namespaces:
+- Name: std
+  Tags:
+  - Name: span
+    Methods:
+    - Name: data
+      SwiftName: __dataUnsafe()
+    - Name: size
+      SwiftSafety: safe
+    - Name: size_bytes
+      SwiftSafety: safe
+    - Name: empty
+      SwiftSafety: safe

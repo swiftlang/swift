@@ -416,7 +416,7 @@ static std::string getSpecializedName(SILFunction *f,
                                       SerializedKind_t serialized,
                                       IndicesSet &promotableIndices) {
   auto p = Demangle::SpecializationPass::CapturePromotion;
-  Mangle::FunctionSignatureSpecializationMangler mangler(p, serialized, f);
+  Mangle::FunctionSignatureSpecializationMangler mangler(f->getASTContext(), p, serialized, f);
   auto fnConv = f->getConventions();
 
   for (unsigned argIdx = 0, endIdx = fnConv.getNumSILArguments();
@@ -1071,14 +1071,9 @@ public:
   ALWAYS_NON_ESCAPING_INST(StrongRelease)
   ALWAYS_NON_ESCAPING_INST(DestroyValue)
   ALWAYS_NON_ESCAPING_INST(EndBorrow)
+  ALWAYS_NON_ESCAPING_INST(DeallocBox)
+  ALWAYS_NON_ESCAPING_INST(EndAccess)
 #undef ALWAYS_NON_ESCAPING_INST
-
-  bool visitDeallocBoxInst(DeallocBoxInst *dbi) {
-    markCurrentOpAsMutation();
-    return true;
-  }
-
-  bool visitEndAccessInst(EndAccessInst *) { return true; }
 
   bool visitApplyInst(ApplyInst *ai) {
     auto argIndex = currentOp.get()->getOperandNumber() - 1;
@@ -1222,7 +1217,7 @@ static bool findEscapeOrMutationUses(Operand *op,
       if (isa<PartialApplyInst>(parent))
         return false;
       state.accumulatedEscapes.push_back(
-          &userMDI->getOperandRef(MarkDependenceInst::Value));
+          &userMDI->getOperandRef(MarkDependenceInst::Dependent));
       return true;
     }
   }
@@ -1478,9 +1473,25 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
       funcBuilder, pai, fri, promotableIndices, f->getResilienceExpansion());
   worklist.push_back(clonedFn);
 
+  SILFunction *origFn = fri->getReferencedFunction();
+  for (const auto *w : mod.lookUpDifferentiabilityWitnessesForFunction(
+         origFn->getName())) {
+    // @derivative(of:) attribute could only be applied at global scope, therefore
+    // local functions might not have custom derivatives registered
+    assert(!w->getJVP() && !w->getVJP() && "does not expect custom derivatives here");
+    auto linkage = stripExternalFromLinkage(clonedFn->getLinkage());
+    SILDifferentiabilityWitness::createDefinition(
+      mod, linkage, clonedFn,
+      w->getKind(), w->getParameterIndices(), w->getResultIndices(),
+      w->getDerivativeGenericSignature(),
+      /*jvp*/ nullptr, /*vjp*/ nullptr,
+      /*isSerialized*/ hasPublicVisibility(clonedFn->getLinkage()),
+      w->getAttribute());
+  }
+
   // Mark the original partial apply function as deletable if it doesn't have
   // uses later.
-  fri->getReferencedFunction()->addSemanticsAttr(semantics::DELETE_IF_UNUSED);
+  origFn->addSemanticsAttr(semantics::DELETE_IF_UNUSED);
 
   // Initialize a SILBuilder and create a function_ref referencing the cloned
   // closure.

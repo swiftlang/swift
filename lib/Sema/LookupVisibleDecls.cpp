@@ -580,7 +580,7 @@ static void lookupVisibleCxxNamespaceMemberDecls(
             {});
 
         for (auto found : allResults) {
-          auto clangMember = found.get<clang::NamedDecl *>();
+          auto clangMember = cast<clang::NamedDecl *>(found);
           if (auto importedDecl =
                   ctx.getClangModuleLoader()->importDeclDirectly(
                       cast<clang::NamedDecl>(clangMember))) {
@@ -987,13 +987,13 @@ public:
                         /*skipProtocolExtensionCheck*/true)) {
           FoundConflicting = true;
 
-          if (!AvailableAttr::isUnavailable(VD)) {
+          if (!VD->isUnavailable()) {
             bool preferVD = (
                 // Prefer derived requirements over their witnesses.
                 Reason == DeclVisibilityKind::
                               MemberOfProtocolDerivedByCurrentNominal ||
                 // Prefer available one.
-                AvailableAttr::isUnavailable(OtherVD) ||
+                OtherVD->isUnavailable() ||
                 // Prefer more accessible one.
                 VD->getFormalAccess() > OtherVD->getFormalAccess());
             if (preferVD) {
@@ -1224,8 +1224,8 @@ private:
           // auxiliary variables (unless 'var' is a closure param).
           (void)var->getPropertyWrapperBackingPropertyType();
         }
-        var->visitAuxiliaryDecls(
-            [&](VarDecl *auxVar) { foundDecl(auxVar); });
+        var->visitAuxiliaryVars(/*forNameLookup*/ true,
+                                [&](VarDecl *auxVar) { foundDecl(auxVar); });
       }
       // NOTE: We don't call Decl::visitAuxiliaryDecls here since peer decls of
       // local decls should not show up in lookup results.
@@ -1316,7 +1316,7 @@ void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
   // doing anything else.
   if (BaseTy->hasTypeParameter()) {
     assert(Sig);
-    BaseTy = Sig.getGenericEnvironment()->mapTypeIntoContext(BaseTy);
+    BaseTy = Sig.getGenericEnvironment()->mapTypeIntoEnvironment(BaseTy);
   }
 
   assert(CurrDC);

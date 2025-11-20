@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -enable-experimental-feature BuiltinModule -enable-experimental-feature RawLayout -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-feature BuiltinModule -enable-experimental-feature RawLayout -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
+
+// REQUIRES: swift_feature_BuiltinModule
+// REQUIRES: swift_feature_RawLayout
 
 import Builtin
 
@@ -17,7 +20,7 @@ struct Lock: ~Copyable {
     // CHECK-NEXT: sil{{.*}} @[[INIT:\$.*4LockV.*fC]] :
     init() {
         // CHECK-NOT: destroy_addr
-        // CHECK: builtin "zeroInitializer"<Lock>
+        // CHECK: builtin "prepareInitialization"({{%.*}} : $*Lock)
         // CHECK-NOT: destroy_addr
         // CHECK: [[F:%.*]] = function_ref @init_lock
         // CHECK: apply [[F]](

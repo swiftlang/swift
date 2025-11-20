@@ -80,8 +80,11 @@ struct SourceCompleteResult {
 };
 
 SourceCompleteResult
-isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf, SourceFileKind SFKind);
-SourceCompleteResult isSourceInputComplete(StringRef Text, SourceFileKind SFKind);
+isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
+                      SourceFileKind SFKind, const LangOptions &LangOpts);
+SourceCompleteResult isSourceInputComplete(StringRef Text,
+                                           SourceFileKind SFKind,
+                                           const LangOptions &LangOpts);
 
 /// Visits all overridden declarations exhaustively from VD, including protocol
 /// conformances and clang declarations.
@@ -399,7 +402,8 @@ struct ResolvedRangeInfo {
                     /*Single entry*/true, /*UnhandledEffects*/{},
                     OrphanKind::None, {}, {}, {}) {}
   ResolvedRangeInfo(): ResolvedRangeInfo(ArrayRef<Token>()) {}
-  void print(llvm::raw_ostream &OS) const;
+  void print(llvm::raw_ostream &OS,
+             const PrintOptions &PO = PrintOptions()) const;
   ExitState exit() const { return ExitInfo.Exit; }
   Type getType() const { return ExitInfo.ReturnType; }
 

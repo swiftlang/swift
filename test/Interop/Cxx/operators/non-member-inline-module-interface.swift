@@ -6,6 +6,7 @@
 // CHECK-NEXT: func / (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK-NEXT: func % (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK-NEXT: func ^ (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
+// CHECK-NEXT: func ~ (lhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK-NEXT: func & (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK-NEXT: func | (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK-NEXT: func << (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
@@ -19,3 +20,7 @@
 
 // CHECK:      func && (lhs: LoadableBoolWrapper, rhs: LoadableBoolWrapper) -> LoadableBoolWrapper
 // CHECK-NEXT: func || (lhs: LoadableBoolWrapper, rhs: LoadableBoolWrapper) -> LoadableBoolWrapper
+
+// CHECK-NOT:  func + (lhs: RValueArithmetic
+
+// CHECK:      func + (lhs: LValueAndRValueArithmetic, rhs: LValueAndRValueArithmetic) -> LValueAndRValueArithmetic

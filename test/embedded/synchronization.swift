@@ -1,13 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature Embedded -disable-availability-checking -c -o %t/main.o
-// RUN: %target-clang %t/main.o -o %t/a.out -dead_strip
-// RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Embedded -disable-availability-checking -wmo) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: synchronization
+// REQUIRES: swift_feature_Embedded
 
 import Synchronization
 

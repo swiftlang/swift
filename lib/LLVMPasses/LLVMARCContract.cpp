@@ -403,6 +403,11 @@ void SwiftARCContract::getAnalysisUsage(llvm::AnalysisUsage &AU) const {
 llvm::PreservedAnalyses
 SwiftARCContractPass::run(llvm::Function &F,
                           llvm::FunctionAnalysisManager &AM) {
+  // Don't touch those functions that implement reference counting in the
+  // runtime.
+  if (!allowArcOptimizations(F.getName()))
+    return PreservedAnalyses::all();
+
   bool changed = SwiftARCContractImpl(F).run();
   if (!changed)
     return PreservedAnalyses::all();

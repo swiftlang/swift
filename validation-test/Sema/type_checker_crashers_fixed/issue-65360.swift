@@ -9,13 +9,13 @@ let _: () -> Void = {
 
 let _: () -> Void = {
   for case (0)? in [a] {}
-  // expected-error@-1 {{pattern cannot match values of type 'Any?'}}
+  // expected-error@-1 {{cannot convert sequence element type 'Any?' to expected type 'Int?'}}
   if case (0, 0) = a {}
 }
 
 let _: () -> Void = {
   for case (0)? in [a] {}
-  // expected-error@-1 {{pattern cannot match values of type 'Any?'}}
+  // expected-error@-1 {{cannot convert sequence element type 'Any?' to expected type 'Int?'}}
   for case (0, 0) in [a] {}
 }
 

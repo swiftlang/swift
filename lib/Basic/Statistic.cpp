@@ -33,14 +33,11 @@
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
-#ifdef HAVE_SYS_RESOURCE_H
+#if HAVE_GETRUSAGE && !defined(__HAIKU__)
 #include <sys/resource.h>
 #endif
 #ifdef HAVE_PROC_PID_RUSAGE
 #include <libproc.h>
-#endif
-#ifdef HAVE_MALLOC_MALLOC_H
-#include <malloc/malloc.h>
 #endif
 #if defined(_WIN32)
 #define NOMINMAX
@@ -383,7 +380,7 @@ void UnifiedStatsReporter::recordJobMaxRSS(long rss) {
 }
 
 int64_t UnifiedStatsReporter::getChildrenMaxResidentSetSize() {
-#if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
+#if HAVE_GETRUSAGE && !defined(__HAIKU__)
   struct rusage RU;
   ::getrusage(RUSAGE_CHILDREN, &RU);
   int64_t M = static_cast<int64_t>(RU.ru_maxrss);
@@ -536,25 +533,16 @@ FrontendStatsTracer::~FrontendStatsTracer()
 // associated fields in the provided AlwaysOnFrontendCounters.
 void updateProcessWideFrontendCounters(
     UnifiedStatsReporter::AlwaysOnFrontendCounters &C) {
-  if (auto instrExecuted = getInstructionsExecuted()) {
-    C.NumInstructionsExecuted = instrExecuted;
+#if defined(HAVE_PROC_PID_RUSAGE) && defined(RUSAGE_INFO_V4)
+  struct rusage_info_v4 ru;
+  if (proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ru) == 0) {
+    C.NumInstructionsExecuted = ru.ri_instructions;
+    C.MaxMallocUsage = ru.ri_lifetime_max_phys_footprint;
+    return;
   }
-
-#if defined(HAVE_MALLOC_ZONE_STATISTICS) && defined(HAVE_MALLOC_MALLOC_H)
-  // On Darwin we have a lifetime max that's maintained by malloc we can
-  // just directly query, even if we only make one query on shutdown.
-  malloc_statistics_t Stats;
-  // Query all zones.
-  malloc_zone_statistics(/*zone=*/NULL, &Stats);
-  C.MaxMallocUsage = (int64_t)Stats.max_size_in_use;
-#else
-  // If we don't have a malloc-tracked max-usage counter, we have to rely
-  // on taking the max over current-usage samples while running and hoping
-  // we get called often enough. This will happen when profiling/tracing,
-  // but not while doing single-query-on-shutdown collection.
-  C.MaxMallocUsage = std::max(C.MaxMallocUsage,
-                              (int64_t)llvm::sys::Process::GetMallocUsage());
 #endif
+
+  // FIXME: Do something useful when the above API is not available.
 }
 
 static inline void

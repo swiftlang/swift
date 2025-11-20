@@ -17,6 +17,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
@@ -35,7 +36,6 @@ class Traversal : public TypeVisitor<Traversal, bool>
   TypeWalker &Walker;
 
   bool visitErrorType(ErrorType *ty) { return false; }
-  bool visitUnresolvedType(UnresolvedType *ty) { return false; }
   bool visitPlaceholderType(PlaceholderType *ty) { return false; }
   bool visitBuiltinType(BuiltinType *ty) { return false; }
   bool visitIntegerType(IntegerType *ty) { return false; }
@@ -50,6 +50,11 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
 
   }
+
+  bool visitLocatableType(LocatableType *ty) {
+    return doIt(ty->getSinglyDesugaredType());
+  }
+
   bool visitSILTokenType(SILTokenType *ty) { return false; }
 
   bool visitPackType(PackType *ty) {
@@ -75,10 +80,6 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
   bool visitPackElementType(PackElementType *ty) {
     return doIt(ty->getPackType());
-  }
-
-  bool visitParenType(ParenType *ty) {
-    return doIt(ty->getUnderlyingType());
   }
 
   bool visitTupleType(TupleType *ty) {
@@ -186,6 +187,10 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return doIt(ty->getBaseType());
   }
 
+  bool visitInlineArrayType(InlineArrayType *ty) {
+    return doIt(ty->getCountType()) || doIt(ty->getElementType());
+  }
+
   bool visitDictionaryType(DictionaryType *ty) {
     return doIt(ty->getKeyType()) || doIt(ty->getValueType());
   }
@@ -257,7 +262,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
   }
 
-  bool visitOpenedArchetypeType(OpenedArchetypeType *opened) {
+  bool visitExistentialArchetypeType(ExistentialArchetypeType *opened) {
     auto *env = opened->getGenericEnvironment();
     for (auto arg : env->getOuterSubstitutions().getReplacementTypes()) {
       if (doIt(arg)) {
@@ -297,17 +302,16 @@ class Traversal : public TypeVisitor<Traversal, bool>
     }
     return false;
   }
-  
-  bool visitBuiltinFixedArrayType(BuiltinFixedArrayType *ty) {
-    if (ty->getSize() && doIt(ty->getSize()))  {
-      return true;
-    }
-    if (ty->getElementType() && doIt(ty->getElementType())) {
-      return true;
+
+  bool visitBuiltinGenericType(BuiltinGenericType *ty) {
+    for (auto replacement : ty->getSubstitutions().getReplacementTypes()) {
+      if (replacement && doIt(replacement)) {
+        return true;
+      }
     }
     return false;
   }
-
+  
 public:
   explicit Traversal(TypeWalker &walker) : Walker(walker) {}
 

@@ -338,11 +338,43 @@ public:
   }
 
   /// Return the applied argument index for the given operand.
+  ///
+  /// This corresponds to the index of the operand in the actual
+  /// SILFunctionType.
+  ///
+  /// As a result this does not include indirect parameters, but it does include
+  /// implicit parameters (e.x.: the implicit isolated(any) parameter) that are
+  /// in the SIL type but are not in the AST type. To ignore such implicit
+  /// parameters, use getASTAppliedArgIndex.
   unsigned getAppliedArgIndex(const Operand &oper) const {
     assert(oper.getUser() == Inst);
     assert(isArgumentOperand(oper));
 
     return oper.getOperandNumber() - getOperandIndexOfFirstArgument();
+  }
+
+  /// Returns the applied AST argument index for the given operand.
+  ///
+  /// This is guaranteed to return an index that can be used with AST function
+  /// types. This means it looks past the callee, indirect function types, as
+  /// well as any other implicit parameters like isolated(any).
+  ///
+  /// NOTE: If we add more implicit parameters to SILFunction types that do not
+  /// appear at the AST level, this code needs to be updated.
+  unsigned getASTAppliedArgIndex(const Operand &oper) const {
+    // We rely on the assertions in getAppliedArgIndex to allow for us to assume
+    // that we have an argument operand. We check later that we do not have an
+    // isolated(any) parameter.
+    unsigned appliedArgIndex = getAppliedArgIndex(oper);
+    if (auto *pai = dyn_cast<PartialApplyInst>(Inst)) {
+      if (pai->getFunctionType()->getIsolation() ==
+          SILFunctionTypeIsolation::forErased()) {
+        assert(appliedArgIndex != 0 &&
+               "isolation(any) does not correspond to an AST argument");
+        appliedArgIndex -= 1;
+      }
+    }
+    return appliedArgIndex;
   }
 
   /// Return the callee's function argument index corresponding to the first
@@ -530,6 +562,18 @@ public:
     llvm_unreachable("covered switch");
   }
 
+  bool hasGuaranteedResult() const {
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->hasGuaranteedResult();
+    case ApplySiteKind::BeginApplyInst:
+    case ApplySiteKind::TryApplyInst:
+    case ApplySiteKind::PartialApplyInst:
+      return false;
+    }
+    llvm_unreachable("covered switch");
+  }
+
   /// Returns true if \p op is an operand that passes an indirect
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const;
@@ -601,13 +645,30 @@ public:
     return getSubstCalleeConv().getParamInfoForSILArg(calleeArgIndex);
   }
 
+  /// Returns true if \p op is the callee operand of this apply site
+  /// and not an argument operand.
+  ///
+  /// If this instruction is not a full apply site, this always returns false.
+  bool isCalleeOperand(const Operand &op) const;
+
+  /// Returns true if this is an 'out' parameter.
   bool isSending(const Operand &oper) const {
-    if (isIndirectErrorResultOperand(oper))
+    if (isIndirectErrorResultOperand(oper) || oper.isTypeDependent() ||
+        isCalleeOperand(oper))
       return false;
     if (isIndirectResultOperand(oper))
       return getSubstCalleeType()->hasSendingResult();
     return getArgumentParameterInfo(oper).hasOption(SILParameterInfo::Sending);
   }
+
+  /// Returns true if this operand is an 'inout sending' parameter.
+  bool isInOutSending(const Operand &oper) const {
+    return isSending(oper) && getArgumentConvention(oper).isInoutConvention();
+  }
+
+  /// Return true if 'operand' is addressable after type substitution in the
+  /// caller's context.
+  bool isAddressable(const Operand &operand) const;
 
   static ApplySite getFromOpaqueValue(void *p) { return ApplySite(p); }
 
@@ -742,6 +803,25 @@ public:
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
+  // For a direct error result, as a result of an @error convention, if any.
+  SILValue getDirectErrorResult() const {
+    switch (getKind()) {
+    case FullApplySiteKind::ApplyInst:
+    case FullApplySiteKind::BeginApplyInst:
+      return SILValue();
+    case FullApplySiteKind::TryApplyInst: {
+      if (getNumIndirectSILErrorResults())
+        return SILValue(); // Not a direct @error convention.
+
+      auto *errBlock = cast<TryApplyInst>(getInstruction())->getErrorBB();
+      assert(errBlock->getNumArguments() == 1 &&
+             "Expected this try_apply to have a single direct error result");
+      return errBlock->getArgument(0);
+    }
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
   unsigned getNumIndirectSILResults() const {
     return getSubstCalleeConv().getNumIndirectSILResults();
   }
@@ -858,6 +938,21 @@ public:
            getNumIndirectSILErrorResults();
   }
 
+  std::optional<ActorIsolation> getActorIsolation() const {
+    if (auto isolation = getIsolationCrossing();
+        isolation && isolation->getCalleeIsolation())
+      return isolation->getCalleeIsolation();
+    auto *calleeFunction = getCalleeFunction();
+    if (!calleeFunction)
+      return {};
+    return calleeFunction->getActorIsolation();
+  }
+
+  bool isCallerIsolationInheriting() const {
+    auto isolation = getActorIsolation();
+    return isolation && isolation->isCallerIsolationInheriting();
+  }
+
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }
 
   static bool classof(const SILInstruction *inst) {
@@ -972,6 +1067,13 @@ inline bool ApplySite::isIndirectErrorResultOperand(const Operand &op) const {
   if (!fas)
     return false;
   return fas.isIndirectErrorResultOperand(op);
+}
+
+inline bool ApplySite::isCalleeOperand(const Operand &op) const {
+  auto fas = asFullApplySite();
+  if (!fas)
+    return false;
+  return fas.isCalleeOperand(op);
 }
 
 } // namespace swift

@@ -248,6 +248,17 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 // so changing this value is not sufficient.
 #define SWIFT_DEFAULT_LLVM_CC llvm::CallingConv::C
 
+// Define the calling convention for refcounting functions for targets where it
+// differs from the standard calling convention. Currently this is only used for
+// swift_retain, swift_release, and some internal helper functions that they
+// call.
+#if defined(__aarch64__) && !SWIFT_RUNTIME_EMBEDDED
+#define SWIFT_REFCOUNT_CC SWIFT_CC_PreserveMost
+#define SWIFT_REFCOUNT_CC_PRESERVEMOST 1
+#else
+#define SWIFT_REFCOUNT_CC
+#endif
+
 /// Should we use absolute function pointers instead of relative ones?
 /// WebAssembly target uses it by default.
 #ifndef SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER
@@ -272,6 +283,9 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_type_descriptor \
   __ptrauth(ptrauth_key_process_independent_data, 1, \
             SpecialPointerAuthDiscriminators::TypeDescriptor)
+#define __ptrauth_swift_protocol_conformance_descriptor \
+  __ptrauth(ptrauth_key_process_independent_data, 1, \
+            SpecialPointerAuthDiscriminators::ProtocolConformanceDescriptor)
 #define __ptrauth_swift_dynamic_replacement_key                                \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::DynamicReplacementKey)
@@ -324,6 +338,12 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_type_layout_string                                     \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::TypeLayoutString)
+#define __ptrauth_swift_deinit_work_function                                   \
+  __ptrauth(ptrauth_key_function_pointer, 1,                                   \
+            SpecialPointerAuthDiscriminators::DeinitWorkFunction)
+#define __ptrauth_swift_is_global_actor_function                               \
+  __ptrauth(ptrauth_key_function_pointer, 1,                                   \
+            SpecialPointerAuthDiscriminators::IsCurrentGlobalActorFunction)
 
 #if __has_attribute(ptrauth_struct)
 #define swift_ptrauth_struct(key, discriminator)                               \
@@ -359,11 +379,14 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_runtime_function_entry_strip(__fn) (__fn)
 #define __ptrauth_swift_heap_object_destructor
 #define __ptrauth_swift_type_descriptor
+#define __ptrauth_swift_protocol_conformance_descriptor
 #define __ptrauth_swift_nonunique_extended_existential_type_shape
 #define __ptrauth_swift_dynamic_replacement_key
 #define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer) (__fn)
 #define swift_ptrauth_sign_opaque_modify_resume_function(__fn, __buffer) (__fn)
 #define __ptrauth_swift_type_layout_string
+#define __ptrauth_swift_deinit_work_function
+#define __ptrauth_swift_is_global_actor_function
 #define swift_ptrauth_struct(key, discriminator)
 #define swift_ptrauth_struct_derived(from)
 #endif

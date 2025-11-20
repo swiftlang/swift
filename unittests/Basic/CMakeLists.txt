@@ -24,6 +24,7 @@ add_swift_unittest(SwiftBasicTests
   ImmutablePointerSetTest.cpp
   JSONSerialization.cpp
   OptionSetTest.cpp
+  Options.cpp
   OwnedStringTest.cpp
   MultiMapCacheTest.cpp
   PointerIntEnumTest.cpp
@@ -36,6 +37,7 @@ add_swift_unittest(SwiftBasicTests
   StringExtrasTest.cpp
   SuccessorMapTest.cpp
   TaggedUnionTest.cpp
+  TaskQueueTest.cpp
   ThreadSafeRefCntPointerTest.cpp
   TransformRangeTest.cpp
   TypeLookupError.cpp
@@ -48,8 +50,10 @@ add_dependencies(SwiftBasicTests "${gyb_dependency_targets}")
 target_link_libraries(SwiftBasicTests
   PRIVATE
   swiftBasic
+  swiftOption
   swiftThreading
   clangBasic
+  LLVMOption
   LLVMTestingSupport
   )
 

@@ -408,3 +408,30 @@ bb6:
   %17 = tuple ()
   return %17 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_load_borrow_with_reborrow :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'test_load_borrow_with_reborrow'
+sil [ossa] @test_load_borrow_with_reborrow : $@convention(thin) () -> () {
+bb0:
+  %owned = apply undef() : $@convention(thin) () -> (@owned Klass)
+  %stack = alloc_stack [lexical] $Klass
+  store %owned to [init] %stack : $*Klass
+  br bb1
+
+bb1:
+  %ld = load [take] %stack : $*Klass
+  destroy_value %ld
+  %owned_other = apply undef() : $@convention(thin) () -> (@owned Klass)
+  store %owned_other to [init] %stack : $*Klass
+  %lb = load_borrow %stack
+  br bb2(%lb)
+
+bb2(%reborrow : @reborrow $Klass):
+  end_borrow %reborrow : $Klass
+  destroy_addr %stack : $*Klass
+  dealloc_stack %stack : $*Klass
+  %retval = tuple ()
+  return %retval : $()
+}
+

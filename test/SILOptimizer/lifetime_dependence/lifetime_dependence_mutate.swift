@@ -3,18 +3,16 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes \
-// RUN:   -disable-experimental-parser-round-trip
-// FIXME: Remove '-disable-experimental-parser-round-trip' (rdar://137636751).
+// RUN:   -enable-experimental-feature Lifetimes
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Lifetimes
 
 struct MutableSpan : ~Escapable, ~Copyable {
   let base: UnsafeMutableRawPointer
   let count: Int
 
-  @lifetime(borrow p)
+  @_lifetime(borrow p)
   init(_ p: UnsafeMutableRawPointer, _ c: Int) {
     self.base = p
     self.count = c
@@ -36,7 +34,7 @@ struct MutableSpan : ~Escapable, ~Copyable {
     var base: UnsafeMutableRawPointer
     var count: Int
 
-    @lifetime(borrow base)
+    @_lifetime(borrow base)
     init(base: UnsafeMutableRawPointer, count: Int) {
       self.base = base
       self.count = count
@@ -51,7 +49,13 @@ struct MutableSpan : ~Escapable, ~Copyable {
     }
   }
 
-  var iterator: Iter { Iter(base: base, count: count) }
+  var iterator: Iter {
+    @_lifetime(copy self)
+    get {
+      let newIter = Iter(base: base, count: count)
+      return _overrideLifetime(newIter, copying: self)
+    }
+  }
 }
 
 extension Array where Element == Int {
@@ -59,7 +63,8 @@ extension Array where Element == Int {
   mutating func mutspan() -> /* dependsOn(scoped self) */ MutableSpan {
     /* not the real implementation */
     let p = self.withUnsafeMutableBufferPointer { $0.baseAddress! }
-    return MutableSpan(p, count)
+    let span = MutableSpan(p, count)
+    return _overrideLifetime(span, mutating: &self)
   }
 }
 
@@ -68,7 +73,7 @@ struct NC : ~Copyable {
   let c: Int
 
   // Requires a mutable borrow.
-  @lifetime(borrow self)
+  @_lifetime(&self)
   mutating func getMutableSpan() -> MutableSpan {
     MutableSpan(p, c)
   }

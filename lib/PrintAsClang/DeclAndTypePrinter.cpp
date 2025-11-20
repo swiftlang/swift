@@ -22,6 +22,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/ClangSwiftTypeCorrespondence.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -32,6 +33,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
@@ -40,12 +42,12 @@
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 
 #include "SwiftToClangInteropContext.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/SourceManager.h"
@@ -146,7 +148,7 @@ class DeclAndTypePrinter::Implementation
 public:
   explicit Implementation(raw_ostream &out, DeclAndTypePrinter &owner,
                           OutputLanguageMode outputLang)
-      : ClangSyntaxPrinter(out), owningPrinter(owner), outputLang(outputLang) {}
+      : ClangSyntaxPrinter(owner.M.getASTContext(), out), owningPrinter(owner), outputLang(outputLang) {}
 
   void print(const Decl *D) {
     PrettyStackTraceDecl trace("printing", D);
@@ -189,7 +191,7 @@ public:
   }
 
   bool isEmptyExtensionDecl(const ExtensionDecl *ED) {
-    auto members = ED->getMembers();
+    auto members = ED->getAllMembers();
     auto hasMembers = std::any_of(members.begin(), members.end(),
                                   [this](const Decl *D) -> bool {
       if (auto VD = dyn_cast<ValueDecl>(D))
@@ -243,23 +245,22 @@ private:
     if (TD->isImplicit() || TD->isSynthesized())
       return;
     os << "  using ";
-    ClangSyntaxPrinter(os).printBaseName(TD);
+    ClangSyntaxPrinter(getASTContext(), os).printBaseName(TD);
     os << "=";
-    ClangSyntaxPrinter(os).printNominalTypeReference(TD, moduleContext);
+    ClangSyntaxPrinter(getASTContext(), os).printNominalTypeReference(TD, moduleContext);
     os << ";\n";
   }
 
   /// Prints the members of a class, extension, or protocol.
   template <bool AllowDelayed = false, typename R>
   void printMembers(R &&members) {
-    CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
     // Using statements for nested types.
     if (outputLang == OutputLanguageMode::Cxx) {
       for (const Decl *member : members) {
         if (member->getModuleContext()->isStdlibModule())
           break;
-        // TODO: support nested classes.
-        if (isa<ClassDecl>(member))
+        auto VD = dyn_cast<ValueDecl>(member);
+        if (!VD || !shouldInclude(VD))
           continue;
         if (const auto *TD = dyn_cast<NominalTypeDecl>(member))
           printUsingForNestedType(TD, TD->getModuleContext());
@@ -372,7 +373,12 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Non objc class.
       ClangClassTypePrinter(os).printClassTypeDecl(
-          CD, [&]() { printMembers(CD->getMembers()); }, owningPrinter);
+          CD,
+          [&]() {
+            CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
+            printMembers(CD->getAllMembers());
+          },
+          owningPrinter);
       recordEmittedDeclInCurrentCxxLexicalScope(CD);
       return;
     }
@@ -412,7 +418,7 @@ private:
       os << " : " << getNameForObjC(superDecl);
     printProtocols(CD->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
-    printMembers(CD->getMembers());
+    printMembers(CD->getAllMembers());
     os << "@end\n";
   }
 
@@ -425,13 +431,14 @@ private:
     printer.printValueTypeDecl(
         SD, /*bodyPrinter=*/
         [&]() {
-          printMembers(SD->getMembers());
+          CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
+          printMembers(SD->getAllMembers());
           for (const auto *ed :
                owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
             if (!cxx_translation::isExposableToCxx(ed->getGenericSignature()))
               continue;
 
-            printMembers(ed->getMembers());
+            printMembers(ed->getAllMembers());
           }
         },
         owningPrinter);
@@ -451,7 +458,7 @@ private:
     os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
     printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
-    printMembers(ED->getMembers());
+    printMembers(ED->getAllMembers());
     os << "@end\n";
   }
 
@@ -472,8 +479,19 @@ private:
 
     printProtocols(PD->getInheritedProtocols());
     os << "\n";
-    printMembers(PD->getMembers());
+    printMembers(PD->getAllMembers());
     os << "@end\n";
+  }
+
+  static bool isClangPOD(const NominalTypeDecl *ntd) {
+    auto clangDecl = ntd->getClangDecl();
+    if (!clangDecl)
+      return false;
+    if (const auto *rd = dyn_cast<clang::RecordDecl>(clangDecl)) {
+      return !isa<clang::CXXRecordDecl>(rd) ||
+             cast<clang::CXXRecordDecl>(rd)->isPOD();
+    }
+    return false;
   }
 
   void visitEnumDeclCxx(EnumDecl *ED) {
@@ -481,13 +499,13 @@ private:
 
     ClangValueTypePrinter valueTypePrinter(os, owningPrinter.prologueOS,
                                            owningPrinter.interopContext);
-    ClangSyntaxPrinter syntaxPrinter(os);
+    ClangSyntaxPrinter syntaxPrinter(ED->getASTContext(), os);
     DeclAndTypeClangFunctionPrinter clangFuncPrinter(
         os, owningPrinter.prologueOS, owningPrinter.typeMapping,
         owningPrinter.interopContext, owningPrinter);
 
     auto &outOfLineOS = owningPrinter.outOfLineDefinitionsOS;
-    ClangSyntaxPrinter outOfLineSyntaxPrinter(outOfLineOS);
+    ClangSyntaxPrinter outOfLineSyntaxPrinter(ED->getASTContext(), outOfLineOS);
     DeclAndTypeClangFunctionPrinter outOfLineFuncPrinter(
         owningPrinter.outOfLineDefinitionsOS, owningPrinter.prologueOS,
         owningPrinter.typeMapping, owningPrinter.interopContext, owningPrinter);
@@ -505,17 +523,17 @@ private:
     auto printIsFunction = [&](StringRef caseName, EnumDecl *ED) {
       std::string declName, defName, name;
       llvm::raw_string_ostream declOS(declName), defOS(defName), nameOS(name);
-      ClangSyntaxPrinter(nameOS).printIdentifier(caseName);
+      ClangSyntaxPrinter(ED->getASTContext(), nameOS).printIdentifier(caseName);
       name[0] = std::toupper(name[0]);
 
       os << "  ";
-      ClangSyntaxPrinter(os).printInlineForThunk();
+      ClangSyntaxPrinter(ED->getASTContext(), os).printInlineForThunk();
       os << "bool is" << name << "() const;\n";
 
       outOfLineSyntaxPrinter
           .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
       outOfLineOS << "  ";
-      ClangSyntaxPrinter(outOfLineOS).printInlineForThunk();
+      ClangSyntaxPrinter(ED->getASTContext(), outOfLineOS).printInlineForThunk();
       outOfLineOS << " bool ";
       outOfLineSyntaxPrinter.printNominalTypeQualifier(
           ED, /*moduleContext=*/ED->getModuleContext());
@@ -539,7 +557,7 @@ private:
 
       std::string declName, defName, name;
       llvm::raw_string_ostream declOS(declName), defOS(defName), nameOS(name);
-      ClangSyntaxPrinter(nameOS).printIdentifier(elementDecl->getNameStr());
+      ClangSyntaxPrinter(elementDecl->getASTContext(), nameOS).printIdentifier(elementDecl->getNameStr());
       name[0] = std::toupper(name[0]);
 
       clangFuncPrinter.printCustomCxxFunction(
@@ -548,12 +566,12 @@ private:
           [&](auto &types) {
             // Printing function name and return type
             os << "  ";
-            ClangSyntaxPrinter(os).printInlineForThunk();
+            ClangSyntaxPrinter(elementDecl->getASTContext(), os).printInlineForThunk();
             os << types[paramType] << " get" << name;
             outOfLineSyntaxPrinter
                 .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
             outOfLineOS << "  ";
-            ClangSyntaxPrinter(outOfLineOS).printInlineForThunk();
+            ClangSyntaxPrinter(elementDecl->getASTContext(), outOfLineOS).printInlineForThunk();
             outOfLineOS << types[paramType] << ' ';
             outOfLineSyntaxPrinter.printNominalTypeQualifier(
                 ED, /*moduleContext=*/ED->getModuleContext());
@@ -589,7 +607,9 @@ private:
             assert(objectTypeDecl != nullptr || paramType->isOptional());
 
             if (objectTypeDecl &&
-                owningPrinter.typeMapping.getKnownCxxTypeInfo(objectTypeDecl)) {
+                (owningPrinter.typeMapping.getKnownCxxTypeInfo(
+                     objectTypeDecl) ||
+                 isClangPOD(objectTypeDecl))) {
               outOfLineOS << "    " << types[paramType] << " result;\n";
               outOfLineOS << "    "
                              "memcpy(&result, payloadFromDestruction, "
@@ -701,7 +721,7 @@ private:
               if (paramType) {
                 if (paramType->getAs<GenericTypeParamType>()) {
                   auto type = types[paramType];
-                  ClangSyntaxPrinter(outOfLineOS)
+                  ClangSyntaxPrinter(paramType->getASTContext(), outOfLineOS)
                       .printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
                         // FIXME: handle C++ types.
                         outOfLineOS << "if constexpr (std::is_base_of<::swift::"
@@ -756,8 +776,9 @@ private:
                   assert(objectTypeDecl != nullptr || paramType->isOptional());
 
                   if (objectTypeDecl &&
-                      owningPrinter.typeMapping.getKnownCxxTypeInfo(
-                          objectTypeDecl)) {
+                      (owningPrinter.typeMapping.getKnownCxxTypeInfo(
+                           objectTypeDecl) ||
+                       isClangPOD(objectTypeDecl))) {
                     outOfLineOS
                         << "    memcpy(result._getOpaquePointer(), &val, "
                            "sizeof(val));\n";
@@ -877,7 +898,7 @@ private:
 
           // Printing operator cases()
           os << "  ";
-          ClangSyntaxPrinter(os).printInlineForThunk();
+          ClangSyntaxPrinter(ED->getASTContext(), os).printInlineForThunk();
           os << "operator cases() const {\n";
           if (ED->isResilient()) {
             if (!elementTagMapping.empty()) {
@@ -907,14 +928,15 @@ private:
           os << "  }\n"; // operator cases()'s closing bracket
           os << "\n";
 
-          printMembers(ED->getMembers());
+          CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
+          printMembers(ED->getAllMembers());
 
           for (const auto *ext :
                owningPrinter.interopContext.getExtensionsForNominalType(ED)) {
             if (!cxx_translation::isExposableToCxx(ext->getGenericSignature()))
               continue;
 
-            printMembers(ext->getMembers());
+            printMembers(ext->getAllMembers());
           }
         },
         owningPrinter);
@@ -1229,7 +1251,8 @@ private:
     // Constructors and methods returning DynamicSelf return
     // instancetype.
     if (isa<ConstructorDecl>(AFD) ||
-        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelfResult() &&
+        (isa<FuncDecl>(AFD) &&
+         cast<FuncDecl>(AFD)->getResultInterfaceType()->hasDynamicSelfType() &&
          !AFD->hasAsync())) {
       if (errorConvention && errorConvention->stripsResultOptionality()) {
         printNullability(OTK_Optional, NullabilityPrintKind::ContextSensitive);
@@ -1551,7 +1574,7 @@ private:
     }
     os << "\n";
     if (representation.isObjCxxOnly())
-      os << "#endif\n";
+      os << "#endif // defined(__OBJC__)\n";
     return representation;
   }
 
@@ -1611,7 +1634,7 @@ private:
                     owningPrinter.interopContext.getIrABIDetails()
                         .getClassBaseOffsetSymbolType();
                 os << "SWIFT_EXTERN ";
-                ClangSyntaxPrinter(os).printKnownCType(
+                ClangSyntaxPrinter(getASTContext(), os).printKnownCType(
                     baseClassOffsetType, owningPrinter.typeMapping);
                 os << ' ' << dispatchInfo->getBaseOffsetSymbolName()
                    << "; // class metadata base offset\n";
@@ -1661,7 +1684,7 @@ private:
         FD->getParameters(), funcTy->isThrowing(), funcTy);
     os << "}\n";
     if (result.isObjCxxOnly())
-      os << "#endif\n";
+      os << "#endif // defined(__OBJC__)\n";
   }
 
   enum class PrintLeadingSpace : bool {
@@ -1686,12 +1709,27 @@ public:
       hasPrintedAnything = true;
     };
 
-    for (auto AvAttr : D->getAttrs().getAttributes<AvailableAttr>()) {
-      if (AvAttr->Platform == PlatformKind::none) {
-        if (AvAttr->PlatformAgnostic ==
-            PlatformAgnosticAvailabilityKind::Unavailable) {
+    for (auto AvAttr : D->getSemanticAvailableAttrs()) {
+      auto domain = AvAttr.getDomain();
+      if (auto domainDecl = domain.getDecl()) {
+        // If the domain is defined in a Clang module then the attr can be
+        // printed.
+        if (domainDecl->hasClangNode()) {
+          // Versioned custom domains aren't supported yet.
+          ASSERT(!domain.isVersioned());
+
+          maybePrintLeadingSpace();
+          os << "SWIFT_AVAILABILITY_DOMAIN("
+             << domain.getNameForAttributePrinting() << ","
+             << (AvAttr.isUnconditionallyUnavailable() ? "1" : "0") << ")";
+        }
+        continue;
+      }
+
+      if (domain.isUniversal()) {
+        if (AvAttr.isUnconditionallyUnavailable()) {
           // Availability for *
-          if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
+          if (!AvAttr.getRename().empty() && isa<ValueDecl>(D)) {
             // rename
             maybePrintLeadingSpace();
             os << "SWIFT_UNAVAILABLE_MSG(\"'"
@@ -1699,15 +1737,15 @@ public:
                << "' has been renamed to '";
             printRenameForDecl(os, AvAttr, cast<ValueDecl>(D), false);
             os << '\'';
-            if (!AvAttr->Message.empty()) {
+            if (!AvAttr.getMessage().empty()) {
               os << ": ";
-              printEncodedString(os, AvAttr->Message, false);
+              printEncodedString(os, AvAttr.getMessage(), false);
             }
             os << "\")";
-          } else if (!AvAttr->Message.empty()) {
+          } else if (!AvAttr.getMessage().empty()) {
             maybePrintLeadingSpace();
             os << "SWIFT_UNAVAILABLE_MSG(";
-            printEncodedString(os, AvAttr->Message);
+            printEncodedString(os, AvAttr.getMessage());
             os << ")";
           } else {
             maybePrintLeadingSpace();
@@ -1715,12 +1753,12 @@ public:
           }
           break;
         }
-        if (AvAttr->isUnconditionallyDeprecated()) {
-          if (!AvAttr->Rename.empty() || !AvAttr->Message.empty()) {
+        if (AvAttr.isUnconditionallyDeprecated()) {
+          if (!AvAttr.getRename().empty() || !AvAttr.getMessage().empty()) {
             maybePrintLeadingSpace();
             os << "SWIFT_DEPRECATED_MSG(";
-            printEncodedString(os, AvAttr->Message);
-            if (!AvAttr->Rename.empty()) {
+            printEncodedString(os, AvAttr.getMessage());
+            if (!AvAttr.getRename().empty()) {
               os << ", ";
               printRenameForDecl(os, AvAttr, cast<ValueDecl>(D), true);
             }
@@ -1734,15 +1772,19 @@ public:
       }
 
       // Availability for a specific platform
-      if (!AvAttr->Introduced.has_value() && !AvAttr->Deprecated.has_value() &&
-          !AvAttr->Obsoleted.has_value() &&
-          !AvAttr->isUnconditionallyDeprecated() &&
-          !AvAttr->isUnconditionallyUnavailable()) {
+      if (!domain.isPlatform())
+        continue;
+
+      if (!AvAttr.getIntroduced().has_value() &&
+          !AvAttr.getDeprecated().has_value() &&
+          !AvAttr.getObsoleted().has_value() &&
+          !AvAttr.isUnconditionallyDeprecated() &&
+          !AvAttr.isUnconditionallyUnavailable()) {
         continue;
       }
 
       const char *plat;
-      switch (AvAttr->Platform) {
+      switch (AvAttr.getPlatform()) {
       case PlatformKind::macOS:
         plat = "macos";
         break;
@@ -1779,11 +1821,25 @@ public:
       case PlatformKind::visionOSApplicationExtension:
         plat = "visionos_app_extension";
         break;
+      case PlatformKind::DriverKit:
+        plat = "driverkit";
+        break;
+      case PlatformKind::Swift:
+      case PlatformKind::anyAppleOS:
+        // FIXME: [runtime availability] Figure out how to support this.
+        ASSERT(0);
+        break;
+      case PlatformKind::FreeBSD:
+        plat = "freebsd";
+        break;
       case PlatformKind::OpenBSD:
         plat = "openbsd";
         break;
       case PlatformKind::Windows:
         plat = "windows";
+        break;
+      case PlatformKind::Android:
+        plat = "android";
         break;
       case PlatformKind::none:
         llvm_unreachable("handled above");
@@ -1791,40 +1847,41 @@ public:
 
       maybePrintLeadingSpace();
       os << "SWIFT_AVAILABILITY(" << plat;
-      if (AvAttr->isUnconditionallyUnavailable()) {
+      if (AvAttr.isUnconditionallyUnavailable()) {
         os << ",unavailable";
       } else {
-        if (AvAttr->Introduced.has_value()) {
-          os << ",introduced=" << AvAttr->Introduced.value().getAsString();
+        if (AvAttr.getIntroduced().has_value()) {
+          os << ",introduced=" << AvAttr.getIntroduced().value().getAsString();
         }
-        if (AvAttr->Deprecated.has_value()) {
-          os << ",deprecated=" << AvAttr->Deprecated.value().getAsString();
-        } else if (AvAttr->isUnconditionallyDeprecated()) {
+        if (AvAttr.getDeprecated().has_value()) {
+          os << ",deprecated=" << AvAttr.getDeprecated().value().getAsString();
+        } else if (AvAttr.isUnconditionallyDeprecated()) {
           // We need to specify some version, we can't just say deprecated.
           // We also can't deprecate it before it's introduced.
-          if (AvAttr->Introduced.has_value()) {
-            os << ",deprecated=" << AvAttr->Introduced.value().getAsString();
+          if (AvAttr.getIntroduced().has_value()) {
+            os << ",deprecated="
+               << AvAttr.getIntroduced().value().getAsString();
           } else {
             os << ",deprecated=0.0.1";
           }
         }
-        if (AvAttr->Obsoleted.has_value()) {
-          os << ",obsoleted=" << AvAttr->Obsoleted.value().getAsString();
+        if (AvAttr.getObsoleted().has_value()) {
+          os << ",obsoleted=" << AvAttr.getObsoleted().value().getAsString();
         }
       }
-      if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
+      if (!AvAttr.getRename().empty() && isa<ValueDecl>(D)) {
         os << ",message=\"'" << cast<ValueDecl>(D)->getBaseName()
            << "' has been renamed to '";
         printRenameForDecl(os, AvAttr, cast<ValueDecl>(D), false);
         os << '\'';
-        if (!AvAttr->Message.empty()) {
+        if (!AvAttr.getMessage().empty()) {
           os << ": ";
-          printEncodedString(os, AvAttr->Message, false);
+          printEncodedString(os, AvAttr.getMessage(), false);
         }
         os << "\"";
-      } else if (!AvAttr->Message.empty()) {
+      } else if (!AvAttr.getMessage().empty()) {
         os << ",message=";
-        printEncodedString(os, AvAttr->Message);
+        printEncodedString(os, AvAttr.getMessage());
       }
       os << ")";
     }
@@ -1832,12 +1889,11 @@ public:
   }
 
 private:
-  void printRenameForDecl(raw_ostream &os, const AvailableAttr *AvAttr,
+  void printRenameForDecl(raw_ostream &os, SemanticAvailableAttr AvAttr,
                           const ValueDecl *D, bool includeQuotes) {
-    assert(!AvAttr->Rename.empty());
+    assert(!AvAttr.getRename().empty());
 
-    auto *renamedDecl = evaluateOrDefault(
-        getASTContext().evaluator, RenamedDeclRequest{D, AvAttr}, nullptr);
+    auto *renamedDecl = D->getRenamedDecl(AvAttr.getParsedAttr());
     if (renamedDecl) {
       assert(shouldInclude(renamedDecl) &&
              "ObjC printer logic mismatch with renamed decl");
@@ -1846,7 +1902,7 @@ private:
           renamedDecl->getObjCRuntimeName()->getString(scratch);
       printEncodedString(os, renamedObjCRuntimeName, includeQuotes);
     } else {
-      printEncodedString(os, AvAttr->Rename, includeQuotes);
+      printEncodedString(os, AvAttr.getRename(), includeQuotes);
     }
   }
 
@@ -1949,8 +2005,9 @@ private:
 
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Documentation.
-      auto *getter = VD->getOpaqueAccessor(AccessorKind::Get);
-      printAbstractFunctionAsMethod(getter, /*isStatic=*/VD->isStatic());
+      // TODO: support read/modify accessors.
+      if (auto *getter = VD->getOpaqueAccessor(AccessorKind::Get))
+        printAbstractFunctionAsMethod(getter, /*isStatic=*/VD->isStatic());
       if (auto *setter = VD->getOpaqueAccessor(AccessorKind::Set))
         printAbstractFunctionAsMethod(setter, /*isStatic=*/VD->isStatic());
       return;
@@ -2190,8 +2247,7 @@ public:
       return nullptr;
 
     // Dig out the Objective-C type.
-    Type objcType = conformance.getTypeWitnessByName(
-        declaredType, ctx.Id_ObjectiveCType);
+    Type objcType = conformance.getTypeWitnessByName(ctx.Id_ObjectiveCType);
 
     // Dig out the Objective-C class.
     return objcType->getClassOrBoundGenericClass();
@@ -2273,6 +2329,14 @@ private:
     return false;
   }
 
+  std::optional<PrimitiveTypeMapping::ClangTypeInfo>
+  getKnownType(const TypeDecl *typeDecl) {
+    if (outputLang == OutputLanguageMode::C)
+      return owningPrinter.typeMapping.getKnownCTypeInfo(typeDecl);
+
+    return owningPrinter.typeMapping.getKnownObjCTypeInfo(typeDecl);
+  }
+
   /// If \p typeDecl is one of the standard library types used to map in Clang
   /// primitives and basic types, print out the appropriate spelling and
   /// return true.
@@ -2281,8 +2345,7 @@ private:
   /// for interfacing with C and Objective-C.
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
                               std::optional<OptionalTypeKind> optionalKind) {
-    auto knownTypeInfo =
-        owningPrinter.typeMapping.getKnownObjCTypeInfo(typeDecl);
+    auto knownTypeInfo = getKnownType(typeDecl);
     if (!knownTypeInfo)
       return false;
     os << knownTypeInfo->name;
@@ -2318,7 +2381,7 @@ private:
 
     if (auto *clangTypeDecl =
           dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
-      assert(!alias->isGeneric()
+      assert(!alias->hasGenericParamList()
              && "generic typealias backed by clang typedecl?");
 
       maybePrintTagKeyword(alias);
@@ -2328,7 +2391,7 @@ private:
         printNullability(optionalKind);
     } else if (auto *clangObjCClass
                = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
-      assert(!alias->isGeneric()
+      assert(!alias->hasGenericParamList()
              && "generic typealias backed by clang interface?");
 
       os << clangObjCClass->getName() << " *";
@@ -2362,8 +2425,15 @@ private:
   }
 
   void maybePrintTagKeyword(const TypeDecl *NTD) {
-    if (isa<EnumDecl>(NTD) && !NTD->hasClangNode()) {
-      os << "enum ";
+    auto *ED = dyn_cast<EnumDecl>(NTD);
+    if (ED && !NTD->hasClangNode()) {
+      if (ED->isCDeclEnum()) {
+        // We should be able to use the tag macro for all printed enums but
+        // for now restrict it to @c to guard it behind the feature flag.
+        os << "SWIFT_ENUM_TAG ";
+      } else {
+        os << "enum ";
+      }
       return;
     }
 
@@ -2643,7 +2713,7 @@ private:
 
     if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
       const ClassDecl *extendedClass = extension->getSelfClassDecl();
-      assert(extendedClass->isGeneric());
+      assert(extendedClass->hasGenericParamList());
       assert(extension->getGenericParams()->size() ==
              extendedClass->getGenericParams()->size() &&
              "extensions with custom generic parameters?");
@@ -2742,11 +2812,6 @@ private:
   void visitPackElementType(PackElementType *PET,
                             std::optional<OptionalTypeKind> optionalKind) {
     llvm_unreachable("Not implemented");
-  }
-
-  void visitParenType(ParenType *PT,
-                      std::optional<OptionalTypeKind> optionalKind) {
-    visitPart(PT->getSinglyDesugaredType(), optionalKind);
   }
 
   void visitSyntaxSugarType(SyntaxSugarType *SST,
@@ -2923,6 +2988,17 @@ static bool excludeForObjCImplementation(const ValueDecl *VD) {
   return false;
 }
 
+bool swift::hasExposeNotCxxAttr(const ValueDecl *VD) {
+  for (const auto *attr : VD->getAttrs().getAttributes<ExposeAttr>())
+    if (attr->getExposureKind() == ExposureKind::NotCxx)
+      return true;
+  if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
+    return hasExposeNotCxxAttr(NMT);
+  if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
+    return hasExposeNotCxxAttr(ED->getExtendedNominal());
+  return false;
+}
+
 static bool isExposedToThisModule(const ModuleDecl &M, const ValueDecl *VD,
                                   const llvm::StringSet<> &exposedModules) {
   if (VD->hasClangNode())
@@ -2974,6 +3050,9 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   if (requiresExposedAttribute && !hasExposeAttr(VD))
     return false;
 
+  if (hasExposeNotCxxAttr(VD))
+    return false;
+
   if (!isVisible(VD))
     return false;
 
@@ -2986,6 +3065,30 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
       return false;
     if (!isEnumExposableToCxx(VD, *this))
       return false;
+  }
+
+  // In C output mode print only the C variant `@c` (no `@_cdecl`),
+  // while in other modes print only `@_cdecl`.
+  std::optional<ForeignLanguage> cdeclKind = std::nullopt;
+  if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD))
+    cdeclKind = FD->getCDeclKind();
+  if (cdeclKind &&
+      (*cdeclKind == ForeignLanguage::C) !=
+       (outputLang == OutputLanguageMode::C))
+    return false;
+
+  // C output mode only prints @c functions and enums.
+  if (outputLang == OutputLanguageMode::C &&
+      !cdeclKind && !isa<EnumDecl>(VD)) {
+    return false;
+  }
+
+  // The C mode prints @c enums and reject other enums,
+  // while other modes accept other enums and reject @c ones.
+  if (isa<EnumDecl>(VD) &&
+      VD->getAttrs().hasAttribute<CDeclAttr>() !=
+        (outputLang == OutputLanguageMode::C)) {
+    return false;
   }
 
   if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
@@ -3057,6 +3160,8 @@ const TypeDecl *DeclAndTypePrinter::getObjCTypeDecl(const TypeDecl* TD) {
 
 StringRef
 DeclAndTypePrinter::maybeGetOSObjectBaseName(const clang::NamedDecl *decl) {
+  if (!decl)
+    return StringRef();
   StringRef name = decl->getName();
   if (!name.consume_front("OS_"))
     return StringRef();

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -swift-version 5 -emit-module-path %t/SerializedStruct.swiftmodule -module-name SerializedStruct %S/Inputs/SerializedStruct.swift
 
-// RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify -disable-availability-checking -swift-version 6 -I %t
+// RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify -verify-ignore-unrelated -disable-availability-checking -swift-version 6 -I %t
 
 // REQUIRES: concurrency
 
@@ -14,5 +14,5 @@ import SerializedStruct // expected-warning {{add '@preconcurrency' to treat 'Se
 // use it to force the right checks happen.
 func test() async -> Int {
   let x = MySerializedStruct()
-  return await x.counter // expected-error {{non-sendable type 'MySerializedStruct' cannot be sent into main actor-isolated context in call to property 'counter'}}
+  return await x.counter // expected-error {{non-Sendable type 'MySerializedStruct' cannot be sent into main actor-isolated context in call to property 'counter'}}
 }

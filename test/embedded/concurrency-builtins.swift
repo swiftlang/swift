@@ -2,9 +2,11 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=wasip1
+// REQUIRES: swift_feature_Embedded
 
 import Builtin
+import _Concurrency
 
 public func test() async {
     _ = Builtin.createAsyncTask(0) { () async throws -> Int in
@@ -12,7 +14,7 @@ public func test() async {
     }
 }
 
-// CHECK: define {{.*}}@"$s4main4testyyYaF"(ptr swiftasync %0)
+// CHECK: define {{.*}}@"$e4main4testyyYaF"(ptr swiftasync %0)
 // CHECK: entry:
 // CHECK:   %result_type_info_record = alloca %swift.result_type_info_task_option
 // CHECK:   call {{.*}}@llvm.coro.id.async

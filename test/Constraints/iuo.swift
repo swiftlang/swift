@@ -179,43 +179,6 @@ class rdar37241550 {
   }
 }
 
-class B {}
-class D : B {
-  var i: Int!
-}
-
-func coerceToIUO(d: D?) -> B {
-  return d as B! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
-}
-
-func forcedDowncastToOptional(b: B?) -> D? {
-  return b as! D! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
-}
-
-func forcedDowncastToObject(b: B?) -> D {
-  return b as! D! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
-}
-
-func forcedDowncastToObjectIUOMember(b: B?) -> Int {
-  return (b as! D!).i // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
-}
-
-func forcedUnwrapViaForcedCast(b: B?) -> B {
-  return b as! B! // expected-warning {{forced cast from 'B?' to 'B' only unwraps optionals; did you mean to use '!'?}}
-  // expected-warning@-1 {{using '!' here is deprecated and will be removed in a future release}}
-}
-
-func conditionalDowncastToOptional(b: B?) -> D? {
-  return b as? D! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
-}
-
-func conditionalDowncastToObject(b: B?) -> D {
-  return b as? D! // expected-error {{value of optional type 'D?' must be unwrapped to a value of type 'D'}}
-  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
-  // expected-warning@-3 {{using '!' here is deprecated and will be removed in a future release}}
-}
-
 // https://github.com/apple/swift/issues/49536
 // Ensure that we select the overload that does *not* involve forcing an IUO.
 do {
@@ -253,10 +216,34 @@ let _ = (returnsIUO as () -> Int)() // expected-error {{cannot convert value of 
 // Make sure we only permit an IUO unwrap on the first application.
 func returnsIUOFn() -> (() -> Int?)! { nil }
 let _: (() -> Int?)? = returnsIUOFn()
-let _: (() -> Int)? = returnsIUOFn() // expected-error {{cannot convert value of type '(() -> Int?)?' to specified type '(() -> Int)?'}}
+let _: (() -> Int)? = returnsIUOFn() // expected-error {{cannot assign value of type '(() -> Int?)?' to type '(() -> Int)?'}}
+// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('() -> Int?' and '() -> Int') are expected to be equal}}
 let _: () -> Int? = returnsIUOFn()
 let _: () -> Int = returnsIUOFn() // expected-error {{cannot convert value of type '(() -> Int?)?' to specified type '() -> Int'}}
 let _: Int? = returnsIUOFn()()
 let _: Int = returnsIUOFn()() // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
 // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
 // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+
+// Make sure it works for compound function references.
+func testCompoundRefs() {
+  func hasArgLabel(x: Int) -> Int! { x }
+  struct S {
+    func hasArgLabel(x: Int) -> Int! { x }
+  }
+  let _ = hasArgLabel(x:)(0)
+  let _: Int? = hasArgLabel(x:)(0)
+  let _: Int = hasArgLabel(x:)(0)
+
+  let _ = S.hasArgLabel(x:)(S())(0)
+  let _: Int? = S.hasArgLabel(x:)(S())(0)
+  let _: Int = S.hasArgLabel(x:)(S())(0)
+
+  let _ = S().hasArgLabel(x:)(0)
+  let _: Int? = S().hasArgLabel(x:)(0)
+  let _: Int = S().hasArgLabel(x:)(0)
+
+  // We still don't allow IUOs for the function itself.
+  let _: (Int) -> Int = hasArgLabel(x:) // expected-error {{cannot convert value of type '(Int) -> Int?' to specified type '(Int) -> Int}}
+  let _: (Int) -> Int? = hasArgLabel(x:)
+}

@@ -232,6 +232,14 @@ bool CircularityChecker::expandTuple(CanTupleType tupleType, unsigned depth) {
 /// Visit a nominal type and try to expand it one level.
 bool CircularityChecker::expandNominal(CanType type, NominalTypeDecl *D,
                                        unsigned depth) {
+  if (D->isResilient(OriginalDecl->getParentModule(),
+                     ResilienceExpansion::Maximal)) {
+    LLVM_DEBUG(llvm::dbgs() << std::string(depth, ' ')
+                            << "skipping resilient nominal "
+                            << type << "\n";);
+    return false;
+  }
+
   LLVM_DEBUG(llvm::dbgs() << std::string(depth, ' ') << "expanding nominal "
                           << type << "\n";);
   if (auto S = dyn_cast<StructDecl>(D)) {
@@ -491,12 +499,6 @@ void CircularityChecker::addPathElement(Path &path, ValueDecl *member,
     elt.Ty = ref->getReferentType();
   }
 
-  // Strip outer parens from the type.  (This is especially common with
-  // enum elements.)
-  if (auto parens = dyn_cast<ParenType>(elt.Ty.getPointer())) {
-    elt.Ty = parens->getSinglyDesugaredType();
-  }
-
   path.push_back(elt);
 }
 
@@ -606,8 +608,8 @@ void CircularityChecker::diagnoseNonWellFoundedEnum(EnumDecl *E) {
       if (auto tuple = payloadTy->getAs<TupleType>()) {
         if (!containsType(tuple, E->getSelfInterfaceType()))
           return false;
-      } else if (auto paren = dyn_cast<ParenType>(payloadTy.getPointer())) {
-        if (!E->getSelfInterfaceType()->isEqual(paren->getUnderlyingType()))
+      } else {
+        if (!E->getSelfInterfaceType()->isEqual(payloadTy))
           return false;
       }
     }

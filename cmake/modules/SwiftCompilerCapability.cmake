@@ -39,6 +39,7 @@ function(swift_get_package_cmo_support out_var)
   # > 6.0 : Fixed feature.
   swift_supports_compiler_arguments(result
     -package-name my-package
+    -enable-library-evolution
     -Xfrontend -package-cmo
     -Xfrontend -allow-non-resilient-access
   )

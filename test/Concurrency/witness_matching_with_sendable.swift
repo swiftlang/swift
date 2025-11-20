@@ -53,3 +53,18 @@ struct S4 : Q { // expected-error {{type 'S4' does not conform to protocol 'Q'}}
   func test(_: [() -> Any?]) {}
   // expected-note@-1 {{candidate has non-matching type '([() -> Any?]) -> ()'}}
 }
+
+// Test that client is allowed to adopt concurrency first.
+protocol PreConcurrency {
+  var prop: [String: Any] { get } // expected-swift6-note {{protocol requires property 'prop' with type '[String : Any]'}}
+  func req(_: [String: Any], _: ((Any)?) -> Void) // expected-swift6-note {{protocol requires function 'req' with type '([String : Any], (Any?) -> Void) -> ()'}}
+}
+
+class Adopter {
+  @preconcurrency var prop: [String: any Sendable] = [:] // expected-swift6-note {{candidate has non-matching type '[String : any Sendable]'}}
+}
+
+extension Adopter : PreConcurrency { // expected-swift6-error {{type 'Adopter' does not conform to protocol 'PreConcurrency'}} expected-swift6-note {{add stubs for conformance}}
+  @preconcurrency func req(_: [String: any Sendable], _: ((any Sendable)?) -> Void) {}
+  // expected-swift6-note@-1 {{candidate has non-matching type '([String : any Sendable], ((any Sendable)?) -> Void) -> ()'}}
+}

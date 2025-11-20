@@ -44,3 +44,8 @@ module ID {
   requires objc
   requires cplusplus
 }
+
+module CxxForeignRef {
+  header "cxx-frt.h"
+  requires cplusplus
+}

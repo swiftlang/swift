@@ -16,12 +16,10 @@ public class M {
   // Verify that definite initialization doesn't create a bogus description of
   // self pointing to the liveness bitvector.
   
-  // CHECK: sil @$s4main1MC4fromAcA12WithDelegate_p_tKcfc
-  // CHECK: bb0
-  // CHECK-NEXT: %2 = alloc_stack $Builtin.Int2
-  // CHECK-NOT: let
-  // CHECK-NOT: name
-  // CHECK: scope
+  // CHECK-LABEL: sil @$s4main1MC4fromAcA12WithDelegate_p_tKcfc
+  // CHECK:       bb0
+  // CHECK-NOT:     alloc_stack $Builtin.Int2{{.*}}let
+  // CHECK:       } // end sil function '$s4main1MC4fromAcA12WithDelegate_p_tKcfc'
     public init(from d: WithDelegate) throws {
         guard let delegate = d.delegate as? DelegateB
         else { throw Err.s(0) }

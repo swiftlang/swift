@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -module-name test -swift-version 5 -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s -module-name test -swift-version 5 -sil-verify-all | %FileCheck %s
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)

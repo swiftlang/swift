@@ -59,7 +59,7 @@ struct StaticMethods {
   }
   static func after(_ num: Int) -> (() -> Int) {}
 // AFTER_STATIC_FUNC: Begin completions, 2 items
-// AFTER_STATIC_FUNC-DAG: Keyword[self]/CurrNominal:          .self[#(() -> Int)#];
+// AFTER_STATIC_FUNC-DAG: Keyword[self]/CurrNominal:          .self[#() -> Int#];
 // AFTER_STATIC_FUNC-DAG: Pattern/CurrModule/Flair[ArgLabels]: ()[#Int#];
 // AFTER_STATIC_FUNC: End completions
 }
@@ -81,12 +81,10 @@ struct AmbiguousInResultBuilder {
 
   func test(myStr: String) {
     foo {
-      Text(#^AMBIGUOUS_IN_RESULT_BUILDER?xfail=TODO^#)
-// AMBIGUOUS_IN_RESULT_BUILDER: Begin completions
+      Text(#^AMBIGUOUS_IN_RESULT_BUILDER^#)
 // AMBIGUOUS_IN_RESULT_BUILDER-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#verbatim: String#}[')'][#Text#]; name=verbatim:
-// AMBIGUOUS_IN_RESULT_BUILDER-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#(content): _#}[')'][#Text#]; name=:
+// AMBIGUOUS_IN_RESULT_BUILDER-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#(content): StringProtocol#}[')'][#Text#]; name=:
 // AMBIGUOUS_IN_RESULT_BUILDER-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: myStr[#String#]; name=myStr
-// AMBIGUOUS_IN_RESULT_BUILDER: End completions
     }
   }
 }

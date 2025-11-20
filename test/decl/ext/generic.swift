@@ -221,3 +221,33 @@ extension NewGeneric {
     return NewGeneric()
   }
 }
+extension (NewGeneric) {
+  static func oldMember2() -> OldGeneric {
+    return OldGeneric()
+  }
+
+  static func newMember2() -> NewGeneric {
+    return NewGeneric()
+  }
+}
+
+protocol P7 {}
+extension Float: P7 {}
+
+protocol Q1 {
+  associatedtype X
+  func foo(_ x: X)
+}
+struct S7<T: P7>: Q1 {
+  func foo(_ x: T) {}
+}
+
+// Make sure we reject these extensions.
+extension S7<Int> {} // expected-error {{type 'Int' does not conform to protocol 'P7'}}
+extension [S7<Int>] {} // expected-error {{type 'Int' does not conform to protocol 'P7'}}
+extension Array<S7<Int>> {} // expected-error {{type 'Int' does not conform to protocol 'P7'}}
+extension S7<Int>? {} // expected-error {{type 'Int' does not conform to protocol 'P7'}}
+extension S7<Int>.X {} // expected-error {{type 'Int' does not conform to protocol 'P7'}}
+extension S7<Float>.X {} // expected-error {{extension of type 'S7<Float>.X' (aka 'Float') must be declared as an extension of 'Float'}}
+// expected-note@-1 {{did you mean to extend 'Float' instead?}}
+extension S7<T> {} // expected-error {{cannot find type 'T' in scope}}

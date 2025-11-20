@@ -2,6 +2,7 @@
 // RUN: %target-swift-emit-sil %s -parse-stdlib -O -enable-experimental-feature Embedded | %FileCheck %s --check-prefix EMBEDDED
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 struct X {}
 
@@ -18,4 +19,4 @@ public func test() {
 // CHECK: sil hidden [Onone] @$s4main8MyStructV3fooyyF : $@convention(method) <T> (MyStruct<T>) -> () {
 
 // EMBEDDED: // specialized MyStruct.foo()
-// EMBEDDED: sil [Onone] @$s4main8MyStructV3fooyyFAA1XV_Tg5 : $@convention(method) (MyStruct<X>) -> () {
+// EMBEDDED: sil shared [Onone] @$e4main8MyStructV3fooyyFAA1XV_Tg5 : $@convention(method) (MyStruct<X>) -> () {

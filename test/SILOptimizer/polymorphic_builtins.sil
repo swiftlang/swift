@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -diagnostic-constant-propagation %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -module-name Swift -diagnostic-constant-propagation %s | %FileCheck %s
 
 sil_stage raw
 

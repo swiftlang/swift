@@ -10,12 +10,12 @@
 // RUN: %FileCheck %t/src/A.swift < %t/A.swiftinterface
 
 // Build the client using module
-// RUN: %target-swift-emit-sil -verify -module-name Client -I %t %t/src/Client.swift | %FileCheck %t/src/Client.swift
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -verify -module-name Client -I %t %t/src/Client.swift | %FileCheck %t/src/Client.swift
 
 // RUN: rm %t/A.swiftmodule
 
 // Re-build the client using interface
-// RUN: %target-swift-emit-sil -verify -module-name Client -I %t %t/src/Client.swift | %FileCheck %t/src/Client.swift
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -verify -module-name Client -I %t %t/src/Client.swift | %FileCheck %t/src/Client.swift
 
 // REQUIRES: asserts
 
@@ -28,7 +28,7 @@ public struct Inlinable {
 // CHECK-NEXT:    @usableFromInline
 // CHECK-NEXT:    @storageRestrictions(initializes: _x) init
 // CHECK-NEXT:    get
-// CHECK-NEXT  }
+// CHECK-NEXT:  }
 
   public var x: Int {
     @usableFromInline
@@ -75,7 +75,7 @@ public struct Transparent {
 // CHECK-NEXT:     self._x = newValue
 // CHECK-NEXT:   }
 // CHECK-NEXT:   get
-// CHECK-NEXT  }
+// CHECK-NEXT:  }
 
   public var x: Int {
     @_alwaysEmitIntoClient

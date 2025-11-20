@@ -1,18 +1,22 @@
-// RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h -enable-experimental-feature ObjCImplementation -enable-experimental-feature CImplementation -target %target-stable-abi-triple
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -import-objc-header %S/Inputs/objc_implementation.h -enable-experimental-feature ObjCImplementation -target %target-stable-abi-triple
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_ObjCImplementation
 
 protocol EmptySwiftProto {}
 
+// expected-note@+1 {{previously implemented here}}
 @_objcImplementation extension ObjCClass: EmptySwiftProto, EmptyObjCProto {
-  // expected-note@-1 {{previously implemented here}}
-  // expected-warning@-2 {{extension for main class interface should provide implementation for instance method 'method(fromHeader4:)'}}
-  // expected-warning@-3 {{extension for main class interface should provide implementation for property 'propertyFromHeader9'}}
-  // FIXME: give better diagnostic expected-warning@-4 {{extension for main class interface should provide implementation for property 'propertyFromHeader8'}}
-  // FIXME: give better diagnostic expected-warning@-5 {{extension for main class interface should provide implementation for property 'propertyFromHeader7'}}
-  // FIXME: give better diagnostic expected-warning@-6 {{extension for main class interface should provide implementation for instance method 'method(fromHeader3:)'}}
-  // expected-warning@-7 {{'@objc @implementation' extension cannot add conformance to 'EmptySwiftProto'; add this conformance with an ordinary extension}}
-  // expected-warning@-8 {{'@objc @implementation' extension cannot add conformance to 'EmptyObjCProto'; add this conformance in the Objective-C header}}
-  // expected-warning@-9 {{extension for main class interface should provide implementation for instance method 'extensionMethod(fromHeader2:)'}}
+  // expected-warning@-1 {{'@objc @implementation' extension cannot add conformance to 'EmptySwiftProto'; add this conformance with an ordinary extension}}
+  // expected-warning@-2 {{'@objc @implementation' extension cannot add conformance to 'EmptyObjCProto'; add this conformance in the Objective-C header}}
+  // expected-warning@-3 {{extension for main class interface does not provide all required implementations; this will become an error after adopting '@implementation'}}
+  // expected-note@-4 {{missing instance method 'method(fromHeader4:)'}} {{none}}
+  // expected-note@-5 {{missing property 'propertyFromHeader9'}} {{none}}
+  // FIXME: give better diagnostic expected-note@-6 {{missing property 'propertyFromHeader8'}} {{none}}
+  // FIXME: give better diagnostic expected-note@-7 {{missing property 'propertyFromHeader7'}} {{none}}
+  // FIXME: give better diagnostic expected-note@-8 {{missing instance method 'method(fromHeader3:)'}} {{none}}
+  // expected-note@-9 {{missing instance method 'extensionMethod(fromHeader2:)'}} {{none}}
+  // expected-note@-10 {{missing property 'readonlyPropertyFromHeader7'}}
+  // expected-note@-11 {{add stubs for missing '@implementation' requirements}} {{76-76=\n    @objc(methodFromHeader3:)\n    open func method(fromHeader3 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(methodFromHeader4:)\n    open func method(fromHeader4 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(propertyFromHeader7)\n    open var propertyFromHeader7: Int32\n\n    @objc(propertyFromHeader8)\n    open var propertyFromHeader8: Int32\n\n    @objc(propertyFromHeader9)\n    open var propertyFromHeader9: Int32\n\n    @objc(readonlyPropertyFromHeader7)\n    open let readonlyPropertyFromHeader7: Int32\n\n    @objc(extensionMethodFromHeader2:)\n    open func extensionMethod(fromHeader2 param: Int32) {\n        <#code#>\n    \}\n}}
 
   func method(fromHeader1: CInt) {
     // OK, provides an implementation for the header's method.
@@ -231,10 +235,14 @@ protocol EmptySwiftProto {}
   // expected-warning@-1 {{property 'rdar122280735' of type '(() -> ()) -> Void' does not match type '(@escaping () -> Void) -> Void' declared by the header}}
 }
 
+// expected-note@+1 {{'PresentAdditions' previously declared here}}
 @_objcImplementation(PresentAdditions) extension ObjCClass {
-  // expected-note@-1 {{'PresentAdditions' previously declared here}}
-  // expected-warning@-2 {{extension for category 'PresentAdditions' should provide implementation for instance method 'categoryMethod(fromHeader4:)'; this will become an error after adopting '@implementation'}}
-  // FIXME: give better diagnostic expected-warning@-3 {{extension for category 'PresentAdditions' should provide implementation for instance method 'categoryMethod(fromHeader3:)'; this will become an error after adopting '@implementation'}}
+  // expected-warning@-1 {{extension for category 'PresentAdditions' does not provide all required implementations; this will become an error after adopting '@implementation'}}
+  // expected-note@-2 {{missing instance method 'categoryMethod(fromHeader4:)'}} {{none}}
+  // FIXME: give better diagnostic expected-note@-3 {{missing instance method 'categoryMethod(fromHeader3:)'}} {{none}}
+  // expected-note@-4 {{missing property 'categoryPropertyFromHeader5'}} {{none}}
+  // expected-note@-5 {{missing property 'categoryReadonlyPropertyFromHeader1'}} {{none}}
+  // expected-note@-6 {{add stubs for missing '@implementation' requirements}} {{61-61=\n    @objc(categoryMethodFromHeader3:)\n    open func categoryMethod(fromHeader3 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(categoryMethodFromHeader4:)\n    open func categoryMethod(fromHeader4 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(categoryPropertyFromHeader5)\n    open var categoryPropertyFromHeader5: Int32 {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n\n    @objc(categoryReadonlyPropertyFromHeader1)\n    open var categoryReadonlyPropertyFromHeader1: Int32 {\n        <#code#>\n    \}\n}}
 
   func method(fromHeader3: CInt) {
     // FIXME: should emit expected-DISABLED-error@-1 {{instance method 'method(fromHeader3:)' should be implemented in extension for main class interface, not category 'PresentAdditions'}}
@@ -293,7 +301,9 @@ protocol EmptySwiftProto {}
 }
 
 @_objcImplementation(SwiftNameTests) extension ObjCClass {
-  // expected-warning@-1 {{extension for category 'SwiftNameTests' should provide implementation for instance method 'methodSwiftName6B()'; this will become an error after adopting '@implementation'}}
+  // expected-warning@-1 {{extension for category 'SwiftNameTests' does not provide all required implementations; this will become an error after adopting '@implementation'}}
+  // expected-note@-2 {{missing instance method 'methodSwiftName6B()'}} {{none}}
+  // expected-note@-3 {{add stub for missing '@implementation' requirement}} {{59-59=\n    @objc(methodObjCName6B)\n    open func methodSwiftName6B() {\n        <#code#>\n    \}\n}}
 
   func methodSwiftName1() {
     // expected-warning@-1 {{selector 'methodSwiftName1' for instance method 'methodSwiftName1()' not found in header; did you mean 'methodObjCName1'?; this will become an error after adopting '@implementation'}} {{3-3=@objc(methodObjCName1) }}
@@ -361,6 +371,10 @@ protocol EmptySwiftProto {}
 }
 
 @_objcImplementation(Effects) extension ObjCClass {
+  // expected-warning@-1 {{extension for category 'Effects' does not provide all required implementations; this will become an error after adopting '@implementation'}}
+  // expected-note@-2 {{missing instance method 'doSomethingMissingAndAsynchronous()' or 'doSomethingMissingAndAsynchronous(completionHandler:)'}}
+  // expected-note@-3 {{add stub for missing '@implementation' requirement}} {{52-52=\n    @objc(doSomethingMissingAndAsynchronousWithCompletionHandler:)\n    open func doSomethingMissingAndAsynchronous() async throws -> Any {\n        <#code#>\n    \}\n}}
+
   @available(SwiftStdlib 5.1, *)
   public func doSomethingAsynchronous() async throws -> Any {
     return self
@@ -404,7 +418,9 @@ protocol EmptySwiftProto {}
 }
 
 @_objcImplementation(Conformance) extension ObjCClass {
-  // expected-warning@-1 {{extension for category 'Conformance' should provide implementation for instance method 'requiredMethod2()'; this will become an error after adopting '@implementation'}}
+  // expected-warning@-1 {{extension for category 'Conformance' does not provide all required implementations; this will become an error after adopting '@implementation'}}
+  // expected-note@-2 {{missing instance method 'requiredMethod2()'}} {{none}}
+  // expected-note@-3 {{add stub for missing '@implementation' requirement}} {{56-56=\n    @objc(requiredMethod2)\n    open func requiredMethod2() {\n        <#code#>\n    \}\n}}
   // no-error concerning 'optionalMethod2()'
 
   func requiredMethod1() {}
@@ -430,15 +446,17 @@ protocol EmptySwiftProto {}
 }
 
 @_objcImplementation(TypeMatchOptionalityInvalid) extension ObjCClass {
-  func nonPointerResult() -> CInt! { fatalError() } // expected-warning{{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because its result type cannot be represented in Objective-C}}
-  func nonPointerArgument(_: CInt!) {} // expected-warning {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+  func nonPointerResult() -> CInt! { fatalError() } // expected-warning{{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because its result type cannot be represented in Objective-C}}
+  func nonPointerArgument(_: CInt!) {} // expected-warning {{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because the type of the parameter cannot be represented in Objective-C}}
 }
 
 @_objcImplementation(InvalidMembers) extension ObjCClass {
-  // expected-warning@-1 {{extension for category 'InvalidMembers' should provide implementation for instance method 'unimplementedMember()'}}
+  // expected-warning@-1 {{extension for category 'InvalidMembers' does not provide all required implementations}}
+  // expected-note@-2 {{missing instance method 'unimplementedMember()'}} {{none}}
+  // expected-note@-3 {{add stub for missing '@implementation' requirement}} {{59-59=\n    @objc(unimplementedMember)\n    open func unimplementedMember() {\n        <#code#>\n    \}\n}}
 
   func nonObjCMethod(_: EmptySwiftProto) {
-    // expected-warning@-1 {{method cannot be in an @objc @implementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+    // expected-warning@-1 {{method cannot be in an '@objc @implementation' extension of a class (without final or '@nonobjc') because the type of the parameter cannot be represented in Objective-C}}
     // expected-note@-2 {{protocol-constrained type containing protocol 'EmptySwiftProto' cannot be represented in Objective-C}}
   }
 
@@ -488,7 +506,7 @@ protocol EmptySwiftProto {}
 // expected-warning@-1 {{extension with Objective-C category name 'PresentAdditions' conflicts with previous extension with the same category name; this is an error in the Swift 6 language mode}}
 
 @_objcImplementation(MissingAdditions) extension ObjCClass {}
-// expected-error@-1 {{could not find category 'MissingAdditions' on Objective-C class 'ObjCClass'; make sure your umbrella or bridging header imports the header that declares it}}
+// expected-error@-1 {{could not find category 'MissingAdditions' on Objective-C class 'ObjCClass'; make sure you import the module or header that declares it}}
 // expected-note@-2 {{remove arguments to implement the main '@interface' for this class}} {{21-39=}}
 
 @_objcImplementation extension ObjCStruct {}
@@ -518,19 +536,19 @@ protocol EmptySwiftProto {}
 // @_cdecl for global functions
 //
 
-@_objcImplementation @_cdecl("CImplFunc1")
+@implementation @_cdecl("CImplFunc1")
 func CImplFunc1(_: Int32) {
   // OK
 }
 
-@_objcImplementation(BadCategory) @_cdecl("CImplFunc2")
+@implementation(BadCategory) @_cdecl("CImplFunc2")
 func CImplFunc2(_: Int32) {
-  // expected-error@-2 {{global function 'CImplFunc2' does not belong to an Objective-C category; remove the category name from this attribute}} {{21-34=}}
+  // expected-error@-2 {{global function 'CImplFunc2' does not belong to an Objective-C category; remove the category name from this attribute}} {{16-29=}}
 }
 
 @_objcImplementation @_cdecl("CImplFuncMissing")
 func CImplFuncMissing(_: Int32) {
-  // expected-error@-2 {{could not find imported function 'CImplFuncMissing' matching global function 'CImplFuncMissing'; make sure your umbrella or bridging header imports the header that declares it}}
+  // expected-error@-2 {{could not find imported function 'CImplFuncMissing' matching global function 'CImplFuncMissing'; make sure you import the module or header that declares it}}
 }
 
 @_objcImplementation @_cdecl("CImplFuncMismatch1")
@@ -538,12 +556,12 @@ func CImplFuncMismatch1(_: Float) {
   // expected-warning@-1 {{global function 'CImplFuncMismatch1' of type '(Float) -> ()' does not match type '(Int32) -> Void' declared by the header}}
 }
 
-@_objcImplementation @_cdecl("CImplFuncMismatch2")
+@implementation @_cdecl("CImplFuncMismatch2")
 func CImplFuncMismatch2(_: Int32) -> Float {
-  // expected-warning@-1 {{global function 'CImplFuncMismatch2' of type '(Int32) -> Float' does not match type '(Int32) -> Void' declared by the header}}
+  // expected-error@-1 {{global function 'CImplFuncMismatch2' of type '(Int32) -> Float' does not match type '(Int32) -> Void' declared by the header}}
 }
 
-@_objcImplementation @_cdecl("CImplFuncMismatch3")
+@implementation @_cdecl("CImplFuncMismatch3")
 func CImplFuncMismatch3(_: Any?) {
   // OK
 }
@@ -553,18 +571,18 @@ func CImplFuncMismatch4(_: Any) {
   // expected-warning@-1 {{global function 'CImplFuncMismatch4' of type '(Any) -> ()' does not match type '(Any?) -> Void' declared by the header}}
 }
 
-@_objcImplementation @_cdecl("CImplFuncMismatch5")
+@implementation @_cdecl("CImplFuncMismatch5")
 func CImplFuncMismatch5(_: Any) {
   // OK
 }
 
-@_objcImplementation @_cdecl("CImplFuncMismatch6")
+@implementation @_cdecl("CImplFuncMismatch6")
 func CImplFuncMismatch6(_: Any!) {
   // OK, mismatch allowed
 }
 
 
-@_objcImplementation @_cdecl("CImplFuncMismatch3a")
+@implementation @_cdecl("CImplFuncMismatch3a")
 func CImplFuncMismatch3a(_: Int32) -> Any? {
   // OK
 }
@@ -574,25 +592,25 @@ func CImplFuncMismatch4a(_: Int32) -> Any {
   // expected-warning@-1 {{global function 'CImplFuncMismatch4a' of type '(Int32) -> Any' does not match type '(Int32) -> Any?' declared by the header}}
 }
 
-@_objcImplementation @_cdecl("CImplFuncMismatch5a")
+@implementation @_cdecl("CImplFuncMismatch5a")
 func CImplFuncMismatch5a(_: Int32) -> Any {
   // OK
 }
 
-@_objcImplementation @_cdecl("CImplFuncMismatch6a")
+@implementation @_cdecl("CImplFuncMismatch6a")
 func CImplFuncMismatch6a(_: Int32) -> Any! {
   // OK, mismatch allowed
 }
 
-@_objcImplementation @_cdecl("CImplFuncNameMismatch1")
+@implementation @_cdecl("CImplFuncNameMismatch1")
 func mismatchedName1(_: Int32) {
-  // expected-error@-2 {{could not find imported function 'CImplFuncNameMismatch1' matching global function 'mismatchedName1'; make sure your umbrella or bridging header imports the header that declares it}}
+  // expected-error@-2 {{could not find imported function 'CImplFuncNameMismatch1' matching global function 'mismatchedName1'; make sure you import the module or header that declares it}}
   // FIXME: Improve diagnostic for a partial match.
 }
 
-@_objcImplementation @_cdecl("mismatchedName2")
+@implementation @_cdecl("mismatchedName2")
 func CImplFuncNameMismatch2(_: Int32) {
-  // expected-error@-2 {{could not find imported function 'mismatchedName2' matching global function 'CImplFuncNameMismatch2'; make sure your umbrella or bridging header imports the header that declares it}}
+  // expected-error@-2 {{could not find imported function 'mismatchedName2' matching global function 'CImplFuncNameMismatch2'; make sure you import the module or header that declares it}}
   // FIXME: Improve diagnostic for a partial match.
 }
 
@@ -600,17 +618,17 @@ func CImplFuncNameMismatch2(_: Int32) {
 // TODO: @_cdecl for global functions imported as computed vars
 //
 var cImplComputedGlobal1: Int32 {
-  @_objcImplementation @_cdecl("CImplGetComputedGlobal1")
+  @implementation @_cdecl("CImplGetComputedGlobal1")
   get {
     // FIXME: Lookup for vars isn't working yet
-    // expected-error@-3 {{could not find imported function 'CImplGetComputedGlobal1' matching getter for var 'cImplComputedGlobal1'; make sure your umbrella or bridging header imports the header that declares it}}
+    // expected-error@-3 {{could not find imported function 'CImplGetComputedGlobal1' matching getter for var 'cImplComputedGlobal1'; make sure you import the module or header that declares it}}
     return 0
   }
 
-  @_objcImplementation @_cdecl("CImplSetComputedGlobal1")
+  @implementation @_cdecl("CImplSetComputedGlobal1")
   set {
     // FIXME: Lookup for vars isn't working yet
-    // expected-error@-3 {{could not find imported function 'CImplSetComputedGlobal1' matching setter for var 'cImplComputedGlobal1'; make sure your umbrella or bridging header imports the header that declares it}}
+    // expected-error@-3 {{could not find imported function 'CImplSetComputedGlobal1' matching setter for var 'cImplComputedGlobal1'; make sure you import the module or header that declares it}}
     print(newValue)
   }
 }
@@ -619,12 +637,12 @@ var cImplComputedGlobal1: Int32 {
 // TODO: @_cdecl for import-as-member functions
 //
 extension CImplStruct {
-  @_objcImplementation @_cdecl("CImplStructStaticFunc1")
+  @implementation @_cdecl("CImplStructStaticFunc1")
   static func staticFunc1(_: Int32) {
     // FIXME: Add underlying support for this
     // expected-error@-3 {{@_cdecl can only be applied to global functions}}
     // FIXME: Lookup in an enclosing type is not working yet
-    // expected-error@-5 {{could not find imported function 'CImplStructStaticFunc1' matching static method 'staticFunc1'; make sure your umbrella or bridging header imports the header that declares it}}
+    // expected-error@-5 {{could not find imported function 'CImplStructStaticFunc1' matching static method 'staticFunc1'; make sure you import the module or header that declares it}}
   }
 }
 

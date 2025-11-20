@@ -13,6 +13,7 @@
 #ifndef SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 #define SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
@@ -49,7 +50,7 @@ class ClangSyntaxPrinter {
 public:
   enum class LeadingTrivia { None, Comma };
 
-  ClangSyntaxPrinter(raw_ostream &os) : os(os) {}
+  ClangSyntaxPrinter(const ASTContext &Ctx, raw_ostream &os) : os(os), mangler(Ctx) {}
 
   /// Print a given identifier. If the identifer conflicts with a keyword, add a
   /// trailing underscore.
@@ -95,7 +96,8 @@ public:
       const NominalTypeDecl *typeDecl);
 
   // Returns true when no qualifiers were printed.
-  bool printNestedTypeNamespaceQualifiers(const ValueDecl *D) const;
+  bool printNestedTypeNamespaceQualifiers(const ValueDecl *D,
+                                          bool forC = false) const;
 
   /// Print out the C++ class access qualifier for the given Swift  type
   /// declaration.

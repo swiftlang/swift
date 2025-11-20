@@ -64,8 +64,8 @@ private:
 
   void initializeFrom(const SymbolInfo &other) {
     _symbolAddress = other._symbolAddress;
-    _symbolName = ::strdup(other._symbolName);
-    _moduleFileName = ::strdup(other._moduleFileName);
+    _symbolName = ::_strdup(other._symbolName);
+    _moduleFileName = ::_strdup(other._moduleFileName);
     _moduleBaseAddress = other._moduleBaseAddress;
   }
 
