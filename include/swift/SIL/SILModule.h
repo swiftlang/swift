@@ -1161,10 +1161,18 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
   return OS;
 }
 
-void verificationFailure(const Twine &complaint,
-              const SILInstruction *atInstruction,
-              const SILArgument *atArgument,
-              llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
+void verificationFailure(
+    const Twine &complaint, const SILFunction *fn,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
+void verificationFailure(
+    const Twine &complaint, const SILInstruction *atInstruction,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
+void verificationFailure(
+    const Twine &complaint, const SILArgument *atArgument,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
+void verificationFailure(
+    const Twine &complaint, SILValue atValue,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
 
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
   switch (mod.getStage()) {

@@ -22,7 +22,7 @@ private func require(_ condition: Bool, _ message: @autoclosure () -> String, at
   if !condition {
     let msg = message()
     msg._withBridgedStringRef { stringRef in
-      BridgedVerifier.verifierError(stringRef, atInstruction.bridged, Optional<Argument>.none.bridged)
+      BridgedVerifier.verifierError(stringRef, atInstruction.bridged)
     }
   }
 }
