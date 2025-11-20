@@ -4321,12 +4321,12 @@ if (-not $SkipBuild) {
           foreach ($Build in $WindowsSDKBuilds) {
             Invoke-BuildStep Build-ExperimentalSDK $Build
 
-            Get-ChildItem "${SDKROOT}\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+            Get-ChildItem -ErrorAction Ignore "${SDKROOT}\usr\lib\swift\windows" -Filter "*.lib" -File | ForEach-Object {
               Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
               Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
             }
 
-            Get-ChildItem "${SDKROOT}\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+            Get-ChildItem -ErrorAction Ignore "${SDKROOT}\usr\lib\swift_static\windows" -Filter "*.lib" -File | ForEach-Object {
               Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
               Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\windows\$($Build.Architecture.LLVMName)\" | Out-Null
             }
@@ -4403,7 +4403,7 @@ if (-not $SkipBuild) {
               Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\android\$($Build.Architecture.LLVMName)\" | Out-Null
             }
 
-            Get-ChildItem "${SDKROOT}\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+            Get-ChildItem -ErrorAction Ignore "${SDKROOT}\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
               Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
               Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\android\$($Build.Architecture.LLVMName)\" | Out-Null
             }
