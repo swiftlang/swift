@@ -1996,6 +1996,28 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
                      "throwing");
       return true;
     }
+
+    // Make sure that if we're overriding a `@dynamicMemberLookup` subscript, it
+    // remains as valid as its parent. `@dynamicMemberLookup`-annotated types
+    // normally go through `AttributeChecker` for validation, but if
+    // `@dynamicMemberLookup` is inherited, there isn't an explicit attr to
+    // validate. Most potential mismatches have been caught at this point, but
+    // we do still need to check that, e.g., the overridden decl hasn't dropped
+    // a default value for one of its parameters.
+    if (auto parentSubscript = dyn_cast<SubscriptDecl>(baseASD)) {
+      auto owningTy = override->getDeclContext()->getDeclaredInterfaceType();
+      if (owningTy->hasDynamicMemberLookupAttribute() &&
+          parentSubscript->isValidDynamicMemberLookupSubscript(std::nullopt)) {
+        auto overrideSubscript = cast<SubscriptDecl>(overrideASD);
+
+        auto [eligibility, _] = evaluateOrFatal(
+            overrideSubscript->getASTContext().evaluator,
+            DynamicMemberLookupSubscriptRequest{overrideSubscript, nullptr});
+        if (eligibility.diagnose()) {
+          return true;
+        }
+      }
+    }
   }
 
   // Various properties are only checked for the storage declarations
