@@ -38,12 +38,17 @@ import A2.B2.C2
 // DUMP-NEXT:   SwiftOnoneSupport
 // DUMP-NEXT:   A1
 // DUMP-NEXT:   B1
+// DUMP-NEXT:   A1
 // DUMP-NEXT:   C1
+// DUMP-NEXT:   A1
 // DUMP-NEXT:   D1
+// DUMP-NEXT:   A1
 // DUMP-NEXT:   E1
+// DUMP-NEXT:   A1
 // DUMP-NEXT:   B2
 // DUMP-NEXT:   A2
 // DUMP-NEXT:   C2
+// DUMP-NEXT:   A2
 
 public func callUnsafe(_ p: UnsafeMutableRawPointer) {
   let _ = a1(p, 13)
@@ -290,7 +295,10 @@ c2_t b2_2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   D1
 // DUMP-NEXT:   A1
 // DUMP-NEXT:   C1
+// DUMP-NEXT:   A1
 // DUMP-NEXT:   B1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   A1
 // DUMP-CXX-NEXT:   CxxShim
 // DUMP-CXX-NEXT:   Cxx
 // DUMP-NEXT:   _StringProcessing
@@ -305,7 +313,10 @@ c2_t b2_2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   D1
 // DUMP-NEXT:   A1
 // DUMP-NEXT:   C1
+// DUMP-NEXT:   A1
 // DUMP-NEXT:   B1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   A1
 // DUMP-CXX-NEXT:   CxxShim
 // DUMP-CXX-NEXT:   Cxx
 // DUMP-NEXT:   _StringProcessing
@@ -333,7 +344,10 @@ e2_t c2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   D1
 // DUMP-NEXT:   A1
 // DUMP-NEXT:   C1
+// DUMP-NEXT:   A1
 // DUMP-NEXT:   B1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   A1
 // DUMP-CXX-NEXT:   CxxShim
 // DUMP-CXX-NEXT:   Cxx
 // DUMP-NEXT:   _StringProcessing
@@ -357,7 +371,10 @@ e2_t d2(void * _Nonnull __sized_by(size), int size);
 // DUMP-NEXT:   D1
 // DUMP-NEXT:   A1
 // DUMP-NEXT:   C1
+// DUMP-NEXT:   A1
 // DUMP-NEXT:   B1
+// DUMP-NEXT:   A1
+// DUMP-NEXT:   A1
 // DUMP-CXX-NEXT:   CxxShim
 // DUMP-CXX-NEXT:   Cxx
 // DUMP-NEXT:   _StringProcessing
