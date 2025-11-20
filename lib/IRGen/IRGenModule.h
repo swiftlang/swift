@@ -1203,7 +1203,7 @@ public:
 
   ClassMetadataStrategy getClassMetadataStrategy(const ClassDecl *theClass);
 
-  bool IsWellKnownBuiltinOrStructralType(CanType type) const;
+  bool isWellKnownBuiltinOrStructuralType(CanType type) const;
 
 private:
   TypeConverter &Types;
