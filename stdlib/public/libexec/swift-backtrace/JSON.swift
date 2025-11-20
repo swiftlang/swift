@@ -26,13 +26,21 @@ import CRT
 @_spi(Internal) import Runtime
 @_spi(MemoryReaders) import Runtime
 
-extension SwiftBacktrace {
+public protocol JSONOutput {
+  static func write(_ string: String, flush: Bool) 
+  static func writeln(_ string: String, flush: Bool)
+  static func getDescription() -> String?
+  static func getArchitecture() -> String?
+  static func getPlatform() -> String?
+  static func getFaultAddress() -> String?
+}
 
-  static func outputJSONCrashLog() {
+extension SwiftBacktrace: JSONOutput {
+  static func getDescription() -> String? {
     guard let target = target else {
       print("swift-backtrace: unable to get target",
             to: &standardError)
-      return
+      return nil
     }
 
     let crashingThread = target.threads[target.crashingThreadNdx]
@@ -46,6 +54,14 @@ extension SwiftBacktrace {
       description = target.signalDescription
     }
 
+    return description
+  }
+
+  static func getArchitecture() -> String? {
+    guard let target else { return nil }
+
+    let crashingThread = target.threads[target.crashingThreadNdx]
+
     let architecture: String
     switch crashingThread.backtrace {
       case let .raw(backtrace):
@@ -54,15 +70,77 @@ extension SwiftBacktrace {
         architecture = backtrace.architecture
     }
 
+    return architecture
+  }
+
+  static func getPlatform() -> String? {
+    guard let target else { return nil }
+
+    return target.images.platform
+  }
+
+  static func getFaultAddress() -> String? {
+    guard let target else { return nil }
+
+    return hex(target.faultAddress)
+  }
+}
+
+public extension JSONOutput {
+  static func writePreamble(now: timespec) {
+    guard let description = getDescription(), let faultAddress = getFaultAddress(),
+    let platform = getPlatform(), let architecture = getArchitecture() else { return }
+
     write("""
-            { \
-            "timestamp": "\(formatISO8601(now))", \
-            "kind": "crashReport", \
-            "description": "\(escapeJSON(description))", \
-            "faultAddress": "\(hex(target.faultAddress))", \
-            "platform": "\(escapeJSON(target.images.platform))", \
-            "architecture": "\(escapeJSON(architecture))"
-            """)
+        { \
+        "timestamp": "\(formatISO8601(now))", \
+        "kind": "crashReport", \
+        "description": "\(escapeJSON(description))", \
+        "faultAddress": "\(faultAddress)", \
+        "platform": "\(escapeJSON(platform))", \
+        "architecture": "\(escapeJSON(architecture))"
+        """,
+    flush: false)
+  }
+}
+
+extension SwiftBacktrace {
+
+  static func outputJSONCrashLog() {
+    guard let target = target else {
+      print("swift-backtrace: unable to get target",
+            to: &standardError)
+      return
+    }
+
+    let crashingThread = target.threads[target.crashingThreadNdx]
+
+    // let description: String
+
+    // if case let .symbolicated(symbolicated) = crashingThread.backtrace,
+    //    let failure = symbolicated.swiftRuntimeFailure {
+    //   description = failure
+    // } else {
+    //   description = target.signalDescription
+    // }
+
+    // let architecture: String
+    // switch crashingThread.backtrace {
+    //   case let .raw(backtrace):
+    //     architecture = backtrace.architecture
+    //   case let .symbolicated(backtrace):
+    //     architecture = backtrace.architecture
+    // }
+
+    // write("""
+    //         { \
+    //         "timestamp": "\(formatISO8601(now))", \
+    //         "kind": "crashReport", \
+    //         "description": "\(escapeJSON(description))", \
+    //         "faultAddress": "\(hex(target.faultAddress))", \
+    //         "platform": "\(escapeJSON(target.images.platform))", \
+    //         "architecture": "\(escapeJSON(architecture))"
+    //         """)
 
     var mentionedImages = Set<Int>()
     var capturedBytes: [UInt64:Array<UInt8>] = [:]
@@ -264,6 +342,8 @@ extension SwiftBacktrace {
         }
       }
     }
+
+    writePreamble(now: now)
 
     write(#", "threads": [ "#)
     if args.threads! {

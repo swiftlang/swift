@@ -26,7 +26,8 @@ internal import Glibc
 internal import Musl
 #endif
 
-internal func hex<T: FixedWidthInteger>(_ value: T,
+@_spi(Utils)
+public func hex<T: FixedWidthInteger>(_ value: T,
                                         prefix shouldPrefix: Bool = true,
                                         width: Int = MemoryLayout<T>.size * 2)
   -> String {
@@ -38,7 +39,8 @@ internal func hex<T: FixedWidthInteger>(_ value: T,
   return "\(prefix)\(padding)\(digits)"
 }
 
-internal func hex(_ bytes: some Sequence<UInt8>) -> String {
+@_spi(Utils)
+public func hex(_ bytes: some Sequence<UInt8>) -> String {
   return bytes.map{ hex($0, prefix: false) }.joined(separator: "")
 }
 
