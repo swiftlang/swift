@@ -52,3 +52,42 @@ do {
   check(NonSendable()) // expected-warning {{type 'NonSendable' does not conform to the 'Sendable' protocol}}
   check(NoInference()) // Ok
 }
+
+func takesSendable<T: Sendable>(_: T) {}
+
+class MyValue {} // expected-note 2 {{class 'MyValue' does not conform to the 'Sendable' protocol}}
+
+public struct D: ~Sendable {
+}
+
+extension D: Sendable {} // expected-error {{cannot both conform to and suppress conformance to 'Sendable'}}
+
+takesSendable(D())
+
+public struct F<T>: ~Sendable {
+  let x: T
+}
+
+extension F: Sendable where T: Sendable { }
+
+takesSendable(F(x: 42))
+
+public struct G<T, U>: ~Sendable { // expected-note {{making generic parameter 'U' conform to the 'Sendable' protocol}}
+  let t: T
+  let u: U // expected-warning {{stored property 'u' of 'Sendable'-conforming generic struct 'G' has non-Sendable type 'U'}}
+}
+
+extension G: Sendable where T: Sendable { }
+
+takesSendable(G(t: "", u: 42))
+takesSendable(G(t: MyValue(), u: 0)) // expected-warning {{type 'MyValue' does not conform to the 'Sendable' protocol}}
+
+public struct H<T, U>: ~Sendable {
+  let t: T
+  let u: U
+}
+
+extension H: Sendable where T: Sendable, U: Sendable { }
+
+takesSendable(H(t: "", u: 42))
+takesSendable(H(t: "", u: MyValue())) // expected-warning {{type 'MyValue' does not conform to the 'Sendable' protocol}}
