@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,7 +21,7 @@ struct Command: Hashable {
 }
 
 extension Command: Decodable {
-  init(from decoder: Decoder) throws {
+  init(from decoder: any Decoder) throws {
     let command = try decoder.singleValueContainer().decode(String.self)
     self = try CommandParser.parseCommand(command)
   }
