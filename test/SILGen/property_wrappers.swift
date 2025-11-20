@@ -1028,3 +1028,33 @@ struct TestReabstractableWrappedValue<T1> {
   @AutoclosureWrapper var v: S<T1> = S()
   init() where T1 == Int { }
 }
+
+// https://github.com/swiftlang/swift/issues/81021
+@propertyWrapper
+struct Clamping {
+    private var value: Int
+    private var range: ClosedRange<Int>
+
+    init(wrappedValue: Int, _ range: ClosedRange<Int>) {
+        self.range = range
+        self.value = range.clamp(wrappedValue)
+    }
+
+    var wrappedValue: Int {
+        get { value }
+        set { value = range.clamp(newValue) }
+    }
+
+    var projectedValue: ClosedRange<Int> {
+        get { range }
+        set { range = newValue }
+    }
+}
+
+extension ClosedRange where Bound: Comparable {
+    func clamp(_ value: Bound) -> Bound {
+        return min(max(lowerBound, value), upperBound)
+    }
+}
+
+func clampingArg(@Clamping(0...10) _ value: Int) {}
