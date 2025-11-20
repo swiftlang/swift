@@ -3681,7 +3681,7 @@ namespace {
       //
       // TODO: If a nominal type is in the same source file as we're currently
       // emitting, we would be able to see its value witness table.
-      if (IGF.IGM.IsWellKnownBuiltinOrStructralType(t))
+      if (IGF.IGM.isWellKnownBuiltinOrStructuralType(t))
         return emitFromValueWitnessTable(t);
 
       // If the type is a singleton aggregate, the field's layout is equivalent

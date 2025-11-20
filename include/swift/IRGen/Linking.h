@@ -465,6 +465,10 @@ class LinkEntity {
     // These are both type kinds and protocol-conformance kinds.
     // TYPE KINDS: BEGIN {{
 
+    /// A SIL differentiability witness. The pointer is a
+    /// SILDifferentiabilityWitness*.
+    DifferentiabilityWitness,
+
     /// A lazy protocol witness accessor function. The pointer is a
     /// canonical TypeBase*, and the secondary pointer is a
     /// ProtocolConformance*.
@@ -474,10 +478,6 @@ class LinkEntity {
     /// canonical TypeBase*, and the secondary pointer is a
     /// ProtocolConformance*.
     ProtocolWitnessTableLazyCacheVariable,
-
-    /// A SIL differentiability witness. The pointer is a
-    /// SILDifferentiabilityWitness*.
-    DifferentiabilityWitness,
 
     // Everything following this is a type kind.
 
