@@ -258,6 +258,17 @@ func test11(_ p: any Any) {
   let c = p as! SubClass
   c.foo()
 }
+
+func test12(_ p: any Any) {
+  print("test any as! (Int, Int, Int, Int)")
+  if let c = p as? (Int, Int, Int, Int) {
+    print("success")
+    print("tuple: \(c.0)")
+  } else {
+    print("cast failed")
+  }
+}
+
 @main
 struct Main {
   static func main() {
@@ -372,5 +383,9 @@ struct Main {
 // OUTPUT:  SubClass.foo
 // OUTPUT:  BaseClass.deinit
 // OUTPUT-NOT:  deinit
+    test12((0, 1, 2, 3))
+// OUTPUT: test any as! (Int, Int, Int, Int)
+// OUTPUT:   success
+// OUTPUT:   tuple: 0
   }
 }
