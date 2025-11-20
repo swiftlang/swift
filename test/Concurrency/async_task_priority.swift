@@ -322,15 +322,15 @@ actor Test {
           await task2.value // Escalate task2 which should be queued behind task1 on the actor
         }
 
-        // This test will only work properly on 27.0+
-        if #available(macOS 27.0, iOS 27.0, tvOS 27.0, watchOS 27.0, *) {
+        // This test will only work properly if Dispatch supports lowering the base priority of a thread
+        if #available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *) {
           tests.test("Task escalation doesn't impact qos_class_self") {
             let task = Task(priority: .utility) {
               let initialQos = DispatchQoS(
                 qosClass: DispatchQoS.QoSClass(rawValue: qos_class_self())!,
                 relativePriority: 0)
               expectEqual(initialQos, DispatchQoS.utility)
-              let childTask = Task {
+              let innerTask = Task {
                 let qosBeforeEscalate = DispatchQoS(
                   qosClass: DispatchQoS.QoSClass(rawValue: qos_class_self())!,
                   relativePriority: 0)
@@ -353,7 +353,7 @@ actor Test {
                 expectEqual(qosAfterYield, DispatchQoS.utility)
               }
 
-              await childTask.value
+              await innerTask.value
             }
 
             await task.value
