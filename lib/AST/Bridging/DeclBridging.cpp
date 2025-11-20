@@ -95,6 +95,16 @@ BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(BridgedASTContext cContext,
 #define ABSTRACT_DECL(Id, Parent) DECL(Id, Parent)
 #include "swift/AST/DeclNodes.def"
 
+// Define `.asNominalTypeDecl` on each BridgedXXXDecl type that's also a
+// NominalTypeDecl.
+#define DECL(Id, Parent)
+#define NOMINAL_TYPE_DECL(Id, Parent)                                          \
+  BridgedNominalTypeDecl Bridged##Id##Decl_asNominalTypeDecl(                  \
+      Bridged##Id##Decl decl) {                                                \
+    return static_cast<NominalTypeDecl *>(decl.unbridged());                   \
+  }
+#include "swift/AST/DeclNodes.def"
+
 // Define `.asDeclContext` on each BridgedXXXDecl type that's also a
 // DeclContext.
 #define DECL(Id, Parent)
@@ -339,7 +349,7 @@ convertToInheritedEntries(ASTContext &ctx, BridgedArrayRef cInheritedTypes) {
       [](auto &e) { return InheritedEntry(e.unbridged()); });
 }
 
-BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
+BridgedEnumDecl BridgedEnumDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     SourceLoc enumKeywordLoc, swift::Identifier name, SourceLoc nameLoc,
     BridgedNullableGenericParamList genericParamList,
@@ -348,7 +358,7 @@ BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
     SourceRange braceRange) {
   ASTContext &context = cContext.unbridged();
 
-  NominalTypeDecl *decl = new (context)
+  auto *decl = new (context)
       EnumDecl(enumKeywordLoc, name, nameLoc,
                convertToInheritedEntries(context, cInheritedTypes),
                genericParamList.unbridged(), cDeclContext.unbridged());

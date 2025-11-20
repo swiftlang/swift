@@ -1992,10 +1992,16 @@ final public class SwitchEnumInst : TermInst {
     zip(caseIndices, successors)
   }
 
+  public var numCases: Int { caseIndices.count }
+
   // This does not handle the special case where the default covers exactly
   // the "missing" case.
   public func getUniqueSuccessor(forCaseIndex: Int) -> BasicBlock? {
     cases.first(where: { $0.0 == forCaseIndex })?.1
+  }
+
+  public func getSuccessorForDefault() -> BasicBlock? {
+    return self.bridged.SwitchEnumInst_getSuccessorForDefault().block
   }
 
   // This does not handle the special case where the default covers exactly

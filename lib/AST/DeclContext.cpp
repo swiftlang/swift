@@ -1067,7 +1067,7 @@ void IterableDeclContext::addMember(Decl *member, Decl *hint, bool insertAtHead)
   case IterableDeclContextKind::NominalTypeDecl: {
     auto nominal = cast<NominalTypeDecl>(this);
     nominal->addedMember(member);
-    assert(member->getDeclContext() == nominal &&
+    assert(member->getDeclContext() == static_cast<DeclContext *>(nominal) &&
            "Added member to the wrong context");
     break;
   }
