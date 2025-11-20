@@ -1627,8 +1627,12 @@ struct BridgedVerifier {
   static void runSwiftFunctionVerification(swift::SILFunction * _Nonnull f, swift::SILContext * _Nonnull context);
 
   static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
-  static void verifierError(BridgedStringRef message, OptionalBridgedInstruction atInstruction,
+  static void verifierError(BridgedStringRef message,
+                            OptionalBridgedInstruction atInstruction);
+  static void verifierError(BridgedStringRef message,
                             OptionalBridgedArgument atArgument);
+  static void verifierError(BridgedStringRef message,
+                            OptionalBridgedValue atValue);
 };
 
 struct BridgedUtilities {
