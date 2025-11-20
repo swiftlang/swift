@@ -5382,10 +5382,9 @@ static const llvm::StringMap<std::vector<int>> STLConditionalParams{
 
 template <typename Kind>
 static bool checkConditionalParams(
-    clang::RecordDecl *recordDecl, ClangImporter::Implementation *impl,
+    const clang::RecordDecl *recordDecl, ClangImporter::Implementation *impl,
     const std::vector<int> &STLParams, std::set<StringRef> &conditionalParams,
-    std::function<void(const clang::Type *)> &maybePushToStack) {
-  HeaderLoc loc{recordDecl->getLocation()};
+    llvm::function_ref<void(const clang::Type *)> maybePushToStack) {
   bool foundErrors = false;
   auto specDecl = cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
   SmallVector<std::pair<unsigned, StringRef>, 4> argumentsToCheck;
@@ -5416,7 +5415,8 @@ static bool checkConditionalParams(
       for (auto nonPackArg : nonPackArgs) {
         if (nonPackArg.getKind() != clang::TemplateArgument::Type) {
           if (impl)
-            impl->diagnose(loc, diag::type_template_parameter_expected,
+            impl->diagnose(HeaderLoc(recordDecl->getLocation()),
+                           diag::type_template_parameter_expected,
                            argToCheck.second);
           foundErrors = true;
         } else {
@@ -5427,7 +5427,7 @@ static bool checkConditionalParams(
     }
     if (hasInjectedSTLAnnotation)
       break;
-    clang::DeclContext *dc = specDecl;
+    const clang::DeclContext *dc = specDecl;
     specDecl = nullptr;
     while ((dc = dc->getParent())) {
       specDecl = dyn_cast<clang::ClassTemplateSpecializationDecl>(dc);
@@ -5474,19 +5474,33 @@ getConditionalCopyableAttrParams(const clang::RecordDecl *decl) {
 CxxEscapability
 ClangTypeEscapability::evaluate(Evaluator &evaluator,
                                 EscapabilityLookupDescriptor desc) const {
+
+  // Escapability inference rules:
+  // - array and vector types have the same escapability as their element type
+  // - pointer and reference types are currently imported as escapable
+  // (importing them as non-escapable broke backward compatibility)
+  // - a record type is escapable or non-escapable if it is explicitly annotated
+  // as such
+  // - a record type is escapable if it is annotated with SWIFT_ESCAPABLE_IF()
+  // and none of the annotation arguments are non-escapable
+  // - in all other cases, the record has unknown escapability (e.g. no
+  // escapability annotations, malformed escapability annotations)
+
   bool hasUnknown = false;
   auto desugared = desc.type->getUnqualifiedDesugaredType();
   if (const auto *recordType = desugared->getAs<clang::RecordType>()) {
     auto recordDecl = recordType->getDecl();
+    // If the root type has a SWIFT_ESCAPABLE annotation, we import the type as
+    // Escapable without entering the loop
     if (hasEscapableAttr(recordDecl))
       return CxxEscapability::Escapable;
   }
 
   llvm::SmallVector<const clang::Type *, 4> stack;
-  // Keep track of Decls we've seen to avoid cycles
+  // Keep track of Types we've seen to avoid cycles
   llvm::SmallDenseSet<const clang::Type *, 4> seen;
 
-  std::function maybePushToStack = [&](const clang::Type *type) {
+  auto maybePushToStack = [&](const clang::Type *type) {
     auto desugared = type->getUnqualifiedDesugaredType();
     if (seen.insert(desugared).second)
       stack.push_back(desugared);
@@ -5524,6 +5538,10 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
 
         continue;
       }
+      // The `annotationOnly` flag used to control which types we infered
+      // escapability for. Currently, this flag is always set to true, meaning
+      // that any type without an annotation (CxxRecordDecls, aggregates, decls
+      // lacking definition, etc.) will raise `hasUnknown`.
       if (desc.annotationOnly) {
         hasUnknown = true;
         continue;
@@ -5539,8 +5557,7 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
           maybePushToStack(field->getType()->getUnqualifiedDesugaredType());
         continue;
       }
-    }
-    if (type->isArrayType()) {
+    } else if (type->isArrayType()) {
       auto elemTy = cast<clang::ArrayType>(type)
                         ->getElementType()
                         ->getUnqualifiedDesugaredType();
@@ -8446,17 +8463,20 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
   // We assume a type can be imported as Copyable unless:
   // - There's no copy constructor
   // - The type has a SWIFT_NONCOPYABLE annotation
-  // - The type has a SWIFT_COPYABLE_IF(T...) annotation, where at least one of T is ~Copyable
-  // - It is one of the STL types in `STLConditionalParams`
+  // - The type has a SWIFT_COPYABLE_IF(T...) annotation, where at least one of
+  // T is ~Copyable
+  // - It is one of the STL types in `STLConditionalParams`, and at least one of
+  // its revelant types is ~Copyable
 
   const auto *type = desc.type->getUnqualifiedDesugaredType();
   auto *importerImpl = desc.importerImpl;
 
-  llvm::SmallVector<clang::RecordDecl *, 4> stack;
+  bool hasUnknown = false;
+  llvm::SmallVector<const clang::RecordDecl *, 4> stack;
   // Keep track of Decls we've seen to avoid cycles
-  llvm::SmallDenseSet<clang::RecordDecl *, 4> seen;
+  llvm::SmallDenseSet<const clang::RecordDecl *, 4> seen;
 
-  std::function maybePushToStack = [&](const clang::Type *type) {
+  auto maybePushToStack = [&](const clang::Type *type) {
     auto recordDecl = type->getAsRecordDecl();
     if (!recordDecl)
       return;
@@ -8481,7 +8501,7 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
 
   maybePushToStack(type);
   while (!stack.empty()) {
-    clang::RecordDecl *recordDecl = stack.back();
+    const clang::RecordDecl *recordDecl = stack.back();
     stack.pop_back();
 
     if (!hasNonCopyableAttr(recordDecl)) {
@@ -8495,22 +8515,7 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
       auto conditionalParams = getConditionalCopyableAttrParams(recordDecl);
 
       if (!STLParams.empty() || !conditionalParams.empty()) {
-        HeaderLoc loc{recordDecl->getLocation()};
-        std::function checkArgValueSemantics =
-            [&](clang::TemplateArgument &arg,
-                StringRef argToCheck) -> std::optional<CxxValueSemanticsKind> {
-          if (arg.getKind() != clang::TemplateArgument::Type) {
-            if (importerImpl)
-              importerImpl->diagnose(
-                  loc, diag::type_template_parameter_expected, argToCheck);
-            return std::nullopt;
-          }
-          maybePushToStack(arg.getAsType()->getUnqualifiedDesugaredType());
-          // FIXME: return std::nullopt for now, while we don't refactor ClangTypeEscapability request
-          return std::nullopt;
-        };
-
-        checkConditionalParams<CxxValueSemanticsKind>(
+        hasUnknown &= checkConditionalParams<CxxValueSemanticsKind>(
             recordDecl, importerImpl, STLParams, conditionalParams,
             maybePushToStack);
 
@@ -8525,7 +8530,7 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
     }
 
     const auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
-    if (!cxxRecordDecl || !cxxRecordDecl->isCompleteDefinition()) {
+    if (!cxxRecordDecl || !recordDecl->isCompleteDefinition()) {
       if (hasNonCopyableAttr(recordDecl))
         return CxxValueSemanticsKind::MoveOnly;
       continue;
@@ -8539,9 +8544,11 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
         (!isCopyable && !isMovable)) {
 
       if (hasConstructorWithUnsupportedDefaultArgs(cxxRecordDecl))
-        return CxxValueSemanticsKind::UnavailableConstructors;
-
-      return CxxValueSemanticsKind::MissingLifetimeOperation;
+        importerImpl->addImportDiagnostic(
+            cxxRecordDecl, Diagnostic(diag::record_unsupported_default_args),
+            cxxRecordDecl->getLocation());
+      hasUnknown = true;
+      continue;
     }
 
     if (hasNonCopyableAttr(cxxRecordDecl) && isMovable)
@@ -8556,7 +8563,8 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
     llvm_unreachable("Could not classify C++ type.");
   }
 
-  return CxxValueSemanticsKind::Copyable;
+  return hasUnknown ? CxxValueSemanticsKind::Unknown
+                    : CxxValueSemanticsKind::Copyable;
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
