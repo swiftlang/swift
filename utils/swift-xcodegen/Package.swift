@@ -1,4 +1,4 @@
-// swift-tools-version: 5.8
+// swift-tools-version: 6.0
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -16,9 +16,6 @@ let package = Package(
             ],
             exclude: [
               "Xcodeproj/README.md",
-            ],
-            swiftSettings: [
-              .enableExperimentalFeature("StrictConcurrency")
             ]
         ),
         .executableTarget(
@@ -26,16 +23,14 @@ let package = Package(
           dependencies: [
             .product(name: "ArgumentParser", package: "swift-argument-parser"),
             "SwiftXcodeGen"
-          ],
-          swiftSettings: [
-            .enableExperimentalFeature("StrictConcurrency")
           ]
         ),
         .testTarget(
           name: "SwiftXcodeGenTest",
           dependencies: ["SwiftXcodeGen"]
         )
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )
 
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
