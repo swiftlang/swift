@@ -62,8 +62,8 @@ enum GenericEnumWithClass<T> {
 // OUTPUT:  deinit called
 // OUTPUT:  deinit called
 // OUTPUT:  deinit called
-
 // OUTPUT-NOT:  deinit called
+// OUTPUT: hello world
 
 func test() {
     let _: any Any = GC<Int>()
@@ -76,6 +76,10 @@ func test() {
     let _: any Any = (StructWithClass(), StructWithClass())
     // outline storage case
     let _: any Any = (StructWithClass(), StructWithClass(), StructWithClass(), StructWithClass())
+    let c: any Any = { print("hello world") }
+    if let cl = c as? () -> () {
+        cl()
+    }
 }
 
 protocol Basic  {

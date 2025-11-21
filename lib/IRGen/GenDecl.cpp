@@ -5480,7 +5480,8 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   }
 
   if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials) &&
-      isa<TupleType>(concreteType)) {
+      (isa<TupleType>(concreteType) ||
+       isa<FunctionType>(concreteType))) {
     IRGen.noteUseOfSpecializedValueMetadata(concreteType);
   }
 
