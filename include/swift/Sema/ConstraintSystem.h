@@ -508,6 +508,10 @@ public:
   /// operator.
   bool isTernary() const;
 
+  /// Determine whether this type variable represents a solver synthesized
+  /// base type of a leading-dot member chain.
+  bool isUnresolvedMemberBase() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -3847,6 +3851,9 @@ public:
 
     addUnsolvedConstraint(constraint);
   }
+
+  void addTransitiveConformanceConstraint(Type type, Type protocolTy,
+                                          ConstraintLocatorBuilder locator);
 
   /// Whether we should record the failure of a constraint.
   bool shouldRecordFailedConstraint() const {

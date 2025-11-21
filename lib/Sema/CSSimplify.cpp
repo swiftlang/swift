@@ -23,6 +23,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
@@ -1473,6 +1474,16 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   return result;
 }
 
+static bool isDirectConformanceOf(TypeVariableType *typeVar,
+                                  Constraint *conformance) {
+  if (!(conformance->getKind() == ConstraintKind::ConformsTo ||
+        conformance->getKind() == ConstraintKind::NonisolatedConformsTo))
+    return false;
+
+  auto requirementTy = conformance->getFirstType();
+  return requirementTy->isEqual(typeVar);
+}
+
 // Match the argument of a call to the parameter.
 static ConstraintSystem::TypeMatchResult matchCallArguments(
     ConstraintSystem &cs, FunctionType *contextualType, ArgumentList *argList,
@@ -1882,25 +1893,10 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         if (locator->isForGenericParameter()) {
           auto &CG = cs.getConstraintGraph();
 
-          auto isTransferableConformance = [&typeVar](Constraint *constraint) {
-            if (constraint->getKind() != ConstraintKind::ConformsTo &&
-                constraint->getKind() != ConstraintKind::NonisolatedConformsTo)
-              return false;
-
-            auto requirementTy = constraint->getFirstType();
-            if (!requirementTy->isEqual(typeVar))
-              return false;
-
-            return constraint->getSecondType()->is<ProtocolType>();
-          };
-
           for (auto *constraint : CG[typeVar].getConstraints()) {
-            if (isTransferableConformance(constraint)) {
-              auto *transitiveConformance = Constraint::create(
-                  cs, ConstraintKind::TransitivelyConformsTo, argTy,
-                  constraint->getSecondType(), constraint->getLocator());
-              cs.addUnsolvedConstraint(transitiveConformance);
-              cs.activateConstraint(transitiveConformance);
+            if (isDirectConformanceOf(typeVar, constraint)) {
+              cs.addTransitiveConformanceConstraint(
+                  argTy, constraint->getSecondType(), loc);
             }
           }
         }
@@ -9341,11 +9337,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
     TypeMatchOptions flags) {
   auto &ctx = getASTContext();
 
-  // Since this is a performance optimization, let's ignore it
-  // in diagnostic mode.
-  if (inSalvageMode())
-    return SolutionKind::Solved;
-
   auto formUnsolved = [&]() {
     // If we're supposed to generate constraints, do so.
     if (flags.contains(TMF_GenerateConstraints)) {
@@ -9363,6 +9354,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
   auto resolvedTy = getFixedTypeRecursive(type, /*wantRValue=*/true);
   if (resolvedTy->isTypeVariableOrMember())
     return formUnsolved();
+
+  // Since this is a performance optimization, let's ignore it
+  // in diagnostic mode. This should only happen once the type
+  // is resolved because leading-dot syntax inference one depends
+  // on this constraint.
+  if (inSalvageMode())
+    return SolutionKind::Solved;
 
   // If the composition consists of a class + protocol,
   // we can't check conformance of the argument because
@@ -16707,6 +16705,33 @@ void ConstraintSystem::addContextualConversionConstraint(
   // FIXME: This is the wrong place to be opening the opaque type.
   auto openedType = openOpaqueType(conversionType, purpose, locator,
                                    /*ownerDecl=*/nullptr);
+
+  // If we have a situations like:
+  //
+  // let v: some P = .myValue
+  //
+  // `some P` is represented as a fresh type variable with a conformance
+  // constraint to `P`. To be able to infer the base type of `.myValue`
+  // we need to record a transitive conformance between the result type
+  // of a leading-dot expression and `P`.
+  //
+  // func test<T: P>(_: T = .myValue) {}
+  //
+  // is similar where `T` is opened and gets a conformance to `P` together
+  // with a conversion constraint to `.myValue`.
+  if (auto *chain = getAsExpr<UnresolvedMemberChainResultExpr>(expr)) {
+    auto *typeVar = openedType->getAs<TypeVariableType>();
+    if (typeVar && typeVar->getImpl().getGenericParameter()) {
+      for (auto *constraint : CG[typeVar].getConstraints()) {
+        if (isDirectConformanceOf(typeVar, constraint)) {
+          addTransitiveConformanceConstraint(getType(chain),
+                                             constraint->getSecondType(),
+                                             getConstraintLocator(chain));
+        }
+      }
+    }
+  }
+
   addConstraint(constraintKind, getType(expr), openedType, locator,
                 /*isFavored*/ true);
 }

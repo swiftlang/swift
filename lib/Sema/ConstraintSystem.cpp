@@ -1554,6 +1554,36 @@ void ConstraintSystem::buildDisjunctionForOptionalVsUnderlying(
   addDisjunctionConstraint(choices, locator, RememberChoice);
 }
 
+void ConstraintSystem::addTransitiveConformanceConstraint(
+    Type type, Type protocolTy, ConstraintLocatorBuilder locator) {
+  if (!protocolTy->is<ProtocolType>())
+    return;
+
+  auto *loc = getConstraintLocator(locator);
+
+  TinyPtrVector<TypeVariableType *> referencedVars;
+  // Note that implicit base type of a leading-dot reference is recorded
+  // as a "referenced" in the constraint. This is important to make sure
+  // that new conformance constraint gets introduced to its inference
+  // without actual conformance check which cannot succeed for the base.
+  //
+  // This supports syntax like `let _: some P = .test`, `<T: P>(_: T = .test)`
+  // and passing leading-dot chain as an argument to a parameter that has a
+  // generic parameter type with conformance constraints.
+  if (auto *M = getAsExpr<UnresolvedMemberChainResultExpr>(
+          simplifyLocatorToAnchor(loc))) {
+    auto *base = M->getChainBase();
+    referencedVars.push_back(
+        findUnresolvedMemberBase(base)->castTo<TypeVariableType>());
+  }
+
+  auto *transitiveConformance =
+      Constraint::create(*this, ConstraintKind::TransitivelyConformsTo, type,
+                         protocolTy, loc, referencedVars);
+  addUnsolvedConstraint(transitiveConformance);
+  activateConstraint(transitiveConformance);
+}
+
 namespace {
 
 struct TypeSimplifier {
