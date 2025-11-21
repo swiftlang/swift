@@ -52,11 +52,31 @@
 using namespace swift;
 using namespace PatternMatch;
 
-static llvm::cl::opt<bool> ShouldReportBoundsChecks("sil-bcopts-report",
-                                                    llvm::cl::init(false));
+static llvm::cl::opt<bool> &ShouldReportBoundsChecks() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-bcopts-report");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-bcopts-report",
+      llvm::cl::init(false));
+  return *opt;
+}
+static auto &EarlyInitShouldReportBoundsChecks = ShouldReportBoundsChecks();
 
-static llvm::cl::opt<bool> EnableABCHoisting("enable-abc-hoisting",
-                                             llvm::cl::init(true));
+static llvm::cl::opt<bool> &EnableABCHoisting() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("enable-abc-hoisting");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "enable-abc-hoisting",
+      llvm::cl::init(true));
+  return *opt;
+}
+static auto &EarlyInitEnableABCHoisting = EnableABCHoisting();
 
 using ArraySet = llvm::SmallPtrSet<SILValue, 16>;
 // A pair of the array pointer and the array check kind (kCheckIndex or
@@ -1054,7 +1074,7 @@ public:
     DestAnalysis = PM->getAnalysis<DestructorAnalysis>();
 
 #ifndef NDEBUG
-    if (ShouldReportBoundsChecks) {
+    if (ShouldReportBoundsChecks()) {
       reportBoundsChecks(func);
     }
 #endif
@@ -1066,7 +1086,7 @@ public:
     changed |= optimizeBoundsChecksInLoops();
 
 #ifndef NDEBUG
-    if (ShouldReportBoundsChecks) {
+    if (ShouldReportBoundsChecks()) {
       reportBoundsChecks(func);
     }
 #endif
@@ -1425,7 +1445,7 @@ bool BoundsCheckOpts::optimizeArrayBoundsCheckInLoop(
       loop,
       /*recursionDepth*/ 0);
 
-  if (!EnableABCHoisting) {
+  if (!EnableABCHoisting()) {
     return changed;
   }
 

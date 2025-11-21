@@ -64,9 +64,21 @@ using namespace swift;
 // FIXME: remove this option after fixing:
 // rdar://145994924 (Mem2Reg calls lifetime completion without checking for
 // pointer escapes)
-llvm::cl::opt<bool> VerifyLifetimeCompletion("verify-lifetime-completion",
-                                             llvm::cl::init(false),
-                                             llvm::cl::desc("."));
+namespace {
+llvm::cl::opt<bool> &VerifyLifetimeCompletion() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("verify-lifetime-completion");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "verify-lifetime-completion",
+      llvm::cl::init(false),
+      llvm::cl::desc("."));
+  return *opt;
+}
+auto &EarlyInitVerifyLifetimeCompletion = VerifyLifetimeCompletion();
+} // namespace
 
 static SILInstruction *endOSSALifetime(SILValue value,
                                        OSSACompleteLifetime::LifetimeEnd end,
@@ -545,7 +557,7 @@ bool OSSACompleteLifetime::analyzeAndUpdateLifetime(
   };
   Walker walker(*this, scopedAddress, boundary, liveness);
   AddressUseKind result = walker.walk(scopedAddress.value);
-  if ((VerifyLifetimeCompletion || ForceLivenessVerification) &&
+  if ((VerifyLifetimeCompletion() || ForceLivenessVerification) &&
       boundary != Boundary::Availability &&
       result != AddressUseKind::NonEscaping) {
     llvm::errs() << "Incomplete liveness for:\n" << scopedAddress.value;
@@ -584,7 +596,7 @@ bool OSSACompleteLifetime::analyzeAndUpdateLifetime(SILValue value,
   }
   InteriorLiveness liveness(value);
   liveness.compute(handleInnerScope);
-  if (VerifyLifetimeCompletion && boundary != Boundary::Availability &&
+  if (VerifyLifetimeCompletion() && boundary != Boundary::Availability &&
       liveness.getAddressUseKind() != AddressUseKind::NonEscaping) {
     llvm::errs() << "Incomplete liveness for: " << value;
     if (auto *escapingUse = liveness.escapingUse) {

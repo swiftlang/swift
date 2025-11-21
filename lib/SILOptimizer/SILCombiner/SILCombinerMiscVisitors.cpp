@@ -43,9 +43,18 @@ using namespace swift::PatternMatch;
 
 /// This flag is used to disable alloc stack optimizations to ease testing of
 /// other SILCombine optimizations.
-static llvm::cl::opt<bool>
-    DisableAllocStackOpts("sil-combine-disable-alloc-stack-opts",
-                          llvm::cl::init(false));
+static llvm::cl::opt<bool> &DisableAllocStackOpts() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-combine-disable-alloc-stack-opts");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-combine-disable-alloc-stack-opts",
+      llvm::cl::init(false));
+  return *opt;
+}
+static auto &EarlyInitDisableAllocStackOpts = DisableAllocStackOpts();
 
 SILInstruction*
 SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
@@ -427,7 +436,7 @@ static bool somethingIsRetained(SILInstruction *from, AllocStackInst *alloc) {
 SILInstruction *SILCombiner::legacyVisitAllocStackInst(AllocStackInst *AS) {
   // If we are testing SILCombine and we are asked not to eliminate
   // alloc_stacks, just return.
-  if (DisableAllocStackOpts)
+  if (DisableAllocStackOpts())
     return nullptr;
 
   AllocStackAnalyzer Analyzer(AS);

@@ -47,18 +47,38 @@
 using namespace swift;
 using namespace Lowering;
 
+namespace {
 // Necessary to straightforwardly write SIL tests that exercise
 // OpaqueValueTypeLowering (and MoveOnlyOpaqueValueTypeLowering): the tests can
 // be written as though opaque values were enabled to begin but have since been
 // lowered out of.
-llvm::cl::opt<bool> TypeLoweringForceOpaqueValueLowering(
-    "type-lowering-force-opaque-value-lowering", llvm::cl::init(false),
-    llvm::cl::desc("Force TypeLowering to behave as if building with opaque "
-                   "values enabled"));
+llvm::cl::opt<bool> &TypeLoweringForceOpaqueValueLowering() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("type-lowering-force-opaque-value-lowering");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "type-lowering-force-opaque-value-lowering", llvm::cl::init(false),
+      llvm::cl::desc("Force TypeLowering to behave as if building with opaque "
+                     "values enabled"));
+  return *opt;
+}
+auto &EarlyInitTypeLoweringForceOpaqueValueLowering = TypeLoweringForceOpaqueValueLowering();
 
-llvm::cl::opt<bool> TypeLoweringDisableVerification(
-    "type-lowering-disable-verification", llvm::cl::init(false),
-    llvm::cl::desc("Disable the asserts-only verification of lowerings"));
+llvm::cl::opt<bool> &TypeLoweringDisableVerification() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("type-lowering-disable-verification");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "type-lowering-disable-verification", llvm::cl::init(false),
+      llvm::cl::desc("Disable the asserts-only verification of lowerings"));
+  return *opt;
+}
+auto &EarlyInitTypeLoweringDisableVerification = TypeLoweringDisableVerification();
+} // namespace
 
 namespace {
   /// A CRTP type visitor for deciding whether the metatype for a type
@@ -2345,7 +2365,7 @@ namespace {
                                             SILTypeProperties properties) {
       properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
       if (!TC.Context.SILOpts.EnableSILOpaqueValues &&
-          !TypeLoweringForceOpaqueValueLowering) {
+          !TypeLoweringForceOpaqueValueLowering()) {
         auto silType = SILType::getPrimitiveAddressType(type);
         return new (TC)
             MoveOnlyAddressOnlyTypeLowering(silType, properties, Expansion);
@@ -2366,7 +2386,7 @@ namespace {
                                     SILTypeProperties properties) {
       properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
       if (!TC.Context.SILOpts.EnableSILOpaqueValues &&
-          !TypeLoweringForceOpaqueValueLowering) {
+          !TypeLoweringForceOpaqueValueLowering()) {
         auto silType = SILType::getPrimitiveAddressType(type);
         return new (TC) AddressOnlyTypeLowering(silType, properties,
                                                            Expansion);
@@ -3285,7 +3305,7 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
                                    AbstractionPattern origType,
                                    CanType substType,
                                    TypeExpansionContext forExpansion) {
-  if (TypeLoweringDisableVerification || !isCacheableLowering(&lowering)) {
+  if (TypeLoweringDisableVerification() || !isCacheableLowering(&lowering)) {
     return;
   }
   verifyLexicalLowering(lowering, origType, substType, forExpansion);

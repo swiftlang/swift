@@ -19,14 +19,33 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/CommandLine.h"
 
-llvm::cl::opt<std::string>
-    SILInlineNeverFuns("sil-inline-never-functions", llvm::cl::init(""),
-                       llvm::cl::desc("Never inline functions whose name "
-                                      "includes this string."));
-llvm::cl::list<std::string>
-    SILInlineNeverFun("sil-inline-never-function", llvm::cl::CommaSeparated,
-                       llvm::cl::desc("Never inline functions whose name "
-                                      "is this string"));
+static llvm::cl::opt<std::string> &SILInlineNeverFuns() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-never-functions");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-inline-never-functions", llvm::cl::init(""),
+      llvm::cl::desc("Never inline functions whose name "
+                     "includes this string."));
+  return *opt;
+}
+static auto &EarlyInitSILInlineNeverFuns = SILInlineNeverFuns();
+
+static llvm::cl::list<std::string> &SILInlineNeverFun() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-never-function");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::list<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::list<std::string>(
+      "sil-inline-never-function", llvm::cl::CommaSeparated,
+      llvm::cl::desc("Never inline functions whose name "
+                     "is this string"));
+  return *opt;
+}
+static auto &EarlyInitSILInlineNeverFun = SILInlineNeverFun();
 
 //===----------------------------------------------------------------------===//
 //                               ConstantTracker
@@ -808,13 +827,13 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
-  if (!SILInlineNeverFuns.empty() &&
-      Callee->getName().contains(SILInlineNeverFuns))
+  if (!SILInlineNeverFuns().empty() &&
+      Callee->getName().contains(SILInlineNeverFuns()))
     return nullptr;
 
-  if (!SILInlineNeverFun.empty() &&
-      SILInlineNeverFun.end() != std::find(SILInlineNeverFun.begin(),
-                                           SILInlineNeverFun.end(),
+  if (!SILInlineNeverFun().empty() &&
+      SILInlineNeverFun().end() != std::find(SILInlineNeverFun().begin(),
+                                           SILInlineNeverFun().end(),
                                            Callee->getName())) {
     return nullptr;
   }

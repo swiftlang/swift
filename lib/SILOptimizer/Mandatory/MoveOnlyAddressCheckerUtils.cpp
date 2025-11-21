@@ -284,11 +284,20 @@
 using namespace swift;
 using namespace swift::siloptimizer;
 
-llvm::cl::opt<bool> DisableMoveOnlyAddressCheckerLifetimeExtension(
-    "move-only-address-checker-disable-lifetime-extension",
-    llvm::cl::init(false),
-    llvm::cl::desc("Disable the lifetime extension of non-consumed fields of "
-                   "move-only values."));
+static llvm::cl::opt<bool> &DisableMoveOnlyAddressCheckerLifetimeExtension() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("move-only-address-checker-disable-lifetime-extension");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "move-only-address-checker-disable-lifetime-extension",
+      llvm::cl::init(false),
+      llvm::cl::desc("Disable the lifetime extension of non-consumed fields of "
+                     "move-only values."));
+  return *opt;
+}
+static auto &EarlyInitDisableMoveOnlyAddressCheckerLifetimeExtension = DisableMoveOnlyAddressCheckerLifetimeExtension();
 
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
@@ -4024,7 +4033,7 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
   liveness.computeBoundary(boundary);
   LLVM_DEBUG(llvm::dbgs() << "Initial use based boundary:\n"; boundary.dump());
 
-  if (!DisableMoveOnlyAddressCheckerLifetimeExtension) {
+  if (!DisableMoveOnlyAddressCheckerLifetimeExtension()) {
     ExtendUnconsumedLiveness extension(addressUseState, liveness, boundary);
     extension.run();
   }
@@ -4053,23 +4062,40 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
 //===----------------------------------------------------------------------===//
 
 #ifndef NDEBUG
-static llvm::cl::opt<uint64_t> NumTopLevelToProcess(
-    "sil-move-only-address-checker-num-top-level-to-process",
-    llvm::cl::desc("Allows for bisecting on move introducer that causes an "
-                   "error. Only meant for debugging!"),
-    llvm::cl::init(UINT64_MAX));
+static llvm::cl::opt<uint64_t> &NumTopLevelToProcess() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-move-only-address-checker-num-top-level-to-process");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<uint64_t>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<uint64_t>(
+      "sil-move-only-address-checker-num-top-level-to-process",
+      llvm::cl::desc("Allows for bisecting on move introducer that causes an "
+                     "error. Only meant for debugging!"),
+      llvm::cl::init(UINT64_MAX));
+  return *opt;
+}
+static auto &EarlyInitNumTopLevelToProcess = NumTopLevelToProcess();
 #endif
 
-static llvm::cl::opt<bool>
-    DumpSILBeforeRemovingMarkUnresolvedNonCopyableValueInst(
-        "sil-move-only-address-checker-dump-before-removing-mark-must-check",
-        llvm::cl::desc(
-            "When bisecting it is useful to dump the SIL before the "
-            "rest of the checker removes "
-            "mark_unresolved_non_copyable_value. This lets one "
-            "grab the SIL of a bad variable after all of the rest have "
-            "been processed to work with further in sil-opt."),
-        llvm::cl::init(false));
+static llvm::cl::opt<bool> &DumpSILBeforeRemovingMarkUnresolvedNonCopyableValueInst() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-move-only-address-checker-dump-before-removing-mark-must-check");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-move-only-address-checker-dump-before-removing-mark-must-check",
+      llvm::cl::desc(
+          "When bisecting it is useful to dump the SIL before the "
+          "rest of the checker removes "
+          "mark_unresolved_non_copyable_value. This lets one "
+          "grab the SIL of a bad variable after all of the rest have "
+          "been processed to work with further in sil-opt."),
+      llvm::cl::init(false));
+  return *opt;
+}
+static auto &EarlyInitDumpSILBeforeRemovingMarkUnresolvedNonCopyableValueInst = DumpSILBeforeRemovingMarkUnresolvedNonCopyableValueInst();
 
 bool MoveOnlyAddressChecker::check(
     llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
@@ -4085,7 +4111,7 @@ bool MoveOnlyAddressChecker::check(
   for (auto *markedValue : moveIntroducersToProcess) {
 #ifndef NDEBUG
     ++numProcessed;
-    if (NumTopLevelToProcess <= numProcessed)
+    if (NumTopLevelToProcess() <= numProcessed)
       break;
 #endif
     LLVM_DEBUG(llvm::dbgs()
@@ -4113,7 +4139,7 @@ bool MoveOnlyAddressChecker::check(
     markedValue->eraseFromParent();
   }
 
-  if (DumpSILBeforeRemovingMarkUnresolvedNonCopyableValueInst) {
+  if (DumpSILBeforeRemovingMarkUnresolvedNonCopyableValueInst()) {
     LLVM_DEBUG(llvm::dbgs()
                    << "Dumping SIL before removing mark must checks!\n";
                fn->dump());

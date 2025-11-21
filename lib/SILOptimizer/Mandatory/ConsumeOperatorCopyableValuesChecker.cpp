@@ -37,8 +37,17 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> DisableUnhandledMoveDiagnostic(
-    "sil-consume-operator-disable-unknown-move-diagnostic");
+static llvm::cl::opt<bool> &DisableUnhandledMoveDiagnostic() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-consume-operator-disable-unknown-move-diagnostic");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-consume-operator-disable-unknown-move-diagnostic");
+  return *opt;
+}
+static auto &EarlyInitDisableUnhandledMoveDiagnostic = DisableUnhandledMoveDiagnostic();
 
 //===----------------------------------------------------------------------===//
 //                            Diagnostic Utilities
@@ -636,7 +645,7 @@ class ConsumeOperatorCopyableValuesCheckerPass : public SILFunctionTransform {
             if (tryEmitCannotConsumeNonLocalMemoryError(mvi))
               continue;
 
-            if (!DisableUnhandledMoveDiagnostic)
+            if (!DisableUnhandledMoveDiagnostic())
               emitUnsupportedUseCaseError(mvi);
           }
         }

@@ -40,13 +40,44 @@ using namespace swift;
 /// Larger blocks will not be duplicated to avoid too much code size increase.
 /// It's very seldom that the default value of 20 is exceeded (< 0.3% of all
 /// loops in the swift benchmarks).
-static llvm::cl::opt<int> LoopRotateSizeLimit("looprotate-size-limit",
-                                              llvm::cl::init(20));
-static llvm::cl::opt<bool> RotateSingleBlockLoop("looprotate-single-block-loop",
-                                                 llvm::cl::init(false));
-static llvm::cl::opt<bool>
-    LoopRotateInfiniteBudget("looprotate-infinite-budget",
-                             llvm::cl::init(false));
+static llvm::cl::opt<int> &LoopRotateSizeLimit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("looprotate-size-limit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "looprotate-size-limit",
+      llvm::cl::init(20));
+  return *opt;
+}
+static auto &EarlyInitLoopRotateSizeLimit = LoopRotateSizeLimit();
+
+static llvm::cl::opt<bool> &RotateSingleBlockLoop() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("looprotate-single-block-loop");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "looprotate-single-block-loop",
+      llvm::cl::init(false));
+  return *opt;
+}
+static auto &EarlyInitRotateSingleBlockLoop = RotateSingleBlockLoop();
+
+static llvm::cl::opt<bool> &LoopRotateInfiniteBudget() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("looprotate-infinite-budget");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "looprotate-infinite-budget",
+      llvm::cl::init(false));
+  return *opt;
+}
+static auto &EarlyInitLoopRotateInfiniteBudget = LoopRotateInfiniteBudget();
 
 static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
                        SILLoopInfo *loopInfo, bool rotateSingleBlockLoops,
@@ -134,7 +165,7 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
     cost += (int)instructionInlineCost(instRef);
   }
 
-  return cost < LoopRotateSizeLimit || LoopRotateInfiniteBudget;
+  return cost < LoopRotateSizeLimit() || LoopRotateInfiniteBudget();
 }
 
 static void mapOperands(SILInstruction *inst,
@@ -258,7 +289,7 @@ static bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
 
   bool didRotate = rotateLoop(
       loop, domInfo, loopInfo,
-      RotateSingleBlockLoop /* rotateSingleBlockLoops */, latch, pm);
+      RotateSingleBlockLoop() /* rotateSingleBlockLoops */, latch, pm);
 
   // Keep rotating at most until we hit the original latch.
   if (didRotate)

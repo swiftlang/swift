@@ -105,11 +105,20 @@ struct SwiftLLVMOptOptions {
       llvm::cl::value_desc("layout-string"), llvm::cl::init(""));
 };
 
-static llvm::cl::opt<std::string> PassPipeline(
-    "passes",
-    llvm::cl::desc(
-        "A textual description of the pass pipeline. To have analysis passes "
-        "available before a certain pass, add 'require<foo-analysis>'."));
+static llvm::cl::opt<std::string> &PassPipeline() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("passes");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "passes",
+      llvm::cl::desc(
+          "A textual description of the pass pipeline. To have analysis passes "
+          "available before a certain pass, add 'require<foo-analysis>'."));
+  return *opt;
+}
+static auto &EarlyInitPassPipeline = PassPipeline();
 //===----------------------------------------------------------------------===//
 //                               Helper Methods
 //===----------------------------------------------------------------------===//
@@ -220,7 +229,7 @@ int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     performLLVMOptimizations(Opts, Diags, nullptr, M.get(), TM.get(),
                              &Out->os());
   } else {
-    std::string Pipeline = PassPipeline;
+    std::string Pipeline = PassPipeline();
     llvm::TargetLibraryInfoImpl TLII(ModuleTriple);
     if (TM)
       TM->setPGOOption(std::nullopt);

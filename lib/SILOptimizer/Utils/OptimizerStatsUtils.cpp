@@ -157,120 +157,276 @@ public:
   }
 };
 
-StatsOnlyInstructionsOpt StatsOnlyInstructionsOptLoc;
+StatsOnlyInstructionsOpt &getStatsOnlyInstructionsOptLoc() {
+  static StatsOnlyInstructionsOpt StatsOnlyInstructionsOptLoc;
+  return StatsOnlyInstructionsOptLoc;
+}
 
-/// Use this option like -Xllvm -sil-stats-only-instructions=strong_retain,alloc_stack
-/// If you need to track all kinds of SILInstructions, you can use
-/// -sil-stats-only-instructions=all
-llvm::cl::opt<StatsOnlyInstructionsOpt, true, llvm::cl::parser<std::string>>
-    StatsOnlyInstructions(
+llvm::cl::opt<StatsOnlyInstructionsOpt, true, llvm::cl::parser<std::string>> &
+StatsOnlyInstructions() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-only-instructions");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<StatsOnlyInstructionsOpt, true, llvm::cl::parser<std::string>>*>(it->second);
+  }
+  /// Use this option like -Xllvm -sil-stats-only-instructions=strong_retain,alloc_stack
+  /// If you need to track all kinds of SILInstructions, you can use
+  /// -sil-stats-only-instructions=all
+  static auto *opt = new llvm::cl::opt<StatsOnlyInstructionsOpt, true, llvm::cl::parser<std::string>>(
         "sil-stats-only-instructions",
         llvm::cl::desc(
             "Comma separated list of SIL instruction names, whose stats "
             "should be collected"),
         llvm::cl::Hidden, llvm::cl::ZeroOrMore,
         llvm::cl::value_desc("instruction name"),
-        llvm::cl::location(StatsOnlyInstructionsOptLoc),
+        llvm::cl::location(getStatsOnlyInstructionsOptLoc()),
         llvm::cl::ValueRequired);
+  return *opt;
+}
+auto &EarlyInitStatsOnlyInstructions = StatsOnlyInstructions();
 
 /// Dump as much statistics as possible, ignore any thresholds.
-llvm::cl::opt<bool> SILStatsDumpAll(
-    "sil-stats-dump-all", llvm::cl::init(false),
-    llvm::cl::desc("Dump all SIL module and SIL function stats"));
+llvm::cl::opt<bool> &SILStatsDumpAll() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-dump-all");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-stats-dump-all", llvm::cl::init(false),
+      llvm::cl::desc("Dump all SIL module and SIL function stats"));
+  return *opt;
+}
+auto &EarlyInitSILStatsDumpAll = SILStatsDumpAll();
 
 /// Dump statistics about the SILModule.
-llvm::cl::opt<bool> SILStatsModules(
-    "sil-stats-modules", llvm::cl::init(false),
-    llvm::cl::desc("Enable computation of statistics for SIL modules"));
+llvm::cl::opt<bool> &SILStatsModules() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-modules");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-stats-modules", llvm::cl::init(false),
+      llvm::cl::desc("Enable computation of statistics for SIL modules"));
+  return *opt;
+}
+auto &EarlyInitSILStatsModules = SILStatsModules();
 
 /// Dump statistics about SILFunctions.
-llvm::cl::opt<bool> SILStatsFunctions(
-    "sil-stats-functions", llvm::cl::init(false),
-    llvm::cl::desc("Enable computation of statistics for SIL functions"));
+llvm::cl::opt<bool> &SILStatsFunctions() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-functions");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-stats-functions", llvm::cl::init(false),
+      llvm::cl::desc("Enable computation of statistics for SIL functions"));
+  return *opt;
+}
+auto &EarlyInitSILStatsFunctions = SILStatsFunctions();
 
 /// Dump statistics about lost debug variables.
-llvm::cl::opt<bool> SILStatsLostVariables(
-    "sil-stats-lost-variables", llvm::cl::init(false),
-    llvm::cl::desc("Dump lost debug variables stats"));
+llvm::cl::opt<bool> &SILStatsLostVariables() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-lost-variables");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-stats-lost-variables", llvm::cl::init(false),
+      llvm::cl::desc("Dump lost debug variables stats"));
+  return *opt;
+}
+auto &EarlyInitSILStatsLostVariables = SILStatsLostVariables();
 
 /// The name of the output file for optimizer counters.
-llvm::cl::opt<std::string> SILStatsOutputFile(
-    "sil-stats-output-file", llvm::cl::init(""),
-    llvm::cl::desc("The name of the output file for optimizer counters"));
+llvm::cl::opt<std::string> &SILStatsOutputFile() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-output-file");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-stats-output-file", llvm::cl::init(""),
+      llvm::cl::desc("The name of the output file for optimizer counters"));
+  return *opt;
+}
+auto &EarlyInitSILStatsOutputFile = SILStatsOutputFile();
 
 /// A threshold in percents for the SIL basic block counters.
-llvm::cl::opt<double> BlockCountDeltaThreshold(
-    "sil-stats-block-count-delta-threshold", llvm::cl::init(1),
-    llvm::cl::desc(
-        "Threshold for reporting changed basic block count numbers"));
+llvm::cl::opt<double> &BlockCountDeltaThreshold() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-block-count-delta-threshold");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<double>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<double>(
+      "sil-stats-block-count-delta-threshold", llvm::cl::init(1),
+      llvm::cl::desc(
+          "Threshold for reporting changed basic block count numbers"));
+  return *opt;
+}
+auto &EarlyInitBlockCountDeltaThreshold = BlockCountDeltaThreshold();
 
 /// A threshold in percents for the SIL instructions counters.
-llvm::cl::opt<double> InstCountDeltaThreshold(
-    "sil-stats-inst-count-delta-threshold", llvm::cl::init(1),
-    llvm::cl::desc(
-        "Threshold for reporting changed instruction count numbers"));
+llvm::cl::opt<double> &InstCountDeltaThreshold() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-inst-count-delta-threshold");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<double>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<double>(
+      "sil-stats-inst-count-delta-threshold", llvm::cl::init(1),
+      llvm::cl::desc(
+          "Threshold for reporting changed instruction count numbers"));
+  return *opt;
+}
+auto &EarlyInitInstCountDeltaThreshold = InstCountDeltaThreshold();
 
 /// A threshold in percents for the SIL functions counters.
-llvm::cl::opt<double> FunctionCountDeltaThreshold(
-    "sil-stats-function-count-delta-threshold", llvm::cl::init(1),
-    llvm::cl::desc("Threshold for reporting changed function count numbers"));
+llvm::cl::opt<double> &FunctionCountDeltaThreshold() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-function-count-delta-threshold");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<double>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<double>(
+      "sil-stats-function-count-delta-threshold", llvm::cl::init(1),
+      llvm::cl::desc("Threshold for reporting changed function count numbers"));
+  return *opt;
+}
+auto &EarlyInitFunctionCountDeltaThreshold = FunctionCountDeltaThreshold();
 
 /// A threshold in percents for the counters of memory used by the compiler.
-llvm::cl::opt<double> UsedMemoryDeltaThreshold(
-    "sil-stats-used-memory-delta-threshold", llvm::cl::init(5),
-    llvm::cl::desc("Threshold for reporting changed memory usage numbers"));
+llvm::cl::opt<double> &UsedMemoryDeltaThreshold() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-used-memory-delta-threshold");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<double>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<double>(
+      "sil-stats-used-memory-delta-threshold", llvm::cl::init(5),
+      llvm::cl::desc("Threshold for reporting changed memory usage numbers"));
+  return *opt;
+}
+auto &EarlyInitUsedMemoryDeltaThreshold = UsedMemoryDeltaThreshold();
 
-llvm::cl::opt<double> UsedMemoryMinDeltaThreshold(
-  "sil-stats-used-memory-min-threshold", llvm::cl::init(1),
-    llvm::cl::desc("Min threshold for reporting changed memory usage numbers"));
+llvm::cl::opt<double> &UsedMemoryMinDeltaThreshold() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-used-memory-min-threshold");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<double>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<double>(
+      "sil-stats-used-memory-min-threshold", llvm::cl::init(1),
+      llvm::cl::desc("Min threshold for reporting changed memory usage numbers"));
+  return *opt;
+}
+auto &EarlyInitUsedMemoryMinDeltaThreshold = UsedMemoryMinDeltaThreshold();
 
 /// A threshold in percents for the basic blocks counter inside a SILFunction.
 /// Has effect only if it is used together with -sil-stats-functions.
-llvm::cl::opt<double> FuncBlockCountDeltaThreshold(
-    "sil-stats-func-block-count-delta-threshold", llvm::cl::init(200),
-    llvm::cl::desc("Threshold for reporting changed basic block count numbers "
-                   "for a function"));
+llvm::cl::opt<double> &FuncBlockCountDeltaThreshold() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-func-block-count-delta-threshold");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<double>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<double>(
+      "sil-stats-func-block-count-delta-threshold", llvm::cl::init(200),
+      llvm::cl::desc("Threshold for reporting changed basic block count numbers "
+                     "for a function"));
+  return *opt;
+}
+auto &EarlyInitFuncBlockCountDeltaThreshold = FuncBlockCountDeltaThreshold();
 
 /// A minimal threshold (in number of basic blocks) for the basic blocks counter
 /// inside a SILFunction. Only functions with more basic blocks than this
 /// threshold are reported. Has effect only if it is used together with
 /// -sil-stats-functions.
-llvm::cl::opt<int> FuncBlockCountMinThreshold(
-    "sil-stats-func-block-count-min-threshold", llvm::cl::init(50),
-    llvm::cl::desc(
-        "Min threshold for reporting changed basic block count numbers "
-        "for a function"));
+llvm::cl::opt<int> &FuncBlockCountMinThreshold() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-func-block-count-min-threshold");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-stats-func-block-count-min-threshold", llvm::cl::init(50),
+      llvm::cl::desc(
+          "Min threshold for reporting changed basic block count numbers "
+          "for a function"));
+  return *opt;
+}
+auto &EarlyInitFuncBlockCountMinThreshold = FuncBlockCountMinThreshold();
 
 /// A threshold in percents for the SIL instructions counter inside a
 /// SILFunction. Has effect only if it is used together with
 /// -sil-stats-functions.
-llvm::cl::opt<double> FuncInstCountDeltaThreshold(
-    "sil-stats-func-inst-count-delta-threshold", llvm::cl::init(200),
-    llvm::cl::desc("Threshold for reporting changed instruction count numbers "
-                   "for a function"));
+llvm::cl::opt<double> &FuncInstCountDeltaThreshold() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-func-inst-count-delta-threshold");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<double>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<double>(
+      "sil-stats-func-inst-count-delta-threshold", llvm::cl::init(200),
+      llvm::cl::desc("Threshold for reporting changed instruction count numbers "
+                     "for a function"));
+  return *opt;
+}
+auto &EarlyInitFuncInstCountDeltaThreshold = FuncInstCountDeltaThreshold();
 
 /// A minimal threshold (in number of instructions) for the SIL instructions
 /// counter inside a SILFunction. Only functions with more instructions than
 /// this threshold are reported. Has effect only if it is used together with
 /// -sil-stats-functions.
-llvm::cl::opt<int> FuncInstCountMinThreshold(
-    "sil-stats-func-inst-count-min-threshold", llvm::cl::init(300),
-    llvm::cl::desc(
-        "Min threshold for reporting changed instruction count numbers "
-        "for a function"));
+llvm::cl::opt<int> &FuncInstCountMinThreshold() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-func-inst-count-min-threshold");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-stats-func-inst-count-min-threshold", llvm::cl::init(300),
+      llvm::cl::desc(
+          "Min threshold for reporting changed instruction count numbers "
+          "for a function"));
+  return *opt;
+}
+auto &EarlyInitFuncInstCountMinThreshold = FuncInstCountMinThreshold();
 
 /// Track only statistics for a function with a given name.
 /// Has effect only if it is used together with -sil-stats-functions.
-llvm::cl::opt<std::string> StatsOnlyFunctionName(
-    "sil-stats-only-function", llvm::cl::init(""),
-    llvm::cl::desc("Function name, whose stats should be tracked"));
+llvm::cl::opt<std::string> &StatsOnlyFunctionName() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-only-function");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-stats-only-function", llvm::cl::init(""),
+      llvm::cl::desc("Function name, whose stats should be tracked"));
+  return *opt;
+}
+auto &EarlyInitStatsOnlyFunctionName = StatsOnlyFunctionName();
 
 /// Track only statistics for a function whose name contains a given substring.
 /// Has effect only if it is used together with -sil-stats-functions.
-llvm::cl::opt<std::string> StatsOnlyFunctionsNamePattern(
-    "sil-stats-only-functions", llvm::cl::init(""),
-    llvm::cl::desc(
-        "Pattern of a function name, whose stats should be tracked"));
+llvm::cl::opt<std::string> &StatsOnlyFunctionsNamePattern() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-stats-only-functions");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-stats-only-functions", llvm::cl::init(""),
+      llvm::cl::desc(
+          "Pattern of a function name, whose stats should be tracked"));
+  return *opt;
+}
+auto &EarlyInitStatsOnlyFunctionsNamePattern = StatsOnlyFunctionsNamePattern();
 
 /// Stats for a SIL function.
 struct FunctionStat {
@@ -341,7 +497,7 @@ struct ModuleStat {
     BlockCount += Stat.BlockCount;
     InstCount += Stat.InstCount;
     ++FunctionCount;
-    if (!StatsOnlyInstructionsOptLoc.getInstCountsNum())
+    if (!getStatsOnlyInstructionsOptLoc().getInstCountsNum())
       return;
     InstCounts.addAll(Stat.InstCounts);
   }
@@ -351,7 +507,7 @@ struct ModuleStat {
     BlockCount -= Stat.BlockCount;
     InstCount -= Stat.InstCount;
     --FunctionCount;
-    if (!StatsOnlyInstructionsOptLoc.getInstCountsNum())
+    if (!getStatsOnlyInstructionsOptLoc().getInstCountsNum())
       return;
     InstCounts.subAll(Stat.InstCounts);
   }
@@ -427,7 +583,7 @@ struct InstCountVisitor : SILInstructionVisitor<InstCountVisitor> {
     ++InstCount;
     ++InstCounts[I->getKind()];
 
-    if (!SILStatsLostVariables)
+    if (!SILStatsLostVariables())
       return;
     // Check the debug variable.
     DebugVarCarryingInst inst(I);
@@ -618,18 +774,18 @@ llvm::raw_ostream &stats_os() {
   // Initialize the stream if it is not initialized yet.
   if (!stats_output_stream) {
     // If there is user-defined output file name, use it.
-    if (!SILStatsOutputFile.empty()) {
+    if (!SILStatsOutputFile().empty()) {
       // Try to open the file.
       std::error_code EC;
       auto fd_stream = std::make_unique<llvm::raw_fd_ostream>(
-          SILStatsOutputFile, EC, llvm::sys::fs::OpenFlags::OF_Text);
+          SILStatsOutputFile(), EC, llvm::sys::fs::OpenFlags::OF_Text);
       if (!fd_stream->has_error() && !EC) {
         stats_output_stream = {fd_stream.release(),
                                [](llvm::raw_ostream *d) { delete d; }};
         return *stats_output_stream.get();
       }
       fd_stream->clear_error();
-      llvm::errs() << SILStatsOutputFile << " : " << EC.message() << "\n";
+      llvm::errs() << SILStatsOutputFile() << " : " << EC.message() << "\n";
     }
     // Otherwise use llvm::errs() as output. No need to destroy it at the end.
     stats_output_stream = {&llvm::errs(), [](llvm::raw_ostream *d) {}};
@@ -704,12 +860,12 @@ void printCounterChange(StringRef Kind, StringRef CounterName, double Delta,
 bool isMatchingFunction(SILFunction *F, bool shouldHaveNamePattern = false) {
   auto FuncName = F->getName();
   // Is it an exact string match?
-  if (!StatsOnlyFunctionName.empty())
-    return F->getName() == StatsOnlyFunctionName;
+  if (!StatsOnlyFunctionName().empty())
+    return F->getName() == StatsOnlyFunctionName();
 
   // Does the name contain a user-defined substring?
-  if (!StatsOnlyFunctionsNamePattern.empty()) {
-    return FuncName.contains(StatsOnlyFunctionsNamePattern);
+  if (!StatsOnlyFunctionsNamePattern().empty()) {
+    return FuncName.contains(StatsOnlyFunctionsNamePattern());
   }
 
   return shouldHaveNamePattern;
@@ -818,10 +974,10 @@ int computeLostVariables(SILFunction *F, FunctionStat &Old, FunctionStat &New) {
 /// \param Ctx transformation context to be used
 void processFuncStatHistory(SILFunction *F, FunctionStat &Stat,
                             TransformationContext &Ctx) {
-  if (!SILStatsFunctions)
+  if (!SILStatsFunctions())
     return;
 
-  if (!SILStatsDumpAll && !isMatchingFunction(F, /*shouldHaveNamePattern*/ true))
+  if (!SILStatsDumpAll() && !isMatchingFunction(F, /*shouldHaveNamePattern*/ true))
     return;
 
   printCounterValue("function_history", "block", Stat.BlockCount, F->getName(),
@@ -830,13 +986,13 @@ void processFuncStatHistory(SILFunction *F, FunctionStat &Stat,
                     Ctx);
 
   /// Dump collected instruction counts.
-  if (!StatsOnlyInstructionsOptLoc.getInstCountsNum())
+  if (!getStatsOnlyInstructionsOptLoc().getInstCountsNum())
     return;
 
   for (auto kind : allSILInstructionKinds()) {
     if (!Stat.InstCounts[kind])
       continue;
-    if (!StatsOnlyInstructionsOptLoc.shouldComputeInstCount(kind))
+    if (!getStatsOnlyInstructionsOptLoc().shouldComputeInstCount(kind))
       continue;
     std::string CounterName = "inst_";
     CounterName += getSILInstructionName(kind);
@@ -855,14 +1011,14 @@ void processFuncStatsChanges(SILFunction *F, FunctionStat &OldStat,
                              TransformationContext &Ctx) {
   processFuncStatHistory(F, NewStat, Ctx);
 
-  if (!SILStatsFunctions && !SILStatsLostVariables && !SILStatsDumpAll)
+  if (!SILStatsFunctions() && !SILStatsLostVariables() && !SILStatsDumpAll())
     return;
 
   if (OldStat == NewStat)
     return;
 
-  if ((!StatsOnlyFunctionsNamePattern.empty() ||
-       !StatsOnlyFunctionName.empty()) &&
+  if ((!StatsOnlyFunctionsNamePattern().empty() ||
+       !StatsOnlyFunctionName().empty()) &&
       !isMatchingFunction(F))
     return;
 
@@ -874,24 +1030,24 @@ void processFuncStatsChanges(SILFunction *F, FunctionStat &OldStat,
   NewLineInserter nl;
 
   // TODO: handle cases where a function got smaller.
-  if ((SILStatsDumpAll &&
+  if ((SILStatsDumpAll() &&
        (DeltaBlockCount != 0.0 || OldStat.BlockCount == 0)) ||
-      (std::abs(DeltaBlockCount) > FuncBlockCountDeltaThreshold &&
-       OldStat.BlockCount > FuncBlockCountMinThreshold)) {
+      (std::abs(DeltaBlockCount) > FuncBlockCountDeltaThreshold() &&
+       OldStat.BlockCount > FuncBlockCountMinThreshold())) {
     stats_os() << nl.get();
     printCounterChange("function", "block", DeltaBlockCount, OldStat.BlockCount,
                        NewStat.BlockCount, Ctx, F->getName());
   }
 
-  if ((SILStatsDumpAll && (DeltaInstCount != 0.0 || OldStat.InstCount == 0)) ||
-      (std::abs(DeltaInstCount) > FuncInstCountDeltaThreshold &&
-       OldStat.InstCount > FuncInstCountMinThreshold)) {
+  if ((SILStatsDumpAll() && (DeltaInstCount != 0.0 || OldStat.InstCount == 0)) ||
+      (std::abs(DeltaInstCount) > FuncInstCountDeltaThreshold() &&
+       OldStat.InstCount > FuncInstCountMinThreshold())) {
     stats_os() << nl.get();
     printCounterChange("function", "inst", DeltaInstCount, OldStat.InstCount,
                        NewStat.InstCount, Ctx, F->getName());
   }
 
-  if ((SILStatsDumpAll || SILStatsLostVariables) && LostVariables) {
+  if ((SILStatsDumpAll() || SILStatsLostVariables()) && LostVariables) {
     stats_os() << nl.get();
     printCounterValue("function", "lostvars", LostVariables, F->getName(), Ctx);
   }
@@ -904,7 +1060,7 @@ void processFuncStatsChanges(SILFunction *F, FunctionStat &OldStat,
 /// \param Ctx transformation context to be used
 void processModuleStatsChanges(ModuleStat &OldStat, ModuleStat &NewStat,
                                TransformationContext &Ctx) {
-  if (!SILStatsModules && !SILStatsDumpAll)
+  if (!SILStatsModules() && !SILStatsDumpAll())
     return;
 
   // Bail if no changes.
@@ -922,10 +1078,10 @@ void processModuleStatsChanges(ModuleStat &OldStat, ModuleStat &NewStat,
 
   // Print delta for blocks only if it is above a threshold or we are asked to
   // dump all changes.
-  if ((SILStatsDumpAll &&
+  if ((SILStatsDumpAll() &&
        (DeltaBlockCount != 0.0 ||
         isFirstTimeData(OldStat.BlockCount, NewStat.BlockCount))) ||
-      (std::abs(DeltaBlockCount) > BlockCountDeltaThreshold)) {
+      (std::abs(DeltaBlockCount) > BlockCountDeltaThreshold())) {
     stats_os() << nl.get();
     printCounterChange("module", "block", DeltaBlockCount, OldStat.BlockCount,
                        NewStat.BlockCount, Ctx);
@@ -933,10 +1089,10 @@ void processModuleStatsChanges(ModuleStat &OldStat, ModuleStat &NewStat,
 
   // Print delta for instructions only if it is above a threshold or we are
   // asked to dump all changes.
-  if ((SILStatsDumpAll &&
+  if ((SILStatsDumpAll() &&
        (DeltaInstCount != 0.0 ||
         isFirstTimeData(OldStat.InstCount, NewStat.InstCount))) ||
-      (std::abs(DeltaInstCount) > InstCountDeltaThreshold)) {
+      (std::abs(DeltaInstCount) > InstCountDeltaThreshold())) {
     stats_os() << nl.get();
     printCounterChange("module", "inst", DeltaInstCount, OldStat.InstCount,
                        NewStat.InstCount, Ctx);
@@ -944,10 +1100,10 @@ void processModuleStatsChanges(ModuleStat &OldStat, ModuleStat &NewStat,
 
   // Print delta for functions only if it is above a threshold or we are
   // asked to dump all changes.
-  if ((SILStatsDumpAll &&
+  if ((SILStatsDumpAll() &&
        (DeltaFunctionCount != 0.0 ||
         isFirstTimeData(OldStat.FunctionCount, NewStat.FunctionCount))) ||
-      (std::abs(DeltaFunctionCount) > FunctionCountDeltaThreshold)) {
+      (std::abs(DeltaFunctionCount) > FunctionCountDeltaThreshold())) {
     stats_os() << nl.get();
     printCounterChange("module", "functions", DeltaFunctionCount,
                        OldStat.FunctionCount, NewStat.FunctionCount, Ctx);
@@ -955,17 +1111,17 @@ void processModuleStatsChanges(ModuleStat &OldStat, ModuleStat &NewStat,
 
   // Print delta for the used memory only if it is above a threshold or we are
   // asked to dump all changes.
-  if ((SILStatsDumpAll &&
-       (std::abs(DeltaUsedMemory) > UsedMemoryMinDeltaThreshold ||
+  if ((SILStatsDumpAll() &&
+       (std::abs(DeltaUsedMemory) > UsedMemoryMinDeltaThreshold() ||
         isFirstTimeData(OldStat.UsedMemory, NewStat.UsedMemory))) ||
-      (std::abs(DeltaUsedMemory) > UsedMemoryDeltaThreshold)) {
+      (std::abs(DeltaUsedMemory) > UsedMemoryDeltaThreshold())) {
     stats_os() << nl.get();
     printCounterChange("module", "memory", DeltaUsedMemory, OldStat.UsedMemory,
                        NewStat.UsedMemory, Ctx);
   }
 
 
-  if (SILStatsDumpAll) {
+  if (SILStatsDumpAll()) {
     // Dump stats about the number of created and deleted instructions.
     auto DeltaCreatedInstCount =
         computeDelta(OldStat.CreatedInstCount, NewStat.CreatedInstCount);
@@ -984,14 +1140,14 @@ void processModuleStatsChanges(ModuleStat &OldStat, ModuleStat &NewStat,
   }
 
   /// Dump collected instruction counts.
-  if (!StatsOnlyInstructionsOptLoc.getInstCountsNum())
+  if (!getStatsOnlyInstructionsOptLoc().getInstCountsNum())
     return;
 
   for (auto kind : allSILInstructionKinds()) {
     // Do not print anything, if there is no change.
     if (OldStat.InstCounts[kind] == NewStat.InstCounts[kind])
       continue;
-    if (!StatsOnlyInstructionsOptLoc.shouldComputeInstCount(kind))
+    if (!getStatsOnlyInstructionsOptLoc().shouldComputeInstCount(kind))
       continue;
     SmallString<64> CounterName("inst_");
     CounterName += getSILInstructionName(kind);
@@ -1108,8 +1264,8 @@ void swift::updateSILModuleStatsAfterTransform(SILModule &M,
                                                SILTransform *Transform,
                                                SILPassManager &PM,
                                                int PassNumber, int Duration) {
-  if (!SILStatsModules && !SILStatsFunctions && !SILStatsLostVariables
-      && !SILStatsDumpAll)
+  if (!SILStatsModules() && !SILStatsFunctions() && !SILStatsLostVariables()
+      && !SILStatsDumpAll())
     return;
   TransformationContext Ctx(M, PM, Transform, PassNumber, Duration);
   OptimizerStatsAnalysis *Stats = PM.getAnalysis<OptimizerStatsAnalysis>();
@@ -1123,7 +1279,7 @@ void swift::updateSILModuleStatsBeforeTransform(SILModule &M,
                                                 SILTransform *Transform,
                                                 SILPassManager &PM,
                                                 int PassNumber) {
-  if (!SILStatsModules && !SILStatsFunctions)
+  if (!SILStatsModules() && !SILStatsFunctions())
     return;
 }
 

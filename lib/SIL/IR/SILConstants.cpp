@@ -20,10 +20,19 @@
 using namespace swift;
 
 namespace swift {
-llvm::cl::opt<unsigned>
-    ConstExprLimit("constexpr-limit", llvm::cl::init(3072),
-                   llvm::cl::desc("Number of instructions interpreted in a"
-                                  " constexpr function"));
+llvm::cl::opt<unsigned> &ConstExprLimit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("constexpr-limit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<unsigned>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<unsigned>(
+      "constexpr-limit", llvm::cl::init(3072),
+      llvm::cl::desc("Number of instructions interpreted in a"
+                     " constexpr function"));
+  return *opt;
+}
+static auto &EarlyInitConstExprLimit = ConstExprLimit();
 }
 
 template <typename... T, typename... U>
@@ -1000,7 +1009,7 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
     return;
   case UnknownReason::TooManyInstructions:
     diagnose(ctx, diagLoc, diag::constexpr_too_many_instructions,
-             ConstExprLimit);
+             ConstExprLimit());
     if (emitTriggerLocInDiag)
       diagnose(ctx, triggerLoc, diag::constexpr_limit_exceeding_instruction,
                triggerLocSkipsInternalLocs);

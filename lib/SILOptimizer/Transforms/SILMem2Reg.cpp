@@ -62,9 +62,18 @@ STATISTIC(NumAllocStackFound,    "Number of AllocStack found");
 STATISTIC(NumAllocStackCaptured, "Number of AllocStack captured");
 STATISTIC(NumInstRemoved,        "Number of Instructions removed");
 
-llvm::cl::opt<bool> Mem2RegDisableLifetimeCanonicalization(
-    "sil-mem2reg-disable-lifetime-canonicalization", llvm::cl::init(false),
-    llvm::cl::desc("Don't canonicalize any lifetimes during Mem2Reg."));
+static llvm::cl::opt<bool> &Mem2RegDisableLifetimeCanonicalization() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-mem2reg-disable-lifetime-canonicalization");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-mem2reg-disable-lifetime-canonicalization", llvm::cl::init(false),
+      llvm::cl::desc("Don't canonicalize any lifetimes during Mem2Reg."));
+  return *opt;
+}
+static auto &EarlyInitMem2RegDisableLifetimeCanonicalization = Mem2RegDisableLifetimeCanonicalization();
 
 static bool lexicalLifetimeEnsured(AllocStackInst *asi);
 static bool lexicalLifetimeEnsured(AllocStackInst *asi, SILInstruction *store);
@@ -2155,7 +2164,7 @@ void MemoryToRegisters::canonicalizeValueLifetimes(
     BasicBlockSetVector &livePhiBlocks) {
   if (!f.hasOwnership())
     return;
-  if (Mem2RegDisableLifetimeCanonicalization)
+  if (Mem2RegDisableLifetimeCanonicalization())
     return;
 
   for (auto *block : livePhiBlocks) {

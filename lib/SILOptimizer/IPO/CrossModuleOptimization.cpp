@@ -36,16 +36,35 @@ using namespace swift;
 
 /// Functions up to this (abstract) size are serialized, even if they are not
 /// generic.
-static llvm::cl::opt<int> CMOFunctionSizeLimit("cmo-function-size-limit",
-                                               llvm::cl::init(20));
+static llvm::cl::opt<int> &CMOFunctionSizeLimit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("cmo-function-size-limit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "cmo-function-size-limit",
+      llvm::cl::init(20));
+  return *opt;
+}
+static auto &EarlyInitCMOFunctionSizeLimit = CMOFunctionSizeLimit();
 
-static llvm::cl::opt<bool> SerializeEverything(
-    "sil-cross-module-serialize-all", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Serialize everything when performing cross module optimization in "
-        "order to investigate performance differences caused by different "
-        "@inlinable, @usableFromInline choices."),
-    llvm::cl::Hidden);
+static llvm::cl::opt<bool> &SerializeEverything() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-cross-module-serialize-all");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-cross-module-serialize-all", llvm::cl::init(false),
+      llvm::cl::desc(
+          "Serialize everything when performing cross module optimization in "
+          "order to investigate performance differences caused by different "
+          "@inlinable, @usableFromInline choices."),
+      llvm::cl::Hidden);
+  return *opt;
+}
+static auto &EarlyInitSerializeEverything = SerializeEverything();
 
 namespace {
 
@@ -571,7 +590,7 @@ bool CrossModuleOptimization::canSerializeFunction(
     for (SILBasicBlock &block : *function) {
       for (SILInstruction &inst : block) {
         size += (int)instructionInlineCost(inst);
-        if (size >= CMOFunctionSizeLimit)
+        if (size >= CMOFunctionSizeLimit())
           return false;
       }
     }
@@ -1140,7 +1159,7 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
       return;
 
     bool conservative = false;
-    bool everything = SerializeEverything;
+    bool everything = SerializeEverything();
     switch (M.getOptions().CMOMode) {
       case swift::CrossModuleOptimizationMode::Off:
         break;

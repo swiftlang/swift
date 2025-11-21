@@ -30,13 +30,27 @@
 using namespace swift;
 using namespace irgen;
 
+namespace {
+// Helper to get or create command line option, checking if already registered.
 // Add a flag which when set to false forces execution of the open-coded version
 // in order to execution test it.
-static llvm::cl::opt<bool> EnableRuntimeTaskDeallocThrough(
-    "enable-runtime-task-dealloc-through", llvm::cl::init(true),
-    llvm::cl::Hidden,
-    llvm::cl::desc(
-        "Use the swift_task_dealloc_through symbol if it's available"));
+llvm::cl::opt<bool> &EnableRuntimeTaskDeallocThrough() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("enable-runtime-task-dealloc-through");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "enable-runtime-task-dealloc-through", llvm::cl::init(true),
+      llvm::cl::Hidden,
+      llvm::cl::desc(
+          "Use the swift_task_dealloc_through symbol if it's available"));
+  return *opt;
+}
+
+// Force early registration before command line parsing
+auto &EarlyInitEnableRuntimeTaskDeallocThrough = EnableRuntimeTaskDeallocThrough();
+} // namespace
 
 namespace {
 
@@ -53,7 +67,7 @@ class GetDeallocThroughFn {
           isPointer8Bytes(IGM.getPointerSize() == Size(8)) {
       assert(!IGM.getAvailabilityRange().isContainedIn(
                  IGM.Context.getCoroutineAccessorsAvailability()) ||
-             !EnableRuntimeTaskDeallocThrough);
+             !EnableRuntimeTaskDeallocThrough());
     }
 
     /// Emit the function.
@@ -61,7 +75,7 @@ class GetDeallocThroughFn {
       auto parameters = IGF.collectParameters();
       auto *ptr = parameters.claimNext();
 
-      if (EnableRuntimeTaskDeallocThrough) {
+      if (EnableRuntimeTaskDeallocThrough()) {
         emitForwardToWeakRuntimeFunction(ptr);
       }
 
@@ -591,7 +605,7 @@ class GetDeallocThroughFn {
 public:
   GetDeallocThroughFn(IRGenModule &IGM) : IGM(IGM) {}
   llvm::Constant *get() {
-    if (EnableRuntimeTaskDeallocThrough &&
+    if (EnableRuntimeTaskDeallocThrough() &&
         IGM.getAvailabilityRange().isContainedIn(
             IGM.Context.getCoroutineAccessorsAvailability())) {
       // For high enough deployment targets, just use the runtime entry point.

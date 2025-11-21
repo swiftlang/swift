@@ -115,25 +115,67 @@ using namespace llvm;
 
 #define DEBUG_TYPE "irgen"
 
-static cl::opt<bool> DisableObjCARCContract(
-    "disable-objc-arc-contract", cl::Hidden,
-    cl::desc("Disable running objc arc contract for testing purposes"));
+namespace {
+// Helpers to get or create command line options, checking if already registered.
+// This is needed when LLVM is built as a DLL and multiple binaries link against it.
+cl::opt<bool> &DisableObjCARCContract() {
+  auto &opts = cl::getRegisteredOptions();
+  auto it = opts.find("disable-objc-arc-contract");
+  if (it != opts.end()) {
+    return *static_cast<cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new cl::opt<bool>(
+      "disable-objc-arc-contract", cl::Hidden,
+      cl::desc("Disable running objc arc contract for testing purposes"));
+  return *opt;
+}
 
 // This option is for performance benchmarking: to ensure a consistent
 // performance data, modules are aligned to the page size.
 // Warning: this blows up the text segment size. So use this option only for
 // performance benchmarking.
-static cl::opt<bool> AlignModuleToPageSize(
-    "align-module-to-page-size", cl::Hidden,
-    cl::desc("Align the text section of all LLVM modules to the page size"));
+cl::opt<bool> &AlignModuleToPageSize() {
+  auto &opts = cl::getRegisteredOptions();
+  auto it = opts.find("align-module-to-page-size");
+  if (it != opts.end()) {
+    return *static_cast<cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new cl::opt<bool>(
+      "align-module-to-page-size", cl::Hidden,
+      cl::desc("Align the text section of all LLVM modules to the page size"));
+  return *opt;
+}
 
-static cl::opt<std::string> SaveIRGen(
-    "save-irgen", cl::Hidden,
-    cl::desc("Save LLVM-IR to a file before LLVM optimizations"));
+cl::opt<std::string> &SaveIRGen() {
+  auto &opts = cl::getRegisteredOptions();
+  auto it = opts.find("save-irgen");
+  if (it != opts.end()) {
+    return *static_cast<cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new cl::opt<std::string>(
+      "save-irgen", cl::Hidden,
+      cl::desc("Save LLVM-IR to a file before LLVM optimizations"));
+  return *opt;
+}
 
-static cl::opt<std::string> SaveIR(
-    "save-ir", cl::Hidden,
-    cl::desc("Save LLVM-IR to a file after LLVM optimizations"));
+cl::opt<std::string> &SaveIR() {
+  auto &opts = cl::getRegisteredOptions();
+  auto it = opts.find("save-ir");
+  if (it != opts.end()) {
+    return *static_cast<cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new cl::opt<std::string>(
+      "save-ir", cl::Hidden,
+      cl::desc("Save LLVM-IR to a file after LLVM optimizations"));
+  return *opt;
+}
+
+// Force early registration before command line parsing
+auto &EarlyInitDisableObjCARCContract = DisableObjCARCContract();
+auto &EarlyInitAlignModuleToPageSize = AlignModuleToPageSize();
+auto &EarlyInitSaveIRGen = SaveIRGen();
+auto &EarlyInitSaveIR = SaveIR();
+} // namespace
 
 std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
            std::string>
@@ -552,7 +594,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   // rely on any other LLVM ARC transformations, but we do need ARC
   // contraction to add the objc_retainAutoreleasedReturnValue
   // assembly markers and remove clang.arc.used.
-  if (Opts.shouldOptimize() && !DisableObjCARCContract &&
+  if (Opts.shouldOptimize() && !DisableObjCARCContract() &&
       !Opts.DisableLLVMOptzns)
     MPM.addPass(createModuleToFunctionPassAdaptor(ObjCARCContractPass()));
 
@@ -612,16 +654,16 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
 
   MPM.run(*Module, MAM);
 
-  if (!SaveIR.empty()) {
+  if (!SaveIR().empty()) {
     std::error_code error;
-    llvm::raw_fd_ostream irFile(SaveIR, error);
+    llvm::raw_fd_ostream irFile(SaveIR().getValue(), error);
     if (irFile.has_error() || error)
       ABORT("cannot open LLVM-IR output file");
 
     Module->print(irFile, nullptr);
   }
 
-  if (AlignModuleToPageSize) {
+  if (AlignModuleToPageSize()) {
     align(Module);
   }
 }
@@ -827,9 +869,9 @@ bool swift::performLLVM(const IRGenOptions &Opts,
     assert(Opts.OutputKind == IRGenOutputKind::Module && "no output specified");
   }
 
-  if (!SaveIRGen.empty()) {
+  if (!SaveIRGen().empty()) {
     std::error_code error;
-    llvm::raw_fd_ostream irgenFile(SaveIRGen, error);
+    llvm::raw_fd_ostream irgenFile(SaveIRGen().getValue(), error);
     if (irgenFile.has_error() || error)
       ABORT("cannot open LLVM-IR output file");
 

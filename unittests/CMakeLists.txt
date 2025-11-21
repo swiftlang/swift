@@ -7,7 +7,11 @@ if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(AST)
   add_subdirectory(Basic)
   add_subdirectory(ClangImporter)
-  add_subdirectory(DependencyScan)
+  # DependencyScan tests use internal C++ APIs that cause duplicate Clang symbols
+  # when LLVM is built as a DLL. Disable until tests are rewritten to use C API.
+  if(NOT LLVM_LINK_LLVM_DYLIB)
+    add_subdirectory(DependencyScan)
+  endif()
   add_subdirectory(Frontend)
   add_subdirectory(FrontendTool)
   add_subdirectory(Localization)

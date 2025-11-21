@@ -39,7 +39,17 @@ using namespace swift;
 
 STATISTIC(NumRefCountOpsRemoved, "Total number of increments removed");
 
-llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(true));
+static llvm::cl::opt<bool> &EnableLoopARC() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("enable-loop-arc");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "enable-loop-arc", llvm::cl::init(true));
+  return *opt;
+}
+static auto &EarlyInitEnableLoopARC = EnableLoopARC();
 
 //===----------------------------------------------------------------------===//
 //                                Code Motion
@@ -259,7 +269,7 @@ class ARCSequenceOpts : public SILFunctionTransform {
     if (F->hasOwnership())
       return;
 
-    if (!EnableLoopARC) {
+    if (!EnableLoopARC()) {
       auto *AA = getAnalysis<AliasAnalysis>(F);
       auto *POTA = getAnalysis<PostOrderAnalysis>();
       auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);

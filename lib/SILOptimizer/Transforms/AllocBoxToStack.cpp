@@ -50,13 +50,31 @@ STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 // checking if a box can be promoted to stack. This is currently set to 4, a
 // limit assumed to be sufficient to handle typical call chain of local
 // functions through which a box can be passed.
-static llvm::cl::opt<unsigned> MaxLocalApplyRecurDepth(
-    "max-local-apply-recur-depth", llvm::cl::init(4),
-    llvm::cl::desc("Max recursive depth for analyzing local functions"));
+static llvm::cl::opt<unsigned> &MaxLocalApplyRecurDepth() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("max-local-apply-recur-depth");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<unsigned>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<unsigned>(
+      "max-local-apply-recur-depth", llvm::cl::init(4),
+      llvm::cl::desc("Max recursive depth for analyzing local functions"));
+  return *opt;
+}
+static auto &EarlyInitMaxLocalApplyRecurDepth = MaxLocalApplyRecurDepth();
 
-static llvm::cl::opt<bool> AllocBoxToStackAnalyzeApply(
-    "allocbox-to-stack-analyze-apply", llvm::cl::init(true),
-    llvm::cl::desc("Analyze functions into while alloc_box is passed"));
+static llvm::cl::opt<bool> &AllocBoxToStackAnalyzeApply() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("allocbox-to-stack-analyze-apply");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "allocbox-to-stack-analyze-apply", llvm::cl::init(true),
+      llvm::cl::desc("Analyze functions into while alloc_box is passed"));
+  return *opt;
+}
+static auto &EarlyInitAllocBoxToStackAnalyzeApply = AllocBoxToStackAnalyzeApply();
 
 //===-----------------------------------------------------------------------===//
 //                 SIL Utilities for alloc_box Promotion
@@ -339,7 +357,7 @@ static bool checkLocalApplyBody(Operand *O,
 // AllocBoxToStack opt. We don't want to increase code size, so this is
 // restricted only for private local functions currently.
 static bool isOptimizableApplySite(ApplySite Apply) {
-  if (!AllocBoxToStackAnalyzeApply) {
+  if (!AllocBoxToStackAnalyzeApply()) {
     // turned off explicitly
     return false;
   }
@@ -413,7 +431,7 @@ static SILInstruction *recursivelyFindBoxOperandsPromotableToAddress(
     }
 
     if (auto Apply = ApplySite::isa(User)) {
-      if (CurrentRecurDepth > MaxLocalApplyRecurDepth) {
+      if (CurrentRecurDepth > MaxLocalApplyRecurDepth()) {
         return User;
       }
       switch (Apply.getKind()) {

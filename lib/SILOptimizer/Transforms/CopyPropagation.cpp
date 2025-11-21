@@ -69,10 +69,19 @@ using namespace swift;
 
 // Canonicalize borrow scopes.
 // This only applies to -O copy-propagation.
-llvm::cl::opt<bool>
-    EnableRewriteBorrows("canonical-ossa-rewrite-borrows",
-                         llvm::cl::init(false),
-                         llvm::cl::desc("Enable rewriting borrow scopes"));
+static llvm::cl::opt<bool> &EnableRewriteBorrows() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("canonical-ossa-rewrite-borrows");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "canonical-ossa-rewrite-borrows",
+      llvm::cl::init(false),
+      llvm::cl::desc("Enable rewriting borrow scopes"));
+  return *opt;
+}
+static auto &EarlyInitEnableRewriteBorrows = EnableRewriteBorrows();
 
 namespace {
 
@@ -693,5 +702,5 @@ SILTransform *swift::createMandatoryCopyPropagation() {
 
 SILTransform *swift::createCopyPropagation() {
   return new CopyPropagation(PruneDebugInsts, /*canonicalizeAll*/ true,
-                             /*canonicalizeBorrows*/ EnableRewriteBorrows);
+                             /*canonicalizeBorrows*/ EnableRewriteBorrows());
 }

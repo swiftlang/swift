@@ -93,10 +93,19 @@ STATISTIC(NumPropagatedClosuresEliminated,
 STATISTIC(NumPropagatedClosuresNotEliminated,
           "Number of closures propagated but not eliminated");
 
-llvm::cl::opt<bool> EliminateDeadClosures(
-    "closure-specialize-eliminate-dead-closures", llvm::cl::init(true),
-    llvm::cl::desc("Do not eliminate dead closures after closure "
-                   "specialization. This is meant to be used when testing."));
+static llvm::cl::opt<bool> &EliminateDeadClosures() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("closure-specialize-eliminate-dead-closures");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "closure-specialize-eliminate-dead-closures", llvm::cl::init(true),
+      llvm::cl::desc("Do not eliminate dead closures after closure "
+                     "specialization. This is meant to be used when testing."));
+  return *opt;
+}
+static auto &EarlyInitEliminateDeadClosures = EliminateDeadClosures();
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
@@ -1108,7 +1117,7 @@ void SILClosureSpecializerTransform::run() {
 
   // If for testing purposes we were asked to not eliminate dead closures,
   // return.
-  if (EliminateDeadClosures) {
+  if (EliminateDeadClosures()) {
     // Otherwise, remove any local dead closures that are now dead since we
     // specialized all of their uses.
     LLVM_DEBUG(llvm::dbgs() << "Trying to remove dead closures!\n");

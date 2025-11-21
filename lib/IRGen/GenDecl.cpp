@@ -87,9 +87,23 @@
 using namespace swift;
 using namespace irgen;
 
-llvm::cl::opt<bool> UseBasicDynamicReplacement(
-    "basic-dynamic-replacement", llvm::cl::init(false),
-    llvm::cl::desc("Basic implementation of dynamic replacement"));
+// Use weak/selectany linkage to avoid duplicate registration when swiftIRGen
+// is linked into multiple DSOs with LLVM as a DLL. Follow the pattern from
+// compiler-rt/lib/profile/InstrProfilingPort.h.
+llvm::cl::opt<bool> &UseBasicDynamicReplacement() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("basic-dynamic-replacement");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "basic-dynamic-replacement", llvm::cl::init(false),
+      llvm::cl::desc("Basic implementation of dynamic replacement"));
+  return *opt;
+}
+
+// Force early registration before command line parsing
+static auto &EarlyInitUseBasicDynamicReplacement = UseBasicDynamicReplacement();
 
 namespace {
 
@@ -3142,7 +3156,7 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
                      : getOptions().PointerAuth.SwiftDynamicReplacements;
   llvm::Value *ReplFn = nullptr, *hasReplFn = nullptr;
 
-  if (UseBasicDynamicReplacement) {
+  if (UseBasicDynamicReplacement()) {
     ReplFn = IGF.Builder.CreateLoad(
         Address(fnPtrAddr, FunctionPtrTy, getPointerAlignment()));
     llvm::Value *lhs = ReplFn;
@@ -3445,7 +3459,7 @@ void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
 void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
   assert(f->getDynamicallyReplacedFunction());
 
-  if (UseBasicDynamicReplacement)
+  if (UseBasicDynamicReplacement())
     return;
 
   auto entity = LinkEntity::forSILFunction(f, true);

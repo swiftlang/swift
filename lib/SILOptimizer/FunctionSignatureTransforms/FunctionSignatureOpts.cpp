@@ -66,16 +66,34 @@ using ArgumentIndexMap = llvm::SmallDenseMap<int, int>;
 //===----------------------------------------------------------------------===//
 
 /// Set to true to enable the support for partial specialization.
-static llvm::cl::opt<bool>
-    FSOEnableGenerics("sil-fso-enable-generics", llvm::cl::init(true),
-                      llvm::cl::desc("Support function signature optimization "
-                                     "of generic functions"));
+static llvm::cl::opt<bool> &FSOEnableGenerics() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-fso-enable-generics");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-fso-enable-generics", llvm::cl::init(true),
+      llvm::cl::desc("Support function signature optimization "
+                     "of generic functions"));
+  return *opt;
+}
+static auto &EarlyInitFSOEnableGenerics = FSOEnableGenerics();
 
-static llvm::cl::opt<bool>
-    FSOOptimizeIfNotCalled("sil-fso-optimize-if-not-called",
-                           llvm::cl::init(false),
-                           llvm::cl::desc("Optimize even if a function isn't "
-                                          "called. For testing only!"));
+static llvm::cl::opt<bool> &FSOOptimizeIfNotCalled() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-fso-optimize-if-not-called");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-fso-optimize-if-not-called",
+      llvm::cl::init(false),
+      llvm::cl::desc("Optimize even if a function isn't "
+                     "called. For testing only!"));
+  return *opt;
+}
+static auto &EarlyInitFSOOptimizeIfNotCalled = FSOOptimizeIfNotCalled();
 
 static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
                                           bool OptForPartialApply) {
@@ -135,7 +153,7 @@ static bool canSpecializeFunction(SILFunction *F,
     return false;
 
   // For now ignore generic functions to keep things simple...
-  if (!FSOEnableGenerics && F->getLoweredFunctionType()->isPolymorphic())
+  if (!FSOEnableGenerics() && F->getLoweredFunctionType()->isPolymorphic())
     return false;
 
   // Make sure F has a linkage that we can optimize.
@@ -673,7 +691,7 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   SILFunction *F = TransformDescriptor.OriginalFunction;
 
   // If we are asked to assume a caller for testing purposes, set the flag.
-  hasCaller |= FSOOptimizeIfNotCalled;
+  hasCaller |= FSOOptimizeIfNotCalled();
 
   if (!hasCaller && (F->getDynamicallyReplacedFunction() ||
                      F->getReferencedAdHocRequirementWitnessFunction() ||

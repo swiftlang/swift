@@ -35,13 +35,32 @@ using namespace swift;
 
 // Print the message string of encountered `cond_fail` instructions the first
 // time the message string is encountered.
-static llvm::cl::opt<bool> PrintCondFailMessages(
-  "print-cond-fail-messages", llvm::cl::init(false),
-  llvm::cl::desc("print cond_fail messages"));
-static llvm::cl::opt<bool> IncludeCondFailMessagesFunction(
-  "print-cond-fail-messages-include-function-name", llvm::cl::init(false),
-  llvm::cl::desc("when printing cond_fail messages include"
-                 "the current SIL function name"));
+static llvm::cl::opt<bool> &PrintCondFailMessages() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("print-cond-fail-messages");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "print-cond-fail-messages", llvm::cl::init(false),
+      llvm::cl::desc("print cond_fail messages"));
+  return *opt;
+}
+static auto &EarlyInitPrintCondFailMessages = PrintCondFailMessages();
+
+static llvm::cl::opt<bool> &IncludeCondFailMessagesFunction() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("print-cond-fail-messages-include-function-name");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "print-cond-fail-messages-include-function-name", llvm::cl::init(false),
+      llvm::cl::desc("when printing cond_fail messages include"
+                     "the current SIL function name"));
+  return *opt;
+}
+static auto &EarlyInitIncludeCondFailMessagesFunction = IncludeCondFailMessagesFunction();
 
 static llvm::DenseSet<StringRef> CondFailMessages;
 
@@ -67,10 +86,10 @@ static bool cleanFunction(SILFunction &fn) {
       //     cond_fail message encountered: Array index is out of range
       //     ...
       //   ```
-      if (PrintCondFailMessages) {
+      if (PrintCondFailMessages()) {
         if (auto CFI = dyn_cast<CondFailInst>(inst)) {
           auto msg = CFI->getMessage().str();
-          if (IncludeCondFailMessagesFunction) {
+          if (IncludeCondFailMessagesFunction()) {
             msg.append(" in ");
             msg.append(fn.getName().str());
           }

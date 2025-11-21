@@ -97,7 +97,17 @@ using namespace swift;
 STATISTIC(NumRetainsSunk, "Number of retains sunk");
 STATISTIC(NumReleasesHoisted, "Number of releases hoisted");
 
-llvm::cl::opt<bool> DisableARCCodeMotion("disable-arc-cm", llvm::cl::init(false));
+static llvm::cl::opt<bool> &DisableARCCodeMotion() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("disable-arc-cm");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "disable-arc-cm", llvm::cl::init(false));
+  return *opt;
+}
+static auto &EarlyInitDisableARCCodeMotion = DisableARCCodeMotion();
 
 //===----------------------------------------------------------------------===//
 //                             Block State 
@@ -1206,7 +1216,7 @@ public:
   /// The entry point to the transformation.
   void run() override {
     // Code motion disabled.
-    if (DisableARCCodeMotion)
+    if (DisableARCCodeMotion())
       return;
 
     // Respect function no.optimize.

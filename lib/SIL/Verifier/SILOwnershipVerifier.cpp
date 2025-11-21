@@ -53,6 +53,7 @@
 
 using namespace swift;
 
+namespace {
 // This is an option to put the SILOwnershipVerifier in testing mode. This
 // causes the following:
 //
@@ -63,17 +64,36 @@ using namespace swift;
 // verification in SILBuilder. This causes errors to be printed twice, once when
 // we build the IR and a second time when we perform a full verification of the
 // IR. For testing purposes, we just want the later.
-llvm::cl::opt<bool> IsSILOwnershipVerifierTestingEnabled(
-    "sil-ownership-verifier-enable-testing",
-    llvm::cl::desc("Put the sil ownership verifier in testing mode. See "
-                   "comment in SILOwnershipVerifier.cpp above option for more "
-                   "information."));
+llvm::cl::opt<bool> &IsSILOwnershipVerifierTestingEnabled() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-ownership-verifier-enable-testing");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-ownership-verifier-enable-testing",
+      llvm::cl::desc("Put the sil ownership verifier in testing mode. See "
+                     "comment in SILOwnershipVerifier.cpp above option for more "
+                     "information."));
+  return *opt;
+}
+auto &EarlyInitIsSILOwnershipVerifierTestingEnabled = IsSILOwnershipVerifierTestingEnabled();
 
 /// This is an option to turn off ownership verification on a specific file. We
 /// still emit code as if we are in ownership mode, but we do not verify. This
 /// is useful for temporarily turning off verification on tests.
-static llvm::cl::opt<bool>
-    DisableOwnershipVerification("disable-sil-ownership-verification");
+llvm::cl::opt<bool> &DisableOwnershipVerification() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("disable-sil-ownership-verification");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "disable-sil-ownership-verification");
+  return *opt;
+}
+auto &EarlyInitDisableOwnershipVerification = DisableOwnershipVerification();
+} // namespace
 
 //===----------------------------------------------------------------------===//
 //                         SILValueOwnershipChecker
@@ -846,7 +866,7 @@ bool SILValueOwnershipChecker::checkUses() {
 }
 
 bool disableOwnershipVerification(const SILModule &mod) {
-  if (DisableOwnershipVerification)
+  if (DisableOwnershipVerification())
     return true;
   if (mod.getASTContext().blockListConfig.hasBlockListAction(
           mod.getSwiftModule()->getRealName().str(),
@@ -896,7 +916,7 @@ void SILInstruction::verifyOperandOwnership(
 
   // If we are testing the verifier, bail so we only print errors once when
   // performing a full verification, instead of additionally in the SILBuilder.
-  if (IsSILOwnershipVerifierTestingEnabled)
+  if (IsSILOwnershipVerifierTestingEnabled())
     return;
   // If this is a terminator instruction, do not verify in SILBuilder. This is
   // because when building a new function, one must create the destination block
@@ -906,7 +926,7 @@ void SILInstruction::verifyOperandOwnership(
 
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
   std::optional<LinearLifetimeChecker::ErrorBuilder> errorBuilder;
-  if (IsSILOwnershipVerifierTestingEnabled) {
+  if (IsSILOwnershipVerifierTestingEnabled()) {
     errorBuilder.emplace(*getFunction(),
                          BehaviorKind::PrintMessageAndReturnFalse);
   } else {
@@ -990,7 +1010,7 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks,
   // performing a full verification a function at a time by the
   // OwnershipVerifierStateDumper pass, instead of additionally in the
   // SILBuilder and in the actual SIL verifier that may be run by sil-opt.
-  if (IsSILOwnershipVerifierTestingEnabled)
+  if (IsSILOwnershipVerifierTestingEnabled())
     return;
 
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
@@ -1045,7 +1065,7 @@ void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
   unsigned errorCounter = 0;
   std::optional<LinearLifetimeChecker::ErrorBuilder> errorBuilder;
-  if (IsSILOwnershipVerifierTestingEnabled) {
+  if (IsSILOwnershipVerifierTestingEnabled()) {
     errorBuilder.emplace(*this, BehaviorKind::PrintMessageAndReturnFalse,
                          &errorCounter);
   } else {

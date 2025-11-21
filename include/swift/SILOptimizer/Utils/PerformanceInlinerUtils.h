@@ -25,8 +25,6 @@
 
 using namespace swift;
 
-extern llvm::cl::opt<bool> EnableSILInliningOfGenerics;
-
 namespace swift {
 class BasicCalleeAnalysis;
 class IsSelfRecursiveAnalysis;

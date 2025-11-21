@@ -32,13 +32,31 @@
 
 using namespace swift;
 
-llvm::cl::list<std::string>
-    SimplifyInstructionTest("simplify-instruction", llvm::cl::CommaSeparated,
-                     llvm::cl::desc("Simplify instruction of specified kind(s)"));
+static llvm::cl::list<std::string> &SimplifyInstructionTest() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("simplify-instruction");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::list<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::list<std::string>(
+      "simplify-instruction", llvm::cl::CommaSeparated,
+      llvm::cl::desc("Simplify instruction of specified kind(s)"));
+  return *opt;
+}
+static auto &EarlyInitSimplifyInstructionTest = SimplifyInstructionTest();
 
-llvm::cl::opt<bool> DisableSwiftVerification(
-    "disable-swift-verification", llvm::cl::init(false),
-    llvm::cl::desc("Disable verification which is implemented in the SwiftCompilerSources"));
+static llvm::cl::opt<bool> &DisableSwiftVerification() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("disable-swift-verification");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "disable-swift-verification", llvm::cl::init(false),
+      llvm::cl::desc("Disable verification which is implemented in the SwiftCompilerSources"));
+  return *opt;
+}
+static auto &EarlyInitDisableSwiftVerification = DisableSwiftVerification();
 
 
 #ifdef PURE_BRIDGING_MODE
@@ -54,7 +72,7 @@ void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
   if (f->getModule().getOptions().VerifyNone)
     return;
 
-  if (DisableSwiftVerification)
+  if (DisableSwiftVerification())
     return;
 
   if (f->hasSemanticsAttr(semantics::NO_SIL_VERIFICATION)) {
@@ -380,7 +398,7 @@ void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
 
 bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const {
   // Fast-path check.
-  if (SimplifyInstructionTest.empty() && !SILPassManager::isAnyPassDisabled())
+  if (SimplifyInstructionTest().empty() && !SILPassManager::isAnyPassDisabled())
     return true;
 
   StringRef instName = getSILInstructionName(inst.unbridged()->getKind());
@@ -388,10 +406,10 @@ bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const 
   if (SILPassManager::isInstructionPassDisabled(instName))
     return false;
 
-  if (SimplifyInstructionTest.empty())
+  if (SimplifyInstructionTest().empty())
     return true;
 
-  for (const std::string &testName : SimplifyInstructionTest) {
+  for (const std::string &testName : SimplifyInstructionTest()) {
     if (testName == instName)
       return true;
   }

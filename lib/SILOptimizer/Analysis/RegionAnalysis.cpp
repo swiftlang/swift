@@ -41,13 +41,22 @@ using namespace swift::regionanalysisimpl;
 
 bool swift::regionanalysisimpl::AbortOnUnknownPatternMatchError = false;
 
-static llvm::cl::opt<bool, true> AbortOnUnknownPatternMatchErrorCmdLine(
-    "sil-region-isolation-assert-on-unknown-pattern",
-    llvm::cl::desc("Abort if SIL region isolation detects an unknown pattern. "
-                   "Intended only to be used when debugging the compiler!"),
-    llvm::cl::Hidden,
-    llvm::cl::location(
-        swift::regionanalysisimpl::AbortOnUnknownPatternMatchError));
+static llvm::cl::opt<bool, true> &AbortOnUnknownPatternMatchErrorCmdLine() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-region-isolation-assert-on-unknown-pattern");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool, true>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool, true>(
+      "sil-region-isolation-assert-on-unknown-pattern",
+      llvm::cl::desc("Abort if SIL region isolation detects an unknown pattern. "
+                     "Intended only to be used when debugging the compiler!"),
+      llvm::cl::Hidden,
+      llvm::cl::location(
+          swift::regionanalysisimpl::AbortOnUnknownPatternMatchError));
+  return *opt;
+}
+static auto &EarlyInitAbortOnUnknownPatternMatchErrorCmdLine = AbortOnUnknownPatternMatchErrorCmdLine();
 
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities

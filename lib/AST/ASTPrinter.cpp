@@ -79,17 +79,35 @@
 using namespace swift;
 
 #ifndef NDEBUG
-static llvm::cl::opt<bool> NumberSuppressionChecks(
-    "swift-ast-printer-number-suppression-checks",
-    llvm::cl::desc("Used to number suppression checks in swift interface files "
-                   "to make it easier to FileCheck them. Only available with "
-                   "asserts enabled and intended for compiler tests."),
-    llvm::cl::init(false), llvm::cl::Hidden);
+static llvm::cl::opt<bool> &NumberSuppressionChecks() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("swift-ast-printer-number-suppression-checks");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "swift-ast-printer-number-suppression-checks",
+      llvm::cl::desc("Used to number suppression checks in swift interface files "
+                     "to make it easier to FileCheck them. Only available with "
+                     "asserts enabled and intended for compiler tests."),
+      llvm::cl::init(false), llvm::cl::Hidden);
+  return *opt;
+}
+static auto &EarlyInitNumberSuppressionChecks = NumberSuppressionChecks();
 #endif
 
-llvm::cl::opt<bool>
-PrintNoUUIDS("print-no-uuids", llvm::cl::init(false),
-                   llvm::cl::desc("don't print UUIDs to make the output better diffable"));
+static llvm::cl::opt<bool> &PrintNoUUIDS() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("print-no-uuids");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "print-no-uuids", llvm::cl::init(false),
+      llvm::cl::desc("don't print UUIDs to make the output better diffable"));
+  return *opt;
+}
+static auto &EarlyInitPrintNoUUIDS = PrintNoUUIDS();
 
 // Defined here to avoid repeatedly paying the price of template instantiation.
 const std::function<bool(const ExtensionDecl *)>
@@ -710,7 +728,7 @@ ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
 }
 
 void ASTPrinter::getUUIDStringForPrinting(UUID uuid, llvm::SmallVectorImpl<char> &out) {
-  if (PrintNoUUIDS) {
+  if (PrintNoUUIDS()) {
     out.clear();
     return;
   }
@@ -3751,7 +3769,7 @@ static void printCompatibilityCheckIf(ASTPrinter &printer, bool isElseIf,
   }
 
 #ifndef NDEBUG
-  if (NumberSuppressionChecks) {
+  if (NumberSuppressionChecks()) {
     static unsigned totalSuppressionChecks = 0;
     printer << " // Suppression Count: " << totalSuppressionChecks;
     ++totalSuppressionChecks;

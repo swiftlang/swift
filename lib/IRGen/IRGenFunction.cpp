@@ -36,9 +36,23 @@
 using namespace swift;
 using namespace irgen;
 
-static llvm::cl::opt<bool> EnableTrapDebugInfo(
-    "enable-trap-debug-info", llvm::cl::init(true), llvm::cl::Hidden,
-    llvm::cl::desc("Generate failure-message functions in the debug info"));
+namespace {
+// Helper to get or create command line option, checking if already registered.
+llvm::cl::opt<bool> &EnableTrapDebugInfo() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("enable-trap-debug-info");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "enable-trap-debug-info", llvm::cl::init(true), llvm::cl::Hidden,
+      llvm::cl::desc("Generate failure-message functions in the debug info"));
+  return *opt;
+}
+
+// Force early registration before command line parsing
+auto &EarlyInitEnableTrapDebugInfo = EnableTrapDebugInfo();
+} // namespace
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
                              bool isPerformanceConstraint,
@@ -533,7 +547,7 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
   // Emit the trap instruction.
   llvm::Function *trapIntrinsic = llvm::Intrinsic::getOrInsertDeclaration(
       &IGM.Module, llvm::Intrinsic::trap);
-  if (EnableTrapDebugInfo && IGM.DebugInfo && !failureMsg.empty()) {
+  if (EnableTrapDebugInfo() && IGM.DebugInfo && !failureMsg.empty()) {
     IGM.DebugInfo->addFailureMessageToCurrentLoc(*this, failureMsg);
   }
   auto Call = IRBuilderBase::CreateCall(trapIntrinsic, {});

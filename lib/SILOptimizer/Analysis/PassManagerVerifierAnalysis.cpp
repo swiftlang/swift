@@ -16,18 +16,27 @@
 #include "swift/SIL/SILModule.h"
 #include "llvm/Support/CommandLine.h"
 
-static llvm::cl::opt<bool>
-    EnableVerifier("enable-sil-passmanager-verifier-analysis",
-                   llvm::cl::desc("Enable verification of the passmanagers "
-                                  "function notification infrastructure"),
-                   llvm::cl::init(true));
+static llvm::cl::opt<bool> &EnableVerifier() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("enable-sil-passmanager-verifier-analysis");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "enable-sil-passmanager-verifier-analysis",
+      llvm::cl::desc("Enable verification of the passmanagers "
+                     "function notification infrastructure"),
+      llvm::cl::init(true));
+  return *opt;
+}
+static auto &EarlyInitEnableVerifier = EnableVerifier();
 
 using namespace swift;
 
 PassManagerVerifierAnalysis::PassManagerVerifierAnalysis(SILModule *mod)
     : SILAnalysis(SILAnalysisKind::PassManagerVerifier), mod(*mod) {
 #ifndef NDEBUG
-  if (!EnableVerifier)
+  if (!EnableVerifier())
     return;
   for (auto &fn : *mod) {
     LLVM_DEBUG(llvm::dbgs() << "PMVerifierAnalysis. Add: " << fn.getName()
@@ -49,7 +58,7 @@ void PassManagerVerifierAnalysis::invalidate(SILFunction *f,
 void PassManagerVerifierAnalysis::notifyAddedOrModifiedFunction(
     SILFunction *f) {
 #ifndef NDEBUG
-  if (!EnableVerifier)
+  if (!EnableVerifier())
     return;
   LLVM_DEBUG(llvm::dbgs() << "PMVerifierAnalysis. Add|Mod: " << f->getName()
                           << '\n');
@@ -60,7 +69,7 @@ void PassManagerVerifierAnalysis::notifyAddedOrModifiedFunction(
 /// Stop tracking a function.
 void PassManagerVerifierAnalysis::notifyWillDeleteFunction(SILFunction *f) {
 #ifndef NDEBUG
-  if (!EnableVerifier)
+  if (!EnableVerifier())
     return;
   LLVM_DEBUG(llvm::dbgs() << "PMVerifierAnalysis. Delete: " << f->getName()
                           << '\n');
@@ -81,7 +90,7 @@ void PassManagerVerifierAnalysis::invalidateFunctionTables() {}
 /// Run the entire verification.
 void PassManagerVerifierAnalysis::verifyFull() const {
 #ifndef NDEBUG
-  if (!EnableVerifier)
+  if (!EnableVerifier())
     return;
 
   // We check that liveFunctionNames is in sync with the module's function list

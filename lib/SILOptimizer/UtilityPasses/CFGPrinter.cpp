@@ -29,14 +29,32 @@ using namespace swift;
 //                                  Options
 //===----------------------------------------------------------------------===//
 
-llvm::cl::opt<std::string> SILViewCFGOnlyFun(
-    "sil-view-cfg-only-function", llvm::cl::init(""),
-    llvm::cl::desc("Only produce a graphviz file for this function"));
+static llvm::cl::opt<std::string> &SILViewCFGOnlyFun() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-view-cfg-only-function");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-view-cfg-only-function", llvm::cl::init(""),
+      llvm::cl::desc("Only produce a graphviz file for this function"));
+  return *opt;
+}
+static auto &EarlyInitSILViewCFGOnlyFun = SILViewCFGOnlyFun();
 
-llvm::cl::opt<std::string> SILViewCFGOnlyFuns(
-    "sil-view-cfg-only-functions", llvm::cl::init(""),
-    llvm::cl::desc("Only produce a graphviz file for the sil for the functions "
-                   "whose name contains this substring"));
+static llvm::cl::opt<std::string> &SILViewCFGOnlyFuns() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-view-cfg-only-functions");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "sil-view-cfg-only-functions", llvm::cl::init(""),
+      llvm::cl::desc("Only produce a graphviz file for the sil for the functions "
+                     "whose name contains this substring"));
+  return *opt;
+}
+static auto &EarlyInitSILViewCFGOnlyFuns = SILViewCFGOnlyFuns();
 
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
@@ -50,10 +68,10 @@ class SILCFGPrinter : public SILFunctionTransform {
     SILFunction *F = getFunction();
 
     // If we are not supposed to dump view this cfg, return.
-    if (!SILViewCFGOnlyFun.empty() && F && F->getName() != SILViewCFGOnlyFun)
+    if (!SILViewCFGOnlyFun().empty() && F && F->getName() != SILViewCFGOnlyFun())
       return;
-    if (!SILViewCFGOnlyFuns.empty() && F &&
-        !F->getName().contains(SILViewCFGOnlyFuns))
+    if (!SILViewCFGOnlyFuns().empty() && F &&
+        !F->getName().contains(SILViewCFGOnlyFuns()))
       return;
 
     F->viewCFG();
