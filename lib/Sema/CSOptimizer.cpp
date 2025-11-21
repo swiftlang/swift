@@ -1429,11 +1429,22 @@ static void determineBestChoicesInContext(
         }
       }
 
-      // If the parameter is `Any` we assume that all candidates are
-      // convertible to it, which makes it a perfect match. The solver
-      // would then decide whether erasing to an existential is preferable.
-      if (paramType->isAny())
-        return 1;
+      if (paramType->isAnyExistentialType()) {
+        // If the parameter is `Any` we assume that all candidates are
+        // convertible to it, which makes it a perfect match. The solver
+        // would then decide whether erasing to an existential is preferable.
+        if (paramType->isAny())
+          return 1;
+
+        // If the parameter is `Any.Type` we assume that all metatype
+        // candidates are convertible to it.
+        if (auto *EMT = paramType->getAs<ExistentialMetatypeType>()) {
+          if (EMT->getExistentialInstanceType()->isAny() &&
+              (candidateType->is<ExistentialMetatypeType>() ||
+               candidateType->is<MetatypeType>()))
+            return 1;
+        }
+      }
 
       // Check if a candidate could be matched to a parameter by
       // an existential opening.
