@@ -53,7 +53,7 @@ swift_dispatch_thread_override_self_with_base(qos_class_t override_qos, qos_clas
 
   if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *)) {
     return dispatch_thread_override_self_with_base(override_qos, base_qos);
-  } else if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *)) {
+  } else if (__builtin_available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)) {
     // If we don't have the ability to set our base qos correctly, at least set the override
     // We want to return 0 here because we have nothing to reset in this case
     (void) dispatch_thread_override_self(override_qos);

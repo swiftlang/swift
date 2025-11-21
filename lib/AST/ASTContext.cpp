@@ -3174,20 +3174,22 @@ ASTContext::getOrCreateLazyContextData(const Decl *decl,
                                        LazyMemberLoader *lazyLoader) {
   if (auto *data = getLazyContextData(decl)) {
     // Make sure we didn't provide an incompatible lazy loader.
-    assert(!lazyLoader || lazyLoader == data->loader);
+    ASSERT(!lazyLoader || lazyLoader == data->loader);
     return data;
   }
 
   LazyContextData *&entry = getImpl().LazyContexts[decl];
 
   // Create new lazy context data with the given loader.
-  assert(lazyLoader && "Queried lazy data for non-lazy iterable context");
+  ASSERT(lazyLoader && "Queried lazy data for non-lazy iterable context");
   if (isa<ProtocolDecl>(decl)) {
     entry = Allocate<LazyProtocolData>();
   } else if (isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl)) {
     entry = Allocate<LazyIterableDeclContextData>();
+  } else if (isa<OpaqueTypeDecl>(decl)) {
+    entry = Allocate<LazyOpaqueTypeData>();
   } else {
-    assert(isa<AssociatedTypeDecl>(decl));
+    ASSERT(isa<AssociatedTypeDecl>(decl));
     entry = Allocate<LazyAssociatedTypeData>();
   }
 
