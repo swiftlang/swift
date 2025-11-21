@@ -1232,12 +1232,9 @@ Pattern *TypeChecker::coercePatternToType(
     } else if (diagTy->isEqual(Context.TheEmptyTupleType)) {
       // Async-let bindings are commonly used to run a Void-returning
       // synchronous function in an async context. As a policy choice, don't
-      // diagnose a Void result on these bindings as potentially unexpected.
-      if (!isOptional && var->isAsyncLet()) {
-        shouldRequireType = false;
-      } else {
-        shouldRequireType = true;
-      }
+      // diagnose an inferred Void type (or optional thereof) on such bindings
+      // as potentially unexpected.
+      shouldRequireType = var->isAsyncLet() ? false : true;
     } else if (auto MTT = diagTy->getAs<AnyMetatypeType>()) {
       if (MTT->getInstanceType()->isAnyObject())
         shouldRequireType = true;

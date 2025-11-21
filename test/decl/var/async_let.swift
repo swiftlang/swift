@@ -63,10 +63,15 @@ func testVoidResultTypeDiagnostics() async {
   async let void6 = asyncVoid()
   await void6
 
-  // expected-warning @+2 {{constant 'maybeVoid' inferred to have type '()?', which may be unexpected}}
-  // expected-note @+1 {{add an explicit type annotation to silence this warning}}
   async let maybeVoid = { Bool.random() ? () : nil }()
   await maybeVoid
+
+  do {
+    final class C: Sendable { func doit() {} }
+    let c: C? = nil
+    async let maybeVoid2 = c?.doit()
+    let _: ()? = await maybeVoid2
+  }
 
   // expected-warning @+2 {{constant 'boxOVoid' inferred to have type '[()]', which may be unexpected}}
   // expected-note @+1 {{add an explicit type annotation to silence this warning}}
