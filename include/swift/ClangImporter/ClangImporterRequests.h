@@ -531,10 +531,6 @@ enum class CxxEscapability { Escapable, NonEscapable, Unknown };
 struct EscapabilityLookupDescriptor final {
   const clang::Type *type;
   ClangImporter::Implementation *impl;
-  // Only explicitly ~Escapable annotated types are considered ~Escapable.
-  // This is for backward compatibility, so we continue to import aggregates
-  // containing pointers as Escapable types.
-  bool annotationOnly = true;
 
   friend llvm::hash_code hash_value(const EscapabilityLookupDescriptor &desc) {
     return llvm::hash_combine(desc.type);
@@ -542,7 +538,7 @@ struct EscapabilityLookupDescriptor final {
 
   friend bool operator==(const EscapabilityLookupDescriptor &lhs,
                          const EscapabilityLookupDescriptor &rhs) {
-    return lhs.type == rhs.type && lhs.annotationOnly == rhs.annotationOnly;
+    return lhs.type == rhs.type;
   }
 
   friend bool operator!=(const EscapabilityLookupDescriptor &lhs,
