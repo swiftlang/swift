@@ -1983,11 +1983,33 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     // Constraints from which we can't do anything.
     break;
 
-  // For now let's avoid inferring protocol requirements from
-  // this constraint, but in the future we could do that to
-  // to filter bindings.
-  case ConstraintKind::TransitivelyConformsTo:
+  case ConstraintKind::TransitivelyConformsTo: {
+    // If this is a base of an unresolved member chain, as a last
+    // resort effort let's infer base to be a protocol type based
+    // on contextual conformance requirements.
+    //
+    // This allows us to find solutions in cases like this:
+    //
+    // \code
+    // func foo<T: P>(_: T) {}
+    // foo(.bar) <- `.bar` should be a static member of `P`.
+    // \endcode
+    if (TypeVar->getImpl().isUnresolvedMemberBase()) {
+      auto protocolTy = constraint->getSecondType();
+      // Compiler-known marker protocols cannot be extended with members,
+      // so do not consider them.
+      if (auto p = protocolTy->getAs<ProtocolType>()) {
+        if (ProtocolDecl *decl = p->getDecl())
+          if (decl->getKnownProtocolKind() && decl->isMarkerProtocol())
+            break;
+      }
+
+      addPotentialBinding(
+          TypeVar,
+          PotentialBinding(protocolTy, AllowedBindingKind::Exact, constraint));
+    }
     break;
+  }
 
   case ConstraintKind::DynamicTypeOf: {
     // Direct binding of the left-hand side could result
