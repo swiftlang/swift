@@ -486,6 +486,7 @@ public:
     SILFunctionArgument,
     Phi,
     BeginApplyToken,
+    DereferenceBorrow,
   };
 
 private:
@@ -523,7 +524,10 @@ public:
         return Kind::BeginApplyToken;
       }
       return Kind::Invalid;
+    case ValueKind::DereferenceBorrowInst:
+      return Kind::DereferenceBorrow;
     }
+       
   }
 
   BorrowedValueKind(Kind newValue) : value(newValue) {}
@@ -542,6 +546,7 @@ public:
       llvm_unreachable("Using invalid case?!");
     case BorrowedValueKind::BeginBorrow:
     case BorrowedValueKind::LoadBorrow:
+    case BorrowedValueKind::DereferenceBorrow:
     case BorrowedValueKind::Phi:
     case BorrowedValueKind::BeginApplyToken:
       return true;
