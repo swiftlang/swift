@@ -14,6 +14,7 @@ struct Magic: Hashable {
   let line: Int
   let column: Int
   let dsohandle: UnsafeRawPointer
+  let extra: Int
 
   init(
     fileID: String = #fileID,
@@ -22,7 +23,8 @@ struct Magic: Hashable {
     function: String = #function,
     line: Int = #line,
     column: Int = #column,
-    dsohandle: UnsafeRawPointer = #dsohandle
+    dsohandle: UnsafeRawPointer = #dsohandle,
+    extra: Int = 42
   ) {
     self.fileID = fileID
     self.file = file
@@ -31,6 +33,7 @@ struct Magic: Hashable {
     self.line = line
     self.column = column
     self.dsohandle = dsohandle
+    self.extra = extra
   }
 
   subscript(
@@ -41,7 +44,8 @@ struct Magic: Hashable {
     function: String = #function,
     line: Int = #line,
     column: Int = #column,
-    dsohandle: UnsafeRawPointer = #dsohandle
+    dsohandle: UnsafeRawPointer = #dsohandle,
+    extra: Int = 42
   ) -> Magic {
     return Magic(
       fileID: fileID,
@@ -50,7 +54,8 @@ struct Magic: Hashable {
       function: function,
       line: line,
       column: column,
-      dsohandle: dsohandle
+      dsohandle: dsohandle,
+      extra: extra
     )
   }
 
@@ -62,23 +67,24 @@ struct Magic: Hashable {
       function: function,
       line: line + lineOffset,
       column: column + columnOffset,
-      dsohandle: dsohandle
+      dsohandle: dsohandle,
+      extra: extra
     )
   }
 }
 
 /* ! ENSURE FORMATTERS ARE DISABLED TO PRESERVE WHITESPACE ! */
-let m1 = Magic() // 71:15
-let m2 = m1.member // 72:13
+let m1 = Magic() // 77:15
+let m2 = m1.member // 78:13
 assert(m1.offset(lineBy: +1, columnBy: -2) == m2)
 
 let m3 = m1
-  .member // 76:4
+  .member // 82:4
 assert(m1.offset(lineBy: +5, columnBy: -11) == m3)
 
 let m4 = m1
   .
-  member // 81:3
+  member // 87:3
 assert(m1.offset(lineBy: +10, columnBy: -12) == m4)
 
 //===----------------------------------------------------------------------===//
