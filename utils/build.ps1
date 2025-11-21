@@ -3977,6 +3977,14 @@ function Test-SourceKitLSP {
     # Tell the tests where to find the just-built plugins.
     $env:SOURCEKIT_LSP_TEST_PLUGIN_PATHS="$($HostPlatform.ToolchainInstallRoot)\usr\lib"
 
+    # Add Python to PATH for external build server tests.
+    # Create python3.exe alias if it doesn't exist (Windows installs python.exe, not python3.exe).
+    $PythonToolsDir = [IO.Path]::GetDirectoryName((Get-PythonExecutable))
+    if (-not (Test-Path "$PythonToolsDir\python3.exe")) {
+      Copy-Item "$PythonToolsDir\python.exe" "$PythonToolsDir\python3.exe"
+    }
+    $env:Path = "$PythonToolsDir;$env:Path"
+
     Build-SPMProject `
       -Action TestParallel `
       -Src "$SourceCache\sourcekit-lsp" `
