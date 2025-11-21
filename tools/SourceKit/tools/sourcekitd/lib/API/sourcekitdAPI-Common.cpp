@@ -260,7 +260,12 @@ bool sourcekitd::initializeClient() {
 
   static std::once_flag flag;
   std::call_once(flag, []() {
-    llvm::install_fatal_error_handler(fatal_error_handler, 0);
+    // In LLVM DLL builds, the fatal error handler may already be registered
+    // by another component sharing LLVM.dll (e.g. libIndexStore). Both
+    // handlers do the same thing (fprintf + abort), so remove the first one
+    // before installing ours.
+    llvm::remove_fatal_error_handler();
+    llvm::install_fatal_error_handler(fatal_error_handler, nullptr);
     sourcekitd::enableLogging("sourcekit");
   });
 
