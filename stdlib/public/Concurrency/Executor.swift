@@ -127,11 +127,12 @@ extension Executor where Self: Equatable {
 }
 
 extension Executor {
-
-  #if !$Embedded
+  #if os(WASI) || !$Embedded
+  // This defaults to `false` so that existing third-party Executor
+  // implementations will work as expected.
   @available(StdlibDeploymentTarget 6.2, *)
   var isMainExecutor: Bool { false }
-  #endif
+  #endif // os(WASI) || !$Embedded
 
 }
 
@@ -346,10 +347,10 @@ public protocol SerialExecutor: Executor {
 @available(StdlibDeploymentTarget 6.0, *)
 extension SerialExecutor {
 
-  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  #if os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   @available(StdlibDeploymentTarget 6.2, *)
   var isMainExecutor: Bool { return MainActor.executor._isSameExecutor(self) }
-  #endif
+  #endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
 
   @available(StdlibDeploymentTarget 6.0, *)
   public func checkIsolated() {
@@ -552,11 +553,11 @@ protocol MainExecutor: RunLoopExecutor, SerialExecutor {
 /// executors.
 @available(StdlibDeploymentTarget 6.2, *)
 protocol ExecutorFactory {
-  #if !$Embedded
+  #if os(WASI) || !$Embedded
   /// Constructs and returns the main executor, which is started implicitly
   /// by the `async main` entry point and owns the "main" thread.
   static var mainExecutor: any MainExecutor { get }
-  #endif
+  #endif // os(WASI) || !$Embedded
 
   /// Constructs and returns the default or global executor, which is the
   /// default place in which we run tasks.
@@ -569,9 +570,9 @@ typealias DefaultExecutorFactory = PlatformExecutorFactory
 @available(StdlibDeploymentTarget 6.2, *)
 @_silgen_name("swift_createExecutors")
 func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
-  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  #if os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   MainActor._executor = factory.mainExecutor
-  #endif
+  #endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   Task._defaultExecutor = factory.defaultExecutor
 }
 
@@ -583,7 +584,7 @@ func _createDefaultExecutors() {
   }
 }
 
-#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+#if os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
 @available(StdlibDeploymentTarget 6.2, *)
 extension MainActor {
   static var _executor: (any MainExecutor)? = nil
@@ -599,7 +600,7 @@ extension MainActor {
     return _executor!
   }
 }
-#endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+#endif // os(WASI) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
 
 @available(StdlibDeploymentTarget 6.2, *)
 extension Task where Success == Never, Failure == Never {
