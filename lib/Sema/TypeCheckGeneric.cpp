@@ -215,7 +215,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   }
 
   // Create the OpaqueTypeDecl for the result type.
-  auto opaqueDecl = OpaqueTypeDecl::get(
+  auto opaqueDecl = OpaqueTypeDecl::create(
       originatingDecl, genericParams, parentDC, interfaceSignature,
       opaqueReprs);
   if (auto originatingSig = originatingDC->getGenericSignatureOfContext()) {
