@@ -12,22 +12,19 @@ import CxxStdlib
 
 var StdHashTestSuite = TestSuite("StdHash")
 
-StdHashTestSuite.test("StdHash.StdString") {
-  let dict: [std.string : String] = [
-    "hello" : "world",
-    "dependent": "type",
-    "swift": "cxx"]
+StdHashTestSuite.test("StdHash.stdBitset") {
+  let dict: [Bitset : String] = [
+    makeBitset(10) : "world",
+    makeBitset(21) : "type",
+    makeBitset(33) : "cxx"]
 
-  expectEqual(dict["hello"], "world")
-  expectEqual(dict["dependent"], "type")
-  expectEqual(dict["swift"], "cxx")
+  expectEqual(dict[makeBitset(10)], "world")
+  expectEqual(dict[makeBitset(21)], "type")
+  expectEqual(dict[makeBitset(33)], "cxx")
 }
 
 // we need to manually instantiate std::hash<std::optional<std::string>>
 StdHashTestSuite.test("StdHash.StdOptionalString") {
-  var hasher = Hasher()
-
-  Optionalstr.init().hash(into: &hasher)
   let dict: [Optionalstr : String] = [
     Optionalstr.init("hello") : "world",
     Optionalstr.init("dependent"): "type",

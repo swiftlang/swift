@@ -3,9 +3,12 @@
 #include <optional>
 #include <string>
 
+using Bitset = std::bitset<64>;
 using Optionalstr = std::optional<std::string>;
 using hashoptstr = std::hash<Optionalstr>;
 using eqoptstr = std::equal_to<Optionalstr>;
+
+Bitset makeBitset(uint64_t n) { return std::bitset<64>{n}; }
 
 struct A {
   int value;
