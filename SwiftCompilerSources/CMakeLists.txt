@@ -225,6 +225,17 @@ function(add_swift_compiler_modules_library name)
     # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
     list(APPEND swift_compile_options "-Xcc" "-Xclang" "-Xcc" "-fmodule-format=raw")
 
+    # When LLVM is built as a DLL with clang-cl, its libraries are compiled with
+    # `/Zc:dllexportInlines-` (see `llvm_add_library` in AddLLVM.cmake). The
+    # C++ headers imported into Swift modules must be parsed with the same
+    # setting, otherwise the importer emits dllimport references to inline
+    # members that LLVM.dll does not export. `-fno-dllexport-inlines` is the
+    # cc1 spelling of that flag.
+    if(LLVM_BUILD_LLVM_DYLIB AND NOT LLVM_DYLIB_EXPORT_INLINES AND
+       MSVC AND CMAKE_CXX_COMPILER_ID MATCHES Clang)
+      list(APPEND swift_compile_options "-Xcc" "-Xclang" "-Xcc" "-fno-dllexport-inlines")
+    endif()
+
   elseif(swift_exec_bin_dir MATCHES ".*/swiftly/bin")
     # Detect and handle swiftly-managed hosts.
     execute_process(COMMAND swiftly use --print-location
