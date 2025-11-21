@@ -376,10 +376,6 @@ public:
 
   llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
 
-  /// The set of transitive protocol requirements inferred through
-  /// subtype/conversion/equivalence relations with other type variables.
-  std::optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
-
   BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
              const PotentialBindings &info);
 
@@ -558,13 +554,6 @@ public:
   /// \param inferredBindings The set of all bindings inferred for type
   /// variables in the workset.
   void inferTransitiveSupertypeBindings();
-
-  void inferTransitiveUnresolvedMemberRefBindings();
-
-  /// Detect subtype, conversion or equivalence relationship
-  /// between two type variables and attempt to propagate protocol
-  /// requirements down the subtype or equivalence chain.
-  void inferTransitiveProtocolRequirements();
 
   /// Check whether the given binding set covers any of the
   /// literal protocols associated with this type variable.

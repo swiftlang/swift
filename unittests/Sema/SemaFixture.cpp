@@ -141,14 +141,9 @@ BindingSet SemaTest::inferBindings(ConstraintSystem &cs,
 
     auto &bindings = node.getBindingSet();
 
-    // FIXME: This is also called in inferTransitiveUnresolvedMemberRefBindings(),
-    // why do we need to call it here too?
-    bindings.inferTransitiveProtocolRequirements();
-
     bindings.inferTransitiveKeyPathBindings();
     (void) bindings.finalizeKeyPathBindings();
 
-    bindings.inferTransitiveUnresolvedMemberRefBindings();
     bindings.finalizeUnresolvedMemberChainResult();
 
     bindings.inferTransitiveSupertypeBindings();
