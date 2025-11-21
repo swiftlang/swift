@@ -24,13 +24,33 @@
 
 using namespace swift;
 
-llvm::cl::opt<bool>
-SILPrintOnError("sil-print-on-error", llvm::cl::init(false),
-                llvm::cl::desc("Printing SIL function bodies in crash diagnostics."));
+namespace {
+llvm::cl::opt<bool> &SILPrintOnError() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-on-error");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-on-error", llvm::cl::init(false),
+      llvm::cl::desc("Printing SIL function bodies in crash diagnostics."));
+  return *opt;
+}
+auto &EarlyInitSILPrintOnError = SILPrintOnError();
 
-llvm::cl::opt<bool> SILPrintModuleOnError(
-    "sil-print-module-on-error", llvm::cl::init(false),
-    llvm::cl::desc("Printing SIL module in crash diagnostics."));
+llvm::cl::opt<bool> &SILPrintModuleOnError() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-module-on-error");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-module-on-error", llvm::cl::init(false),
+      llvm::cl::desc("Printing SIL module in crash diagnostics."));
+  return *opt;
+}
+auto &EarlyInitSILPrintModuleOnError = SILPrintModuleOnError();
+} // namespace
 
 static void printLocationDescription(llvm::raw_ostream &out,
                                          SILLocation::FilenameAndLocation loc,
@@ -93,9 +113,9 @@ void PrettyStackTraceSILFunction::printFunctionInfo(llvm::raw_ostream &out) cons
     printSILLocationDescription(out, func->getLocation(),
                                 func->getModule().getASTContext());
   }
-  if (SILPrintOnError)
+  if (SILPrintOnError())
     func->print(out);
-  if (SILPrintModuleOnError)
+  if (SILPrintModuleOnError())
     func->getModule().print(out, func->getModule().getSwiftModule());
 }
 

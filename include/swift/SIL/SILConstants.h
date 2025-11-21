@@ -37,7 +37,7 @@ struct SymbolicValueMemoryObject;
 struct UnknownSymbolicValue;
 struct SymbolicClosure;
 
-extern llvm::cl::opt<unsigned> ConstExprLimit;
+extern llvm::cl::opt<unsigned> &ConstExprLimit();
 
 /// An abstract class that exposes functions for allocating symbolic values.
 /// The implementors of this class have to determine where to allocate them and

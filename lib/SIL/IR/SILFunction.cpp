@@ -754,29 +754,57 @@ void SILFunction::moveBlockBefore(SILBasicBlock *BB, SILFunction::iterator IP) {
 
 #ifndef NDEBUG
 
-static llvm::cl::opt<unsigned>
-MaxColumns("view-cfg-max-columns", llvm::cl::init(80),
-           llvm::cl::desc("Maximum width of a printed node"));
-
 namespace {
 enum class LongLineBehavior { None, Truncate, Wrap };
-} // end anonymous namespace
-static llvm::cl::opt<LongLineBehavior>
-LLBehavior("view-cfg-long-line-behavior",
-           llvm::cl::init(LongLineBehavior::Truncate),
-           llvm::cl::desc("Behavior when line width is greater than the "
-                          "value provided my -view-cfg-max-columns "
-                          "option"),
-           llvm::cl::values(
-               clEnumValN(LongLineBehavior::None, "none", "Print everything"),
-               clEnumValN(LongLineBehavior::Truncate, "truncate",
-                          "Truncate long lines"),
-               clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines")));
 
-static llvm::cl::opt<bool>
-RemoveUseListComments("view-cfg-remove-use-list-comments",
-                      llvm::cl::init(false),
-                      llvm::cl::desc("Should use list comments be removed"));
+llvm::cl::opt<unsigned> &MaxColumns() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("view-cfg-max-columns");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<unsigned>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<unsigned>(
+      "view-cfg-max-columns", llvm::cl::init(80),
+      llvm::cl::desc("Maximum width of a printed node"));
+  return *opt;
+}
+auto &EarlyInitMaxColumns = MaxColumns();
+
+llvm::cl::opt<LongLineBehavior> &LLBehavior() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("view-cfg-long-line-behavior");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<LongLineBehavior>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<LongLineBehavior>(
+      "view-cfg-long-line-behavior",
+      llvm::cl::init(LongLineBehavior::Truncate),
+      llvm::cl::desc("Behavior when line width is greater than the "
+                     "value provided my -view-cfg-max-columns "
+                     "option"),
+      llvm::cl::values(
+          clEnumValN(LongLineBehavior::None, "none", "Print everything"),
+          clEnumValN(LongLineBehavior::Truncate, "truncate",
+                     "Truncate long lines"),
+          clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines")));
+  return *opt;
+}
+auto &EarlyInitLLBehavior = LLBehavior();
+
+llvm::cl::opt<bool> &RemoveUseListComments() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("view-cfg-remove-use-list-comments");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "view-cfg-remove-use-list-comments",
+      llvm::cl::init(false),
+      llvm::cl::desc("Should use list comments be removed"));
+  return *opt;
+}
+auto &EarlyInitRemoveUseListComments = RemoveUseListComments();
+} // end anonymous namespace
 
 template <typename InstTy, typename CaseValueTy>
 inline CaseValueTy getCaseValueForBB(const InstTy *Inst,
@@ -825,22 +853,22 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
         OutStr.insert(OutStr.begin() + i + 1, 'l');
         ColNum = 0;
         LastSpace = 0;
-      } else if (RemoveUseListComments && OutStr[i] == '/' &&
+      } else if (RemoveUseListComments() && OutStr[i] == '/' &&
                  i != (OutStr.size() - 1) && OutStr[i + 1] == '/') {
         unsigned Idx = OutStr.find('\n', i + 1); // Find end of line
         OutStr.erase(OutStr.begin() + i, OutStr.begin() + Idx);
         --i;
 
-      } else if (ColNum == MaxColumns) { // Handle long lines.
+      } else if (ColNum == MaxColumns()) { // Handle long lines.
 
-        if (LLBehavior == LongLineBehavior::Wrap) {
+        if (LLBehavior() == LongLineBehavior::Wrap) {
           if (!LastSpace)
             LastSpace = i;
           OutStr.insert(LastSpace, "\\l...");
           ColNum = i - LastSpace;
           LastSpace = 0;
           i += 3; // The loop will advance 'i' again.
-        } else if (LLBehavior == LongLineBehavior::Truncate) {
+        } else if (LLBehavior() == LongLineBehavior::Truncate) {
           unsigned Idx = OutStr.find('\n', i + 1); // Find end of line
           OutStr.erase(OutStr.begin() + i, OutStr.begin() + Idx);
           --i;
@@ -920,16 +948,27 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
 #endif
 
 #ifndef NDEBUG
-static llvm::cl::opt<std::string>
-TargetFunction("view-cfg-only-for-function", llvm::cl::init(""),
-               llvm::cl::desc("Only print out the cfg for this function"));
+namespace {
+llvm::cl::opt<std::string> &TargetFunction() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("view-cfg-only-for-function");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<std::string>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<std::string>(
+      "view-cfg-only-for-function", llvm::cl::init(""),
+      llvm::cl::desc("Only print out the cfg for this function"));
+  return *opt;
+}
+auto &EarlyInitTargetFunction = TargetFunction();
+} // namespace
 #endif
 
 static void viewCFGHelper(const SILFunction* f, bool skipBBContents) {
 /// When asserts are disabled, this should be a NoOp.
 #ifndef NDEBUG
     // If we have a target function, only print that function out.
-    if (!TargetFunction.empty() && !(f->getName().str() == TargetFunction))
+    if (!TargetFunction().empty() && !(f->getName().str() == TargetFunction()))
       return;
 
     ViewGraph(const_cast<SILFunction *>(f), "cfg" + f->getName().str(),

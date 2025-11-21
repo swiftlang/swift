@@ -30,12 +30,23 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> EmitLogging(
-    "sil-move-only-checker-emit-pruned-liveness-logging");
+namespace {
+llvm::cl::opt<bool> &EmitLogging() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-move-only-checker-emit-pruned-liveness-logging");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-move-only-checker-emit-pruned-liveness-logging");
+  return *opt;
+}
+auto &EarlyInitEmitLogging = EmitLogging();
+} // namespace
 
 #define PRUNED_LIVENESS_LOG(X) \
   do { \
-    if (EmitLogging) { \
+    if (EmitLogging()) { \
       LLVM_DEBUG(X); \
       } \
     } while (0)

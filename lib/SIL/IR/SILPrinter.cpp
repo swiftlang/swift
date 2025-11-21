@@ -62,51 +62,144 @@
 using namespace swift;
 using ID = SILPrintContext::ID;
 
-llvm::cl::opt<bool>
-SILPrintNoColor("sil-print-no-color", llvm::cl::init(""),
-                llvm::cl::desc("Don't use color when printing SIL"));
+namespace {
+llvm::cl::opt<bool> &SILPrintNoColor() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-no-color");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-no-color", llvm::cl::init(""),
+      llvm::cl::desc("Don't use color when printing SIL"));
+  return *opt;
+}
+auto &EarlyInitSILPrintNoColor = SILPrintNoColor();
 
-llvm::cl::opt<bool>
-SILFullDemangle("sil-full-demangle", llvm::cl::init(false),
-                llvm::cl::desc("Fully demangle symbol names in SIL output"));
+llvm::cl::opt<bool> &SILFullDemangle() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-full-demangle");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-full-demangle", llvm::cl::init(false),
+      llvm::cl::desc("Fully demangle symbol names in SIL output"));
+  return *opt;
+}
+auto &EarlyInitSILFullDemangle = SILFullDemangle();
 
-llvm::cl::opt<bool>
-SILPrintDebugInfo("sil-print-debuginfo", llvm::cl::init(false),
-                llvm::cl::desc("Include debug info in SIL output"));
+llvm::cl::opt<bool> &SILPrintDebugInfoVerbose() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-debuginfo-verbose");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-debuginfo-verbose",
+      llvm::cl::init(false),
+      llvm::cl::desc("Print verbose debug info output"));
+  return *opt;
+}
+auto &EarlyInitSILPrintDebugInfoVerbose = SILPrintDebugInfoVerbose();
 
-llvm::cl::opt<bool>
-    SILPrintDebugInfoVerbose("sil-print-debuginfo-verbose",
-                             llvm::cl::init(false),
-                             llvm::cl::desc("Print verbose debug info output"));
+llvm::cl::opt<bool> &SILPrintSourceInfo() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-sourceinfo");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-sourceinfo", llvm::cl::init(false),
+      llvm::cl::desc("Include source annotation in SIL output"));
+  return *opt;
+}
+auto &EarlyInitSILPrintSourceInfo = SILPrintSourceInfo();
 
-llvm::cl::opt<bool>
-SILPrintSourceInfo("sil-print-sourceinfo", llvm::cl::init(false),
-                   llvm::cl::desc("Include source annotation in SIL output"));
+llvm::cl::opt<bool> &SILPrintTypes() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-types");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-types", llvm::cl::init(false),
+      llvm::cl::desc("always print type annotations for instruction operands in SIL output"));
+  return *opt;
+}
+auto &EarlyInitSILPrintTypes = SILPrintTypes();
 
-llvm::cl::opt<bool>
-SILPrintTypes("sil-print-types", llvm::cl::init(false),
-                   llvm::cl::desc("always print type annotations for instruction operands in SIL output"));
+llvm::cl::opt<bool> &SILPrintOwnership() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-ownership");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-ownership", llvm::cl::init(false),
+      llvm::cl::desc("print ownership of instruction results in SIL output"));
+  return *opt;
+}
+auto &EarlyInitSILPrintOwnership = SILPrintOwnership();
 
-llvm::cl::opt<bool>
-SILPrintOwnership("sil-print-ownership", llvm::cl::init(false),
-                   llvm::cl::desc("print ownership of instruction results in SIL output"));
+llvm::cl::opt<bool> &SILPrintNoUses() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-no-uses");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-no-uses", llvm::cl::init(false),
+      llvm::cl::desc("omit use comments in SIL output"));
+  return *opt;
+}
+auto &EarlyInitSILPrintNoUses = SILPrintNoUses();
 
-llvm::cl::opt<bool>
-SILPrintNoUses("sil-print-no-uses", llvm::cl::init(false),
-                   llvm::cl::desc("omit use comments in SIL output"));
+llvm::cl::opt<bool> &SILPrintGenericSpecializationInfo() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-generic-specialization-info");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-generic-specialization-info", llvm::cl::init(false),
+      llvm::cl::desc("Include generic specialization"
+                     "information info in SIL output"));
+  return *opt;
+}
+auto &EarlyInitSILPrintGenericSpecializationInfo = SILPrintGenericSpecializationInfo();
 
-llvm::cl::opt<bool> SILPrintGenericSpecializationInfo(
-    "sil-print-generic-specialization-info", llvm::cl::init(false),
-    llvm::cl::desc("Include generic specialization"
-                   "information info in SIL output"));
+llvm::cl::opt<bool> &SILPrintFunctionIsolationInfo() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-function-isolation-info");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-function-isolation-info", llvm::cl::init(false),
+      llvm::cl::desc("Print out isolation info on functions in a manner that SIL "
+                     "understands [e.x.: not in comments]"));
+  return *opt;
+}
+auto &EarlyInitSILPrintFunctionIsolationInfo = SILPrintFunctionIsolationInfo();
+} // namespace
 
-llvm::cl::opt<bool> SILPrintFunctionIsolationInfo(
-    "sil-print-function-isolation-info", llvm::cl::init(false),
-    llvm::cl::desc("Print out isolation info on functions in a manner that SIL "
-                   "understands [e.x.: not in comments]"));
+// SILPrintDebugInfo is used in other files (extern in SILVerifier.cpp)
+llvm::cl::opt<bool> &SILPrintDebugInfo() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-debuginfo");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-debuginfo", llvm::cl::init(false),
+      llvm::cl::desc("Include debug info in SIL output"));
+  return *opt;
+}
+static auto &EarlyInitSILPrintDebugInfo = SILPrintDebugInfo();
 
 static std::string demangleSymbol(StringRef Name) {
-  if (SILFullDemangle)
+  if (SILFullDemangle())
     return Demangle::demangleSymbolAsString(Name);
   return Demangle::demangleSymbolAsString(Name,
                     Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
@@ -125,7 +218,7 @@ public:
 #define DEF_COL(NAME, RAW) case NAME: Color = raw_ostream::RAW; break;
 
   explicit SILColor(raw_ostream &OS, SILColorKind K) : OS(OS) {
-    if (!OS.has_colors() || SILPrintNoColor)
+    if (!OS.has_colors() || SILPrintNoColor())
       return;
     switch (K) {
       DEF_COL(SC_Type, YELLOW)
@@ -135,7 +228,7 @@ public:
   }
 
   explicit SILColor(raw_ostream &OS, ID::ID_Kind K) : OS(OS) {
-    if (!OS.has_colors() || SILPrintNoColor)
+    if (!OS.has_colors() || SILPrintNoColor())
       return;
     switch (K) {
       DEF_COL(ID::SILUndef, RED)
@@ -148,7 +241,7 @@ public:
   }
   
   ~SILColor() {
-    if (!OS.has_colors() || SILPrintNoColor)
+    if (!OS.has_colors() || SILPrintNoColor())
       return;
     // FIXME: instead of resetColor(), we can look into
     // capturing the current active color and restoring it.
@@ -825,7 +918,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   }
 
   bool needPrintTypeFor(SILValue V) {
-    if (SILPrintTypes)
+    if (SILPrintTypes())
       return true;
 
     if (!V)
@@ -927,7 +1020,7 @@ public:
   }
 
   void printBlockArgumentUses(const SILBasicBlock *BB) {
-    if (SILPrintNoUses)
+    if (SILPrintNoUses())
       return;
 
     if (BB->args_empty())
@@ -1044,7 +1137,7 @@ public:
     printBlockArguments(BB);
     *this << ":";
 
-    if (!BB->pred_empty() && !SILPrintNoUses) {
+    if (!BB->pred_empty() && !SILPrintNoUses()) {
       PrintState.OS.PadToColumn(50);
       
       *this << "// Preds:";
@@ -1069,7 +1162,7 @@ public:
     const auto &SM = BB->getModule().getASTContext().SourceMgr;
     std::optional<SILLocation> PrevLoc;
     for (const SILInstruction &I : *BB) {
-      if (SILPrintSourceInfo) {
+      if (SILPrintSourceInfo()) {
         auto CurSourceLoc = I.getLoc().getSourceLoc();
         if (CurSourceLoc.isValid()) {
           if (!PrevLoc ||
@@ -1090,7 +1183,7 @@ public:
         }
       }
       Ctx.printInstructionCallBack(&I);
-      if (SILPrintGenericSpecializationInfo) {
+      if (SILPrintGenericSpecializationInfo()) {
         if (auto AI = ApplySite::isa(const_cast<SILInstruction *>(&I)))
           if ((AI.getSpecializationInfo() ||
                !AI.getSubstitutionMap().empty()) &&
@@ -1148,7 +1241,7 @@ public:
     if (!inst->isStaticInitializerInst() &&
         inst->getFunction()->hasOwnership() &&
         hasNonAddressResults(inst) &&
-        (SILPrintOwnership || hasUnusualResultOwnership(inst)))
+        (SILPrintOwnership() || hasUnusualResultOwnership(inst)))
     {
       lineComments.delim();
 
@@ -1166,7 +1259,7 @@ public:
   }
 
   void printUserList(ArrayRef<SILValue> values, SILNodePointer node) {
-    if (SILPrintNoUses)
+    if (SILPrintNoUses())
       return;
 
     // If the set of values is empty, we need to print the ID of
@@ -1255,7 +1348,7 @@ public:
         *this << "* ";
       *this << QuotedString(DL.filename) << ':' << DL.line << ':'
             << (unsigned)DL.column;
-      if (SILPrintDebugInfoVerbose) {
+      if (SILPrintDebugInfoVerbose()) {
         if (Loc.isImplicit())
           *this << " isImplicit: " << "true";
         else
@@ -3700,7 +3793,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "\n";
   }
 
-  if (SILPrintGenericSpecializationInfo) {
+  if (SILPrintGenericSpecializationInfo()) {
     if (isSpecialization()) {
       printGenericSpecializationInfo(OS, "function", getName(),
                                      getSpecializationInfo());
@@ -3789,7 +3882,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
 
   // This is here only for testing purposes.
-  if (SILPrintFunctionIsolationInfo) {
+  if (SILPrintFunctionIsolationInfo()) {
     if (auto isolation = getActorIsolation()) {
       OS << "[isolation \"";
       isolation->printForSIL(OS);
@@ -4931,12 +5024,12 @@ void KeyPathPatternComponent::print(SILPrintContext &ctxt) const {
 SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
                                  bool SortedSIL, bool PrintFullConvention)
     : OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
-      DebugInfo(SILPrintDebugInfo), PrintFullConvention(PrintFullConvention) {}
+      DebugInfo(SILPrintDebugInfo()), PrintFullConvention(PrintFullConvention) {}
 
 SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, const SILOptions &Opts)
     : OutStream(OS), Verbose(Opts.EmitVerboseSIL),
       SortedSIL(Opts.EmitSortedSIL),
-      DebugInfo(Opts.PrintDebugInfo || SILPrintDebugInfo),
+      DebugInfo(Opts.PrintDebugInfo || SILPrintDebugInfo()),
       PrintFullConvention(Opts.PrintFullConvention) {}
 
 SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,

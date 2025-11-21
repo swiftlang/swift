@@ -36,145 +36,373 @@ using namespace swift;
 
 STATISTIC(NumFunctionsInlined, "Number of functions inlined");
 
-llvm::cl::opt<bool> PrintShortestPathInfo(
-    "print-shortest-path-info", llvm::cl::init(false),
-    llvm::cl::desc("Print shortest-path information for inlining"));
+namespace {
+llvm::cl::opt<bool> &PrintShortestPathInfo() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("print-shortest-path-info");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "print-shortest-path-info", llvm::cl::init(false),
+      llvm::cl::desc("Print shortest-path information for inlining"));
+  return *opt;
+}
+auto &EarlyInitPrintShortestPathInfo = PrintShortestPathInfo();
 
-llvm::cl::opt<bool> EnableSILInliningOfGenerics(
-  "sil-inline-generics", llvm::cl::init(false),
-  llvm::cl::desc("Enable inlining of generics"));
+llvm::cl::opt<bool> &EnableSILInliningOfGenerics() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-generics");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-inline-generics", llvm::cl::init(false),
+      llvm::cl::desc("Enable inlining of generics"));
+  return *opt;
+}
+auto &EarlyInitEnableSILInliningOfGenerics = EnableSILInliningOfGenerics();
 
-llvm::cl::opt<bool>
-    EnableSILAggressiveInlining("sil-aggressive-inline", llvm::cl::init(false),
-                               llvm::cl::desc("Enable aggressive inlining"));
+llvm::cl::opt<bool> &EnableSILAggressiveInlining() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-aggressive-inline");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-aggressive-inline", llvm::cl::init(false),
+      llvm::cl::desc("Enable aggressive inlining"));
+  return *opt;
+}
+auto &EarlyInitEnableSILAggressiveInlining = EnableSILAggressiveInlining();
 
-llvm::cl::opt<bool> EnableVerifyAfterInlining(
-    "sil-inline-verify-after-inline", llvm::cl::init(false),
-    llvm::cl::desc("Run sil verification after inlining all found callee apply "
-                   "sites into a caller."));
+llvm::cl::opt<bool> &EnableVerifyAfterInlining() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-verify-after-inline");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-inline-verify-after-inline", llvm::cl::init(false),
+      llvm::cl::desc("Run sil verification after inlining all found callee apply "
+                     "sites into a caller."));
+  return *opt;
+}
+auto &EarlyInitEnableVerifyAfterInlining = EnableVerifyAfterInlining();
 
-llvm::cl::opt<bool> SILPrintInliningCallee(
-    "sil-print-inlining-callee", llvm::cl::init(false),
-    llvm::cl::desc("Print functions that are inlined into other functions."));
+llvm::cl::opt<bool> &SILPrintInliningCallee() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-inlining-callee");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-inlining-callee", llvm::cl::init(false),
+      llvm::cl::desc("Print functions that are inlined into other functions."));
+  return *opt;
+}
+auto &EarlyInitSILPrintInliningCallee = SILPrintInliningCallee();
 
-llvm::cl::opt<bool> SILPrintInliningCallerBefore(
-    "sil-print-inlining-caller-before", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Print functions into which another function is about to be inlined."));
+llvm::cl::opt<bool> &SILPrintInliningCallerBefore() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-inlining-caller-before");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-inlining-caller-before", llvm::cl::init(false),
+      llvm::cl::desc(
+          "Print functions into which another function is about to be inlined."));
+  return *opt;
+}
+auto &EarlyInitSILPrintInliningCallerBefore = SILPrintInliningCallerBefore();
 
-llvm::cl::opt<bool> SILPrintInliningCallerAfter(
-    "sil-print-inlining-caller-after", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Print functions into which another function has been inlined."));
+llvm::cl::opt<bool> &SILPrintInliningCallerAfter() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-print-inlining-caller-after");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-print-inlining-caller-after", llvm::cl::init(false),
+      llvm::cl::desc(
+          "Print functions into which another function has been inlined."));
+  return *opt;
+}
+auto &EarlyInitSILPrintInliningCallerAfter = SILPrintInliningCallerAfter();
 
-llvm::cl::opt<bool> EnableVerifyAfterEachInlining(
-    "sil-inline-verify-after-each-inline", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Run sil verification after inlining each found callee apply "
-        "site into a caller."));
+llvm::cl::opt<bool> &EnableVerifyAfterEachInlining() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-verify-after-each-inline");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-inline-verify-after-each-inline", llvm::cl::init(false),
+      llvm::cl::desc(
+          "Run sil verification after inlining each found callee apply "
+          "site into a caller."));
+  return *opt;
+}
+auto &EarlyInitEnableVerifyAfterEachInlining = EnableVerifyAfterEachInlining();
 
-//===----------------------------------------------------------------------===//
-//                           Heuristics
-//===----------------------------------------------------------------------===//
+llvm::cl::opt<int> &RemovedCallBenefit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-removed-call-benefit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-removed-call-benefit", llvm::cl::init(20),
+      llvm::cl::desc("The base value for every call: it represents the benefit "
+                     "of removing the call overhead itself."));
+  return *opt;
+}
+auto &EarlyInitRemovedCallBenefit = RemovedCallBenefit();
 
-/// The following constants define the cost model for inlining. Some constants
-/// are also defined in ShortestPathAnalysis.
+llvm::cl::opt<int> &RemovedCoroutineCallBenefit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-removed-coroutine-call-benefit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-removed-coroutine-call-benefit", llvm::cl::init(300),
+      llvm::cl::desc("The benefit of inlining a `begin_apply`."));
+  return *opt;
+}
+auto &EarlyInitRemovedCoroutineCallBenefit = RemovedCoroutineCallBenefit();
 
-llvm::cl::opt<int> RemovedCallBenefit(
-    "sil-inline-removed-call-benefit", llvm::cl::init(20),
-    llvm::cl::desc("The base value for every call: it represents the benefit "
-                   "of removing the call overhead itself."));
+llvm::cl::opt<int> &RemovedClosureBenefit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-removed-closure-benefit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-removed-closure-benefit",
+      llvm::cl::init(RemovedCallBenefit() + 50),
+      llvm::cl::desc(
+          "The benefit if the operand of an apply gets constant e.g. if a "
+          "closure is passed to an apply instruction in the callee."));
+  return *opt;
+}
+auto &EarlyInitRemovedClosureBenefit = RemovedClosureBenefit();
 
-llvm::cl::opt<int> RemovedCoroutineCallBenefit(
-    "sil-inline-removed-coroutine-call-benefit", llvm::cl::init(300),
-    llvm::cl::desc("The benefit of inlining a `begin_apply`."));
+llvm::cl::opt<int> &RemovedLoadBenefit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-removed-load-benefit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-removed-load-benefit", llvm::cl::init(RemovedCallBenefit() + 5),
+      llvm::cl::desc("The benefit if a load can (probably) eliminated because it "
+                     "loads from a stack location in the caller."));
+  return *opt;
+}
+auto &EarlyInitRemovedLoadBenefit = RemovedLoadBenefit();
 
-llvm::cl::opt<int> RemovedClosureBenefit(
-    "sil-inline-removed-closure-benefit",
-    llvm::cl::init(RemovedCallBenefit + 50),
-    llvm::cl::desc(
-        "The benefit if the operand of an apply gets constant e.g. if a "
-        "closure is passed to an apply instruction in the callee."));
+llvm::cl::opt<int> &RemovedStoreBenefit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-removed-store-benefit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-removed-store-benefit", llvm::cl::init(RemovedCallBenefit() + 10),
+      llvm::cl::desc("The benefit if a store can (probably) eliminated because "
+                     "it stores to a stack location in the caller."));
+  return *opt;
+}
+auto &EarlyInitRemovedStoreBenefit = RemovedStoreBenefit();
 
-llvm::cl::opt<int> RemovedLoadBenefit(
-    "sil-inline-removed-load-benefit", llvm::cl::init(RemovedCallBenefit + 5),
-    llvm::cl::desc("The benefit if a load can (probably) eliminated because it "
-                   "loads from a stack location in the caller."));
+llvm::cl::opt<int> &RemovedTerminatorBenefit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-removed-terminator-benefit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-removed-terminator-benefit",
+      llvm::cl::init(RemovedCallBenefit() + 10),
+      llvm::cl::desc("The benefit if the condition of a terminator instruction "
+                     "gets constant due to inlining."));
+  return *opt;
+}
+auto &EarlyInitRemovedTerminatorBenefit = RemovedTerminatorBenefit();
 
-llvm::cl::opt<int> RemovedStoreBenefit(
-    "sil-inline-removed-store-benefit", llvm::cl::init(RemovedCallBenefit + 10),
-    llvm::cl::desc("The benefit if a store can (probably) eliminated because "
-                   "it stores to a stack location in the caller."));
+llvm::cl::opt<int> &RefCountBenefit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-ref-count-benefit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-ref-count-benefit",
+      llvm::cl::init(RemovedCallBenefit() + 20),
+      llvm::cl::desc("The benefit if a retain/release can "
+                     "(probably) be eliminated after inlining."));
+  return *opt;
+}
+auto &EarlyInitRefCountBenefit = RefCountBenefit();
 
-llvm::cl::opt<int> RemovedTerminatorBenefit(
-    "sil-inline-removed-terminator-benefit",
-    llvm::cl::init(RemovedCallBenefit + 10),
-    llvm::cl::desc("The benefit if the condition of a terminator instruction "
-                   "gets constant due to inlining."));
+llvm::cl::opt<int> &FastPathBuiltinBenefit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-fast-path-builtin-benefit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-fast-path-builtin-benefit",
+      llvm::cl::init(RemovedCallBenefit() + 40),
+      llvm::cl::desc("The benefit of a onFastPath builtin."));
+  return *opt;
+}
+auto &EarlyInitFastPathBuiltinBenefit = FastPathBuiltinBenefit();
 
-llvm::cl::opt<int>
-    RefCountBenefit("sil-inline-ref-count-benefit",
-                    llvm::cl::init(RemovedCallBenefit + 20),
-                    llvm::cl::desc("The benefit if a retain/release can "
-                                   "(probably) be eliminated after inlining."));
+llvm::cl::opt<int> &DevirtualizedCallBenefit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-devirtualized-call-benefit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-devirtualized-call-benefit",
+      llvm::cl::init(RemovedCallBenefit() + 300),
+      llvm::cl::desc("The benefit of being able to devirtualize a call."));
+  return *opt;
+}
+auto &EarlyInitDevirtualizedCallBenefit = DevirtualizedCallBenefit();
 
-llvm::cl::opt<int> FastPathBuiltinBenefit(
-    "sil-inline-fast-path-builtin-benefit",
-    llvm::cl::init(RemovedCallBenefit + 40),
-    llvm::cl::desc("The benefit of a onFastPath builtin."));
+llvm::cl::opt<int> &GenericSpecializationBenefit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-generic-specialization-benefit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-generic-specialization-benefit",
+      llvm::cl::init(RemovedCallBenefit() + 300),
+      llvm::cl::desc("The benefit of being able to produce a generic "
+                     "specialization for a call."));
+  return *opt;
+}
+auto &EarlyInitGenericSpecializationBenefit = GenericSpecializationBenefit();
 
-llvm::cl::opt<int> DevirtualizedCallBenefit(
-    "sil-inline-devirtualized-call-benefit",
-    llvm::cl::init(RemovedCallBenefit + 300),
-    llvm::cl::desc("The benefit of being able to devirtualize a call."));
+llvm::cl::opt<int> &ExclusivityBenefit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-exclusivity-benefit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-exclusivity-benefit", llvm::cl::init(RemovedCallBenefit() + 10),
+      llvm::cl::desc("The benefit of inlining an exclusivity-containing callee. "
+                     "The exclusivity needs to be: dynamic, has no nested "
+                     "conflict and addresses known storage"));
+  return *opt;
+}
+auto &EarlyInitExclusivityBenefit = ExclusivityBenefit();
 
-llvm::cl::opt<int> GenericSpecializationBenefit(
-    "sil-inline-generic-specialization-benefit",
-    llvm::cl::init(RemovedCallBenefit + 300),
-    llvm::cl::desc("The benefit of being able to produce a generic "
-                   "specialization for a call."));
+llvm::cl::opt<int> &OSizeClassMethodBenefit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-o-size-class-method-benefit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-o-size-class-method-benefit", llvm::cl::init(5),
+      llvm::cl::desc("The benefit of inlining class methods with -Osize. We only "
+                     "inline very small class methods with -Osize."));
+  return *opt;
+}
+auto &EarlyInitOSizeClassMethodBenefit = OSizeClassMethodBenefit();
 
-llvm::cl::opt<int> ExclusivityBenefit(
-    "sil-inline-exclusivity-benefit", llvm::cl::init(RemovedCallBenefit + 10),
-    llvm::cl::desc("The benefit of inlining an exclusivity-containing callee. "
-                   "The exclusivity needs to be: dynamic, has no nested "
-                   "conflict and addresses known storage"));
+llvm::cl::opt<int> &GlobalInitBenefit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-global-init-benefit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-global-init-benefit", llvm::cl::init(100),
+      llvm::cl::desc("The benefit of inlining constructors into global initializers."));
+  return *opt;
+}
+auto &EarlyInitGlobalInitBenefit = GlobalInitBenefit();
 
-llvm::cl::opt<int> OSizeClassMethodBenefit(
-    "sil-inline-o-size-class-method-benefit", llvm::cl::init(5),
-    llvm::cl::desc("The benefit of inlining class methods with -Osize. We only "
-                   "inline very small class methods with -Osize."));
+llvm::cl::opt<int> &TrivialFunctionThreshold() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-trivial-function-threshold");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-trivial-function-threshold", llvm::cl::init(18),
+      llvm::cl::desc("Approximately up to this cost level a function can be "
+                     "inlined without increasing the code size."));
+  return *opt;
+}
+auto &EarlyInitTrivialFunctionThreshold = TrivialFunctionThreshold();
 
-llvm::cl::opt<int> GlobalInitBenefit(
-    "sil-inline-global-init-benefit", llvm::cl::init(100),
-    llvm::cl::desc("The benefit of inlining constructors into global initializers."));
+llvm::cl::opt<int> &BlockLimitDenominator() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-block-limit-denominator");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-block-limit-denominator", llvm::cl::init(3000),
+      llvm::cl::desc("Configuration for the \"soft\" caller block limit. When "
+                     "changing make sure you update BlockLimitMaxIntNumerator."));
+  return *opt;
+}
+auto &EarlyInitBlockLimitDenominator = BlockLimitDenominator();
 
-llvm::cl::opt<int> TrivialFunctionThreshold(
-    "sil-inline-trivial-function-threshold", llvm::cl::init(18),
-    llvm::cl::desc("Approximately up to this cost level a function can be "
-                   "inlined without increasing the code size."));
+llvm::cl::opt<int> &BlockLimitMaxIntNumerator() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-block-limit-max-int-numerator");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-block-limit-max-int-numerator", llvm::cl::init(18608),
+      llvm::cl::desc("Computations with BlockLimitDenominator will overflow with "
+                     "numerators >= this value. This equals cbrt(INT_MAX) * "
+                     "cbrt(BlockLimitDenominator); we hardcode its value because "
+                     "std::cbrt() is not constexpr."));
+  return *opt;
+}
+auto &EarlyInitBlockLimitMaxIntNumerator = BlockLimitMaxIntNumerator();
 
-llvm::cl::opt<int> BlockLimitDenominator(
-    "sil-inline-block-limit-denominator", llvm::cl::init(3000),
-    llvm::cl::desc("Configuration for the \"soft\" caller block limit. When "
-                   "changing make sure you update BlockLimitMaxIntNumerator."));
+llvm::cl::opt<int> &OverallCallerBlockLimit() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-overall-caller-block-limit");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-overall-caller-block-limit", llvm::cl::init(400),
+      llvm::cl::desc("No inlining is done if the caller has more than this "
+                     "number of blocks."));
+  return *opt;
+}
+auto &EarlyInitOverallCallerBlockLimit = OverallCallerBlockLimit();
 
-llvm::cl::opt<int> BlockLimitMaxIntNumerator(
-    "sil-inline-block-limit-max-int-numerator", llvm::cl::init(18608),
-    llvm::cl::desc("Computations with BlockLimitDenominator will overflow with "
-                   "numerators >= this value. This equals cbrt(INT_MAX) * "
-                   "cbrt(BlockLimitDenominator); we hardcode its value because "
-                   "std::cbrt() is not constexpr."));
-
-llvm::cl::opt<int> OverallCallerBlockLimit(
-    "sil-inline-overall-caller-block-limit", llvm::cl::init(400),
-    llvm::cl::desc("No inlining is done if the caller has more than this "
-                   "number of blocks."));
-
-llvm::cl::opt<int> DefaultApplyLength(
-    "sil-inline-default-apply-length", llvm::cl::init(10),
-    llvm::cl::desc("The assumed execution length of a function call."));
-
+llvm::cl::opt<int> &DefaultApplyLength() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-inline-default-apply-length");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<int>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<int>(
+      "sil-inline-default-apply-length", llvm::cl::init(10),
+      llvm::cl::desc("The assumed execution length of a function call."));
+  return *opt;
+}
+auto &EarlyInitDefaultApplyLength = DefaultApplyLength();
+} // namespace
 //===----------------------------------------------------------------------===//
 //                           Printing Helpers
 //===----------------------------------------------------------------------===//

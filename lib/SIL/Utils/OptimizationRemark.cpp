@@ -233,11 +233,22 @@ inferOptRemarkSearchBackwards(SILInstruction &i,
   return SourceLoc();
 }
 
-static llvm::cl::opt<bool> IgnoreAlwaysInferForTesting(
-    "sil-opt-remark-ignore-always-infer", llvm::cl::Hidden,
-    llvm::cl::init(false),
-    llvm::cl::desc(
-        "Disables always infer source loc behavior for testing purposes"));
+namespace {
+llvm::cl::opt<bool> &IgnoreAlwaysInferForTesting() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("sil-opt-remark-ignore-always-infer");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "sil-opt-remark-ignore-always-infer", llvm::cl::Hidden,
+      llvm::cl::init(false),
+      llvm::cl::desc(
+          "Disables always infer source loc behavior for testing purposes"));
+  return *opt;
+}
+auto &EarlyInitIgnoreAlwaysInferForTesting = IgnoreAlwaysInferForTesting();
+} // namespace
 
 // Attempt to infer a SourceLoc for \p i using heuristics specified by \p
 // inferBehavior.
@@ -253,7 +264,7 @@ SourceLoc swift::OptRemark::inferOptRemarkSourceLoc(
   // loc and if that loc is an inlined call site.
   auto loc = i.getLoc();
   if (!(bool(inferBehavior & SourceLocInferenceBehavior::AlwaysInfer) &&
-        !IgnoreAlwaysInferForTesting)) {
+        !IgnoreAlwaysInferForTesting())) {
     LLVM_DEBUG(llvm::dbgs() << "Testing insts own source loc?!\n");
     if (loc.getSourceLoc().isValid()) {
       LLVM_DEBUG(llvm::dbgs() << "Found initial valid loc!\n");

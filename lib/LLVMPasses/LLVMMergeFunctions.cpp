@@ -68,18 +68,38 @@ using namespace swift;
 STATISTIC(NumSwiftFunctionsMerged, "Number of functions merged");
 STATISTIC(NumSwiftThunksWritten, "Number of thunks generated");
 
-static cl::opt<unsigned> NumFunctionsForSanityCheck(
-    "swiftmergefunc-sanity",
-    cl::desc("How many functions in module could be used for "
-             "SwiftMergeFunctions pass sanity check. "
-             "'0' disables this check. Works only with '-debug' key."),
-    cl::init(0), cl::Hidden);
+namespace {
+cl::opt<unsigned> &NumFunctionsForSanityCheck() {
+  auto &opts = cl::getRegisteredOptions();
+  auto it = opts.find("swiftmergefunc-sanity");
+  if (it != opts.end()) {
+    return *static_cast<cl::opt<unsigned>*>(it->second);
+  }
+  static auto *opt = new cl::opt<unsigned>(
+      "swiftmergefunc-sanity",
+      cl::desc("How many functions in module could be used for "
+               "SwiftMergeFunctions pass sanity check. "
+               "'0' disables this check. Works only with '-debug' key."),
+      cl::init(0), cl::Hidden);
+  return *opt;
+}
+auto &EarlyInitNumFunctionsForSanityCheck = NumFunctionsForSanityCheck();
 
-static cl::opt<unsigned> FunctionMergeThreshold(
-    "swiftmergefunc-threshold",
-    cl::desc("Functions larger than the threshold are considered for merging."
-             "'0' disables function merging at all."),
-    cl::init(15), cl::Hidden);
+cl::opt<unsigned> &FunctionMergeThreshold() {
+  auto &opts = cl::getRegisteredOptions();
+  auto it = opts.find("swiftmergefunc-threshold");
+  if (it != opts.end()) {
+    return *static_cast<cl::opt<unsigned>*>(it->second);
+  }
+  static auto *opt = new cl::opt<unsigned>(
+      "swiftmergefunc-threshold",
+      cl::desc("Functions larger than the threshold are considered for merging."
+               "'0' disables function merging at all."),
+      cl::init(15), cl::Hidden);
+  return *opt;
+}
+auto &EarlyInitFunctionMergeThreshold = FunctionMergeThreshold();
+} // namespace
 
 namespace {
 
@@ -560,7 +580,7 @@ swift::createLegacySwiftMergeFunctionsPass(bool ptrAuthEnabled,
 }
 
 bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakTrackingVH> &Worklist) {
-  if (const unsigned Max = NumFunctionsForSanityCheck) {
+  if (const unsigned Max = NumFunctionsForSanityCheck()) {
     unsigned TripleNumber = 0;
     bool Valid = true;
 
@@ -688,15 +708,15 @@ static bool isEligibleFunction(Function *F) {
     return false;
   
   unsigned Benefit = getBenefit(F);
-  if (Benefit < FunctionMergeThreshold)
+  if (Benefit < FunctionMergeThreshold())
     return false;
   
   return true;
 }
 
 bool SwiftMergeFunctions::runOnModule(Module &M) {
-  
-  if (FunctionMergeThreshold == 0)
+
+  if (FunctionMergeThreshold() == 0)
     return false;
 
   module = &M;

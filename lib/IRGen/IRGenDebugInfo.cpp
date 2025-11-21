@@ -82,10 +82,24 @@
 using namespace swift;
 using namespace irgen;
 
-llvm::cl::opt<bool> VerifyLineTable(
-    "verify-linetable", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Verify that the debug locations within one scope are contiguous."));
+namespace {
+// Helper to get or create command line option, checking if already registered.
+llvm::cl::opt<bool> &VerifyLineTable() {
+  auto &opts = llvm::cl::getRegisteredOptions();
+  auto it = opts.find("verify-linetable");
+  if (it != opts.end()) {
+    return *static_cast<llvm::cl::opt<bool>*>(it->second);
+  }
+  static auto *opt = new llvm::cl::opt<bool>(
+      "verify-linetable", llvm::cl::init(false),
+      llvm::cl::desc(
+          "Verify that the debug locations within one scope are contiguous."));
+  return *opt;
+}
+
+// Force early registration before command line parsing
+auto &EarlyInitVerifyLineTable = VerifyLineTable();
+} // namespace
 
 namespace {
 using TrackingDIRefMap =
@@ -3002,7 +3016,7 @@ void IRGenDebugInfoImpl::finalize() {
 bool IRGenDebugInfoImpl::lineEntryIsSane(FileAndLocation DL,
                                          const SILDebugScope *DS) {
   // All bets are off for optimized code.
-  if (!VerifyLineTable || Opts.shouldOptimize())
+  if (!VerifyLineTable() || Opts.shouldOptimize())
     return true;
   // We entered a new lexical block.
   if (DS != LastScope)
