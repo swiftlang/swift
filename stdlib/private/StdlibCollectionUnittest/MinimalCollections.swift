@@ -83,6 +83,8 @@ public enum UnderestimatedCountBehavior {
 ///
 /// This sequence is consumed when its generator is advanced.
 public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
+  public typealias Element = T
+  
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)

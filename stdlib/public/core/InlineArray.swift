@@ -615,20 +615,20 @@ extension InlineArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
-extension InlineArray: Iterable where Element: ~Copyable {
-  public typealias BorrowIterator = Span<Element>.BorrowIterator
-
-  @_alwaysEmitIntoClient
-  @_transparent
-  public var estimatedCount: EstimatedCount {
-    .exactly(count)
-  }
-
-  @_alwaysEmitIntoClient
-  @_lifetime(borrow self)
-  @_transparent
-  public func startBorrowIteration() -> Span<Element> {
-    span
-  }
-}
+//@available(SwiftStdlib 6.3, *)
+//extension InlineArray: Iterable where Element: ~Copyable {
+//  public typealias BorrowIterator = Span<Element>.BorrowIterator
+//
+//  @_alwaysEmitIntoClient
+//  @_transparent
+//  public var estimatedCount: EstimatedCount {
+//    .exactly(count)
+//  }
+//
+//  @_alwaysEmitIntoClient
+//  @_lifetime(borrow self)
+//  @_transparent
+//  public func startBorrowIteration() -> Span<Element> {
+//    span
+//  }
+//}

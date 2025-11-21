@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.3, *)
-public protocol BorrowIteratorProtocol<Element>: ~Copyable, ~Escapable {
+public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
   associatedtype Element: ~Copyable
 
   // FIXME: This ought to be a core requirement, but `Ref` is not a thing yet.
@@ -90,7 +90,7 @@ public protocol BorrowIteratorProtocol<Element>: ~Copyable, ~Escapable {
 }
 
 @available(SwiftStdlib 6.3, *)
-extension BorrowIteratorProtocol where Self: ~Copyable & ~Escapable {
+extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable {
   @_alwaysEmitIntoClient
   @_lifetime(&self)
   @_lifetime(self: copy self)
@@ -101,7 +101,7 @@ extension BorrowIteratorProtocol where Self: ~Copyable & ~Escapable {
 }
 
 @available(SwiftStdlib 6.3, *)
-extension BorrowIteratorProtocol where Self: ~Copyable & ~Escapable {
+extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable {
   @_alwaysEmitIntoClient
   @_lifetime(self: copy self)
   public mutating func skip(by offset: Int) -> Int {
@@ -115,29 +115,29 @@ extension BorrowIteratorProtocol where Self: ~Copyable & ~Escapable {
   }
 }
 
+//@available(SwiftStdlib 6.3, *)
+//extension Span: Iterable where Element: ~Copyable {
+//  // FIXME: This simple definition cannot also be a backward (or bidirectional)
+//  // iterator, nor a random-access iterator. If we want to go in that direction,
+//  // we'll need to rather introduce a type more like `RigidArray.BorrowIterator`.
+//  public typealias BorrowIterator = Self
+//
+//  @_alwaysEmitIntoClient
+//  @_transparent
+//  public var estimatedCount: EstimatedCount {
+//    .exactly(count)
+//  }
+//
+//  @_alwaysEmitIntoClient
+//  @_lifetime(copy self)
+//  @_transparent
+//  public func startBorrowIteration() -> Span<Element> {
+//    self
+//  }
+//}
+
 @available(SwiftStdlib 6.3, *)
-extension Span: Iterable where Element: ~Copyable {
-  // FIXME: This simple definition cannot also be a backward (or bidirectional)
-  // iterator, nor a random-access iterator. If we want to go in that direction,
-  // we'll need to rather introduce a type more like `RigidArray.BorrowIterator`.
-  public typealias BorrowIterator = Self
-
-  @_alwaysEmitIntoClient
-  @_transparent
-  public var estimatedCount: EstimatedCount {
-    .exactly(count)
-  }
-
-  @_alwaysEmitIntoClient
-  @_lifetime(copy self)
-  @_transparent
-  public func startBorrowIteration() -> Span<Element> {
-    self
-  }
-}
-
-@available(SwiftStdlib 6.3, *)
-extension Span: BorrowIteratorProtocol where Element: ~Copyable {
+extension Span: BorrowingIteratorProtocol where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_lifetime(&self)
   @_lifetime(self: copy self)
@@ -149,37 +149,79 @@ extension Span: BorrowIteratorProtocol where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.3, *)
-extension MutableSpan: Iterable where Element: ~Copyable {
-  public typealias BorrowIterator = Span<Element>.BorrowIterator
-
-  @_alwaysEmitIntoClient
-  @_transparent
-  public var estimatedCount: EstimatedCount {
-    .exactly(count)
-  }
-
+extension Span: Sequence /* where Element: ~Copyable */ {
+  public typealias Iterator = NeverIterator<Element>
+  
   @_alwaysEmitIntoClient
   @_lifetime(borrow self)
-  @_transparent
-  public func startBorrowIteration() -> Span<Element> {
-    span
+  public func makeBorrowingIterator() -> Span<Element> {
+    self
   }
 }
 
-@available(SwiftStdlib 6.3, *)
-extension OutputSpan: Iterable where Element: ~Copyable {
-  public typealias BorrowIterator = Span<Element>.BorrowIterator
-
-  @_alwaysEmitIntoClient
-  @_transparent
-  public var estimatedCount: EstimatedCount {
-    .exactly(count)
+extension InlineArray: Sequence /* where Element: ~Copyable */ {
+  public typealias Element = Element
+//  public typealias Iterator = NeverIterator<Element>
+  public typealias BorrowingIterator = Span<Element>
+  
+  // This will NOT work once `Element: ~Copyable` is in the works
+  // Problematic because we can only conform to `Sequence` once, so we
+  // need to provide a single iterator type, but it can't handle both
+  // ~Copyable and copyable elements (I think)
+  public struct Iterator: IteratorProtocol {
+    var array: [count of Element]
+    var index: Int = 0
+    
+    public mutating func next() -> Element? {
+      guard index < array.count else { return nil }
+      defer { index &+= 1 }
+      return array[index]
+    }
   }
-
+  
+  public func makeIterator() -> Iterator {
+    .init(array: self)
+  }
+  
   @_alwaysEmitIntoClient
   @_lifetime(borrow self)
-  @_transparent
-  public func startBorrowIteration() -> Span<Element> {
+  public func makeBorrowingIterator() -> Span<Element> {
     self.span
   }
 }
+
+//@available(SwiftStdlib 6.3, *)
+//extension MutableSpan: Iterable where Element: ~Copyable {
+//  public typealias BorrowIterator = Span<Element>.BorrowIterator
+//
+//  @_alwaysEmitIntoClient
+//  @_transparent
+//  public var estimatedCount: EstimatedCount {
+//    .exactly(count)
+//  }
+//
+//  @_alwaysEmitIntoClient
+//  @_lifetime(borrow self)
+//  @_transparent
+//  public func startBorrowIteration() -> Span<Element> {
+//    span
+//  }
+//}
+//
+//@available(SwiftStdlib 6.3, *)
+//extension OutputSpan: Iterable where Element: ~Copyable {
+//  public typealias BorrowIterator = Span<Element>.BorrowIterator
+//
+//  @_alwaysEmitIntoClient
+//  @_transparent
+//  public var estimatedCount: EstimatedCount {
+//    .exactly(count)
+//  }
+//
+//  @_alwaysEmitIntoClient
+//  @_lifetime(borrow self)
+//  @_transparent
+//  public func startBorrowIteration() -> Span<Element> {
+//    self.span
+//  }
+//}

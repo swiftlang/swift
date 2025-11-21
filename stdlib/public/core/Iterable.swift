@@ -21,7 +21,7 @@ public enum EstimatedCount {
 @available(SwiftStdlib 6.3, *)
 public protocol Iterable<Element>: ~Copyable, ~Escapable {
   associatedtype Element: ~Copyable
-  associatedtype BorrowIterator: BorrowIteratorProtocol<Element> & ~Copyable & ~Escapable
+  associatedtype BorrowIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable
 
   var isEmpty: Bool { get }
 

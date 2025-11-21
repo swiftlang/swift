@@ -278,7 +278,7 @@
     "InlineArray.swift",
     "_InlineArray.swift",
     "Iterable.swift",
-    "BorrowIteratorProtocol.swift"
+    "BorrowingIteratorProtocol.swift"
   ],
   "Result": [
     "Result.swift"
