@@ -190,6 +190,32 @@ func test4(_ p: any WithAssoc) {
   c.printValue()
 }
 
+func test5(_ p: any Any) {
+  print("test any as? MyStruct")
+  if let c = p as? MyStruct {
+      print("success")
+      c.a()
+  } else {
+      print("cast failed")
+  }
+}
+
+func test6(_ p: any Any) {
+  print("test any as? LargeMyStruct")
+  if let c = p as? LargeMyStruct {
+      print("success")
+      c.a()
+  } else {
+      print("cast failed")
+  }
+}
+
+func test7(_ p: any Any) {
+  print("test any as! LargeMyStruct")
+  let c = p as! LargeMyStruct
+  c.a()
+}
+
 @main
 struct Main {
   static func main() {
@@ -219,6 +245,48 @@ struct Main {
     test4(ConformWithLargeAssoc())
 // OUTPUT: my value of LargeMyStruct (mutating expect 10): 10
 // OUTPUT: my value of LargeMyStruct: 5
+// OUTPUT:  deinit called
+// OUTPUT-NOT:  deinit called
+
+    test5(MyStruct())
+// OUTPUT: test any as? MyStruct
+// OUTPUT: success
+// OUTPUT: a MyStruct 5
+    test5(GC<Int>())
+// OUTPUT: test any as? MyStruct
+// OUTPUT: cast failed
+// OUTPUT:  deinit called
+// OUTPUT-NOT:  deinit called
+    test5(LargeMyStruct())
+// OUTPUT: test any as? MyStruct
+// OUTPUT:  deinit called
+// OUTPUT: cast failed
+// OUTPUT-NOT:  deinit called
+   test5(GenericStructWithClass<Int>())
+// OUTPUT: test any as? MyStruct
+// OUTPUT: cast failed
+// OUTPUT:  deinit called
+// OUTPUT:  deinit called
+// OUTPUT-NOT:  deinit called
+    test6(MyStruct())
+// OUTPUT: test any as? LargeMyStruct
+// OUTPUT: cast failed
+// OUTPUT-NOT:  deinit called
+    test6(LargeMyStruct())
+// OUTPUT: test any as? LargeMyStruct
+// OUTPUT: success
+// OUTPUT: a LargeMyStruct 5
+// OUTPUT:  deinit called
+// OUTPUT-NOT:  deinit called
+    test6(GenericStructWithClass<Int>())
+// OUTPUT: test any as? LargeMyStruct
+// OUTPUT: cast failed
+// OUTPUT:  deinit called
+// OUTPUT:  deinit called
+// OUTPUT-NOT:  deinit called
+    test7(LargeMyStruct())
+// OUTPUT: test any as! LargeMyStruct
+// OUTPUT: a LargeMyStruct 5
 // OUTPUT:  deinit called
 // OUTPUT-NOT:  deinit called
   }
