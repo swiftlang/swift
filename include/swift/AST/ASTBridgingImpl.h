@@ -260,6 +260,10 @@ bool BridgedDeclObj::ProtocolDecl_requiresClass() const {
   return getAs<swift::ProtocolDecl>()->requiresClass();
 }
 
+bool BridgedDeclObj::ProtocolDecl_isInvertible() const {
+  return getAs<swift::ProtocolDecl>()->getInvertibleProtocolKind() != std::nullopt;
+}
+
 bool BridgedDeclObj::AbstractFunction_isOverridden() const {
   return getAs<swift::AbstractFunctionDecl>()->isOverridden();
 }

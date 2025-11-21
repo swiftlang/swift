@@ -34,6 +34,7 @@ namespace irgen {
   class Address;
   class Explosion;
   class IRGenFunction;
+  class IRGenModule;
 
   /// Emit the metadata and witness table initialization for an allocated
   /// opaque existential container.
@@ -44,16 +45,20 @@ namespace irgen {
                                    SILType loweredSrcType,
                                  ArrayRef<ProtocolConformanceRef> conformances);
 
-  /// Emit an existential metatype container from a metatype value
-  /// as an explosion.
-  void emitExistentialMetatypeContainer(IRGenFunction &IGF,
-                                        Explosion &out,
-                                        SILType outType,
-                                        llvm::Value *metatype,
-                                        SILType metatypeType,
-                                 ArrayRef<ProtocolConformanceRef> conformances);
-  
-  
+  /// Emit an existential metatype container from a metatype value as an
+  /// explosion.
+  void emitExistentialMetatypeContainer(
+      IRGenFunction &IGF, Explosion &out, SILType outType,
+      llvm::Value *metatype, SILType metatypeType,
+      ArrayRef<ProtocolConformanceRef> conformances);
+
+  /// Emit an existential metatype container from a metatype value as an
+  /// explosion of llvm::Constant values (suitable for static initialization).
+  void emitExistentialMetatypeContainer(
+      IRGenModule &IGM, Explosion &out, SILType outType,
+      llvm::Constant *metatype, SILType metatypeType,
+      ArrayRef<ProtocolConformanceRef> conformances);
+
   /// Emit a class existential container from a class instance value
   /// as an explosion.
   void emitClassExistentialContainer(IRGenFunction &IGF,

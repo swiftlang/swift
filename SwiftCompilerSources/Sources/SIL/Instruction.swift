@@ -901,6 +901,10 @@ class OpenExistentialBoxValueInst : SingleValueInstruction, UnaryInstruction {}
 final public
 class InitExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction {
   public var metatype: Value { operand.value }
+
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.InitExistentialMetatypeInst_getConformances())
+  }
 }
 
 final public

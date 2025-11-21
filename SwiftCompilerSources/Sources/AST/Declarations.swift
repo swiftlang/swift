@@ -132,6 +132,8 @@ final public class ClassDecl: NominalTypeDecl {
 
 final public class ProtocolDecl: NominalTypeDecl {
   public var requiresClass: Bool { bridged.ProtocolDecl_requiresClass() }
+  
+  public var isInvertible: Bool { bridged.ProtocolDecl_isInvertible() }
 }
 
 final public class BuiltinTupleDecl: NominalTypeDecl {}
