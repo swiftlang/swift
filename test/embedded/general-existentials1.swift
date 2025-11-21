@@ -47,7 +47,6 @@ func test(existential: any P) {
   existential.bar()
 }
 
-/*
 public protocol ProtoWithAssocType<T> {
   associatedtype T
   func foo(t: T)
@@ -133,6 +132,7 @@ public class Derived2<T>: Base<T> {
   public override func bar() { print("Derived2.bar()") }
 }
 
+/*
 public func takes_p1(_ p: P1) {
   p.normal()
 }
@@ -265,25 +265,27 @@ struct Main {
     // CHECK: GenericStruct.foo: 28
     // CHECK: GenericStruct.bar: 28
 
-    /*
     callExWithAssocType(createExWithAssocType())
-    // xCHECK: 27
+    // CHECK: 27
 
     callExWithAssocConf(createExWithAssocConf())
-    // xCHECK: foo
-    // xCHECK: bar
+    // CHECK: foo
+    // CHECK: bar
 
     callExWithAssocConf(OtherClass())
-    // xCHECK: other-foo
-    // xCHECK: derived-bar
+    // CHECK: other-foo
+    // CHECK: derived-bar
 
     test(existential: Derived1())
-    // xCHECK: Derived1.foo()
-    // xCHECK: Derived1.bar()
+    // CHECK: Derived1.foo()
+    // CHECK: Derived1.bar()
+
 
     test(existential: Derived2<Bool>())
-    // xCHECK: Derived2.foo()
-    // xCHECK: Derived2.bar()
+    // CHECK: Derived2.foo()
+    // CHECK: Derived2.bar()
+
+    /*
 
     testConditionalConformance(t: S(i: 27))
     // xCHECK: 27
