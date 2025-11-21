@@ -263,7 +263,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   case CTP_EnumCaseRawValue:
   case CTP_DefaultParameter:
   case CTP_AutoclosureDefaultParameter:
-  case CTP_CalleeResult:
   case CTP_CallArgument:
   case CTP_ClosureResult:
   case CTP_ArrayElement:
@@ -274,7 +273,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   case CTP_SubscriptAssignSource:
   case CTP_Condition:
   case CTP_WrappedProperty:
-  case CTP_ComposedPropertyWrapper:
   case CTP_CannotFail:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
@@ -306,14 +304,31 @@ void SyntacticElementTarget::markInvalid() const {
       return Action::Continue(P);
     }
 
+    void invalidateVarDecl(VarDecl *VD) {
+      // Only set invalid if we don't already have an interface type computed.
+      if (!VD->hasInterfaceType())
+        VD->setInvalid();
+
+      // Also do the same for any auxiliary vars.
+      VD->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *VD) {
+        invalidateVarDecl(VD);
+      });
+    }
+
     PreWalkAction walkToDeclPre(Decl *D) override {
       // Mark any VarDecls and PatternBindingDecls as invalid.
       if (auto *VD = dyn_cast<VarDecl>(D)) {
-        // Only set invalid if we don't already have an interface type computed.
-        if (!VD->hasInterfaceType())
-          D->setInvalid();
-      } else if (isa<PatternBindingDecl>(D)) {
-        D->setInvalid();
+        invalidateVarDecl(VD);
+      } else if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+        PBD->setInvalid();
+        // Make sure we mark the patterns and initializers as having been
+        // checked, otherwise `typeCheckPatternBinding` might try to check them
+        // again.
+        for (auto i : range(0, PBD->getNumPatternEntries())) {
+          PBD->setPattern(i, PBD->getPattern(i), /*fullyValidated*/ true);
+          if (PBD->isInitialized(i))
+            PBD->setInitializerChecked(i);
+        }
       }
       return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }

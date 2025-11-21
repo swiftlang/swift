@@ -889,12 +889,12 @@ public:
   }
 
   SILType getSILTypeInContext(SILResultInfo result, CanSILFunctionType fnTy) {
-    auto t = F.mapTypeIntoContext(getSILType(result, fnTy));
+    auto t = F.mapTypeIntoEnvironment(getSILType(result, fnTy));
     return getTypeLowering(t).getLoweredType().getCategoryType(t.getCategory());
   }
 
   SILType getSILTypeInContext(SILParameterInfo param, CanSILFunctionType fnTy) {
-    auto t = F.mapTypeIntoContext(getSILType(param, fnTy));
+    auto t = F.mapTypeIntoEnvironment(getSILType(param, fnTy));
     return getTypeLowering(t).getLoweredType().getCategoryType(t.getCategory());
   }
 
@@ -3174,6 +3174,7 @@ public:
   ///   within the loop; can be null to bind no elements
   /// \param reverse - if true, iterate the elements in reverse order,
   ///   starting at index limitWithinComponent - 1
+  /// \param emitLoopLatch - emit the entry block.
   /// \param emitBody - a function that will be called to emit the body of
   ///   the loop. It's okay if this has paths that exit the body of the loop,
   ///   but it should leave the insertion point set at the end.
@@ -3191,20 +3192,20 @@ public:
       SILLocation loc, CanPackType formalPackType, unsigned componentIndex,
       SILValue startingAfterIndexWithinComponent, SILValue limitWithinComponent,
       GenericEnvironment *openedElementEnv, bool reverse,
+      llvm::function_ref<SILBasicBlock *()> emitLoopLatch,
       llvm::function_ref<void(SILValue indexWithinComponent,
                               SILValue packExpansionIndex, SILValue packIndex)>
-          emitBody,
-      SILBasicBlock *loopLatch = nullptr);
+          emitBody);
 
   /// A convenience version of dynamic pack loop that visits an entire
   /// pack expansion component in forward order.
   void emitDynamicPackLoop(
       SILLocation loc, CanPackType formalPackType, unsigned componentIndex,
       GenericEnvironment *openedElementEnv,
+      llvm::function_ref<SILBasicBlock *()> emitLoopLatch,
       llvm::function_ref<void(SILValue indexWithinComponent,
                               SILValue packExpansionIndex, SILValue packIndex)>
-          emitBody,
-      SILBasicBlock *loopLatch = nullptr);
+          emitBody);
 
   /// Emit a transform on each element of a pack-expansion component
   /// of a pack, write the result into a pack-expansion component of

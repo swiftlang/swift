@@ -46,6 +46,7 @@ enum IllegalConstErrorDiagnosis {
   TypeExpression,
   KeyPath,
   Closure,
+  ClosureWithCaptures,
   OpaqueDeclRef,
   OpaqueFuncDeclRef,
   NonConventionCFunc,
@@ -81,6 +82,9 @@ static void diagnoseError(const Expr *errorExpr,
     break;
   case Closure:
     diags.diagnose(errorLoc, diag::const_unsupported_closure);
+    break;
+  case ClosureWithCaptures:
+    diags.diagnose(errorLoc, diag::const_unsupported_closure_with_captures);
     break;
   case OpaqueDeclRef:
     diags.diagnose(errorLoc, diag::const_opaque_decl_ref);
@@ -176,6 +180,16 @@ checkSupportedWithSectionAttribute(const Expr *expr,
       // Non-InlineArray arrays are not allowed
       return std::make_pair(expr, TypeNotSupported);
     }
+    
+    // Coerce expressions to UInt8 are allowed (to support @DebugDescription)
+    if (const CoerceExpr *coerceExpr = dyn_cast<CoerceExpr>(expr)) {
+      auto coerceType = coerceExpr->getType();
+      if (coerceType && coerceType->isUInt8()) {
+        expressionsToCheck.push_back(coerceExpr->getSubExpr());
+        continue;
+      }
+      return std::make_pair(expr, TypeNotSupported);
+    }
 
     // Operators are not allowed in @section expressions
     if (isa<BinaryExpr>(expr)) {
@@ -212,13 +226,27 @@ checkSupportedWithSectionAttribute(const Expr *expr,
     if (isa<KeyPathExpr>(expr))
       return std::make_pair(expr, KeyPath);
 
-    // Closure expressions are not supported in constant expressions
-    if (isa<AbstractClosureExpr>(expr))
-      return std::make_pair(expr, Closure);
+    // Closures are allowed if they have no captures
+    if (auto closureExpr = dyn_cast<ClosureExpr>(expr)) {
+      TypeChecker::computeCaptures(const_cast<ClosureExpr *>(closureExpr));
+      if (!closureExpr->getCaptureInfo().isTrivial()) {
+        return std::make_pair(expr, ClosureWithCaptures);
+      }
+      continue;
+    }
 
-    // Function conversions are not allowed in constant expressions
-    if (isa<FunctionConversionExpr>(expr))
+    // Function conversions are allowed if the conversion is to '@convention(c)'
+    if (auto functionConvExpr = dyn_cast<FunctionConversionExpr>(expr)) {
+      if (auto targetFnTy =
+              functionConvExpr->getType()->getAs<AnyFunctionType>()) {
+        if (targetFnTy->getExtInfo().getRepresentation() ==
+            FunctionTypeRepresentation::CFunctionPointer) {
+          expressionsToCheck.push_back(functionConvExpr->getSubExpr());
+          continue;
+        }
+      }
       return std::make_pair(expr, Default);
+    }
 
     // Direct references to non-generic functions are allowed
     if (const DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(expr)) {
@@ -226,7 +254,7 @@ checkSupportedWithSectionAttribute(const Expr *expr,
 
       // Function references are allowed if they are non-generic
       if (auto *funcDecl = dyn_cast<FuncDecl>(decl)) {
-        if (!funcDecl->isGeneric() &&
+        if (!funcDecl->hasGenericParamList() &&
             !funcDecl->getDeclContext()->isGenericContext()) {
           continue;
         }
@@ -237,6 +265,60 @@ checkSupportedWithSectionAttribute(const Expr *expr,
       return std::make_pair(expr, OpaqueDeclRef);
     }
 
+    // Allow specific patterns of AutoClosureExpr, which is used in static func
+    // references. E.g. "MyStruct.staticFunc" is:
+    // - autoclosure_expr type="() -> ()"
+    //   - call_expr type="()"
+    //     - dot_syntax_call_expr
+    //       - declref_expr decl="MyStruct.staticFunc"
+    //       - dot_self_expr type="MyStruct.Type"
+    //         - type_expr type="MyStruct.Type"
+    if (auto autoClosureExpr = dyn_cast<AutoClosureExpr>(expr)) {
+      auto subExpr = autoClosureExpr->getUnwrappedCurryThunkExpr();
+      if (auto dotSyntaxCall = dyn_cast<DotSyntaxCallExpr>(subExpr)) {
+        if (auto declRef = dyn_cast<DeclRefExpr>(dotSyntaxCall->getFn())) {
+          if (auto funcDecl = dyn_cast<FuncDecl>(declRef->getDecl())) {
+            // Check if it's a function on a concrete non-generic type
+            if (!funcDecl->hasGenericParamList() &&
+                !funcDecl->getDeclContext()->isGenericContext() &&
+                funcDecl->isStatic()) {
+              if (auto args = dotSyntaxCall->getArgs()) {
+                if (args->size() == 1) {
+                  // Check that the single arg is a DotSelfExpr with only a
+                  // direct concrete TypeExpr inside
+                  if (auto dotSelfExpr =
+                          dyn_cast<DotSelfExpr>(args->get(0).getExpr())) {
+                    if (const TypeExpr *typeExpr =
+                            dyn_cast<TypeExpr>(dotSelfExpr->getSubExpr())) {
+                      auto baseType = typeExpr->getType();
+                      if (baseType && baseType->is<MetatypeType>()) {
+                        auto instanceType =
+                            baseType->getMetatypeInstanceType();
+                        if (auto nominal =
+                                instanceType
+                                    ->getNominalOrBoundGenericNominal()) {
+                          if (!nominal->hasGenericParamList() &&
+                              !nominal->getDeclContext()->isGenericContext() &&
+                              !nominal->isResilient()) {
+                            continue;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      return std::make_pair(expr, Default);
+    }
+
+    // Other closure expressions (auto-closures) are not allowed
+    if (isa<AbstractClosureExpr>(expr))
+      return std::make_pair(expr, Default);
+
     // DotSelfExpr for metatype references (but only a direct TypeExpr inside)
     if (const DotSelfExpr *dotSelfExpr = dyn_cast<DotSelfExpr>(expr)) {
       if (const TypeExpr *typeExpr =
@@ -246,7 +328,7 @@ checkSupportedWithSectionAttribute(const Expr *expr,
           auto instanceType = baseType->getMetatypeInstanceType();
           if (auto nominal = instanceType->getNominalOrBoundGenericNominal()) {
             // Allow non-generic, non-resilient types
-            if (!nominal->isGeneric() && !nominal->isResilient()) {
+            if (!nominal->hasGenericParamList() && !nominal->isResilient()) {
               continue;
             }
           }

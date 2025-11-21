@@ -23,14 +23,14 @@ void CASOptions::enumerateCASConfigurationFlags(
       llvm::function_ref<void(llvm::StringRef)> Callback) const {
   if (EnableCaching) {
     Callback("-cache-compile-job");
-    if (!Config.CASPath.empty()) {
+    if (!CASOpts.CASPath.empty()) {
       Callback("-cas-path");
-      Callback(Config.CASPath);
+      Callback(CASOpts.CASPath);
     }
-    if (!Config.PluginPath.empty()) {
+    if (!CASOpts.PluginPath.empty()) {
       Callback("-cas-plugin-path");
-      Callback(Config.PluginPath);
-      for (auto Opt : Config.PluginOptions) {
+      Callback(CASOpts.PluginPath);
+      for (auto Opt : CASOpts.PluginOptions) {
         Callback("-cas-plugin-option");
         Callback((llvm::Twine(Opt.first) + "=" + Opt.second).str());
       }

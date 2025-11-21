@@ -866,7 +866,8 @@ scope-ending instructions if:
   through a scope-ending instruction of `I` in between.
 
 - All initial paths that pass through a scope-ending instruction
-  of `I` twice must also pass through `I` in between.
+  of `I` twice (not necessarily the same instruction) must also
+  pass through `I` in between.
 
 - All terminating initial paths that pass through `I` must also
   pass through a scope-ending instruction of `I`.

@@ -219,9 +219,6 @@ NOTE(scanner_find_cycle_swift_overlay_path, none,
 NOTE(scanner_cycle_source_target_shadow_module, none,
      "source target '%0' shadowing a%select{ |n SDK }2Swift module with the same name at: '%1'", (StringRef, StringRef, bool))
 
-ERROR(scanner_arguments_invalid, none,
-      "dependencies scanner cannot be configured with arguments: '%0'", (StringRef))
-
 ERROR(error_scanner_extra, none,
       "failed inside dependency scanner: '%0'", (StringRef))
 

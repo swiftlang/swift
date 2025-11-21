@@ -278,6 +278,9 @@ class IRGenOptions {
 public:
   std::string ModuleName;
 
+  /// The path to the main binary swiftmodule for the debug info.
+  std::string DebugModulePath;
+
   /// The compilation directory for the debug info.
   std::string DebugCompilationDir;
 
@@ -556,8 +559,8 @@ public:
   // Whether to emit mergeable or non-mergeable traps.
   unsigned MergeableTraps : 1;
 
-  /// Enable the use of swift_retain/releaseClient functions.
-  unsigned EnableClientRetainRelease : 1;
+  /// Enable the use of swift_retain/releaseDirect functions.
+  unsigned EnableSwiftDirectRuntime : 1;
 
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
@@ -686,7 +689,7 @@ public:
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(true),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
         UseCoroCCX8664(false), UseCoroCCArm64(false), MergeableTraps(false),
-        EnableClientRetainRelease(false),
+        EnableSwiftDirectRuntime(false),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),

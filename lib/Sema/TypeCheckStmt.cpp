@@ -153,7 +153,7 @@ namespace {
 
       // Auxiliary decls need to have their contexts adjusted too.
       if (auto *VD = dyn_cast<VarDecl>(D)) {
-        VD->visitAuxiliaryDecls([&](VarDecl *D) {
+        VD->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *D) {
           D->setDeclContext(ParentDC);
         });
       }
@@ -865,7 +865,6 @@ static bool typeCheckHasSymbolStmtConditionElement(StmtConditionElement &elt,
 static bool typeCheckBooleanStmtConditionElement(StmtConditionElement &elt,
                                                  DeclContext *dc) {
   Expr *E = elt.getBoolean();
-  assert(!E->getType() && "the bool condition is already type checked");
   bool hadError = TypeChecker::typeCheckCondition(E, dc);
   elt.setBoolean(E);
   return hadError;
@@ -1042,9 +1041,9 @@ public:
   /// DC - This is the current DeclContext.
   DeclContext *DC;
 
-  /// Skip type checking any elements inside 'BraceStmt', also this is
-  /// propagated to ConstraintSystem.
-  bool LeaveBraceStmtBodyUnchecked = false;
+  /// The BraceStmts that should be type-checked. This should always be `All`,
+  /// unless we're lazy type-checking for e.g completion.
+  BraceStmtChecking BraceChecking = BraceStmtChecking::All;
 
   ASTContext &getASTContext() const { return Ctx; };
 
@@ -1092,12 +1091,14 @@ public:
     auto &eval = getASTContext().evaluator;
     auto *S =
         evaluateOrDefault(eval, PreCheckReturnStmtRequest{RS, DC}, nullptr);
+    if (!S)
+      return nullptr;
 
-    // We do a cast here as it may have been turned into a FailStmt. We should
-    // return that without doing anything else.
-    RS = dyn_cast_or_null<ReturnStmt>(S);
+    // We do a cast here as we may now have a different stmt (e.g a FailStmt, or
+    // a BraceStmt for error cases). If so, recurse into the visitor.
+    RS = dyn_cast<ReturnStmt>(S);
     if (!RS)
-      return S;
+      return visit(S);
 
     auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
     assert(TheFunc && "Should have bailed from pre-check if this is None");
@@ -1311,7 +1312,7 @@ public:
     if (!diagnosed) {
       auto *nominalDecl = fn->getDeclContext()->getSelfNominalTypeDecl();
       Type nominalType =
-          fn->mapTypeIntoContext(nominalDecl->getDeclaredInterfaceType());
+          fn->mapTypeIntoEnvironment(nominalDecl->getDeclaredInterfaceType());
 
       // must be noncopyable
       if (nominalType->isCopyable()) {
@@ -1503,7 +1504,7 @@ public:
     // FIXME: This is a hack to avoid cycles through NamingPatternRequest when
     // doing lazy type-checking, we ought to fix the request to be granular in
     // the type-checking work it kicks.
-    bool skipWhere = LeaveBraceStmtBodyUnchecked &&
+    bool skipWhere = (BraceChecking != BraceStmtChecking::All) &&
       Ctx.SourceMgr.hasIDEInspectionTargetBuffer();
 
     TypeChecker::typeCheckForEachPreamble(DC, S, skipWhere);
@@ -1738,11 +1739,19 @@ public:
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, S);
 
-    // Type-check the 'do' body.  Type failures in here will generally
-    // not cause type failures in the 'catch' clauses.
-    Stmt *newBody = S->getBody();
-    typeCheckStmt(newBody);
-    S->setBody(newBody);
+    {
+      // If we have do-catch body checking enabled, make sure we visit the
+      // BraceStmt.
+      std::optional<llvm::SaveAndRestore<BraceStmtChecking>> braceChecking;
+      if (BraceChecking == BraceStmtChecking::OnlyDoCatchBody)
+        braceChecking.emplace(BraceChecking, BraceStmtChecking::All);
+
+      // Type-check the 'do' body.  Type failures in here will generally
+      // not cause type failures in the 'catch' clauses.
+      Stmt *newBody = S->getBody();
+      typeCheckStmt(newBody);
+      S->setBody(newBody);
+    }
 
     // Do-catch statements always limit exhaustivity checks.
     bool limitExhaustivityChecks = true;
@@ -1778,16 +1787,31 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
   auto &ctx = DC->getASTContext();
   auto fn = AnyFunctionRef::fromDeclContext(DC);
 
+  auto errorResult = [&]() -> Stmt * {
+    // We don't need any recovery if there's no result, just bail.
+    if (!RS->hasResult())
+      return nullptr;
+
+    // If we have a result, make sure it's preserved, insert an implicit brace
+    // with a wrapping error expression. This ensures we can still do semantic
+    // functionality, and avoids downstream crashes where we expect the
+    // expression to have been type-checked.
+    auto *result = RS->getResult();
+    RS->setResult(nullptr);
+    auto *err = new (ctx) ErrorExpr(result->getSourceRange(), Type(), result);
+    return BraceStmt::createImplicit(ctx, {err});
+  };
+
   // Not valid outside of a function.
   if (!fn) {
     ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_invalid_outside_func);
-    return nullptr;
+    return errorResult();
   }
 
   // If the return is in a defer, then it isn't valid either.
   if (isDefer(DC)) {
     ctx.Diags.diagnose(RS->getReturnLoc(), diag::jump_out_of_defer, "return");
-    return nullptr;
+    return errorResult();
   }
 
   // The rest of the checks only concern return statements with results.
@@ -1808,8 +1832,7 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
     if (!nilExpr) {
       ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_init_non_nil)
           .highlight(E->getSourceRange());
-      RS->setResult(nullptr);
-      return RS;
+      return errorResult();
     }
 
     // "return nil" is only permitted in a failable initializer.
@@ -1819,8 +1842,7 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
       ctx.Diags
           .diagnose(ctor->getLoc(), diag::make_init_failable, ctor)
           .fixItInsertAfter(ctor->getLoc(), "?");
-      RS->setResult(nullptr);
-      return RS;
+      return errorResult();
     }
 
     // Replace the "return nil" with a new 'fail' statement.
@@ -2192,7 +2214,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
 }
 
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
-  if (LeaveBraceStmtBodyUnchecked)
+  if (BraceChecking != BraceStmtChecking::All)
     return BS;
 
   // Diagnose defer statement being last one in block (only if
@@ -2218,12 +2240,12 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 }
 
 void TypeChecker::typeCheckASTNode(ASTNode &node, DeclContext *DC,
-                                   bool LeaveBodyUnchecked) {
+                                   BraceStmtChecking braceChecking) {
   StmtChecker stmtChecker(DC);
   // FIXME: 'ActiveLabeledStmts', etc. in StmtChecker are not
   // populated. Since they don't affect "type checking", it's doesn't cause
   // any issue for now. But it should be populated nonetheless.
-  stmtChecker.LeaveBraceStmtBodyUnchecked = LeaveBodyUnchecked;
+  stmtChecker.BraceChecking = braceChecking;
   stmtChecker.typeCheckASTNode(node);
 }
 
@@ -2769,7 +2791,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
     }
   }
 
-  TypeChecker::typeCheckASTNode(finder.getRef(), DC, /*LeaveBodyUnchecked=*/false);
+  TypeChecker::typeCheckASTNode(finder.getRef(), DC);
   return false;
 }
 

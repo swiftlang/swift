@@ -553,7 +553,15 @@ namespace {
       const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      return importer::findCopyConstructor(cxxRecordDecl);
+      for (auto ctor : cxxRecordDecl->ctors()) {
+        if (ctor->isCopyConstructor() &&
+            // FIXME: Support default arguments (rdar://142414553)
+            ctor->getNumParams() == 1 &&
+            ctor->getAccess() == clang::AS_public && !ctor->isDeleted() &&
+            !ctor->isIneligibleOrNotSelected())
+          return ctor;
+      }
+      return nullptr;
     }
 
     const clang::CXXConstructorDecl *findMoveConstructor() const {
@@ -621,18 +629,7 @@ namespace {
 
       auto &ctx = IGF.IGM.Context;
       auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-
-      if (copyConstructor->isDefaulted() &&
-          copyConstructor->getAccess() == clang::AS_public &&
-          !copyConstructor->isDeleted() &&
-          // Note: we use "doesThisDeclarationHaveABody" here because
-          // that's what "DefineImplicitCopyConstructor" checks.
-          !copyConstructor->doesThisDeclarationHaveABody()) {
-        importer->getClangSema().DefineImplicitCopyConstructor(
-            clang::SourceLocation(),
-            const_cast<clang::CXXConstructorDecl *>(copyConstructor));
-      }
-
+      
       auto &diagEngine = importer->getClangSema().getDiagnostics();
       clang::DiagnosticErrorTrap trap(diagEngine);
       auto clangFnAddr =

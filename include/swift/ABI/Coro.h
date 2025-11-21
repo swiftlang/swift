@@ -30,6 +30,8 @@ enum class CoroAllocatorKind : uint8_t {
   Async = 1,
   // malloc/free
   Malloc = 2,
+  // swift_coroFrameAlloc/free
+  TypedMalloc = 3,
 };
 
 class CoroAllocatorFlags : public FlagSet<uint32_t> {

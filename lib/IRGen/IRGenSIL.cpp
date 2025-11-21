@@ -2038,7 +2038,7 @@ static ArrayRef<SILArgument *> emitEntryPointIndirectReturn(
   // Map an indirect return for a type SIL considers loadable but still
   // requires an indirect return at the IR level.
   SILFunctionConventions fnConv(funcTy, IGF.getSILModule());
-  SILType directResultType = IGF.CurSILFn->mapTypeIntoContext(
+  SILType directResultType = IGF.CurSILFn->mapTypeIntoEnvironment(
       fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
 
   if (fnConv.hasAddressResult()) {
@@ -2066,7 +2066,7 @@ static ArrayRef<SILArgument *> emitEntryPointIndirectReturn(
            IGF.IGM.getMaximalTypeExpansionContext())) {
     SILArgument *ret = bbargs[idx];
     auto inContextResultType =
-        IGF.CurSILFn->mapTypeIntoContext(indirectResultType);
+        IGF.CurSILFn->mapTypeIntoEnvironment(indirectResultType);
     auto &retTI = IGF.IGM.getTypeInfo(ret->getType());
     auto &paramTI = IGF.IGM.getTypeInfo(inContextResultType);
 
@@ -2095,7 +2095,7 @@ static void bindParameter(IRGenSILFunction &IGF,
                           unsigned index, SILArgument *param, SILType paramTy,
                           ExplosionForArgument explosionForArgument) {
   // Pull out the parameter value and its formal type.
-  auto &paramTI = IGF.getTypeInfo(IGF.CurSILFn->mapTypeIntoContext(paramTy));
+  auto &paramTI = IGF.getTypeInfo(IGF.CurSILFn->mapTypeIntoEnvironment(paramTy));
   auto &argTI = IGF.getTypeInfo(param->getType());
 
   // If the SIL parameter isn't passed indirectly, we need to map it
@@ -2186,14 +2186,14 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     auto errorType =
         fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
     auto inContextErrorType =
-      IGF.CurSILFn->mapTypeIntoContext(errorType);
+      IGF.CurSILFn->mapTypeIntoEnvironment(errorType);
     bool isTypedError = fnConv.isTypedError();
     bool isIndirectError = fnConv.hasIndirectSILErrorResults();
 
     if (isTypedError && !isIndirectError) {
       auto resultType =
           fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
-      auto inContextResultType = IGF.CurSILFn->mapTypeIntoContext(resultType);
+      auto inContextResultType = IGF.CurSILFn->mapTypeIntoEnvironment(resultType);
       auto &resultTI =
           cast<FixedTypeInfo>(IGF.getTypeInfo(inContextResultType));
       auto &errorTI = cast<FixedTypeInfo>(IGF.getTypeInfo(inContextErrorType));
@@ -3064,11 +3064,6 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
     if (name == "swift_task_future_wait_throwing")
       return SpecialKind::TaskFutureWaitThrowing;
 
-    if (name == "swift_asyncLet_wait")
-      return SpecialKind::AsyncLetWait;
-    if (name == "swift_asyncLet_wait_throwing")
-      return SpecialKind::AsyncLetWaitThrowing;
-
     if (name == "swift_asyncLet_get")
       return SpecialKind::AsyncLetGet;
     if (name == "swift_asyncLet_get_throwing")
@@ -3737,7 +3732,7 @@ static void emitBuiltinStackAlloc(IRGenSILFunction &IGF,
 
   auto stackAddress =
       IGF.emitDynamicAlloca(IGF.IGM.Int8Ty, size, align, DoesNotAllowTaskAlloc,
-                            IsNotForCalleeCoroutineFrame, "temp_alloc");
+                            /*mallocTypeId=*/nullptr, "temp_alloc");
   IGF.setLoweredStackAddress(i, stackAddress);
 }
 
@@ -3966,11 +3961,6 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
         !subMap.getRecursiveProperties().hasPrimaryArchetype()) {
       emission->useProfilingThunk();
     }
-  }
-
-  if (calleeFP.shouldPassContinuationDirectly()) {
-    llArgs.add(emission->getResumeFunctionPointer());
-    llArgs.add(emission->getAsyncContext());
   }
 
   // Add all those arguments.
@@ -4480,7 +4470,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
 
   auto getNullErrorValue = [&] () -> llvm::Value* {
     if (!conv.isTypedError()) {
-      auto errorResultType = IGF.CurSILFn->mapTypeIntoContext(
+      auto errorResultType = IGF.CurSILFn->mapTypeIntoEnvironment(
           conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
       auto errorType =
           cast<llvm::PointerType>(IGF.IGM.getStorageType(errorResultType));
@@ -4494,7 +4484,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     if (fnType->getCoroutineKind() == SILCoroutineKind::YieldOnce) {
       assert(IGF.CurSILFn->getLoweredFunctionType()->getLanguage() ==
              SILFunctionLanguage::Swift);
-      auto funcResultType = IGF.CurSILFn->mapTypeIntoContext(
+      auto funcResultType = IGF.CurSILFn->mapTypeIntoEnvironment(
         conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
 
       emitYieldOnceCoroutineResult(IGF, result, funcResultType, resultTy);
@@ -4510,7 +4500,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
   if (conv.hasAddressResult()) {
     assert(IGF.CurSILFn->getLoweredFunctionType()->getLanguage() ==
            SILFunctionLanguage::Swift);
-    auto funcResultType = IGF.CurSILFn->mapTypeIntoContext(
+    auto funcResultType = IGF.CurSILFn->mapTypeIntoEnvironment(
         conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
 
     emitAddressResult(IGF, result, funcResultType, resultTy);
@@ -4542,7 +4532,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     }
   }
 
-  auto funcResultType = IGF.CurSILFn->mapTypeIntoContext(
+  auto funcResultType = IGF.CurSILFn->mapTypeIntoEnvironment(
       conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
 
   if (IGF.isAsync()) {
@@ -4562,7 +4552,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     SILType errorType;
     if (fnType->hasErrorResult() && conv.isTypedError() &&
         !conv.hasIndirectSILResults() && !conv.hasIndirectSILErrorResults()) {
-      errorType = IGF.CurSILFn->mapTypeIntoContext(
+      errorType = IGF.CurSILFn->mapTypeIntoEnvironment(
           conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
     }
     IGF.emitScalarReturn(resultTy, funcResultType, result, swiftCCReturn, false,
@@ -4630,11 +4620,11 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
       llvm::Constant *flag = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
       flag = llvm::ConstantExpr::getIntToPtr(flag, IGM.Int8PtrTy);
       Explosion errorResult = getLoweredExplosion(i->getOperand());
-      auto silErrorTy = CurSILFn->mapTypeIntoContext(
+      auto silErrorTy = CurSILFn->mapTypeIntoEnvironment(
           conv.getSILErrorType(IGM.getMaximalTypeExpansionContext()));
       auto &errorTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silErrorTy));
 
-      auto silResultTy = CurSILFn->mapTypeIntoContext(
+      auto silResultTy = CurSILFn->mapTypeIntoEnvironment(
           conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
 
       if (silErrorTy.getASTType()->isNever()) {
@@ -4681,15 +4671,15 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
     auto exn = getLoweredExplosion(i->getOperand());
 
     auto layout = getAsyncContextLayout(*this);
-    auto funcResultType = CurSILFn->mapTypeIntoContext(
+    auto funcResultType = CurSILFn->mapTypeIntoEnvironment(
         conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
 
     if (conv.isTypedError()) {
-      auto silErrorTy = CurSILFn->mapTypeIntoContext(
+      auto silErrorTy = CurSILFn->mapTypeIntoEnvironment(
           conv.getSILErrorType(IGM.getMaximalTypeExpansionContext()));
       auto &errorTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silErrorTy));
 
-      auto silResultTy = CurSILFn->mapTypeIntoContext(
+      auto silResultTy = CurSILFn->mapTypeIntoEnvironment(
           conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
       auto &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silResultTy));
       auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
@@ -4757,7 +4747,7 @@ void IRGenSILFunction::visitThrowAddrInst(swift::ThrowAddrInst *i) {
   // Async functions just return to the continuation.
   } else {
     auto layout = getAsyncContextLayout(*this);
-    auto funcResultType = CurSILFn->mapTypeIntoContext(
+    auto funcResultType = CurSILFn->mapTypeIntoEnvironment(
         conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
 
     llvm::Constant *flag = llvm::ConstantInt::get(IGM.IntPtrTy, 1);

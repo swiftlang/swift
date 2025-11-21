@@ -143,11 +143,12 @@ public:
         auto &dep = cache.findKnownDependency(bridgingDep);
         auto *clangDep = dep.getAsClangModule();
         assert(clangDep && "wrong module dependency kind");
+        auto pcmPath = llvm::sys::path::filename(clangDep->mappedPCMPath).str();
         if (!clangDep->moduleCacheKey.empty()) {
           bridgingHeaderBuildCmd.push_back("-Xcc");
           bridgingHeaderBuildCmd.push_back("-fmodule-file-cache-key");
           bridgingHeaderBuildCmd.push_back("-Xcc");
-          bridgingHeaderBuildCmd.push_back(clangDep->mappedPCMPath);
+          bridgingHeaderBuildCmd.push_back(pcmPath);
           bridgingHeaderBuildCmd.push_back("-Xcc");
           bridgingHeaderBuildCmd.push_back(clangDep->moduleCacheKey);
         }
@@ -277,17 +278,21 @@ private:
   bool handleClangModuleDependency(
       ModuleDependencyID depModuleID,
       const ClangModuleDependencyStorage &clangDepDetails) {
+    auto pcmPath =
+        clangDepDetails.moduleCacheKey.empty()
+            ? clangDepDetails.mappedPCMPath
+            : llvm::sys::path::filename(clangDepDetails.mappedPCMPath).str();
     if (!resolvingDepInfo.isSwiftSourceModule()) {
       if (!resolvingDepInfo.isClangModule()) {
         commandline.push_back("-Xcc");
         commandline.push_back("-fmodule-file=" + depModuleID.ModuleName + "=" +
-                              clangDepDetails.mappedPCMPath);
+                              pcmPath);
       }
       if (!clangDepDetails.moduleCacheKey.empty()) {
         commandline.push_back("-Xcc");
         commandline.push_back("-fmodule-file-cache-key");
         commandline.push_back("-Xcc");
-        commandline.push_back(clangDepDetails.mappedPCMPath);
+        commandline.push_back(pcmPath);
         commandline.push_back("-Xcc");
         commandline.push_back(clangDepDetails.moduleCacheKey);
       }

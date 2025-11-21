@@ -2204,7 +2204,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
   auto capturedEnvs = loweredCaptures.getGenericEnvironments();
   auto *isolatedParam = loweredCaptures.getIsolatedParamCapture();
 
-  auto mapTypeOutOfContext = [&](Type t) -> CanType {
+  auto mapTypeOutOfEnvironment = [&](Type t) -> CanType {
     LLVM_DEBUG(llvm::dbgs() << "-- capture with contextual type " << t << "\n");
 
     auto result = mapLocalArchetypesOutOfContext(t, origGenericSig, capturedEnvs)
@@ -2218,7 +2218,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
     if (capture.isDynamicSelfMetadata()) {
       ParameterConvention convention = ParameterConvention::Direct_Unowned;
       auto dynamicSelfInterfaceType =
-          mapTypeOutOfContext(loweredCaptures.getDynamicSelfType());
+          mapTypeOutOfEnvironment(loweredCaptures.getDynamicSelfType());
 
       auto selfMetatype = CanMetatypeType::get(dynamicSelfInterfaceType,
                                                MetatypeRepresentation::Thick);
@@ -2231,7 +2231,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
 
     if (capture.isOpaqueValue()) {
       OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
-      auto canType = mapTypeOutOfContext(opaqueValue->getType());
+      auto canType = mapTypeOutOfEnvironment(opaqueValue->getType());
       auto &loweredTL =
           TC.getTypeLowering(AbstractionPattern(genericSig, canType),
                              canType, expansion);
@@ -2279,7 +2279,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
            (genericSig && origGenericSig &&
             !genericSig->isEqual(origGenericSig)));
 
-    auto interfaceType = mapTypeOutOfContext(type)->getReducedType(
+    auto interfaceType = mapTypeOutOfEnvironment(type)->getReducedType(
         genericSig ? genericSig : origGenericSig);
     auto &loweredTL =
         TC.getTypeLowering(AbstractionPattern(genericSig, interfaceType),
@@ -3440,7 +3440,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
 
   auto substFormalTypeIntoThunkContext =
       [&](CanType t) -> CanType {
-    return GenericEnvironment::mapTypeIntoContext(
+    return GenericEnvironment::mapTypeIntoEnvironment(
         genericEnv,
         mapLocalArchetypesOutOfContext(t, baseGenericSig, capturedEnvs))
                ->getCanonicalType();
@@ -3448,7 +3448,7 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   auto substLoweredTypeIntoThunkContext =
       [&](CanSILFunctionType t) -> CanSILFunctionType {
     return cast<SILFunctionType>(
-        GenericEnvironment::mapTypeIntoContext(
+        GenericEnvironment::mapTypeIntoEnvironment(
           genericEnv,
           mapLocalArchetypesOutOfContext(t, baseGenericSig, capturedEnvs))
               ->getCanonicalType());
@@ -3517,8 +3517,8 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
     params.push_back({dynamicSelfType, ParameterConvention::Direct_Unowned});
   }
 
-  auto mapTypeOutOfContext = [&](CanType type) -> CanType {
-    return type->mapTypeOutOfContext()->getCanonicalType();
+  auto mapTypeOutOfEnvironment = [&](CanType type) -> CanType {
+    return type->mapTypeOutOfEnvironment()->getCanonicalType();
   };
 
   // Map the parameter and expected types out of context to get the interface
@@ -3526,26 +3526,26 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   SmallVector<SILParameterInfo, 4> interfaceParams;
   interfaceParams.reserve(params.size());
   for (auto &param : params) {
-    auto interfaceParam = param.map(mapTypeOutOfContext);
+    auto interfaceParam = param.map(mapTypeOutOfEnvironment);
     interfaceParams.push_back(interfaceParam);
   }
 
   SmallVector<SILYieldInfo, 4> interfaceYields;
   for (auto &yield : expectedType->getYields()) {
-    auto interfaceYield = yield.map(mapTypeOutOfContext);
+    auto interfaceYield = yield.map(mapTypeOutOfEnvironment);
     interfaceYields.push_back(interfaceYield);
   }
 
   SmallVector<SILResultInfo, 4> interfaceResults;
   for (auto &result : expectedType->getResults()) {
-    auto interfaceResult = result.map(mapTypeOutOfContext);
+    auto interfaceResult = result.map(mapTypeOutOfEnvironment);
     interfaceResults.push_back(interfaceResult);
   }
 
   std::optional<SILResultInfo> interfaceErrorResult;
   if (expectedType->hasErrorResult()) {
     auto errorResult = expectedType->getErrorResult();
-    interfaceErrorResult = errorResult.map(mapTypeOutOfContext);;
+    interfaceErrorResult = errorResult.map(mapTypeOutOfEnvironment);;
   }
 
   // The type of the thunk function.
@@ -3809,7 +3809,7 @@ public:
           if (!classDecl->isForeignReferenceType()) {
             assert(!classDecl->hasClangNode() &&
                    "unexpected imported class type in C function");
-            assert(!classDecl->isGeneric());
+            assert(!classDecl->hasGenericParamList());
             return ParameterConvention::Indirect_In_Guaranteed;
           }
         }
@@ -4424,12 +4424,29 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     if (!c.hasDecl())
       return SILFunctionTypeRepresentation::CFunctionPointer;
 
-    if (auto method =
-            dyn_cast_or_null<clang::CXXMethodDecl>(c.getDecl()->getClangDecl()))
-      return isa<clang::CXXConstructorDecl>(method) || method->isStatic()
-                 ? SILFunctionTypeRepresentation::CFunctionPointer
-                 : SILFunctionTypeRepresentation::CXXMethod;
+    if (auto clangDecl = c.getDecl()->getClangDecl()) {
+      if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
+        return isa<clang::CXXConstructorDecl>(method) || method->isStatic()
+                   ? SILFunctionTypeRepresentation::CFunctionPointer
+                   : SILFunctionTypeRepresentation::CXXMethod;
+      }
 
+      if (auto function = dyn_cast<clang::FunctionDecl>(clangDecl)) {
+        if (auto fnType = function->getType()->getAs<clang::FunctionType>()) {
+          switch (fnType->getCallConv()) {
+            case clang::CC_Swift:
+              return SILFunctionTypeRepresentation::Thin;
+
+            case clang::CC_C:
+              return SILFunctionTypeRepresentation::CFunctionPointer;
+
+            default:
+              // Fall back to heuristics below.
+              break;
+          }
+        }
+      }
+    }
 
     // For example, if we have a function in a namespace:
     if (c.getDecl()->isImportAsMember())

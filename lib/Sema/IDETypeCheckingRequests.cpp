@@ -151,7 +151,7 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
     return true;
 
   ProtocolDecl *BaseTypeProtocolDecl = nullptr;
-  if (auto opaqueType = dyn_cast<OpaqueTypeArchetypeType>(BaseTy)) {
+  if (auto *opaqueType = BaseTy->getAs<OpaqueTypeArchetypeType>()) {
     if (opaqueType->getConformsTo().size() == 1) {
       BaseTypeProtocolDecl = opaqueType->getConformsTo().front();
     }
@@ -209,7 +209,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
 
   // The innermost generic parameters are mapped to error types.
   unsigned innerDepth = genericSig->getMaxDepth();
-  if (!genericDecl->isGeneric())
+  if (!genericDecl->hasGenericParamList())
     ++innerDepth;
 
   // We treat substitution failure as success, to ignore requirements

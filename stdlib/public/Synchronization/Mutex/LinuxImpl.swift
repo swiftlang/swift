@@ -235,8 +235,7 @@ extension _MutexHandle {
 
     // EDEADLK - "The futex word at uaddr is already locked by the caller."
     case 35:
-      // TODO: Replace with a colder function / one that takes a StaticString
-      fatalError("Attempt to try to lock Mutex in already acquired thread")
+      return false
 
     // This handles all of the following errors which generally aren't
     // applicable to this implementation:

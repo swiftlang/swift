@@ -533,7 +533,7 @@ static void hashStringForList(IRGenModule &IGM, const ArrayRef<T> &list,
       CanType Ty = paramOrRetVal.getArgumentType(
           IGM.getSILModule(), fnType, IGM.getMaximalTypeExpansionContext());
       if (Ty->hasTypeParameter())
-        Ty = genericEnv->mapTypeIntoContext(Ty)->getCanonicalType();
+        Ty = genericEnv->mapTypeIntoEnvironment(Ty)->getCanonicalType();
       hashStringForType(IGM, Ty, Out, genericEnv);
     }
     Out << ":";
@@ -552,7 +552,7 @@ static void hashStringForList(IRGenModule &IGM,
       CanType Ty = paramOrRetVal.getReturnValueType(
           IGM.getSILModule(), fnType, IGM.getMaximalTypeExpansionContext());
       if (Ty->hasTypeParameter())
-        Ty = genericEnv->mapTypeIntoContext(Ty)->getCanonicalType();
+        Ty = genericEnv->mapTypeIntoEnvironment(Ty)->getCanonicalType();
       hashStringForType(IGM, Ty, Out, genericEnv);
     }
     Out << ":";
@@ -628,7 +628,7 @@ getCoroutineYieldTypesDiscriminator(IRGenModule &IGM, CanSILFunctionType type) {
       CanType Ty = yield.getArgumentType(IGM.getSILModule(), type,
                                          IGM.getMaximalTypeExpansionContext());
       if (Ty->hasTypeParameter())
-        Ty = genericEnv->mapTypeIntoContext(Ty)->getCanonicalType();
+        Ty = genericEnv->mapTypeIntoEnvironment(Ty)->getCanonicalType();
       hashStringForType(IGM, Ty, out, genericEnv);
     }
     out << ":";
@@ -771,6 +771,16 @@ void ConstantAggregateBuilderBase::addSignedPointer(llvm::Constant *pointer,
                    llvm::ConstantInt::get(IGM().Int64Ty, otherDiscriminator));
 }
 
+llvm::ConstantInt *IRGenModule::getMallocTypeId(llvm::Function *fn) {
+  if (!getOptions().EmitTypeMallocForCoroFrame) {
+    // Even when typed malloc isn't enabled, a type id may be required for ABI
+    // reasons (e.g. as an argument to swift_coro_alloc).  Use a cheaply
+    // materialized value.
+    return llvm::ConstantInt::get(Int64Ty, 0);
+  }
+  return getDiscriminatorForString(*this, fn->getName());
+}
+
 llvm::ConstantInt* IRGenFunction::getMallocTypeId() {
-  return getDiscriminatorForString(IGM, CurFn->getName());
+  return IGM.getMallocTypeId(CurFn);
 }

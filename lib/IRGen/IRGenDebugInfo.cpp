@@ -864,7 +864,7 @@ private:
   llvm::DIModule *getOrCreateModule(const void *Key, llvm::DIScope *Parent,
                                     StringRef Name, StringRef IncludePath,
                                     uint64_t Signature = ~1ULL,
-                                    StringRef ASTFile = StringRef()) {
+                                    StringRef ASTFile = {}) {
     // Look in the cache first.
     auto Val = DIModuleCache.find(Key);
     if (Val != DIModuleCache.end())
@@ -929,10 +929,10 @@ private:
         // Note: The implementation here assumes that all clang submodules
         //       belong to the same PCM file.
         ASTSourceDescriptor ParentDescriptor(*ClangModule->Parent);
-        Parent = getOrCreateModule({ParentDescriptor.getModuleName(),
-                                    ParentDescriptor.getPath(),
-                                    Desc.getASTFile(), Desc.getSignature()},
-                                   ClangModule->Parent);
+        Parent = getOrCreateModule(
+            {ParentDescriptor.getModuleName(), ParentDescriptor.getPath(),
+             Desc.getASTFile(), Desc.getSignature(), /*CASID=*/""},
+            ClangModule->Parent);
       }
       return getOrCreateModule(ClangModule, Parent, Desc.getModuleName(),
                                IncludePath, Signature, Desc.getASTFile());
@@ -1042,7 +1042,7 @@ private:
         return false;
       });
 
-      Ty = Ty->mapTypeOutOfContext();
+      Ty = Ty->mapTypeOutOfEnvironment();
     } else {
       Sig = IGM.getCurGenericContext();
     }
@@ -1075,12 +1075,11 @@ private:
         CanonicalName.clear();
     }
 
-    bool IsTypeOriginallyDefinedIn =
-        containsOriginallyDefinedIn(DbgTy.getType());
-    // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
+    bool IsTypeOriginallyDefinedIn = containsOriginallyDefinedIn(DbgTy.getType());
+    bool IsCxxType = containsCxxType(DbgTy.getType());
     // There's no way to round trip when respecting @_originallyDefinedIn for a type.
-    if (!Opts.DisableRoundTripDebugTypes &&
-        !Ty->getASTContext().LangOpts.EnableCXXInterop && !IsTypeOriginallyDefinedIn) {
+    // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
+    if (!Opts.DisableRoundTripDebugTypes && !IsTypeOriginallyDefinedIn && !IsCxxType) {
       // Make sure we can reconstruct mangled types for the debugger.
       auto &Ctx = Ty->getASTContext();
       Type Reconstructed = Demangle::getTypeForMangling(Ctx, SugaredName, Sig);
@@ -1286,11 +1285,11 @@ private:
       return {false, {}};
     // Go from Pair<Int, Double> to Pair<T, U>.
     Type InterfaceTy = Decl->getDeclaredInterfaceType();
-    Type UnsubstitutedTy = Decl->mapTypeIntoContext(InterfaceTy);
+    Type UnsubstitutedTy = Decl->mapTypeIntoEnvironment(InterfaceTy);
 
     Mangle::ASTMangler Mangler(IGM.Context);
     std::string DeclTypeMangledName = Mangler.mangleTypeForDebugger(
-        UnsubstitutedTy->mapTypeOutOfContext(), {});
+        UnsubstitutedTy->mapTypeOutOfEnvironment(), {});
     bool IsUnsubstituted = (DeclTypeMangledName == MangledName);
     return {IsUnsubstituted, UnsubstitutedTy};
   }
@@ -1465,7 +1464,7 @@ private:
       std::optional<CompletedDebugTypeInfo> ElemDbgTy;
       if (auto PayloadTy = ElemDecl->getPayloadInterfaceType()) {
         // A variant case which carries a payload.
-        PayloadTy = ElemDecl->getParentEnum()->mapTypeIntoContext(PayloadTy);
+        PayloadTy = ElemDecl->getParentEnum()->mapTypeIntoEnvironment(PayloadTy);
         auto &TI = IGM.getTypeInfoForUnlowered(PayloadTy);
         ElemDbgTy = CompletedDebugTypeInfo::getFromTypeInfo(PayloadTy, TI, IGM);
         // FIXME: This is not correct, but seems to be the only way to emit
@@ -1533,7 +1532,7 @@ private:
       std::optional<DebugTypeInfo> ElemDbgTy;
       if (auto PayloadTy = ElemDecl->getPayloadInterfaceType()) {
         // A variant case which carries a payload.
-        PayloadTy = ElemDecl->getParentEnum()->mapTypeIntoContext(PayloadTy);
+        PayloadTy = ElemDecl->getParentEnum()->mapTypeIntoEnvironment(PayloadTy);
         ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
             PayloadTy, IGM.getTypeInfoForUnlowered(PayloadTy), IGM);
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(),
@@ -1600,7 +1599,7 @@ private:
     std::vector<Type> GenericArgs;
     Type CurrentType = BGT;
     while (CurrentType && CurrentType->getAnyNominal()) {
-      if (auto *BGT = llvm::dyn_cast<BoundGenericType>(CurrentType))
+      if (auto *BGT = CurrentType->getAs<BoundGenericType>())
         GenericArgs.insert(GenericArgs.end(), BGT->getGenericArgs().begin(),
                            BGT->getGenericArgs().end());
       CurrentType = CurrentType->getNominalParent();
@@ -2461,9 +2460,10 @@ private:
         return TypeWalker::Action::Stop;
 
       DeclContext *D = nullptr;
-      if (auto *TAT = llvm::dyn_cast<TypeAliasType>(T))
+      if (auto *TAT = llvm::dyn_cast<TypeAliasType>(T.getPointer()))
         D = TAT->getDecl()->getDeclContext();
-      else if (auto *NT = llvm::dyn_cast<NominalOrBoundGenericNominalType>(T))
+      else if (auto *NT = llvm::dyn_cast<NominalOrBoundGenericNominalType>(
+                   T.getPointer()))
         D = NT->getDecl()->getDeclContext();
 
       // A type inside a function uses that function's signature as part of
@@ -2502,6 +2502,42 @@ private:
     OriginallyDefinedInFinder Walker;
     T.walk(Walker);
     return Walker.visitedOriginallyDefinedIn;
+  }
+
+  /// Returns true if the type contains an imported C++ type. Due to
+  /// various unimplemented features these cannot round-trip through
+  /// the ASTDemangler.
+  ///
+  /// FIXME: Get these cases working with the ASTDemangler instead.
+  bool containsCxxType(Type T) {
+    return T.findIf([&](Type t) -> bool {
+      if (auto *decl = t->getAnyNominal()) {
+        if (auto *clangDecl = decl->getClangDecl()) {
+          // Lookup of template instantiations is not implemented.
+          if (isa<clang::ClassTemplateSpecializationDecl>(clangDecl))
+            return true;
+
+          // Lookup of types in weird contexts is not implemented.
+          if (isa<clang::EnumDecl>(clangDecl) ||
+              isa<clang::CXXRecordDecl>(clangDecl)) {
+            auto *dc = clangDecl->getDeclContext();
+            while (!isa<clang::TranslationUnitDecl>(dc)) {
+              // ... in namespaces,
+              if (isa<clang::NamespaceDecl>(dc))
+                return true;
+
+              // ... or inside other types.
+              if (isa<clang::CXXRecordDecl>(dc))
+                return true;
+
+              dc = dc->getParent();
+            }
+          }
+        }
+      }
+
+      return false;
+    });
   }
 
   /// Returns the decl of the type's parent chain annotated by
@@ -2594,11 +2630,11 @@ private:
           // Describe the submodule, but substitute the cached ASTFile from
           // the toplevel module. The ASTFile pointer in SubModule may be
           // dangling and cant be trusted.
-          Scope = getOrCreateModule({SubModuleDesc->getModuleName(),
-                                     SubModuleDesc->getPath(),
-                                     TopLevelModuleDesc->getASTFile(),
-                                     TopLevelModuleDesc->getSignature()},
-                                    SubModuleDesc->getModuleOrNull());
+          Scope = getOrCreateModule(
+              {SubModuleDesc->getModuleName(), SubModuleDesc->getPath(),
+               TopLevelModuleDesc->getASTFile(),
+               TopLevelModuleDesc->getSignature(), /*CASID=*/""},
+              SubModuleDesc->getModuleOrNull());
         else if (SubModuleDesc->getModuleOrNull() == nullptr)
           // This is (bridging header) PCH.
           Scope = getOrCreateModule(*SubModuleDesc, nullptr);
@@ -2823,8 +2859,12 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
 
   // Create a module for the current compile unit.
   auto *MDecl = IGM.getSwiftModule();
-  llvm::sys::path::remove_filename(SourcePath);
-  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, SourcePath);
+  StringRef Path = Opts.DebugModulePath;
+  if (Path.empty()) {
+    llvm::sys::path::remove_filename(SourcePath);
+    Path = SourcePath;
+  }
+  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, Path);
   DBuilder.createImportedModule(MainFile, MainModule, MainFile, 0);
 
   // Macro definitions that were defined by the user with "-Xcc -D" on the
@@ -3302,9 +3342,9 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
       SILType SILTy = IGM.silConv.getSILType(
           *ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext());
 
-      errorResultTy = SILFn->mapTypeIntoContext(errorResultTy)
+      errorResultTy = SILFn->mapTypeIntoEnvironment(errorResultTy)
           ->getCanonicalType();
-      SILTy = SILFn->mapTypeIntoContext(SILTy);
+      SILTy = SILFn->mapTypeIntoEnvironment(SILTy);
 
       auto DTI = DebugTypeInfo::getFromTypeInfo(
           errorResultTy,

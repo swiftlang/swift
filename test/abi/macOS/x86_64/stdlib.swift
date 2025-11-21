@@ -1143,3 +1143,6 @@ Removed: _$sSS10_wordIndex6beforeSS0B0VAD_tF
 // Internal info exposed for swift-inspect.
 Added: __swift_debug_allocationPoolSize
 Added: __swift_debug_metadataAllocatorPageSize
+
+// New debug environment variable for the concurrency runtime.
+Added: _concurrencyEnableTaskSlabAllocator

@@ -1642,7 +1642,8 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     FrontendOptions::ActionType requestedAction,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
-    bool suppressNotes, bool suppressRemarks) {
+    bool suppressNotes, bool suppressRemarks,
+    PrintDiagnosticNamesMode printDiagnosticNames) {
   GenericArgs.push_back("-frontend");
   // Start with a genericSubInvocation that copies various state from our
   // invoking ASTContext.
@@ -1743,6 +1744,20 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     GenericArgs.push_back("-suppress-remarks");
   }
 
+  // Inherit the parent invocation's setting for printing diagnostic IDs.
+  genericSubInvocation.getDiagnosticOptions().PrintDiagnosticNames =
+      printDiagnosticNames;
+  switch (printDiagnosticNames) {
+  case PrintDiagnosticNamesMode::None:
+    break;
+  case PrintDiagnosticNamesMode::Identifier:
+    GenericArgs.push_back("-debug-diagnostic-names");
+    break;
+  case PrintDiagnosticNamesMode::Group:
+    // FIXME: Currently no flag for Group mode
+    break;
+  }
+
   // Inherit this setting down so that it can affect error diagnostics (mostly
   // by making them non-fatal).
   genericSubInvocation.getLangOptions().DebuggerSupport = LangOpts.DebuggerSupport;
@@ -1790,7 +1805,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
 
   if (casOpts.EnableCaching) {
     genericSubInvocation.getCASOptions().EnableCaching = casOpts.EnableCaching;
-    genericSubInvocation.getCASOptions().Config = casOpts.Config;
+    genericSubInvocation.getCASOptions().CASOpts = casOpts.CASOpts;
     genericSubInvocation.getCASOptions().HasImmutableFileSystem =
         casOpts.HasImmutableFileSystem;
     casOpts.enumerateCASConfigurationFlags(
@@ -1849,7 +1864,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   inheritOptionsForBuildingInterface(LoaderOpts.requestedAction, searchPathOpts,
                                      langOpts, clangImporterOpts, casOpts,
                                      Diags->getSuppressNotes(),
-                                     Diags->getSuppressRemarks());
+                                     Diags->getSuppressRemarks(),
+                                     Diags->getPrintDiagnosticNamesMode());
   // Configure front-end input.
   auto &SubFEOpts = genericSubInvocation.getFrontendOptions();
   SubFEOpts.RequestedAction = LoaderOpts.requestedAction;

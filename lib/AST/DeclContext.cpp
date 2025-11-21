@@ -104,7 +104,7 @@ VarDecl *DeclContext::getNonLocalVarDecl() const {
 
 Type DeclContext::getDeclaredTypeInContext() const {
   if (auto declaredType = getDeclaredInterfaceType())
-    return mapTypeIntoContext(declaredType);
+    return mapTypeIntoEnvironment(declaredType);
   return Type();
 }
 
@@ -175,8 +175,8 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
   return nullptr;
 }
 
-Type DeclContext::mapTypeIntoContext(Type type) const {
-  return GenericEnvironment::mapTypeIntoContext(
+Type DeclContext::mapTypeIntoEnvironment(Type type) const {
+  return GenericEnvironment::mapTypeIntoEnvironment(
       getGenericEnvironmentOfContext(), type);
 }
 
@@ -593,7 +593,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         return {FragileFunctionKind::Inlinable};
       }
 
-      if (AFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+      if (AFD->isAlwaysEmittedIntoClient()) {
         return {FragileFunctionKind::AlwaysEmitIntoClient};
       }
 
@@ -608,7 +608,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         if (storage->hasAttributeWithInlinableSemantics()) {
           return {FragileFunctionKind::Inlinable};
         }
-        if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+        if (storage->isAlwaysEmittedIntoClient()) {
           return {FragileFunctionKind::AlwaysEmitIntoClient};
         }
         if (storage->isBackDeployed()) {
@@ -629,7 +629,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
 bool DeclContext::isInnermostContextGeneric() const {
   if (auto Decl = getAsDecl())
     if (auto GC = Decl->getAsGenericContext())
-      return GC->isGeneric();
+      return GC->hasGenericParamList();
   return false;
 }
 

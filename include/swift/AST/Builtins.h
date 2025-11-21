@@ -77,7 +77,7 @@ enum class OverloadedBuiltinKind : uint8_t {
 };
 
 /// BuiltinValueKind - The set of (possibly overloaded) builtin functions.
-enum class BuiltinValueKind {
+enum class BuiltinValueKind : unsigned {
   None = 0,
 #define BUILTIN(Id, Name, Attrs) Id,
 #include "swift/AST/Builtins.def"
@@ -107,10 +107,21 @@ getLLVMIntrinsicIDForBuiltinWithOverflow(BuiltinValueKind ID);
 ///
 /// Returns null if the name does not identifier a known builtin value.
 ValueDecl *getBuiltinValueDecl(ASTContext &Context, Identifier Name);
-  
+
+/// Overload that takes a StringRef instead of an Identifier. We convert it to
+/// an identifier internally.
+ValueDecl *getBuiltinValueDecl(ASTContext &Context, StringRef Name);
+
 /// Returns the name of a builtin declaration given a builtin ID.
 StringRef getBuiltinName(BuiltinValueKind ID);
-  
+
+/// Namespace containing constexpr StringLiterals of BuiltinNames so that
+/// builtin names can be referred to without using raw string literals.
+namespace BuiltinNames {
+#define BUILTIN(Id, Name, Attrs) constexpr StringLiteral Id = Name;
+#include "swift/AST/Builtins.def"
+} // namespace BuiltinNames
+
 /// The information identifying the builtin - its kind and types.
 class BuiltinInfo {
 public:

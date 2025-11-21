@@ -2453,7 +2453,7 @@ static void resolveCursorFromUSR(
         if (DC->isTypeContext()) {
           auto ContainerType = DC->getSelfInterfaceType();
           ContainerType =
-              D->getInnermostDeclContext()->mapTypeIntoContext(ContainerType);
+              D->getInnermostDeclContext()->mapTypeIntoEnvironment(ContainerType);
         }
 
         ResolvedValueRefCursorInfoPtr Info = new ResolvedValueRefCursorInfo(

@@ -82,7 +82,10 @@ private:
 
   /// Mapping from original basic blocks to corresponding pullback basic blocks.
   /// Pullback basic blocks always have the predecessor as the single argument.
-  llvm::DenseMap<SILBasicBlock *, SILBasicBlock *> pullbackBBMap;
+  /// Pullback block might be split into SESE region. Here we record entry and
+  /// exit blocks of this region
+  llvm::DenseMap<SILBasicBlock *, std::pair<SILBasicBlock *, SILBasicBlock *>>
+      pullbackBBMap;
 
   /// Mapping from original basic blocks and original values to corresponding
   /// adjoint values.
@@ -117,6 +120,11 @@ private:
   /// cleaned before processing another basic block.
   llvm::DenseMap<SILBasicBlock *, llvm::SmallSetVector<SILValue, 32>>
       blockTemporaries;
+
+  /// Adjoints for result values of `try_apply` instruction. These are only
+  /// available in normal destination basic block. Therefore we keep them
+  /// on the side.
+  llvm::DenseMap<TryApplyInst *, SILValue> tryApplyAdjoints;
 
   /// The scope cloner.
   ScopeCloner scopeCloner;
@@ -232,7 +240,7 @@ private:
   /// Remap any archetypes into the current function's context.
   SILType remapType(SILType ty) {
     if (ty.hasArchetype())
-      ty = ty.mapTypeOutOfContext();
+      ty = ty.mapTypeOutOfEnvironment();
     auto remappedType = ty.getASTType()->getReducedType(
         getPullback().getLoweredFunctionType()->getSubstGenericSignature());
     auto remappedSILType =
@@ -240,7 +248,7 @@ private:
     // FIXME: Sometimes getPullback() doesn't have a generic environment, in which
     // case callers are apparently happy to receive an interface type.
     if (getPullback().getGenericEnvironment())
-      return getPullback().mapTypeIntoContext(remappedSILType);
+      return getPullback().mapTypeIntoEnvironment(remappedSILType);
     return remappedSILType;
   }
 
@@ -617,7 +625,7 @@ private:
     auto pullbackBBArg =
         activeValuePullbackBBArgumentMap[{origBB, activeValue}];
     assert(pullbackBBArg);
-    assert(pullbackBBArg->getParent() == getPullbackBlock(origBB));
+    assert(pullbackBBArg->getParent() == getPullbackBlocksRegion(origBB).first);
     return pullbackBBArg;
   }
 
@@ -808,7 +816,13 @@ private:
   // CFG mapping
   //--------------------------------------------------------------------------//
 
-  SILBasicBlock *getPullbackBlock(SILBasicBlock *originalBlock) {
+  // Given the original basic block returns a corresponding pullback basic
+  // block.  In some cases we generate the whole SESE region to represent more
+  // complex control flow (e.g. for error results). In such case the first
+  // returning value is the first block of such a region and the second one is
+  // the last block of it.  In "normal" cases they are the same.
+  std::pair<SILBasicBlock *, SILBasicBlock *>
+  getPullbackBlocksRegion(const SILBasicBlock *originalBlock) {
     return pullbackBBMap.lookup(originalBlock);
   }
 
@@ -950,8 +964,11 @@ public:
       auto &s = llvm::dbgs() << "[ADJ] Emitted in pullback (pb bb" <<
         builder.getInsertionBB()->getDebugID() << "):\n";
       auto afterInsertion = builder.getInsertionPoint();
-      for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
-        s << *it;
+      if (beforeInsertion->getParent() == afterInsertion->getParent())
+        for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
+          s << *it;
+      else
+        s << "insertion spread over multiple BBs\n";
     });
   }
 
@@ -991,26 +1008,143 @@ public:
       return;
     }
 
-    buildPullbackCall(ai);
-  }
-
-  void buildPullbackCall(FullApplySite fai) {
-    auto loc = fai->getLoc();
-    auto *bb = fai->getParent();
-
-    // Replace a call to a function with a call to its pullback.
     auto &nestedApplyInfo = getContext().getNestedApplyInfo();
-    auto applyInfoLookup = nestedApplyInfo.find(fai);
+    auto applyInfoLookup = nestedApplyInfo.find(ai);
     // If no `NestedApplyInfo` was found, then this task doesn't need to be
     // differentiated.
     if (applyInfoLookup == nestedApplyInfo.end()) {
       // Must not be active.
-      // TODO: Do we need to check token result for begin_apply?
-      SILValue result = fai.getResult();
-      assert(!result || !getActivityInfo().isActive(result, getConfig()));
+      assert(!getActivityInfo().isActive(ai, getConfig()));
       return;
     }
+
+    // Replace a call to a function with a call to its pullback.
+    buildPullbackCall(ai, applyInfoLookup->getSecond());
+  }
+
+  void visitTryApplyInst(TryApplyInst *tai) {
+    assert(getPullbackInfo().shouldDifferentiateApplySite(tai));
+
+    // Replace a call to a function with a call to its pullback.
+    auto &nestedApplyInfo = getContext().getNestedApplyInfo();
+    auto applyInfoLookup = nestedApplyInfo.find(tai);
+    // If no `NestedApplyInfo` was found, then this task doesn't need to be
+    // differentiated.
+    if (applyInfoLookup == nestedApplyInfo.end()) {
+      const auto *normalBlock = tai->getNormalBB();
+      assert(normalBlock->getNumArguments() == 1 &&
+             "Expected try apply to have a single result");
+      // Must not be active.
+      assert(!getActivityInfo().isActive(normalBlock->getArgument(0),
+                                         getConfig()));
+      return;
+    }
+
+    // try_apply pullback produces value only on non-error path, therefore
+    // its pullback might be not available. Therefore we wrap pullback into
+    // Optional in the linear map tuple. Build a diamond-shaped CFG fragment
+    // here, emitting switch_enum to unwrap an Optional<PullbackType>. If
+    // pullback is present we emit a pullback call and propagate adjoints of
+    // arguments to successor block. Otherwise, there is no pullback call, so we
+    // only propagate adjoints of would-be arguments. So, the code looks like as
+    // follows: bb1(%35 : $Float, %36 : @owned $(_: Optional<@callee_guaranteed
+    // (Float) -> Float>)):
+    //   %37 = destructure_tuple %36
+    //   switch_enum %37, case #Optional.some!enumelt: bb8, case
+    //   #Optional.none!enumelt: bb9
+    // bb8(%39 : @owned $@callee_guaranteed (Float) -> Float)
+    //   %40 = apply %39(%0) : $@callee_guaranteed (Float) -> Float
+    //   accumulate adjoints (using %35)...
+    //   %54 = load [trivial] %42
+    //   br bb10(%54)
+    // bb9:
+    //   br bb10(%35)
+    // bb10(%60 : $Float):
+    //   ...
+    auto loc = tai->getLoc();
+    auto optPullback = getPullbackTupleElement(tai);
+    auto *pbBB = builder.getInsertionBB();
+    auto *normalPbBB = pbBB->split(builder.getInsertionPoint());
+    auto *errorPbBB = getPullback().createBasicBlockAfter(normalPbBB);
+    auto *afterTryApplyPbBB = getPullback().createBasicBlockAfter(errorPbBB);
+
+    // Note that we cannot simply assign map value as DenseMap entry references
+    // could be invalidated on insertion, so map[a] = map[b] may trigger
+    // use-after-free
+    {
+      auto currentBT = blockTemporaries[pbBB];
+      blockTemporaries.try_emplace(afterTryApplyPbBB, std::move(currentBT));
+      blockTemporaries[pbBB].clear();
+    }
+
+    auto pullback =
+        builder.createSwitchOptional(loc, optPullback, normalPbBB, errorPbBB,
+                                     optPullback->getOwnershipKind());
+
+    SmallVector<SILValue, 2> adjArgs;
+    FullApplySite fai(tai);
+    auto *originalBB = tai->getParent();
     auto &applyInfo = applyInfoLookup->getSecond();
+    for (unsigned i : applyInfo.config.parameterIndices->getIndices()) {
+      unsigned argIdx = fai.getNumIndirectSILResults() +
+                        fai.getNumIndirectSILErrorResults() + i;
+      auto origArg = fai.getArgument(argIdx);
+      auto paramInfo = fai.getSubstCalleeConv().getParamInfoForSILArg(argIdx);
+      if (paramInfo.isAutoDiffSemanticResult())
+        continue;
+      // We only need to create phi arguments for SSA values (non-address),
+      // everything else just loads from the adjoint buffers
+      if (getTangentValueCategory(origArg) != SILValueCategory::Object)
+        continue;
+
+      adjArgs.push_back(origArg);
+      afterTryApplyPbBB->createPhiArgument(origArg->getType(),
+                                           OwnershipKind::Owned);
+    }
+
+    {
+      builder.setInsertionPoint(errorPbBB);
+
+      SmallVector<SILValue> outAdjArgs;
+      for (auto arg : adjArgs) {
+        auto argAdj = getAdjointValue(originalBB, arg);
+        outAdjArgs.push_back(materializeAdjointDirect(argAdj, loc));
+      }
+
+      cleanUpTemporariesForBlock(errorPbBB, loc);
+      builder.createBranch(loc, afterTryApplyPbBB, outAdjArgs);
+    }
+
+    {
+      builder.setInsertionPoint(normalPbBB);
+      buildPullbackCall(tai, applyInfo, pullback);
+
+      SmallVector<SILValue> outAdjArgs;
+      for (auto arg : adjArgs) {
+        auto argAdj = getAdjointValue(originalBB, arg);
+        outAdjArgs.push_back(materializeAdjointDirect(argAdj, loc));
+      }
+
+      cleanUpTemporariesForBlock(normalPbBB, loc);
+      builder.createBranch(loc, afterTryApplyPbBB, outAdjArgs);
+    }
+
+    builder.setInsertionPoint(afterTryApplyPbBB);
+    for (auto [index, arg] : llvm::enumerate(adjArgs)) {
+      auto forwardedArgAdj =
+          makeConcreteAdjointValue(afterTryApplyPbBB->getArgument(index));
+      setAdjointValue(originalBB, arg, forwardedArgAdj);
+    }
+
+    pullbackBBMap[tai->getParent()].second = afterTryApplyPbBB;
+  }
+
+  void buildPullbackCall(FullApplySite fai, NestedApplyInfo &applyInfo,
+                         SILValue pullback = SILValue()) {
+    auto loc = fai->getLoc();
+    auto *bb = fai->getParent();
+    if (!pullback)
+      pullback = getPullbackTupleElement(fai);
 
     // Get the original result of the `apply` instruction.
     const auto &conv = fai.getSubstCalleeConv();
@@ -1022,7 +1156,8 @@ public:
     collectAllActualResultsInTypeOrder(fai, origDirectResults, origAllResults);
     // Append semantic result arguments after original results.
     for (auto paramIdx : applyInfo.config.parameterIndices->getIndices()) {
-      unsigned argIdx = fai.getNumIndirectSILResults() + paramIdx;
+      unsigned argIdx = fai.getNumIndirectSILResults() +
+                        fai.getNumIndirectSILErrorResults() + paramIdx;
       auto paramInfo = conv.getParamInfoForSILArg(argIdx);
       if (!paramInfo.isAutoDiffSemanticResult())
         continue;
@@ -1035,7 +1170,6 @@ public:
 
     // Handle callee pullback indirect results.
     // Create local allocations for these and destroy them after the call.
-    auto pullback = getPullbackTupleElement(fai);
     auto pullbackType =
         remapType(pullback->getType()).castTo<SILFunctionType>();
 
@@ -1055,16 +1189,24 @@ public:
     unsigned firstSemanticParamResultIdx = conv.getResults().size();
     unsigned firstYieldResultIndex = firstSemanticParamResultIdx +
       conv.getNumAutoDiffSemanticResultParameters();
+
     for (auto resultIndex : applyInfo.config.resultIndices->getIndices()) {
       if (resultIndex >= firstYieldResultIndex)
         continue;
       assert(resultIndex < origAllResults.size());
       auto origResult = origAllResults[resultIndex];
+
       // Get the seed (i.e. adjoint value of the original result).
       SILValue seed;
       switch (getTangentValueCategory(origResult)) {
       case SILValueCategory::Object:
-        seed = materializeAdjointDirect(getAdjointValue(bb, origResult), loc);
+        // Adjoint for normal try_apply result is available in the normal
+        // destination BB. Get it from there.
+        seed =
+            (fai.getKind() == FullApplySiteKind::TryApplyInst
+                 ? tryApplyAdjoints.at(cast<TryApplyInst>(fai.getInstruction()))
+                 : materializeAdjointDirect(getAdjointValue(bb, origResult),
+                                            loc));
         break;
       case SILValueCategory::Address:
         seed = getAdjointBuffer(bb, origResult);
@@ -1122,7 +1264,8 @@ public:
     // Accumulate adjoints for original differentiation parameters.
     auto allResultsIt = allResults.begin();
     for (unsigned i : applyInfo.config.parameterIndices->getIndices()) {
-      unsigned argIdx = fai.getNumIndirectSILResults() + i;
+      unsigned argIdx = fai.getNumIndirectSILResults() +
+                        fai.getNumIndirectSILErrorResults() + i;
       auto origArg = fai.getArgument(argIdx);
       // Skip adjoint accumulation for semantic results arguments.
       auto paramInfo = fai.getSubstCalleeConv().getParamInfoForSILArg(argIdx);
@@ -1205,7 +1348,7 @@ public:
       return;
     }
 
-    buildPullbackCall(bai);
+    buildPullbackCall(bai, applyInfoLookup->second);
   }
 
   void visitBeginApplyInst(BeginApplyInst *bai) {
@@ -2280,7 +2423,7 @@ bool PullbackCloner::Implementation::run() {
 
   for (auto *origBB : originalBlocks) {
     auto *pullbackBB = pullback.createBasicBlock();
-    pullbackBBMap.insert({origBB, pullbackBB});
+    pullbackBBMap.try_emplace(origBB, std::pair(pullbackBB, pullbackBB));
     auto pbTupleLoweredType =
         remapType(getPullbackInfo().getLinearMapTupleLoweredType(origBB));
     // If the BB is the original exit, then the pullback block that we just
@@ -2472,7 +2615,7 @@ bool PullbackCloner::Implementation::run() {
       if (loop == nullptr)
         continue;
       SILBasicBlock *loopHeader = loop->getHeader();
-      SILBasicBlock *pbLoopHeader = getPullbackBlock(loopHeader);
+      SILBasicBlock *pbLoopHeader = getPullbackBlocksRegion(loopHeader).first;
       LLVM_DEBUG(getADDebugStream()
                  << "Original bb" << bb->getDebugID()
                  << " belongs to a loop, original header bb"
@@ -2600,7 +2743,7 @@ bool PullbackCloner::Implementation::run() {
 
   // Prepare and emit a `return` in the pullback exit block.
   auto *origEntry = getOriginal().getEntryBlock();
-  auto *pbExit = getPullbackBlock(origEntry);
+  auto *pbExit = getPullbackBlocksRegion(origEntry).second;
   builder.setCurrentDebugScope(pbExit->back().getDebugScope());
   builder.setInsertionPoint(pbExit);
 
@@ -2771,7 +2914,7 @@ void PullbackCloner::Implementation::emitZeroDerivativesForNonvariedResult(
   auto indirectResultIt = pullback.getIndirectResults().begin();
   for (auto resultInfo : pullback.getLoweredFunctionType()->getResults()) {
     auto resultType =
-        pullback.mapTypeIntoContext(resultInfo.getInterfaceType())
+        pullback.mapTypeIntoEnvironment(resultInfo.getInterfaceType())
             ->getCanonicalType();
     if (resultInfo.isFormalDirect())
       directResults.push_back(builder.emitZero(pbLoc, resultType));
@@ -2899,7 +3042,7 @@ SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
     SmallDenseMap<SILValue, TrampolineBlockSet> &pullbackTrampolineBlockMap) {
   // Get the pullback block and optional pullback trampoline block of the
   // predecessor block.
-  auto *pullbackBB = getPullbackBlock(origPredBB);
+  auto *pullbackBB = getPullbackBlocksRegion(origPredBB).first;
   auto *pullbackTrampolineBB = getPullbackTrampolineBlock(origPredBB, origBB);
   // If the predecessor block does not have a corresponding pullback
   // trampoline block, then the pullback successor is the pullback block.
@@ -2998,7 +3141,7 @@ SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
 void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
   auto pbLoc = getPullback().getLocation();
   // Get the corresponding pullback basic block.
-  auto *pbBB = getPullbackBlock(bb);
+  auto *pbBB = getPullbackBlocksRegion(bb).first;
   builder.setInsertionPoint(pbBB);
 
   LLVM_DEBUG({
@@ -3022,6 +3165,9 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
     if (errorOccurred)
       return;
   }
+
+  // If visitor changed current BB, update it here as well.
+  pbBB = builder.getInsertionBB();
 
   // Emit a branching terminator for the block.
   // If the original block is the original entry, then the pullback block is
@@ -3104,8 +3250,8 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
           if (isSwitchEnumInstOnOptional(termInst)) {
             accumulateAdjointValueForOptional(bb, incomingValue, concreteBBArgAdjCopy);
           } else {
-            blockTemporaries[getPullbackBlock(predBB)].insert(
-              concreteBBArgAdjCopy);
+            blockTemporaries[getPullbackBlocksRegion(predBB).first].insert(
+                concreteBBArgAdjCopy);
             addAdjointValue(predBB, incomingValue,
                             makeConcreteAdjointValue(concreteBBArgAdjCopy), pbLoc);
           }
@@ -3126,6 +3272,40 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
           else
             addToAdjointBuffer(bb, incomingValue, bbArgAdjBuf, pbLoc);
         }
+        break;
+      }
+      }
+    } else if (auto *tai =
+                   dyn_cast<TryApplyInst>(bbArg->getSingleTerminator())) {
+      // try_apply does not provide result, so there is no value to propagate
+      // adjoint to.  Prepare adjoint and associate it "on side", so it will be
+      // used as seed during pullback call emission
+      if (!getPullbackInfo().shouldDifferentiateApplySite(tai))
+        continue;
+
+      LLVM_DEBUG(getADDebugStream()
+                 << "Creating adjoint value to active try_apply " << *tai
+                 << " in " << bb->getDebugID() << " destination  ");
+
+      auto *predBB = tai->getParentBlock();
+      switch (getTangentValueCategory(bbArg)) {
+      case SILValueCategory::Object: {
+        auto bbArgAdj = getAdjointValue(bb, bbArg);
+        auto concreteBBArgAdj = materializeAdjointDirect(bbArgAdj, pbLoc);
+        auto concreteBBArgAdjCopy =
+            builder.emitCopyValueOperation(pbLoc, concreteBBArgAdj);
+
+        blockTemporaries[getPullbackBlocksRegion(predBB).first].insert(
+            concreteBBArgAdjCopy);
+        auto [_, inserted] =
+            tryApplyAdjoints.try_emplace(tai, concreteBBArgAdjCopy);
+        assert(inserted && "should have unique adjoint for try_apply");
+        break;
+      }
+      case SILValueCategory::Address: {
+        auto bbArgAdjBuf = getAdjointBuffer(bb, bbArg);
+        auto [_, inserted] = tryApplyAdjoints.try_emplace(tai, bbArgAdjBuf);
+        assert(inserted && "should have unique adjoint for try_apply");
         break;
       }
       }
@@ -3460,7 +3640,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberModify() {
   // destination. Unwind destination is unreachable as the coroutine can never
   // be aborted.
   auto *unwindBB = getPullback().createBasicBlock();
-  auto *resumeBB = getPullbackBlock(origEntry);
+  auto *resumeBB = getPullbackBlocksRegion(origEntry).first;
   builder.createYield(yi->getLoc(), {adjSelfElt}, resumeBB, unwindBB);
   builder.setInsertionPoint(unwindBB);
   builder.createUnreachable(SILLocation::invalid());

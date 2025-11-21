@@ -101,7 +101,7 @@ public func testIfAvailableDynamicDomain() {
 }
 // CHECK: end sil function '$s4Test28testIfAvailableDynamicDomainyyF'
 
-// CHECK-LABEL: sil non_abi [serialized] [ossa] @$sSC33__swift_DynamicDomain_isAvailableBi1_yF : $@convention(thin) () -> Builtin.Int1
+// CHECK-LABEL: sil private [ossa] @$sSC33__swift_DynamicDomain_isAvailableBi1_yF : $@convention(thin) () -> Builtin.Int1
 // CHECK: bb0:
 // CHECK:   [[QUERY_FUNC:%.*]] = function_ref @$sSo27__DynamicDomain_isAvailableSbyFTo : $@convention(c) () -> Bool
 // CHECK:   [[QUERY_RESULT:%.*]] = apply [[QUERY_FUNC]]() : $@convention(c) () -> Bool

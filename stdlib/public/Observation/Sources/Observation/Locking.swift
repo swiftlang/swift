@@ -23,8 +23,8 @@ import Glibc
 import Musl
 #elseif canImport(WinSDK)
 import WinSDK
-#elseif canImport(Bionic)
-import Bionic
+#elseif canImport(Android)
+import Android
 #elseif arch(wasm32)
 #else
 #error("Unsupported platform")

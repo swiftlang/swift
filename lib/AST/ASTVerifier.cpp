@@ -688,7 +688,7 @@ public:
           // Mapping the archetype out and back in should produce the
           // same archetype.
           auto interfaceType = archetype->getInterfaceType();
-          auto contextType = archetypeEnv->mapTypeIntoContext(interfaceType);
+          auto contextType = archetypeEnv->mapTypeIntoEnvironment(interfaceType);
 
           if (!contextType->isEqual(archetype)) {
             Out << "Archetype " << archetype->getString() << " does not appear"
@@ -1101,7 +1101,7 @@ public:
 
       if (auto *FD = dyn_cast<FuncDecl>(func)) {
         resultType = FD->getResultInterfaceType();
-        resultType = FD->mapTypeIntoContext(resultType);
+        resultType = FD->mapTypeIntoEnvironment(resultType);
         hasInOutResult = FD->getInterfaceType()
                              ->castTo<AnyFunctionType>()
                              ->getExtInfo()
@@ -2508,6 +2508,24 @@ public:
       verifyCheckedBase(E);
     }
 
+    void verifyChecked(BorrowExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying BorrowExpr", E);
+
+      auto toType = E->getType();
+      auto fromType = E->getSubExpr()->getType();
+
+      // FIXME: doesStorageProduceLValue should not return false for a 'let',
+      //   so that you can borrow from it.
+      if (!fromType->hasLValueType())
+        error("borrow source must be an l-value", E);
+
+      // Result type can be either l-value or r-value.
+      // Ensure underlying type matches.
+      if (fromType->getRValueType()->getCanonicalType() !=
+          toType->getRValueType()->getCanonicalType())
+        error("borrow should not be performing a cast", E);
+    }
+
     void verifyChecked(ABISafeConversionExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verify ABISafeConversionExpr", E);
 
@@ -3239,7 +3257,7 @@ public:
     void verifyParsed(DestructorDecl *DD) {
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
-      if (DD->isGeneric()) {
+      if (DD->hasGenericParamList()) {
         Out << "DestructorDecl cannot be generic";
         abort();
       }

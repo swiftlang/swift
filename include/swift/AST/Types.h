@@ -372,6 +372,8 @@ enum class TypeMatchFlags {
   IgnoreSendability = 1 << 7,
   /// Ignore global actor isolation attributes on functions when matching types.
   IgnoreFunctionGlobalActorIsolation = 1 << 8,
+  /// Require parameter labels to match.
+  RequireMatchingParameterLabels = 1 << 9,
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
@@ -840,7 +842,7 @@ public:
   Type addCurriedSelfType(const DeclContext *dc);
 
   /// Map a contextual type to an interface type.
-  Type mapTypeOutOfContext();
+  Type mapTypeOutOfEnvironment();
 
   /// Compute and return the set of type variables that occur within this
   /// type.
@@ -1109,9 +1111,6 @@ public:
 
   /// Check if this is a ObjCBool type from the Objective-C module.
   bool isObjCBool();
-
-  /// Check if this is a std.string type from C++.
-  bool isCxxString();
 
   /// Check if this is the type Unicode.Scalar from the Swift standard library.
   bool isUnicodeScalar();
@@ -4772,8 +4771,8 @@ public:
     return getWithInterfaceType(fn(getInterfaceType()));
   }
 
-  SILParameterInfo mapTypeOutOfContext() const {
-    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
+  SILParameterInfo mapTypeOutOfEnvironment() const {
+    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfEnvironment()
                                                   ->getCanonicalType());
   }
 
@@ -5045,8 +5044,8 @@ public:
     return getWithInterfaceType(fn(getInterfaceType()));
   }
 
-  SILResultInfo mapTypeOutOfContext() const {
-    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
+  SILResultInfo mapTypeOutOfEnvironment() const {
+    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfEnvironment()
                                                   ->getCanonicalType());
   }
 
@@ -5112,8 +5111,8 @@ public:
     return getWithInterfaceType(fn(getInterfaceType()));
   }
 
-  SILYieldInfo mapTypeOutOfContext() const {
-    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfContext()
+  SILYieldInfo mapTypeOutOfEnvironment() const {
+    return getWithInterfaceType(getInterfaceType()->mapTypeOutOfEnvironment()
                                                   ->getCanonicalType());
   }
 

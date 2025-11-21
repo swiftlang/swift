@@ -93,6 +93,7 @@
 #include "clang/Serialization/ObjectFilePCHContainerReader.h"
 #include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "clang/Tooling/DependencyScanning/ScanAndUpdateArgs.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -1197,9 +1198,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     // compiler can be more efficient to compute swift cache key without having
     // the knowledge about clang command-line options.
     if (ctx.CASOpts.EnableCaching || ctx.CASOpts.ImportModuleFromCAS) {
-      CI->getCASOpts().CASPath = ctx.CASOpts.Config.CASPath;
-      CI->getCASOpts().PluginPath = ctx.CASOpts.Config.PluginPath;
-      CI->getCASOpts().PluginOptions = ctx.CASOpts.Config.PluginOptions;
+      CI->getCASOpts() = ctx.CASOpts.CASOpts;
       // When clangImporter is used to compile (generate .pcm or .pch), need to
       // inherit the include tree from swift args (last one wins) and clear the
       // input file.
@@ -4363,6 +4362,9 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
   FEOpts.IncludeTimestamps = false;
   FEOpts.ModuleMapFiles.clear();
 
+  // APINotesOptions.
+  instance.getAPINotesOpts().ModuleSearchPaths.clear();
+
   // IndexStorePath is forwarded from swift.
   FEOpts.IndexStorePath.clear();
 
@@ -4759,8 +4761,10 @@ void ClangImporter::Implementation::getMangledName(
     auto ctorGlobalDecl =
         clang::GlobalDecl(ctor, clang::CXXCtorType::Ctor_Complete);
     mangler->mangleCXXName(ctorGlobalDecl, os);
-  } else {
+  } else if (mangler->shouldMangleDeclName(clangDecl)) {
     mangler->mangleName(clangDecl, os);
+  } else {
+    os << clangDecl->getName();
   }
 }
 
@@ -6230,7 +6234,7 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
                              AbstractStorageDecl *baseClassVar) {
   auto &ctx = declContext->getASTContext();
   auto computedType = computedVar->getInterfaceType();
-  auto contextTy = declContext->mapTypeIntoContext(computedType);
+  auto contextTy = declContext->mapTypeIntoEnvironment(computedType);
 
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types, unless the base accessor returns it by value.
@@ -6385,7 +6389,7 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
 
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
     auto contextTy =
-        newContext->mapTypeIntoContext(subscript->getElementInterfaceType());
+        newContext->mapTypeIntoEnvironment(subscript->getElementInterfaceType());
     // Subscripts that return non-copyable types are not yet supported.
     // See: https://github.com/apple/swift/issues/70047.
     if (contextTy->isNoncopyable())
@@ -8322,39 +8326,16 @@ bool importer::isViewType(const clang::CXXRecordDecl *decl) {
   return !hasOwnedValueAttr(decl) && hasPointerInSubobjects(decl);
 }
 
-const clang::CXXConstructorDecl *
-importer::findCopyConstructor(const clang::CXXRecordDecl *decl) {
-  for (auto ctor : decl->ctors()) {
-    if (ctor->isCopyConstructor() &&
-        // FIXME: Support default arguments (rdar://142414553)
-        ctor->getNumParams() == 1 && ctor->getAccess() == clang::AS_public &&
-        !ctor->isDeleted() && !ctor->isIneligibleOrNotSelected())
-      return ctor;
-  }
-  return nullptr;
-}
+static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
+  if (decl->hasSimpleCopyConstructor())
+    return true;
 
-static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl,
-                                  ClangImporter::Implementation *importerImpl) {
-  if (!decl->hasSimpleCopyConstructor()) {
-    auto *copyCtor = findCopyConstructor(decl);
-    if (!copyCtor)
-      return false;
-
-    if (!copyCtor->isDefaulted())
-      return true;
-  }
-
-  // If the copy constructor is defaulted or implicitly declared, we should only
-  // import the type as copyable if all its fields are also copyable
-  // FIXME: we should also look at the bases
-  return llvm::none_of(decl->fields(), [&](clang::FieldDecl *field) {
-    if (const auto *rd = field->getType()->getAsRecordDecl()) {
-      return (!field->getType()->isReferenceType() &&
-              !field->getType()->isPointerType() &&
-              recordHasMoveOnlySemantics(rd, importerImpl));
-    }
-    return false;
+  return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+    return ctor->isCopyConstructor() && !ctor->isDeleted() &&
+           !ctor->isIneligibleOrNotSelected() &&
+           // FIXME: Support default arguments (rdar://142414553)
+           ctor->getNumParams() == 1 &&
+           ctor->getAccess() == clang::AccessSpecifier::AS_public;
   });
 }
 
@@ -8553,8 +8534,8 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
     return CxxValueSemanticsKind::Copyable;
   }
 
-  bool isCopyable = !hasNonCopyableAttr(cxxRecordDecl) &&
-                    hasCopyTypeOperations(cxxRecordDecl, importerImpl);
+  bool isCopyable = !hasNonCopyableAttr(cxxRecordDecl) && 
+                    hasCopyTypeOperations(cxxRecordDecl);
   bool isMovable = hasMoveTypeOperations(cxxRecordDecl);
 
   if (!hasDestroyTypeOperations(cxxRecordDecl) || (!isCopyable && !isMovable)) {
@@ -8724,57 +8705,7 @@ SourceLoc swift::extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc) {
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           ClangTypeExplicitSafetyDescriptor desc) {
-  auto qt = static_cast<clang::QualType>(desc.type);
-  out << "Checking if type '" << qt.getAsString() << "' is explicitly safe.\n";
-}
-
-SourceLoc swift::extractNearestSourceLoc(ClangTypeExplicitSafetyDescriptor desc) {
-  return SourceLoc();
-}
-
-ExplicitSafety ClangTypeExplicitSafety::evaluate(
-    Evaluator &evaluator, ClangTypeExplicitSafetyDescriptor desc) const {
-  auto clangType = static_cast<clang::QualType>(desc.type);
-
-  // Handle pointers.
-  auto pointeeType = clangType->getPointeeType();
-  if (!pointeeType.isNull()) {
-    // Function pointers are okay.
-    if (pointeeType->isFunctionType())
-      return ExplicitSafety::Safe;
-
-    // Pointers to record types are okay if they come in as foreign reference
-    // types.
-    if (auto *recordDecl = pointeeType->getAsRecordDecl()) {
-      if (hasImportAsRefAttr(recordDecl))
-        return ExplicitSafety::Safe;
-    }
-
-    // All other pointers are considered unsafe.
-    return ExplicitSafety::Unsafe;
-  }
-
-  // Handle records recursively.
-  if (auto recordDecl = clangType->getAsTagDecl()) {
-    // If we reached this point the types is not imported as a shared reference,
-    // so we don't need to check the bases whether they are shared references.
-    auto req = ClangDeclExplicitSafety({recordDecl, false});
-    if (evaluator.hasActiveRequest(req))
-      // Cycles are allowed in templates, e.g.:
-      //   template <typename>   class Foo { ... }; // throws away template arg
-      //   template <typename T> class Bar : Foo<Bar<T>> { ... };
-      // We need to avoid them here.
-      return ExplicitSafety::Unspecified;
-    return evaluateOrDefault(evaluator, req, ExplicitSafety::Unspecified);
-  }
-
-  // Everything else is safe.
-  return ExplicitSafety::Safe;
-}
-
-void swift::simple_display(llvm::raw_ostream &out,
-                           CxxDeclExplicitSafetyDescriptor desc) {
+                           ClangDeclExplicitSafetyDescriptor desc) {
   out << "Checking if '";
   if (auto namedDecl = dyn_cast<clang::NamedDecl>(desc.decl))
     out << namedDecl->getNameAsString();
@@ -8783,7 +8714,7 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "' is explicitly safe.\n";
 }
 
-SourceLoc swift::extractNearestSourceLoc(CxxDeclExplicitSafetyDescriptor desc) {
+SourceLoc swift::extractNearestSourceLoc(ClangDeclExplicitSafetyDescriptor desc) {
   return SourceLoc();
 }
 
@@ -8842,96 +8773,132 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   return {CustomRefCountingOperationResult::tooManyFound, nullptr, name};
 }
 
-/// Check whether the given Clang type involves an unsafe type.
-static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
-  auto req = ClangTypeExplicitSafety({clangType});
-  if (evaluator.hasActiveRequest(req))
-    // If there is a cycle in a type, assume ExplicitSafety is Unspecified,
-    // i.e., not unsafe:
-    return false;
-  return evaluateOrDefault(evaluator, req, ExplicitSafety::Unspecified) ==
-         ExplicitSafety::Unsafe;
-}
-
-ExplicitSafety
-ClangDeclExplicitSafety::evaluate(Evaluator &evaluator,
-                                  CxxDeclExplicitSafetyDescriptor desc) const {
+ExplicitSafety ClangDeclExplicitSafety::evaluate(
+    Evaluator &evaluator, ClangDeclExplicitSafetyDescriptor desc) const {
   // FIXME: Also similar to hasPointerInSubobjects
   // FIXME: should probably also subsume IsSafeUseOfCxxDecl
-  
-  // Explicitly unsafe.
-  auto decl = desc.decl;
-  if (hasSwiftAttribute(decl, "unsafe"))
-    return ExplicitSafety::Unsafe;
-  
-  // Explicitly safe.
-  if (hasSwiftAttribute(decl, "safe"))
-    return ExplicitSafety::Safe;
 
-  // Shared references are considered safe.
   if (desc.isClass)
-    return ExplicitSafety::Safe;
+    // Safety for class types is handled a bit differently than other types.
+    // If it is not explicitly marked unsafe, it is always explicitly safe.
+    return hasSwiftAttribute(desc.decl, "unsafe") ? ExplicitSafety::Unsafe
+                                                  : ExplicitSafety::Safe;
 
-  // Enums are always safe.
-  if (isa<clang::EnumDecl>(decl))
-    return ExplicitSafety::Safe;
+  // Clang record types are considered explicitly unsafe if any of their fields,
+  // base classes, and template type parameters are unsafe. We use a stack for
+  // this recursive traversal.
+  //
+  // Invariant: if any Decl in the stack is unsafe, then desc.decl is unsafe.
+  llvm::SmallVector<const clang::Decl *, 4> stack;
 
-  // If it's not a record, leave it unspecified.
-  auto recordDecl = dyn_cast<clang::RecordDecl>(decl);
-  if (!recordDecl)
-    return ExplicitSafety::Unspecified;
+  // Keep track of which Decls we've seen to avoid cycles.
+  llvm::SmallDenseSet<const clang::Decl *, 4> seen;
 
-  // Escapable and non-escapable annotations imply that the declaration is
-  // safe.
-  if (evaluateOrDefault(
-          evaluator,
-          ClangTypeEscapability({recordDecl->getTypeForDecl(), nullptr}),
-          CxxEscapability::Unknown) != CxxEscapability::Unknown)
-    return ExplicitSafety::Safe;
+  // Check whether a type is unsafe. This function may also push to the stack.
+  auto isUnsafe = [&](clang::QualType type) -> bool {
+    auto pointeeType = type->getPointeeType();
+    if (!pointeeType.isNull()) {
+      if (pointeeType->isFunctionType())
+        return false; // Function pointers are not unsafe
+      auto *recordDecl = pointeeType->getAsRecordDecl();
+      if (recordDecl && hasImportAsRefAttr(recordDecl))
+        return false; // Pointers are ok if imported as foreign reference types
+      return true; // All other pointers are considered unsafe.
+    }
+    if (auto *decl = type->getAsTagDecl()) {
+      // We need to check the safety of the TagDecl corresponding to this type
+      if (seen.insert(decl).second)
+        // Only visit decl if we have not seen it before, to avoid cycles
+        stack.push_back(decl);
+    }
+    return false; // This type does not look unsafe on its own
+  };
 
-  // A template class is unsafe if any of its type arguments are unsafe.
-  // Note that this does not rely on the record being defined.
-  if (const auto *ctsd =
-          dyn_cast<clang::ClassTemplateSpecializationDecl>(recordDecl)) {
-    for (auto arg : ctsd->getTemplateArgs().asArray()) {
-      switch (arg.getKind()) {
-      case clang::TemplateArgument::Type:
-        if (hasUnsafeType(evaluator, arg.getAsType()))
-          return ExplicitSafety::Unsafe;
-        break;
-      case clang::TemplateArgument::Pack:
-        for (auto pkArg : arg.getPackAsArray()) {
-          if (pkArg.getKind() == clang::TemplateArgument::Type &&
-              hasUnsafeType(evaluator, pkArg.getAsType()))
+  stack.push_back(desc.decl);
+  seen.insert(desc.decl);
+  while (!stack.empty()) {
+    const clang::Decl *decl = stack.back();
+    stack.pop_back();
+
+    // Found unsafe; whether decl == desc.decl or not, desc.decl is unsafe
+    // (see invariant, above)
+    if (hasSwiftAttribute(decl, "unsafe"))
+      return ExplicitSafety::Unsafe;
+
+    if (hasSwiftAttribute(decl, "safe"))
+      continue;
+
+    // Enums are always safe
+    if (isa<clang::EnumDecl>(decl))
+      continue;
+
+    auto *recordDecl = dyn_cast<clang::RecordDecl>(decl);
+    if (!recordDecl) {
+      if (decl == desc.decl)
+        // If desc.decl is not a RecordDecl or EnumDecl, safety is unspecified.
+        return ExplicitSafety::Unspecified;
+      // If we encountered non-Record non-Enum decl during recursive traversal,
+      // we need to continue checking safety of other decls.
+      continue;
+    }
+
+    // Escapability annotations imply that the declaration is safe
+    if (evaluateOrDefault(
+            evaluator,
+            ClangTypeEscapability({recordDecl->getTypeForDecl(), nullptr}),
+            CxxEscapability::Unknown) != CxxEscapability::Unknown)
+      continue;
+
+    // A template class is unsafe if any of its type arguments are unsafe.
+    // Note that this does not rely on the record being defined.
+    if (auto *specDecl =
+            dyn_cast<clang::ClassTemplateSpecializationDecl>(recordDecl)) {
+      for (auto arg : specDecl->getTemplateArgs().asArray()) {
+        switch (arg.getKind()) {
+        case clang::TemplateArgument::Type:
+          if (isUnsafe(arg.getAsType()))
             return ExplicitSafety::Unsafe;
+          break;
+        case clang::TemplateArgument::Pack:
+          for (auto pkArg : arg.getPackAsArray()) {
+            if (pkArg.getKind() == clang::TemplateArgument::Type &&
+                isUnsafe(pkArg.getAsType()))
+              return ExplicitSafety::Unsafe;
+          }
+          break;
+        default:
+          continue;
         }
-        break;
-      default:
-        continue;
       }
     }
-  }
-  
-  // If we don't have a definition, leave it unspecified.
-  recordDecl = recordDecl->getDefinition();
-  if (!recordDecl)
-    return ExplicitSafety::Unspecified;
-  
-  // If this is a C++ class, check its bases.
-  if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl)) {
-    for (auto base : cxxRecordDecl->bases()) {
-      if (hasUnsafeType(evaluator, base.getType()))
+
+    recordDecl = recordDecl->getDefinition();
+    if (!recordDecl) {
+      if (decl == desc.decl)
+        // If desc.decl doesn't have a definition, safety is unspecified.
+        return ExplicitSafety::Unspecified;
+      // If we encountered decl without definition during recursive traversal,
+      // we need to continue checking safety of other decls.
+      continue;
+    }
+
+    if (auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl)) {
+      for (auto base : cxxRecordDecl->bases()) {
+        if (isUnsafe(base.getType()))
+          return ExplicitSafety::Unsafe;
+      }
+    }
+
+    for (auto *field : recordDecl->fields()) {
+      if (isUnsafe(field->getType()))
         return ExplicitSafety::Unsafe;
     }
   }
 
-  // Check the fields.
-  for (auto field : recordDecl->fields()) {
-    if (hasUnsafeType(evaluator, field->getType()))
-      return ExplicitSafety::Unsafe;
-  }
-
-  // Okay, call it safe.
+  // desc.decl isn't explicitly marked unsafe, and none of the types/decls
+  // reachable from desc.decl are considered unsafe either. Cases where we would
+  // consider desc.decl's safety unspecified should have returned early from the
+  // loop. Thus, we can conclude that desc.decl is safe.
   return ExplicitSafety::Safe;
 }
 

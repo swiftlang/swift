@@ -593,7 +593,7 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
       } else if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
         if (isa<ProtocolDecl>(typeDecl->getDeclContext()) &&
             getStage() == TypeResolutionStage::Structural) {
-          if (aliasDecl && !aliasDecl->isGeneric()) {
+          if (aliasDecl && !aliasDecl->hasGenericParamList()) {
             return adjustAliasType(aliasDecl->getStructuralType());
           }
         }
@@ -684,7 +684,7 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
       if (contextSig) {
         // Avoid building this generic environment unless we need it.
         auto *genericEnv = contextSig.getGenericEnvironment();
-        return genericEnv->mapTypeIntoContext(result);
+        return genericEnv->mapTypeIntoEnvironment(result);
       }
     }
     return result;
@@ -1298,7 +1298,7 @@ Type TypeResolution::applyUnboundGenericArguments(
     if (result->hasTypeParameter()) {
       if (const auto contextSig = getGenericSignature()) {
         auto *genericEnv = contextSig.getGenericEnvironment();
-        // FIXME: This should just use mapTypeIntoContext(), but we can't yet
+        // FIXME: This should just use mapTypeIntoEnvironment(), but we can't yet
         // because we sometimes have type parameters here that are invalid for
         // our generic signature. This can happen if the type parameter was
         // found via unqualified lookup, but the current context's
@@ -1791,7 +1791,7 @@ static void diagnoseGenericArgumentsOnSelf(const TypeResolution &resolution,
 
   diags.diagnose(repr->getNameLoc(), diag::cannot_specialize_self);
 
-  if (selfNominal->isGeneric() && !isa<ProtocolDecl>(selfNominal)) {
+  if (selfNominal->hasGenericParamList() && !isa<ProtocolDecl>(selfNominal)) {
     diags
         .diagnose(repr->getNameLoc(), diag::specialize_explicit_type_instead,
                   declaredType)
@@ -2660,7 +2660,7 @@ Type TypeResolution::resolveContextualType(
       packElementOpener, requirementOpener);
   const auto ty = resolution.resolveType(TyR, silContext);
 
-  return GenericEnvironment::mapTypeIntoContext(
+  return GenericEnvironment::mapTypeIntoEnvironment(
       resolution.getGenericSignature().getGenericEnvironment(), ty);
 }
 
@@ -2769,7 +2769,7 @@ bool swift::diagnoseMissingOwnership(ParamSpecifier ownership,
 
   // The parameter type is written with respect to the surrounding
   // generic environment.
-  ty = GenericEnvironment::mapTypeIntoContext(
+  ty = GenericEnvironment::mapTypeIntoEnvironment(
              resolution.getGenericSignature().getGenericEnvironment(),
              ty);
 
@@ -3125,7 +3125,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
         },
         LookUpConformanceInModule());
 
-    archetypeType = env->mapTypeIntoContext(interfaceType);
+    archetypeType = env->mapTypeIntoEnvironment(interfaceType);
     ASSERT(archetypeType->is<ExistentialArchetypeType>());
   }
 
@@ -4468,7 +4468,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       thrownTy = Type();
     } else if (inStage(TypeResolutionStage::Interface) &&
                !options.contains(TypeResolutionFlags::SilenceErrors)) {
-      auto thrownTyInContext = GenericEnvironment::mapTypeIntoContext(
+      auto thrownTyInContext = GenericEnvironment::mapTypeIntoEnvironment(
         resolution.getGenericSignature().getGenericEnvironment(), thrownTy);
       if (!checkConformance(thrownTyInContext, ctx.getErrorDecl())) {
         diagnoseInvalid(
@@ -4851,7 +4851,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
     // Only once we've done all the necessary substitutions, map the type
     // into the function's environment.
-    selfType = GenericEnvironment::mapTypeIntoContext(
+    selfType = GenericEnvironment::mapTypeIntoEnvironment(
         genericSig.getGenericEnvironment(), selfType);
 
     // The Self type can be nested in a few layers of metatypes (etc.).
@@ -5412,14 +5412,14 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
     unwrappedType = wrappedOptionalType;
   }
 
-  if (auto dynamicSelfType = dyn_cast<DynamicSelfType>(unwrappedType)) {
+  if (auto *dynamicSelfType = unwrappedType->getAs<DynamicSelfType>()) {
     unwrappedType = dynamicSelfType->getSelfType();
   }
 
   if (inStage(TypeResolutionStage::Interface) &&
       !options.is(TypeResolverContext::Inherited)) {
     if (auto *env = resolution.getGenericSignature().getGenericEnvironment())
-      unwrappedType = env->mapTypeIntoContext(unwrappedType);
+      unwrappedType = env->mapTypeIntoEnvironment(unwrappedType);
 
     if (!unwrappedType->isAnyActorType() && !unwrappedType->hasError()) {
       diagnoseInvalid(
@@ -5851,7 +5851,7 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
   // do not allow move-only types as the element of a vararg
   // FIXME: This does not correctly handle type variables and unbound generics.
   if (inStage(TypeResolutionStage::Interface)) {
-    auto contextTy = GenericEnvironment::mapTypeIntoContext(
+    auto contextTy = GenericEnvironment::mapTypeIntoEnvironment(
         resolution.getGenericSignature().getGenericEnvironment(), element);
     if (!contextTy->hasError() && contextTy->isNoncopyable()) {
       diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_variadic,
@@ -6000,7 +6000,7 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
   // Open the pack reference to an element archetype if requested.
   if (auto openPackElement = resolution.getPackElementOpener()) {
     auto *env = resolution.getGenericSignature().getGenericEnvironment();
-    return openPackElement(env->mapTypeIntoContext(packReference), repr);
+    return openPackElement(env->mapTypeIntoEnvironment(packReference), repr);
   }
 
   return packReference;
@@ -6044,7 +6044,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
         !ty->hasUnboundGenericType() &&
         !ty->hasTypeVariable() &&
         !isa<TupleTypeRepr>(tyR)) {
-      auto contextTy = GenericEnvironment::mapTypeIntoContext(
+      auto contextTy = GenericEnvironment::mapTypeIntoEnvironment(
           resolution.getGenericSignature().getGenericEnvironment(), ty);
       if (!contextTy->hasError() && contextTy->isNoncopyable())
         moveOnlyElementIndex = i;
@@ -6481,7 +6481,7 @@ Type TypeChecker::substMemberTypeWithBase(TypeDecl *member,
 
   auto *aliasDecl = dyn_cast<TypeAliasDecl>(member);
   if (aliasDecl) {
-    if (aliasDecl->isGeneric()) {
+    if (aliasDecl->hasGenericParamList()) {
       return UnboundGenericType::get(
           aliasDecl, baseTy,
           aliasDecl->getASTContext());

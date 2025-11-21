@@ -726,12 +726,13 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
       bool foundMatch = false;
       if (auto *varDecl = dyn_cast<VarDecl>(value)) {
         // Check if the name matches any auxiliary decls not in the AST
-        varDecl->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
-          if (auxiliaryVar->ValueDecl::getName().matchesRef(fullName)) {
-            value = auxiliaryVar;
-            foundMatch = true;
-          }
-        });
+        varDecl->visitAuxiliaryVars(
+            /*forNameLookup*/ true, [&](VarDecl *auxiliaryVar) {
+              if (auxiliaryVar->ValueDecl::getName().matchesRef(fullName)) {
+                value = auxiliaryVar;
+                foundMatch = true;
+              }
+            });
       }
 
       if (!foundMatch)
@@ -938,13 +939,14 @@ public:
       bool foundMatch = false;
       if (auto *varDecl = dyn_cast<VarDecl>(value)) {
         // Check if the name matches any auxiliary decls not in the AST
-        varDecl->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
-          if (name.isSimpleName(auxiliaryVar->getName())
-                && hasCorrectABIRole(auxiliaryVar)) {
-            results.push_back(auxiliaryVar);
-            foundMatch = true;
-          }
-        });
+        varDecl->visitAuxiliaryVars(
+            /*forNameLookup*/ true, [&](VarDecl *auxiliaryVar) {
+              if (name.isSimpleName(auxiliaryVar->getName()) &&
+                  hasCorrectABIRole(auxiliaryVar)) {
+                results.push_back(auxiliaryVar);
+                foundMatch = true;
+              }
+            });
       }
 
       if (!foundMatch && value->getName().matchesRef(name.getFullName())

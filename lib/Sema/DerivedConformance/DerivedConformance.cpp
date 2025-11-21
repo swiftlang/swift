@@ -99,8 +99,6 @@ bool DerivedConformance::derivesProtocolConformance(
   if (*derivableKind == KnownDerivableProtocolKind::Actor)
     return canDeriveActor(DC, Nominal);
 
-  if (*derivableKind == KnownDerivableProtocolKind::Identifiable)
-    return canDeriveIdentifiable(Nominal, DC);
   if (*derivableKind == KnownDerivableProtocolKind::DistributedActor)
     return canDeriveDistributedActor(Nominal, DC);
   if (*derivableKind == KnownDerivableProtocolKind::DistributedActorSystem)
@@ -193,7 +191,7 @@ DerivedConformance::storedPropertiesNotConformingToProtocol(
     if (!type)
       nonconformingProperties.push_back(propertyDecl);
 
-    if (!checkConformance(DC->mapTypeIntoContext(type), protocol)) {
+    if (!checkConformance(DC->mapTypeIntoEnvironment(type), protocol)) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -352,14 +350,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
         return getRequirement(KnownProtocolKind::Actor);
       }
     }
-
-    // DistributedActor.id
-    if (name.isSimpleName(ctx.Id_id))
-      return getRequirement(KnownProtocolKind::DistributedActor);
-
-    // DistributedActor.actorSystem
-    if (name.isSimpleName(ctx.Id_actorSystem))
-      return getRequirement(KnownProtocolKind::DistributedActor);
 
     return nullptr;
   }
@@ -573,7 +563,7 @@ DerivedConformance::declareDerivedProperty(SynthesizedIntroducer intro,
   propDecl->setInterfaceType(propertyInterfaceType);
 
   auto propertyContextType =
-      getConformanceContext()->mapTypeIntoContext(propertyInterfaceType);
+      getConformanceContext()->mapTypeIntoEnvironment(propertyInterfaceType);
 
   Pattern *propPat =
       NamedPattern::createImplicit(Context, propDecl, propertyContextType);
@@ -840,7 +830,7 @@ DerivedConformance::associatedValuesNotConformingToProtocol(
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (checkConformance(DC->mapTypeIntoContext(type), protocol).isInvalid()) {
+      if (checkConformance(DC->mapTypeIntoEnvironment(type), protocol).isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }

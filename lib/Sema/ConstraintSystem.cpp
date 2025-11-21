@@ -257,28 +257,11 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 
       // If the protocol has a default type, check it.
       if (auto defaultType = TypeChecker::getDefaultType(literalProtocol, DC)) {
-        auto isDefaultType = [&literalProtocol, &defaultType](Type type) {
-          // Treat `std.string` as a default type just like we do
-          // Swift standard library `String`. This helps to disambiguate
-          // operator overloads that use `std.string` vs. a custom C++
-          // type that conforms to `ExpressibleByStringLiteral` as well.
-          //
-          // This doesn't clash with String because inference won't attempt
-          // C++ types unless we discover them from a constraint and the
-          // optimizer and old hacks always prefer the actual default type.
-          if (literalProtocol->getKnownProtocolKind() ==
-                  KnownProtocolKind::ExpressibleByStringLiteral &&
-              type->isCxxString()) {
-            return true;
-          }
-
-          // Check whether the nominal types match. This makes sure that we
-          // properly handle Array vs. Array<T>.
-          return defaultType->getAnyNominal() == type->getAnyNominal();
-        };
-
-        if (!isDefaultType(type))
+        // Check whether the nominal types match. This makes sure that we
+        // properly handle Array vs. Array<T>.
+        if (defaultType->getAnyNominal() != type->getAnyNominal()) {
           increaseScore(SK_NonDefaultLiteral, locator);
+        }
       }
 
       break;
@@ -549,7 +532,7 @@ Type ConstraintSystem::getExplicitCaughtErrorType(CatchNode catchNode) {
   // If there is an explicit caught type for this node, use it.
   if (Type explicitCaughtType = catchNode.getExplicitCaughtType(ctx)) {
     if (explicitCaughtType->hasTypeParameter())
-      explicitCaughtType = DC->mapTypeIntoContext(explicitCaughtType);
+      explicitCaughtType = DC->mapTypeIntoEnvironment(explicitCaughtType);
 
     return explicitCaughtType;
   }
@@ -677,52 +660,12 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, newPath);
 }
 
-ConstraintLocator *ConstraintSystem::getImplicitValueConversionLocator(
-    ConstraintLocatorBuilder root, ConversionRestrictionKind restriction) {
-  SmallVector<LocatorPathElt, 4> path;
-  auto anchor = root.getLocatorParts(path);
-  {
-    if (isExpr<DictionaryExpr>(anchor) && path.size() > 1) {
-      // Drop everything except for first `tuple element #`.
-      path.pop_back_n(path.size() - 1);
-    }
-
-    // Drop any value-to-optional conversions that were applied along the
-    // way to reach this one.
-    while (!path.empty()) {
-      if (path.back().is<LocatorPathElt::OptionalInjection>()) {
-        path.pop_back();
-        continue;
-      }
-      break;
-    }
-
-    // If conversion is for a tuple element, let's drop `TupleType`
-    // components from the path since they carry information for
-    // diagnostics that `ExprRewriter` won't be able to re-construct
-    // during solution application.
-    if (!path.empty() && path.back().is<LocatorPathElt::TupleElement>()) {
-      path.erase(llvm::remove_if(path,
-                                 [](const LocatorPathElt &elt) {
-                                   return elt.is<LocatorPathElt::TupleType>();
-                                 }),
-                 path.end());
-    }
-  }
-
-  return getConstraintLocator(/*base=*/getConstraintLocator(anchor, path),
-                              LocatorPathElt::ImplicitConversion(restriction));
-}
-
 ConstraintLocator *ConstraintSystem::getCalleeLocator(
     ConstraintLocator *locator, bool lookThroughApply,
     llvm::function_ref<Type(Expr *)> getType,
     llvm::function_ref<Type(Type)> simplifyType,
     llvm::function_ref<std::optional<SelectedOverload>(ConstraintLocator *)>
         getOverloadFor) {
-  if (locator->findLast<LocatorPathElt::ImplicitConversion>())
-    return locator;
-
   auto anchor = locator->getAnchor();
   auto path = locator->getPath();
   {
@@ -1244,72 +1187,63 @@ TypeVariableType *ConstraintSystem::isRepresentativeFor(
   return *member;
 }
 
-static std::optional<std::pair<VarDecl *, Type>>
-getPropertyWrapperInformationFromOverload(
-    SelectedOverload resolvedOverload, DeclContext *DC,
-    llvm::function_ref<std::optional<std::pair<VarDecl *, Type>>(VarDecl *)>
-        getInformation) {
-  if (auto *decl =
-          dyn_cast_or_null<VarDecl>(resolvedOverload.choice.getDeclOrNull())) {
-    if (auto declInformation = getInformation(decl)) {
-      Type type;
-      VarDecl *memberDecl;
-      std::tie(memberDecl, type) = *declInformation;
-      if (Type baseType = resolvedOverload.choice.getBaseType()) {
-        type = baseType->getRValueType()->getTypeOfMember(memberDecl, type);
-      }
-      return std::make_pair(decl, type);
-    }
+static Type getPropertyWrapperTypeFromOverload(
+    ConstraintSystem &cs, SelectedOverload resolvedOverload,
+    llvm::function_ref<VarDecl *(VarDecl *)> getWrapperVar) {
+  auto *D = dyn_cast_or_null<VarDecl>(resolvedOverload.choice.getDeclOrNull());
+  if (!D)
+    return Type();
+
+  auto *wrapperVar = getWrapperVar(D);
+  if (!wrapperVar)
+    return Type();
+
+  // First check to see if we have a type for this wrapper variable, which will
+  // the case for e.g local wrappers in closures.
+  if (auto ty = cs.getTypeIfAvailable(wrapperVar))
+    return ty;
+
+  // If we don't have a type for the wrapper variable this shouldn't be a
+  // VarDecl we're solving for.
+  ASSERT(!cs.hasType(D) && "Should have recorded type for wrapper var");
+
+  // For the backing property we need to query the request to ensure it kicks
+  // type-checking if necessary. Otherwise we can query the interface type.
+  auto ty = wrapperVar == D->getPropertyWrapperBackingProperty()
+                ? D->getPropertyWrapperBackingPropertyType()
+                : wrapperVar->getInterfaceType();
+  if (!ty)
+    return Type();
+
+  // If this is a for a property, substitute the base type. Otherwise we have
+  // a local property wrapper and need to map the resulting type into context.
+  if (auto baseType = resolvedOverload.choice.getBaseType()) {
+    ty = baseType->getRValueType()->getTypeOfMember(wrapperVar, ty);
+  } else {
+    ty = cs.DC->mapTypeIntoEnvironment(ty);
   }
-  return std::nullopt;
+  return ty;
 }
 
-std::optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getPropertyWrapperProjectionInfo(
+Type ConstraintSystem::getPropertyWrapperProjectionType(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrapperInformationFromOverload(
-      resolvedOverload, DC,
-      [](VarDecl *decl) -> std::optional<std::pair<VarDecl *, Type>> {
-        if (!decl->hasAttachedPropertyWrapper())
-          return std::nullopt;
-
-        auto projectionVar = decl->getPropertyWrapperProjectionVar();
-        if (!projectionVar)
-          return std::nullopt;
-
-        return std::make_pair(projectionVar,
-                              projectionVar->getInterfaceType());
-      });
+  return getPropertyWrapperTypeFromOverload(
+      *this, resolvedOverload,
+      [&](VarDecl *decl) { return decl->getPropertyWrapperProjectionVar(); });
 }
 
-std::optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getPropertyWrapperInformation(
+Type ConstraintSystem::getPropertyWrapperBackingType(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrapperInformationFromOverload(
-      resolvedOverload, DC,
-      [](VarDecl *decl) -> std::optional<std::pair<VarDecl *, Type>> {
-        if (!decl->hasAttachedPropertyWrapper())
-          return std::nullopt;
-
-        auto backingTy = decl->getPropertyWrapperBackingPropertyType();
-        if (!backingTy)
-          return std::nullopt;
-
-        return std::make_pair(decl, backingTy);
-      });
+  return getPropertyWrapperTypeFromOverload(
+      *this, resolvedOverload,
+      [](VarDecl *decl) { return decl->getPropertyWrapperBackingProperty(); });
 }
 
-std::optional<std::pair<VarDecl *, Type>>
-ConstraintSystem::getWrappedPropertyInformation(
+Type ConstraintSystem::getWrappedPropertyType(
     SelectedOverload resolvedOverload) {
-  return getPropertyWrapperInformationFromOverload(
-      resolvedOverload, DC,
-      [](VarDecl *decl) -> std::optional<std::pair<VarDecl *, Type>> {
-        if (auto wrapped = decl->getOriginalWrappedProperty())
-          return std::make_pair(decl, wrapped->getInterfaceType());
-
-        return std::nullopt;
-      });
+  return getPropertyWrapperTypeFromOverload(
+      *this, resolvedOverload,
+      [](VarDecl *decl) { return decl->getOriginalWrappedProperty(); });
 }
 
 void ConstraintSystem::addOverloadSet(Type boundType,
@@ -1922,7 +1856,7 @@ static Type replacePlaceholderType(PlaceholderType *placeholder,
   // logic work with ErrorTypes instead.
   if (forCompletion) {
     if (auto *GP = replacement->getAs<GenericTypeParamType>())
-      return GP->getDecl()->getInnermostDeclContext()->mapTypeIntoContext(GP);
+      return GP->getDecl()->getInnermostDeclContext()->mapTypeIntoEnvironment(GP);
   }
   // Return an ErrorType with the replacement as the original type. Note that
   // if we failed to replace a type variable with a generic parameter,
@@ -1935,7 +1869,7 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType,
   // If we've been asked for an interface type, start by mapping any archetypes
   // out of context.
   if (wantInterfaceType)
-    type = type->mapTypeOutOfContext();
+    type = type->mapTypeOutOfEnvironment();
 
   if (!type->hasTypeVariableOrPlaceholder())
     return type;
@@ -1949,7 +1883,7 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType,
         if (wantInterfaceType) {
           if (auto *gp = tvt->getImpl().getGenericParameter())
             return gp;
-          return getFixedType(tvt)->mapTypeOutOfContext();
+          return getFixedType(tvt)->mapTypeOutOfEnvironment();
         }
         return getFixedType(tvt);
       });
@@ -3590,12 +3524,13 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::LValueConversion:
+    case ConstraintLocator::OptionalInjection:
     case ConstraintLocator::DynamicType:
     case ConstraintLocator::UnresolvedMember:
     case ConstraintLocator::ImplicitCallAsFunction:
       // Arguments in autoclosure positions, lvalue and rvalue adjustments,
-      // unresolved members, and implicit callAsFunction references are
-      // implicit.
+      // optional injections, unresolved members, and implicit callAsFunction
+      // references are implicit.
       path = path.slice(1);
       continue;
 
@@ -3917,12 +3852,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
     }
 
-    case ConstraintLocator::ImplicitConversion:
-      break;
-
     case ConstraintLocator::Witness:
     case ConstraintLocator::WrappedValue:
-    case ConstraintLocator::OptionalInjection:
     case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
     case ConstraintLocator::FallbackType:
     case ConstraintLocator::KeyPathSubscriptIndex:
@@ -4072,9 +4003,6 @@ ConstraintSystem::getArgumentInfoLocator(ConstraintLocator *locator) {
   // An empty locator which code completion uses for member references.
   if (anchor.isNull() && locator->getPath().empty())
     return nullptr;
-
-  if (locator->findLast<LocatorPathElt::ImplicitConversion>())
-    return locator;
 
   // Applies and unresolved member exprs can have callee locators that are
   // dependent on the type of their function, which may not have been resolved
@@ -5102,7 +5030,7 @@ bool ConstraintSystem::isArgumentGenericFunction(Type argType, Expr *argExpr) {
       auto choice = selectedOverload->choice;
       if (auto func =
               dyn_cast_or_null<AbstractFunctionDecl>(choice.getDeclOrNull())) {
-        if (func->isGeneric())
+        if (func->hasGenericParamList())
           return true;
       }
 
@@ -5125,7 +5053,7 @@ bool ConstraintSystem::isArgumentGenericFunction(Type argType, Expr *argExpr) {
       continue;
 
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-      if (func->isGeneric())
+      if (func->hasGenericParamList())
         return true;
   }
 

@@ -1658,12 +1658,48 @@ public:
       require(lhs == rhs ||
               (lhs.isAddress() && lhs.getObjectType() == rhs) ||
               (DebugVarTy.isAddress() && lhs == rhs.getObjectType()) ||
-
               // When cloning SIL (e.g. in LoopUnroll) local archetypes are uniqued
               // and therefore distinct in cloned instructions.
               (lhs.hasLocalArchetype() && rhs.hasLocalArchetype()),
-              "Two variables with different type but same scope!");
+              "Two variables with different type but same scope");
     }
+
+    // Check that all inlined function arguments agree on their types.
+#ifdef EXPENSIVE_VERIFIER_CHECKS
+    if (unsigned ArgNo = varInfo->ArgNo)
+      if (varInfo->Scope)
+        if (SILFunction *Fn = varInfo->Scope->getInlinedFunction()) {
+          using ArgMap = llvm::StringMap<llvm::SmallVector<SILType, 8>>;
+          static ArgMap DebugArgs;
+          llvm::StringRef Key = Fn->getName();
+          if (!Key.empty()) {
+            auto [It, Inserted] = DebugArgs.insert({Key, {}});
+            auto &CachedArgs = It->second;
+            if (Inserted || (!Inserted && (CachedArgs.size() < ArgNo)) ||
+                (!Inserted && !CachedArgs[ArgNo - 1])) {
+              if (CachedArgs.size() < ArgNo)
+                CachedArgs.resize(ArgNo);
+              CachedArgs[ArgNo - 1] = DebugVarTy;
+            } else {
+              SILType CachedArg = CachedArgs[ArgNo - 1];
+              auto lhs = CachedArg.removingMoveOnlyWrapper();
+              auto rhs = DebugVarTy.removingMoveOnlyWrapper();
+              if (lhs != rhs) {
+                llvm::errs() << "***** " << varInfo->Name << "\n";
+                lhs.dump();
+                rhs.dump();
+                Fn->dump();
+              }
+              require(
+                  lhs == rhs ||
+                      (lhs.isAddress() && lhs.getObjectType() == rhs) ||
+                      (DebugVarTy.isAddress() && lhs == rhs.getObjectType()) ||
+                      (lhs.hasLocalArchetype() && rhs.hasLocalArchetype()),
+                  "Conflicting types for function argument!");
+            }
+          }
+        }
+#endif
 
     // Check debug info expression
     if (const auto &DIExpr = varInfo->DIExpr) {
@@ -2538,6 +2574,20 @@ public:
 
     if (builtinKind == BuiltinValueKind::ExtractFunctionIsolation) {
       require(false, "this builtin is pre-SIL-only");
+    }
+
+    if (builtinKind == BuiltinValueKind::FinishAsyncLet) {
+      requireType(BI->getType(), _object(_tuple()),
+                  "result of finishAsyncLet");
+      require(arguments.size() == 2, "finishAsyncLet requires two arguments");
+      requireType(arguments[0]->getType(), _object(_rawPointer),
+                  "first argument of finishAsyncLet");
+      requireType(arguments[1]->getType(), _object(_rawPointer),
+                  "second argument of finishAsyncLet");
+
+      require((bool)isBuiltinInst(arguments[0],
+                              BuiltinValueKind::StartAsyncLetWithLocalBuffer),
+              "first argument of finishAsyncLet must be a startAsyncLet");
     }
 
     // Validate all "SIL builtins" never show up as BuiltinInst since they
@@ -5332,7 +5382,7 @@ public:
     LLVM_DEBUG(RI->print(llvm::dbgs()));
 
     SILType functionResultType =
-        F.getLoweredType(F.mapTypeIntoContext(fnConv.getSILResultType(
+        F.getLoweredType(F.mapTypeIntoEnvironment(fnConv.getSILResultType(
                                                   F.getTypeExpansionContext()))
                              .getASTType())
             .getCategoryType(
@@ -5345,6 +5395,17 @@ public:
                instResultType.dump(););
     requireSameType(functionResultType, instResultType,
                     "return value type does not match return type of function");
+
+    // If the result type is an address, ensure it's base address is from a
+    // function argument.
+    if (F.getModule().getStage() >= SILStage::Canonical &&
+        functionResultType.isAddress()) {
+      auto base = getAccessBase(RI->getOperand());
+      require(!base->getType().isAddress() || isa<SILFunctionArgument>(base) ||
+                  isa<ApplyInst>(base) &&
+                      cast<ApplyInst>(base)->hasAddressResult(),
+              "unidentified address return");
+    }
   }
 
   void checkThrowInst(ThrowInst *TI) {
@@ -5354,7 +5415,7 @@ public:
             "throw in function that doesn't have an error result");
 
     SILType functionResultType =
-        F.getLoweredType(F.mapTypeIntoContext(fnConv.getSILErrorType(
+        F.getLoweredType(F.mapTypeIntoEnvironment(fnConv.getSILErrorType(
                                                   F.getTypeExpansionContext()))
                              .getASTType())
             .getCategoryType(fnConv.getSILErrorType(F.getTypeExpansionContext())
@@ -5383,7 +5444,7 @@ public:
     require(yieldedValues.size() == yieldInfos.size(),
             "wrong number of yielded values for function");
     for (auto i : indices(yieldedValues)) {
-      SILType yieldType = F.mapTypeIntoContext(
+      SILType yieldType = F.mapTypeIntoEnvironment(
           fnConv.getSILType(yieldInfos[i], F.getTypeExpansionContext()));
       requireSameType(yieldedValues[i]->getType(), yieldType,
                       "yielded value does not match yield type of coroutine");
@@ -6385,7 +6446,7 @@ public:
         auto interfaceTy = archetype->getInterfaceType();
         auto rootParamTy = interfaceTy->getRootGenericParam();
 
-        auto root = genericEnv->mapTypeIntoContext(
+        auto root = genericEnv->mapTypeIntoEnvironment(
             rootParamTy)->castTo<ElementArchetypeType>();
         auto it = allOpened.find(root->getCanonicalType());
         assert(it != allOpened.end());
@@ -6558,7 +6619,7 @@ public:
     auto argI = entry->args_begin();
 
     auto check = [&](const char *what, SILType ty) {
-      auto mappedTy = F.mapTypeIntoContext(ty);
+      auto mappedTy = F.mapTypeIntoEnvironment(ty);
       SILArgument *bbarg = *argI;
       ++argI;
       if (bbarg->getType() != mappedTy &&
@@ -7002,6 +7063,44 @@ public:
     };
   };
 
+  static bool isScopeInst(SILInstruction *i) {
+    if (isa<BeginAccessInst>(i) ||
+        isa<BeginApplyInst>(i) ||
+        isa<StoreBorrowInst>(i)) {
+      return true;
+    } else if (auto bi = dyn_cast<BuiltinInst>(i)) {
+      if (auto bk = bi->getBuiltinKind()) {
+        switch (*bk) {
+        case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
+          return true;
+
+        default:
+          return false;
+        }
+      }
+    }
+    return false;
+  }
+
+  static bool isScopeEndingInst(SILInstruction *i) {
+    if (isa<EndAccessInst>(i) ||
+        isa<AbortApplyInst>(i) ||
+        isa<EndApplyInst>(i)) {
+      return true;
+    } else if (auto bi = dyn_cast<BuiltinInst>(i)) {
+      if (auto bk = bi->getBuiltinKind()) {
+        switch (*bk) {
+        case BuiltinValueKind::FinishAsyncLet:
+          return true;
+
+        default:
+          return false;
+        }
+      }
+    }
+    return false;
+  }
+
   /// Verify the various control-flow-sensitive rules of SIL:
   ///
   /// - stack allocations and deallocations must obey a stack discipline
@@ -7078,14 +7177,11 @@ public:
               // The deallocation is printed out as the focus of the failure.
             });
           }
-        } else if (isa<BeginAccessInst>(i) || isa<BeginApplyInst>(i) ||
-                   isa<StoreBorrowInst>(i)) {
+        } else if (isScopeInst(&i)) {
           bool notAlreadyPresent = state.ActiveOps.insert(&i).second;
           require(notAlreadyPresent,
                   "operation was not ended before re-beginning it");
-
-        } else if (isa<EndAccessInst>(i) || isa<AbortApplyInst>(i) ||
-                   isa<EndApplyInst>(i)) {
+        } else if (isScopeEndingInst(&i)) {
           if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
             bool present = state.ActiveOps.erase(beginOp);
             require(present, "operation has already been ended");
@@ -7717,7 +7813,7 @@ CanType SILProperty::getBaseType() const {
 
   if (sig) {
     auto env = dc->getGenericEnvironmentOfContext();
-    baseTy = env->mapTypeIntoContext(baseTy)->getCanonicalType();
+    baseTy = env->mapTypeIntoEnvironment(baseTy)->getCanonicalType();
   }
 
   return baseTy;
@@ -7736,7 +7832,7 @@ void SILProperty::verify(const SILModule &M) const {
     auto env =
         decl->getInnermostDeclContext()->getGenericEnvironmentOfContext();
     subs = env->getForwardingSubstitutionMap();
-    leafTy = env->mapTypeIntoContext(leafTy)->getCanonicalType();
+    leafTy = env->mapTypeIntoEnvironment(leafTy)->getCanonicalType();
   }
   bool hasIndices = false;
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {

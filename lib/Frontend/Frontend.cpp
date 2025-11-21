@@ -284,6 +284,9 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.SkipNonExportableDecls =
       getLangOptions().SkipNonExportableDecls;
 
+  serializationOpts.SkipImplementationOnlyDecls =
+      getLangOptions().hasFeature(Feature::CheckImplementationOnly);
+
   serializationOpts.ExplicitModuleBuild = FrontendOpts.DisableImplicitModules;
 
   serializationOpts.EnableSerializationRemarks =
@@ -474,12 +477,12 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
     return false;
 
   const auto &Opts = getInvocation().getCASOptions();
-  if (Opts.Config.CASPath.empty() && Opts.Config.PluginPath.empty()) {
+  if (Opts.CASOpts.CASPath.empty() && Opts.CASOpts.PluginPath.empty()) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
                          "no CAS options provided");
     return true;
   }
-  auto MaybeDB = Opts.Config.createDatabases();
+  auto MaybeDB = Opts.CASOpts.getOrCreateDatabases();
   if (!MaybeDB) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
                          toString(MaybeDB.takeError()));
@@ -708,6 +711,25 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
         new llvm::vfs::OverlayFileSystem(MemFS);
     OverlayVFS->pushOverlay(SourceMgr.getFileSystem());
     SourceMgr.setFileSystem(std::move(OverlayVFS));
+  } else {
+    // For non-caching -direct-clang-cc1-module-build emit-pcm build,
+    // setup the clang VFS so it can find system modulemap files
+    // (like vcruntime.modulemap) as an input file.
+    if (Invocation.getClangImporterOptions().DirectClangCC1ModuleBuild &&
+        Invocation.getFrontendOptions().RequestedAction ==
+            FrontendOptions::ActionType::EmitPCM) {
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
+          SourceMgr.getFileSystem();
+      ClangInvocationFileMappingContext Context(
+          Invocation.getLangOptions(), Invocation.getSearchPathOptions(),
+          Invocation.getClangImporterOptions(), Invocation.getCASOptions(),
+          Diagnostics);
+      ClangInvocationFileMapping FileMapping = applyClangInvocationMapping(
+          Context, nullptr, VFS, /*suppressDiagnostic=*/false);
+      if (!FileMapping.redirectedFiles.empty()) {
+        SourceMgr.setFileSystem(std::move(VFS));
+      }
+    }
   }
 
   auto ExpectedOverlay =
@@ -1464,6 +1486,21 @@ static void configureAvailabilityDomains(const ASTContext &ctx,
     createAndInsertDomain(disabled, CustomAvailabilityDomain::Kind::Disabled);
   for (auto dynamic : opts.AvailabilityDomains.DynamicDomains)
     createAndInsertDomain(dynamic, CustomAvailabilityDomain::Kind::Dynamic);
+
+  // If we didn't see the UnicodeNormalization availability domain, set it
+  // appropriately.
+  if (domainMap.count(ctx.getIdentifier("UnicodeNormalization")) == 0) {
+    if (ctx.LangOpts.hasFeature(Feature::Embedded)) {
+      // Embedded Swift disables this domain by default.
+      createAndInsertDomain("UnicodeNormalization",
+                            CustomAvailabilityDomain::Kind::Enabled);
+    } else {
+      // Non-Embedded Swift always enables the Unicode tables.
+      createAndInsertDomain("UnicodeNormalization",
+                            CustomAvailabilityDomain::Kind::AlwaysEnabled);
+    }
+  }
+
 
   mainModule->setAvailabilityDomains(std::move(domainMap));
 }

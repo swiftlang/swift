@@ -939,7 +939,11 @@ DefineMemberBasedOnUse::diagnoseForAmbiguity(CommonFixesArray commonFixes) const
     const auto *solution = solutionAndFix.first;
     const auto *fix = solutionAndFix.second->getAs<DefineMemberBasedOnUse>();
 
-    auto baseType = solution->simplifyType(fix->BaseType);
+    // Ignore differences in optionality since we can look through an optional
+    // to resolve an implicit member `.foo`.
+    auto baseType = solution->simplifyType(fix->BaseType)
+                        ->getMetatypeInstanceType()
+                        ->lookThroughAllOptionalTypes();
     if (!concreteBaseType)
       concreteBaseType = baseType;
 

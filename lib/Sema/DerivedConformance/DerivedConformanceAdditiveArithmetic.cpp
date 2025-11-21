@@ -77,7 +77,7 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
     if (v->getInterfaceType()->hasError())
       return false;
-    auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
+    auto varType = DC->mapTypeIntoEnvironment(v->getValueInterfaceType());
     return (bool) checkConformance(varType, proto);
   });
 }
@@ -97,7 +97,7 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
   initDRE->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
   auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
       DeclNameLoc(), nominal, funcDecl,
-      funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
+      funcDecl->mapTypeIntoEnvironment(nominal->getInterfaceType()));
   auto *initExpr = ConstructorRefCallExpr::create(C, initDRE, nominalTypeExpr);
 
   // Get operator protocol requirement.
@@ -111,7 +111,7 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
   // Create expression combining lhs and rhs members using member operator.
   auto createMemberOpExpr = [&](VarDecl *member) -> Expr * {
     auto memberType =
-        parentDC->mapTypeIntoContext(member->getValueInterfaceType());
+        parentDC->mapTypeIntoEnvironment(member->getValueInterfaceType());
     auto confRef = lookupConformance(memberType, proto);
     assert(confRef && "Member does not conform to math protocol");
 
@@ -227,12 +227,12 @@ deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
 
   auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
       DeclNameLoc(), nominal, funcDecl,
-      funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
+      funcDecl->mapTypeIntoEnvironment(nominal->getInterfaceType()));
   auto *initExpr = ConstructorRefCallExpr::create(C, initDRE, nominalTypeExpr);
 
   auto createMemberPropertyExpr = [&](VarDecl *member) -> Expr * {
     auto memberType =
-        parentDC->mapTypeIntoContext(member->getValueInterfaceType());
+        parentDC->mapTypeIntoEnvironment(member->getValueInterfaceType());
     Expr *memberExpr = nullptr;
     // If the property is static, create a type expression: `Member`.
     if (reqDecl->isStatic()) {

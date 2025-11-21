@@ -313,9 +313,7 @@ bool OwnershipUseVisitor<Impl>::visitInnerBorrowScopeEnd(Operand *borrowEnd) {
     return handleUsePoint(borrowEnd, UseLifetimeConstraint::NonLifetimeEnding);
   }
   case OperandOwnership::InstantaneousUse: {
-    auto builtinUser = dyn_cast<BuiltinInst>(borrowEnd->getUser());
-    if (builtinUser && builtinUser->getBuiltinKind() ==
-                           BuiltinValueKind::EndAsyncLetLifetime) {
+    if (isBuiltinInst(borrowEnd->getUser(), BuiltinValueKind::EndAsyncLetLifetime)) {
       return handleUsePoint(borrowEnd,
                             UseLifetimeConstraint::NonLifetimeEnding);
     }

@@ -93,8 +93,8 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
 ///
 /// A *continuation* is an opaque representation of program state.
 /// To create a continuation in asynchronous code,
-/// call the `withUnsafeContinuation(function:_:)` or
-/// `withUnsafeThrowingContinuation(function:_:)` function.
+/// call the `withCheckedContinuation(isolation:function:_:)` or
+/// `withCheckedThrowingContinuation(isolation:function:_:)` function.
 /// To resume the asynchronous task,
 /// call the `resume(returning:)`,
 /// `resume(throwing:)`,
