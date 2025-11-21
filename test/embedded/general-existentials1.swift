@@ -132,7 +132,6 @@ public class Derived2<T>: Base<T> {
   public override func bar() { print("Derived2.bar()") }
 }
 
-/*
 public func takes_p1(_ p: P1) {
   p.normal()
 }
@@ -248,7 +247,6 @@ struct K4<I: BinaryInteger>: Q {
 func testP4() -> any P4 {
   return C4(t: K4(x: 437))
 }
-*/
 
 @main
 struct Main {
@@ -285,17 +283,15 @@ struct Main {
     // CHECK: Derived2.foo()
     // CHECK: Derived2.bar()
 
-    /*
 
     testConditionalConformance(t: S(i: 27))
-    // xCHECK: 27
+    // CHECK: 27
 
     testP3().foo()
-    // xCHECK: 102
+    // CHECK: 102
 
     testP4().foo()
-    // xCHECK: 437
-    */
+    // CHECK: 437
   }
 }
 
