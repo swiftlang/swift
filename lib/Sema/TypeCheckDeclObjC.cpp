@@ -2542,6 +2542,9 @@ namespace {
         auto opposite = (*this)(rightDecl, leftDecl);
         if (normal != opposite)
           return normal;
+
+        leftContext = leftContext->getParent();
+        rightContext = rightContext->getParent();
       }
 
       // Final tiebreaker: Kind
