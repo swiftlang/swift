@@ -263,8 +263,11 @@ static bool isValidBinOp(NominalTypeDecl *decl, const clang::FunctionDecl *fd) {
     auto parTy = getReadOnlyParamType(fd->getParamDecl(0));
     if (parTy.isNull())
       return false;
-    auto thisTy = method->getParent()->getTypeForDecl();
-    return parTy.getCanonicalType() == thisTy->getCanonicalTypeUnqualified() &&
+
+    auto &clangCtx = method->getASTContext();
+
+    auto parentTy = clangCtx.getCanonicalTagType(method->getParent());
+    return parTy.getCanonicalType() == parentTy &&
            parTy.getCanonicalType() == ty->getCanonicalTypeUnqualified();
   }
   if (fd->param_size() != 2)
@@ -358,9 +361,11 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl) {
         return false;
       if (!parTy->isIntegerType())
         return false;
-      auto thisTy = method->getParent()->getTypeForDecl();
-      return thisTy->getCanonicalTypeUnqualified() ==
-             ty->getCanonicalTypeUnqualified();
+
+      auto &clangCtx = method->getASTContext();
+
+      auto parentTy = clangCtx.getCanonicalTagType(method->getParent());
+      return parentTy == ty->getCanonicalTypeUnqualified();
     }
     if (fd->param_size() != 2)
       return false;
@@ -410,10 +415,9 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
   clang::Sema &clangSema = impl.getClangSema();
 
   clang::UnresolvedSet<1> ops;
-  auto qualType = clang::QualType(classDecl->getTypeForDecl(), 0);
-  auto arg = clang::CXXThisExpr::Create(clangCtx, clang::SourceLocation(),
-                                        qualType, false);
-  arg->setType(clang::QualType(classDecl->getTypeForDecl(), 0));
+  auto *arg = clang::CXXThisExpr::Create(
+      clangCtx, clang::SourceLocation(),
+      clangCtx.getCanonicalTagType(classDecl), false);
 
   clang::OverloadedOperatorKind opKind =
       clang::BinaryOperator::getOverloadedOperator(operatorKind);
@@ -633,8 +637,10 @@ CxxIteratorInfoRequest::evaluate(Evaluator &evaluator,
     if (auto *iterator_traits = stdNS->lookup(iteratorTraitsId)
                                     .find_first<clang::ClassTemplateDecl>()) {
       void *insertPos = nullptr; // unused
+      auto declTy = sema.getASTContext().getCanonicalTagType(decl);
+
       if (auto *traitSpecialization = iterator_traits->findSpecialization(
-              {clang::TemplateArgument(ctx.getTypeDeclType(decl))}, insertPos);
+              {clang::TemplateArgument(declTy)}, insertPos);
           traitSpecialization && traitSpecialization->hasDefinition()) {
         if (traitSpecialization->isExplicitSpecialization()) {
           // Determine info from definition of iterator_traits specialization,
@@ -767,7 +773,7 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
       if (!equalEqual) {
         // If `func ==` still can't be found, it might be defined for a base
         // class of the current class.
-        auto paramTy = clangCtx.getRecordType(clangDecl);
+        auto paramTy = clangCtx.getCanonicalTagType(clangDecl);
         synthesizeCXXOperator(impl, clangDecl, clang::BinaryOperatorKind::BO_EQ,
                               paramTy, paramTy, clangCtx.BoolTy);
         equalEqual = getEqualEqualOperator(decl);
@@ -824,7 +830,7 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
       minus = getMinusOperator(decl);
       if (!minus) {
         clang::QualType returnTy = instantiated->getReturnType();
-        auto paramTy = clangCtx.getRecordType(clangDecl);
+        auto paramTy = clangCtx.getCanonicalTagType(clangDecl);
         synthesizeCXXOperator(impl, clangDecl,
                               clang::BinaryOperatorKind::BO_Sub, paramTy,
                               paramTy, returnTy);
@@ -919,8 +925,8 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
       constRefValueType.getNonReferenceType(), clang::ExprValueKind::VK_LValue,
       clangDecl->getLocation());
 
-  auto clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
-      clang::QualType(clangDecl->getTypeForDecl(), 0));
+  auto *clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
+      clangCtx.getCanonicalTagType(clangDecl));
   SmallVector<clang::Expr *, 1> constructExprArgs = {fakeValueRefExpr};
 
   // Instantiate the templated constructor that would accept this fake variable.
@@ -1554,8 +1560,8 @@ static void conformToCxxSpan(ClangImporter::Implementation &impl,
   // passing constPointer and count
   SmallVector<clang::Expr *, 2> constructExprArgs = {fakePointer, fakeCount};
 
-  auto clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
-      clang::QualType(clangDecl->getTypeForDecl(), 0));
+  auto *clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
+      clangCtx.getCanonicalTagType(clangDecl));
 
   // Instantiate the templated constructor that would accept this fake variable.
   auto constructExprResult = clangSema.BuildCXXTypeConstructExpr(
