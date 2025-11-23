@@ -459,14 +459,24 @@ public protocol Sequence<Element>: ~Copyable, ~Escapable {
 }
 
 @available(SwiftStdlib 6.3, *)
+@frozen
 public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: /* & ~Copyable & ~Escapable */
   BorrowingIteratorProtocol where Iterator.Element: Copyable
 {
+  @usableFromInline
   var iterator: Iterator
+  @usableFromInline
   var curValue: Iterator.Element?
- 
+
   public typealias Element = Iterator.Element
 
+  @_transparent
+  public init(iterator: Iterator) {
+    self.iterator = iterator
+    curValue = nil
+  }
+
+  @_transparent
   @lifetime(&self)
   public mutating func nextSpan(maximumCount: Int) -> Span<Iterator.Element> {
     curValue = iterator.next()
@@ -487,6 +497,7 @@ extension NeverIterator: IteratorProtocol { /* where Element: ~Copyable */
 
 @available(SwiftStdlib 6.3, *)
 extension Sequence where BorrowingIterator == BorrowingIteratorAdapter<Iterator> {
+  @_transparent
   public func makeBorrowingIterator() -> BorrowingIterator {
     BorrowingIteratorAdapter(iterator: makeIterator())
   }

@@ -1019,7 +1019,7 @@ extension Optional: _ObjectiveCBridgeable {
 
 extension Optional where Wrapped: ~Copyable {
   @available(SwiftStdlib 6.3, *)
-  @_alwaysEmitIntoClient
+  @_transparent
   public var _span: Span<Wrapped> {
     @_addressableSelf
     @lifetime(borrow self)
