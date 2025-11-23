@@ -478,11 +478,11 @@ namespace {
 
     void emitCopyWithCopyFunction(IRGenFunction &IGF, SILType T, Address src,
                                   Address dst) const {
+      auto &clangCtx = clangDecl->getASTContext();
       auto *copyFunction =
           clang::CodeGen::getNonTrivialCStructCopyAssignmentOperator(
               IGF.IGM.getClangCGM(), dst.getAlignment(), src.getAlignment(),
-              /*isVolatile*/ false,
-              clang::QualType(clangDecl->getTypeForDecl(), 0));
+              /*isVolatile*/ false, clangCtx.getCanonicalTagType(clangDecl));
       auto *dstValue = dst.getAddress();
       auto *srcValue = src.getAddress();
       IGF.Builder.CreateCall(copyFunction->getFunctionType(), copyFunction,

@@ -241,8 +241,10 @@ static const clang::RecordDecl *
 getReturnTypeAsRecordDeclPtr(const clang::NamedDecl *ND) {
   clang::QualType retTy;
 
+  auto &clangCtx = ND->getASTContext();
+
   if (auto *CD = dyn_cast<clang::CXXConstructorDecl>(ND))
-    retTy = CD->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
+    retTy = clangCtx.getCanonicalTagType(CD->getParent());
   else if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
     retTy = FD->getReturnType();
   else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND))

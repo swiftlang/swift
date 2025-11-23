@@ -1069,7 +1069,6 @@ namespace {
     SUGAR_TYPE(Attributed)
     SUGAR_TYPE(Adjusted)
     SUGAR_TYPE(SubstTemplateTypeParm)
-    SUGAR_TYPE(Elaborated)
     SUGAR_TYPE(Using)
     SUGAR_TYPE(BTFTagAttributed)
     SUGAR_TYPE(PredefinedSugar)
@@ -1818,9 +1817,6 @@ void swift::findSwiftAttributes(
       [&](clang::QualType type) -> clang::QualType {
     if (auto *MQT = dyn_cast<clang::MacroQualifiedType>(type))
       return MQT->isSugared() ? skipUnrelatedSugar(MQT->desugar()) : type;
-
-    if (auto *ET = dyn_cast<clang::ElaboratedType>(type))
-      return ET->isSugared() ? skipUnrelatedSugar(ET->desugar()) : type;
 
     return type;
   };
@@ -3030,9 +3026,6 @@ ArgumentAttrs ClangImporter::Implementation::inferDefaultArgument(
   // Don't introduce a default argument for the first parameter of setters.
   if (isFirstParameter && camel_case::getFirstWord(baseNameStr) == "set")
     return DefaultArgumentKind::None;
-
-  if (auto elaboratedTy = type->getAs<clang::ElaboratedType>())
-    type = elaboratedTy->desugar();
 
   // Some nullable parameters default to 'nil'.
   if (clangOptionality == OTK_Optional) {
