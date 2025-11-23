@@ -3883,7 +3883,9 @@ void ClangImporter::lookupTypeDecl(
     if (sema.LookupName(lookupResult, /*Scope=*/sema.TUScope)) {
       for (auto clangDecl : lookupResult) {
         if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(clangDecl)) {
-          auto qualType = Impl.getClangASTContext().getTypedefType(typedefDecl);
+          auto qualType = Impl.getClangASTContext().getTypedefType(
+              clang::ElaboratedTypeKeyword::None,
+              /*Qualifier=*/std::nullopt, typedefDecl);
           if (auto optionSetEnum = findOptionSetEnum(qualType, Impl)) {
             if (auto typeDecl = optionSetEnum.getType()->getAnyNominal()) {
               foundViaClang = true;
@@ -6137,7 +6139,7 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
     auto *thisExpr = clang::CXXThisExpr::Create(
         clangCtx, clang::SourceLocation(), newMethod->getThisType(),
         /*IsImplicit=*/false);
-    clang::QualType baseClassPtr = clangCtx.getRecordType(baseClass);
+    clang::QualType baseClassPtr = clangCtx.getCanonicalTagType(baseClass);
     baseClassPtr.addConst();
     baseClassPtr = clangCtx.getPointerType(baseClassPtr);
 
@@ -7351,9 +7353,12 @@ Type ClangImporter::importVarDeclType(
 
   // Special case: NS Notifications
   if (isNSNotificationGlobal(decl))
-    if (auto newtypeDecl = findSwiftNewtype(decl, Impl.getClangSema(),
-                                            Impl.CurrentVersion))
-      declType = Impl.getClangASTContext().getTypedefType(newtypeDecl);
+    if (auto *newtypeDecl =
+            findSwiftNewtype(decl, Impl.getClangSema(), Impl.CurrentVersion)) {
+      declType = Impl.getClangASTContext().getTypedefType(
+          clang::ElaboratedTypeKeyword::None,
+          /*Qualifier=*/std::nullopt, newtypeDecl);
+    }
 
   bool inSystemModule = isInSystemModule(dc);
 
@@ -7514,7 +7519,7 @@ ClangImporter::instantiateCXXClassTemplate(
     decl->AddSpecialization(ctsd, InsertPos);
   }
 
-  auto CanonType = decl->getASTContext().getTypeDeclType(ctsd);
+  auto CanonType = decl->getASTContext().getCanonicalTagType(ctsd);
   assert(isa<clang::RecordType>(CanonType) &&
           "type of non-dependent specialization is not a RecordType");
 
@@ -7998,7 +8003,8 @@ bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
 }
 
 bool ClangImporter::isCxxMoveOnlyType(const clang::CXXRecordDecl *decl) {
-  return importer::getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl) ==
+  auto declTy = decl->getASTContext().getCanonicalTagType(decl);
+  return importer::getCxxValueSemanticsKind(declTy.getTypePtr(), Impl) ==
          CxxValueSemanticsKind::MoveOnly;
 }
 
@@ -8772,6 +8778,9 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
 
   stack.push_back(desc.decl);
   seen.insert(desc.decl);
+
+  auto &clangCtx = desc.decl->getASTContext();
+
   while (!stack.empty()) {
     const clang::Decl *decl = stack.back();
     stack.pop_back();
@@ -8801,7 +8810,8 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
     // Escapability tells us how to treat this record's safety.
     switch (evaluateOrDefault(
         evaluator,
-        ClangTypeEscapability({recordDecl->getTypeForDecl(), nullptr}),
+        ClangTypeEscapability(
+            {clangCtx.getCanonicalTagType(recordDecl).getTypePtr(), nullptr}),
         CxxEscapability::Unknown)) {
     case CxxEscapability::Escapable:
       // A self-contained (escapable) type is safe.
@@ -8809,7 +8819,8 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
     case CxxEscapability::NonEscapable:
       // A non-escapable "view" is safe only if it is a *direct* view. Views
       // with more complex lifetime dependencies are imported as unsafe.
-      if (importer::isDirectViewType(recordDecl->getTypeForDecl(), evaluator))
+      if (importer::isDirectViewType(
+              clangCtx.getCanonicalTagType(recordDecl).getTypePtr(), evaluator))
         continue;
       return ExplicitSafety::Unsafe;
     case CxxEscapability::Unknown:
@@ -9002,20 +9013,15 @@ const clang::TypedefType *ClangImporter::getTypeDefForCXXCFOptionsDefinition(
   if (!enumDecl->getDeclName().isEmpty())
     return nullptr;
 
-  const clang::ElaboratedType *elaboratedType =
-      dyn_cast<clang::ElaboratedType>(enumDecl->getIntegerType().getTypePtr());
-  if (auto typedefType =
-          elaboratedType
-              ? dyn_cast<clang::TypedefType>(elaboratedType->desugar())
-              : dyn_cast<clang::TypedefType>(
-                    enumDecl->getIntegerType().getTypePtr())) {
-    auto enumExtensibilityAttr =
-        elaboratedType
-            ? enumDecl->getAttr<clang::EnumExtensibilityAttr>()
-            : typedefType->getDecl()->getAttr<clang::EnumExtensibilityAttr>();
+  auto *integerType = enumDecl->getIntegerType().getTypePtr();
+  if (!integerType)
+    return nullptr;
+
+  if (auto *typedefType = dyn_cast<clang::TypedefType>(integerType)) {
+    auto *enumExtensibilityAttr =
+        typedefType->getDecl()->getAttr<clang::EnumExtensibilityAttr>();
     const bool hasFlagEnumAttr =
-        elaboratedType ? enumDecl->hasAttr<clang::FlagEnumAttr>()
-                       : typedefType->getDecl()->hasAttr<clang::FlagEnumAttr>();
+        typedefType->getDecl()->hasAttr<clang::FlagEnumAttr>();
 
     if (enumExtensibilityAttr &&
         enumExtensibilityAttr->getExtensibility() ==

@@ -3563,7 +3563,7 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
     // for the C++ struct that does not zero out trivial fields of a struct.
     auto cxxRecord = ctor->getParent();
     clang::ASTContext &ctx = cxxRecord->getASTContext();
-    auto typeSize = ctx.getTypeSizeInChars(ctx.getRecordType(cxxRecord));
+    auto typeSize = ctx.getTypeSizeInChars(ctx.getCanonicalTagType(cxxRecord));
     subIGF.Builder.CreateMemSet(Args[0],
                                 llvm::ConstantInt::get(subIGF.IGM.Int8Ty, 0),
                                 typeSize.getQuantity(), llvm::MaybeAlign());

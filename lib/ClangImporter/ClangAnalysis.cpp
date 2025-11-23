@@ -469,8 +469,10 @@ static const clang::RecordDecl *
 getReturnTypeAsRecordDeclPtr(const clang::NamedDecl *ND) {
   clang::QualType retTy;
 
+  auto &clangCtx = ND->getASTContext();
+
   if (auto *CD = dyn_cast<clang::CXXConstructorDecl>(ND))
-    retTy = CD->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
+    retTy = clangCtx.getCanonicalTagType(CD->getParent());
   else if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
     retTy = FD->getReturnType();
   else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND))
@@ -1067,12 +1069,12 @@ bool importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
   if (clangTypeIsForeignReference(method->getReturnType(), ctx))
     return false;
 
-  auto parentQualType =
-      method->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
+  auto *parentDecl = method->getParent();
+  auto parentQualType = method->getASTContext().getCanonicalTagType(parentDecl);
 
   bool parentIsSelfContained =
       !clangTypeIsForeignReference(parentQualType, ctx) &&
-      anySubobjectsSelfContained(method->getParent());
+      anySubobjectsSelfContained(parentDecl);
 
   // If it returns a pointer or reference from an owned parent, that's a
   // projection (unsafe).
