@@ -260,6 +260,12 @@ std::string typeUSR(Type type) {
   if (!type)
     return "";
 
+  if (type->is<ModuleType>()) {
+    // ASTMangler does not support "module types". This can appear, for
+    // example, on the left-hand side of a `DotSyntaxBaseIgnoredExpr` for a
+    // module-qualified free function call: `Swift.print()`.
+    return "";
+  }
   if (type->hasArchetype()) {
     type = type->mapTypeOutOfEnvironment();
   }
@@ -279,6 +285,13 @@ std::string typeUSR(Type type) {
 std::string declTypeUSR(const ValueDecl *D) {
   if (!D)
     return "";
+
+  if (isa<ModuleDecl>(D)) {
+    // ASTMangler does not support "module types". This can appear, for
+    // example, on the left-hand side of a `DotSyntaxBaseIgnoredExpr` for a
+    // module-qualified free function call: `Swift.print()`.
+    return "";
+  }
 
   std::string usr;
   llvm::raw_string_ostream os(usr);

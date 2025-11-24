@@ -484,3 +484,10 @@ dynamic func toBeReplaced(arg: Int) {}
 
 @_dynamicReplacement(for: toBeReplaced(arg:))
 func toReplaceWith(arg: Int) {}
+
+// Regression test: Swift 6.2 and earlier crashed trying to form the type USR
+// of the "module type" of a `DotSyntaxBaseIgnoredExpr` when calling a
+// module-qualified free function.
+func moduleTypeUSRRegressionTest() {
+    Swift.print("")
+}
