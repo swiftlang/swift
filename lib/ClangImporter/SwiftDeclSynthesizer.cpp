@@ -276,16 +276,9 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
     // Create the expression node.
     StringRef printedValueCopy(context.AllocateCopy(printedValue));
     if (value.getKind() == clang::APValue::Int) {
-      bool isBool = type->getCanonicalType()->isBool();
-      // Check if "type" is a C++ enum with an underlying type of "bool".
-      if (!isBool && type->getStructOrBoundGenericStruct() &&
-          type->getStructOrBoundGenericStruct()->getClangDecl()) {
-        if (auto enumDecl = dyn_cast<clang::EnumDecl>(
-                type->getStructOrBoundGenericStruct()->getClangDecl())) {
-          isBool = enumDecl->getIntegerType()->isBooleanType();
-        }
-      }
-      if (isBool) {
+      // Check if "type" is Bool or a C++ enum with an underlying type of Bool.
+      // NOTE: This must match the condition in `importNumericLiteral`.
+      if (isBoolOrBoolEnumType(type)) {
         auto *boolExpr = new (context)
             BooleanLiteralExpr(value.getInt().getBoolValue(), SourceLoc(),
                                /*Implicit=*/true);
