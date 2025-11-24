@@ -227,7 +227,7 @@ internal struct Section {
 /// Holds the addresses and sizes of sections related to reflection.
 internal struct ReflectionInfo : Sequence {
   internal typealias Element = Section?
-  @available(macOS 9999, *)
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   internal typealias BorrowingIterator = BorrowingIteratorAdapter<AnyIterator<Section?>>
   
   /// The name of the loaded image.
