@@ -21,6 +21,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -477,6 +478,9 @@ public:
 ApplySite replaceWithSpecializedCallee(
     ApplySite applySite, SILValue callee, const ReabstractionInfo &reInfo,
     const TypeReplacements &typeReplacements = {});
+
+Type replaceLocalArchetypes(
+  llvm::SmallDenseMap<GenericEnvironment*, SmallVector<Type, 2>> &envs, Type type);
 
 /// Checks if all OnoneSupport pre-specializations are included in the module
 /// as public functions.

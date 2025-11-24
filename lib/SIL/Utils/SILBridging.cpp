@@ -30,6 +30,7 @@
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SIL/Test.h"
+#include "swift/SILOptimizer/Utils/Generics.h"
 #include <string>
 #include <cstring>
 #include <stdio.h>
@@ -632,11 +633,6 @@ public:
   BridgedTypeSubstClonerImpl(SILFunction &from, SILFunction &toEmptyFunction, SubstitutionMap subs)
     : TypeSubstCloner<BridgedTypeSubstClonerImpl>(toEmptyFunction, from, subs) {}
 
-  BridgedTypeSubstClonerImpl(SILInstruction *insertionPoint,  SubstitutionMap subs)
-    : TypeSubstCloner<BridgedTypeSubstClonerImpl>(*insertionPoint->getFunction(), subs){
-    Builder.setInsertionPoint(insertionPoint);
-  }
-
   SILValue getClonedValue(SILValue v) {
     return getMappedValue(v);
   }
@@ -654,10 +650,49 @@ public:
   }
 
   SILFunction *getOriginal() { return &Original; }
+};
+
+class BridgedArchetypeSubstClonerImpl : public TypeSubstCloner<BridgedArchetypeSubstClonerImpl> {
+  SILInstruction *result = nullptr;
+  llvm::SmallDenseMap<GenericEnvironment*, llvm::SmallVector<Type, 2>> mappings;
+
+public:
+  BridgedArchetypeSubstClonerImpl(SILInstruction *insertionPoint, llvm::ArrayRef<std::tuple<GenericEnvironment*, llvm::ArrayRef<SILType>>> typeMappings)
+    : TypeSubstCloner<BridgedArchetypeSubstClonerImpl>(*insertionPoint->getFunction(), SubstitutionMap()){
+    Builder.setInsertionPoint(insertionPoint);
+    for (auto& [i,j] : typeMappings) {
+      std::vector<Type> types;
+      std::transform(j.vec().begin(), j.vec().end(), types.begin(), [](SILType t) {return t.getRawASTType();});
+      mappings[i] = SmallVector<Type>(types.begin(), types.end());
+    }
+  }
+
+  SILType remapType(SILType Ty) {
+    // FIXIME: lower this type
+    // SILType &Sty = replaceLocalArchetypes(mappings, Ty.getRawASTType());
+    SILType Sty;
+    if (!Sty)
+      Sty = SILClonerWithScopes<BridgedArchetypeSubstClonerImpl>::remapType(Ty);
+    return Sty;
+  }
 
   void setInsertionPoint(SILInstruction *inst) {
     Builder.setInsertionPoint(inst);
   }
+
+  SILValue getClonedValue(SILValue v) {
+    return getMappedValue(v);
+  }
+
+  SILFunction *getOriginal() { return &Original; }
+
+  SILInstruction *cloneInst(SILInstruction *inst) {
+    result = nullptr;
+    visit(inst);
+    ASSERT(result && "instruction not cloned");
+    return result;
+  }
+
 };
 
 } // namespace swift
@@ -737,14 +772,6 @@ BridgedTypeSubstCloner::BridgedTypeSubstCloner(BridgedFunction fromFunction, Bri
   context.context->notifyNewCloner();
 }
 
-BridgedTypeSubstCloner::BridgedTypeSubstCloner(BridgedInstruction inst,
-                                               BridgedSubstitutionMap substitutions,
-                                               BridgedContext context)
-  : cloner(new BridgedTypeSubstClonerImpl(inst.unbridged(),
-                                          substitutions.unbridged())) {
-  context.context->notifyNewCloner();
-}
-
 void BridgedTypeSubstCloner::destroy(BridgedContext context) {
   delete cloner;
   cloner = nullptr;
@@ -763,19 +790,46 @@ BridgedValue BridgedTypeSubstCloner::getClonedValue(BridgedValue v) {
   return {cloner->getClonedValue(v.getSILValue())};
 }
 
-void BridgedTypeSubstCloner::recordFoldedValue(BridgedValue orig, BridgedValue mapped) const {
+BridgedArchetypeSubstCloner::BridgedArchetypeSubstCloner(BridgedInstruction inst,
+                                               BridgedArrayRef types,
+                                               BridgedContext context)
+  : cloner(new BridgedArchetypeSubstClonerImpl(inst.unbridged(),
+                                          types.unbridged<std::tuple<GenericEnvironment*, ArrayRef<SILType>>>())) {
+  context.context->notifyNewCloner();
+}
+
+
+void BridgedArchetypeSubstCloner::destroy(BridgedContext context) {
+  delete cloner;
+  cloner = nullptr;
+  context.context->notifyClonerDestroyed();
+}
+
+void BridgedArchetypeSubstCloner::cloneFunctionBody() const {
+  cloner->cloneFunction(cloner->getOriginal());
+}
+
+BridgedBasicBlock BridgedArchetypeSubstCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
+  return { cloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
+}
+
+BridgedValue BridgedArchetypeSubstCloner::getClonedValue(BridgedValue v) {
+  return {cloner->getClonedValue(v.getSILValue())};
+}
+
+void BridgedArchetypeSubstCloner::recordFoldedValue(BridgedValue orig, BridgedValue mapped) const {
   cloner->recordFoldedValue(orig.getSILValue(), mapped.getSILValue());
 }
 
-bool BridgedTypeSubstCloner::isValueCloned(BridgedValue v) const {
+bool BridgedArchetypeSubstCloner::isValueCloned(BridgedValue v) const {
   return cloner->isValueCloned(v.getSILValue());
 }
 
-BridgedInstruction BridgedTypeSubstCloner::clone(BridgedInstruction inst) const {
+BridgedInstruction BridgedArchetypeSubstCloner::clone(BridgedInstruction inst) const {
   return {cloner->cloneInst(inst.unbridged())->asSILNode()};
 }
 
-void BridgedTypeSubstCloner::setInsertionPoint(BridgedInstruction inst) const {
+void BridgedArchetypeSubstCloner::setInsertionPoint(BridgedInstruction inst) const {
   cloner->setInsertionPoint(inst.unbridged());
 }
 

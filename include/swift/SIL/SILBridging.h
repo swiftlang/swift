@@ -18,6 +18,7 @@
 ///
 /// See include guidelines and caveats in `BasicBridging.h`.
 #include "swift/AST/ASTBridging.h"
+#include "swift/Basic/BasicBridging.h"
 
 #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 #include "llvm/ADT/ArrayRef.h"
@@ -64,6 +65,7 @@ class SILLoopInfo;
 class SILLoop;
 class BridgedClonerImpl;
 class BridgedTypeSubstClonerImpl;
+class BridgedArchetypeSubstClonerImpl;
 class SILDebugLocation;
 class NominalTypeDecl;
 class VarDecl;
@@ -934,7 +936,6 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType PackLengthInst_getPackType() const;
   BRIDGED_INLINE SwiftInt ScalarPackIndexInst_getComponentIndex() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType AnyPackIndexInst_getIndexedPackType() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature OpenPackElementInst_getGenericSignature() const;
 
   // =========================================================================//
   //                   VarDeclInst and DebugVariableInst
@@ -1596,8 +1597,17 @@ struct BridgedTypeSubstCloner {
 
   BridgedTypeSubstCloner(BridgedFunction fromFunction, BridgedFunction toFunction,
                          BridgedSubstitutionMap substitutions, BridgedContext context);
-  BridgedTypeSubstCloner(BridgedInstruction inst,
-                         BridgedSubstitutionMap substitutions, BridgedContext context);
+  void destroy(BridgedContext context);
+  void cloneFunctionBody() const;
+  SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
+  SWIFT_IMPORT_UNSAFE BridgedValue getClonedValue(BridgedValue v);
+};
+
+struct BridgedArchetypeSubstCloner {
+  swift::BridgedArchetypeSubstClonerImpl * _Nonnull cloner;
+
+  BridgedArchetypeSubstCloner(BridgedInstruction inst,
+                         BridgedArrayRef types, BridgedContext context);
   void destroy(BridgedContext context);
   void cloneFunctionBody() const;
   SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;

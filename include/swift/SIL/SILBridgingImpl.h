@@ -1832,10 +1832,6 @@ BridgedCanType BridgedInstruction::AnyPackIndexInst_getIndexedPackType() const {
   return getAs<swift::AnyPackIndexInst>()->getIndexedPackType();
 }
 
-BridgedGenericSignature BridgedInstruction::OpenPackElementInst_getGenericSignature() const {
-  return {getAs<swift::OpenPackElementInst>()->getOpenedGenericEnvironment()->getGenericSignature().getPointer()};
-}
-
 //===----------------------------------------------------------------------===//
 //                     VarDeclInst and DebugVariableInst
 //===----------------------------------------------------------------------===//

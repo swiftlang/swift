@@ -190,14 +190,9 @@ public struct Cloner<Context: MutatingContext>: ClonerCommonUtils {
   }
 }
 
-public struct TypeSubstitutionCloner<Context: MutatingContext>: ClonerCommonUtils {
+public struct TypeSubstitutionCloner<Context: MutatingContext> {
   public private(set) var bridged: BridgedTypeSubstCloner
   public let context: Context
-
-  public enum Target {
-    case function(Function)
-  }
-  public let target: Target
 
   public init(fromFunction: Function,
               toEmptyFunction: Function,
@@ -207,13 +202,38 @@ public struct TypeSubstitutionCloner<Context: MutatingContext>: ClonerCommonUtil
     self.bridged = BridgedTypeSubstCloner(fromFunction.bridged, toEmptyFunction.bridged,
                                           substitutions.bridged, context._bridged)
     self.context = context
-    self.target = .function(toEmptyFunction)
   }
 
+  public mutating func deinitialize() {
+    bridged.destroy(context._bridged)
+  }
+
+  public mutating func getClonedValue(of originalValue: Value) -> Value {
+    bridged.getClonedValue(originalValue.bridged).value
+  }
+
+  public func getClonedBlock(for originalBlock: BasicBlock) -> BasicBlock {
+    bridged.getClonedBasicBlock(originalBlock.bridged).block
+  }
+
+  public func cloneFunctionBody() {
+    bridged.cloneFunctionBody()
+  }
+}
+
+public struct ArchetypeSubstitutionCloner<Context: MutatingContext>: ClonerCommonUtils {
+  public private(set) var bridged: BridgedArchetypeSubstCloner
+  public let context: Context
+
+  public enum Target {
+    case function(Function)
+  }
+  public let target: Target
+
   public init(cloneBefore inst: Instruction,
-              substitutions: SubstitutionMap, _ context: Context) {
-    self.bridged = BridgedTypeSubstCloner(inst.bridged,
-                                          substitutions.bridged, context._bridged)
+              substitutions: BridgedArrayRef, _ context: Context) {
+    self.bridged = BridgedArchetypeSubstCloner(inst.bridged,
+                                          substitutions, context._bridged)
     self.context = context
     self.target = .function(inst.parentFunction)
   }
@@ -255,12 +275,9 @@ public struct TypeSubstitutionCloner<Context: MutatingContext>: ClonerCommonUtil
     bridged.setInsertionPoint(inst.bridged)
   }
 
-  public mutating func cloneRecursively(inst: Instruction, resetInsertionPoint: Bool) -> Instruction? {
+  public mutating func cloneRecursively(inst: Instruction) -> Instruction? {
 
-    // change insertion point
-    if resetInsertionPoint {
-      setInsertionPoint(inst: inst)
-    }
+    setInsertionPoint(inst: inst)
     let cloned = clone(instruction: inst)
     return cloned
   }

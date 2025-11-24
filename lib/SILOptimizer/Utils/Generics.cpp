@@ -2658,6 +2658,45 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
   llvm_unreachable("unhandled kind of apply");
 }
 
+Type replaceLocalArchetypes(
+  llvm::SmallDenseMap<GenericEnvironment*,
+                 SmallVector<Type, 2>> &envs, Type type) {
+
+  // Recursively transform the given type.
+  return type.transformRec([&](TypeBase *t) -> Type {
+    if (auto *archetypeTy = dyn_cast<LocalArchetypeType>(type)) {
+      // An archetype is a generic environment together with an
+      // interface type.
+      auto *env = archetypeTy->getGenericEnvironment();
+      auto interfaceType = archetypeTy->getInterfaceType();
+
+      // Look up the array of concrete replacement types for
+      // this environment.
+      auto found = envs.find(env);
+
+      // If there's no entry in the mapping table for this
+      // archetype's environment, leave this archetype
+      // unchanged.
+      if (found == envs.end())
+        return t;
+
+      // Look up the concrete replacement type in our mapping.
+      return interfaceType.subst(
+        [&](SubstitutableType *substTy) {
+          auto *paramTy = cast<GenericTypeParamType>(substTy);
+          unsigned index = paramTy->getIndex();
+          ASSERT(index < found->second.size());
+          return found->second[index];
+        },
+        LookUpConformanceInModule());
+    }
+
+    // Anything that's not a local archetype remains unchanged.
+    return t;
+  });
+}
+
+
 namespace {
 
 /// local overload of `replaceWithSpecializedFunction` that takes a

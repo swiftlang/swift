@@ -23,10 +23,9 @@ extension OpenPackElementInst {
   fileprivate func replacePackElementTypes(_ context: SimplifyContext) {
 
     if let dpi = operands.first?.value as? DynamicPackIndexInst,
-       let ili = dpi.operands.first?.value as? IntegerLiteralInst,
-       let index = ili.value
+        dpi.operands.first?.value as? IntegerLiteralInst != nil//,
+       /*let index = ili.value*/
     {
-      //return dpi.indexedPackType.packElementTypes[index].canonical
       var worklist = ValueWorklist(context)
       var instStack = Stack<Instruction>(context)
 
@@ -42,7 +41,9 @@ extension OpenPackElementInst {
         replacementTypes.append(type.canonical.rawType)
       }
 
-      /* var cloner = 
+      /*
+      var cloner = ArchetypeSubstitutionCloner(inst: self, substitutions:,
+              context: context)
       defer { cloner.deinitialize() }
       */
 
