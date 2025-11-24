@@ -507,7 +507,7 @@ void swift::checkUnsafeStorage(NominalTypeDecl *nominal) {
   ASTContext &ctx = nominal->getASTContext();
   if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
     if (Type superclassType = classDecl->getSuperclass()) {
-      superclassType = classDecl->mapTypeIntoContext(superclassType);
+      superclassType = classDecl->mapTypeIntoEnvironment(superclassType);
       bool diagnosed = false;
       diagnoseUnsafeType(ctx, classDecl->getLoc(), superclassType, [&](Type type) {
         if (diagnosed)

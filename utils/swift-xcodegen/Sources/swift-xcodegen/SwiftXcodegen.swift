@@ -295,7 +295,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
 
   func runTask<R>(
     _ body: @escaping @Sendable () throws -> R
-  ) async throws -> Task<R, Error> {
+  ) async throws -> Task<R, any Error> {
     let task = Task(operation: body)
     if !self.parallel {
       _ = try await task.value

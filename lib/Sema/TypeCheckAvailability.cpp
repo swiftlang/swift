@@ -16,6 +16,7 @@
 
 #include "TypeCheckAvailability.h"
 #include "MiscDiagnostics.h"
+#include "TypeCheckAccess.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
@@ -232,6 +233,20 @@ ExportContext ExportContext::withRefinedAvailability(
 
 bool ExportContext::mustOnlyReferenceExportedDecls() const {
   return Exported || FragileKind.kind != FragileFunctionKind::None;
+}
+
+bool ExportContext::canReferenceOrigin(DisallowedOriginKind originKind) const {
+  if (originKind == DisallowedOriginKind::None)
+    return true;
+
+  // Non public imports aren't hidden dependencies in embedded  mode,
+  // don't enforce them on implicitly always emit into client code.
+  if (originKind == DisallowedOriginKind::NonPublicImport &&
+      getFragileFunctionKind().kind ==
+        FragileFunctionKind::EmbeddedAlwaysEmitIntoClient)
+    return true;
+
+  return false;
 }
 
 std::optional<ExportabilityReason>
@@ -1041,15 +1056,22 @@ static bool diagnosePotentialUnavailability(
   {
     auto type = rootConf->getType();
     auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-    auto err = ctx.Diags.diagnose(
-        loc, diag::conformance_availability_only_version_newer, type, proto,
-        domain, availability);
+    auto err = availability.hasMinimumVersion()
+        ? ctx.Diags.diagnose(
+            loc, diag::conformance_availability_only_version_newer, type, proto,
+            domain, availability)
+        : ctx.Diags.diagnose(
+            loc, diag::conformance_availability_not_available, type, proto,
+            domain);
 
     auto behaviorLimit = behaviorLimitForExplicitUnavailability(rootConf, dc);
-    if (behaviorLimit >= DiagnosticBehavior::Warning)
+    if (!availability.hasMinimumVersion()) {
+      // Don't downgrade
+    } else if (behaviorLimit >= DiagnosticBehavior::Warning) {
       err.limitBehavior(behaviorLimit);
-    else
+    } else {
       err.warnUntilSwiftVersion(6);
+    }
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(loc, dc, domain,
@@ -2605,7 +2627,7 @@ private:
           if (ty->isKnownImmutableKeyPathType())
             return StorageAccessKind::Get;
 
-          if (auto existential = dyn_cast<ExistentialType>(ty)) {
+          if (auto *existential = ty->getAs<ExistentialType>()) {
             if (auto superclass =
                     existential->getExistentialLayout().getSuperclass()) {
               if (superclass->isKnownImmutableKeyPathType())
@@ -3633,9 +3655,7 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
   }
 
   // Skip functions emitted into clients, SPI or implicit.
-  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
-      decl->isSPI() ||
-      decl->isImplicit())
+  if (decl->isAlwaysEmittedIntoClient() || decl->isSPI() || decl->isImplicit())
     return false;
 
   // Skip unavailable decls.

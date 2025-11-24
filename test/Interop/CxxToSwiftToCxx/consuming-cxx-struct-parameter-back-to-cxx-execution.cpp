@@ -175,9 +175,9 @@ int main() {
     // CHECK-NEXT: take shared frt x 2
     UseCxx::consumeSharedFRT(&sfrt);
     // CHECK-NEXT: retainShared
-    // CHECK-NEXT: releaseShared
     // CHECK-NEXT: consume shared frt x 2
     SharedFRT *sfrtptr = UseCxx::returnSharedFRT(&sfrt);
+    // CHECK-NEXT: releaseShared
     // CHECK-NEXT: retainShared
     // CHECK-NEXT: return shared frt x 2
     SharedFRT *sfrtptr2 = UseCxx::returnSharedFRT2();
@@ -191,8 +191,8 @@ int main() {
     UseCxx::consumeValueWrapper(wrapper);
     // CHECK-NEXT: retainShared
     // CHECK-NEXT: retainShared
-    // CHECK-NEXT: releaseShared
     // CHECK-NEXT: return shared frt x 4
+    // CHECK-NEXT: releaseShared
     // CHECK-NEXT: releaseShared
   }
   {

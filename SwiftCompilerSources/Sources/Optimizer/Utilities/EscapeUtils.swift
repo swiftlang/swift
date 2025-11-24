@@ -387,7 +387,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       if handleDestroy(of: operand.value, path: path) == .abortWalk {
         return .abortWalk
       }
-    case is ReturnInst:
+    case is ReturnInstruction:
       return isEscaping
     case is ApplyInst, is TryApplyInst, is BeginApplyInst:
       return walkDownCallee(argOp: operand, apply: instruction as! FullApplySite, path: path)
@@ -534,7 +534,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       if handleDestroy(of: operand.value, path: path) == .abortWalk {
         return .abortWalk
       }
-    case is ReturnInst:
+    case is ReturnInstruction:
       return isEscaping
     case is ApplyInst, is TryApplyInst, is BeginApplyInst:
       return walkDownCallee(argOp: operand, apply: instruction as! FullApplySite, path: path)

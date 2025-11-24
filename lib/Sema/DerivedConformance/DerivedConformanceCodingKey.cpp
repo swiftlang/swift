@@ -322,7 +322,7 @@ static bool canSynthesizeCodingKey(DerivedConformance &derived) {
   Type rawType = enumDecl->getRawType();
   if (rawType) {
     auto *parentDC = derived.getConformanceContext();
-    rawType = parentDC->mapTypeIntoContext(rawType);
+    rawType = parentDC->mapTypeIntoEnvironment(rawType);
 
     if (!rawType->isString() && !rawType->isInt()) {
       return false;

@@ -124,7 +124,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
 
   // NOTE: this acquire synchronizes with `completeFuture`.
   auto queueHead = fragment->waitQueue.load(std::memory_order_acquire);
-  bool contextInitialized = false;
+  bool suspendedWaiter = false;
   while (true) {
     switch (queueHead.getStatus()) {
     case Status::Error:
@@ -132,7 +132,14 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
       SWIFT_TASK_DEBUG_LOG("task %p waiting on task %p, completed immediately",
                            waitingTask, this);
       _swift_tsan_acquire(static_cast<Job *>(this));
-      if (contextInitialized) waitingTask->flagAsRunning();
+      if (suspendedWaiter) {
+        // This will always return zero because we were just
+        // running this Task so its BasePriority (which is
+        // immutable) should've already been set on the thread.
+        [[maybe_unused]]
+        uint32_t opaque = waitingTask->flagAsRunning();
+        assert(opaque == 0);
+      }
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
 
@@ -146,8 +153,8 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
       break;
     }
 
-    if (!contextInitialized) {
-      contextInitialized = true;
+    if (!suspendedWaiter) {
+      suspendedWaiter = true;
       auto context =
           reinterpret_cast<TaskFutureWaitAsyncContext *>(waitingTaskContext);
       context->errorResult = nullptr;
@@ -771,13 +778,6 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       group = cast<TaskGroupTaskOptionRecord>(option)->getGroup();
       assert(group && "Missing group");
       jobFlags.task_setIsGroupChildTask(true);
-      break;
-
-    case TaskOptionRecordKind::AsyncLet:
-      asyncLet = cast<AsyncLetTaskOptionRecord>(option)->getAsyncLet();
-      assert(asyncLet && "Missing async let storage");
-      jobFlags.task_setIsAsyncLetTask(true);
-      jobFlags.task_setIsChildTask(true);
       break;
 
     case TaskOptionRecordKind::AsyncLetWithBuffer: {
@@ -1666,8 +1666,11 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
   // we try to tail-call.
   } while (false);
 #else
-  // Restore the running state of the task and resume it.
-  task->flagAsRunning();
+  // This will always return zero because we were just running this Task so its
+  // BasePriority (which is immutable) should've already been set on the thread.
+  [[maybe_unused]]
+  uint32_t opaque = task->flagAsRunning();
+  assert(opaque == 0);
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 
   if (context->isExecutorSwitchForced())

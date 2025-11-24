@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-struct ClangTarget {
+struct ClangTarget: ~Copyable {
   var name: String
   var parentPath: RelativePath
   var sources: [RelativePath]

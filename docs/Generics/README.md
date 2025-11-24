@@ -18,7 +18,7 @@ It's written in TeX, so to typeset the PDF yourself, you need a TeX distribution
 
 ### Using `make`
 
-Running `make` in `docs/Generics/` will run `pdflatex` and `bibtex` in the right order to generate the final document with bibliography, index and cross-references:
+Running `make` in `docs/Generics/` will run `pdflatex` and `bibtex` in the right order to generate the final document with bibliography, index, and cross-references:
 
 ```
 cd docs/Generics/
@@ -61,16 +61,13 @@ This is a work in progress.
 
 The following chapters need some editing:
 
-- Part II:
-  - Substitution Maps
 - Part IV:
   - Completion
 
 The following chapters are not yet written:
 
 - Part III:
-  - Opaque Return Types
   - Existential Types
 - Part IV:
   - The Property Map
-  - Rule Minimization
+  - Minimization

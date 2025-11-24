@@ -196,7 +196,7 @@ void SILGenFunction::emitExpectedExecutorProlog() {
 
     case ActorIsolation::GlobalActor:
       if (F.isAsync() || wantDataRaceChecks) {
-        auto globalActorType = F.mapTypeIntoContext(actorIsolation.getGlobalActor());
+        auto globalActorType = F.mapTypeIntoEnvironment(actorIsolation.getGlobalActor());
         setExpectedExecutorForGlobalActor(*this, globalActorType);
       }
       break;
@@ -228,7 +228,7 @@ void SILGenFunction::emitExpectedExecutorProlog() {
 
     case ActorIsolation::GlobalActor:
       if (wantExecutor) {
-        auto globalActorType = F.mapTypeIntoContext(actorIsolation.getGlobalActor());
+        auto globalActorType = F.mapTypeIntoEnvironment(actorIsolation.getGlobalActor());
         setExpectedExecutorForGlobalActor(*this, globalActorType);
         break;
       }
@@ -660,7 +660,7 @@ SILGenFunction::emitClosureIsolation(SILLocation loc, SILDeclRef constant,
     llvm_unreachable("closures cannot directly have erased isolation");
 
   case ActorIsolation::GlobalActor: {
-    auto globalActorType = F.mapTypeIntoContext(isolation.getGlobalActor())
+    auto globalActorType = F.mapTypeIntoEnvironment(isolation.getGlobalActor())
                                ->getCanonicalType();
     return emitGlobalActorIsolation(loc, globalActorType);
   }
@@ -748,7 +748,7 @@ SILGenFunction::emitExecutor(SILLocation loc, ActorIsolation isolation,
   }
 
   case ActorIsolation::GlobalActor: {
-    auto globalActorType = F.mapTypeIntoContext(isolation.getGlobalActor());
+    auto globalActorType = F.mapTypeIntoEnvironment(isolation.getGlobalActor());
     return emitLoadGlobalActorExecutor(globalActorType);
   }
   }

@@ -221,7 +221,7 @@ FUNCTION(NativeStrongRelease, Swift, swift_release, C_CC, AlwaysAvailable,
          UNKNOWN_MEMEFFECTS)
 
 // void *swift_retain(void *ptr);
-FUNCTION(NativeStrongRetainClient, Swift, swift_retainClient, SwiftClientRR_CC, AlwaysAvailable,
+FUNCTION(NativeStrongRetainDirect, Swift, swift_retainDirect, SwiftDirectRR_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, FirstParamReturned, WillReturn),
@@ -229,7 +229,15 @@ FUNCTION(NativeStrongRetainClient, Swift, swift_retainClient, SwiftClientRR_CC, 
          UNKNOWN_MEMEFFECTS)
 
 // void swift_release(void *ptr);
-FUNCTION(NativeStrongReleaseClient, Swift, swift_releaseClient, SwiftClientRR_CC, AlwaysAvailable,
+FUNCTION(NativeStrongReleaseDirect, Swift, swift_releaseDirect, SwiftDirectRR_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_releaseBox(void *ptr);
+FUNCTION(ReleaseBox, Swift, swift_releaseBox, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind),
@@ -436,18 +444,18 @@ FUNCTION(BridgeObjectStrongRelease, Swift, swift_bridgeObjectRelease,
          EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
          UNKNOWN_MEMEFFECTS)
 
-// void *swift_bridgeObjectRetainClient(void *ptr);
-FUNCTION(BridgeObjectStrongRetainClient, Swift, swift_bridgeObjectRetainClient,
-         SwiftClientRR_CC, AlwaysAvailable,
+// void *swift_bridgeObjectRetainDirect(void *ptr);
+FUNCTION(BridgeObjectStrongRetainDirect, Swift, swift_bridgeObjectRetainDirect,
+         SwiftDirectRR_CC, AlwaysAvailable,
          RETURNS(BridgeObjectPtrTy),
          ARGS(BridgeObjectPtrTy),
          ATTRS(NoUnwind, FirstParamReturned),
          EFFECT(RuntimeEffect::RefCounting),
          UNKNOWN_MEMEFFECTS)
 
-// void *swift_bridgeObjectReleaseClient(void *ptr);
-FUNCTION(BridgeObjectStrongReleaseClient, Swift, swift_bridgeObjectReleaseClient,
-         SwiftClientRR_CC, AlwaysAvailable,
+// void *swift_bridgeObjectReleaseDirect(void *ptr);
+FUNCTION(BridgeObjectStrongReleaseDirect, Swift, swift_bridgeObjectReleaseDirect,
+         SwiftDirectRR_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(BridgeObjectPtrTy),
          ATTRS(NoUnwind),
@@ -2100,12 +2108,6 @@ FUNCTION(CoroFrameAlloc, Swift, swift_coroFrameAlloc, C_CC,
          NO_ATTRS,
          EFFECT(RuntimeEffect::Allocating),
          UNKNOWN_MEMEFFECTS)
-FUNCTION(coroFrameAllocStub, Swift, swift_coroFrameAllocStub, C_CC,
-         AlwaysAvailable, RETURNS(Int8PtrTy),
-         ARGS(SizeTy, Int64Ty),
-         ATTRS(NoUnwind),
-         EFFECT(RuntimeEffect::Allocating),
-         UNKNOWN_MEMEFFECTS)
 
 // void *_Block_copy(void *block);
 FUNCTION(BlockCopy, BlocksRuntime, _Block_copy, C_CC, AlwaysAvailable,
@@ -2555,27 +2557,6 @@ FUNCTION(DistributedActorInitializeRemote,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-/// void swift_asyncLet_start(
-///     AsyncLet *alet,
-///     TaskOptionRecord *options,
-///     const Metadata *futureResultType,
-///     void *closureEntryPoint,
-///     HeapObject *closureContext
-/// );
-FUNCTION(AsyncLetStart,
-         _Concurrency, swift_asyncLet_start, SwiftCC,
-         ConcurrencyAvailability,
-         RETURNS(VoidTy),
-         ARGS(SwiftAsyncLetPtrTy,         // AsyncLet*
-              SwiftTaskOptionRecordPtrTy, // options
-              TypeMetadataPtrTy,          // futureResultType
-              Int8PtrTy,                  // closureEntry
-              OpaquePtrTy                 // closureContext
-         ),
-         ATTRS(NoUnwind),
-         EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
-
 /// void swift_asyncLet_begin(
 ///     AsyncLet *alet,
 ///     TaskOptionRecord *options,
@@ -2597,14 +2578,26 @@ FUNCTION(AsyncLetBegin,
          ),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         UNKNOWN_MEMEFFECTS)
 
-// void swift_asyncLet_end(AsyncLet *alet);
-FUNCTION(EndAsyncLet,
-         _Concurrency, swift_asyncLet_end, SwiftCC,
+/// void swift_asyncLet_finish(
+///     AsyncLet *alet,
+///     TaskOptionRecord *options,
+///     const Metadata *futureResultType,
+///     void *closureEntryPoint,
+///     HeapObject *closureContext,
+///     void *resultBuffer
+/// );
+FUNCTION(AsyncLetFinish,
+         _Concurrency, swift_asyncLet_finish, SwiftAsyncCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
-         ARGS(SwiftAsyncLetPtrTy),
+         ARGS(SwiftContextPtrTy,          // current context
+              SwiftAsyncLetPtrTy,         // AsyncLet*
+              Int8PtrTy,                  // resultBuffer
+              TaskContinuationFunctionPtrTy, // continuation
+              SwiftContextPtrTy           // temp context
+         ),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
@@ -2671,6 +2664,72 @@ FUNCTION(TaskGroupDestroy,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// CancellationNotificationStatusRecord*
+// swift_task_addCancellationHandler(
+//     CancellationNotificationStatusRecord::FunctionType handler,
+//     void *context);
+FUNCTION(TaskAddCancellationHandler,
+        _Concurrency, swift_task_addCancellationHandler, SwiftCC,
+        ConcurrencyAvailability,
+        RETURNS(Int8PtrTy),
+        ARGS(Int8PtrTy, Int8PtrTy),
+        ATTRS(NoUnwind),
+        EFFECT(RuntimeEffect::Concurrency),
+        UNKNOWN_MEMEFFECTS)
+
+// void swift_task_removeCancellationHandler(
+//   CancellationNotificationStatusRecord *record);
+FUNCTION(TaskRemoveCancellationHandler,
+         _Concurrency, swift_task_removeCancellationHandler, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// EscalationNotificationStatusRecord*
+// swift_task_addPriorityEscalationHandler(
+//     EscalationNotificationStatusRecord::FunctionType handler,
+//     void *context);
+FUNCTION(TaskAddPriorityEscalationHandler,
+        _Concurrency, swift_task_addPriorityEscalationHandler, SwiftCC,
+        ConcurrencyAvailability,
+        RETURNS(Int8PtrTy),
+        ARGS(Int8PtrTy, Int8PtrTy),
+        ATTRS(NoUnwind),
+        EFFECT(RuntimeEffect::Concurrency),
+        UNKNOWN_MEMEFFECTS)
+
+// void swift_task_removePriorityEscalationHandler(
+//   EscalationNotificationStatusRecord *record);
+FUNCTION(TaskRemovePriorityEscalationHandler,
+         _Concurrency, swift_task_removePriorityEscalationHandler, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_task_localValuePush(const HeapObject *key,
+//                                /* +1 */ OpaqueValue *value,
+//                                const Metadata *valueType);
+FUNCTION(TaskLocalValuePush, _Concurrency, swift_task_localValuePush, SwiftCC,
+         ConcurrencyAvailability, RETURNS(),
+         ARGS(RefCountedPtrTy, OpaquePtrTy, TypeMetadataPtrTy), ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency), UNKNOWN_MEMEFFECTS)
+
+// void swift_task_localValuePop();
+FUNCTION(TaskLocalValuePop,
+         _Concurrency, swift_task_localValuePop, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(),
+         ARGS(),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)

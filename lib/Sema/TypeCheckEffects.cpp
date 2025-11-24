@@ -397,7 +397,7 @@ public:
     case Kind::Parameter:
       auto *param = getParameter();
       auto *dc = param->getDeclContext();
-      return dc->mapTypeIntoContext(param->getInterfaceType())
+      return dc->mapTypeIntoEnvironment(param->getInterfaceType())
           ->lookThroughAllOptionalTypes();
     }
     llvm_unreachable("bad kind");

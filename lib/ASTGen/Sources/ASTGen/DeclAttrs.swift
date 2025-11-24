@@ -150,6 +150,8 @@ extension ASTGenVisitor {
         return handle(self.generateEffectsAttr(attribute: node)?.asDeclAttribute)
       case .Exclusivity:
         return handle(self.generateExclusivityAttr(attribute: node)?.asDeclAttribute)
+      case .Export:
+        return handle(self.generateExportAttr(attribute: node)?.asDeclAttribute)
       case .Expose:
         return handle(self.generateExposeAttr(attribute: node)?.asDeclAttribute)
       case .Extern:
@@ -1068,6 +1070,33 @@ extension ASTGenVisitor {
       protocolType: type,
       memberName: member.name,
       memberNameLoc: member.loc
+    )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @export(interface)
+  ///   @export(implementation)
+  ///   ```
+  func generateExportAttr(attribute node: AttributeSyntax) -> BridgedExportAttr? {
+    let kind: swift.ExportKind? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "interface": return .interface
+        case "implementation": return .implementation
+        default: return nil
+        }
+      }
+    )
+    guard let kind else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      kind: kind
     )
   }
 

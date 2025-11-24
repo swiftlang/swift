@@ -315,8 +315,7 @@ namespace {
                               << " for layout " << Layout::Code << "\n");
     }
 
-    bool ShouldSerializeAll;
-    bool SerializeDebugInfoSIL;
+    const SerializationOptions &Options;
 
     void addMandatorySILFunction(const SILFunction *F,
                                  bool emitDeclarationsForOnoneSupport);
@@ -399,10 +398,9 @@ namespace {
     IdentifierID addSILFunctionRef(SILFunction *F);
 
   public:
-    SILSerializer(Serializer &S, llvm::BitstreamWriter &Out, bool serializeAll,
-                  bool serializeDebugInfo)
-        : S(S), Out(Out), ShouldSerializeAll(serializeAll),
-          SerializeDebugInfoSIL(serializeDebugInfo) {}
+    SILSerializer(Serializer &S, llvm::BitstreamWriter &Out,
+                  const SerializationOptions &options)
+        : S(S), Out(Out), Options(options) {}
 
     void writeSILModule(const SILModule *SILMod);
   };
@@ -544,7 +542,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // Otherwise, the generic specializer fails to remap references to functions
   // in debug scopes to their specialized versions which breaks IRGen.
   // TODO: add an assertion in IRGen when the specializer fails to remap.
-  if (!NoBody || SerializeDebugInfoSIL)
+  if (!NoBody || Options.SerializeDebugInfoSIL)
     if (auto *genericEnv = F.getGenericEnvironment())
       genericSigID = S.addGenericSignatureRef(genericEnv->getGenericSignature());
 
@@ -691,7 +689,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   DebugScopeMap.clear();
   SourceLocMap.clear();
 
-  if (SerializeDebugInfoSIL)
+  if (Options.SerializeDebugInfoSIL)
     writeDebugScopes(F.getDebugScope(), F.getModule().getSourceManager());
   // Assign a unique ID to each basic block of the SILFunction.
   unsigned BasicID = 0;
@@ -781,13 +779,13 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
   const SILDebugScope *Prev = nullptr;
   auto &SM = BB.getParent()->getModule().getSourceManager();
   for (const SILInstruction &SI : BB) {
-    if (SerializeDebugInfoSIL) {
+    if (Options.SerializeDebugInfoSIL) {
       if (SI.getDebugScope() != Prev) {
         Prev = SI.getDebugScope();
         writeDebugScopes(Prev, SM);
       }
     }
-    if (SerializeDebugInfoSIL) {
+    if (Options.SerializeDebugInfoSIL) {
       writeSourceLoc(SI.getLoc(), SM);
     }
 
@@ -1060,7 +1058,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
 
   case SILInstructionKind::DebugValueInst: {
-    if (!SerializeDebugInfoSIL)
+    if (!Options.SerializeDebugInfoSIL)
      return;
     auto DVI = cast<DebugValueInst>(&SI);
     unsigned attrs = unsigned(DVI->poisonRefs() & 0x1);
@@ -3287,7 +3285,7 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
 void SILSerializer::writeSILVTable(const SILVTable &vt) {
   // Do not emit vtables for non-public classes unless everything has to be
   // serialized.
-  if (!ShouldSerializeAll &&
+  if (!Options.SerializeAllSIL &&
       vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Package)
     return;
 
@@ -3313,7 +3311,7 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
     SmallVector<uint64_t, 4> ListOfValues;
     SILFunction *impl = entry.getImplementation();
 
-    if (ShouldSerializeAll ||
+    if (Options.SerializeAllSIL ||
         (vt.isAnySerialized() &&
          impl->hasValidLinkageForFragileRef(vt.getSerializedKind()))) {
       handleSILDeclRef(S, entry.getMethod(), ListOfValues);
@@ -3333,12 +3331,12 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
 void SILSerializer::writeSILMoveOnlyDeinit(const SILMoveOnlyDeinit &deinit) {
   // Do not emit deinit for non-public nominal types unless everything has to be
   // serialized.
-  if (!ShouldSerializeAll && deinit.getNominalDecl()->getEffectiveAccess() <
+  if (!Options.SerializeAllSIL && deinit.getNominalDecl()->getEffectiveAccess() <
                                  swift::AccessLevel::Package)
     return;
 
   SILFunction *impl = deinit.getImplementation();
-  if (!ShouldSerializeAll &&
+  if (!Options.SerializeAllSIL &&
       // Package CMO for MoveOnlyDeinit is not supported so
       // pass the IsSerialized argument to keep the behavior
       // consistent with or without the optimization.
@@ -3510,6 +3508,12 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
 }
 
 void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
+  if (Options.SkipImplementationOnlyDecls &&
+      wt.getConformingNominal()->getAttrs().hasAttribute<
+        ImplementationOnlyAttr>()) {
+    return;
+  }
+
   WitnessTableList[wt.getName()] = NextWitnessTableID++;
   WitnessTableOffset.push_back(Out.GetCurrentBitNo());
 
@@ -3734,7 +3738,7 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
   }
 
   // If we are asked to serialize everything, go ahead and do it.
-  if (ShouldSerializeAll)
+  if (Options.SerializeAllSIL)
     return true;
 
   // If F is serialized, we should always emit its body.
@@ -3814,13 +3818,13 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // serialize everything.
   // FIXME: Resilience: could write out vtable for fragile classes.
   for (const auto &vt : SILMod->getVTables()) {
-    if ((ShouldSerializeAll || vt->isAnySerialized()) &&
+    if ((Options.SerializeAllSIL || vt->isAnySerialized()) &&
         SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(vt->getClass()))
       writeSILVTable(*vt);
   }
 
   for (const auto &deinit : SILMod->getMoveOnlyDeinits()) {
-    if ((ShouldSerializeAll || deinit->isAnySerialized()) &&
+    if ((Options.SerializeAllSIL || deinit->isAnySerialized()) &&
         SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
             deinit->getNominalDecl()))
       writeSILMoveOnlyDeinit(*deinit);
@@ -3828,7 +3832,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Write out property descriptors.
   for (const SILProperty &prop : SILMod->getPropertyList()) {
-    if ((ShouldSerializeAll || prop.isAnySerialized()) &&
+    if ((Options.SerializeAllSIL || prop.isAnySerialized()) &&
         SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
                                      prop.getDecl()->getInnermostDeclContext()))
       writeSILProperty(prop);
@@ -3836,7 +3840,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Write out fragile WitnessTables.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
-    if ((ShouldSerializeAll || wt.isAnySerialized()) &&
+    if ((Options.SerializeAllSIL || wt.isAnySerialized()) &&
         SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
                                          wt.getConformance()->getDeclContext()))
       writeSILWitnessTable(wt);
@@ -3860,7 +3864,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Add global variables that must be emitted to the list.
   for (const SILGlobalVariable &g : SILMod->getSILGlobals()) {
-    if (g.isAnySerialized() || ShouldSerializeAll)
+    if (g.isAnySerialized() || Options.SerializeAllSIL)
       addReferencedGlobalVariable(&g);
   }
 
@@ -3894,7 +3898,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
     // TODO(TF-893): Consider checking
     // `SILMod->shouldSerializeEntitiesAssociatedWithDeclContext` on the JVP/VJP
     // functions.
-    if ((ShouldSerializeAll || diffWitness.isSerialized()))
+    if ((Options.SerializeAllSIL || diffWitness.isSerialized()))
       DifferentiabilityWitnessesToEmit.insert(&diffWitness);
   }
   for (auto *diffWitness : DifferentiabilityWitnessesToEmit)
@@ -3945,11 +3949,10 @@ void SILSerializer::writeSILModule(const SILModule *SILMod) {
   writeIndexTables();
 }
 
-void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL,
-                          bool serializeDebugInfo) {
+void Serializer::writeSIL(const SILModule *SILMod) {
   if (!SILMod)
     return;
 
-  SILSerializer SILSer(*this, Out, serializeAllSIL, serializeDebugInfo);
+  SILSerializer SILSer(*this, Out, Options);
   SILSer.writeSILModule(SILMod);
 }

@@ -328,7 +328,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // Try to resolve a witness method against our known conformances.
   if (auto *wmi = dyn_cast<WitnessMethodInst>(value)) {
     auto conf = substitutionMap.lookupConformance(
-        wmi->getLookupType()->mapTypeOutOfContext()->getCanonicalType(),
+        wmi->getLookupType()->mapTypeOutOfEnvironment()->getCanonicalType(),
         wmi->getConformance().getProtocol());
     if (conf.isInvalid())
       return getUnknown(evaluator, value,

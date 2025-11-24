@@ -100,7 +100,7 @@ fileprivate final class ProjectGenerator {
     }
   }
 
-  init(for spec: ProjectSpec) {
+  init(for spec: consuming ProjectSpec) {
     self.spec = spec
 
     // Create an 'ALL' meta-target that depends on everything.
@@ -361,7 +361,7 @@ fileprivate final class ProjectGenerator {
 
   /// Checks whether a given Clang target can be represented using a buildable
   /// folder.
-  func canUseBuildableFolder(for clangTarget: ClangTarget) throws -> Bool {
+  func canUseBuildableFolder(for clangTarget: borrowing ClangTarget) throws -> Bool {
     try canUseBuildableFolder(
       at: clangTarget.parentPath,
       sources: clangTarget.sources + clangTarget.unbuildableSources
@@ -410,7 +410,7 @@ fileprivate final class ProjectGenerator {
     }
   }
 
-  func generateClangTarget(_ targetInfo: ClangTarget) throws {
+  func generateClangTarget(_ targetInfo: consuming ClangTarget) throws {
     let targetPath = targetInfo.parentPath
     guard checkNotExcluded(targetPath, for: "Clang target") else {
       return
@@ -910,7 +910,7 @@ fileprivate final class ProjectGenerator {
 }
 
 extension ProjectSpec {
-  public func generateAndWrite(
+  public consuming func generateAndWrite(
     into outputDir: AbsolutePath
   ) throws -> GeneratedProject {
     let generator = ProjectGenerator(for: self)

@@ -305,14 +305,11 @@ getInnermostIntroVersion(ArrayRef<Decl *> DeclStack, PlatformKind Platform) {
 
 /// Using the introducing version of a symbol as the start version to redirect
 /// linkage path isn't sufficient. This is because the executable can be deployed
-/// to OS versions that were before the symbol was introduced. When that happens,
-/// strictly using the introductory version can lead to NOT redirecting.
+/// to OS versions that were before the symbol was introduced.
 static llvm::VersionTuple calculateLdPreviousVersionStart(ASTContext &ctx,
                                                 llvm::VersionTuple introVer) {
-  auto minDep = ctx.LangOpts.getMinPlatformVersion();
-  if (minDep < introVer)
-    return llvm::VersionTuple(1, 0);
-  return introVer;
+  // We can do this because currently because we don't support multiple moves.
+  return llvm::VersionTuple(1, 0);
 }
 
 void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
@@ -702,8 +699,13 @@ void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
 }
 
 class APIGenRecorder final : public APIRecorder {
-  static bool isSPI(const Decl *decl) {
+  bool isSPI(const Decl *decl) {
     assert(decl);
+
+    // If the module's library level is more restricted than API, all symbols
+    // should be SPIs.
+    if (module->getLibraryLevel() < swift::LibraryLevel::API)
+      return true;
 
     if (auto value = dyn_cast<ValueDecl>(decl)) {
       auto accessScope =
@@ -716,7 +718,7 @@ class APIGenRecorder final : public APIRecorder {
         return true;
     }
 
-    return decl->isSPI() || decl->isAvailableAsSPI();
+    return decl->isSPI() || getAvailability(decl).spiAvailable;
   }
 
 public:
@@ -821,25 +823,31 @@ private:
   llvm::DenseMap<CategoryNameKey, unsigned> CategoryCounts;
 
   apigen::APIAvailability getAvailability(const Decl *decl) {
-    std::optional<bool> unavailable;
+    std::optional<bool> unavailable, spiAvailable;
     std::string introduced, obsoleted;
-    bool hasFallbackUnavailability = false;
+    bool hasFallbackUnavailability = false, hasFallbackSPIAvailability = false;
     auto platform = targetPlatform(module->getASTContext().LangOpts);
-    for (auto attr : decl->getSemanticAvailableAttrs()) {
+    const Decl *declForAvailability = decl->getInnermostDeclWithAvailability();
+    if (!declForAvailability)
+      return {};
+    for (auto attr : declForAvailability->getSemanticAvailableAttrs()) {
       if (!attr.isPlatformSpecific()) {
         hasFallbackUnavailability = attr.isUnconditionallyUnavailable();
+        hasFallbackSPIAvailability = attr.isSPI();
         continue;
       }
       if (attr.getPlatform() != platform)
         continue;
       unavailable = attr.isUnconditionallyUnavailable();
+      spiAvailable = attr.isSPI();
       if (attr.getIntroduced())
         introduced = attr.getIntroduced()->getAsString();
       if (attr.getObsoleted())
         obsoleted = attr.getObsoleted()->getAsString();
     }
     return {introduced, obsoleted,
-            unavailable.value_or(hasFallbackUnavailability)};
+            unavailable.value_or(hasFallbackUnavailability),
+            spiAvailable.value_or(hasFallbackSPIAvailability)};
   }
 
   StringRef getSelectorName(SILDeclRef method, SmallString<128> &buffer) {

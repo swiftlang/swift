@@ -39,6 +39,14 @@ protected:
     : super(IGM), Target(target) {}
 
 public:
+
+  void embeddedLayout() {
+    // The embedded layout consists of:
+    // -1 : vwt
+    //  0 : metadata flags
+    super::layout();
+  }
+
   void layout() {
     super::layout();
 

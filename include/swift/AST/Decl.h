@@ -374,6 +374,12 @@ bool conflicting(ASTContext &ctx,
                  bool *wouldConflictInSwift5 = nullptr,
                  bool skipProtocolExtensionCheck = false);
 
+/// The kind of special compiler synthesized property in a \c distributed actor,
+/// currently this includes \c id and \c actorSystem.
+enum class SpecialDistributedActorProperty {
+  Id, ActorSystem
+};
+
 /// The kind of artificial main to generate.
 enum class ArtificialMainKind : uint8_t {
   NSApplicationMain,
@@ -755,6 +761,11 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
+  SWIFT_INLINE_BITFIELD(OpaqueTypeDecl, GenericTypeDecl, 1,
+    /// Whether we have lazily-loaded underlying substitutions.
+    HasLazyUnderlyingSubstitutions : 1
+  );
+
   SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
@@ -1079,12 +1090,22 @@ public:
   /// behaviors for it and, if it's an extension, its members.
   bool isObjCImplementation() const;
 
+  /// True if this declaration should always have its implementation made
+  /// available to the client, and not have an ABI symbol.
+  ///
+  /// This can be spelled with @export(implementation) or the historical
+  /// @_alwaysEmitIntoClient.
+  bool isAlwaysEmittedIntoClient() const;
+
   /// True if this declaration should never have its implementation made
   /// available to any client. This overrides cross-module optimization and
   /// optimizations that might use the implementation, such that the only
   /// implementation of this function is the one compiled into its owning
   /// module. Practically speaking, this prohibits serialization of the SIL
   /// for this definition.
+  ///
+  /// This can be spelled with @export(interface) or the historical
+  /// @_neverEmitIntoClient.
   bool isNeverEmittedIntoClient() const;
 
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
@@ -1680,15 +1701,15 @@ public:
   ///
   /// \code
   /// class C<T> {
-  ///   func f1() {}    // isGeneric == false
-  ///   func f2<T>() {} // isGeneric == true
+  ///   func f1() {}    // hasGenericParamList == false
+  ///   func f2<T>() {} // hasGenericParamList == true
   /// }
   ///
-  /// protocol P { // isGeneric == true due to implicit Self param
-  ///   func p()   // isGeneric == false
+  /// protocol P { // hasGenericParamList == true due to implicit Self param
+  ///   func p()   // hasGenericParamList == false
   /// }
   /// \endcode
-  bool isGeneric() const { return getGenericParams() != nullptr; }
+  bool hasGenericParamList() const { return getGenericParams() != nullptr; }
   bool hasComputedGenericSignature() const;
   bool isComputingGenericSignature() const;
   
@@ -3056,6 +3077,12 @@ public:
   /// `distributed var get { }` accessors.
   bool isDistributedGetAccessor() const;
 
+  /// Whether this is the special synthesized 'id' or 'actorSystem' property
+  /// of a distributed actor. If \p onlyCheckName is set, then any
+  /// matching user-defined property with the name is also considered.
+  std::optional<SpecialDistributedActorProperty>
+  isSpecialDistributedActorProperty(bool onlyCheckName = false) const;
+
   bool hasName() const { return bool(Name); }
   bool isOperator() const { return Name.isOperator(); }
 
@@ -3624,7 +3651,8 @@ private:
   OpaqueTypeDecl(ValueDecl *NamingDecl, GenericParamList *GenericParams,
                  DeclContext *DC,
                  GenericSignature OpaqueInterfaceGenericSignature,
-                 ArrayRef<TypeRepr *> OpaqueReturnTypeReprs);
+                 ArrayRef<TypeRepr *> OpaqueReturnTypeReprs,
+                 bool hasLazyUnderlyingSubstitutions);
 
   unsigned getNumOpaqueReturnTypeReprs() const {
     return NamingDeclAndHasOpaqueReturnTypeRepr.getInt()
@@ -3636,12 +3664,20 @@ private:
     return getNumOpaqueReturnTypeReprs();
   }
 
+  void loadLazyUnderlyingSubstitutions();
+
 public:
-  static OpaqueTypeDecl *get(
+  static OpaqueTypeDecl *create(
       ValueDecl *NamingDecl, GenericParamList *GenericParams,
       DeclContext *DC,
       GenericSignature OpaqueInterfaceGenericSignature,
       ArrayRef<TypeRepr *> OpaqueReturnTypeReprs);
+
+  static OpaqueTypeDecl *createDeserialized(
+      GenericParamList *GenericParams,
+      DeclContext *DC,
+      GenericSignature OpaqueInterfaceGenericSignature,
+      LazyMemberLoader *lazyLoader, uint64_t underlyingSubsData);
 
   ValueDecl *getNamingDecl() const {
     return NamingDeclAndHasOpaqueReturnTypeRepr.getPointer();
@@ -3698,19 +3734,19 @@ public:
       bool typeCheckFunctionBodies=true) const;
 
   void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
-    assert(!UniqueUnderlyingType.has_value() && "resetting underlying type?!");
+    ASSERT(!Bits.OpaqueTypeDecl.HasLazyUnderlyingSubstitutions);
+    ASSERT(!UniqueUnderlyingType.has_value() && "resetting underlying type?!");
     UniqueUnderlyingType = subs;
   }
 
   bool hasConditionallyAvailableSubstitutions() const {
+    const_cast<OpaqueTypeDecl *>(this)->loadLazyUnderlyingSubstitutions();
+
     return ConditionallyAvailableTypes.has_value();
   }
 
   ArrayRef<ConditionallyAvailableSubstitutions *>
-  getConditionallyAvailableSubstitutions() const {
-    assert(ConditionallyAvailableTypes);
-    return ConditionallyAvailableTypes.value();
-  }
+  getConditionallyAvailableSubstitutions() const;
 
   void setConditionallyAvailableSubstitutions(
       ArrayRef<ConditionallyAvailableSubstitutions *> substitutions);
@@ -5430,7 +5466,6 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Decodable,
   AdditiveArithmetic,
   Differentiable,
-  Identifiable,
   Actor,
   DistributedActor,
   DistributedActorSystem,
@@ -6060,9 +6095,7 @@ public:
 
   /// Return true if this is a property that either has storage
   /// or init accessor associated with it.
-  bool supportsInitialization() const {
-    return hasStorage() || hasInitAccessor();
-  }
+  bool supportsInitialization() const;
 
   /// Return true if this storage has the basic accessors/capability
   /// to be mutated.  This is generally constant after the accessors are
@@ -6716,7 +6749,10 @@ public:
   ///
   /// From the standpoint of access control and exportability checking, this
   /// var will behave as if it was public, even if it is internal or private.
-  bool isLayoutExposedToClients() const;
+  ///
+  /// If \p applyImplicit, consider implicitly exposed layouts as well.
+  /// This applies to non-resilient modules.
+  bool isLayoutExposedToClients(bool applyImplicit = false) const;
 
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
@@ -6724,13 +6760,18 @@ public:
     Bits.VarDecl.IsDebuggerVar = IsDebuggerVar;
   }
 
-  /// Visit all auxiliary declarations to this VarDecl.
+  /// Visit all auxiliary variables for this VarDecl.
   ///
-  /// An auxiliary declaration is a declaration synthesized by the compiler to support
-  /// this VarDecl, such as synthesized property wrapper variables.
+  /// An auxiliary variable is one that is synthesized by the compiler to
+  /// support this VarDecl, such as synthesized property wrapper variables.
   ///
-  /// \note this function only visits auxiliary decls that are not part of the AST.
-  void visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)>) const;
+  /// \param forNameLookup If \c true, will only visit auxiliary variables that
+  /// may appear in name lookup results.
+  ///
+  /// \note this function only visits auxiliary variables that are not part of
+  /// the AST.
+  void visitAuxiliaryVars(bool forNameLookup,
+                          llvm::function_ref<void(VarDecl *)>) const;
 
   /// Is this the synthesized storage for a 'lazy' property?
   bool isLazyStorageProperty() const {
@@ -7004,9 +7045,6 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'sending'.
     IsSending = 1 << 4,
-
-    /// Whether or not this parameter is isolated to a caller.
-    IsCallerIsolated = 1 << 5,
   };
 
   /// The type repr and 3 bits used for flags.
@@ -7305,18 +7343,6 @@ public:
       addFlag(Flag::IsSending);
     else
       removeFlag(Flag::IsSending);
-  }
-
-  /// Whether or not this parameter is marked with 'nonisolated(nonsending)'.
-  bool isCallerIsolated() const {
-    return getOptions().contains(Flag::IsCallerIsolated);
-  }
-
-  void setCallerIsolated(bool value = true) {
-    if (value)
-      addFlag(Flag::IsCallerIsolated);
-    else
-      removeFlag(Flag::IsCallerIsolated);
   }
 
   /// Whether or not this parameter is marked with '@_addressable'.

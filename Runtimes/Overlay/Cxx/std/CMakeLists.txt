@@ -25,6 +25,7 @@ target_compile_options(swiftCxxStdlib PRIVATE
 target_link_libraries(swiftCxxStdlib PRIVATE
   $<$<BOOL:${HAVE___GLIBCXX__}>:libstdcxx>
   $<$<NOT:$<PLATFORM_ID:Darwin>>:cxxshim>
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>
   swiftCxx
   swiftCore
   swift_Builtin_float

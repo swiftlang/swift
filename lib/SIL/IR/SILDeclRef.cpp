@@ -505,14 +505,14 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::Deallocator:
   case Kind::IsolatedDeallocator:
   case Kind::Destroyer: {
-    // @_alwaysEmitIntoClient declarations are like the default arguments of
+    // Always-emit-into-client declarations are like the default arguments of
     // public functions; they are roots for dead code elimination and have
     // serialized bodies, but no public symbol in the generated binary.
-    if (d->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    if (d->isAlwaysEmittedIntoClient())
       return Limit::AlwaysEmitIntoClient;
     if (auto accessor = dyn_cast<AccessorDecl>(d)) {
       auto *storage = accessor->getStorage();
-      if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      if (storage->isAlwaysEmittedIntoClient())
         return Limit::AlwaysEmitIntoClient;
     }
     break;
@@ -1025,7 +1025,8 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
     // @objc thunks for top-level functions are serializable since they're
     // referenced from @convention(c) conversions inside inlinable
     // functions.
-    return IsSerialized;
+    if (isThunk())
+      return IsSerialized;
   }
 
   // Declarations imported from Clang modules are serialized if
@@ -1192,13 +1193,13 @@ bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   if (!decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return false;
 
-  // If the declaration is marked as @_neverEmitIntoClient, it has a unique
-  // definition.
+  // If the declaration is marked as never being emitted into the client, it
+  // has a unique definition.
   if (decl->isNeverEmittedIntoClient())
     return false;
 
-  /// @_alwaysEmitIntoClient means that we have a non-unique definition.
-  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+  /// Always-emit-into-client means that we have a non-unique definition.
+  if (decl->isAlwaysEmittedIntoClient())
     return true;
 
   // If the declaration is marked in a manner that indicates that other

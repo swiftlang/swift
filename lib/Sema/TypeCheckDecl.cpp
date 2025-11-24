@@ -1171,7 +1171,7 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   assert(rawTy && "Cannot compute value kind without raw type!");
   
   if (ED->getGenericEnvironmentOfContext() != nullptr)
-    rawTy = ED->mapTypeIntoContext(rawTy);
+    rawTy = ED->mapTypeIntoEnvironment(rawTy);
 
   // Swift enums require that the raw type is convertible from one of the
   // primitive literal protocols.
@@ -1218,7 +1218,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   }
 
   if (ED->getGenericEnvironmentOfContext() != nullptr)
-    rawTy = ED->mapTypeIntoContext(rawTy);
+    rawTy = ED->mapTypeIntoEnvironment(rawTy);
   if (rawTy->hasError())
     return std::make_tuple<>();
 
@@ -2480,7 +2480,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     Type interfaceType = namingPattern->getType();
     if (interfaceType->hasArchetype())
-      interfaceType = interfaceType->mapTypeOutOfContext();
+      interfaceType = interfaceType->mapTypeOutOfEnvironment();
 
     // In SIL mode, VarDecls are written as having reference storage types.
     if (!interfaceType->is<ReferenceStorageType>()) {
@@ -2516,7 +2516,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       thrownTy = AFD->getThrownInterfaceType();
       ProtocolDecl *errorProto = Context.getErrorDecl();
       if (thrownTy && !thrownTy->hasError() && errorProto) {
-        Type thrownTyInContext = AFD->mapTypeIntoContext(thrownTy);
+        Type thrownTyInContext = AFD->mapTypeIntoEnvironment(thrownTy);
         if (!checkConformance(thrownTyInContext, errorProto)) {
           SourceLoc loc;
           if (auto thrownTypeRepr = AFD->getThrownTypeRepr())
@@ -2727,6 +2727,18 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
 
   if (!namingPattern) {
     if (auto parentStmt = VD->getRecursiveParentPatternStmt()) {
+      // We have a parent stmt. This should only ever be the case for completion
+      // or lazy type-checking, regular type-checking should go through the
+      // StmtChecker and assign types before querying this, otherwise we could
+      // end up double-type-checking.
+      //
+      // FIXME: We ought to be able to enable the following assert once we've
+      // fixed cases where we currently allow forward references to variables to
+      // kick interface type requests
+      // (https://github.com/swiftlang/swift/pull/85141).
+      // ASSERT(Context.SourceMgr.hasIDEInspectionTargetBuffer() ||
+      //        Context.TypeCheckerOpts.EnableLazyTypecheck);
+
       // Try type checking parent control statement.
       if (auto condStmt = dyn_cast<LabeledConditionalStmt>(parentStmt)) {
         // The VarDecl is defined inside a condition of a `if` or `while` stmt.
@@ -2752,18 +2764,20 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
         assert(foundVarDecl && "VarDecl not declared in its parent?");
         (void) foundVarDecl;
       } else {
-        // We have some other parent stmt. Type check it completely.
+        // We have some other statement, e.g a switch or some kind of loop. We
+        // need to type-check it to get the type of the bound variable. We
+        // generally want to skip type-checking any BraceStmts, the only
+        // exception being do-catch bodies since we need to compute the thrown
+        // error type for catch clauses.
+        // FIXME: Rather than going through `typeCheckASTNode` and trying to
+        // exclude type-checker work, we ought to do more granular requests.
+        auto braceCheck = BraceStmtChecking::OnlyDoCatchBody;
+
         if (auto CS = dyn_cast<CaseStmt>(parentStmt))
           parentStmt = CS->getParentStmt();
 
-        bool LeaveBodyUnchecked = true;
-        // type-checking 'catch' patterns depends on the type checked body.
-        if (isa<DoCatchStmt>(parentStmt))
-          LeaveBodyUnchecked = false;
-
         ASTNode node(parentStmt);
-        TypeChecker::typeCheckASTNode(node, VD->getDeclContext(),
-                                      LeaveBodyUnchecked);
+        TypeChecker::typeCheckASTNode(node, VD->getDeclContext(), braceCheck);
       }
       namingPattern = VD->getCanonicalVarDecl()->NamingPattern;
     }
@@ -2905,6 +2919,10 @@ static ArrayRef<Decl *> evaluateMembersRequest(
       ResolveImplicitMemberRequest{nominal,
                  ImplicitMemberAction::ResolveCodingKeys},
       {});
+
+    // Synthesize distributed actor 'id' and 'actorSystem' if needed.
+    (void)nominal->getDistributedActorIDProperty();
+    (void)nominal->getDistributedActorSystemProperty();
   }
 
   // Expand synthesized member macros.
@@ -2940,14 +2958,11 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     if (auto *vd = dyn_cast<ValueDecl>(member)) {
       // Add synthesized members to a side table and sort them by their mangled
       // name, since they could have been added to the class in any order.
-      if (vd->isSynthesized() &&
-          // FIXME: IRGen requires the distributed actor synthesized
-          // properties to be in a specific order that is different
-          // from ordering by their mangled name, so preserve the order
-          // they were added in.
-          !(nominal &&
-            (vd == nominal->getDistributedActorIDProperty() ||
-             vd == nominal->getDistributedActorSystemProperty()))) {
+      // FIXME: IRGen requires the distributed actor synthesized properties to
+      // be in a specific order that is different from ordering by their
+      // mangled name, so preserve the order
+      // they were added in.
+      if (vd->isSynthesized() && !vd->isSpecialDistributedActorProperty()) {
         synthesizedMembers.add(vd);
         return;
       }
@@ -2988,7 +3003,7 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
 
   // Check that the nominal type and the typealias are either both generic
   // at this level or neither are.
-  if (nominal->isGeneric() != typealias->isGeneric())
+  if (nominal->hasGenericParamList() != typealias->hasGenericParamList())
     return false;
 
   // Make sure either both have generic signatures or neither do.
@@ -3013,7 +3028,8 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
     return false;
 
   // If neither is generic at this level, we have a pass-through typealias.
-  if (!typealias->isGeneric()) return true;
+  if (!typealias->hasGenericParamList())
+    return true;
 
   if (typealias->getUnderlyingType()->isEqual(
         nominal->getSelfInterfaceType())) {

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-final class SwiftTarget {
+// FIXME: Come up with a design to safely convince the compiler that this is never accessed concurrently.
+final class SwiftTarget: @unchecked Sendable {
   let name: String
   let moduleName: String
 
@@ -41,16 +42,16 @@ extension SwiftTarget: CustomDebugStringConvertible {
 }
 
 extension SwiftTarget {
-  struct Sources {
+  struct Sources: Sendable {
     var repoSources: [RelativePath] = []
     var externalSources: [AbsolutePath] = []
   }
-  struct BuildRule {
+  struct BuildRule: Sendable {
     var parentPath: RelativePath?
     var sources: Sources
     var buildArgs: BuildArgs
   }
-  struct EmitModuleRule {
+  struct EmitModuleRule: Sendable {
     var sources: Sources
     var buildArgs: BuildArgs
   }

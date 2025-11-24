@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,16 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Synchronization
+
 public final class NinjaBuildDir: Sendable {
   public let path: AbsolutePath
   public let projectRootDir: AbsolutePath
-  private let _tripleSuffix: Result<String, Error>
+  private let _tripleSuffix: Result<String, any Error>
 
-  private let repoBuildDirs = MutexBox<[Repo: RepoBuildDir]>()
+  private let repoBuildDirs = Mutex<[Repo: RepoBuildDir]>()
 
   private static func detectTripleSuffix(
     buildDir: AbsolutePath
-  ) -> Result<String, Error> {
+  ) -> Result<String, any Error> {
     Result {
       for dir in try buildDir.getDirContents() {
         guard buildDir.appending(dir).isDirectory,

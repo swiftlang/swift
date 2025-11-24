@@ -76,7 +76,7 @@ static Type deriveCaseIterable_AllCases(DerivedConformance &derived) {
   //   typealias AllCases = [SomeEnum]
   // }
   auto *rawInterfaceType = computeAllCasesType(cast<EnumDecl>(derived.Nominal));
-  return derived.getConformanceContext()->mapTypeIntoContext(rawInterfaceType);
+  return derived.getConformanceContext()->mapTypeIntoEnvironment(rawInterfaceType);
 }
 
 ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {

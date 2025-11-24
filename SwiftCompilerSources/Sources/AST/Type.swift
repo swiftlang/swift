@@ -66,6 +66,32 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
   public func subst(with substitutionMap: SubstitutionMap) -> Type {
     return Type(bridged: bridged.subst(substitutionMap.bridged))
   }
+
+  public func mapOutOfEnvironment() -> Type {
+    return Type(bridged: bridged.mapOutOfEnvironment())
+  }
+
+  /// Returns a stronger canonicalization which folds away equivalent
+  /// associated types, or type parameters that have been made concrete.
+  public func getReducedType(of signature: GenericSignature) -> CanonicalType {
+    CanonicalType(bridged: bridged.getReducedType(signature.bridged))
+  }
+
+  public var nameOfGenericTypeParameter: Identifier {
+    bridged.GenericTypeParam_getName()
+  }
+
+  public var depthOfGenericTypeParameter: Int {
+    bridged.GenericTypeParam_getDepth()
+  }
+
+  public var indexOfGenericTypeParameter: Int {
+    bridged.GenericTypeParam_getIndex()
+  }
+
+  public var kindOfGenericTypeParameter: GenericTypeParameterKind {
+    bridged.GenericTypeParam_getParamKind()
+  }
 }
 
 /// A Type that is statically known to be canonical.
@@ -266,6 +292,12 @@ extension TypeProperties {
     return Conformance(bridged: rawType.bridged.checkConformance(`protocol`.bridged))
   }
 
+  /// The generic signature that the component types are specified in terms of, if any.
+  public var substitutedGenericSignatureOfFunctionType: CanonicalGenericSignature {
+    CanonicalGenericSignature(
+      bridged: rawType.canonical.bridged.SILFunctionType_getSubstGenericSignature())
+  }
+
   public var containsSILPackExpansionType: Bool {
     return rawType.bridged.containsSILPackExpansionType()
   }
@@ -330,3 +362,5 @@ extension CanonicalType: Equatable {
     lhs.rawType == rhs.rawType
   }
 }
+
+public typealias GenericTypeParameterKind = swift.GenericTypeParamKind

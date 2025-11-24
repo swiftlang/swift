@@ -990,7 +990,7 @@ void DestroyAddrHoisting::hoistDestroys(
     if (!continueWithNextSubpassRun(asi))
       return;
     changed |= ::hoistDestroys(asi,
-                               /*ignoreDeinitBarriers=*/!asi->isLexical(),
+                               /*ignoreDeinitBarriers=*/false,
                                remainingDestroyAddrs, deleter, calleeAnalysis);
   }
   // Arguments enclose everything.

@@ -838,10 +838,7 @@ node based on the kind of expression:
   the body of the closure is type-checked with that
   complete function type.
 
-The solution application step cannot fail for any type checking rule
-modeled by the constraint system. However, there are some failures
-that are intentionally left to the solution application phase, such as
-a postfix '!' applied to a non-optional type.
+The solution application step cannot fail.
 
 #### Locators
 
@@ -849,62 +846,26 @@ During constraint generation and solving, numerous constraints are
 created, broken apart, and solved. During constraint application as
 well as during diagnostics emission, it is important to track the
 relationship between the constraints and the actual AST nodes from
-which they originally came. For example, consider the following type
-checking problem::
-```swift
-  struct X {
-    // user-defined conversions
-    func [conversion] __conversion () -> String { /* ... */ }
-    func [conversion] __conversion () -> Int { /* ... */ }
-  }
+which they originally came.
 
-  func f(_ i : Int, s : String) { }
+We need to map constraints back to the expressions they refer to.
 
-  var x : X
-  f(10.5, x)
-```
-This constraint system generates the constraints "`T(f)` ==Fn `T0 -> T1`"
-(for fresh variables `T0` and `T1`), "`(T2, X) <c T0`" (for fresh variable `T2`)
-and "`T2` conforms to `ExpressibleByFloatLiteral`". As part of the solution,
-after `T0` is replaced with `(i : Int, s : String)`, the second of
-these constraints is broken down into "`T2 <c Int`" and "`X <c String`".
-These two constraints are interesting for different
-reasons: the first will fail, because `Int` does not conform to
-`ExpressibleByFloatLiteral`. The second will succeed by selecting one
-of the (overloaded) conversion functions.
-
-In both of these cases, we need to map the actual constraint of
-interest back to the expressions they refer to. In the first case, we
-want to report not only that the failure occurred because `Int` is
-not `ExpressibleByFloatLiteral`, but we also want to point out where
-the `Int` type actually came from, i.e., in the parameter. In the
-second case, we want to determine which of the overloaded conversion
-functions was selected to perform the conversion, so that conversion
-function can be called by constraint application if all else succeeds.
-
-*Locators* address both issues by tracking the location and derivation
-of constraints. Each locator is anchored at a specific AST node
-(expression, pattern, declaration etc.) i.e., the function application
-`f(10.5, x)`, and contains a path of zero or more derivation steps
-from that anchor. For example, the "`T(f)` ==Fn `T0 -> T1`"
-constraint has a locator that is anchored at the function application
-and a path with the "apply function" derivation step, meaning that
-this is the function being applied. Similarly, the "`(T2, X) <c T0`
-constraint has a locator anchored at the function application and a
-path with the "apply argument" derivation step, meaning that this is
+*Locators* track the location and derivation of constraints.
+Each locator is anchored at a specific AST node
+(expression, pattern, declaration etc.). For example, an applicable
+function constraint has a locator that is anchored at the function
+application expression, and a path with the "apply function"
+derivation step. Similarly, an conversion constraint generated for
+a function argument has a locator anchored at the function application
+and a path with the "apply argument" derivation step, meaning that this is
 the argument to the function.
 
 When constraints are simplified, the resulting constraints have
 locators with longer paths. For example, when a conversion constraint between two
-tuples is simplified conversion constraints between the corresponding
-tuple elements, the resulting locators refer to specific elements. For
-example, the `T2 <c Int` constraint will be anchored at the function
-application (still), and have two derivation steps in its path: the
-"apply function" derivation step from its parent constraint followed
-by the "tuple element 0" constraint that refers to this specific tuple
-element. Similarly, the `X <c String` constraint will have the same
-locator, but with "tuple element 1" rather than "tuple element 0". The
-`ConstraintLocator` type in the constraint solver has a number of
+tuples is simplified down to conversion constraints between the corresponding
+tuple elements, the resulting locators refer to specific elements.
+
+The `ConstraintLocator` type in the constraint solver has a number of
 different derivation step kinds (called "path elements" in the source)
 that describe the various ways in which larger constraints can be
 broken down into smaller ones.
@@ -912,16 +873,9 @@ broken down into smaller ones.
 ##### Overload Choices
 
 Whenever the solver creates a new overload set, that overload set is
-associated with a particular locator. Continuing the example from the
-parent section, the solver will create an overload set containing the
-two user-defined conversions. This overload set is created while
-simplifying the constraint `X <c String`, so it uses the locator
-from that constraint extended by a "conversion member" derivation
-step. The complete locator for this overload set is, therefore::
-```
-  function application -> apply argument -> tuple element #1 -> conversion member
-```
-When the solver selects a particular overload from the overload set,
+associated with a particular locator. 
+
+When the solver selects a particular overload an the overload set,
 it records the selected overload based on the locator of the overload
 set. When it comes time to perform constraint application, the locator
 is recreated based on context (as the bottom-up traversal walks the
@@ -942,46 +896,17 @@ the path of the solver, and can be used to query and recover the
 important decisions made by the solver. However, the locators
 determined by the solver may not directly refer to the most specific
 AST node for the purposes of identifying the corresponding source
-location. For example, the failed constraint "`Int` conforms to
-`ExpressibleByFloatLiteral`" can most specifically by centered on the
-floating-point literal `10.5`, but its locator is::
-```
-  function application -> apply argument -> tuple element #0
-```
+location.
+
 The process of locator simplification maps a locator to its most
 specific AST node. Essentially, it starts at the anchor of the
-locator (in this case, the application `f(10.5, x)`) and then walks
-the path, matching derivation steps to subexpressions. The "function
-application" derivation step extracts the argument (`(10.5, x)`).
-Then, the "tuple element #0" derivation extracts the tuple
-element 0 subexpression, `10.5`, at which point we have traversed
-the entire path and now have the most specific expression for
-source-location purposes.
+locator and then walks the path, matching derivation steps to
+subexpressions.
 
-Simplification does not always exhaust the complete path. For example,
-consider a slight modification to our example, so that the argument to
-`f` is provided by another call, we get a different result
-entirely::
-```swift
-  func f(_ i : Int, s : String) { }
-  func g() -> (f : Float, x : X) { }
+For example, the "function application" derivation step extracts
+the argument list, and the "tuple element #0" derivation extracts
+the sub-expression for the first argument.
 
-  f(g())
-```
-Here, the failing constraint is `Float <c Int`, with the same
-locator::
-```
-  function application -> apply argument -> tuple element #0
-```
-When we simplify this locator, we start with `f(g())`. The "apply
-argument" derivation step takes us to the argument expression
-`g()`. Here, however, there is no subexpression for the first tuple
-element of `g()`, because it's simply part of the tuple returned
-from `g`. At this point, simplification ceases, and creates the
-simplified locator::
-```
-  function application of g -> tuple element #0
-```
 ### Performance
 
 The performance of the type checker is dependent on a number of

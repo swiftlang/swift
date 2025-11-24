@@ -1064,11 +1064,15 @@ public:
   void
   getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
 
-  /// Has \p module been imported via an '@_implementationOnly' import
-  /// instead of another kind of import?
+  /// Has \p module been imported via an '@_implementationOnly' import and
+  /// not by anything more visible?
   ///
-  /// This assumes that \p module was imported.
-  bool isImportedImplementationOnly(const ModuleDecl *module) const;
+  /// If \p assumeImported, assume that \p module was imported and avoid the
+  /// work to confirm it is imported at all. Transitive modules not reexported
+  /// are not considered imported here and may lead to false positive without
+  /// this setting.
+  bool isImportedImplementationOnly(const ModuleDecl *module,
+      bool assumeImported = true) const;
 
   /// Finds all top-level decls of this module.
   ///

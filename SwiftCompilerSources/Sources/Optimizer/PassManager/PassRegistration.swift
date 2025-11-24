@@ -80,6 +80,7 @@ private func registerSwiftPasses() {
   registerPass(computeSideEffects, { computeSideEffects.run($0) })
   registerPass(diagnoseInfiniteRecursion, { diagnoseInfiniteRecursion.run($0) })
   registerPass(destroyHoisting, { destroyHoisting.run($0) })
+  registerPass(mandatoryDestroyHoisting, { mandatoryDestroyHoisting.run($0) })
   registerPass(initializeStaticGlobalsPass, { initializeStaticGlobalsPass.run($0) })
   registerPass(objCBridgingOptimization, { objCBridgingOptimization.run($0) })
   registerPass(objectOutliner, { objectOutliner.run($0) })

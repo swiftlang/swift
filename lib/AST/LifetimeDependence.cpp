@@ -543,7 +543,7 @@ public:
     auto *eed = cast<EnumElementDecl>(decl);
     auto *parentEnum = eed->getParentEnum();
     auto enumType =
-        parentEnum->mapTypeIntoContext(parentEnum->getDeclaredInterfaceType());
+        parentEnum->mapTypeIntoEnvironment(parentEnum->getDeclaredInterfaceType());
 
     // Add early bailout for imported enums.
     if (parentEnum->hasClangNode()) {
@@ -717,7 +717,7 @@ protected:
         continue;
       }
       if (!isDiagnosedNonEscapable(
-            afd->mapTypeIntoContext(param->getInterfaceType()))) {
+            afd->mapTypeIntoEnvironment(param->getInterfaceType()))) {
         continue;
       }
       if (!depBuilder.hasTargetDeps(paramIndex)) {
@@ -793,7 +793,7 @@ protected:
     auto *afd = cast<AbstractFunctionDecl>(decl);
     if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
       if (accessor->isCoroutine()) {
-        auto yieldTyInContext = accessor->mapTypeIntoContext(
+        auto yieldTyInContext = accessor->mapTypeIntoEnvironment(
           accessor->getStorage()->getValueInterfaceType());
         return yieldTyInContext;
       }
@@ -805,7 +805,7 @@ protected:
       auto ctor = cast<ConstructorDecl>(afd);
       resultType = ctor->getResultInterfaceType();
     }
-    return afd->mapTypeIntoContext(resultType);
+    return afd->mapTypeIntoEnvironment(resultType);
   }
 
   // ==========================================================================
@@ -1173,7 +1173,7 @@ protected:
       auto *afd = cast<AbstractFunctionDecl>(decl);
       auto *param = afd->getParameters()->get(newValIdx);
       Type paramTypeInContext =
-        afd->mapTypeIntoContext(param->getInterfaceType());
+        afd->mapTypeIntoEnvironment(param->getInterfaceType());
       if (paramTypeInContext->hasError()) {
         return;
       }
@@ -1281,7 +1281,7 @@ protected:
     for (auto *param : *afd->getParameters()) {
       SWIFT_DEFER { paramIndex++; };
       Type paramTypeInContext =
-        afd->mapTypeIntoContext(param->getInterfaceType());
+        afd->mapTypeIntoEnvironment(param->getInterfaceType());
       if (paramTypeInContext->hasError()) {
         return;
       }
@@ -1401,7 +1401,7 @@ protected:
     // Do not infer non-escapable dependence kind -- it is ambiguous.
     auto *param = afd->getParameters()->get(0);
     Type paramTypeInContext =
-      afd->mapTypeIntoContext(param->getInterfaceType());
+      afd->mapTypeIntoEnvironment(param->getInterfaceType());
     if (paramTypeInContext->hasError()) {
       return;
     }
@@ -1434,7 +1434,7 @@ protected:
     for (auto *param : *afd->getParameters()) {
       SWIFT_DEFER { paramIndex++; };
       Type paramTypeInContext =
-        afd->mapTypeIntoContext(param->getInterfaceType());
+        afd->mapTypeIntoEnvironment(param->getInterfaceType());
       if (paramTypeInContext->hasError()) {
         return;
       }
@@ -1523,7 +1523,7 @@ protected:
     for (unsigned paramIndex : range(afd->getParameters()->size())) {
       auto *param = afd->getParameters()->get(paramIndex);
       if (!isDiagnosedNonEscapable(
-              afd->mapTypeIntoContext(param->getInterfaceType()))) {
+              afd->mapTypeIntoEnvironment(param->getInterfaceType()))) {
         continue;
       }
       if (!param->isInOut())
@@ -1544,7 +1544,7 @@ protected:
       return;
     }
     if (!isDiagnosedNonEscapable(
-          afd->mapTypeIntoContext(param->getInterfaceType()))) {
+          afd->mapTypeIntoEnvironment(param->getInterfaceType()))) {
       return;
     }
     depBuilder.inferInoutDependency(paramIndex);

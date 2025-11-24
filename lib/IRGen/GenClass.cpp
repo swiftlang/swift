@@ -2188,7 +2188,7 @@ namespace {
       if (prop->getAttrs().hasAttribute<NSManagedAttr>())
         outs << ",D";
       
-      auto isObject = propDC->mapTypeIntoContext(propTy)
+      auto isObject = propDC->mapTypeIntoEnvironment(propTy)
           ->hasRetainablePointerRepresentation();
       auto hasObjectEncoding = typeEnc[0] == '@';
       

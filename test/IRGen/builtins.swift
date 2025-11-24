@@ -928,4 +928,63 @@ func allocateVector<Element>(elementType: Element.Type, capacity: Builtin.Word) 
   return Builtin.allocVector(elementType, capacity)
 }
 
+// CHECK-LABEL: define{{.*}} void @"$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaF"(ptr swiftasync %0, i64 %1, i64 %2)
+// CHECK: [[RESULT:%.*]] = call{{.*}} @swift_task_addCancellationHandler(ptr @"$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaFyyXEfU_{{(.ptrauth)?}}", ptr null)
+// CHECK: [[CONTEXT:%.*]] = call{{.*}} @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata, i32 0, i32 2), i64 32, i64 7)
+// CHECK: [[RESULT_2:%.*]] = call {{.*}} @swift_task_addCancellationHandler(ptr @"$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaFyyXEfU0_TA{{(.ptrauth)?}}", ptr [[CONTEXT]])
+// CHECK: musttail call swifttailcc void {{%.*}}(ptr swiftasync {{.*}}, ptr [[RESULT]], ptr [[RESULT_2]])
+nonisolated(nonsending) func testTaskAddCancellationHandler() async -> (UnsafeRawPointer, UnsafeRawPointer) {
+  let result = Builtin.taskAddCancellationHandler {}
+  let x = "123" 
+  let result2 = Builtin.taskAddCancellationHandler {
+    print(x)
+  }
+  return (result, result2)
+}
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins33testTaskRemoveCancellationHandleryySVYaF"(ptr swiftasync %0, i64 %1, i64 %2, ptr %3)
+// CHECK: call{{.*}} @swift_task_removeCancellationHandler(ptr %3)
+nonisolated(nonsending) func testTaskRemoveCancellationHandler(_ x: UnsafeRawPointer) async {
+  Builtin.taskRemoveCancellationHandler(record: x)
+}
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins36testTaskAddPriorityEscalationHandlerSV_SVtyYaF"(ptr swiftasync %0, i64 %1, i64 %2)
+// CHECK: [[RESULT:%.*]] = call{{.*}} @swift_task_addPriorityEscalationHandler(ptr @"$s8builtins36testTaskAddPriorityEscalationHandlerSV_SVtyYaFys5UInt8V_ADtXEfU_{{(.ptrauth)?}}", ptr null)
+// CHECK: [[CONTEXT:%.*]] = call {{.*}}@swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata.3, i32 0, i32 2), i64 32, i64 7)
+// CHECK: [[RESULT_2:%.*]] = call{{.*}} @swift_task_addPriorityEscalationHandler(ptr @"$s8builtins36testTaskAddPriorityEscalationHandlerSV_SVtyYaFys5UInt8V_ADtXEfU0_TA{{(.ptrauth)?}}", ptr [[CONTEXT]])
+// CHECK: musttail call swifttailcc void {{%.*}}(ptr swiftasync {{%.*}}, ptr [[RESULT]], ptr [[RESULT_2]])
+nonisolated(nonsending) func testTaskAddPriorityEscalationHandler() async -> (UnsafeRawPointer, UnsafeRawPointer) {
+  let result = Builtin.taskAddPriorityEscalationHandler { (x: UInt8, y: UInt8) in
+    _ = x
+    _ = y
+  }
+  let str = "123"
+  let result2 = Builtin.taskAddPriorityEscalationHandler { (x: UInt8, y: UInt8) in
+    print(str)
+    _ = x
+    _ = y
+  }
+  return (result, result2)
+}
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins39testTaskRemovePriorityEscalationHandleryySVYaF"(ptr swiftasync %0, i64 %1, i64 %2, ptr %3)
+// CHECK: call{{.*}} @swift_task_removePriorityEscalationHandler(ptr %3)
+nonisolated(nonsending) func testTaskRemovePriorityEscalationHandler(_ x: UnsafeRawPointer) async {
+  Builtin.taskRemovePriorityEscalationHandler(record: x)
+}
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins22testTaskLocalValuePushyyBp_xntYalF"(ptr swiftasync %0, i64 %1, i64 %2, ptr %3, ptr noalias %4, ptr %Value)
+// CHECK: [[TASK_VAR:%.*]] = call swiftcc ptr @swift_task_alloc({{.*}}
+// CHECK: call ptr %InitializeWithTake(ptr noalias [[TASK_VAR]], ptr noalias {{%.*}}, ptr %Value)
+// CHECK: call swiftcc {} @swift_task_localValuePush(ptr %3, ptr [[TASK_VAR]], ptr %Value)
+nonisolated(nonsending) func testTaskLocalValuePush<Value>(_ key: Builtin.RawPointer, _ value: consuming Value) async {
+  Builtin.taskLocalValuePush(key, value)
+}
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins21testTaskLocalValuePopyyYaF"(ptr swiftasync %0, i64 %1, i64 %2)
+// CHECK: call swiftcc {} @swift_task_localValuePop()
+nonisolated(nonsending) func testTaskLocalValuePop() async {
+  Builtin.taskLocalValuePop()
+}  
+
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}

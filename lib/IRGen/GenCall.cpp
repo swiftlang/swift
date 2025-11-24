@@ -221,7 +221,11 @@ IRGenFunction::getDefaultCoroutineAllocatorKind() {
     return CoroAllocatorKind::Async;
   }
   if (isCoroutine()) {
-    return CoroAllocatorKind::Malloc;
+    if (getOptions().EmitTypeMallocForCoroFrame) {
+      return CoroAllocatorKind::TypedMalloc;
+    } else {
+      return CoroAllocatorKind::Malloc;
+    }
   }
   if (IGM.SwiftCoroCC != llvm::CallingConv::SwiftCoro) {
     // If the swiftcorocc isn't available, fall back to malloc.
@@ -2491,6 +2495,12 @@ SignatureExpansionABIDetails Signature::getUncachedABIDetails(
   return result;
 }
 
+Signature Signature::forFunction(llvm::Function *fn) {
+  auto sig = Signature(fn->getFunctionType(), fn->getAttributes(),
+                       fn->getCallingConv());
+  return sig;
+}
+
 Signature Signature::forCoroutineContinuation(IRGenModule &IGM,
                                               CanSILFunctionType fnType) {
   assert(fnType->isCoroutine());
@@ -2701,16 +2711,13 @@ irgen::getAsyncFunctionAndSize(IRGenFunction &IGF,
   return {fn, size};
 }
 
-std::pair<llvm::Value *, llvm::Value *>
-irgen::getCoroFunctionAndSize(IRGenFunction &IGF,
-                              FunctionPointer functionPointer,
-                              std::pair<bool, bool> values) {
-  assert(values.first || values.second);
+std::tuple<llvm::Value *, llvm::Value *, llvm::Value *>
+irgen::getCoroFunctionValues(IRGenFunction &IGF,
+                             FunctionPointer functionPointer,
+                             std::tuple<bool, bool, bool> values) {
+  auto [emitFunction, emitSize, emitTypeID] = values;
+  assert(emitFunction || emitSize || emitTypeID);
   assert(functionPointer.getKind() != FunctionPointer::Kind::Function);
-
-  bool emitFunction = values.first;
-  bool emitSize = values.second;
-  assert(emitFunction || emitSize);
 
   // Ensure that the CoroFunctionPointer is not auth'd if it is not used and
   // that it is not auth'd more than once if it is needed.
@@ -2764,7 +2771,15 @@ irgen::getCoroFunctionAndSize(IRGenFunction &IGF,
     size = IGF.Builder.CreateLoad(sizePtr, IGF.IGM.Int32Ty,
                                   IGF.IGM.getPointerAlignment());
   }
-  return {fn, size};
+
+  llvm::Value *typeID = nullptr;
+  if (emitTypeID) {
+    auto *sizePtr = IGF.Builder.CreateStructGEP(IGF.IGM.CoroFunctionPointerTy,
+                                                getCoroPtr(), 2);
+    typeID = IGF.Builder.CreateLoad(sizePtr, IGF.IGM.Int64Ty,
+                                    IGF.IGM.getPointerAlignment());
+  }
+  return {fn, size, typeID};
 }
 
 namespace {
@@ -2804,16 +2819,17 @@ public:
     assert(!coroAllocator);
 
     if (IsCalleeAllocatedCoroutine) {
-      llvm::Value *bufferSize32;
-      std::tie(calleeFunction, bufferSize32) =
-          getCoroFunctionAndSize(IGF, CurCallee.getFunctionPointer());
+      auto kind = IGF.getDefaultCoroutineAllocatorKind();
+      llvm::Value *bufferSize32, *mallocTypeId;
+      std::tie(calleeFunction, bufferSize32, mallocTypeId) =
+          getCoroFunctionValues(IGF, CurCallee.getFunctionPointer());
       auto *bufferSize = IGF.Builder.CreateZExt(bufferSize32, IGF.IGM.SizeTy);
-      coroStaticFrame = emitAllocYieldOnce2CoroutineFrame(IGF, bufferSize);
+      coroStaticFrame =
+          emitAllocYieldOnce2CoroutineFrame(IGF, bufferSize, mallocTypeId);
       // TODO: CoroutineAccessors: Optimize allocator kind (e.g. async callers
       //                           only need to use the TaskAllocator if the
       //                           coroutine is suspended across an await).
-      coroAllocator = emitYieldOnce2CoroutineAllocator(
-          IGF, IGF.getDefaultCoroutineAllocatorKind());
+      coroAllocator = emitYieldOnce2CoroutineAllocator(IGF, kind);
     }
   }
   void end() override { super::end(); }
@@ -3341,6 +3357,14 @@ public:
       break;
     }
     }
+
+    // If we're passing the continuation directly, add those implicit
+    // arguments.
+    if (getCallee().shouldPassContinuationDirectly()) {
+      asyncExplosion.add(getResumeFunctionPointer());
+      asyncExplosion.add(getAsyncContext());
+    }
+
     super::setArgs(asyncExplosion, false, witnessMetadata);
 
     auto layout = getAsyncContextLayout();
@@ -3854,7 +3878,7 @@ void CallEmission::emitToMemory(Address addr,
 
   if (origResultType->hasTypeParameter())
     origResultType = IGF.IGM.getGenericEnvironment()
-      ->mapTypeIntoContext(origResultType)
+      ->mapTypeIntoEnvironment(origResultType)
       ->getCanonicalType();
 
   if (origResultType != substResultType) {
@@ -5179,10 +5203,12 @@ void irgen::emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
   auto deallocFn = IGF.IGM.getOpaquePtr(getCoroDeallocFn(IGF.IGM));
   auto allocFrameFn = IGF.IGM.getOpaquePtr(getCoroAllocFrameFn(IGF.IGM));
   auto deallocFrameFn = IGF.IGM.getOpaquePtr(getCoroDeallocFrameFn(IGF.IGM));
+  auto *typeID = IGF.getMallocTypeId();
   emitRetconCoroutineEntry(
       IGF, fnType, buffer, llvm::Intrinsic::coro_id_retcon_once_dynamic,
       Size(-1) /*dynamic-to-IRGen size*/, IGF.IGM.getCoroStaticFrameAlignment(),
-      {cfp, allocator}, allocFn, deallocFn, {allocFrameFn, deallocFrameFn});
+      {cfp, allocator}, allocFn, deallocFn,
+      {allocFrameFn, deallocFrameFn, typeID});
 }
 void irgen::emitYieldOnce2CoroutineEntry(
     IRGenFunction &IGF, LinkEntity coroFunction, CanSILFunctionType fnType,
@@ -5213,9 +5239,10 @@ Address irgen::emitAllocYieldManyCoroutineBuffer(IRGenFunction &IGF) {
                                  getYieldManyCoroutineBufferAlignment(IGF.IGM));
 }
 
-StackAddress irgen::emitAllocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
-                                                      llvm::Value *size) {
-  return emitAllocCoroStaticFrame(IGF, size);
+StackAddress
+irgen::emitAllocYieldOnce2CoroutineFrame(IRGenFunction &IGF, llvm::Value *size,
+                                         llvm::Value *mallocTypeId) {
+  return emitAllocCoroStaticFrame(IGF, size, mallocTypeId);
 }
 
 void irgen::emitDeallocYieldOnceCoroutineBuffer(IRGenFunction &IGF,
@@ -5264,14 +5291,15 @@ void irgen::emitStaticDeallocAsyncContext(IRGenFunction &IGF, Address context,
 }
 
 StackAddress irgen::emitAllocCoroStaticFrame(IRGenFunction &IGF,
-                                             llvm::Value *size) {
+                                             llvm::Value *size,
+                                             llvm::Value *mallocTypeId) {
+  ASSERT(mallocTypeId);
   // TODO: Avoid swift_task_alloc (async) and malloc (yield_once) if the
   //       suspension doesn't span an apply of an async function or a yield
   //       respectively.
-  auto retval = IGF.emitDynamicAlloca(
-      IGF.IGM.Int8Ty, size, Alignment(MaximumAlignment), AllowsTaskAlloc,
-      IsForCalleeCoroutineFrame_t(IGF.isCalleeAllocatedCoroutine()),
-      "callee-coro-frame");
+  auto retval =
+      IGF.emitDynamicAlloca(IGF.IGM.Int8Ty, size, Alignment(MaximumAlignment),
+                            AllowsTaskAlloc, mallocTypeId, "callee-coro-frame");
   IGF.Builder.CreateLifetimeStart(retval.getAddress(),
                                   Size(-1) /*dynamic size*/);
   return retval;
@@ -6420,6 +6448,32 @@ Callee irgen::getCFunctionPointerCallee(IRGenFunction &IGF,
                                           fnPtr, authInfo, sig);
 
   return Callee(std::move(calleeInfo), fn);
+}
+
+Callee Callee::forBuiltinRuntimeFunction(IRGenModule &IGM,
+                                         llvm::Constant *fnPtr,
+                                         BuiltinValueKind builtin,
+                                         SubstitutionMap subs,
+                                         FunctionPointerKind fpKind) {
+  auto &ctx = IGM.Context;
+  auto builtinDecl =
+    getBuiltinValueDecl(ctx, ctx.getIdentifier(getBuiltinName(builtin)));
+
+  auto loweredFnType = IGM.getSILTypes().getConstantFunctionType(
+                         TypeExpansionContext::minimal(),
+                         SILDeclRef(builtinDecl, SILDeclRef::Kind::Func));
+  auto signature = IGM.getSignature(loweredFnType, fpKind);
+
+  auto fp = FunctionPointer::forDirect(fpKind, fnPtr, nullptr, signature);
+
+  auto substFnType = loweredFnType;
+  if (subs) {
+    substFnType = loweredFnType->substGenericArgs(IGM.getSILModule(), subs,
+                                            TypeExpansionContext::minimal());
+  }
+  CalleeInfo calleeInfo(loweredFnType, substFnType, subs);
+
+  return Callee(std::move(calleeInfo), fp);
 }
 
 FunctionPointer FunctionPointer::forDirect(IRGenModule &IGM,

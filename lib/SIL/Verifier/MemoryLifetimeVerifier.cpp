@@ -335,7 +335,7 @@ bool MemoryLifetimeVerifier::applyMayRead(Operand *argOp, SILValue addr) {
 
 void MemoryLifetimeVerifier::requireNoStoreBorrowLocation(
     SILValue addr, SILInstruction *where) {
-  if (isa<StoreBorrowInst>(addr)) {
+  if (isStoreBorrowLocation(addr)) {
     reportError("store-borrow location cannot be written",
                 locations.getLocationIdx(addr), where);
   }

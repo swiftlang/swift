@@ -116,3 +116,30 @@ func testGenericPointerConversions(
   // Make sure this is ambiguous.
   ptr.foo(chars) // expected-error {{ambiguous use of 'foo'}}
 }
+
+// Make sure we prefer non-pack overloads when pointer conversions are involved.
+func testOverloadedPackPointerConversions() {
+  func takesPtr(_ ptr: UnsafePointer<CChar>) {}
+
+  // Deprecation does not impact solution score, so we can use it to ensure
+  // we don't pick it.
+  @available(*, deprecated, message: "shouldn't have picked this overload")
+  func packOverloaded1<each T, R>(_ xs: repeat each T, fn: (repeat each T) -> R?) {}
+  func packOverloaded1<T, R>(_ x: T, fn: (T) -> R?) {}
+  packOverloaded1("") { takesPtr($0) }
+
+  @available(*, deprecated, message: "shouldn't have picked this overload")
+  func packOverloaded2<each T, R>(_ xs: (repeat each T)?, fn: (repeat each T) -> R?) {}
+  func packOverloaded2<T, R>(_ x: T?, fn: (T) -> R?) {}
+  packOverloaded2("") { takesPtr($0) }
+
+  @available(*, deprecated, message: "shouldn't have picked this overload")
+  func packOverloaded3<each T, R>(_ xs: repeat (each T)?, fn: (repeat each T) -> R?) {}
+  func packOverloaded3<T, R>(_ x: T?, fn: (T) -> R?) {}
+  packOverloaded3("") { takesPtr($0) }
+
+  @available(*, deprecated, message: "shouldn't have picked this overload")
+  func packOverloaded4<each T, R>(_ xs: (repeat (each T)?)?, fn: (repeat each T) -> R?) {}
+  func packOverloaded4<T, R>(_ x: T??, fn: (T) -> R?) {}
+  packOverloaded4("") { takesPtr($0) }
+}

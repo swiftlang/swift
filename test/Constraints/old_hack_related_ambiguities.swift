@@ -383,3 +383,34 @@ do {
     }
   }
 }
+
+// Calls with single unlabeled arguments shouldn't favor overloads that don't match on async.
+do {
+  struct V {
+    var data: Int = 0
+  }
+
+  func test(_: Int) -> Int { 42 }
+  func test(_: Int, v: Int = 42) async -> V? { nil }
+
+  func doAsync<T>(_ fn: () async -> T) async -> T { await fn() }
+
+  func computeAsync(v: Int) async {
+    let v1 = await test(v)
+    if let v1 {
+      _ = v1.data // Ok
+    }
+
+    let v2 = await doAsync { await test(v) }
+    if let v2 {
+      _ = v2.data // Ok
+    }
+
+    _ = await doAsync {
+      let v = await test(v)
+      if let v {
+        _ = v.data // Ok
+      }
+    }
+  }
+}

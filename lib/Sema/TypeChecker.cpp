@@ -614,7 +614,7 @@ bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
                                    DeclContext *dc,
                                    std::optional<TypeResolutionStage> stage) {
   if (stage)
-    type = dc->mapTypeIntoContext(type);
+    type = dc->mapTypeIntoEnvironment(type);
   auto tanSpace = type->getAutoDiffTangentSpace(
       LookUpConformanceInModule());
   if (!tanSpace)

@@ -2043,7 +2043,7 @@ tryOptimizeGenericDisjunction(ConstraintSystem &cs, Constraint *disjunction,
     assert(decl);
 
     auto *AFD = dyn_cast<AbstractFunctionDecl>(decl);
-    if (!AFD || !AFD->isGeneric())
+    if (!AFD || !AFD->hasGenericParamList())
       return false;
 
     if (AFD->getAttrs().hasAttribute<DisfavoredOverloadAttr>())

@@ -1248,6 +1248,8 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   // Add protocols for any synthesized protocol attributes.
   for (auto attr : getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    if (attr->isSuppressed())
+      continue;
     addSynthesized(attr->getProtocol());
   }
 

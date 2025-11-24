@@ -10,7 +10,9 @@ enum FakeOptional<T> {
 }
 
 sil [ossa] @getX : $@convention(thin) () -> (@owned X)
-sil [ossa] @holdX : $@convention(thin) (@guaranteed X) -> ()
+sil [ossa] @holdX : $@convention(thin) (@guaranteed X) -> () {
+  [global:]
+}
 
 // CHECK-LABEL: sil [ossa] @nohoist_destroy_over_reborrow_endborrow : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @reborrow $X, [[VALUE:%[^,]+]] : @owned $X):

@@ -212,6 +212,8 @@ public:
   getUncachedABIDetails(IRGenModule &IGM, CanSILFunctionType formalType,
                         FunctionPointerKind kind);
 
+  static Signature forFunction(llvm::Function *fn);
+
   /// Compute the signature of a coroutine's continuation function.
   static Signature forCoroutineContinuation(IRGenModule &IGM,
                                             CanSILFunctionType coroType);

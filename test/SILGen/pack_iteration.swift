@@ -1,5 +1,4 @@
-
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name pack_iteration %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name pack_iteration %s -target %target-swift-5.9-abi-triple | %FileCheck %s
 
 //////////////////
 // Declarations //
@@ -239,13 +238,14 @@ func iterateTrivialBreak<each Element>(over element: repeat each Element) {
 // CHECK: [[NONE_BB]]:
 // CHECK: br [[FUNC_END_BB:bb[0-9]+]]
 //
-// CHECK: [[FUNC_END_BB]]
-// CHECK: [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
-// CHECK: apply [[FUNC_END_FUNC]]() : $@convention(thin) () -> ()
-//
 // CHECK: [[LATCH]]:
 // CHECK: [[ADD_WORD:%.*]] = builtin "add_Word"([[IDX3]] : $Builtin.Word, [[IDX2]] : $Builtin.Word) : $Builtin.Word
 // CHECK: br [[LOOP_DEST]]([[ADD_WORD]] : $Builtin.Word)
+//
+// CHECK: [[FUNC_END_BB]]
+// CHECK: [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
+// CHECK: apply [[FUNC_END_FUNC]]() : $@convention(thin) () -> ()
+// CHECK: return
 // CHECK: } // end sil function '$s14pack_iteration20iterateContinueBreak4overyxxQp_tRvzlF'
 func iterateContinueBreak<each Element>(over element: repeat each Element) {
   for el in repeat each element {
@@ -321,5 +321,91 @@ func iterateClosure<each Element>(over element: repeat each Element) {
     for el in repeat each element {
       loopBodyEnd()
     }
+  }
+}
+
+struct G<each T> {
+  var t: (repeat each T)
+}
+
+// Make sure the 'break' jump destination uses the correct
+// cleanup height.
+
+// CHECK-LABEL: sil hidden [ossa] @$s14pack_iteration0B12BreakCleanupyyAA1GVyxxQp_QPGRvzlF : $@convention(thin) <each T> (@in_guaranteed G<repeat each T>) -> () {
+// CHECK: bb0(%0 : $*G<repeat each T>):
+// CHECK: [[STACK:%.*]] = alloc_stack $(repeat each T)
+// CHECK-NEXT: [[PROJ:%.*]] = struct_element_addr %0 : $*G<repeat each T>, #G.t
+// CHECK-NEXT: copy_addr [[PROJ]] to [init] [[STACK]] : $*(repeat each T)
+// CHECK-NEXT: [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK-NEXT: [[ONE:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK-NEXT: [[LEN:%.*]] = pack_length $Pack{repeat each T}
+// CHECK-NEXT: br bb1([[ZERO]] : $Builtin.Word)
+//
+// CHECK: bb1([[IDX:%.*]] : $Builtin.Word):
+// CHECK-NEXT: [[CMP:%.*]] = builtin "cmp_eq_Word"([[IDX:%.*]] : $Builtin.Word, [[LEN]] : $Builtin.Word) : $Builtin.Int1
+// CHECK-NEXT: cond_br [[CMP]], bb3, bb2
+//
+// CHECK: bb2:
+// CHECK-NEXT: [[PACK_IDX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
+// CHECK-NEXT: [[ELT:%.*]] = open_pack_element [[PACK_IDX]] of <each T> at <Pack{repeat each T}>, shape $each T
+// CHECK-NEXT: [[ELT_STACK:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element({{.*}}) each T
+// CHECK-NEXT: [[ELT_TUPLE:%.*]] = tuple_pack_element_addr [[PACK_IDX]] of [[STACK]] : $*(repeat each T) as $*@pack_element({{.*}}) each T
+// CHECK-NEXT: copy_addr [[ELT_TUPLE]] to [init] [[ELT_STACK]] : $*@pack_element({{.*}}) each T
+// CHECK-NEXT: destroy_addr [[ELT_STACK]] : $*@pack_element({{.*}}) each T
+// CHECK-NEXT: dealloc_stack [[ELT_STACK]] : $*@pack_element({{.*}}) each T
+
+// CHECK: br bb5
+//
+// CHECK: bb3:
+// CHECK-NEXT: bb5
+//
+// CHECK: bb4:
+// CHECK-NEXT: [[NEXT:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
+// CHECK: br bb1([[NEXT]] : $Builtin.Word)
+//
+// CHECK: bb5:
+// CHECK: destroy_addr [[STACK]] : $*(repeat each T) 
+// CHECK: dealloc_stack [[STACK]] : $*(repeat each T)
+// CHECK: [[RESULT:%.*]] = tuple ()
+// CHECK: return [[RESULT]] : $()
+func iterationBreakCleanup<each T>(_ xs: G<repeat each T>) {
+  for x in repeat each xs.t {
+    break
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s14pack_iteration0B15ContinueCleanupyyAA1GVyxxQp_QPGRvzlF : $@convention(thin) <each T> (@in_guaranteed G<repeat each T>) -> () {
+// CHECK: bb0(%0 : $*G<repeat each T>):
+// CHECK: [[STACK:%.*]] = alloc_stack $(repeat each T)
+// CHECK-NEXT: [[PROJ:%.*]] = struct_element_addr %0 : $*G<repeat each T>, #G.t
+// CHECK-NEXT: copy_addr [[PROJ]] to [init] [[STACK]] : $*(repeat each T)
+// CHECK-NEXT: [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK-NEXT: [[ONE:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK-NEXT: [[LEN:%.*]] = pack_length $Pack{repeat each T}
+// CHECK-NEXT: br bb1([[ZERO]] : $Builtin.Word)
+//
+// CHECK: bb1([[IDX:%.*]] : $Builtin.Word):
+// CHECK-NEXT: [[CMP:%.*]] = builtin "cmp_eq_Word"([[IDX:%.*]] : $Builtin.Word, [[LEN]] : $Builtin.Word) : $Builtin.Int1
+// CHECK-NEXT: cond_br [[CMP]], bb2, bb3
+//
+// CHECK: bb2:
+// CHECK: destroy_addr [[STACK]] : $*(repeat each T) 
+// CHECK: dealloc_stack [[STACK]] : $*(repeat each T)
+// CHECK: [[RESULT:%.*]] = tuple ()
+// CHECK: return [[RESULT]] : $()
+//
+// CHECK: bb3:
+// CHECK-NEXT: [[PACK_IDX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
+// CHECK-NEXT: [[ELT:%.*]] = open_pack_element [[PACK_IDX]] of <each T> at <Pack{repeat each T}>, shape $each T
+// CHECK-NEXT: [[ELT_STACK:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element({{.*}}) each T
+// CHECK-NEXT: [[ELT_TUPLE:%.*]] = tuple_pack_element_addr [[PACK_IDX]] of [[STACK]] : $*(repeat each T) as $*@pack_element({{.*}}) each T
+// CHECK-NEXT: copy_addr [[ELT_TUPLE]] to [init] [[ELT_STACK]] : $*@pack_element({{.*}}) each T
+// CHECK-NEXT: destroy_addr [[ELT_STACK]] : $*@pack_element({{.*}}) each T
+// CHECK-NEXT: dealloc_stack [[ELT_STACK]] : $*@pack_element({{.*}}) each T
+// CHECK-NEXT: [[NEXT:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
+// CHECK: br bb1([[NEXT]] : $Builtin.Word)
+func iterationContinueCleanup<each T>(_ xs: G<repeat each T>) {
+  for x in repeat each xs.t {
+    continue
   }
 }

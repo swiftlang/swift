@@ -266,6 +266,8 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addOnoneSimplification();
   P.addInitializeStaticGlobals();
 
+  P.addMandatoryDestroyHoisting();
+
   // MandatoryPerformanceOptimizations might create specializations that are not
   // used, and by being unused they are might have unspecialized applies.
   // Eliminate them via the DeadFunctionAndGlobalElimination in embedded Swift
@@ -525,7 +527,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // of embedded Swift.
   if (!P.getOptions().EmbeddedSwift) {
     P.addGenericSpecializer();
-    P.addPackSpecialization();
+    // P.addPackSpecialization();
     // Run devirtualizer after the specializer, because many
     // class_method/witness_method instructions may use concrete types now.
     P.addDevirtualizer();

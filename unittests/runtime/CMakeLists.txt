@@ -8,8 +8,13 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 
   if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
     if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
-      set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang++")
-      set(CMAKE_C_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang")
+      if(SWIFT_COMPILER_IS_MSVC_LIKE)
+        set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang-cl")
+        set(CMAKE_C_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang-cl")
+      else()
+        set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang++")
+        set(CMAKE_C_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang")
+      endif()
     endif()
   elseif(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
     message(FATAL_ERROR "Building the swift runtime is not supported with ${CMAKE_C_COMPILER_ID}. Use the just-built clang instead.")
@@ -159,4 +164,37 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     swiftThreading${SWIFT_PRIMARY_VARIANT_SUFFIX}
     ${PLATFORM_TARGET_LINK_LIBRARIES}
     )
+
+###
+# GTEST_SKIP conditions.
+#
+# Sometimes, we need to skip running a unit test due to some bug on a specific
+# platform. You can add a skip like this to the test:
+#
+#  #ifdef __SKIP_RDAR123__
+#    GTEST_SKIP() << "Skipping due to rdar://123";
+#  #endif
+#
+# and use CMake to detect the OS, such as via
+#  
+#  if(EXISTS "/etc/os-release")
+#    file(READ "/etc/os-release" OS_RELEASE)
+#     if(OS_RELEASE MATCHES "Amazon Linux 2")
+#       ...
+#
+# and use 
+#   
+#    target_compile_definitions(SwiftRuntimeTests PRIVATE __SKIP_RDAR123__)
+#
+# to add the preprocessor definition.
+
+
+# A few unit tests with actor scheduling are failing AL2 aarch64 (rdar://163604876)
+if(EXISTS "/etc/os-release")
+    file(READ "/etc/os-release" OS_RELEASE)
+    if(OS_RELEASE MATCHES "Amazon Linux 2" AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64|arm64")
+        target_compile_definitions(SwiftRuntimeTests PRIVATE __SKIP_RDAR163604876__)
+    endif()
+endif()
+
 endif()

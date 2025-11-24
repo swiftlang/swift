@@ -26,15 +26,26 @@
 // RUN: test -f %t/Test.swiftmodule
 
 /// Expect cache hit second time
-// RUN: %target-swift-frontend -cache-compile-job -cas-backend -cas-backend-mode=verify -Rcache-compile-job %t/test.swift %t/foo.swift -emit-module -o %t/Test.swiftmodule \
+// RUN: %target-swift-frontend -cache-compile-job -cas-backend -cas-backend-mode=verify -Rcache-compile-job %t/test.swift %t/foo.swift -emit-module -o %t/Test1.swiftmodule \
 // RUN:  -module-name Test -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --check-prefix=CACHE-HIT %s
-// RUN: %target-swift-frontend -cache-compile-job -cas-backend -cas-backend-mode=verify -Rcache-compile-job -primary-file %t/test.swift %t/foo.swift -c -o %t/test.o  \
+// RUN: %target-swift-frontend -cache-compile-job -cas-backend -cas-backend-mode=verify -Rcache-compile-job -primary-file %t/test.swift %t/foo.swift -c -o %t/test1.o  \
 // RUN:  -module-name Test -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --check-prefix=CACHE-HIT %s
-// RUN: %target-swift-frontend -cache-compile-job -cas-backend -cas-backend-mode=verify -Rcache-compile-job %t/test.swift -primary-file %t/foo.swift -c -o %t/foo.o  \
+// RUN: %target-swift-frontend -cache-compile-job -cas-backend -cas-backend-mode=verify -Rcache-compile-job %t/test.swift -primary-file %t/foo.swift -c -o %t/foo1.o  \
 // RUN:  -module-name Test -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --check-prefix=CACHE-HIT %s
-// RUN: test -f %t/test.o
-// RUN: test -f %t/foo.o
-// RUN: test -f %t/Test.swiftmodule
+// RUN: test -f %t/test1.o
+// RUN: test -f %t/foo1.o
+// RUN: test -f %t/Test1.swiftmodule
+
+/// Multithread IRGen.
+// RUN: %target-swift-frontend -cache-compile-job -cas-backend -cas-backend-mode=verify -Rcache-compile-job %t/test.swift %t/foo.swift -c -o %t/test2.o -o %t/foo2.o \
+// RUN:  -num-threads 2 -module-name Test -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --check-prefix=CACHE-MISS %s
+// RUN: test -f %t/test2.o
+// RUN: test -f %t/foo2.o
+
+// RUN: %target-swift-frontend -cache-compile-job -cas-backend -cas-backend-mode=verify -Rcache-compile-job %t/test.swift %t/foo.swift -c -o %t/test3.o -o %t/foo3.o \
+// RUN:  -num-threads 2 -module-name Test -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --check-prefix=CACHE-HIT %s
+// RUN: test -f %t/test3.o
+// RUN: test -f %t/foo3.o
 
 //--- test.swift
 func testFunc() {}

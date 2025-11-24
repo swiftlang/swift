@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// The specification for a project to generate.
-public struct ProjectSpec {
+public struct ProjectSpec: ~Copyable {
   public var name: String
   public var buildDir: RepoBuildDir
   public var runnableBuildDir: RepoBuildDir

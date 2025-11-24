@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Osize -import-objc-header %S/Inputs/Outliner.h %s -Xllvm -sil-print-types -emit-sil -enforce-exclusivity=unchecked -enable-copy-propagation | %FileCheck %s
-// RUN: %target-swift-frontend -Osize -g -import-objc-header %S/Inputs/Outliner.h %s -Xllvm -sil-print-types -emit-sil -enforce-exclusivity=unchecked -enable-copy-propagation | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=mandatory-destroy-hoisting -Osize -import-objc-header %S/Inputs/Outliner.h %s -Xllvm -sil-print-types -emit-sil -enforce-exclusivity=unchecked -enable-copy-propagation | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=mandatory-destroy-hoisting -Osize -g -import-objc-header %S/Inputs/Outliner.h %s -Xllvm -sil-print-types -emit-sil -enforce-exclusivity=unchecked -enable-copy-propagation | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: optimized_stdlib

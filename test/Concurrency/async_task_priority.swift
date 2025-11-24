@@ -322,6 +322,43 @@ actor Test {
           await task2.value // Escalate task2 which should be queued behind task1 on the actor
         }
 
+        // This test will only work properly if Dispatch supports lowering the base priority of a thread
+        if #available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *) {
+          tests.test("Task escalation doesn't impact qos_class_self") {
+            let task = Task(priority: .utility) {
+              let initialQos = DispatchQoS(
+                qosClass: DispatchQoS.QoSClass(rawValue: qos_class_self())!,
+                relativePriority: 0)
+              expectEqual(initialQos, DispatchQoS.utility)
+              let innerTask = Task {
+                let qosBeforeEscalate = DispatchQoS(
+                  qosClass: DispatchQoS.QoSClass(rawValue: qos_class_self())!,
+                  relativePriority: 0)
+                // Unstructured task should inherit utility priority
+                expectEqual(qosBeforeEscalate, DispatchQoS.utility)
+                // Escalate priority override, not base QoS
+                withUnsafeCurrentTask {
+                  $0!.escalatePriority(to: .userInitiated)
+                }
+                let qosAfterEscalate = DispatchQoS(
+                  qosClass: DispatchQoS.QoSClass(rawValue: qos_class_self())!,
+                  relativePriority: 0)
+                // qos_class_self should remain utility after escalation
+                expectEqual(qosAfterEscalate, DispatchQoS.utility)
+                await Task.yield()
+                let qosAfterYield = DispatchQoS(
+                  qosClass: DispatchQoS.QoSClass(rawValue: qos_class_self())!,
+                  relativePriority: 0)
+                // qos_class_self should remain utility after yield
+                expectEqual(qosAfterYield, DispatchQoS.utility)
+              }
+
+              await innerTask.value
+            }
+
+            await task.value
+          }
+        }
       }
       await runAllTestsAsync()
     }

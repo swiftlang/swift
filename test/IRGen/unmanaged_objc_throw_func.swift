@@ -20,8 +20,8 @@ import Foundation
     // CHECK-NEXT: %._value = getelementptr inbounds{{.*}} %TSi, ptr %[[T2]], i32 0, i32 0
     // CHECK:      %[[T7:.+]] = call swiftcc ptr @"$ss27_finalizeUninitializedArrayySayxGABnlF"(ptr %[[T1]], ptr @"$sSiN")
     // CHECK:      %[[T4:.+]] = call swiftcc ptr @"$sSa10FoundationE19_bridgeToObjectiveCSo7NSArrayCyF"(ptr %[[T7]], ptr @"$sSiN")
-    // CHECK-NEXT: store ptr %[[T4]]
     // CHECK-NEXT: call void @swift_bridgeObjectRelease(ptr %{{[0-9]+}}) #{{[0-9]+}}
+    // CHECK-NEXT: store ptr %[[T4]]
     // CHECK-NEXT: call void @llvm.objc.release(ptr %[[T4]])
     // CHECK-NEXT: ret ptr %[[T4]]
     let arr = [1] as CFArray
@@ -37,12 +37,14 @@ import Foundation
 
 // CHECK: [[L2]]:                                     ; preds = %entry
 // CHECK-NEXT: %[[T4:.+]] = phi ptr [ %[[T0]], %entry ]
+// CHECK-NEXT: call void @llvm.objc.release(ptr %{{.+}})
 // CHECK-NEXT: %[[T5:.+]] = ptrtoint ptr %[[T4]] to i{{32|64}}
 // CHECK-NEXT: br label %[[L3:.+]]
 
 // CHECK: [[L1]]:                                     ; preds = %entry
 // CHECK-NEXT: %[[T6:.+]] = phi ptr [ %[[T2]], %entry ]
 // CHECK-NEXT: store ptr null, ptr %swifterror, align {{[0-9]+}}
+// CHECK-NEXT: call void @llvm.objc.release(ptr %{{.+}})
 // CHECK-NEXT: %[[T7:.+]] = icmp eq i{{32|64}} %{{.+}}, 0
 // CHECK-NEXT: br i1 %[[T7]], label %[[L4:.+]], label %[[L5:.+]]
 
@@ -54,8 +56,7 @@ import Foundation
 // CHECK-NEXT: %[[T9:.+]] = phi ptr [ %[[T8]], %[[L5]] ]
 // CHECK-NEXT: %[[T10:.+]] = call swiftcc ptr @"$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF"(ptr %[[T6]]) #{{[0-9]+}}
 // CHECK: call swiftcc void @"$sSA7pointeexvs"(ptr noalias %{{.+}}, ptr %[[T9]], ptr %{{.+}}) #{{[0-9]+}}
-// CHECK: call void @swift_errorRelease(ptr %[[T6]]) #{{[0-9]+}}
-// CHECK-NEXT: br label %[[L7:.+]]
+// CHECK: br label %[[L7:.+]]
 
 // CHECK: [[L4]]:                                     ; preds = %[[L1]]
 // CHECK-NEXT: call void @swift_errorRelease(ptr %[[T6]]) #{{[0-9]+}}
@@ -66,6 +67,5 @@ import Foundation
 
 // CHECK: [[L3]]:                                     ; preds = %[[L2]], %[[L7]]
 // CHECK-NEXT: %[[T12:.+]] = phi i{{32|64}} [ 0, %[[L7]] ], [ %[[T5]], %[[L2]] ]
-// CHECK-NEXT: call void @llvm.objc.release(ptr %{{.+}})
 // CHECK-NEXT: %[[T14:.+]] = inttoptr i{{32|64}} %[[T12]] to ptr
 // CHECK-NEXT: ret ptr %[[T14]]

@@ -86,7 +86,6 @@ set(CoreLibs
   CompatibilityOverride
   stubs
   CommandLineSupport
-  core
   SwiftOnoneSupport
   RemoteInspection
   SwiftRemoteMirror
@@ -96,6 +95,10 @@ set(CoreLibs
 foreach(library ${CoreLibs})
   copy_library_sources(${library} "public" "Core")
 endforeach()
+
+# copying Core/core separately, so we can specify the case of the target folder
+# correctly on case sensitive file systems
+copy_library_sources("" "public/core" "Core/Core")
 
 message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Core/Info.plist.in")
 copy_files("" "Core" FILES "Info.plist.in")

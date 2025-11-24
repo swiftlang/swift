@@ -188,7 +188,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
         CurDeclContext,
         /*ProduceDiagnostics=*/false);
     if (!ty->hasError()) {
-      ParsedTypeLoc.setType(CurDeclContext->mapTypeIntoContext(ty));
+      ParsedTypeLoc.setType(CurDeclContext->mapTypeIntoEnvironment(ty));
       return true;
     }
 
@@ -883,7 +883,7 @@ static void addKeywordsAfterReturn(CodeCompletionResultSink &Sink, DeclContext *
       // Note that `TypeContext` must stay alive for the duration of
       // `~CodeCodeCompletionResultBuilder()`.
       ExpectedTypeContext TypeContext;
-      TypeContext.setPossibleTypes({DC->mapTypeIntoContext(resultType)});
+      TypeContext.setPossibleTypes({DC->mapTypeIntoEnvironment(resultType)});
 
       CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Literal,
                                           SemanticContextKind::None);

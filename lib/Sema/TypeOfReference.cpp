@@ -67,7 +67,7 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
         isTypeResolution
             // Type resolution produces interface types, so we have to map
             // the parent type into context before binding type variables.
-            ? DC->mapTypeIntoContext(parentTy)
+            ? DC->mapTypeIntoEnvironment(parentTy)
             : parentTy;
 
     const auto subs =
@@ -115,7 +115,7 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
           [](auto, auto) { /*will be called, but we already handled reqs*/ })
           .applyUnboundGenericArguments(decl, parentTy, SourceLoc(), arguments);
   if (!parentTy && !isTypeResolution) {
-    result = DC->mapTypeIntoContext(result);
+    result = DC->mapTypeIntoEnvironment(result);
   }
 
   return result;
@@ -148,7 +148,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   // If this decl is generic, the constraints are handled when the generic
   // parameters are applied, so we don't have to handle them here (which makes
   // getting the right substitution maps easier).
-  if (!decl || decl->isGeneric())
+  if (!decl || decl->hasGenericParamList())
     return;
 
   // struct A<T> {
@@ -787,8 +787,8 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
   if (!wantInterfaceType && requestedType->hasArchetype()) {
     auto valueDC = value->getDeclContext();
     if (valueDC != UseDC) {
-      Type mapped = requestedType->mapTypeOutOfContext();
-      requestedType = UseDC->mapTypeIntoContext(mapped);
+      Type mapped = requestedType->mapTypeOutOfEnvironment();
+      requestedType = UseDC->mapTypeIntoEnvironment(mapped);
     }
   }
 
@@ -1168,7 +1168,7 @@ ConstraintSystem::getTypeOfReferencePre(OverloadChoice choice,
                                      /*packElementOpener*/ nullptr)
             .resolveTypeInContext(typeDecl, /*foundDC*/ nullptr,
                                   /*isSpecialized=*/false);
-    type = useDC->mapTypeIntoContext(type);
+    type = useDC->mapTypeIntoEnvironment(type);
 
     checkNestedTypeConstraints(*this, type, locator, preparedOverload);
 
@@ -1401,7 +1401,7 @@ static void bindArchetypesFromContext(
 
     auto genericSig = parentDC->getGenericSignatureOfContext();
     for (auto *paramTy : genericSig.getGenericParams()) {
-      Type contextTy = cs.DC->mapTypeIntoContext(paramTy);
+      Type contextTy = cs.DC->mapTypeIntoEnvironment(paramTy);
       if (paramTy->isParameterPack())
         contextTy = PackType::getSingletonPackExpansion(contextTy);
       bindPrimaryArchetype(paramTy, contextTy);
@@ -1688,7 +1688,7 @@ Type constraints::getDynamicSelfReplacementType(
   const auto *selfDecl = SuperExpr->getSelf();
   return selfDecl->getDeclContext()
       ->getInnermostTypeContext()
-      ->mapTypeIntoContext(selfDecl->getInterfaceType())
+      ->mapTypeIntoEnvironment(selfDecl->getInterfaceType())
       ->getMetatypeInstanceType();
 }
 
@@ -2580,13 +2580,6 @@ static std::pair<bool, unsigned>
 isInvalidPartialApplication(ConstraintSystem &cs,
                             const AbstractFunctionDecl *member,
                             ConstraintLocator *locator) {
-  // If this is a compiler synthesized implicit conversion, let's skip
-  // the check because the base of `UDE` is not the base of the injected
-  // initializer.
-  if (locator->isLastElement<LocatorPathElt::ConstructorMember>() &&
-      locator->findFirst<LocatorPathElt::ImplicitConversion>())
-    return {false, 0};
-
   auto *UDE = getAsExpr<UnresolvedDotExpr>(locator->getAnchor());
   if (UDE == nullptr)
     return {false,0};

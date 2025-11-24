@@ -145,17 +145,6 @@ static bool printModuleInterfaceDecl(Decl *D,
     Printer.callAvoidPrintDeclPost(D);
     return false;
   }
-  if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
-    // Clang extensions (categories) are always printed in source order.
-    // Swift extensions are printed with their associated type unless it's
-    // a cross-module extension.
-    if (!extensionHasClangNode(Ext)) {
-      auto ExtendedNominal = Ext->getExtendedNominal();
-      if (!ExtendedNominal ||
-          Ext->getModuleContext() == ExtendedNominal->getModuleContext())
-        return false;
-    }
-  }
 
   // It'd be nice to avoid cloning the options here, but that would require
   // SynthesizedExtensionAnalyzer to promise to stay within the lifetime of
@@ -676,6 +665,14 @@ void swift::ide::printModuleInterface(
       if (extensionHasClangNode(Ext)) {
         addToClangDecls(Ext, extensionGetClangNode(Ext));
         continue;
+      }
+
+      // Swift extensions are printed with their associated type unless it's
+      // a cross-module extension.
+      if (auto extendedTy = Ext->getExtendedNominal()) {
+        if (TargetMod->isSameModuleLookingThroughOverlays(
+                extendedTy->getModuleContext()))
+          continue;
       }
     }
 

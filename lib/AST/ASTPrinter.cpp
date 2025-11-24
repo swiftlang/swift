@@ -229,6 +229,8 @@ static NonRecursivePrintOptions getNonRecursiveOptions(const ValueDecl *D) {
   NonRecursivePrintOptions options;
   if (D->isImplicitlyUnwrappedOptional())
     options |= NonRecursivePrintOption::ImplicitlyUnwrappedOptional;
+  if (isa<ParamDecl>(D))
+    options |= NonRecursivePrintOption::SkipNonisolatedNonsending;
   return options;
 }
 
@@ -263,6 +265,7 @@ private:
 };
 
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
+                                                   bool useModuleSelectors,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
                                                    InterfaceMode interfaceMode,
@@ -276,6 +279,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
   result.CurrentModule = ModuleToPrint;
+  result.UseModuleSelectors = useModuleSelectors;
   result.FullyQualifiedTypes = true;
   result.FullyQualifiedTypesIfAmbiguous = true;
   result.FullyQualifiedExtendedTypesIfAmbiguous = true;
@@ -1178,7 +1182,7 @@ public:
       Type CurrentType = Options.TransformContext->getBaseType();
       if (CurrentType && CurrentType->hasArchetype()) {
         // ExistentialArchetypeTypes get replaced by a GenericTypeParamType without a
-        // name in mapTypeOutOfContext. The GenericTypeParamType has no children
+        // name in mapTypeOutOfEnvironment. The GenericTypeParamType has no children
         // so we can't use it for TypeTransformContext.
         // To work around this, replace the ExistentialArchetypeType with the type of
         // the protocol itself.
@@ -1186,7 +1190,7 @@ public:
           assert(Opened->isRoot());
           CurrentType = Opened->getExistentialType();
         }
-        CurrentType = CurrentType->mapTypeOutOfContext();
+        CurrentType = CurrentType->mapTypeOutOfEnvironment();
       }
       setCurrentType(CurrentType);
     }
@@ -2959,7 +2963,7 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
 }
 
 void PrintAST::printGenericDeclGenericParams(GenericContext *decl) {
-  if (decl->isGeneric())
+  if (decl->hasGenericParamList())
     if (auto GenericSig = decl->getGenericSignature()) {
       Printer.printStructurePre(PrintStructureKind::DeclGenericParameterClause);
       printGenericSignature(GenericSig, PrintParams | InnermostOnly);
@@ -3534,7 +3538,7 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
       Options.TransformContext->isPrintingSynthesizedExtension()) {
     auto extendedType = Options.TransformContext->getBaseType();
     if (extendedType->hasArchetype())
-      extendedType = extendedType->mapTypeOutOfContext();
+      extendedType = extendedType->mapTypeOutOfEnvironment();
     printSynthesizedExtension(extendedType, decl);
   } else
     printExtension(decl);
@@ -3893,6 +3897,12 @@ static bool isEscaping(Type type) {
   return false;
 }
 
+static bool isNonisolatedCaller(Type type) {
+  if (auto *funcTy = type->getAs<AnyFunctionType>())
+    return funcTy->getIsolation().isNonIsolatedCaller();
+  return false;
+}
+
 static void printParameterFlags(ASTPrinter &printer,
                                 const PrintOptions &options,
                                 const ParamDecl *param,
@@ -4075,17 +4085,6 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
   auto interfaceTy = param->getInterfaceType();
 
-  // If type of this parameter is isolated to a caller, let's
-  // strip the isolation from the type to avoid printing it as
-  // part of the function type because that would break ordering
-  // between specifiers and attributes.
-  if (param->isCallerIsolated()) {
-    if (auto *funcTy = dyn_cast<AnyFunctionType>(interfaceTy.getPointer())) {
-      interfaceTy =
-          funcTy->withIsolation(FunctionTypeIsolation::forNonIsolated());
-    }
-  }
-
   TypeLoc TheTypeLoc;
   if (auto *repr = param->getTypeRepr()) {
     TheTypeLoc = TypeLoc(repr, interfaceTy);
@@ -4106,7 +4105,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       // be written explicitly in this position.
       printParameterFlags(Printer, Options, param, paramFlags,
                           isEscaping(type) && !isEnumElement,
-                          param->isCallerIsolated());
+                          isNonisolatedCaller(interfaceTy));
     }
 
     printTypeLoc(TheTypeLoc, getNonRecursiveOptions(param));
@@ -4398,8 +4397,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
       if (decl->hasSendingResult()) {
         Printer << "sending ";
-      } else if (auto *ft = llvm::dyn_cast_if_present<AnyFunctionType>(
-                     decl->getInterfaceType())) {
+      } else if (auto *ft =
+                     decl->getInterfaceType()->getAs<AnyFunctionType>()) {
         if (ft->hasExtInfo() && ft->hasSendingResult()) {
           Printer << "sending ";
         }
@@ -6058,9 +6057,8 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
-  template <typename T>
-  void printModuleContext(T *Ty) {
-    FileUnit *File = cast<FileUnit>(Ty->getDecl()->getModuleScopeContext());
+  void printModuleContext(GenericTypeDecl *TyDecl) {
+    FileUnit *File = cast<FileUnit>(TyDecl->getModuleScopeContext());
     ModuleDecl *Mod = File->getParentModule();
     StringRef ExportedModuleName = File->getExportedModuleName();
 
@@ -6069,7 +6067,7 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     // all of these modules may be visible. We therefore need to make sure we
     // choose a module that is visible from the current module. This is possible
     // only if we know what the current module is.
-    const clang::Decl *ClangDecl = Ty->getDecl()->getClangDecl();
+    const clang::Decl *ClangDecl = TyDecl->getClangDecl();
     if (ClangDecl && Options.CurrentModule) {
       for (auto *Redecl : ClangDecl->redecls()) {
         auto *owningModule = Redecl->getOwningModule();
@@ -6106,12 +6104,10 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     }
 
     if (Options.UseOriginallyDefinedInModuleNames) {
-      Decl *D = Ty->getDecl();
-      for (auto attr: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
+      if (auto attr =
+            TyDecl->getAttrs().getAttribute<OriginallyDefinedInAttr>()) {
         Name = Mod->getASTContext().getIdentifier(
-            const_cast<OriginallyDefinedInAttr *>(attr)
-                ->getManglingModuleName());
-        break;
+            attr->getManglingModuleName());
       }
     }
 
@@ -6122,7 +6118,6 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     }
 
     Printer.printModuleRef(Mod, Name);
-    Printer << ".";
   }
 
   template <typename T>
@@ -6140,7 +6135,42 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return M->getRealName().str().starts_with(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX);
   }
 
+  bool isMemberOfGenericParameter(TypeBase *T) {
+    Type parent = nullptr;
+    if (auto alias = dyn_cast<TypeAliasType>(T))
+      parent = alias->getParent();
+    else if (auto generic = T->getAs<AnyGenericType>())
+      parent = generic->getParent();
+    return parent && parent->isTypeParameter();
+  }
+
+  bool shouldPrintModuleSelector(TypeBase *T) {
+    if (!Options.UseModuleSelectors)
+      return false;
+
+    GenericTypeDecl *GTD = T->getAnyGeneric();
+    if (!GTD && isa<TypeAliasType>(T))
+      GTD = cast<TypeAliasType>(T)->getDecl();
+    if (!GTD)
+      return false;
+
+    // Builtin types must always be qualified somehow.
+    ModuleDecl *M = GTD->getDeclContext()->getParentModule();
+    if (M->isBuiltinModule())
+      return true;
+
+    // A member of a generic parameter can't be qualified by a module selector.
+    if (isMemberOfGenericParameter(T))
+      return false;
+
+    // Module selectors skip over local types, so don't add one.
+    return GTD->getLocalContext() == nullptr;
+  }
+
   bool shouldPrintFullyQualified(TypeBase *T) {
+    if (Options.UseModuleSelectors)
+      return false;
+
     if (Options.FullyQualifiedTypes)
       return true;
 
@@ -6197,7 +6227,15 @@ public:
       printParentType(parent);
       NameContext = PrintNameContext::TypeMember;
     } else if (shouldPrintFullyQualified(Ty)) {
-      printModuleContext(Ty);
+      printModuleContext(Ty->getDecl());
+      Printer << ".";
+      NameContext = PrintNameContext::TypeMember;
+    }
+
+    // We print module selectors whether or not we printed a parent type.
+    if (shouldPrintModuleSelector(Ty)) {
+      printModuleContext(Ty->getDecl());
+      Printer << "::";
       NameContext = PrintNameContext::TypeMember;
     }
 
@@ -6323,7 +6361,7 @@ public:
     printQualifiedType(T);
 
     auto *typeAliasDecl = T->getDecl();
-    if (typeAliasDecl->isGeneric()) {
+    if (typeAliasDecl->hasGenericParamList()) {
       if (Options.PrintTypesForDebugging)
         printGenericArgs(T->getDirectGenericArgs());
       else
@@ -6465,14 +6503,14 @@ public:
        if (auto currentType = Options.TransformContext->getBaseType()) {
          auto printingType = T;
          if (currentType->hasArchetype())
-           currentType = currentType->mapTypeOutOfContext();
+           currentType = currentType->mapTypeOutOfEnvironment();
 
          if (auto errorTy = printingType->getAs<ErrorType>())
            if (auto origTy = errorTy->getOriginalType())
              printingType = origTy;
 
          if (printingType->hasArchetype())
-           printingType = printingType->mapTypeOutOfContext();
+           printingType = printingType->mapTypeOutOfEnvironment();
 
          if (currentType->isEqual(printingType))
            return;
@@ -6588,7 +6626,8 @@ public:
     visit(staticSelfT);
   }
 
-  void printFunctionExtInfo(AnyFunctionType *fnType) {
+  void printFunctionExtInfo(AnyFunctionType *fnType,
+                            NonRecursivePrintOptions nrOptions) {
     if (!fnType->hasExtInfo()) {
       Printer << "@_NO_EXTINFO ";
       return;
@@ -6619,7 +6658,18 @@ public:
 
     auto isolation = info.getIsolation();
     switch (isolation.getKind()) {
-    case FunctionTypeIsolation::Kind::NonIsolated:
+    case FunctionTypeIsolation::Kind::NonIsolated: {
+      // When `NonisolatedNonsendingByDefault` is enabled and async
+      // function type is nonisolated it could only mean that it is
+      // either explicitly `@concurrent` or inferred to be one and
+      // it should be printed accordingly.
+      if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
+          fnType->isAsync()) {
+        Printer << "@concurrent ";
+      }
+      break;
+    }
+
     case FunctionTypeIsolation::Kind::Parameter:
       break;
 
@@ -6634,6 +6684,9 @@ public:
       break;
 
     case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
+      if (nrOptions & NonRecursivePrintOption::SkipNonisolatedNonsending)
+        break;
+
       Printer << "nonisolated(nonsending) ";
       break;
     }
@@ -6886,7 +6939,7 @@ public:
       Printer.printStructurePost(PrintStructureKind::FunctionType);
     };
 
-    printFunctionExtInfo(T);
+    printFunctionExtInfo(T, nrOptions);
 
     // If we're stripping argument labels from types, do it when printing.
     visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/ false,
@@ -6944,7 +6997,7 @@ public:
       Printer.printStructurePost(PrintStructureKind::FunctionType);
     };
 
-    printFunctionExtInfo(T);
+    printFunctionExtInfo(T, nrOptions);
     printGenericSignature(T->getGenericSignature(),
                           PrintAST::PrintParams |
                           PrintAST::defaultGenericRequirementFlags(Options));
@@ -7446,7 +7499,7 @@ public:
   void printArchetypeCommon(Type interfaceTy, GenericEnvironment *env) {
     if (auto *paramTy = interfaceTy->getAs<GenericTypeParamType>()) {
       if (Options.AlternativeTypeNames) {
-        auto archetypeTy = env->mapTypeIntoContext(paramTy)->getAs<GenericTypeParamType>();
+        auto archetypeTy = env->mapTypeIntoEnvironment(paramTy)->getAs<GenericTypeParamType>();
         if (archetypeTy) {
           auto found = Options.AlternativeTypeNames->find(CanType(archetypeTy));
           if (found != Options.AlternativeTypeNames->end()) {
@@ -7464,7 +7517,7 @@ public:
 
     auto *memberTy = interfaceTy->castTo<DependentMemberType>();
     if (auto *paramTy = memberTy->getBase()->getAs<GenericTypeParamType>())
-      printParentType(env->mapTypeIntoContext(paramTy));
+      printParentType(env->mapTypeIntoEnvironment(paramTy));
     else {
       printArchetypeCommon(memberTy->getBase(), env);
       Printer << ".";
@@ -7640,7 +7693,7 @@ public:
 
       // Print based on the type.
       Printer.printKeyword("some", Options, /*Suffix=*/" ");
-      auto archetypeType = decl->getDeclContext()->mapTypeIntoContext(
+      auto archetypeType = decl->getDeclContext()->mapTypeIntoEnvironment(
           decl->getDeclaredInterfaceType())->castTo<ArchetypeType>();
       auto constraintType = archetypeType->getExistentialType();
       if (auto *existentialType = constraintType->getAs<ExistentialType>())
@@ -8195,6 +8248,39 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
   }
 }
 
+static Type stripParameterizedProtocolArgs(Type type) {
+  if (!type)
+    return type;
+
+  // For each ParameterizedProtocolType process each member recursively
+  if (auto *compositionType = type->getAs<ProtocolCompositionType>()) {
+    SmallVector<Type, 4> processedMembers;
+    bool hasChanged = false;
+    for (auto member : compositionType->getMembers()) {
+      Type processedMember = stripParameterizedProtocolArgs(member);
+      if (!processedMember)
+        continue;
+      processedMembers.push_back(processedMember);
+      if (processedMember.getPointer() != member.getPointer())
+        hasChanged = true;
+    }
+    // Rebuild ProtocolCompositionType if at least one member had generic args
+    if (hasChanged) {
+      return ProtocolCompositionType::get(
+          type->getASTContext(), processedMembers,
+          compositionType->getInverses(),
+          compositionType->hasExplicitAnyObject());
+    }
+    return type;
+  }
+
+  // Strip generic arguments of a single ParameterizedProtocolType
+  if (auto *paramProto = type->getAs<ParameterizedProtocolType>()) {
+    return paramProto->getBaseType();
+  }
+  return type;
+}
+
 void
 swift::getInheritedForPrinting(
     const Decl *decl, const PrintOptions &options,
@@ -8264,12 +8350,22 @@ swift::getInheritedForPrinting(
       }
     }
 
-    Results.push_back(inherited.getEntry(i));
+    auto entry = inherited.getEntry(i);
+    if (auto type = entry.getType()) {
+      Type strippedType = stripParameterizedProtocolArgs(type);
+      if (strippedType.getPointer() != type.getPointer()) {
+        entry = InheritedEntry(TypeLoc::withoutLoc(strippedType),
+                               entry.getOptions());
+      }
+    }
+
+    Results.push_back(entry);
   }
 
   // Collect synthesized conformances.
   llvm::SetVector<ProtocolDecl *> protocols;
   llvm::TinyPtrVector<ProtocolDecl *> uncheckedProtocols;
+  llvm::TinyPtrVector<ProtocolDecl *> suppressedProtocols;
   for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     if (auto *proto = attr->getProtocol()) {
       // FIXME: Reconstitute inverses here
@@ -8289,12 +8385,15 @@ swift::getInheritedForPrinting(
       protocols.insert(proto);
       if (attr->isUnchecked())
         uncheckedProtocols.push_back(proto);
+      if (attr->isSuppressed())
+        suppressedProtocols.push_back(proto);
     }
   }
 
   for (size_t i = 0; i < protocols.size(); i++) {
     auto proto = protocols[i];
     bool isUnchecked = llvm::is_contained(uncheckedProtocols, proto);
+    bool isSuppressed = llvm::is_contained(suppressedProtocols, proto);
 
     if (!options.shouldPrint(proto)) {
       // If private stdlib protocols are skipped and this is a private stdlib
@@ -8319,7 +8418,7 @@ swift::getInheritedForPrinting(
     if (isUnchecked)
       options |= ProtocolConformanceFlags::Unchecked;
     Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-                       options});
+                       options, isSuppressed});
   }
 }
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -113,7 +113,7 @@ fileprivate extension PropertyList {
 
   struct _Encoder: Encoder {
     var userInfo: [CodingUserInfoKey: Any] { [:] }
-    var codingPath: [CodingKey] { fatalError("Unsupported") }
+    var codingPath: [any CodingKey] { fatalError("Unsupported") }
 
     var result = Result()
     init() {}
@@ -122,10 +122,10 @@ fileprivate extension PropertyList {
       .init(KeyedContainer<Key>(result: result.makeDictionary()))
     }
 
-    func unkeyedContainer() -> UnkeyedEncodingContainer {
+    func unkeyedContainer() -> any UnkeyedEncodingContainer {
       UnkeyedContainer(result: result.makeArray())
     }
-    func singleValueContainer() -> SingleValueEncodingContainer {
+    func singleValueContainer() -> any SingleValueEncodingContainer {
       SingleValueContainer(result: result)
     }
   }
@@ -133,7 +133,7 @@ fileprivate extension PropertyList {
 
 extension PropertyList {
   fileprivate struct KeyedContainer<Key: CodingKey>: KeyedEncodingContainerProtocol {
-    var codingPath: [CodingKey] { fatalError("Unsupported") }
+    var codingPath: [any CodingKey] { fatalError("Unsupported") }
     var result: Result
 
     mutating func encode(_ value: String, forKey key: Key) {
@@ -144,10 +144,12 @@ extension PropertyList {
       result.dictionary[key.stringValue] = try .encode(value)
     }
 
-    mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer { fatalError("Unsupported") }
+    mutating func nestedUnkeyedContainer(forKey key: Key) -> any UnkeyedEncodingContainer {
+      fatalError("Unsupported")
+    }
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> { fatalError("Unsupported") }
-    mutating func superEncoder(forKey key: Key) -> Encoder { fatalError("Unsupported") }
-    mutating func superEncoder() -> Encoder { fatalError("Unsupported") }
+    mutating func superEncoder(forKey key: Key) -> any Encoder { fatalError("Unsupported") }
+    mutating func superEncoder() -> any Encoder { fatalError("Unsupported") }
     mutating func encodeNil(forKey key: Key) { fatalError("Unsupported") }
     mutating func encode(_ value: Bool, forKey key: Key) { fatalError("Unsupported") }
     mutating func encode(_ value: Double, forKey key: Key) { fatalError("Unsupported") }
@@ -165,7 +167,7 @@ extension PropertyList {
   }
 
   fileprivate struct UnkeyedContainer: UnkeyedEncodingContainer {
-    var codingPath: [CodingKey] { fatalError("Unsupported") }
+    var codingPath: [any CodingKey] { fatalError("Unsupported") }
 
     var result: Result
     var count: Int {
@@ -181,8 +183,8 @@ extension PropertyList {
     }
 
     mutating func nestedContainer<NestedKey: CodingKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> { fatalError("Unsupported") }
-    mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer { fatalError("Unsupported") }
-    mutating func superEncoder() -> Encoder { fatalError("Unsupported") }
+    mutating func nestedUnkeyedContainer() -> any UnkeyedEncodingContainer { fatalError("Unsupported") }
+    mutating func superEncoder() -> any Encoder { fatalError("Unsupported") }
     mutating func encodeNil() { fatalError("Unsupported") }
     mutating func encode(_ value: Bool) { fatalError("Unsupported") }
     mutating func encode(_ value: Double) { fatalError("Unsupported") }
@@ -200,7 +202,7 @@ extension PropertyList {
   }
 
   fileprivate struct SingleValueContainer: SingleValueEncodingContainer {
-    var codingPath: [CodingKey] { fatalError("Unsupported") }
+    var codingPath: [any CodingKey] { fatalError("Unsupported") }
     var result: Result
 
     mutating func encode<T: Encodable>(_ value: T) throws {

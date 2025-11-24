@@ -4108,7 +4108,7 @@ public:
 
     if (T) {
       T = T->getRValueType();
-      tryDemangleType(T->mapTypeOutOfContext(),
+      tryDemangleType(T->mapTypeOutOfEnvironment(),
                       (NestedDCs.empty()
                        ? D->getDeclContext()
                        : NestedDCs.back()),
@@ -4122,7 +4122,7 @@ private:
     Mangle::ASTMangler Mangler(Ctx);
     auto sig = DC->getGenericSignatureOfContext();
     std::string mangledName(Mangler.mangleTypeForDebugger(T, sig));
-    Type ReconstructedType = DC->mapTypeIntoContext(
+    Type ReconstructedType = DC->mapTypeIntoEnvironment(
         Demangle::getTypeForMangling(Ctx, mangledName));
     Stream << "type: ";
     if (ReconstructedType) {

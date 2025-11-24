@@ -84,8 +84,8 @@ public func withTaskCancellationHandler<T>(
 ) async rethrows -> T {
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
-  let record = unsafe _taskAddCancellationHandler(handler: handler)
-  defer { unsafe _taskRemoveCancellationHandler(record: record) }
+  let record = unsafe Builtin.taskAddCancellationHandler(handler: handler)
+  defer { unsafe Builtin.taskRemoveCancellationHandler(record: record) }
 
   return try await operation()
 }
@@ -105,8 +105,8 @@ public func _unsafeInheritExecutor_withTaskCancellationHandler<T>(
 ) async rethrows -> T {
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
-  let record = unsafe _taskAddCancellationHandler(handler: handler)
-  defer { unsafe _taskRemoveCancellationHandler(record: record) }
+  let record = unsafe Builtin.taskAddCancellationHandler(handler: handler)
+  defer { unsafe Builtin.taskRemoveCancellationHandler(record: record) }
 
   return try await operation()
 }
@@ -163,15 +163,3 @@ public struct CancellationError: Error {
   // no extra information, cancellation is intended to be light-weight
   public init() {}
 }
-
-@usableFromInline
-@available(SwiftStdlib 5.1, *)
-@_silgen_name("swift_task_addCancellationHandler")
-func _taskAddCancellationHandler(handler: () -> Void) -> UnsafeRawPointer /*CancellationNotificationStatusRecord*/
-
-@usableFromInline
-@available(SwiftStdlib 5.1, *)
-@_silgen_name("swift_task_removeCancellationHandler")
-func _taskRemoveCancellationHandler(
-  record: UnsafeRawPointer /*CancellationNotificationStatusRecord*/
-)

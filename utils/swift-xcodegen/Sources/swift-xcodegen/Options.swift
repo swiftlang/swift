@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -165,7 +165,7 @@ struct ProjectOptions: ParsableArguments {
     help: """
       Generate targets for Swift files in the standard library. This requires
       using Xcode with a main development Swift snapshot, and as such is
-      disabled by default. 
+      disabled by default.
       
       A development snapshot is necessary to avoid spurious build/live issues
       due to the fact that the stdlib is built using the just-built Swift
@@ -238,7 +238,7 @@ struct ProjectOptions: ParsableArguments {
 struct MiscOptions: ParsableArguments {
   @Option(help: """
     The project root directory, which is the parent directory of the Swift repo.
-    By default this is inferred from the build directory path.
+    By default, this is inferred from the build directory path.
     """)
   var projectRootDir: AnyPath?
 

@@ -36,6 +36,8 @@ public struct DeclRef: CustomStringConvertible, NoReflectionChildren {
   public func calleesAreStaticallyKnowable(_ context: some Context) -> Bool {
     context._bridged.calleesAreStaticallyKnowable(bridged)
   }
+
+  public var sourceFile: SourceFile? { SourceFile(bridged: bridged.getSourceFile()) }
 }
 
 extension DeclRef: DiagnosticArgument {

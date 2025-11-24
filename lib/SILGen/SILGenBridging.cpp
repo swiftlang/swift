@@ -123,7 +123,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF, SILLocation loc,
 
   // FIXME: Figure out the right SubstitutionMap stuff if the witness
   // has generic parameters of its own.
-  assert(!cast<FuncDecl>(witness)->isGeneric() &&
+  assert(!cast<FuncDecl>(witness)->hasGenericParamList() &&
          "Generic witnesses not supported");
 
   auto *dc = cast<FuncDecl>(witness)->getDeclContext();
@@ -561,9 +561,9 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // Build the invoke function signature. The block will capture the original
   // function value.
   auto fnInterfaceTy = cast<SILFunctionType>(
-    loweredFuncUnsubstTy->mapTypeOutOfContext()->getCanonicalType());
+    loweredFuncUnsubstTy->mapTypeOutOfEnvironment()->getCanonicalType());
   auto blockInterfaceTy = cast<SILFunctionType>(
-    loweredBlockTy->mapTypeOutOfContext()->getCanonicalType());
+    loweredBlockTy->mapTypeOutOfEnvironment()->getCanonicalType());
 
   assert(!blockInterfaceTy->isCoroutine());
 
@@ -1722,7 +1722,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   SILFunctionConventions objcConv(CanSILFunctionType(objcFnTy), SGM.M);
   SILFunctionConventions nativeConv(CanSILFunctionType(nativeInfo.SILFnType),
                                     SGM.M);
-  auto swiftResultTy = F.mapTypeIntoContext(
+  auto swiftResultTy = F.mapTypeIntoEnvironment(
       nativeConv.getSILResultType(getTypeExpansionContext()));
   auto objcResultTy = objcConv.getSILResultType(getTypeExpansionContext());
 
@@ -2183,13 +2183,13 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     // type rather than the declaration.
     auto selfArgTy = F.getLoweredFunctionType()->getSelfParameter()
       .getSILStorageType(getModule(), F.getLoweredFunctionType(), getTypeExpansionContext());
-    auto selfArg = F.begin()->createFunctionArgument(F.mapTypeIntoContext(selfArgTy), selfDecl);
+    auto selfArg = F.begin()->createFunctionArgument(F.mapTypeIntoEnvironment(selfArgTy), selfDecl);
     params.push_back(selfArg);
 
     // For allocating constructors, 'self' is a metatype, not the 'self' value
     // formally present in the constructor body.
     if (thunk.kind == SILDeclRef::Kind::Allocator) {
-      allocatorSelfType = F.mapTypeIntoContext(
+      allocatorSelfType = F.mapTypeIntoEnvironment(
         fd->getDeclContext()->getSelfInterfaceType());
     }
   }
@@ -2293,10 +2293,10 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         }
 
         CanType nativeFormalType =
-          F.mapTypeIntoContext(nativeFormalParams[nativeParamIndex])
+          F.mapTypeIntoEnvironment(nativeFormalParams[nativeParamIndex])
             ->getCanonicalType();
         CanType foreignFormalType =
-          F.mapTypeIntoContext(foreignFormalParams[nativeParamIndex])
+          F.mapTypeIntoEnvironment(foreignFormalParams[nativeParamIndex])
             ->getCanonicalType();
 
         if (isSelf) {
@@ -2307,7 +2307,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
 
         auto foreignParam = foreignFnTy->getParameters()[foreignArgIndex++];
         SILType foreignLoweredTy =
-            F.mapTypeIntoContext(foreignParam.getSILStorageType(
+            F.mapTypeIntoEnvironment(foreignParam.getSILStorageType(
                 F.getModule(), foreignFnTy, F.getTypeExpansionContext()));
 
         auto bridged = emitNativeToBridgedValue(fd, param, nativeFormalType,
@@ -2342,10 +2342,10 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     fnType = fnType->substGenericArgs(SGM.M, subs, getTypeExpansionContext());
 
     CanType nativeFormalResultType =
-        fd->mapTypeIntoContext(nativeCI.LoweredType.getResult())
+        fd->mapTypeIntoEnvironment(nativeCI.LoweredType.getResult())
             ->getCanonicalType();
     CanType bridgedFormalResultType =
-        fd->mapTypeIntoContext(foreignCI.LoweredType.getResult())
+        fd->mapTypeIntoEnvironment(foreignCI.LoweredType.getResult())
             ->getCanonicalType();
     CalleeTypeInfo calleeTypeInfo(
         fnType, AbstractionPattern(nativeFnTy->getInvocationGenericSignature(),

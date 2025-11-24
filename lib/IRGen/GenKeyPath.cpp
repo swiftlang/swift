@@ -204,7 +204,7 @@ getLayoutFunctionForComputedComponent(IRGenModule &IGM,
 
     for (auto &index : component.getArguments()) {
       auto ty = genericEnv
-        ? genericEnv->mapTypeIntoContext(IGM.getSILModule(), index.LoweredType)
+        ? genericEnv->mapTypeIntoEnvironment(IGM.getSILModule(), index.LoweredType)
         : index.LoweredType;
       auto &ti = IGM.getTypeInfo(ty);
       auto indexSize = ti.getSize(IGF, ty);
@@ -259,7 +259,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
   bool isTrivial = true;
   for (auto &component : component.getArguments()) {
     auto ty = genericEnv
-      ? genericEnv->mapTypeIntoContext(IGM.getSILModule(), component.LoweredType)
+      ? genericEnv->mapTypeIntoEnvironment(IGM.getSILModule(), component.LoweredType)
       : component.LoweredType;
     auto &ti = IGM.getTypeInfo(ty);
     isTrivial &= ti.isTriviallyDestroyable(ResilienceExpansion::Minimal);
@@ -297,7 +297,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
       llvm::Value *offset = nullptr;
       for (auto &component : component.getArguments()) {
         auto ty = genericEnv
-          ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
+          ? genericEnv->mapTypeIntoEnvironment(IGM.getSILModule(),
                                            component.LoweredType)
           : component.LoweredType;
         auto &ti = IGM.getTypeInfo(ty);
@@ -348,7 +348,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
       llvm::Value *offset = nullptr;
       for (auto &component : component.getArguments()) {
         auto ty = genericEnv
-          ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
+          ? genericEnv->mapTypeIntoEnvironment(IGM.getSILModule(),
                                            component.LoweredType)
           : component.LoweredType;
         auto &ti = IGM.getTypeInfo(ty);
@@ -479,7 +479,7 @@ getInitializerForComputedComponent(IRGenModule &IGM,
     // Figure out the offsets of the operands in the source buffer.
     for (int i = 0; i <= lastOperandNeeded; ++i) {
       auto ty = genericEnv
-        ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
+        ? genericEnv->mapTypeIntoEnvironment(IGM.getSILModule(),
                                          operands[i].LoweredType)
         : operands[i].LoweredType;
       
@@ -508,7 +508,7 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       auto &index = component.getArguments()[i];
 
       auto ty = genericEnv
-        ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
+        ? genericEnv->mapTypeIntoEnvironment(IGM.getSILModule(),
                                          index.LoweredType)
         : index.LoweredType;
       
@@ -673,7 +673,7 @@ emitKeyPathComponent(IRGenModule &IGM,
 
     // Recover class decl from superclass constraint
     if (!classDecl && genericEnv) {
-      auto ty = genericEnv->mapTypeIntoContext(baseTy)->getCanonicalType();
+      auto ty = genericEnv->mapTypeIntoEnvironment(baseTy)->getCanonicalType();
       auto archetype = dyn_cast<ArchetypeType>(ty);
       if (archetype && archetype->requiresClass()) {
         auto superClassTy = ty->getSuperclass(false)->getCanonicalType();
@@ -702,7 +702,7 @@ emitKeyPathComponent(IRGenModule &IGM,
           SILType::getPrimitiveObjectType(loweredClassTy.getASTType());
       if (!loweredClassTy.getASTType()->hasArchetype())
         loweredBaseContextTy = SILType::getPrimitiveObjectType(
-            GenericEnvironment::mapTypeIntoContext(genericEnv,
+            GenericEnvironment::mapTypeIntoEnvironment(genericEnv,
                                                    loweredClassTy.getASTType())
                 ->getCanonicalType());
 
@@ -928,7 +928,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       auto loweredClassTy = loweredBaseTy;
       // Recover class decl from superclass constraint
       if (!classDecl && genericEnv) {
-        auto ty = genericEnv->mapTypeIntoContext(baseTy)->getCanonicalType();
+        auto ty = genericEnv->mapTypeIntoEnvironment(baseTy)->getCanonicalType();
         auto archetype = dyn_cast<ArchetypeType>(ty);
         if (archetype && archetype->requiresClass()) {
           auto superClassTy = ty->getSuperclass(false)->getCanonicalType();
@@ -961,7 +961,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         // and start counting at the Swift native root.
         if (loweredClassTy.getASTType()->hasTypeParameter())
           loweredClassTy = SILType::getPrimitiveObjectType(
-              GenericEnvironment::mapTypeIntoContext(
+              GenericEnvironment::mapTypeIntoEnvironment(
                   genericEnv, loweredClassTy.getASTType())
                   ->getCanonicalType());
         switch (getClassFieldAccess(IGM, loweredClassTy, property)) {

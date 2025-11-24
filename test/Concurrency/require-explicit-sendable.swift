@@ -1,5 +1,5 @@
+// RUN: %target-swift-frontend -Wwarning ExplicitSendable -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend -require-explicit-sendable -strict-concurrency=complete %s -emit-sil -o /dev/null -verify
-
 
 public protocol P { }
 

@@ -25,7 +25,7 @@ private func implicitlyInlinablePrivate() {
   localInternalFunc()
 }
 
-@_neverEmitIntoClient
+@export(interface)
 public func explicitNonInliable() {
   _ = StructFromDirect()
 
@@ -33,7 +33,7 @@ public func explicitNonInliable() {
     _ = StructFromDirect()
   }
 
-  @_neverEmitIntoClient
+  @export(interface)
   func nested() {
     _ = StructFromDirect()
   }
@@ -42,7 +42,7 @@ public func explicitNonInliable() {
   localInternalFunc()
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 public func legalAccessToIndirect() {
   _ = StructFromIndirect()
 
@@ -57,7 +57,7 @@ public func legalAccessToIndirect() {
 }
 
 extension Array {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var myMutableSpan: Int {
     get {
       return 0

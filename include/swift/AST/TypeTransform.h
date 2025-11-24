@@ -184,7 +184,7 @@ case TypeKind::Id:
 
       auto *newEnv = GenericEnvironment::forOpenedExistential(
           genericSig, existentialTy, newSubMap, uuid);
-      return newEnv->mapTypeIntoContext(local->getInterfaceType());
+      return newEnv->mapTypeIntoEnvironment(local->getInterfaceType());
     }
 
     case TypeKind::ElementArchetype: {

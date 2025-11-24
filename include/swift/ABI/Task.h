@@ -29,6 +29,13 @@
 #include "bitset"
 #include "queue" // TODO: remove and replace with our own mpsc
 
+// Does the runtime integrate with libdispatch?
+#if defined(SWIFT_CONCURRENCY_USES_DISPATCH)
+#define SWIFT_CONCURRENCY_ENABLE_DISPATCH SWIFT_CONCURRENCY_USES_DISPATCH
+#else
+#define SWIFT_CONCURRENCY_ENABLE_DISPATCH 0
+#endif
+
 // Does the runtime provide priority escalation support?
 #ifndef SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH && \
@@ -422,7 +429,22 @@ public:
   ///
   /// Generally this should be done immediately after updating
   /// ActiveTask.
-  void flagAsRunning();
+  ///
+  /// When Dispatch is used for the default executor:
+  /// * If the return value is non-zero, it must be passed
+  ///   to swift_dispatch_thread_reset_override_self
+  ///   before returning to the executor.
+  /// * If the return value is zero, it may be ignored or passed to
+  ///   the aforementioned function (which will ignore values of zero).
+  /// The current implementation will always return zero
+  /// if you call flagAsRunning again before calling
+  /// swift_dispatch_thread_reset_override_self with the
+  /// initial value. This supports suspending and immediately
+  /// resuming a Task without returning up the callstack.
+  ///
+  /// For all other default executors, flagAsRunning
+  /// will return zero which may be ignored.
+  uint32_t flagAsRunning();
 
   /// Flag that this task is now suspended with information about what it is
   /// waiting on.

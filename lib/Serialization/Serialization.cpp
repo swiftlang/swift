@@ -756,6 +756,16 @@ IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC,
   if (M->isClangHeaderImportModule())
     return OBJC_HEADER_MODULE_ID;
 
+  // Reject references to hidden dependencies.
+  if (getASTContext().LangOpts.hasFeature(
+          Feature::CheckImplementationOnlyStrict) &&
+      !allowCompilerErrors() &&
+      this->M->isImportedImplementationOnly(M, /*assumeImported=*/false)) {
+    getASTContext().Diags.diagnose(SourceLoc(),
+        diag::serialization_xref_to_hidden_dependency,
+        M, crossReferencedDecl);
+  }
+
   auto exportedModuleName = file->getExportedModuleName();
   assert(!exportedModuleName.empty());
   auto moduleID = M->getASTContext().getIdentifier(exportedModuleName);
@@ -1947,7 +1957,7 @@ void Serializer::writeLocalNormalProtocolConformance(
       // in terms of interface types; hence the hasPrimaryArchetype() check is
       // necessary for correctness, not just as a fast path.
       if (subs.getRecursiveProperties().hasPrimaryArchetype())
-        subs = subs.mapReplacementTypesOutOfContext();
+        subs = subs.mapReplacementTypesOutOfEnvironment();
 
       data.push_back(addSubstitutionMapRef(subs));
       data.push_back(witness.getEnterIsolation().has_value() ? 1 : 0);
@@ -2451,6 +2461,8 @@ void Serializer::writeCrossReference(const Decl *D) {
   using namespace decls_block;
 
   unsigned abbrCode;
+
+  llvm::SaveAndRestore<const Decl *> SaveDecl(crossReferencedDecl, D);
 
   if (auto op = dyn_cast<OperatorDecl>(D)) {
     writeCrossReference(op->getDeclContext(), 1);
@@ -3070,6 +3082,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::Export: {
+      auto *theAttr = cast<ExportAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[ExportDeclAttrLayout::Code];
+      ExportDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       (unsigned)theAttr->exportKind);
+      return;
+    }
+        
     case DeclAttrKind::NonSendable: {
       auto *theAttr = cast<NonSendableAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[NonSendableDeclAttrLayout::Code];
@@ -3936,7 +3956,7 @@ private:
 
       // If we have a contextual type, map out to an interface type.
       if (type->hasArchetype())
-        type = type->mapTypeOutOfContext();
+        type = type->mapTypeOutOfEnvironment();
 
       return type;
     };
@@ -4800,7 +4820,6 @@ public:
         param->isCompileTimeLiteral(),
         param->isConstVal(),
         param->isSending(),
-        param->isCallerIsolated(),
         param->isAddressable(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
@@ -4896,41 +4915,50 @@ public:
 
     auto genericSigID = S.addGenericSignatureRef(opaqueDecl->getGenericSignature());
 
+    uint8_t rawAccessLevel =
+        getRawStableAccessLevel(opaqueDecl->getFormalAccess());
+    bool exportUnderlyingType = opaqueDecl->exportUnderlyingType();
+
+    bool hasUnderlyingType = false;
     SubstitutionMapID underlyingSubsID = 0;
     if (auto underlying = opaqueDecl->getUniqueUnderlyingTypeSubstitutions()) {
       underlyingSubsID = S.addSubstitutionMapRef(*underlying);
+      hasUnderlyingType = true;
     } else if (opaqueDecl->hasConditionallyAvailableSubstitutions()) {
       // Universally available type doesn't have any availability conditions
-      // so it could be serialized into "unique" slot to safe space.
+      // so it could be serialized into "unique" slot to save space.
       auto universal =
           opaqueDecl->getConditionallyAvailableSubstitutions().back();
       underlyingSubsID = S.addSubstitutionMapRef(universal->getSubstitutions());
+      hasUnderlyingType = true;
     }
-    uint8_t rawAccessLevel =
-        getRawStableAccessLevel(opaqueDecl->getFormalAccess());
-    bool exportDetails = opaqueDecl->exportUnderlyingType();
 
-    unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code];
-    OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+    OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord,
+                                 S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code],
                                  contextID.getOpaqueValue(), namingDeclID,
                                  interfaceSigID, interfaceTypeID, genericSigID,
-                                 underlyingSubsID, rawAccessLevel,
-                                 exportDetails);
+                                 rawAccessLevel, hasUnderlyingType,
+                                 exportUnderlyingType);
     writeGenericParams(opaqueDecl->getGenericParams());
+
+    if (!hasUnderlyingType)
+      return;
+
+    UnderlyingSubstitutionLayout::emitRecord(
+        S.Out, S.ScratchRecord,
+        S.DeclTypeAbbrCodes[UnderlyingSubstitutionLayout::Code],
+        underlyingSubsID);
 
     // Serialize all of the conditionally available substitutions expect the
     // last one - universal, it's serialized into "unique" slot.
     if (opaqueDecl->hasConditionallyAvailableSubstitutions()) {
-      unsigned abbrCode =
-          S.DeclTypeAbbrCodes[ConditionalSubstitutionLayout::Code];
       for (const auto *subs :
            opaqueDecl->getConditionallyAvailableSubstitutions().drop_back()) {
         ConditionalSubstitutionLayout::emitRecord(
-            S.Out, S.ScratchRecord, abbrCode,
+            S.Out, S.ScratchRecord,
+            S.DeclTypeAbbrCodes[ConditionalSubstitutionLayout::Code],
             S.addSubstitutionMapRef(subs->getSubstitutions()));
 
-        unsigned condAbbrCode =
-            S.DeclTypeAbbrCodes[ConditionalSubstitutionConditionLayout::Code];
         for (const auto &query : subs->getAvailabilityQueries()) {
           // FIXME: [availability] Support arbitrary domains (rdar://156513787).
           DEBUG_ASSERT(query.getDomain().isPlatform());
@@ -4942,8 +4970,9 @@ public:
                            std::optional<llvm::VersionTuple>(
                                availableRange.getRawMinimumVersion()));
           ConditionalSubstitutionConditionLayout::emitRecord(
-              S.Out, S.ScratchRecord, condAbbrCode, query.isUnavailability(),
-              LIST_VER_TUPLE_PIECES(osVersion));
+              S.Out, S.ScratchRecord,
+              S.DeclTypeAbbrCodes[ConditionalSubstitutionConditionLayout::Code],
+              query.isUnavailability(), LIST_VER_TUPLE_PIECES(osVersion));
         }
       }
     }
@@ -5382,6 +5411,19 @@ bool Serializer::shouldSkipDecl(const Decl *D) const {
 void Serializer::writeASTBlockEntity(const Decl *D) {
   using namespace decls_block;
 
+  if (Options.SkipImplementationOnlyDecls) {
+    // Skip @_implementationOnly types.
+    if (D->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+      return;
+
+    // Skip non-public @export(interface) functions.
+    auto FD = dyn_cast<AbstractFunctionDecl>(D);
+    if (FD && FD->isNeverEmittedIntoClient() &&
+        !FD->getFormalAccessScope(/*useDC*/nullptr,
+          /*treatUsableFromInlineAsPublic*/true).isPublicOrPackage())
+      return;
+  }
+
   PrettyStackTraceDecl trace("serializing", D);
   assert(DeclsToSerialize.hasRef(D));
 
@@ -5594,7 +5636,7 @@ struct ImplementationOnlyWalker : TypeWalker {
   const ModuleDecl *currentModule;
   ImplementationOnlyWalker(const ModuleDecl *M) : currentModule(M) {}
   Action walkToTypePre(Type ty) override {
-    if (auto *typeAlias = dyn_cast<TypeAliasType>(ty)) {
+    if (auto *typeAlias = dyn_cast<TypeAliasType>(ty.getPointer())) {
       if (importedImplementationOnly(typeAlias->getDecl()))
         return Action::Stop;
     } else if (auto *nominal = ty->getAs<NominalType>()) {
@@ -6527,6 +6569,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<MembersLayout>();
   registerDeclTypeAbbr<XRefLayout>();
 
+  registerDeclTypeAbbr<UnderlyingSubstitutionLayout>();
   registerDeclTypeAbbr<ConditionalSubstitutionLayout>();
   registerDeclTypeAbbr<ConditionalSubstitutionConditionLayout>();
 
@@ -7294,7 +7337,7 @@ void Serializer::writeToStream(
     BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
     S.writeHeader();
     S.writeInputBlock();
-    S.writeSIL(SILMod, options.SerializeAllSIL, options.SerializeDebugInfoSIL);
+    S.writeSIL(SILMod);
     S.writeAST(DC);
 
     if (S.hadError)

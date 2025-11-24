@@ -85,7 +85,14 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
   src = IGF.Builder.CreateElementBitCast(src, IGF.IGM.OpaqueTy);
 
   // Load type metadata for the source's static type and the target type.
-  llvm::Value *srcMetadata = IGF.emitTypeMetadataRef(srcType);
+  llvm::Value *srcMetadata = nullptr;
+
+  // Embedded swift currently only supports existential -> concrete type casts.
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+    srcMetadata = llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
+  } else {
+    srcMetadata = IGF.emitTypeMetadataRef(srcType);
+  }
   llvm::Value *targetMetadata = IGF.emitTypeMetadataRef(targetType);
 
   llvm::Value *args[] = {

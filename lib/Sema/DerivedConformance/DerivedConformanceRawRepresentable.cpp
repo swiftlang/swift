@@ -65,7 +65,7 @@ static Type deriveRawRepresentable_Raw(DerivedConformance &derived) {
   //   typealias Raw = SomeType
   // }
   auto rawInterfaceType = cast<EnumDecl>(derived.Nominal)->getRawType();
-  return derived.getConformanceContext()->mapTypeIntoContext(rawInterfaceType);
+  return derived.getConformanceContext()->mapTypeIntoEnvironment(rawInterfaceType);
 }
 
 static std::pair<BraceStmt *, bool>
@@ -90,7 +90,7 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
-  rawTy = toRawDecl->mapTypeIntoContext(rawTy);
+  rawTy = toRawDecl->mapTypeIntoEnvironment(rawTy);
 
   if (enumDecl->isObjC()) {
     // Special case: ObjC enums are represented by their raw value, so just use
@@ -303,7 +303,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
-  rawTy = initDecl->mapTypeIntoContext(rawTy);
+  rawTy = initDecl->mapTypeIntoEnvironment(rawTy);
 
   bool isStringEnum = rawTy->isString();
   llvm::SmallVector<Expr *, 16> stringExprs;
@@ -407,7 +407,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   auto enumDecl = cast<EnumDecl>(derived.Nominal);
   auto parentDC = derived.getConformanceContext();
   auto rawInterfaceType = enumDecl->getRawType();
-  auto rawType = parentDC->mapTypeIntoContext(rawInterfaceType);
+  auto rawType = parentDC->mapTypeIntoEnvironment(rawInterfaceType);
 
 
   assert([&]() -> bool {
@@ -459,7 +459,7 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
   if (!computeAutomaticEnumValueKind(enumDecl))
     return false;
 
-  rawType = DC->mapTypeIntoContext(rawType);
+  rawType = DC->mapTypeIntoEnvironment(rawType);
 
   auto inherited = enumDecl->getInherited().getEntries();
   if (!inherited.empty() && inherited.front().wasValidated() &&
@@ -480,7 +480,7 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
   if (!rawValueDecls.empty()) {
     if (auto alias = dyn_cast<TypeDecl>(rawValueDecls.front())) {
       auto ty = alias->getDeclaredInterfaceType();
-      if (!DC->mapTypeIntoContext(ty)->isEqual(rawType)) {
+      if (!DC->mapTypeIntoEnvironment(ty)->isEqual(rawType)) {
         return false;
       }
     }

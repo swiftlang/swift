@@ -5,11 +5,11 @@ import Foundation
 
 @objc
 class Foo: NSObject {
-  // CHECK-DAG: constructor/Swift | init(object:)
+  // CHECK-DAG: constructor(internal)/Swift | init(object:)
   init(object: Any?) {}
 }
 
 extension Foo {
-  // CHECK-DAG: static-property/Swift | boom
+  // CHECK-DAG: static-property(internal)/Swift | boom
   static let boom = Foo(object: self)
 }

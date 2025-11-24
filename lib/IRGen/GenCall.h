@@ -143,9 +143,9 @@ namespace irgen {
   std::pair<llvm::Value *, llvm::Value *>
   getAsyncFunctionAndSize(IRGenFunction &IGF, FunctionPointer functionPointer,
                           std::pair<bool, bool> values = {true, true});
-  std::pair<llvm::Value *, llvm::Value *>
-  getCoroFunctionAndSize(IRGenFunction &IGF, FunctionPointer functionPointer,
-                         std::pair<bool, bool> values = {true, true});
+  std::tuple<llvm::Value *, llvm::Value *, llvm::Value *> getCoroFunctionValues(
+      IRGenFunction &IGF, FunctionPointer functionPointer,
+      std::tuple<bool, bool, bool> values = {true, true, true});
   llvm::CallingConv::ID
   expandCallingConv(IRGenModule &IGM, SILFunctionTypeRepresentation convention,
                     bool isAsync, bool isCalleeAllocatedCoro);
@@ -221,7 +221,8 @@ namespace irgen {
                               NativeCCEntryPointArgumentEmission &emission);
 
   StackAddress emitAllocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
-                                                 llvm::Value *size);
+                                                 llvm::Value *size,
+                                                 llvm::Value *mallocTypeId);
   void emitDeallocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
                                            StackAddress allocation);
   void
@@ -252,7 +253,8 @@ namespace irgen {
                               LinkEntity asyncFunction,
                               unsigned asyncContextIndex);
 
-  StackAddress emitAllocCoroStaticFrame(IRGenFunction &IGF, llvm::Value *size);
+  StackAddress emitAllocCoroStaticFrame(IRGenFunction &IGF, llvm::Value *size,
+                                        llvm::Value *mallocTypeId);
   void emitDeallocCoroStaticFrame(IRGenFunction &IGF, StackAddress frame);
 
   /// Yield the given values from the current continuation.

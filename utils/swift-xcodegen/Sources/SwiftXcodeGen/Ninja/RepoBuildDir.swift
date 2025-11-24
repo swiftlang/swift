@@ -2,13 +2,15 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+import Synchronization
 
 public final class RepoBuildDir: Sendable {
   public let projectRootDir: AbsolutePath
@@ -19,10 +21,10 @@ public final class RepoBuildDir: Sendable {
 
   private let repoDirCache: DirectoryCache
 
-  private let _ninjaFile = MutexBox<NinjaBuildFile?>()
-  private let _runnableTargets = MutexBox<RunnableTargets?>()
-  private let _clangArgs = MutexBox<ClangBuildArgsProvider?>()
-  private let _swiftTargets = MutexBox<SwiftTargets?>()
+  private let _ninjaFile = Mutex<NinjaBuildFile?>()
+  private let _runnableTargets = Mutex<RunnableTargets?>()
+  private let _clangArgs = Mutex<ClangBuildArgsProvider?>()
+  private let _swiftTargets = Mutex<SwiftTargets?>()
 
   init(_ repo: Repo, for parent: NinjaBuildDir) throws {
     self.projectRootDir = parent.projectRootDir

@@ -188,8 +188,8 @@ switch (clock_id) {
 #elif WE_HAVE_STD_CHRONO
       auto num = std::chrono::steady_clock::period::num;
       auto den = std::chrono::steady_clock::period::den;
-      continuous.tv_sec = num / den;
-      continuous.tv_nsec = (num * 1'000'000'000ll) % den
+      suspending.tv_sec = num / den;
+      suspending.tv_nsec = (num * 1'000'000'000ll) % den
 #else
 #error Missing platform suspending time definition
 #endif

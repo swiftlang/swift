@@ -10,6 +10,8 @@
 // RUN:   -emit-module-path %t/A.swiftmodule \
 // RUN:   -emit-module-interface-path %t/A.swiftinterface
 
+// RUN: %FileCheck %t/src/A.swift --input-file %t/A.swiftinterface
+
 // RUN: %target-swift-typecheck-module-from-interface(%t/A.swiftinterface) -module-name A
 
 // Build the client using module
@@ -22,9 +24,27 @@
 
 //--- A.swift
 @MainActor
-
 public final class Test {
+  // CHECK: nonisolated(nonsending) final public func test() async
   public nonisolated func test() async {}
+
+  // CHECK: @_Concurrency.MainActor final public func compute(callback: nonisolated(nonsending) @escaping @Sendable () async -> Swift.Void)
+  public func compute(callback: @escaping @Sendable () async -> Void) {}
+}
+
+public struct InferenceTest {
+  // CHECK: nonisolated(nonsending) public func infersAttr() async
+  public func infersAttr() async {}
+
+  // CHECK: public func testNested(callback: @escaping (nonisolated(nonsending) @Sendable () async -> Swift.Void) -> Swift.Void)
+  public func testNested(callback: @escaping (@Sendable () async -> Void) -> Void) {}
+  // CHECK: public func testNested(dict: [Swift.String : (nonisolated(nonsending) () async -> Swift.Void)?])
+  public func testNested(dict: [String: (() async -> Void)?]) {}
+
+  // CHECK: nonisolated(nonsending) public func testAutoclosure(value1 fn: nonisolated(nonsending) @autoclosure () async -> Swift.Int) async
+  public func testAutoclosure(value1 fn: @autoclosure () async -> Int) async { await fn() }
+  // CHECK: nonisolated(nonsending) public func testAutoclosure(value2 fn: nonisolated(nonsending) @autoclosure () async -> Swift.Int) async
+  public func testAutoclosure(value2 fn: nonisolated(nonsending) @autoclosure () async -> Int) async { await fn() }
 }
 
 //--- Client.swift
@@ -41,4 +61,34 @@ import A
 @MainActor
 func test(t: Test) async {
   await t.test() // Ok
+}
+
+// CHECK-LABEL: sil hidden @$s6Client16testWithCallback1ty1A4TestC_tYaF : $@convention(thin) @async (@guaranteed Test) -> ()
+// CHECK: function_ref @$s1A4TestC7compute8callbackyyyYaYbYCc_tF : $@convention(method) (@guaranteed @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> (), @guaranteed Test) -> ()
+// CHECK: } // end sil function '$s6Client16testWithCallback1ty1A4TestC_tYaF'
+@MainActor
+func testWithCallback(t: Test) async {
+  t.compute(callback: {})
+}
+
+// CHECK-LABEL: sil hidden @$s6Client13testInference1ty1A0C4TestV_tYaF : $@convention(thin) @async (@in_guaranteed InferenceTest) -> ()
+// CHECK: function_ref @$s1A13InferenceTestV10infersAttryyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed InferenceTest) -> ()
+// CHECK: function_ref @$s1A13InferenceTestV10testNested8callbackyyyyYaYbYCXEc_tF : $@convention(method) (@guaranteed @callee_guaranteed (@guaranteed @noescape @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> (), @in_guaranteed InferenceTest) -> ()
+// CHECK: function_ref @$s1A13InferenceTestV10testNested4dictySDySSyyYaYCcSgG_tF : $@convention(method) (@guaranteed Dictionary<String, Optional<nonisolated(nonsending) () async -> ()>>, @in_guaranteed InferenceTest) -> ()
+// CHECK: } // end sil function '$s6Client13testInference1ty1A0C4TestV_tYaF'
+@MainActor
+func testInference(t: InferenceTest) async {
+    await t.infersAttr()
+
+    t.testNested { _ in }
+    t.testNested(dict: [:])
+}
+
+// CHECK-LABEL: sil hidden @$s6Client15testAutoclosure1ty1A13InferenceTestV_tYaF : $@convention(thin) @async (@in_guaranteed InferenceTest) -> ()
+// CHECK: function_ref @$s1A13InferenceTestV15testAutoclosure6value1ySiyYaYCXK_tYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> Int, @in_guaranteed InferenceTest) -> ()
+// CHECK: function_ref @$s1A13InferenceTestV15testAutoclosure6value2ySiyYaYCXK_tYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> Int, @in_guaranteed InferenceTest) -> ()
+// CHECK: } // end sil function '$s6Client15testAutoclosure1ty1A13InferenceTestV_tYaF'
+func testAutoclosure(t: InferenceTest) async {
+    await t.testAutoclosure(value1: 42)
+    await t.testAutoclosure(value2: 42)
 }

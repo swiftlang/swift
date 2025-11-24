@@ -1011,7 +1011,18 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   } else if (privateDiscriminator.empty()) {
     auto newEnd = std::remove_if(results.begin()+oldSize, results.end(),
                                  [](const ValueDecl *VD) -> bool {
-      return VD->getFormalAccess() <= AccessLevel::FilePrivate;
+      // FIXME: The ClangImporter sometimes generates private declarations but
+      // doesn't give their file unit a private discriminator so they mangle
+      // incorrectly.
+      //
+      // The hasClangNode() carveout makes the ASTDemangler work properly in
+      // this case.
+      //
+      // We should fix things up so that such declarations also mangle with a
+      // a private discriminator, in which case this entry point will be called
+      // with the right parameters so that this isn't needed.
+      return (VD->getFormalAccess() <= AccessLevel::FilePrivate &&
+              !VD->hasClangNode());
     });
     results.erase(newEnd, results.end());
 
@@ -2979,10 +2990,10 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
   assert(targetModule != getParentModule() &&
          "getImportAccessLevel doesn't support checking for a self-import");
 
-  /// Order of relevancy of `import` to reach `targetModule` assuming the same
-  /// visibility level. Lower is better/more authoritative.
+  /// Order of relevancy of `import` to reach `targetModule`.
+  /// Lower is better/more authoritative.
   auto rateImport = [&](const ImportAccessLevel import) -> int {
-    auto importedModule = import->module.importedModule->getTopLevelModule();
+    auto importedModule = import->module.importedModule;
 
     // Prioritize public names:
     if (targetModule->getExportAsName() == importedModule->getBaseIdentifier())
@@ -2997,14 +3008,9 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
     if (targetModule == importedModule->getUnderlyingModuleIfOverlay())
       return 3;
 
-    // Any import in the sources:
-    if (import->importLoc.isValid()) {
-      // Prefer clang submodules to their top level modules:
-      if (import->module.importedModule != importedModule)
-        return 4;
-
-      return 5;
-    }
+    // Any import in the sources.
+    if (import->importLoc.isValid())
+      return 4;
 
     return 10;
   };
@@ -3014,12 +3020,11 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
   auto &imports = getASTContext().getImportCache();
   ImportAccessLevel restrictiveImport = std::nullopt;
   for (auto &import : *Imports) {
-    auto importedModule = import.module.importedModule->getTopLevelModule();
     if ((!restrictiveImport.has_value() ||
          import.accessLevel > restrictiveImport->accessLevel ||
          (import.accessLevel == restrictiveImport->accessLevel &&
           rateImport(import) < rateImport(restrictiveImport))) &&
-        imports.isImportedBy(targetModule, importedModule)) {
+        imports.isImportedBy(targetModule, import.module.importedModule)) {
       restrictiveImport = import;
     }
   }
@@ -3067,7 +3072,8 @@ void ModuleDecl::setPackageName(Identifier name) {
   Package = PackageUnit::create(name, *this, getASTContext());
 }
 
-bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
+bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module,
+    bool assumeImported) const {
   if (module == this) return false;
 
   auto &imports = getASTContext().getImportCache();
@@ -3088,7 +3094,17 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
       return false;
   }
 
-  return true;
+  if (assumeImported)
+    return true;
+
+  results.clear();
+  getImportedModules(results,
+      {ModuleDecl::ImportFilterKind::ImplementationOnly});
+  for (auto &desc : results)
+    if (imports.isImportedBy(module, desc.importedModule))
+      return true;
+
+  return false;
 }
 
 void SourceFile::lookupImportedSPIGroups(

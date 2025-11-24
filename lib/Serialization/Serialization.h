@@ -118,6 +118,9 @@ class Serializer : public SerializerBase {
 
   bool hadImplementationOnlyImport = false;
 
+  /// Current decl being serialized.
+  const Decl* crossReferencedDecl = nullptr;
+
   /// Helper for serializing entities in the AST block object graph.
   ///
   /// Keeps track of assigning IDs to newly-seen entities, and collecting
@@ -433,8 +436,7 @@ private:
                     const SpecificASTBlockRecordKeeper &entities);
 
   /// Serializes all transparent SIL functions in the SILModule.
-  void writeSIL(const SILModule *M, bool serializeAllSIL,
-                bool serializeDebugInfo);
+  void writeSIL(const SILModule *M);
 
   /// Top-level entry point for serializing a module.
   void writeAST(ModuleOrSourceFile DC);

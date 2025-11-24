@@ -26,9 +26,6 @@
 // Never referenced.
 // LIBRARY-IR-NOT: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = linkonce_odr {{(protected |dllexport )?}}global
 
-// Note: referenced by swift_allocEmptyBox.
-// LIBRARY-IR: @"$es16_emptyBoxStorageSi_Sitvp" = linkonce_odr {{(protected |dllexport )?}}global
-
 // LIBRARY-IR-NOT: define {{.*}}@"$e7Library5helloSaySiGyF"()
 public func hello() -> [Int] {
   getArray()
@@ -53,7 +50,7 @@ private func throughPrivate() -> [Int] {
 public func unnecessary() -> Int64 { 5 }
 
 // LIBRARY-IR: define {{.*}} @"$e7Library14unusedYetThere
-@_neverEmitIntoClient
+@export(interface)
 public func unusedYetThere() -> Int64 { 5 }
 
 open class PointClass {
@@ -81,7 +78,7 @@ extension PointClass: Reflectable {
 }
 
 // LIBRARY-IR: define {{.*}} @"$e7Library18createsExistentialAA11Reflectable_pyF"()
-@_neverEmitIntoClient
+@export(interface)
 public func createsExistential() -> any Reflectable {
   return PointClass(x: 5, y: 5)
 }

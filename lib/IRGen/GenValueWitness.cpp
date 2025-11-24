@@ -387,7 +387,7 @@ static Address getArgAsBuffer(IRGenFunction &IGF,
 static CanType getFormalTypeInPrimaryContext(CanType abstractType) {
   auto *nominal = abstractType.getAnyNominal();
   if (nominal && abstractType->isEqual(nominal->getDeclaredType())) {
-    return nominal->mapTypeIntoContext(nominal->getDeclaredInterfaceType())
+    return nominal->mapTypeIntoEnvironment(nominal->getDeclaredInterfaceType())
       ->getCanonicalType();
   }
 
@@ -397,7 +397,7 @@ static CanType getFormalTypeInPrimaryContext(CanType abstractType) {
 
 SILType irgen::getLoweredTypeInPrimaryContext(IRGenModule &IGM,
                                               NominalTypeDecl *type) {
-  CanType concreteFormalType = type->mapTypeIntoContext(
+  CanType concreteFormalType = type->mapTypeIntoEnvironment(
       type->getDeclaredInterfaceType())->getCanonicalType();
   return IGM.getLoweredType(concreteFormalType);
 }
@@ -1371,7 +1371,7 @@ addValueWitnesses(IRGenModule &IGM, ConstantStructBuilder &B,
 /// Currently, this is true if the size and/or alignment of the type is
 /// dependent on its generic parameters.
 bool irgen::hasDependentValueWitnessTable(IRGenModule &IGM, NominalTypeDecl *decl) {
-  auto ty = decl->mapTypeIntoContext(decl->getDeclaredInterfaceType());
+  auto ty = decl->mapTypeIntoEnvironment(decl->getDeclaredInterfaceType());
   return !IGM.getTypeInfoForUnlowered(ty).isFixedSize();
 }
 
@@ -1380,17 +1380,24 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
                                              CanType abstractType,
                                              bool &canBeConstant) {
   std::optional<BoundGenericTypeCharacteristics> boundGenericCharacteristics;
-  if (auto boundGenericType = dyn_cast<BoundGenericType>(abstractType)) {
-    CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);
+  // Embedded existentials need fully "specialized" value witness table
+  // functions: i.e the metadata argument must remain unused.
+  // For the non-embedded existentials path, when there is a bound generic type,
+  // that is we have a specialized generic type, we have decided for code size
+  // reasons to continue using "generic" value witness table functions i.e the
+  // same once used for runtime instantiated generic metadata.
+  if (!IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+    auto *nomDecl = abstractType->getNominalOrBoundGenericNominal();
+    if (abstractType->isSpecialized() && nomDecl) {
+      CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);
 
-    auto concreteLoweredType = IGM.getLoweredType(concreteFormalType);
-    const auto *boundConcreteTI = &IGM.getTypeInfo(concreteLoweredType);
-    auto packing = boundConcreteTI->getFixedPacking(IGM);
-    boundGenericCharacteristics = {concreteLoweredType, boundConcreteTI,
-                                   packing};
-
-    abstractType =
-        boundGenericType->getDecl()->getDeclaredType()->getCanonicalType();
+      auto concreteLoweredType = IGM.getLoweredType(concreteFormalType);
+      const auto *boundConcreteTI = &IGM.getTypeInfo(concreteLoweredType);
+      auto packing = boundConcreteTI->getFixedPacking(IGM);
+      boundGenericCharacteristics = {concreteLoweredType, boundConcreteTI,
+                                     packing};
+      abstractType = nomDecl->getDeclaredType()->getCanonicalType();
+    }
   }
   CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);
 
@@ -1533,13 +1540,22 @@ ConstantReference irgen::emitValueWitnessTable(IRGenModule &IGM,
                                              bool isPattern,
                                              bool relativeReference) {
   // See if we can use a prefab witness table from the runtime.
-  if (!isPattern) {
+  if (!isPattern &&
+      !IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
     if (auto known = getAddrOfKnownValueWitnessTable(IGM, abstractType,
                                                      relativeReference)) {
       return known;
     }
   }
-  
+
+  // There might already be a definition emitted in embedded mode.
+  if (IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+    auto addr = IGM.getAddrOfValueWitnessTable(abstractType);
+    if (!cast<llvm::GlobalVariable>(addr)->isDeclaration()) {
+      return {addr, ConstantReference::Direct};
+    }
+  }
+
   // We should never be making a pattern if the layout isn't fixed.
   // The reverse can be true for types whose layout depends on
   // resilient types.

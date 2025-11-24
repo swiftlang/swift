@@ -2,9 +2,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/ModuleCache)
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -parse-as-library  -emit-module -emit-module-path %t/MyModule.swiftmodule -enable-library-evolution -module-name MyModule -swift-version 5
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -parse-as-library  -emit-module -emit-module-path %t/MyModule.swiftmodule -enable-library-evolution -module-name MyModule -swift-version 5 -emit-api-descriptor-path %t/api.json
-// RUN: %validate-json %t/api.json | %FileCheck %s --check-prefixes=CHECK-SPI,CHECK-SPI-EMIT
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -parse-as-library  -emit-module -emit-module-path %t/MyModule.swiftmodule -enable-library-evolution -module-name MyModule -swift-version 5 -library-level api
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -parse-as-library  -emit-module -emit-module-path %t/MyModule.swiftmodule -enable-library-evolution -module-name MyModule -swift-version 5 -emit-api-descriptor-path %t/api.json -target arm64-apple-macos26 -library-level api
+// RUN: %validate-json %t/api.json | %FileCheck %s
 
 import Foundation
 
@@ -25,336 +25,295 @@ public class MyClass2 : NSObject {
 @available(iOS 8.0, *)
 public func spiAvailableFunc() {}
 
+@_spi_available(macOS 11, *)
+@available(iOS 10, *)
+public class SPIClass {
+  public func noAvailabilityAttr() {}
+}
+
 // CHECK:      {
-// CHECK-NEXT:   "target":
+// CHECK-NEXT:   "target": "arm64-apple-macos26",
 // CHECK-NEXT:   "globals": [
 // CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A5ClassC9spiMethodyyFTj",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A5ClassC9spiMethodyyFTq",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A5ClassCACycfC",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A5ClassCACycfc",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A5ClassCMa",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A5ClassCMn",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A5ClassCMo",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A5ClassCMu",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A5ClassCN",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A5ClassCfD",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTj",
-// CHECK-NEXT:       "access": "public",
-// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
-// CHECK-NEXT:       "unavailable": true
+// CHECK-NEXT:       "introduced": "10.10",
+// CHECK-NEXT:       "SPIAvailable": true
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTq",
-// CHECK-NEXT:       "access": "public",
-// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
-// CHECK-NEXT:       "unavailable": true
+// CHECK-NEXT:       "introduced": "10.10",
+// CHECK-NEXT:       "SPIAvailable": true
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A6Class2C9spiMethodyyFTj",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A6Class2C9spiMethodyyFTq",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2CACycfC",
 // CHECK-NEXT:       "access": "public",
-// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2CACycfc",
 // CHECK-NEXT:       "access": "public",
-// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2CMa",
 // CHECK-NEXT:       "access": "public",
-// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2CMn",
 // CHECK-NEXT:       "access": "public",
-// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2CMo",
 // CHECK-NEXT:       "access": "public",
-// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2CMu",
 // CHECK-NEXT:       "access": "public",
-// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2CN",
 // CHECK-NEXT:       "access": "public",
-// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2CfD",
 // CHECK-NEXT:       "access": "public",
-// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule15newUnprovenFuncyyF",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule16spiAvailableFuncyyF",
-// CHECK-NEXT:       "access": "public",
-// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
-// CHECK-NEXT:       "unavailable": true
+// CHECK-NEXT:       "introduced": "10.10",
+// CHECK-NEXT:       "SPIAvailable": true
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule8SPIClassC18noAvailabilityAttryyFTj",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "introduced": "11",
+// CHECK-NEXT:       "SPIAvailable": true
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule8SPIClassC18noAvailabilityAttryyFTq",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "introduced": "11",
+// CHECK-NEXT:       "SPIAvailable": true
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCMa",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "introduced": "11",
+// CHECK-NEXT:       "SPIAvailable": true
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCMm",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "introduced": "11",
+// CHECK-NEXT:       "SPIAvailable": true
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCMn",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "introduced": "11",
+// CHECK-NEXT:       "SPIAvailable": true
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCMo",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "introduced": "11",
+// CHECK-NEXT:       "SPIAvailable": true
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCMu",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "introduced": "11",
+// CHECK-NEXT:       "SPIAvailable": true
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCN",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "introduced": "11",
+// CHECK-NEXT:       "SPIAvailable": true
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCfD",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "introduced": "11",
+// CHECK-NEXT:       "SPIAvailable": true
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCfd",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "introduced": "11",
+// CHECK-NEXT:       "SPIAvailable": true
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "interfaces": [
 // CHECK-NEXT:     {
-// CHECK-NEXT:       "name": "_TtC8MyModule8MyClass2",
-// CHECK-NEXT:       "access": "public",
-// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "name": "_TtC8MyModule7MyClass",
+// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "super": "NSObject",
 // CHECK-NEXT:       "instanceMethods": [
 // CHECK-NEXT:         {
+// CHECK-NEXT:           "name": "spiMethod",
+// CHECK-NEXT:           "access": "private",
+// CHECK-NEXT:           "file": "SOURCE_DIR/test/APIJSON/spi.swift"
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
+// CHECK-NEXT:           "name": "init",
+// CHECK-NEXT:           "access": "private",
+// CHECK-NEXT:           "file": "SOURCE_DIR/test/APIJSON/spi.swift"
+// CHECK-NEXT:         }
+// CHECK-NEXT:       ],
+// CHECK-NEXT:       "classMethods": []
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_TtC8MyModule8MyClass2",
+// CHECK-NEXT:       "access": "public",
+// CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "super": "NSObject",
+// CHECK-NEXT:       "instanceMethods": [
+// CHECK-NEXT:         {
+// CHECK-NEXT:           "name": "spiMethod",
+// CHECK-NEXT:           "access": "private",
+// CHECK-NEXT:           "file": "SOURCE_DIR/test/APIJSON/spi.swift"
+// CHECK-NEXT:         },
+// CHECK-NEXT:         {
 // CHECK-NEXT:           "name": "spiAvailableMethod",
-// CHECK-NEXT:           "access": "public",
-// CHECK-NEXT:           "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:           "unavailable": true
+// CHECK-NEXT:           "access": "private",
+// CHECK-NEXT:           "file": "SOURCE_DIR/test/APIJSON/spi.swift",
+// CHECK-NEXT:           "introduced": "10.10",
+// CHECK-NEXT:           "SPIAvailable": true
 // CHECK-NEXT:         },
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "name": "init",
 // CHECK-NEXT:           "access": "public",
-// CHECK-NEXT:           "file": "/@input/MyModule.swiftinterface"
+// CHECK-NEXT:           "file": "SOURCE_DIR/test/APIJSON/spi.swift"
 // CHECK-NEXT:         }
 // CHECK-NEXT:       ],
 // CHECK-NEXT:       "classMethods": []
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
-// CHECK-NEXT:   "categories": [],
+ // CHECK-NEXT:  "categories": [],
 // CHECK-NEXT:   "version": "1.0"
 // CHECK-NEXT: }
-
-// CHECK-SPI:      {
-// CHECK-SPI-NEXT:   "target":
-// CHECK-SPI-NEXT:   "globals": [
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A5ClassC9spiMethodyyFTj",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A5ClassC9spiMethodyyFTq",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A5ClassCACycfC",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A5ClassCACycfc",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A5ClassCMa",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A5ClassCMn",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A5ClassCMo",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A5ClassCMu",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A5ClassCN",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A5ClassCfD",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTj",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported",
-// CHECK-SPI-NEXT:       "introduced": "10.10"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTq",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported",
-// CHECK-SPI-NEXT:       "introduced": "10.10"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2C9spiMethodyyFTj",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2C9spiMethodyyFTq",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2CACycfC",
-// CHECK-SPI-NEXT:       "access": "public",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2CACycfc",
-// CHECK-SPI-NEXT:       "access": "public",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2CMa",
-// CHECK-SPI-NEXT:       "access": "public",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2CMn",
-// CHECK-SPI-NEXT:       "access": "public",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2CMo",
-// CHECK-SPI-NEXT:       "access": "public",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2CMu",
-// CHECK-SPI-NEXT:       "access": "public",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2CN",
-// CHECK-SPI-NEXT:       "access": "public",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2CfD",
-// CHECK-SPI-NEXT:       "access": "public",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule15newUnprovenFuncyyF",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported"
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:    {
-// CHECK-SPI-NEXT:       "name": "_$s8MyModule16spiAvailableFuncyyF",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported",
-// CHECK-SPI-NEXT:       "introduced": "10.10"
-// CHECK-SPI-NEXT:     }
-// CHECK-SPI-NEXT:   ],
-// CHECK-SPI-NEXT:   "interfaces": [
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_TtC8MyModule7MyClass",
-// CHECK-SPI-NEXT:       "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported",
-// CHECK-SPI-NEXT:       "super": "NSObject",
-// CHECK-SPI-NEXT:       "instanceMethods": [
-// CHECK-SPI-NEXT:         {
-// CHECK-SPI-NEXT:           "name": "spiMethod",
-// CHECK-SPI-NEXT:           "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:   "file": "/@input/MyModule.swiftmodule"
-// CHECK-SPI-EMIT-NEXT:      "file": "SOURCE_DIR/test/APIJSON/spi.swift"
-// CHECK-SPI-NEXT:         },
-// CHECK-SPI-NEXT:         {
-// CHECK-SPI-NEXT:           "name": "init",
-// CHECK-SPI-NEXT:           "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:   "file": "/@input/MyModule.swiftmodule"
-// CHECK-SPI-EMIT-NEXT:      "file": "SOURCE_DIR/test/APIJSON/spi.swift"
-// CHECK-SPI-NEXT:         }
-// CHECK-SPI-NEXT:       ],
-// CHECK-SPI-NEXT:       "classMethods": []
-// CHECK-SPI-NEXT:     },
-// CHECK-SPI-NEXT:     {
-// CHECK-SPI-NEXT:       "name": "_TtC8MyModule8MyClass2",
-// CHECK-SPI-NEXT:       "access": "public",
-// CHECK-SPI-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:       "linkage": "exported",
-// CHECK-SPI-NEXT:       "super": "NSObject",
-// CHECK-SPI-NEXT:       "instanceMethods": [
-// CHECK-SPI-NEXT:         {
-// CHECK-SPI-NEXT:           "name": "spiMethod",
-// CHECK-SPI-NEXT:           "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:   "file": "/@input/MyModule.swiftmodule"
-// CHECK-SPI-EMIT-NEXT:      "file": "SOURCE_DIR/test/APIJSON/spi.swift"
-// CHECK-SPI-NEXT:         },
-// CHECK-SPI-NEXT:         {
-// CHECK-SPI-NEXT:           "name": "spiAvailableMethod",
-// CHECK-SPI-NEXT:           "access": "private",
-// CHECK-SPI-EXTRACT-NEXT:   "file": "/@input/MyModule.swiftmodule"
-// CHECK-SPI-EMIT-NEXT:      "file": "SOURCE_DIR/test/APIJSON/spi.swift",
-// CHECK-SPI-NEXT:           "introduced": "10.10"
-// CHECK-SPI-NEXT:         },
-// CHECK-SPI-NEXT:         {
-// CHECK-SPI-NEXT:           "name": "init",
-// CHECK-SPI-NEXT:           "access": "public",
-// CHECK-SPI-EXTRACT-NEXT:   "file": "/@input/MyModule.swiftmodule"
-// CHECK-SPI-EMIT-NEXT:      "file": "SOURCE_DIR/test/APIJSON/spi.swift"
-// CHECK-SPI-NEXT:         }
-// CHECK-SPI-NEXT:       ],
-// CHECK-SPI-NEXT:       "classMethods": []
-// CHECK-SPI-NEXT:     }
-// CHECK-SPI-NEXT:   ],
- // CHECK-SPI-NEXT:  "categories": [],
-// CHECK-SPI-NEXT:   "version": "1.0"
-// CHECK-SPI-NEXT: }

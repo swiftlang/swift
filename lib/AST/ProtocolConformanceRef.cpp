@@ -114,7 +114,7 @@ ProtocolConformanceRef::subst(InFlightSubstitution &IFS) const {
   return IFS.lookupConformance(origType, proto, /*level=*/0);
 }
 
-ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
+ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfEnvironment() const {
   if (isConcrete()) {
     return getConcrete()->subst(
         MapTypeOutOfContext(),
@@ -129,7 +129,7 @@ ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() cons
         SubstFlags::SubstitutePrimaryArchetypes);
   } else if (isAbstract()) {
     auto *abstract = getAbstract();
-    return forAbstract(abstract->getType()->mapTypeOutOfContext(),
+    return forAbstract(abstract->getType()->mapTypeOutOfEnvironment(),
                        abstract->getProtocol());
   }
 
@@ -256,7 +256,7 @@ ProtocolConformanceRef::getAssociatedConformance(Type assocType,
     auto subjectType = computeSubjectType(archetypeType->getInterfaceType());
 
     return lookupConformance(
-        genericEnv->mapTypeIntoContext(subjectType),
+        genericEnv->mapTypeIntoEnvironment(subjectType),
         protocol);
   }
 

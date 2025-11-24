@@ -806,7 +806,7 @@ public:
         new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                               SourceLoc(), Context.getIdentifier(NameBuf),
                               TypeCheckDC);
-    VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
+    VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfEnvironment());
     VD->setImplicit();
 
     NamedPattern *NP = NamedPattern::createImplicit(Context, VD, VD->getTypeInContext());
@@ -820,7 +820,7 @@ public:
     // Don't try to log ~Copyable types, as we can't pass them to the generic logging functions yet.
     if (auto *VD = dyn_cast_or_null<ValueDecl>(node.dyn_cast<Decl *>())) {
       auto interfaceTy = VD->getInterfaceType();
-      auto contextualTy = VD->getInnermostDeclContext()->mapTypeIntoContext(interfaceTy);
+      auto contextualTy = VD->getInnermostDeclContext()->mapTypeIntoEnvironment(interfaceTy);
       return contextualTy->isCopyable();
     } else if (auto *E = node.dyn_cast<Expr *>()) {
       return E->getType()->isCopyable();

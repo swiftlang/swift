@@ -65,6 +65,7 @@ namespace irgen {
   /// Stub function that weakly links againt the swift_coroFrameAlloc
   /// function. This is required for back-deployment.
   llvm::Constant *getCoroFrameAllocStubFn(IRGenModule &IGM);
+  FunctionPointer getCoroFrameAllocStubFunctionPointer(IRGenModule &IGM);
 } // end namespace irgen
 } // end namespace swift
 

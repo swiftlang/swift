@@ -111,7 +111,7 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
   VD->setInterfaceType(metatypeTy);
 
   return SGF.F.begin()->createFunctionArgument(
-      SGF.getLoweredTypeForFunctionArgument(DC->mapTypeIntoContext(metatypeTy)),
+      SGF.getLoweredTypeForFunctionArgument(DC->mapTypeIntoEnvironment(metatypeTy)),
       VD);
 }
 
@@ -122,7 +122,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
                                               DeclContext *DC,
                       LoweredParamsInContextGenerator &loweredParamTypes,
                                         Initialization *argInit = nullptr) {
-  auto type = DC->mapTypeIntoContext(interfaceType)->getCanonicalType();
+  auto type = DC->mapTypeIntoEnvironment(interfaceType)->getCanonicalType();
 
   // Restructure tuple arguments.
   if (auto tupleIfaceTy = dyn_cast<TupleType>(interfaceType)) {
@@ -212,6 +212,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
     auto formalPackType = CanPackType::get(SGF.getASTContext(), {type});
 
     SGF.emitDynamicPackLoop(loc, formalPackType, /*component*/0, openedEnv,
+                            []() -> SILBasicBlock * { return nullptr; },
                             [&](SILValue indexWithinComponent,
                                 SILValue packExpansionIndex,
                                 SILValue packIndex) {
@@ -299,7 +300,7 @@ emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
   }
 
   // The `self` metatype.
-  auto metatypeTy = MetatypeType::get(accessor->mapTypeIntoContext(selfIfaceTy));
+  auto metatypeTy = MetatypeType::get(accessor->mapTypeIntoEnvironment(selfIfaceTy));
   arguments.push_back(SGF.B.createMetatype(loc, SGF.getLoweredType(metatypeTy)));
 
   SubstitutionMap subs;
@@ -691,7 +692,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // failure.
   SILBasicBlock *failureExitBB = nullptr;
   SILArgument *failureExitArg = nullptr;
-  auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
+  auto resultType = ctor->mapTypeIntoEnvironment(ctor->getResultInterfaceType());
   auto &resultLowering = getTypeLowering(resultType);
 
   if (ctor->isFailable()) {
@@ -851,7 +852,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
 void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   Type enumIfaceTy = element->getParentEnum()->getDeclaredInterfaceType();
-  Type enumTy = F.mapTypeIntoContext(enumIfaceTy);
+  Type enumTy = F.mapTypeIntoEnvironment(enumIfaceTy);
   auto &enumTI =
       SGM.Types.getTypeLowering(enumTy, TypeExpansionContext::minimal());
 
@@ -945,7 +946,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // argument for it.
   if (F.getConventions().hasIndirectSILErrorResults()) {
     assert(F.getConventions().getNumIndirectSILErrorResults() == 1);
-    auto paramTy = F.mapTypeIntoContext(
+    auto paramTy = F.mapTypeIntoEnvironment(
                        F.getConventions().getSILErrorType(getTypeExpansionContext()));
     auto inContextParamTy = F.getLoweredType(paramTy.getASTType())
                                 .getCategoryType(paramTy.getCategory());
@@ -957,7 +958,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   }
 
   if (F.isNonisolatedNonsending()) {
-    auto paramTy = F.mapTypeIntoContext(
+    auto paramTy = F.mapTypeIntoEnvironment(
         SILType::getBuiltinImplicitActorType(F.getASTContext()));
     auto inContextParamTy = F.getLoweredType(paramTy.getASTType())
                                 .getCategoryType(paramTy.getCategory());
@@ -1215,7 +1216,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   prepareEpilog(ctor, std::nullopt, ctor->getEffectiveThrownErrorType(),
                 CleanupLocation(endOfInitLoc));
 
-  auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
+  auto resultType = ctor->mapTypeIntoEnvironment(ctor->getResultInterfaceType());
 
   // If the constructor can fail, set up an alternative epilog for constructor
   // failure.
@@ -1455,7 +1456,7 @@ static std::pair<AbstractionPattern, CanType>
 getInitializationTypeInContext(
     DeclContext *fromDC, DeclContext *toDC,
     Pattern *pattern) {
-  auto interfaceType = pattern->getType()->mapTypeOutOfContext();
+  auto interfaceType = pattern->getType()->mapTypeOutOfEnvironment();
 
   // If this pattern is initializing the backing storage for a property
   // with an attached wrapper that is initialized with `=`, the
@@ -1471,7 +1472,7 @@ getInitializationTypeInContext(
     fromDC->getGenericSignatureOfContext().getCanonicalSignature(),
     interfaceType->getCanonicalType());
 
-  auto substType = toDC->mapTypeIntoContext(interfaceType)->getCanonicalType();
+  auto substType = toDC->mapTypeIntoEnvironment(interfaceType)->getCanonicalType();
 
   return std::make_pair(origType, substType);
 }

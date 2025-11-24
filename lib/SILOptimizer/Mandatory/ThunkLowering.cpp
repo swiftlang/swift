@@ -115,7 +115,7 @@ void ThunkBodyBuilder::createEntryBlockArguments() {
   for (auto indirectResult : conventions.getIndirectSILResults()) {
     SILType ty = conventions.getSILType(indirectResult,
                                         thunk->getTypeExpansionContext());
-    ty = thunk->mapTypeIntoContext(ty);
+    ty = thunk->mapTypeIntoEnvironment(ty);
     thunkArguments.push_back(block->createFunctionArgument(ty));
   }
 
@@ -123,7 +123,7 @@ void ThunkBodyBuilder::createEntryBlockArguments() {
   for (auto paramInfo : conventions.getParameters()) {
     SILType ty =
         conventions.getSILType(paramInfo, thunk->getTypeExpansionContext());
-    ty = thunk->mapTypeIntoContext(ty);
+    ty = thunk->mapTypeIntoEnvironment(ty);
     thunkArguments.push_back(block->createFunctionArgument(ty));
   }
 }
@@ -152,7 +152,7 @@ void ThunkBodyBuilder::callBeginApplyThunkedFunction(
     for (auto result : conventions.getDirectSILResults()) {
       auto ty =
           conventions.getSILType(result, thunk->getTypeExpansionContext());
-      ty = thunk->mapTypeIntoContext(ty);
+      ty = thunk->mapTypeIntoEnvironment(ty);
       directResultTypes.push_back(ty.getASTType());
     }
 
@@ -199,7 +199,7 @@ void ThunkBodyBuilder::callTryApplyThunkedFunction(
     for (auto result : conventions.getDirectSILResults()) {
       auto ty =
           conventions.getSILType(result, thunk->getTypeExpansionContext());
-      ty = thunk->mapTypeIntoContext(ty);
+      ty = thunk->mapTypeIntoEnvironment(ty);
       normalBlockArgs.push_back(ty.getASTType());
     }
 

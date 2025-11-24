@@ -71,11 +71,6 @@ enum AllowsTaskAlloc_t : bool {
   AllowsTaskAlloc = true,
 };
 
-enum IsForCalleeCoroutineFrame_t : bool {
-  IsNotForCalleeCoroutineFrame,
-  IsForCalleeCoroutineFrame,
-};
-
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
 class IRGenFunction {
@@ -315,8 +310,7 @@ public:
   StackAddress
   emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize, Alignment align,
                     AllowsTaskAlloc_t allowTaskAlloc = AllowsTaskAlloc,
-                    IsForCalleeCoroutineFrame_t forCalleeCoroutineFrame =
-                        IsNotForCalleeCoroutineFrame,
+                    llvm::Value *mallocTypeId = nullptr,
                     const llvm::Twine &name = "");
   void emitDeallocateDynamicAlloca(StackAddress address,
                                    bool allowTaskDealloc = true,
@@ -632,6 +626,9 @@ public:
   void emitNativeStrongRelease(llvm::Value *value, Atomicity atomicity);
   void emitNativeSetDeallocating(llvm::Value *value);
 
+  // Routines to deal with box (embedded) runtime calls.
+  void emitReleaseBox(llvm::Value *value);
+
   // Routines for the ObjC reference-counting style.
   void emitObjCStrongRetain(llvm::Value *value);
   llvm::Value *emitObjCRetainCall(llvm::Value *value);
@@ -775,7 +772,7 @@ public:
   void bindLocalTypeDataFromSelfWitnessTable(
                 const ProtocolConformance *conformance,
                 llvm::Value *selfTable,
-                llvm::function_ref<CanType (CanType)> mapTypeIntoContext);
+                llvm::function_ref<CanType (CanType)> mapTypeIntoEnvironment);
 
   void setDominanceResolver(DominanceResolverFunction resolver) {
     assert(DominanceResolver == nullptr);

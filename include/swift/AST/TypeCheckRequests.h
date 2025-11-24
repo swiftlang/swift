@@ -276,9 +276,9 @@ public:
 
 /// Determine whether the given declaration has
 /// a C-compatible interface.
-class IsCCompatibleFuncDeclRequest :
-    public SimpleRequest<IsCCompatibleFuncDeclRequest,
-                         bool(FuncDecl *),
+class IsCCompatibleDeclRequest :
+    public SimpleRequest<IsCCompatibleDeclRequest,
+                         bool(ValueDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -287,7 +287,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, FuncDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Caching.
@@ -2978,9 +2978,6 @@ enum class ImplicitMemberAction : uint8_t {
   ResolveCodingKeys,
   ResolveEncodable,
   ResolveDecodable,
-  ResolveDistributedActor,
-  ResolveDistributedActorID,
-  ResolveDistributedActorSystem,
 };
 
 class ResolveImplicitMemberRequest

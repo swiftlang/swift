@@ -84,7 +84,7 @@ void ClangSyntaxPrinter::printModuleNamespaceQualifiersIfNeeded(
 
 bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclTemplateSpecifiers(
     const NominalTypeDecl *typeDecl) {
-  if (!typeDecl->isGeneric())
+  if (!typeDecl->hasGenericParamList())
     return true;
   printGenericSignature(
       typeDecl->getGenericSignature().getCanonicalSignature());
@@ -93,7 +93,7 @@ bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclTemplateSpecifiers(
 
 bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclInnerStaticAssert(
     const NominalTypeDecl *typeDecl) {
-  if (!typeDecl->isGeneric())
+  if (!typeDecl->hasGenericParamList())
     return true;
   printGenericSignatureInnerStaticAsserts(
       typeDecl->getGenericSignature().getCanonicalSignature());
@@ -173,7 +173,7 @@ void ClangSyntaxPrinter::printNominalTypeReference(
   if (!printNestedTypeNamespaceQualifiers(typeDecl))
     os << "::";
   ClangSyntaxPrinter(typeDecl->getASTContext(), os).printBaseName(typeDecl);
-  if (typeDecl->isGeneric())
+  if (typeDecl->hasGenericParamList())
     printGenericSignatureParams(
         typeDecl->getGenericSignature().getCanonicalSignature());
 }

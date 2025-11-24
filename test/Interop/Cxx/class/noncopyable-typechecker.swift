@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -cxx-interoperability-mode=default -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-ignore-unrelated
-// RUN: %target-swift-frontend -cxx-interoperability-mode=default -Xcc -std=c++20 -verify-additional-prefix cpp20- -D CPP20 -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-ignore-unrelated
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -Xcc -std=c++20 -verify-additional-prefix cpp20- -D CPP20 -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h
 
 //--- Inputs/module.modulemap
 module Test {
@@ -15,7 +15,7 @@ module Test {
 
 struct NonCopyable {
     NonCopyable() = default;
-    NonCopyable(const NonCopyable& other) = delete; // expected-note {{'NonCopyable' has been explicitly marked deleted here}}
+    NonCopyable(const NonCopyable& other) = delete;
     NonCopyable(NonCopyable&& other) = default;
 };
 
@@ -79,44 +79,6 @@ struct SWIFT_NONCOPYABLE NonCopyableNonMovable { // expected-note {{record 'NonC
     NonCopyableNonMovable(NonCopyableNonMovable&& other) = delete;
 };
 
-struct ImplicitCopyConstructor {
-    NonCopyable element;
-};
-
-template <typename T, typename P, typename R>
-struct TemplatedImplicitCopyConstructor {
-    T element;
-    P *pointer;
-    R &reference;
-};
-
-using NonCopyableT = TemplatedImplicitCopyConstructor<NonCopyable, int, int>;
-using NonCopyableP = TemplatedImplicitCopyConstructor<int, NonCopyable, int>;
-using NonCopyableR = TemplatedImplicitCopyConstructor<int, int, NonCopyable>;
-
-struct DefaultedCopyConstructor {
-    NonCopyable element; // expected-note {{copy constructor of 'DefaultedCopyConstructor' is implicitly deleted because field 'element' has a deleted copy constructor}}
-    DefaultedCopyConstructor(const DefaultedCopyConstructor&) = default; 
-    // expected-warning@-1 {{explicitly defaulted copy constructor is implicitly deleted}}
-    // expected-note@-2 {{replace 'default' with 'delete'}}
-    DefaultedCopyConstructor(DefaultedCopyConstructor&&) = default;
-};
-
-template<typename T>
-struct TemplatedDefaultedCopyConstructor {
-    T element;
-    TemplatedDefaultedCopyConstructor(const TemplatedDefaultedCopyConstructor&) = default;
-    TemplatedDefaultedCopyConstructor(TemplatedDefaultedCopyConstructor&&) = default;
-};
-
-template<typename T>
-struct DerivedTemplatedDefaultedCopyConstructor : TemplatedDefaultedCopyConstructor<T> {};
-
-using CopyableDefaultedCopyConstructor = TemplatedDefaultedCopyConstructor<NonCopyableP>;
-using NonCopyableDefaultedCopyConstructor = TemplatedDefaultedCopyConstructor<NonCopyable>;
-using CopyableDerived = DerivedTemplatedDefaultedCopyConstructor<NonCopyableR>;
-using NonCopyableDerived = DerivedTemplatedDefaultedCopyConstructor<NonCopyable>;
-
 template<typename T> struct SWIFT_COPYABLE_IF(T) DisposableContainer {};
 struct POD { int x; float y; }; // special members are implicit, but should be copyable
 using DisposablePOD = DisposableContainer<POD>; // should also be copyable
@@ -169,23 +131,6 @@ func doubleAnnotation() {
 func missingLifetimeOperation() {
     let s = NonCopyableNonMovable() // expected-error {{cannot find 'NonCopyableNonMovable' in scope}}
     takeCopyable(s)
-}
-
-func implicitCopyConstructor(i: borrowing ImplicitCopyConstructor, t: borrowing NonCopyableT, p: borrowing NonCopyableP, r: borrowing NonCopyableR) {
-    takeCopyable(i) // expected-error {{global function 'takeCopyable' requires that 'ImplicitCopyConstructor' conform to 'Copyable'}}
-    takeCopyable(t) // expected-error {{global function 'takeCopyable' requires that 'NonCopyableT' (aka 'TemplatedImplicitCopyConstructor<NonCopyable, CInt, CInt>') conform to 'Copyable'}}
-    
-    // References and pointers to non-copyable types are still copyable
-    takeCopyable(p)
-    takeCopyable(r)
-}
-
-func defaultCopyConstructor(d: borrowing DefaultedCopyConstructor, d1: borrowing CopyableDefaultedCopyConstructor, d2: borrowing NonCopyableDefaultedCopyConstructor, d3: borrowing CopyableDerived, d4: borrowing NonCopyableDerived) {
-    takeCopyable(d) // expected-error {{global function 'takeCopyable' requires that 'DefaultedCopyConstructor' conform to 'Copyable'}}
-    takeCopyable(d1)
-    takeCopyable(d2) // expected-error {{global function 'takeCopyable' requires that 'NonCopyableDefaultedCopyConstructor' (aka 'TemplatedDefaultedCopyConstructor<NonCopyable>') conform to 'Copyable'}}
-    takeCopyable(d3)
-    takeCopyable(d4) // expected-error {{global function 'takeCopyable' requires that 'NonCopyableDerived' (aka 'DerivedTemplatedDefaultedCopyConstructor<NonCopyable>') conform to 'Copyable'}}
 }
 
 func copyableDisposablePOD(p: DisposablePOD) {

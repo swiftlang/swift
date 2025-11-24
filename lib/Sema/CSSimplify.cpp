@@ -4825,14 +4825,19 @@ static ConstraintFix *fixPropertyWrapperFailure(
   if (!resolvedOverload)
     return nullptr;
 
+  auto *decl = resolvedOverload->choice.getDeclOrNull();
+  auto *VD = dyn_cast_or_null<VarDecl>(decl);
+  if (!VD)
+    return nullptr;
+
   enum class Fix : uint8_t {
     ProjectedValue,
     PropertyWrapper,
     WrappedValue,
   };
 
-  auto applyFix = [&](Fix fix, VarDecl *decl, Type type) -> ConstraintFix * {
-    if (!decl->hasInterfaceType() || !type)
+  auto applyFix = [&](Fix fix, Type type) -> ConstraintFix * {
+    if (!VD->hasInterfaceType() || !type)
       return nullptr;
 
     if (baseTy->isEqual(type))
@@ -4841,40 +4846,34 @@ static ConstraintFix *fixPropertyWrapperFailure(
     if (baseTy->is<TypeVariableType>() || type->is<TypeVariableType>())
       return nullptr;
 
-    if (!attemptFix(*resolvedOverload, decl, type))
+    if (!attemptFix(*resolvedOverload, VD, type))
       return nullptr;
 
     switch (fix) {
     case Fix::ProjectedValue:
     case Fix::PropertyWrapper:
-      return UsePropertyWrapper::create(cs, decl, fix == Fix::ProjectedValue,
-                                        baseTy, toType.value_or(type),
-                                        locator);
+      return UsePropertyWrapper::create(cs, VD, fix == Fix::ProjectedValue,
+                                        baseTy, toType.value_or(type), locator);
 
     case Fix::WrappedValue:
-      return UseWrappedValue::create(cs, decl, baseTy, toType.value_or(type),
+      return UseWrappedValue::create(cs, VD, baseTy, toType.value_or(type),
                                      locator);
     }
     llvm_unreachable("Unhandled Fix type in switch");
   };
 
-  if (auto projection =
-          cs.getPropertyWrapperProjectionInfo(*resolvedOverload)) {
-    if (auto *fix = applyFix(Fix::ProjectedValue, projection->first,
-                             projection->second))
+  if (auto projectTy = cs.getPropertyWrapperProjectionType(*resolvedOverload)) {
+    if (auto *fix = applyFix(Fix::ProjectedValue, projectTy))
       return fix;
   }
 
-  if (auto wrapper = cs.getPropertyWrapperInformation(*resolvedOverload)) {
-    if (auto *fix =
-            applyFix(Fix::PropertyWrapper, wrapper->first, wrapper->second))
+  if (auto backingTy = cs.getPropertyWrapperBackingType(*resolvedOverload)) {
+    if (auto *fix = applyFix(Fix::PropertyWrapper, backingTy))
       return fix;
   }
 
-  if (auto wrappedProperty =
-          cs.getWrappedPropertyInformation(*resolvedOverload)) {
-    if (auto *fix = applyFix(Fix::WrappedValue, wrappedProperty->first,
-                             wrappedProperty->second))
+  if (auto wrappedTy = cs.getWrappedPropertyType(*resolvedOverload)) {
+    if (auto *fix = applyFix(Fix::WrappedValue, wrappedTy))
       return fix;
   }
 
@@ -5582,6 +5581,10 @@ bool ConstraintSystem::repairFailures(
   if (path.empty()) {
     if (!anchor)
       return false;
+
+    // If we have an ErrorExpr anchor, we don't need to do any more fixes.
+    if (isExpr<ErrorExpr>(anchor))
+      return true;
 
     // This could be:
     // - `InOutExpr` used with r-value e.g. `foo(&x)` where `x` is a `let`.
@@ -6695,6 +6698,10 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::Condition: {
+    // If the condition is already a hole, we're done.
+    if (lhs->isPlaceholder())
+      return true;
+
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       return true;
@@ -7740,16 +7747,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                  isExpr<ForcedCheckedCastExpr>(anchor);
         };
 
-        if (!isCGFloatInit(anchor) && !isCoercionOrCast(anchor, path) &&
-            llvm::none_of(path, [&](const LocatorPathElt &rawElt) {
-              if (auto elt =
-                      rawElt.getAs<LocatorPathElt::ImplicitConversion>()) {
-                auto convKind = elt->getConversionKind();
-                return convKind == ConversionRestrictionKind::DoubleToCGFloat ||
-                       convKind == ConversionRestrictionKind::CGFloatToDouble;
-              }
-              return false;
-            })) {
+        if (!isCGFloatInit(anchor) && !isCoercionOrCast(anchor, path)) {
           conversionsOrFixes.push_back(
               desugar1->isCGFloat()
                   ? ConversionRestrictionKind::CGFloatToDouble
@@ -9033,7 +9031,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           return SolutionKind::Solved;
         };
 
-        if (witness->isGeneric()) {
+        if (witness->hasGenericParamList()) {
           // `DistributedActorSystem.remoteCall`
           if (witness->isDistributedActorSystemRemoteCall(/*isVoidReturn=*/false)) {
             if (GP->isEqual(cast<FuncDecl>(witness)->getResultInterfaceType()))
@@ -9970,15 +9968,15 @@ ConstraintSystem::matchPackElementType(Type elementType, Type patternType,
   }
 
   auto shapeParam = CanGenericTypeParamType(cast<GenericTypeParamType>(
-      shapeClass->mapTypeOutOfContext()->getCanonicalType()));
+      shapeClass->mapTypeOutOfEnvironment()->getCanonicalType()));
 
   auto *genericEnv = getPackExpansionEnvironment(packExpansion);
   if (genericEnv) {
     if (shapeParam != genericEnv->getOpenedElementShapeClass()) {
       return tryFix([&]() {
-        auto envShape = genericEnv->mapTypeIntoContext(
+        auto envShape = genericEnv->mapTypeIntoEnvironment(
             genericEnv->getOpenedElementShapeClass());
-        if (auto *pack = dyn_cast<PackType>(envShape))
+        if (auto *pack = dyn_cast<PackType>(envShape.getPointer()))
           envShape = pack->unwrapSingletonPackExpansion()->getPatternType();
 
         return SkipSameShapeRequirement::create(
@@ -11032,10 +11030,6 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
   if (!anchor)
     return nullptr;
 
-  // Avoid checking implicit conversions injected by the compiler.
-  if (locator->findFirst<LocatorPathElt::ImplicitConversion>())
-    return nullptr;
-
   auto getType = [&cs](Expr *expr) -> Type {
     return cs.simplifyType(cs.getType(expr))->getRValueType();
   };
@@ -11605,22 +11599,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             // `key path` constraint can't be retired until all components
             // are simplified.
             addTypeVariableConstraintsToWorkList(memberTypeVar);
-          } else if (isa<Expr *>(locator->getAnchor()) &&
-                     !getSemanticsProvidingParentExpr(
-                         getAsExpr(locator->getAnchor()))) {
-            // If there are no contextual expressions that could provide
-            // a type for the member type variable, let's default it to
-            // a placeholder eagerly so it could be propagated to the
-            // pattern if necessary.
-            recordTypeVariablesAsHoles(memberTypeVar);
-          } else if (locator->isLastElement<LocatorPathElt::PatternMatch>()) {
-            // Let's handle member patterns specifically because they use
-            // equality instead of argument application constraint, so allowing
-            // them to bind member could mean missing valid hole positions in
-            // the pattern.
-            recordTypeVariablesAsHoles(memberTypeVar);
           } else {
-            recordPotentialHole(memberTypeVar);
+            // Eagerly turn the member type variable into a hole since we know
+            // this is where the issue is and we've recorded a fix for it. This
+            // avoids producing unnecessary holes for e.g generic parameters.
+            recordTypeVariablesAsHoles(memberTypeVar);
           }
         }
 
@@ -11772,7 +11755,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     if (auto archetype =
             baseTy->getMetatypeInstanceType()->getAs<ArchetypeType>()) {
       if (auto genericTy =
-              archetype->mapTypeOutOfContext()->getAs<GenericTypeParamType>()) {
+              archetype->mapTypeOutOfEnvironment()->getAs<GenericTypeParamType>()) {
         for (auto param : DC->getGenericSignatureOfContext()
                               .getGenericParams()) {
           // Find a param at the same depth and one index past the type we're
@@ -15422,7 +15405,23 @@ static void increaseScoreForGenericParamPointerConversion(
     return;
 
   // Check to see if the parameter is a generic parameter, or dependent member.
-  auto paramTy = param->getInterfaceType()->lookThroughAllOptionalTypes();
+  // Look though optionals and pack expansions.
+  auto paramTy = param->getInterfaceType();
+  while (true) {
+    paramTy = paramTy->lookThroughAllOptionalTypes();
+    if (auto packExpansion = paramTy->getAs<PackExpansionType>()) {
+      paramTy = packExpansion->getPatternType();
+      continue;
+    }
+    // Also look through "vanishing" tuples.
+    if (auto *tupleTy = paramTy->getAs<TupleType>()) {
+      if (tupleTy->getNumElements() == 1 && !tupleTy->getElement(0).hasName()) {
+        paramTy = tupleTy->getElement(0).getType();
+        continue;
+      }
+    }
+    break;
+  }
   if (!paramTy->isTypeParameter())
     return;
 
@@ -16681,7 +16680,6 @@ void ConstraintSystem::addContextualConversionConstraint(
 
   case CTP_ArrayElement:
   case CTP_AssignSource:
-  case CTP_CalleeResult:
   case CTP_CannotFail:
   case CTP_Condition:
   case CTP_Unused:
@@ -16697,7 +16695,6 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_CoerceOperand:
   case CTP_SubscriptAssignSource:
   case CTP_WrappedProperty:
-  case CTP_ComposedPropertyWrapper:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
     break;

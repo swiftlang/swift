@@ -22,7 +22,6 @@ add_library(swift_Concurrency
   TaskLocal.cpp
   TaskStatus.cpp
   ThreadingError.cpp
-  TracingSignpost.cpp
   "${PROJECT_SOURCE_DIR}/CompatibilityOverride/CompatibilityOverride.cpp"
   "./linker-support/magic-symbols-for-install-name.c"
   Actor.swift
@@ -99,6 +98,13 @@ add_library(swift_Concurrency
   "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Task+immediate.swift")
 
+if(SwiftCore_ENABLE_STDLIB_TRACING)
+  target_compile_definitions(swift_Concurrency
+    PRIVATE SWIFT_STDLIB_CONCURRENCY_TRACING)
+  target_sources(swift_Concurrency
+    PRIVATE TracingSignpost.cpp)
+endif()
+
 if(APPLE)
   target_sources(swift_Concurrency PRIVATE
     CFExecutor.swift
@@ -139,6 +145,7 @@ target_link_libraries(swift_Concurrency PRIVATE
   $<$<PLATFORM_ID:Android>:log>
   $<$<PLATFORM_ID:Windows>:Synchronization>
   $<$<PLATFORM_ID:Windows>:mincore>
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>
   # Link to the runtime that we are just building.
   swiftCore)
 set_target_properties(swift_Concurrency PROPERTIES

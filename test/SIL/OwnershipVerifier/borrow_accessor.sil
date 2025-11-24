@@ -8,26 +8,14 @@ public struct Wrapper {
   var k: Klass
 }
 
-public struct GenWrapper<T> {
-  @_hasStorage var _prop: T { get set }
-  public var prop: T
-}
-
 sil [ossa] @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
 bb0(%0 : @guaranteed $Wrapper):
   %2 = struct_extract %0, #Wrapper._k             
   return %2                                       
 }
 
-sil [ossa] @borrow_addressonly_prop : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_address T {
-bb0(%0 : $*GenWrapper<T>):
-  %2 = struct_element_addr %0, #GenWrapper._prop  
-  return %2                                       
-}
-
 sil @get_wrapper : $@convention(thin) () -> @owned Klass
 sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-sil @use_T : $@convention(thin) <T> (@in_guaranteed T) -> ()
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_end_borrow_on_guaranteed_return_value'
 // CHECK: Invalid End Borrow!
@@ -147,18 +135,6 @@ bb0(%0 : @owned $Wrapper):
   %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
   %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
   destroy_value %0
-  %6 = tuple ()
-  return %6
-}
-
-// TODO: Add verification support in MemoryLifetimeVerifier
-sil [ossa] @test_use_after_free_address_only : $@convention(thin) <T> (@in GenWrapper<T>) -> () {
-bb0(%0 : $*GenWrapper<T>):
-  %1 = function_ref @borrow_addressonly_prop : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
-  %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
-  %3 = function_ref @use_T : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  destroy_addr %0
-  %5 = apply %3<T>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   %6 = tuple ()
   return %6
 }

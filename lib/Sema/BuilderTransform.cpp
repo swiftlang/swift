@@ -956,7 +956,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
     options |= ConstraintSystemFlags::DebugConstraints;
 
   auto resultInterfaceTy = func->getResultInterfaceType();
-  auto resultContextType = func->mapTypeIntoContext(resultInterfaceTy);
+  auto resultContextType = func->mapTypeIntoEnvironment(resultInterfaceTy);
 
   // Determine whether we're inferring the underlying type for the opaque
   // result type of this function.
@@ -982,7 +982,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   // parameters to appear in the result builder type, because
   // the result builder type will only be used inside the body
   // of this decl; it's not part of the interface type.
-  builderType = func->mapTypeIntoContext(builderType);
+  builderType = func->mapTypeIntoEnvironment(builderType);
 
   {
     auto result = cs.matchResultBuilder(
