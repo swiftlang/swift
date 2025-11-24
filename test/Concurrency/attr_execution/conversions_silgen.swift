@@ -659,3 +659,29 @@ func testSendableToSendableConversionWithNonisilatedNonsending() {
     nonisolated(nonsending) @escaping (String) async throws -> String
   ) async throws -> Void = test
 }
+
+func testNonisolatedNonsendingClosureInGlobalActorContext() {
+  class NonSendable {
+    var state = ""
+  }
+
+  struct S {
+    static func compute(closure: nonisolated(nonsending) @Sendable @escaping (sending NonSendable) async -> Void) async {}
+  }
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen52testNonisolatedNonsendingClosureInGlobalActorContextyyF0D0L_yyYaF : $@convention(thin) @async () -> ()
+  // CHECK: [[CLOSURE:%.*]] = function_ref @$s21attr_execution_silgen52testNonisolatedNonsendingClosureInGlobalActorContextyyF0D0L_yyYaFyAaByyF11NonSendableL_CYuYaYbYCcfU_ : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @guaranteed NonSendable) -> ()
+  // CHECK: [[THICK_CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE]] to $@Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @guaranteed NonSendable) -> ()
+  // CHECK: [[CLOSURE_THUNK:%.*]] = function_ref @$sBA21attr_execution_silgen52testNonisolatedNonsendingClosureInGlobalActorContextyyF11NonSendableL_CIeghHgILgT_BAADIeghHgILxT_TR : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @owned NonSendable, @guaranteed @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @guaranteed NonSendable) -> ()) -> ()
+  // CHECK: [[THUNKED_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_THUNK]]([[THICK_CLOSURE]])
+  // CHECK: [[COMPUTE:%.*]] = function_ref @$s21attr_execution_silgen52testNonisolatedNonsendingClosureInGlobalActorContextyyF1SL_V7compute7closureyyAaByyF11NonSendableL_CnYuYaYbYCc_tYaFZ : $@convention(method) @async (@guaranteed @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @owned NonSendable) -> (), @thin S.Type) -> ()
+  // CHECK: apply [[COMPUTE]]([[THUNKED_CLOSURE]], {{.*}}) : $@convention(method) @async (@guaranteed @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_sending @owned NonSendable) -> (), @thin S.Type) -> ()
+  // CHECK: } // end sil function '$s21attr_execution_silgen52testNonisolatedNonsendingClosureInGlobalActorContextyyF0D0L_yyYaF'
+  @MainActor
+  func test() async {
+    // CHECK: // closure #1 in test #1 () in testNonisolatedNonsendingClosureInGlobalActorContext()
+    // CHECK: // Isolation: caller_isolation_inheriting
+    await S.compute { _ in
+    }
+  }
+}

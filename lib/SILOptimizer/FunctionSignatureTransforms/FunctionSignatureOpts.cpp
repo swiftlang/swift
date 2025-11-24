@@ -320,7 +320,7 @@ mapInterfaceTypes(SILFunction *F,
     if (!Param.getInterfaceType()->hasArchetype())
       continue;
     Param = SILParameterInfo(
-        Param.getInterfaceType()->mapTypeOutOfContext()->getCanonicalType(),
+        Param.getInterfaceType()->mapTypeOutOfEnvironment()->getCanonicalType(),
         Param.getConvention());
   }
 
@@ -328,7 +328,7 @@ mapInterfaceTypes(SILFunction *F,
     if (!Result.getInterfaceType()->hasArchetype())
       continue;
     auto InterfaceResult = Result.getWithInterfaceType(
-        Result.getInterfaceType()->mapTypeOutOfContext()->getCanonicalType());
+        Result.getInterfaceType()->mapTypeOutOfEnvironment()->getCanonicalType());
     Result = InterfaceResult;
   }
 
@@ -337,7 +337,7 @@ mapInterfaceTypes(SILFunction *F,
       InterfaceErrorResult =
           SILResultInfo(InterfaceErrorResult.value()
                             .getInterfaceType()
-                            ->mapTypeOutOfContext()
+                            ->mapTypeOutOfEnvironment()
                             ->getCanonicalType(),
                         InterfaceErrorResult.value().getConvention());
     }

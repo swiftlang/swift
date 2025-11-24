@@ -509,7 +509,7 @@ bool SILFunction::shouldOptimize() const {
   return getEffectiveOptimizationMode() != OptimizationMode::NoOptimization;
 }
 
-Type SILFunction::mapTypeIntoContext(Type type) const {
+Type SILFunction::mapTypeIntoEnvironment(Type type) const {
   assert(!type->hasPrimaryArchetype());
 
   if (GenericEnv) {
@@ -517,7 +517,7 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
     // type, which might contain element archetypes, if it was the interface type
     // of a closure or local variable.
     if (type->hasElementArchetype())
-      return GenericEnv->mapTypeIntoContext(type);
+      return GenericEnv->mapTypeIntoEnvironment(type);
 
     // Otherwise, assume we have an interface type for the "combined" captured
     // environment.
@@ -530,7 +530,7 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
   return type;
 }
 
-SILType SILFunction::mapTypeIntoContext(SILType type) const {
+SILType SILFunction::mapTypeIntoEnvironment(SILType type) const {
   assert(!type.hasPrimaryArchetype());
 
   if (GenericEnv) {
@@ -546,7 +546,7 @@ SILType SILFunction::mapTypeIntoContext(SILType type) const {
   return type;
 }
 
-SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
+SILType GenericEnvironment::mapTypeIntoEnvironment(SILModule &M,
                                                SILType type) const {
   assert(!type.hasPrimaryArchetype());
 

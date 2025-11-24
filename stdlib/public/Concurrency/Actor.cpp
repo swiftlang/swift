@@ -237,11 +237,16 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     // current thread.  If the task suspends somewhere, it should
     // update the task status appropriately; we don't need to update
     // it afterwards.
-    task->flagAsRunning();
+    [[maybe_unused]]
+    uint32_t dispatchOpaquePriority = task->flagAsRunning();
 
     auto traceHandle = concurrency::trace::job_run_begin(job);
     task->runInFullyEstablishedContext();
     concurrency::trace::job_run_end(traceHandle);
+
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    swift_dispatch_thread_reset_override_self(dispatchOpaquePriority);
+#endif
 
     assert(ActiveTask::get() == nullptr &&
            "active task wasn't cleared before suspending?");

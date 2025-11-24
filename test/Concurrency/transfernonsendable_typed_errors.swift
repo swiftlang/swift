@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -target %target-swift-5.1-abi-triple
-// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -target %target-swift-5.1-abi-triple -enable-upcoming-feature NonisolatedNonsendingByDefault
+// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -verify-additional-prefix ni- -target %target-swift-5.1-abi-triple
+// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -verify-additional-prefix ni-ns- -target %target-swift-5.1-abi-triple -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

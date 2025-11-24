@@ -1264,7 +1264,8 @@ public:
   void addSynthesizedProtocolAttrs(
       NominalTypeDecl *nominal,
       ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-      bool isUnchecked = false);
+      bool isUnchecked = false,
+      bool isSuppressed = false);
 
   void makeComputed(AbstractStorageDecl *storage, AccessorDecl *getter,
                     AccessorDecl *setter);
@@ -1761,6 +1762,11 @@ public:
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
+  void finishOpaqueTypeDecl(OpaqueTypeDecl *decl,
+                            uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
   template <typename DeclTy, typename ...Targs>
   DeclTy *createDeclWithClangNode(ClangNode ClangN, AccessLevel access,
                                   Targs &&... Args) {
@@ -1827,6 +1833,7 @@ public:
   void addOptionSetTypealiases(NominalTypeDecl *nominal);
 
   void swiftify(AbstractFunctionDecl *MappedDecl);
+  void swiftifyProtocol(NominalTypeDecl *MappedDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///
@@ -1973,11 +1980,6 @@ namespace importer {
 /// type into Swift.
 bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
                                  ClangImporter::Implementation *importerImpl);
-
-/// Returns true if the given C/C++ record should be imported as non-copyable into
-/// Swift.
-bool recordHasMoveOnlySemantics(const clang::RecordDecl *decl,
-                                ClangImporter::Implementation *importerImpl);
 
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.

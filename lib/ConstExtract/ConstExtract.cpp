@@ -112,7 +112,7 @@ std::string toFullyQualifiedProtocolNameString(const swift::ProtocolDecl &Protoc
 std::string toMangledTypeNameString(const swift::Type &Type) {
   auto PrintingType = Type;
   if (Type->hasArchetype())
-    PrintingType = Type->mapTypeOutOfContext();
+    PrintingType = Type->mapTypeOutOfEnvironment();
   return Mangle::ASTMangler(Type->getASTContext()).mangleTypeWithoutPrefix(PrintingType->getCanonicalType());
 }
 
@@ -1392,7 +1392,7 @@ void writeAssociatedTypeAliases(llvm::json::OStream &JSON,
                              toFullyQualifiedTypeNameString(type));
               JSON.attribute("substitutedMangledTypeName",
                              toMangledTypeNameString(type));
-              if (auto OpaqueTy = dyn_cast<OpaqueTypeArchetypeType>(type)) {
+              if (auto *OpaqueTy = type->getAs<OpaqueTypeArchetypeType>()) {
                 writeSubstitutedOpaqueTypeAliasDetails(JSON, *OpaqueTy);
               }
             });

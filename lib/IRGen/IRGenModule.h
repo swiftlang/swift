@@ -349,8 +349,9 @@ private:
   llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedClassMetadata;
 
   llvm::SmallVector<CanType, 4> LazySpecializedClassMetadata;
+  llvm::SmallVector<CanType, 4> LazySpecializedValueMetadata;
 
-  llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedSpecializedClassMetadata;
+  llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedSpecializedMetadata;
 
   llvm::SmallVector<ClassDecl *, 4> ClassesForEagerInitialization;
 
@@ -362,12 +363,16 @@ private:
 
   /// The queue of IRGenModules for multi-threaded compilation.
   SmallVector<IRGenModule *, 8> Queue;
+
+  /// ObjectStore for MCCAS backend if used.
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
   
   std::atomic<int> QueueIndex;
   
   friend class CurrentIGMPtr;
 public:
-  explicit IRGenerator(const IRGenOptions &opts, SILModule &module);
+  explicit IRGenerator(const IRGenOptions &opts, SILModule &module,
+                       std::shared_ptr<llvm::cas::ObjectStore> CAS = nullptr);
 
   /// Attempt to create an llvm::TargetMachine for the current target.
   std::unique_ptr<llvm::TargetMachine> createTargetMachine();
@@ -509,6 +514,7 @@ public:
 
   void noteUseOfClassMetadata(CanType classType);
   void noteUseOfSpecializedClassMetadata(CanType classType);
+  void noteUseOfSpecializedValueMetadata(CanType valueType);
 
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
     noteUseOfTypeGlobals(type, true, RequireMetadata);
@@ -828,6 +834,7 @@ public:
   llvm::StructType *TupleTypeMetadataTy;     /// %swift.tuple_type
   llvm::StructType *FullHeapMetadataStructTy; /// %swift.full_heapmetadata = type { ... }
   llvm::StructType *FullBoxMetadataStructTy; /// %swift.full_boxmetadata = type { ... }
+  llvm::StructType *EmbeddedExistentialsMetadataStructTy;
   llvm::StructType *FullTypeMetadataStructTy; /// %swift.full_type = type { ... }
   llvm::StructType *FullExistentialTypeMetadataStructTy; /// %swift.full_existential_type = type { ... }
   llvm::StructType *FullForeignTypeMetadataStructTy; /// %swift.full_foreign_type = type { ... }
@@ -882,7 +889,7 @@ public:
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
   // clang-format on
 
-  llvm::StructType *CoroFunctionPointerTy; // { i32, i32 }
+  llvm::StructType *CoroFunctionPointerTy; // { i32, i32, i64 }
   llvm::FunctionType *CoroAllocateFnTy;
   llvm::FunctionType *CoroDeallocateFnTy;
   llvm::IntegerType *CoroAllocatorFlagsTy;
@@ -921,7 +928,7 @@ public:
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
   llvm::CallingConv::ID SwiftAsyncCC;  /// swift calling convention for async
   llvm::CallingConv::ID SwiftCoroCC;   /// swift calling convention for callee-allocated coroutines
-  llvm::CallingConv::ID SwiftClientRR_CC; /// swift client retain/release calling convention
+  llvm::CallingConv::ID SwiftDirectRR_CC; /// swift direct retain/release calling convention
 
   /// What kind of tail call should be used for async->async calls.
   llvm::CallInst::TailCallKind AsyncTailCallKind;
@@ -1196,7 +1203,7 @@ public:
 
   ClassMetadataStrategy getClassMetadataStrategy(const ClassDecl *theClass);
 
-  bool IsWellKnownBuiltinOrStructralType(CanType type) const;
+  bool isWellKnownBuiltinOrStructuralType(CanType type) const;
 
 private:
   TypeConverter &Types;
@@ -1674,6 +1681,8 @@ public:
   llvm::AttributeList constructInitialAttributes();
   StackProtectorMode shouldEmitStackProtector(SILFunction *f);
 
+  llvm::ConstantInt *getMallocTypeId(llvm::Function *fn);
+
   void emitProtocolDecl(ProtocolDecl *D);
   void emitEnumDecl(EnumDecl *D);
   void emitStructDecl(StructDecl *D);
@@ -1734,6 +1743,7 @@ public:
   SILFunction *getSILFunctionForCoroFunctionPointer(llvm::Constant *cfp);
 
   llvm::Constant *getAddrOfGlobalCoroMallocAllocator();
+  llvm::Constant *getAddrOfGlobalCoroTypedMallocAllocator();
   llvm::Constant *getAddrOfGlobalCoroAsyncTaskAllocator();
 
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,

@@ -189,3 +189,19 @@ func test016() {
     i.#^INSIDE_CATCH_TYPEDERR_DOT?check=INT_DOT^#
   }
 }
+
+// https://github.com/swiftlang/swift/issues/85434
+func issue85434() throws {
+  func foo() throws(Error4) {}
+  do {
+    try foo()
+  } catch let error {
+    switch error {
+    case .#^SWITCH_INSIDE_CATCH^#
+      // SWITCH_INSIDE_CATCH-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: E1[#Error4#]; name=E1
+      // SWITCH_INSIDE_CATCH-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: E2({#Int32#})[#Error4#]; name=E2()
+    default:
+      throw error
+    }
+  }
+}

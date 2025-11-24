@@ -27,7 +27,6 @@ import Closure
 // CHECK: strong_retain %[[V3]] : $@callee_guaranteed (@in_guaranteed NonTrivial) -> ()
 // CHECK: apply %[[V3]](%[[V1]]) : $@callee_guaranteed (@in_guaranteed NonTrivial) -> ()
 // CHECK: %[[V6:.*]] = tuple ()
-// CHECK: strong_release %[[V3]] : $@callee_guaranteed (@in_guaranteed NonTrivial) -> ()
 // CHECK: return %[[V6]] : $()
 
 // NonTrivial is destroyed by the caller.

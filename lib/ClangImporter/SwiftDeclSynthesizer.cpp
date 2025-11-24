@@ -358,7 +358,7 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
   ASTContext &ctx = afd->getASTContext();
   auto func = cast<AccessorDecl>(afd);
   VarDecl *constantVar = cast<VarDecl>(func->getStorage());
-  Type type = func->mapTypeIntoContext(constantVar->getValueInterfaceType());
+  Type type = func->mapTypeIntoEnvironment(constantVar->getValueInterfaceType());
 
   auto contextData =
       ConstantGetterBodyContextData::getFromOpaqueValue(voidContext);
@@ -1824,7 +1824,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
                              : rawElementTy;
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types that are returned indirectly.
-  bool isNoncopyable = dc->mapTypeIntoContext(elementTy)->isNoncopyable();
+  bool isNoncopyable = dc->mapTypeIntoEnvironment(elementTy)->isNoncopyable();
   bool isImplicit = !(isNoncopyable || resultDependsOnSelf);
   bool useAddress =
       rawElementTy->getAnyPointerElementType() && (isNoncopyable || resultDependsOnSelf);
@@ -2632,8 +2632,8 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
       ImporterImpl.ImportedHeaderUnit);
   funcDecl->setBodySynthesizer(synthesizeDefaultArgumentBody, (void *)param);
   funcDecl->setAccess(AccessLevel::Public);
-  funcDecl->addAttribute(new (ctx)
-                             AlwaysEmitIntoClientAttr(/*IsImplicit=*/true));
+  funcDecl->addAttribute(
+      new (ctx) ExportAttr(ExportKind::Implementation, /*IsImplicit=*/true));
   // At this point, the parameter/return types of funcDecl might not be imported
   // into Swift completely, meaning that their protocol conformances might not
   // be populated yet. Prevent LifetimeDependenceInfoRequest from prematurely
@@ -3183,9 +3183,7 @@ FuncDecl *SwiftDeclSynthesizer::makeAvailabilityDomainPredicate(
       BuiltinIntegerType::get(1, ctx), ImporterImpl.ImportedHeaderUnit);
   funcDecl->setBodySynthesizer(synthesizeAvailabilityDomainPredicateBody,
                                (void *)var);
-  funcDecl->setAccess(AccessLevel::Public);
-  funcDecl->addAttribute(new (ctx)
-                             AlwaysEmitIntoClientAttr(/*IsImplicit=*/true));
+  funcDecl->setAccess(AccessLevel::Private);
 
   ImporterImpl.availabilityDomainPredicates[var] = funcDecl;
 

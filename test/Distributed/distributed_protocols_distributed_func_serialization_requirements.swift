@@ -54,6 +54,7 @@ distributed actor ProtocolWithChecksSeqReqDA_MissingSystem: ProtocolWithChecksSe
   //
   // expected-error@-6{{type 'ProtocolWithChecksSeqReqDA_MissingSystem' does not conform to protocol 'DistributedActor'}}
   // expected-note@-7 {{add stubs for conformance}}
+  // expected-error@-8 {{type 'ProtocolWithChecksSeqReqDA_MissingSystem' does not conform to protocol 'Identifiable'}}
 
   // Entire conformance is doomed, so we didn't proceed to checking the functions; that's fine
   distributed func testAT() async throws -> NotCodable { .init() }

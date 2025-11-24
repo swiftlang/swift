@@ -3167,11 +3167,11 @@ static bool fixItOverrideDeclarationTypesImpl(
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
-      auto resultType = method->mapTypeIntoContext(
+      auto resultType = method->mapTypeIntoEnvironment(
           method->getResultInterfaceType());
 
       auto *baseMethod = cast<FuncDecl>(base);
-      auto baseResultType = baseMethod->mapTypeIntoContext(
+      auto baseResultType = baseMethod->mapTypeIntoEnvironment(
           baseMethod->getResultInterfaceType());
 
       fixedAny |= checkType(resultType, ParamDecl::Specifier::Default,
@@ -3194,8 +3194,8 @@ static bool fixItOverrideDeclarationTypesImpl(
     }
 
     auto resultType =
-        subscript->mapTypeIntoContext(subscript->getElementInterfaceType());
-    auto baseResultType = baseSubscript->mapTypeIntoContext(
+        subscript->mapTypeIntoEnvironment(subscript->getElementInterfaceType());
+    auto baseResultType = baseSubscript->mapTypeIntoEnvironment(
         baseSubscript->getElementInterfaceType());
     fixedAny |= checkType(resultType, ParamDecl::Specifier::Default,
                           baseResultType, ParamDecl::Specifier::Default,
@@ -3693,7 +3693,7 @@ public:
     // If we have one successful candidate, then save it as the underlying
     // substitutions of the opaque decl.
     OpaqueDecl->setUniqueUnderlyingTypeSubstitutions(
-        std::get<1>(candidate).mapReplacementTypesOutOfContext());
+        std::get<1>(candidate).mapReplacementTypesOutOfEnvironment());
   }
 
   // There is no clear winner here since there are candidates within
@@ -3759,14 +3759,14 @@ public:
       conditionalSubstitutions.push_back(
           OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
               Ctx, queries,
-              std::get<1>(candidate).mapReplacementTypesOutOfContext()));
+              std::get<1>(candidate).mapReplacementTypesOutOfEnvironment()));
     }
 
     // Add universally available choice as the last one.
     conditionalSubstitutions.push_back(
         OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
             Ctx, {AvailabilityQuery::universallyConstant(true)},
-            universalSubstMap.mapReplacementTypesOutOfContext()));
+            universalSubstMap.mapReplacementTypesOutOfEnvironment()));
 
     OpaqueDecl->setConditionallyAvailableSubstitutions(
         conditionalSubstitutions);
@@ -6749,7 +6749,7 @@ TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
     resultType = func->getResultInterfaceType();
-    resultType = func->mapTypeIntoContext(resultType);
+    resultType = func->mapTypeIntoEnvironment(resultType);
     returnsSelf = func->getResultInterfaceType()->hasDynamicSelfType();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;

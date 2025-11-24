@@ -125,8 +125,11 @@ func __withTaskPriorityEscalationHandler0<T, E>(
   onPriorityEscalated handler0: @Sendable (UInt8, UInt8) -> Void,
   isolation: isolated (any Actor)? = #isolation
 ) async throws(E) -> T {
-  let record = unsafe _taskAddPriorityEscalationHandler(handler: handler0)
-  defer { unsafe _taskRemovePriorityEscalationHandler(record: record) }
+  let record =
+    unsafe Builtin.taskAddPriorityEscalationHandler(handler: handler0)
+  defer {
+    unsafe Builtin.taskRemovePriorityEscalationHandler(record: record)
+  }
 
   return try await operation()
 }

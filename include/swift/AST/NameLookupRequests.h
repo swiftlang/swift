@@ -776,10 +776,11 @@ void simple_display(llvm::raw_ostream &out,
 
 SourceLoc extractNearestSourceLoc(const LookupConformanceDescriptor &desc);
 
-class LookupConformanceInModuleRequest
-    : public SimpleRequest<LookupConformanceInModuleRequest,
+class LookupConformanceRequest
+    : public SimpleRequest<LookupConformanceRequest,
                            ProtocolConformanceRef(LookupConformanceDescriptor),
-                           RequestFlags::Uncached|RequestFlags::DependencySink> {
+                           RequestFlags::Uncached |
+                               RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 

@@ -304,6 +304,10 @@ public:
   void clearCache() { cache.clear(); }
 
   /// Is the given request, or an equivalent, currently being evaluated?
+  ///
+  /// WARN: do not rely on this function to avoid request cycles. Doing so can
+  /// lead to bugs that are very difficult to debug, especially when request
+  /// caching is involved.
   template <typename Request>
   bool hasActiveRequest(const Request &request) const {
     return activeRequests.count(ActiveRequest(request));

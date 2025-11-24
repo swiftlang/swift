@@ -16,8 +16,7 @@
 
 // RUN: dwarfdump --debug-info @%t/A.path | %FileCheck %s
 
-// CHECK: DW_AT_GNU_dwo_name
-// CHECK-SAME: TMP_DIR
+// CHECK: DW_AT_GNU_dwo_name ("llvmcas://{{.*}}")
 
 //--- test.swift
 import A

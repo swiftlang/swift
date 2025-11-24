@@ -474,9 +474,11 @@ foreach(SDK ${SWIFT_SDKS})
         list(APPEND test_dependencies "touch-covering-tests")
       endif()
 
-      list(APPEND test_dependencies
-        "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
-        "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+      if(SWIFT_BUILD_STDLIB)
+        list(APPEND test_dependencies
+          "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
+          "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+      endif()
 
       set(validation_test_dependencies)
 

@@ -694,7 +694,7 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
           // synthesized code, in that case, don't map the type into context,
           // but return as is -- the synthesis should ensure the type is
           // correct.
-          LookupDC ? LookupDC->mapTypeIntoContext(D->getInterfaceType())
+          LookupDC ? LookupDC->mapTypeIntoEnvironment(D->getInterfaceType())
                    : D->getInterfaceType());
     } else {
       if (makeTypeValue) {
@@ -815,11 +815,11 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
       BaseExpr = TypeExpr::createImplicitForDecl(
           UDRE->getNameLoc(), selfParam,
           /*DC*/ nullptr,
-          DC->mapTypeIntoContext(selfParam->getInterfaceType()));
+          DC->mapTypeIntoEnvironment(selfParam->getInterfaceType()));
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
       BaseExpr = TypeExpr::createImplicitForDecl(
           UDRE->getNameLoc(), NTD, BaseDC,
-          DC->mapTypeIntoContext(NTD->getInterfaceType()));
+          DC->mapTypeIntoEnvironment(NTD->getInterfaceType()));
     } else {
       BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
                                            /*Implicit=*/true);

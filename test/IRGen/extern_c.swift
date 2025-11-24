@@ -2,6 +2,17 @@
 
 // REQUIRES: swift_feature_Extern
 
+
+// CHECK: @pointer_c = external global
+@_extern(c)
+var pointer_c: UnsafeMutablePointer<Int>
+
+// CHECK: @nullable_pointer_c = external global
+@_extern(c)
+var nullable_pointer_c: UnsafeMutablePointer<Int>?
+
+func acceptInt(_: Int) { }
+
 func test() {
   // CHECK: call void @explicit_extern_c()
   explicit_extern_c()
@@ -12,6 +23,11 @@ func test() {
   default_arg_value()
   // CHECK: call void @default_arg_value(i32 24)
   default_arg_value(24)
+
+  // CHECK: call void @swift_beginAccess(ptr @pointer_c
+  // CHECK-NEXT: [[POINTEE_VAL:%[0-9]+]] = load ptr, ptr @pointer_c
+  // CHECK-NEXT: call void @swift_endAccess
+  acceptInt(pointer_c.pointee)
 }
 
 test()

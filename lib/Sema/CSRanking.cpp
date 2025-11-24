@@ -349,7 +349,7 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
   auto func1 = dyn_cast<FuncDecl>(decl1);
   auto func2 = dyn_cast<FuncDecl>(decl2);
   if (func1 && func2) {
-    bothGeneric = func1->isGeneric() && func2->isGeneric();
+    bothGeneric = func1->hasGenericParamList() && func2->hasGenericParamList();
 
     sig1 = func1->getGenericSignature();
     sig2 = func2->getGenericSignature();
@@ -358,7 +358,8 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
   auto subscript1 = dyn_cast<SubscriptDecl>(decl1);
   auto subscript2 = dyn_cast<SubscriptDecl>(decl2);
   if (subscript1 && subscript2) {
-    bothGeneric = subscript1->isGeneric() && subscript2->isGeneric();
+    bothGeneric =
+        subscript1->hasGenericParamList() && subscript2->hasGenericParamList();
 
     sig1 = subscript1->getGenericSignature();
     sig2 = subscript2->getGenericSignature();
@@ -435,7 +436,7 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
 
   cs.addConstraint(ConstraintKind::Bind,
                    replacements[0].second,
-                   dc1->mapTypeIntoContext(selfType1),
+                   dc1->mapTypeIntoEnvironment(selfType1),
                    nullptr);
 
   // Solve the system. If the first extension is at least as specialized as the
@@ -518,14 +519,14 @@ bool CompareDeclSpecializationRequest::evaluate(
   // A non-generic declaration is more specialized than a generic declaration.
   if (auto func1 = dyn_cast<AbstractFunctionDecl>(decl1)) {
     auto func2 = cast<AbstractFunctionDecl>(decl2);
-    if (func1->isGeneric() != func2->isGeneric())
-      return completeResult(func2->isGeneric());
+    if (func1->hasGenericParamList() != func2->hasGenericParamList())
+      return completeResult(func2->hasGenericParamList());
   }
 
   if (auto subscript1 = dyn_cast<SubscriptDecl>(decl1)) {
     auto subscript2 = cast<SubscriptDecl>(decl2);
-    if (subscript1->isGeneric() != subscript2->isGeneric())
-      return completeResult(subscript2->isGeneric());
+    if (subscript1->hasGenericParamList() != subscript2->hasGenericParamList())
+      return completeResult(subscript2->hasGenericParamList());
   }
 
   // Members of protocol extensions have special overloading rules.
@@ -609,7 +610,7 @@ bool CompareDeclSpecializationRequest::evaluate(
   auto openedType1 = openType(cs, innerDC1, outerDC1, type1, replacements, locator);
 
   for (auto replacement : replacements) {
-    if (auto mapped = innerDC1->mapTypeIntoContext(replacement.first)) {
+    if (auto mapped = innerDC1->mapTypeIntoEnvironment(replacement.first)) {
       cs.addConstraint(ConstraintKind::Bind, replacement.second, mapped,
                        locator);
     }
@@ -1207,9 +1208,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
             
             // If both are convenience initializers, and the instance type of
             // one is a subtype of the other's, favor the subtype constructor.
-            auto resType1 = ctor1->mapTypeIntoContext(
+            auto resType1 = ctor1->mapTypeIntoEnvironment(
                 ctor1->getResultInterfaceType());
-            auto resType2 = ctor2->mapTypeIntoContext(
+            auto resType2 = ctor2->mapTypeIntoEnvironment(
                 ctor2->getResultInterfaceType());
             
             if (!resType1->isEqual(resType2)) {

@@ -23,23 +23,6 @@ public func _asyncLetStart<T>(
   operation: @Sendable () async throws -> T
 )
 
-/// DEPRECATED. use _asyncLet_get instead
-@available(SwiftStdlib 5.1, *)
-@_silgen_name("swift_asyncLet_wait")
-public func _asyncLetGet<T>(asyncLet: Builtin.RawPointer) async -> T
-
-/// DEPRECATED. use _asyncLet_get_throwing instead
-@available(SwiftStdlib 5.1, *)
-@_silgen_name("swift_asyncLet_wait_throwing")
-public func _asyncLetGetThrowing<T>(asyncLet: Builtin.RawPointer) async throws -> T
-
-/// DEPRECATED. use _asyncLet_finish instead
-@available(SwiftStdlib 5.1, *)
-@_silgen_name("swift_asyncLet_end")
-public func _asyncLetEnd(
-  asyncLet: Builtin.RawPointer // TODO: should this take __owned?
-)
-
 /// Wait if necessary and then project the result value of an async let
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_asyncLet_get")

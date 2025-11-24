@@ -26,6 +26,8 @@ internal func localInternalFunc() {} // expected-note {{global function 'localIn
 
 @_spi(S) public func localSPI() {}
 
+typealias AliasToDirect = StructFromDirect
+
 @inlinable
 public func explicitlyInlinable(arg: StructFromDirect = StructFromDirect()) {
 // expected-error @-1 {{initializer 'init()' cannot be used in a default argument value because 'directs' was imported implementation-only}}
@@ -55,19 +57,19 @@ public func explicitlyInlinable(arg: StructFromDirect = StructFromDirect()) {
 public func implicitlyInlinablePublic(arg: StructFromDirect = StructFromDirect()) {
 // expected-error @-1 {{initializer 'init()' cannot be used in a default argument value because 'directs' was imported implementation-only}}
 // expected-error @-2 {{struct 'StructFromDirect' cannot be used in a default argument value because 'directs' was imported implementation-only}}
-// expected-error @-3 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
+// expected-error @-3 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
 
-  _ = StructFromDirect() // expected-error {{initializer 'init()' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
-  // expected-error@-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
+  _ = StructFromDirect() // expected-error {{initializer 'init()' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+  // expected-error@-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
 
   if (true) {
-    _ = StructFromDirect() // expected-error {{initializer 'init()' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
-    // expected-error@-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
+    _ = StructFromDirect() // expected-error {{initializer 'init()' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+    // expected-error@-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
   }
 
   func nested() {
-    _ = StructFromDirect() // expected-error {{initializer 'init()' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
-    // expected-error@-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
+    _ = StructFromDirect() // expected-error {{initializer 'init()' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+    // expected-error@-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
   }
   nested()
 
@@ -82,23 +84,25 @@ public func implicitlyInlinablePublic(arg: StructFromDirect = StructFromDirect()
 
   localSPI()
   spiFunctionFromDirect()
+
+  let _: AliasToDirect // expected-error {{AliasToDirect' aliases 'directs.StructFromDirect' and cannot be used in an embedded function not marked '@export(interface)' because 'directs' has been imported as implementation-only}}
 }
 
 private func implicitlyInlinablePrivate(arg: StructFromDirect = StructFromDirect()) {
-// expected-error @-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
+// expected-error @-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
 // expected-note @-2 {{global function 'implicitlyInlinablePrivate(arg:)' is not '@usableFromInline' or public}}
 
-  _ = StructFromDirect() // expected-error {{initializer 'init()' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
-  // expected-error@-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
+  _ = StructFromDirect() // expected-error {{initializer 'init()' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+  // expected-error@-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
 
   if (true) {
-    _ = StructFromDirect() // expected-error {{initializer 'init()' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
-    // expected-error@-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
+    _ = StructFromDirect() // expected-error {{initializer 'init()' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+    // expected-error@-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
   }
 
   func nested() {
-    _ = StructFromDirect() // expected-error {{initializer 'init()' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
-    // expected-error@-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
+    _ = StructFromDirect() // expected-error {{initializer 'init()' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
+    // expected-error@-1 {{struct 'StructFromDirect' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
   }
   nested()
 
@@ -110,7 +114,7 @@ private func implicitlyInlinablePrivate(arg: StructFromDirect = StructFromDirect
   explicitNonInliable()
 }
 
-@_neverEmitIntoClient
+@export(interface)
 public func explicitNonInliable(arg: StructFromDirect = StructFromDirect()) {
 // expected-error @-1 {{initializer 'init()' cannot be used in a default argument value because 'directs' was imported implementation-only}}
 // expected-error @-2 {{struct 'StructFromDirect' cannot be used in a default argument value because 'directs' was imported implementation-only}}
@@ -135,7 +139,7 @@ public func explicitNonInliable(arg: StructFromDirect = StructFromDirect()) {
   explicitNonInliable()
 }
 
-@_neverEmitIntoClient
+@export(interface)
 internal func explicitNonInliableInternal(arg: StructFromDirect = StructFromDirect()) {
   _ = StructFromDirect()
 
@@ -161,7 +165,7 @@ internal func explicitNonInliableInternal(arg: StructFromDirect = StructFromDire
 struct Accessors {
   public var var1: Int {
     get {
-      globalFunctionFromDirect() // expected-error {{global function 'globalFunctionFromDirect()' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
+      globalFunctionFromDirect() // expected-error {{global function 'globalFunctionFromDirect()' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
       return 0
     }
   }
@@ -169,12 +173,12 @@ struct Accessors {
   @_alwaysEmitIntoClient
   public var var2: Int {
     get {
-      globalFunctionFromDirect() // expected-error {{global function 'globalFunctionFromDirect()' cannot be used in an embedded function not marked '@_neverEmitIntoClient' because 'directs' was imported implementation-only}}
+      globalFunctionFromDirect() // expected-error {{global function 'globalFunctionFromDirect()' cannot be used in an embedded function not marked '@export(interface)' because 'directs' was imported implementation-only}}
       return 0
     }
   }
 
-  @_neverEmitIntoClient
+  @export(interface)
   public var var3: Int {
     get {
       globalFunctionFromDirect()
@@ -183,7 +187,7 @@ struct Accessors {
   }
 
   public var var4: Int {
-    @_neverEmitIntoClient
+    @export(interface)
     get {
       globalFunctionFromDirect()
       return 0

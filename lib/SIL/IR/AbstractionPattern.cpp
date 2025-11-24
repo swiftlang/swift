@@ -97,7 +97,7 @@ TypeConverter::getAbstractionPattern(VarDecl *var, bool isNonObjC) {
 
   if (auto clangDecl = var->getClangDecl()) {
     auto clangType = getClangType(clangDecl);
-    auto contextType = var->getDeclContext()->mapTypeIntoContext(swiftType);
+    auto contextType = var->getDeclContext()->mapTypeIntoEnvironment(swiftType);
     swiftType =
         getLoweredBridgedType(AbstractionPattern(sig, swiftType, clangType),
                               contextType, getClangDeclBridgeability(clangDecl),
@@ -324,7 +324,7 @@ bool AbstractionPattern::conformsToKnownProtocol(
     // that ensures the type conforms.
     auto type = getType();
     if (hasGenericSignature() && getType()->hasTypeParameter()) {
-      type = GenericEnvironment::mapTypeIntoContext(
+      type = GenericEnvironment::mapTypeIntoEnvironment(
         getGenericSignature().getGenericEnvironment(), getType())
         ->getReducedType(getGenericSignature());
     }

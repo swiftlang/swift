@@ -44,7 +44,23 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
 }
 
 ModuleDecl *SILGlobalVariable::getParentModule() const {
-  return ParentModule ? ParentModule : getModule().getSwiftModule();
+  if (auto parentModule = DeclCtxOrParentModule.dyn_cast<ModuleDecl *>())
+    return parentModule;
+
+  if (auto declContext = DeclCtxOrParentModule.dyn_cast<DeclContext *>())
+    return declContext->getParentModule();
+
+  return getModule().getSwiftModule();
+}
+
+DeclContext *SILGlobalVariable::getDeclContext() const {
+  if (auto var = getDecl())
+    return var->getDeclContext();
+
+  if (auto declContext = DeclCtxOrParentModule.dyn_cast<DeclContext *>())
+    return declContext;
+
+  return nullptr;
 }
 
 static bool isGlobalLet(SILModule &mod, VarDecl *decl, SILType type) {

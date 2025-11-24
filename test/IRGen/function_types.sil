@@ -26,8 +26,8 @@ entry(%x : $@convention(thin) () -> ()):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @thick_func_value(ptr %0, ptr %1) {{.*}} {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    call{{( preserve_mostcc)?}} ptr @swift_retain{{(Client)?}}(ptr returned %1) {{#[0-9]+}}
-// CHECK-NEXT:    call{{( preserve_mostcc)?}} void @swift_release{{(Client)?}}(ptr %1) {{#[0-9]+}}
+// CHECK-NEXT:    call{{( preserve_mostcc)?}} ptr @swift_retain{{(Direct)?}}(ptr returned %1) {{#[0-9]+}}
+// CHECK-NEXT:    call{{( preserve_mostcc)?}} void @swift_release{{(Direct)?}}(ptr %1) {{#[0-9]+}}
 // CHECK-NEXT:    %3 = insertvalue { ptr, ptr } undef, ptr %0, 0
 // CHECK-NEXT:    %4 = insertvalue { ptr, ptr } %3, ptr %1, 1
 // CHECK-NEXT:    ret { ptr, ptr } %4

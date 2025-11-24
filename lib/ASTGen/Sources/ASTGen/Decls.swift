@@ -109,7 +109,7 @@ extension ASTGenVisitor {
     return decl
   }
 
-  func generate(enumDecl node: EnumDeclSyntax) -> BridgedNominalTypeDecl? {
+  func generate(enumDecl node: EnumDeclSyntax) -> BridgedEnumDecl? {
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
@@ -135,7 +135,7 @@ extension ASTGenVisitor {
       self.generate(memberBlockItemList: node.memberBlock.members)
     }
     let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
+    decl.asNominalTypeDecl.setParsedMembers(
       members.lazy.bridgedArray(in: self),
       fingerprint: fp.bridged
     )
@@ -610,8 +610,15 @@ extension ASTGenVisitor {
       // TODO: Diagnostics
       fatalError("invalid pattern binding introducer")
     }
+
+    // @const/@section globals are not top-level, per SE-0492.
+    // We follow the same rule for @_extern.
+    let isConst = attrs.attributes.hasAttribute(.Section)
+      || attrs.attributes.hasAttribute(.ConstVal)
+      || attrs.attributes.hasAttribute(.Extern)
+
     let topLevelDecl: BridgedTopLevelCodeDecl?
-    if self.declContext.isModuleScopeContext, self.declContext.parentSourceFile.isScriptMode {
+    if self.declContext.isModuleScopeContext, self.declContext.parentSourceFile.isScriptMode, !isConst {
       topLevelDecl = BridgedTopLevelCodeDecl.create(self.ctx, declContext: self.declContext)
     } else {
       topLevelDecl = nil

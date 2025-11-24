@@ -951,20 +951,30 @@ public:
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
 
-  void
+  virtual void
   loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
                            SmallVectorImpl<Requirement> &requirements,
                            SmallVectorImpl<ProtocolTypeAlias> &typeAliases) override;
 
-  void
+  virtual void
   loadAssociatedTypes(
       const ProtocolDecl *proto, uint64_t contextData,
       SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
 
-  void
+  virtual void
   loadPrimaryAssociatedTypes(
       const ProtocolDecl *proto, uint64_t contextData,
       SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
+
+  virtual void
+  finishOpaqueTypeDecl(OpaqueTypeDecl *opaqueDecl,
+                       uint64_t contextData) override;
+
+  void deserializeConditionalSubstitutions(
+      SmallVectorImpl<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
+          &limitedAvailability);
+  void deserializeConditionalSubstitutionAvailabilityQueries(
+      SmallVectorImpl<AvailabilityQuery> &queries);
 
   std::optional<StringRef> getGroupNameById(unsigned Id) const;
   std::optional<StringRef> getSourceFileNameById(unsigned Id) const;

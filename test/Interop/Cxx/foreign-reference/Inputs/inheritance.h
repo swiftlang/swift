@@ -288,8 +288,11 @@ struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:retain1")))
 __attribute__((swift_attr("release:release1"))) B3 : B1 {};
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winaccessible-base"
 struct D : B1, B2, B3 {}; // expected-warning {{unable to infer SWIFT_SHARED_REFERENCE for 'D', although one of its transitive base types is marked as SWIFT_SHARED_REFERENCE}}
 D *returnD() { return new D(); };
+#pragma clang diagnostic pop
 } // namespace MultipleInheritanceExample3
 
 void retain1(MultipleInheritanceExample3::B1 *v) {}

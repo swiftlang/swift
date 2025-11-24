@@ -230,7 +230,7 @@
 /test/Generics/                                     @hborla @slavapestov
 /test/Generics/inverse*                             @kavon
 /test/IDE/                                          @bnbarham @hamishknight @rintaro
-/test/IRGen/                                        @AnthonyLatsis @rjmccall
+/test/IRGen/                                        @rjmccall
 /test/Index/                                        @bnbarham @hamishknight @rintaro
 /test/Interop/                                      @egorzhdan @Xazax-hun @j-hui @susmonteiro @hnrklssn
 /test/Macros/SwiftifyImport                         @hnrklssn @Xazax-hun
@@ -294,7 +294,7 @@
 /utils/*windows*                                              @compnerd
 /utils/availability-macros.def                                @swiftlang/standard-librarians
 /utils/build.ps1                                              @compnerd
-/utils/build_swift/                                           @etcwilde @justice-adams-apple @shahmishal
+/utils/build_swift/                                           @etcwilde @justice-adams-apple @shahmishal @edymtt
 /utils/generate-xcode                                         @hamishknight
 /utils/gen-unicode-data                                       @swiftlang/standard-librarians
 /utils/gyb                                                    @swiftlang/standard-librarians
@@ -304,7 +304,7 @@
 /utils/gyb.py                                                 @swiftlang/standard-librarians
 /utils/sourcekit_fuzzer/                                      @bnbarham @hamishknight @rintaro
 /utils/swift-xcodegen/                                        @hamishknight
-/utils/swift_build_support/                                   @etcwilde @justice-adams-apple @shahmishal
+/utils/swift_build_support/                                   @etcwilde @justice-adams-apple @shahmishal @edymtt
 /utils/swift_build_support/products/earlyswiftsyntax.py       @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/skstresstester.py         @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/sourcekitlsp.py           @bnbarham @hamishknight @rintaro

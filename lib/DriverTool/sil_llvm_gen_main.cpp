@@ -456,12 +456,13 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
     if (options.PerformWMO) {
       return IRGenDescriptor::forWholeModule(
           mod, Opts, TBDOpts, SILOpts, SILTypes,
-          /*SILMod*/ nullptr, moduleName, PSPs);
+          /*SILMod*/ nullptr, moduleName, PSPs, /*CAS=*/nullptr);
     }
 
-    return IRGenDescriptor::forFile(
-        mod->getFiles()[0], Opts, TBDOpts, SILOpts, SILTypes,
-        /*SILMod*/ nullptr, moduleName, PSPs, /*discriminator*/ "");
+    return IRGenDescriptor::forFile(mod->getFiles()[0], Opts, TBDOpts, SILOpts,
+                                    SILTypes,
+                                    /*SILMod*/ nullptr, moduleName, PSPs,
+                                    /*CAS=*/nullptr, /*discriminator*/ "");
   };
 
   auto &eval = CI.getASTContext().evaluator;

@@ -23,6 +23,7 @@
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclNameLoc.h"
+#include "swift/AST/ExportKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LifetimeDependence.h"
@@ -256,8 +257,9 @@ protected:
       kind : NumExternKindBits
     );
 
-    SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute, 1,
-      isUnchecked : 1
+    SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute, 2,
+      isUnchecked : 1,
+      isSuppressed: 1
     );
 
     SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 3,
@@ -1754,12 +1756,13 @@ class SynthesizedProtocolAttr : public DeclAttribute {
 
 public:
   SynthesizedProtocolAttr(ProtocolDecl *protocol, LazyConformanceLoader *Loader,
-                          bool isUnchecked)
+                          bool isUnchecked, bool isSuppressed)
       : DeclAttribute(DeclAttrKind::SynthesizedProtocol, SourceLoc(),
                       SourceRange(),
                       /*Implicit=*/true),
         Loader(Loader), protocol(protocol) {
     Bits.SynthesizedProtocolAttr.isUnchecked = unsigned(isUnchecked);
+    Bits.SynthesizedProtocolAttr.isSuppressed = unsigned(isSuppressed);
   }
 
   /// Retrieve the known protocol kind naming the protocol to be
@@ -1772,6 +1775,10 @@ public:
     return bool(Bits.SynthesizedProtocolAttr.isUnchecked);
   }
 
+  bool isSuppressed() const {
+    return bool(Bits.SynthesizedProtocolAttr.isSuppressed);
+  }
+
   /// Retrieve the lazy loader that will be used to populate the
   /// synthesized conformance.
   LazyConformanceLoader *getLazyLoader() const { return Loader; }
@@ -1782,12 +1789,13 @@ public:
 
   SynthesizedProtocolAttr *clone(ASTContext &ctx) const {
     return new (ctx) SynthesizedProtocolAttr(
-        protocol, getLazyLoader(), isUnchecked());
+        protocol, getLazyLoader(), isUnchecked(), isSuppressed());
   }
 
   bool isEquivalent(const SynthesizedProtocolAttr *other,
                     Decl *attachedTo) const {
     return isUnchecked() == other->isUnchecked()
+            && isSuppressed() == other->isSuppressed()
             && getProtocol() == other->getProtocol()
             && getLazyLoader() == other->getLazyLoader();
   }
@@ -2358,6 +2366,10 @@ public:
   CustomAttrOwner getOwner() const { return owner; }
 
   ASTContext &getASTContext() const;
+
+  /// If \c true, we should prefer a property wrapper if one exists for the
+  /// given attribute over a macro.
+  bool shouldPreferPropertyWrapperOverMacro() const;
 
   /// Retrieve the NominalTypeDecl the CustomAttr refers to, or \c nullptr if
   /// it doesn't refer to one (which can be the case for e.g macro attrs).
@@ -2942,6 +2954,35 @@ enum class NonSendableKind : uint8_t {
   /// A '@_nonSendable(_assumed)' attribute. Should be applied to large swaths
   /// of declarations; does not override explicit 'Sendable' conformances.
   Assumed
+};
+
+/// Specify whether the declaration should be exported as an interface or
+/// an implementation.
+class ExportAttr : public DeclAttribute {
+public:
+  /// How this declaration is exported.
+  const ExportKind exportKind;
+
+  ExportAttr(SourceLoc atLoc, SourceRange range, ExportKind exportKind,
+             bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Export, atLoc, range, implicit),
+        exportKind(exportKind) {}
+
+  ExportAttr(ExportKind exportKind, bool implicit = false)
+    : ExportAttr(SourceLoc(), SourceRange(), exportKind, implicit) { }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Export;
+  }
+
+  /// Create a copy of this attribute.
+  ExportAttr *clone(ASTContext &ctx) const {
+    return new (ctx) ExportAttr(AtLoc, Range, exportKind, isImplicit());
+  }
+
+  bool isEquivalent(const ExportAttr *other, Decl *attachedTo) const {
+    return exportKind == other->exportKind;
+  }
 };
 
 /// Marks a declaration as explicitly non-Sendable.

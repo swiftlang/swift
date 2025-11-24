@@ -53,10 +53,16 @@ public:
     /// function)... so we just use an artificial ActorInstance to represent
     /// self in this case.
     CapturedActorSelf = 0x2,
+
+    /// An actor instance in an async allocating init where we are going to
+    /// allocate the actual actor internally. This is considered to be isolated
+    /// to the actor instance.
+    ActorAsyncAllocatingInit = 0x3,
   };
 
-  /// Set to (SILValue(), $KIND) if we have an ActorAccessorInit|CapturedSelf.
-  /// Is null if we have (SILValue(), Kind::Value).
+  /// Set to (SILValue(), $KIND) if we have an
+  /// ActorAccessorInit|CapturedSelf|ActorAsyncAllocatingInit.  Is null if we
+  /// have (SILValue(), Kind::Value).
   llvm::PointerIntPair<SILValue, 2> value;
 
   ActorInstance(SILValue value, Kind kind)
@@ -94,6 +100,12 @@ public:
     return ActorInstance(SILValue(), Kind::CapturedActorSelf);
   }
 
+  /// See Kind::ActorAsyncAllocatingInit for explanation on what a
+  /// ActorAsyncAllocatingInit is.
+  static ActorInstance getForActorAsyncAllocatingInit() {
+    return ActorInstance(SILValue(), Kind::ActorAsyncAllocatingInit);
+  }
+
   explicit operator bool() const { return bool(value.getOpaqueValue()); }
 
   Kind getKind() const { return Kind(value.getInt()); }
@@ -117,6 +129,10 @@ public:
     return getKind() == Kind::CapturedActorSelf;
   }
 
+  bool isActorAsyncAllocatingInit() const {
+    return getKind() == Kind::ActorAsyncAllocatingInit;
+  }
+
   bool operator==(const ActorInstance &other) const {
     // If both are null, return true.
     if (!bool(*this) && !bool(other))
@@ -132,6 +148,7 @@ public:
       return getValue() == other.getValue();
     case Kind::ActorAccessorInit:
     case Kind::CapturedActorSelf:
+    case Kind::ActorAsyncAllocatingInit:
       return true;
     }
   }

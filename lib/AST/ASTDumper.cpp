@@ -261,7 +261,7 @@ std::string typeUSR(Type type) {
     return "";
 
   if (type->hasArchetype()) {
-    type = type->mapTypeOutOfContext();
+    type = type->mapTypeOutOfEnvironment();
   }
   if (type->hasLocalArchetype()) {
     type = replaceLocalArchetypesWithExistentials(type);
@@ -589,6 +589,15 @@ static StringRef getDumpString(InlineKind kind) {
     return "never";
   }
   llvm_unreachable("unhandled InlineKind");
+}
+static StringRef getDumpString(ExportKind kind) {
+  switch (kind) {
+  case ExportKind::Interface:
+    return "interface";
+  case ExportKind::Implementation:
+    return "implementation";
+  }
+  llvm_unreachable("unhandled ExportKind");
 }
 static StringRef getDumpString(MacroRole role) {
   return getMacroRoleString(role);
@@ -5306,6 +5315,11 @@ public:
     printField(Attr->getKind(), Label::always("kind"));
     printFoot();
   }
+  void visitExportAttr(ExportAttr *Attr, Label label) {
+    printCommon(Attr, "export_attr", label);
+    printField(Attr->exportKind, Label::always("kind"));
+    printFoot();
+  }
   void visitLifetimeAttr(LifetimeAttr *Attr, Label label) {
     printCommon(Attr, "lifetime_attr", label);
     // FIXME: Improve, more detailed info.
@@ -6807,7 +6821,7 @@ void GenericEnvironment::dump(raw_ostream &os) const {
   os << "Generic environment:\n";
   for (auto gp : getGenericParams()) {
     gp->dump(os);
-    mapTypeIntoContext(gp)->dump(os);
+    mapTypeIntoEnvironment(gp)->dump(os);
   }
   os << "Generic parameters:\n";
   for (auto paramTy : getGenericParams())

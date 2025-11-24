@@ -21,6 +21,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/DiagnosticKind.h"
 #include "swift/AST/DiagnosticList.h"
+#include "swift/AST/ExportKind.h"
 #include "swift/AST/GenericTypeParamKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LayoutConstraintKind.h"
@@ -44,6 +45,7 @@ class AvailabilityDomainOrIdentifier;
 class Argument;
 class ASTContext;
 struct ASTNode;
+class CanGenericSignature;
 struct CaptureListEntry;
 class DeclAttributes;
 class DeclBaseName;
@@ -86,6 +88,7 @@ class BridgedASTContext;
 class BridgedLangOptions;
 struct BridgedSubstitutionMap;
 struct BridgedGenericSignature;
+struct BridgedCanGenericSignature;
 struct BridgedConformance;
 class BridgedParameterList;
 
@@ -316,18 +319,28 @@ struct BridgedDeclObj {
 #endif
 
   BridgedDeclObj(SwiftObject obj) : obj(obj) {}
+  BRIDGED_INLINE BridgedDeclObj(BridgedDecl decl);
   BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE swift::SourceLoc getLoc() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getModuleContext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getParent() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableDeclContext getDeclContext() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclContext asGenericContext() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclContext asTopLevelCodeDecl() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclContext asModuleDecl() const;
+  BRIDGED_INLINE void setImplicit() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Type_getName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Value_getUserFacingName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SourceLoc Value_getNameLoc() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::Identifier
+  Value_getBaseIdentifier() const;
   BRIDGED_INLINE bool hasClangNode() const;
   BRIDGED_INLINE bool Value_isObjC() const;
   BRIDGED_INLINE bool AbstractStorage_isConst() const;
   BRIDGED_INLINE bool GenericType_isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool NominalType_isGlobalActor() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType
+  NominalType_getDeclaredInterfaceType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj NominalType_getValueTypeDestructor() const;
   BRIDGED_INLINE bool Enum_hasRawType() const;
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
@@ -337,7 +350,14 @@ struct BridgedDeclObj {
   BRIDGED_INLINE bool AbstractFunction_isOverridden() const;
   BRIDGED_INLINE bool Destructor_isIsolated() const;
   BRIDGED_INLINE bool EnumElementDecl_hasAssociatedValues() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedParameterList
+  EnumElementDecl_getParameterList() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef
+  EnumElementDecl_getNameStr() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef AccessorDecl_getKindName() const;
+  BRIDGED_INLINE void GenericContext_setGenericSignature(BridgedGenericSignature genericSignature) const;
+  BRIDGED_INLINE void ValueDecl_setAccess(swift::AccessLevel accessLevel) const;
+  BRIDGED_INLINE void NominalTypeDecl_addMember(BridgedDeclObj member) const;
 };
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedASTNodeKind : uint8_t {
@@ -388,6 +408,15 @@ public:
   SWIFT_NAME("getter:Bridged" #Id "Decl.asDecl(self:)")                        \
   BridgedDecl Bridged##Id##Decl_asDecl(Bridged##Id##Decl decl);
 #define ABSTRACT_DECL(Id, Parent) DECL(Id, Parent)
+#include "swift/AST/DeclNodes.def"
+
+// Declare `.asNominalTypeDecl` on each BridgedXXXDecl type that's also a
+// NominalTypeDecl.
+#define DECL(Id, Parent)
+#define NOMINAL_TYPE_DECL(Id, Parent)                                          \
+  SWIFT_NAME("getter:Bridged" #Id "Decl.asNominalTypeDecl(self:)")             \
+  BridgedNominalTypeDecl Bridged##Id##Decl_asNominalTypeDecl(                  \
+      Bridged##Id##Decl decl);
 #include "swift/AST/DeclNodes.def"
 
 // Declare `.asDeclContext` on each BridgedXXXDecl type that's also a
@@ -575,6 +604,14 @@ BridgedDeclContext_getParentSourceFile(BridgedDeclContext dc);
 
 SWIFT_NAME("getter:BridgedSourceFile.isScriptMode(self:)")
 BRIDGED_INLINE bool BridgedSourceFile_isScriptMode(BridgedSourceFile sf);
+
+SWIFT_NAME("BridgedSourceFile.addTopLevelDecl(self:_:)")
+BRIDGED_INLINE void BridgedSourceFile_addTopLevelDecl(BridgedSourceFile sf,
+                                                      BridgedDecl decl);
+
+SWIFT_NAME("BridgedFileUnit.castToSourceFile(self:)")
+BRIDGED_INLINE BridgedNullableSourceFile
+BridgedFileUnit_castToSourceFile(BridgedFileUnit fileUnit);
 
 SWIFT_NAME("BridgedPatternBindingInitializer.create(declContext:)")
 BridgedPatternBindingInitializer
@@ -780,6 +817,10 @@ SWIFT_NAME("BridgedDeclAttributes.add(self:_:)")
 void BridgedDeclAttributes_add(BridgedDeclAttributes *_Nonnull attrs,
                                BridgedDeclAttribute add);
 
+SWIFT_NAME("BridgedDeclAttributes.hasAttribute(self:_:)")
+bool BridgedDeclAttributes_hasAttribute(
+    const BridgedDeclAttributes *_Nonnull attrs, swift::DeclAttrKind kind);
+
 SWIFT_NAME("BridgedDeclAttribute.createSimple(_:kind:atLoc:nameLoc:)")
 BridgedDeclAttribute BridgedDeclAttribute_createSimple(
     BridgedASTContext cContext, swift::DeclAttrKind kind,
@@ -951,6 +992,12 @@ BridgedImplementsAttr BridgedImplementsAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedTypeRepr cProtocolType,
     BridgedDeclNameRef cMemberName, BridgedDeclNameLoc cMemberNameLoc);
+
+SWIFT_NAME("BridgedExportAttr.createParsed(_:atLoc:range:kind:)")
+BridgedExportAttr BridgedExportAttr_createParsed(BridgedASTContext cContext,
+                                                 swift::SourceLoc atLoc,
+                                                 swift::SourceRange range,
+                                                 swift::ExportKind kind);
 
 SWIFT_NAME("BridgedInlineAttr.createParsed(_:atLoc:range:kind:)")
 BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
@@ -1347,9 +1394,17 @@ BridgedParamDecl BridgedParamDecl_createParsed(
     swift::SourceLoc paramNameLoc, BridgedNullableExpr defaultValue,
     BridgedNullableDefaultArgumentInitializer cDefaultArgumentInitContext);
 
+SWIFT_NAME("BridgedParamDecl.cloneWithoutType(self:)")
+BRIDGED_INLINE BridgedParamDecl
+BridgedParamDecl_cloneWithoutType(BridgedParamDecl cDecl);
+
 SWIFT_NAME("BridgedParamDecl.setTypeRepr(self:_:)")
 BRIDGED_INLINE void BridgedParamDecl_setTypeRepr(BridgedParamDecl cDecl,
                                                  BridgedTypeRepr cType);
+
+SWIFT_NAME("BridgedParamDecl.setInterfaceType(self:_:)")
+BRIDGED_INLINE void BridgedParamDecl_setInterfaceType(BridgedParamDecl cDecl,
+                                                      BridgedASTType cType);
 
 /// The various spellings of ownership modifier that can be used in source.
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedParamSpecifier {
@@ -1434,7 +1489,7 @@ void BridgedExtensionDecl_setParsedMembers(BridgedExtensionDecl decl,
 SWIFT_NAME(
     "BridgedEnumDecl.createParsed(_:declContext:enumKeywordLoc:name:nameLoc:"
     "genericParamList:inheritedTypes:genericWhereClause:braceRange:)")
-BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
+BridgedEnumDecl BridgedEnumDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     swift::SourceLoc enumKeywordLoc, swift::Identifier name,
     swift::SourceLoc nameLoc, BridgedNullableGenericParamList genericParamList,
@@ -2864,6 +2919,12 @@ BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
     swift::SourceLoc nameLoc, BridgedNullableTypeRepr opaqueInheritedType,
     size_t index, swift::GenericTypeParamKind paramKind);
 
+SWIFT_NAME("BridgedGenericTypeParamDecl.createImplicit(declContext:"
+           "name:depth:index:paramKind:)")
+BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createImplicit(
+    BridgedDeclContext cDeclContext, swift::Identifier name, SwiftInt depth,
+    SwiftInt index, swift::GenericTypeParamKind paramKind);
+
 SWIFT_NAME(
     "BridgedTrailingWhereClause.createParsed(_:whereKeywordLoc:requirements:)")
 BridgedTrailingWhereClause
@@ -2987,6 +3048,15 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getInvocationGenericSignatureOfFunctionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapOutOfEnvironment() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType
+  getReducedType(BridgedGenericSignature sig) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::Identifier
+  GenericTypeParam_getName() const;
+  BRIDGED_INLINE SwiftInt GenericTypeParam_getDepth() const;
+  BRIDGED_INLINE SwiftInt GenericTypeParam_getIndex() const;
+  BRIDGED_INLINE swift::GenericTypeParamKind
+  GenericTypeParam_getParamKind() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;
   BRIDGED_INLINE bool containsSILPackExpansionType() const;
   BRIDGED_INLINE bool isSILPackElementAddress() const;
@@ -3000,6 +3070,8 @@ public:
   BRIDGED_INLINE BridgedCanType(swift::CanType ty);
   BRIDGED_INLINE swift::CanType unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getRawType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanGenericSignature
+  SILFunctionType_getSubstGenericSignature() const;
 };
 
 struct BridgedASTTypeArray {
@@ -3063,7 +3135,16 @@ struct BridgedGenericSignature {
   BRIDGED_INLINE swift::GenericSignature unbridged() const;
   BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray getGenericParams() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoContext(BridgedASTType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoEnvironment(BridgedASTType type) const;
+  BRIDGED_INLINE BridgedCanGenericSignature getCanonicalSignature() const;
+};
+
+struct BridgedCanGenericSignature {
+  const swift::GenericSignatureImpl *_Nullable impl;
+
+  BRIDGED_INLINE swift::CanGenericSignature unbridged() const;
+  BRIDGED_INLINE BridgedGenericSignature getGenericSignature() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoEnvironment(BridgedASTType type) const;
 };
 
 struct BridgedFingerprint {

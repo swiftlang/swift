@@ -524,6 +524,7 @@ public:
     // Loop over the pack, initializing each value with the appropriate
     // element.
     SGF.emitDynamicPackLoop(loc, FormalPackType, ComponentIndex, openedEnv,
+                            []() -> SILBasicBlock * { return nullptr; },
                             [&](SILValue indexWithinComponent,
                                 SILValue expansionIndex,
                                 SILValue packIndex) {
@@ -834,9 +835,9 @@ public:
     SILFunction *impl =
         SGF.SGM.getOrCreateForeignAsyncCompletionHandlerImplFunction(
             cast<SILFunctionType>(
-                impFnTy->mapTypeOutOfContext()->getReducedType(sig)),
-            blockStorageTy->mapTypeOutOfContext()->getReducedType(sig),
-            continuationTy->mapTypeOutOfContext()->getReducedType(sig),
+                impFnTy->mapTypeOutOfEnvironment()->getReducedType(sig)),
+            blockStorageTy->mapTypeOutOfEnvironment()->getReducedType(sig),
+            continuationTy->mapTypeOutOfEnvironment()->getReducedType(sig),
             origFormalType, sig, calleeTypeInfo);
     auto impRef = SGF.B.createFunctionRef(loc, impl);
 
@@ -947,7 +948,7 @@ public:
         }
 
         auto mappedOutContinuationTy =
-            continuationTy->mapTypeOutOfContext()->getCanonicalType();
+            continuationTy->mapTypeOutOfEnvironment()->getCanonicalType();
         auto resumeType =
             cast<BoundGenericType>(mappedOutContinuationTy).getGenericArgs()[0];
 
@@ -957,7 +958,7 @@ public:
                 : SGF.SGM.getResumeUnsafeThrowingContinuationWithError();
 
         Type replacementTypes[] = {
-            SGF.F.mapTypeIntoContext(resumeType)->getCanonicalType()};
+            SGF.F.mapTypeIntoEnvironment(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
                                          LookUpConformanceInModule());
@@ -1313,6 +1314,7 @@ ResultPlanBuilder::buildPackExpansionIntoPack(SILValue packAddr,
   // we can emit a dynamic loop to do that now.
   if (init->canPerformInPlacePackInitialization(openedEnv, eltTy)) {
     SGF.emitDynamicPackLoop(loc, formalPackType, componentIndex, openedEnv,
+                            []() -> SILBasicBlock * { return nullptr; },
                             [&](SILValue indexWithinComponent,
                                 SILValue expansionPackIndex,
                                 SILValue packIndex) {
@@ -1334,6 +1336,7 @@ ResultPlanBuilder::buildPackExpansionIntoPack(SILValue packAddr,
                                     SILType::getPrimitiveObjectType(tupleTy));
 
   SGF.emitDynamicPackLoop(loc, formalPackType, componentIndex, openedEnv,
+                          []() -> SILBasicBlock * { return nullptr; },
                           [&](SILValue indexWithinComponent,
                               SILValue expansionPackIndex,
                               SILValue packIndex) {

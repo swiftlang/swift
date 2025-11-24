@@ -941,8 +941,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GetEnumTag)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InjectEnumTag)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DistributedActorAsAnyActor)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AddressOfRawLayout)
-BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLet)
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, EndAsyncLet)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FinishAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, EndAsyncLetLifetime)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroup)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroupWithFlags)
@@ -1053,6 +1052,19 @@ BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildDefaultActorExecutorRef)
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildMainActorExecutorRef)
 
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContextWithType)
+
+// InstantaneousUse since we take in a closure at +0.
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TaskAddCancellationHandler)
+// Trivial use since our operand is just an UnsafeRawPointer.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemoveCancellationHandler)
+// InstantaneousUse since we take in a closure at +0.
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TaskAddPriorityEscalationHandler)
+// Trivial use since our operand is just an UnsafeRawPointer.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemovePriorityEscalationHandler)
+// This is a trivial use since our first operand is a Builtin.RawPointer and our
+// second is an address to our generic Value.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskLocalValuePush)
+
 #undef BUILTIN_OPERAND_OWNERSHIP
 
 #define SHOULD_NEVER_VISIT_BUILTIN(ID)                                         \
@@ -1063,6 +1075,7 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContextWithType)
   }
 SHOULD_NEVER_VISIT_BUILTIN(GetCurrentAsyncTask)
 SHOULD_NEVER_VISIT_BUILTIN(GetCurrentExecutor)
+SHOULD_NEVER_VISIT_BUILTIN(TaskLocalValuePop)
 #undef SHOULD_NEVER_VISIT_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see

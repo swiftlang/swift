@@ -1880,7 +1880,7 @@ void AsyncConverter::addAsyncFuncReturnType(
 
 void AsyncConverter::addResultTypeAnnotationIfNecessary(
     const FuncDecl *FD, const AsyncHandlerDesc &HandlerDesc) {
-  if (FD->isGeneric()) {
+  if (FD->hasGenericParamList()) {
     OS << tok::colon << " ";
     addAsyncFuncReturnType(HandlerDesc);
   }

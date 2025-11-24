@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-import ArgumentParser
-import System
+public import protocol ArgumentParser.ExpressibleByArgument
+public import System
 
 public enum AnyPath: PathProtocol, Sendable {
   case relative(RelativePath)
@@ -64,7 +64,7 @@ extension AnyPath {
 }
 
 extension AnyPath: Decodable {
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     self.init(try decoder.singleValueContainer().decode(String.self))
   }
 }

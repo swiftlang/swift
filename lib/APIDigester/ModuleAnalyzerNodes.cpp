@@ -1764,7 +1764,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     // Exclude decls with @_alwaysEmitIntoClient if we are checking ABI.
     // These decls are considered effectively public because they are usable
     // from inline, so we have to manually exclude them here.
-    if (D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    if (D->isAlwaysEmittedIntoClient())
       return true;
   } else {
     if (D->isPrivateSystemDecl(false))

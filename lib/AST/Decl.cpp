@@ -507,7 +507,7 @@ void Decl::visitAuxiliaryDecls(
     }
   }
 
-  // FIXME: fold VarDecl::visitAuxiliaryDecls into this.
+  // FIXME: fold VarDecl::visitAuxiliaryVars into this.
 }
 
 void Decl::forEachAttachedMacro(MacroRole role,
@@ -2276,8 +2276,32 @@ bool Decl::isObjCImplementation() const {
   return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
 }
 
+bool Decl::isAlwaysEmittedIntoClient() const {
+  // @export(implementation)
+  if (auto exportAttr = getAttrs().getAttribute<ExportAttr>()) {
+    if (exportAttr->exportKind == ExportKind::Implementation)
+      return true;
+  }
+
+  // @_alwaysEmitIntoClient
+  if (getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    return true;
+
+  return false;
+}
+
 bool Decl::isNeverEmittedIntoClient() const {
-  return getAttrs().hasAttribute<NeverEmitIntoClientAttr>();
+  // @export(interface)
+  if (auto exportAttr = getAttrs().getAttribute<ExportAttr>()) {
+    if (exportAttr->exportKind == ExportKind::Interface)
+      return true;
+  }
+
+  // @_neverEmitIntoClient
+  if (getAttrs().hasAttribute<NeverEmitIntoClientAttr>())
+    return true;
+
+  return false;
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
@@ -2753,20 +2777,33 @@ bool VarDecl::isInitExposedToClients() const {
   return hasInitialValue() && isLayoutExposedToClients();
 }
 
-bool VarDecl::isLayoutExposedToClients() const {
+bool VarDecl::isLayoutExposedToClients(bool applyImplicit) const {
   auto parent = dyn_cast<NominalTypeDecl>(getDeclContext());
   if (!parent) return false;
   if (isStatic()) return false;
 
-
+  auto M = getDeclContext()->getParentModule();
   auto nominalAccess =
     parent->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
-  if (!nominalAccess.isPublic()) return false;
 
-  if (!parent->getAttrs().hasAttribute<FrozenAttr>() &&
-      !parent->getAttrs().hasAttribute<FixedLayoutAttr>())
+  // Resilient modules and classes hide layouts by default.
+  bool layoutIsHiddenByDefault = !applyImplicit ||
+    !getASTContext().LangOpts.hasFeature(Feature::CheckImplementationOnly) ||
+    M->getResilienceStrategy() == ResilienceStrategy::Resilient;
+  if (layoutIsHiddenByDefault) {
+    if (!nominalAccess.isPublic())
+      return false;
+
+    if (!parent->getAttrs().hasAttribute<FrozenAttr>() &&
+        !parent->getAttrs().hasAttribute<FixedLayoutAttr>())
     return false;
+  } else {
+    // Non-resilient module: layouts are exposed by default unless marked
+    // otherwise.
+    if (parent->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+      return false;
+  }
 
   if (!hasStorage() &&
       !getAttrs().hasAttribute<LazyAttr>() &&
@@ -4213,7 +4250,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   }
 
   if (auto *extension = dyn_cast<ExtensionDecl>(getDeclContext()))
-    if (extension->isGeneric())
+    if (extension->hasGenericParamList())
       signature.InExtensionOfGenericType = true;
 
   return signature;
@@ -4949,14 +4986,14 @@ bool ValueDecl::isUsableFromInline() const {
     return abiRole.getCounterpart()->isUsableFromInline();
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
-      getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+      isAlwaysEmittedIntoClient() ||
       hasAttributeWithInlinableSemantics())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
     auto *storage = accessor->getStorage();
     if (storage->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
-        storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+        storage->isAlwaysEmittedIntoClient() ||
         storage->hasAttributeWithInlinableSemantics())
       return true;
   }
@@ -4964,7 +5001,7 @@ bool ValueDecl::isUsableFromInline() const {
   if (auto *opaqueType = dyn_cast<OpaqueTypeDecl>(this)) {
     if (auto *namingDecl = opaqueType->getNamingDecl()) {
       if (namingDecl->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
-          namingDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+          namingDecl->isAlwaysEmittedIntoClient() ||
           namingDecl->hasAttributeWithInlinableSemantics())
         return true;
     }
@@ -5499,8 +5536,18 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return srcPkg && usePkg && usePkg->isSamePackageAs(srcPkg);
   }
   case AccessLevel::Public:
-  case AccessLevel::Open:
+  case AccessLevel::Open: {
+    if (VD->getASTContext().LangOpts.hasFeature(
+            Feature::EnforceSPIOperatorGroup) &&
+        VD->isOperator() && VD->isSPI()) {
+      const DeclContext *useFile = useDC->getModuleScopeContext();
+      if (useFile->getParentModule() == sourceDC->getParentModule())
+        return true;
+      auto *useSF = dyn_cast<SourceFile>(useFile);
+      return !useSF || useSF->isImportedAsSPI(VD);
+    }
     return true;
+  }
   }
   llvm_unreachable("bad access level");
 }
@@ -6449,6 +6496,16 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   if (isa<ProtocolDecl>(this))
     return;
 
+  auto baseName = member.getBaseName();
+  auto &Context = getASTContext();
+
+  // For a distributed actor `id` and `actorSystem` can be synthesized without
+  // causing cycles so do them above the cycle guard.
+  if (member.isSimpleName(Context.Id_id))
+    (void)getDistributedActorIDProperty();
+  if (member.isSimpleName(Context.Id_actorSystem))
+    (void)getDistributedActorSystemProperty();
+
   // Silently break cycles here because we can't be sure when and where a
   // request to synthesize will come from yet.
   // FIXME: rdar://56844567
@@ -6458,14 +6515,12 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   Bits.NominalTypeDecl.IsComputingSemanticMembers = true;
   SWIFT_DEFER { Bits.NominalTypeDecl.IsComputingSemanticMembers = false; };
 
-  auto baseName = member.getBaseName();
-  auto &Context = getASTContext();
   std::optional<ImplicitMemberAction> action = std::nullopt;
   if (baseName.isConstructor())
     action.emplace(ImplicitMemberAction::ResolveImplicitInit);
 
   if (member.isSimpleName() && !baseName.isSpecial()) {
-    if (baseName.getIdentifier() == getASTContext().Id_CodingKeys) {
+    if (baseName.getIdentifier() == Context.Id_CodingKeys) {
       action.emplace(ImplicitMemberAction::ResolveCodingKeys);
     }
   } else {
@@ -6474,21 +6529,12 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
       if (baseName.isConstructor()) {
         if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
           action.emplace(ImplicitMemberAction::ResolveDecodable);
-        } else if (argumentNames.front() == Context.Id_system) {
-          action.emplace(ImplicitMemberAction::ResolveDistributedActorSystem);
         }
       } else if (!baseName.isSpecial() &&
                  baseName.getIdentifier() == Context.Id_encode &&
                  (member.isSimpleName() ||
                   argumentNames.front() == Context.Id_to)) {
         action.emplace(ImplicitMemberAction::ResolveEncodable);
-      }
-    } else if (member.isSimpleName() || argumentNames.size() == 2) {
-      if (baseName.isConstructor()) {
-        if (argumentNames[0] == Context.Id_resolve &&
-            argumentNames[1] == Context.Id_using) {
-          action.emplace(ImplicitMemberAction::ResolveDistributedActor);
-        }
       }
     }
   }
@@ -7554,8 +7600,6 @@ ProtocolDecl::getKnownDerivableProtocolKind() const {
     return KnownDerivableProtocolKind::AdditiveArithmetic;
   case KnownProtocolKind::Differentiable:
     return KnownDerivableProtocolKind::Differentiable;
-  case KnownProtocolKind::Identifiable:
-    return KnownDerivableProtocolKind::Identifiable;
   case KnownProtocolKind::Actor:
     return KnownDerivableProtocolKind::Actor;
   case KnownProtocolKind::DistributedActor:
@@ -7980,6 +8024,13 @@ bool AbstractStorageDecl::hasInitAccessor() const {
       HasInitAccessorRequest{const_cast<AbstractStorageDecl *>(this)}, false);
 }
 
+bool AbstractStorageDecl::supportsInitialization() const {
+  if (getAttrs().hasAttribute<ExternAttr>())
+    return false;
+
+  return hasStorage() || hasInitAccessor();
+}
+
 VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
                  SourceLoc nameLoc, Identifier name,
                  DeclContext *dc, StorageIsMutable_t supportsMutation)
@@ -7996,7 +8047,7 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
 }
 
 Type VarDecl::getTypeInContext() const {
-  return getDeclContext()->mapTypeIntoContext(getInterfaceType());
+  return getDeclContext()->mapTypeIntoEnvironment(getInterfaceType());
 }
 
 /// Translate an "is mutable" bit into a StorageMutability value.
@@ -8146,6 +8197,10 @@ bool VarDecl::isLazilyInitializedGlobal() const {
     return false;
 
   if (getAttrs().hasAttribute<SILGenNameAttr>())
+    return false;
+
+  // @_extern declarations are not initialized.
+  if (getAttrs().hasAttribute<ExternAttr>())
     return false;
 
   // Top-level global variables in the main source file and in the REPL are not
@@ -8783,14 +8838,22 @@ bool VarDecl::hasStorageOrWrapsStorage() const {
   return false;
 }
 
-void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) const {
+void VarDecl::visitAuxiliaryVars(
+    bool forNameLookup, llvm::function_ref<void(VarDecl *)> visit) const {
   if (getDeclContext()->isTypeContext() ||
       (isImplicit() && !isa<ParamDecl>(this)))
     return;
 
-  if (getAttrs().hasAttribute<LazyAttr>()) {
-    if (auto *backingVar = getLazyStorageProperty())
-      visit(backingVar);
+  // The backing storage for a lazy property is not accessible to name lookup.
+  // This is not only a matter of hiding implementation details, but also
+  // correctness since triggering LazyStoragePropertyRequest currently eagerly
+  // requests the interface type for the var, which could result in incorrectly
+  // type-checking a lazy local independently of its surrounding closure.
+  if (!forNameLookup) {
+    if (getAttrs().hasAttribute<LazyAttr>()) {
+      if (auto *backingVar = getLazyStorageProperty())
+        visit(backingVar);
+    }
   }
 
   if (getAttrs().hasAttribute<CustomAttr>() || hasImplicitPropertyWrapper()) {
@@ -8858,7 +8921,7 @@ Type VarDecl::getPropertyWrapperInitValueInterfaceType() const {
 
   Type valueInterfaceTy = initInfo.getWrappedValuePlaceholder()->getType();
   if (valueInterfaceTy->hasPrimaryArchetype())
-    valueInterfaceTy = valueInterfaceTy->mapTypeOutOfContext();
+    valueInterfaceTy = valueInterfaceTy->mapTypeOutOfEnvironment();
 
   return valueInterfaceTy;
 }
@@ -9151,8 +9214,8 @@ void ParamDecl::setTypeRepr(TypeRepr *repr) {
 
       if (auto *callerIsolated =
               dyn_cast<CallerIsolatedTypeRepr>(unwrappedType)) {
-        setCallerIsolated(true);
         unwrappedType = callerIsolated->getBase();
+        continue;
       }
 
       break;
@@ -9168,7 +9231,7 @@ void ParamDecl::setDefaultArgumentKind(DefaultArgumentKind K) {
 
 /// Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {
-  return mapTypeIntoContext(getSelfInterfaceType());
+  return mapTypeIntoEnvironment(getSelfInterfaceType());
 }
 
 TupleType *BuiltinTupleDecl::getTupleSelfType(const ExtensionDecl *owner) const {
@@ -10757,13 +10820,16 @@ bool AbstractFunctionDecl::isResilient(ModuleDecl *M,
 OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
                                GenericParamList *GenericParams, DeclContext *DC,
                                GenericSignature OpaqueInterfaceGenericSignature,
-                               ArrayRef<TypeRepr *>
-                                   OpaqueReturnTypeReprs)
+                               ArrayRef<TypeRepr *> OpaqueReturnTypeReprs,
+                               bool hasLazyUnderlyingSubstitutions)
     : GenericTypeDecl(DeclKind::OpaqueType, DC, Identifier(), SourceLoc(), {},
                       GenericParams),
       NamingDeclAndHasOpaqueReturnTypeRepr(
         NamingDecl, !OpaqueReturnTypeReprs.empty()),
       OpaqueInterfaceGenericSignature(OpaqueInterfaceGenericSignature) {
+  Bits.OpaqueTypeDecl.HasLazyUnderlyingSubstitutions
+      = hasLazyUnderlyingSubstitutions;
+
   // Always implicit.
   setImplicit();
 
@@ -10776,7 +10842,7 @@ OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
                           OpaqueReturnTypeReprs.end(), getTrailingObjects());
 }
 
-OpaqueTypeDecl *OpaqueTypeDecl::get(
+OpaqueTypeDecl *OpaqueTypeDecl::create(
       ValueDecl *NamingDecl, GenericParamList *GenericParams,
       DeclContext *DC,
       GenericSignature OpaqueInterfaceGenericSignature,
@@ -10787,7 +10853,33 @@ OpaqueTypeDecl *OpaqueTypeDecl::get(
   auto mem = ctx.Allocate(size, alignof(OpaqueTypeDecl));
   return new (mem) OpaqueTypeDecl(
       NamingDecl, GenericParams, DC, OpaqueInterfaceGenericSignature,
-      OpaqueReturnTypeReprs);
+      OpaqueReturnTypeReprs, /*hasLazyUnderlyingSubstitutions=*/false);
+}
+
+OpaqueTypeDecl *OpaqueTypeDecl::createDeserialized(
+    GenericParamList *GenericParams, DeclContext *DC,
+    GenericSignature OpaqueInterfaceGenericSignature,
+    LazyMemberLoader *lazyLoader, uint64_t underlyingSubsData) {
+  bool hasLazyUnderlyingSubstitutions = (underlyingSubsData != 0);
+
+  ASTContext &ctx = DC->getASTContext();
+  auto size = totalSizeToAlloc<TypeRepr *>(0);
+  auto mem = ctx.Allocate(size, alignof(OpaqueTypeDecl));
+
+  // NamingDecl is set later by deserialization
+  auto *decl = new (mem) OpaqueTypeDecl(
+      /*namingDecl=*/nullptr, GenericParams, DC,
+      OpaqueInterfaceGenericSignature, { },
+      hasLazyUnderlyingSubstitutions);
+
+  if (hasLazyUnderlyingSubstitutions) {
+    auto &ctx = DC->getASTContext();
+    auto *data = static_cast<LazyOpaqueTypeData *>(
+          ctx.getOrCreateLazyContextData(decl, lazyLoader));
+    data->underlyingSubsData = underlyingSubsData;
+  }
+
+  return decl;
 }
 
 bool OpaqueTypeDecl::isOpaqueReturnTypeOf(const Decl *ownerDecl) const {
@@ -10843,14 +10935,39 @@ bool OpaqueTypeDecl::exportUnderlyingType() const {
   llvm_unreachable("The naming decl is expected to be either an AFD or ASD");
 }
 
+void OpaqueTypeDecl::loadLazyUnderlyingSubstitutions() {
+  if (!Bits.OpaqueTypeDecl.HasLazyUnderlyingSubstitutions)
+    return;
+
+  Bits.OpaqueTypeDecl.HasLazyUnderlyingSubstitutions = 0;
+
+  auto &ctx = getASTContext();
+  auto *data = static_cast<LazyOpaqueTypeData *>(
+          ctx.getLazyContextData(this));
+  ASSERT(data != nullptr);
+
+  data->loader->finishOpaqueTypeDecl(
+      this, data->underlyingSubsData);
+}
+
 std::optional<SubstitutionMap>
 OpaqueTypeDecl::getUniqueUnderlyingTypeSubstitutions(
     bool typeCheckFunctionBodies) const {
+  const_cast<OpaqueTypeDecl *>(this)->loadLazyUnderlyingSubstitutions();
+
   if (!typeCheckFunctionBodies)
     return UniqueUnderlyingType;
 
   return evaluateOrDefault(getASTContext().evaluator,
                            UniqueUnderlyingTypeSubstitutionsRequest{this}, {});
+}
+
+ArrayRef<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
+OpaqueTypeDecl::getConditionallyAvailableSubstitutions() const {
+  const_cast<OpaqueTypeDecl *>(this)->loadLazyUnderlyingSubstitutions();
+
+  assert(ConditionallyAvailableTypes);
+  return ConditionallyAvailableTypes.value();
 }
 
 std::optional<unsigned>
@@ -10882,7 +10999,8 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
 
 void OpaqueTypeDecl::setConditionallyAvailableSubstitutions(
     ArrayRef<ConditionallyAvailableSubstitutions *> substitutions) {
-  assert(!ConditionallyAvailableTypes &&
+  ASSERT(!Bits.OpaqueTypeDecl.HasLazyUnderlyingSubstitutions);
+  ASSERT(!ConditionallyAvailableTypes &&
          "resetting conditionally available substitutions?!");
   ConditionallyAvailableTypes = getASTContext().AllocateCopy(substitutions);
 }
@@ -12994,7 +13112,7 @@ std::optional<Type>
 CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
   if (auto func = dyn_cast<AbstractFunctionDecl *>()) {
     if (auto thrownError = func->getEffectiveThrownErrorType())
-      return func->mapTypeIntoContext(*thrownError);
+      return func->mapTypeIntoEnvironment(*thrownError);
 
     return std::nullopt;
   }

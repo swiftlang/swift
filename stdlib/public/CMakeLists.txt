@@ -320,8 +320,8 @@ endif()
 if(SWIFT_BUILD_STDLIB)
   # These must be kept in dependency order so that any referenced targets
   # exist at the time we look for them in add_swift_*.
-  if(SWIFT_BUILD_CLIENT_RETAIN_RELEASE)
-    add_subdirectory(ClientRetainRelease)
+  if(SWIFT_BUILD_SWIFT_DIRECT_RUNTIME)
+    add_subdirectory(SwiftDirectRuntime)
   endif()
 
   add_subdirectory(runtime)

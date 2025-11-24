@@ -163,6 +163,7 @@ public:
   bool HermeticSealAtLink = false;
   bool EmbeddedSwiftModule = false;
   bool SkipNonExportableDecls = false;
+  bool SkipImplementationOnlyDecls = false;
   bool ExplicitModuleBuild = false;
   bool EnableSerializationRemarks = false;
   bool IsInterfaceSDKRelative = false;

@@ -2180,6 +2180,17 @@ void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
   if (decl->isFromASTFile())
     return;
 
+  // Exclude a predefined declaration that's not a definition if its
+  // definition exists in the same module so that the definition will
+  // be associated with the base name, noting predefined declarations
+  // won't be serialized into the pcm and its state including its
+  // definition pointer won't be reconstructed after deserialization,
+  // which would cause a type not found error.
+  if (Writer.isDeclPredefined(decl))
+    if (auto tagDecl = dyn_cast<clang::TagDecl>(decl))
+      if (!tagDecl->isThisDeclarationADefinition() && tagDecl->getDefinition())
+        return;
+
   // Iterate into extern "C" {} type declarations.
   if (auto linkageDecl = dyn_cast<clang::LinkageSpecDecl>(decl)) {
     for (auto *decl : linkageDecl->noload_decls()) {

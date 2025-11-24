@@ -17,6 +17,8 @@
 #ifndef SWIFT_SILGEN_CLEANUP_H
 #define SWIFT_SILGEN_CLEANUP_H
 
+#define SWIFT_INCLUDED_IN_SILGEN_SOURCES
+
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/DiverseStack.h"

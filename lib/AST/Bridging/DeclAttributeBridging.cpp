@@ -98,6 +98,11 @@ void BridgedDeclAttributes_add(BridgedDeclAttributes *cAttrs,
   *cAttrs = attrs;
 }
 
+bool BridgedDeclAttributes_hasAttribute(
+    const BridgedDeclAttributes *_Nonnull attrs, swift::DeclAttrKind kind) {
+  return attrs->unbridged().getAttribute(kind) != nullptr;
+}
+
 static AvailableAttr::Kind unbridge(BridgedAvailableAttrKind value) {
   switch (value) {
   case BridgedAvailableAttrKindDefault:
@@ -345,6 +350,14 @@ BridgedImplementsAttr BridgedImplementsAttr_createParsed(
       cContext.unbridged(), atLoc, range, cProtocolType.unbridged(),
       cMemberName.unbridged().getFullName(), cMemberNameLoc.unbridged());
 }
+
+BridgedExportAttr BridgedExportAttr_createParsed(BridgedASTContext cContext,
+                                                 SourceLoc atLoc,
+                                                 SourceRange range,
+                                                 swift::ExportKind kind) {
+  return new (cContext.unbridged()) ExportAttr(atLoc, range, kind);
+}
+
 
 BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
                                                  SourceLoc atLoc,

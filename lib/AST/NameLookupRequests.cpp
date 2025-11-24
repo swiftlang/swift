@@ -427,10 +427,10 @@ void ModuleQualifiedLookupRequest::writeDependencySink(
 }
 
 //----------------------------------------------------------------------------//
-// LookupConformanceInModuleRequest computation.
+// LookupConformanceRequest computation.
 //----------------------------------------------------------------------------//
 
-void LookupConformanceInModuleRequest::writeDependencySink(
+void LookupConformanceRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker,
     ProtocolConformanceRef lookupResult) const {
   if (lookupResult.isInvalid() || !lookupResult.isConcrete())

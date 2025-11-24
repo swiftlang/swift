@@ -1431,8 +1431,8 @@ static bool generateReproducer(CompilerInstance &Instance,
   llvm::sys::path::append(casPath, "cas");
   clang::CASOptions newCAS;
   newCAS.CASPath = casPath.str();
-  newCAS.PluginPath = casOpts.Config.PluginPath;
-  newCAS.PluginOptions = casOpts.Config.PluginOptions;
+  newCAS.PluginPath = casOpts.CASOpts.PluginPath;
+  newCAS.PluginOptions = casOpts.CASOpts.PluginOptions;
   auto db = newCAS.getOrCreateDatabases();
   if (!db) {
     diags.diagnose(SourceLoc(), diag::error_cas_initialization,
@@ -1785,21 +1785,22 @@ static bool serializeModuleSummary(SILModule *SM,
 static GeneratedModule
 generateIR(const IRGenOptions &IRGenOpts, const TBDGenOptions &TBDOpts,
            std::unique_ptr<SILModule> SM, const PrimarySpecificPaths &PSPs,
+           std::shared_ptr<llvm::cas::ObjectStore> CAS,
+           cas::SwiftCASOutputBackend *casBackend,
            StringRef OutputFilename, ModuleOrSourceFile MSF,
            llvm::GlobalVariable *&HashGlobal,
            ArrayRef<std::string> parallelOutputFilenames,
            ArrayRef<std::string> parallelIROutputFilenames) {
-  if (auto *SF = MSF.dyn_cast<SourceFile *>()) {
-    return performIRGeneration(SF, IRGenOpts, TBDOpts,
-                               std::move(SM), OutputFilename, PSPs,
-                               SF->getPrivateDiscriminator().str(),
-                               &HashGlobal);
-  } else {
-    return performIRGeneration(cast<ModuleDecl *>(MSF), IRGenOpts, TBDOpts,
-                               std::move(SM), OutputFilename, PSPs,
-                               parallelOutputFilenames,
-                               parallelIROutputFilenames, &HashGlobal);
-  }
+  if (auto *SF = MSF.dyn_cast<SourceFile *>())
+    return performIRGeneration(SF, IRGenOpts, TBDOpts, std::move(SM),
+                               OutputFilename, PSPs, std::move(CAS),
+                               SF->getPrivateDiscriminator().str(), &HashGlobal,
+                               casBackend);
+
+  return performIRGeneration(
+      cast<ModuleDecl *>(MSF), IRGenOpts, TBDOpts, std::move(SM),
+      OutputFilename, PSPs, std::move(CAS), parallelOutputFilenames,
+      parallelIROutputFilenames, &HashGlobal, casBackend);
 }
 
 static bool processCommandLineAndRunImmediately(CompilerInstance &Instance,
@@ -1950,10 +1951,8 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
                          llvm::Module *IRModule,
                          llvm::GlobalVariable *HashGlobal) {
   const auto &opts = Instance.getInvocation().getIRGenOptions();
-  std::unique_ptr<llvm::TargetMachine> TargetMachine =
-      createTargetMachine(opts, Instance.getASTContext());
-
-  TargetMachine->Options.MCOptions.CAS = Instance.getSharedCASInstance();
+  std::unique_ptr<llvm::TargetMachine> TargetMachine = createTargetMachine(
+      opts, Instance.getASTContext(), Instance.getSharedCASInstance());
 
   if (Instance.getInvocation().getCASOptions().EnableCaching &&
       opts.UseCASBackend)
@@ -2162,10 +2161,14 @@ static bool performCompileStepsPostSILGen(
                                       options::OPT_ir_output_path);
 
   llvm::GlobalVariable *HashGlobal;
-  auto IRModule =
-      generateIR(IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
-                 OutputFilename, MSF, HashGlobal, ParallelOutputFilenames,
-                 ParallelIROutputFilenames);
+  cas::SwiftCASOutputBackend *casBackend =
+      Invocation.getCASOptions().EnableCaching && IRGenOpts.UseCASBackend
+          ? &Instance.getCASOutputBackend()
+          : nullptr;
+  auto IRModule = generateIR(
+      IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
+      Instance.getSharedCASInstance(), casBackend, OutputFilename, MSF,
+      HashGlobal, ParallelOutputFilenames, ParallelIROutputFilenames);
 
   // Write extra LLVM IR output if requested
   if (IRModule && !PSPs.SupplementaryOutputs.LLVMIROutputPath.empty()) {

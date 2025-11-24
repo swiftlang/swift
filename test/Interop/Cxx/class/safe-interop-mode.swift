@@ -94,22 +94,18 @@ using TTakePtr = TTake<int *>;
 using TTakeSafeTuple = TTake<SafeTuple>;
 using TTakeUnsafeTuple = TTake<UnsafeTuple>;
 
-// An escapability or explicit safety annotation means a type is considered safe
-// even if it would otherwise be considered unsafe.
-template <typename> struct SWIFT_ESCAPABLE TEscape {};
-template <typename> struct __attribute__((swift_attr("safe"))) TSafe { void *ptr; };
-
-using TEscapePtr = TEscape<int *>;
-using TEscapeUnsafeTuple = TEscape<UnsafeTuple>;
-using TSafePtr = TSafe<int *>;
-using TSafeTuple = TSafe<UnsafeTuple>;
-
 struct HoldsShared {
   SharedObject* obj;
 
   SharedObject* getObj() const SWIFT_RETURNS_INDEPENDENT_VALUE
                                SWIFT_RETURNS_UNRETAINED;
 };
+
+template <typename, typename> struct TTake2 {};
+template <typename T> struct PassThru {};
+struct IsUnsafe { int *p; };
+struct HasUnsafe : TTake2<PassThru<HasUnsafe>, IsUnsafe> {};
+using AlsoUnsafe = PassThru<HasUnsafe>;
 
 //--- test.swift
 
@@ -224,7 +220,12 @@ func useTTakeUnsafeTuple(x: TTakeUnsafeTuple) {
   _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
 }
 
-func useTEscapePtr(x: TEscapePtr) { _ = x }
-func useTEscapeUnsafeTuple(x: TEscapeUnsafeTuple) { _ = x }
-func useTSafePtr(x: TSafePtr) { _ = x }
-func useTSafeTuple(x: TSafeTuple) { _ = x }
+func useTTakeUnsafeTuple(x: HasUnsafe) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func useTTakeUnsafeTuple(x: AlsoUnsafe) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}

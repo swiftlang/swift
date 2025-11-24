@@ -472,7 +472,7 @@ llvm::Function *createMetatypeAccessorFunction(IRGenModule &IGM, SILType ty,
   std::string symbolName =
       mangler.mangleSymbolNameForMangledMetadataAccessorString(
           "get_type_metadata_for_layout_string", sig,
-          fieldType->mapTypeOutOfContext()->getCanonicalType(),
+          fieldType->mapTypeOutOfEnvironment()->getCanonicalType(),
           MangledTypeRefRole::Metadata);
 
   auto helperFn = IGM.getOrCreateHelperFunction(
@@ -508,7 +508,7 @@ llvm::Function *createFixedEnumLoadTag(IRGenModule &IGM,
 
   IRGenMangler mangler(IGM.Context);
   auto symbol = mangler.mangleSymbolNameForMangledGetEnumTagForLayoutString(
-      entry.ty.getASTType()->mapTypeOutOfContext()->getCanonicalType());
+      entry.ty.getASTType()->mapTypeOutOfEnvironment()->getCanonicalType());
 
   auto helperFn = IGM.getOrCreateHelperFunction(
       symbol, IGM.Int32Ty /*retTy*/, IGM.Int8PtrTy /*argTys*/,
@@ -1739,7 +1739,7 @@ AlignedGroupEntry::layoutString(IRGenModule &IGM,
   std::string symbolName =
       mangler.mangleSymbolNameForMangledMetadataAccessorString(
           "type_layout_string", genericSig.getCanonicalSignature(),
-          ty.getASTType()->mapTypeOutOfContext()->getCanonicalType(),
+          ty.getASTType()->mapTypeOutOfEnvironment()->getCanonicalType(),
           MangledTypeRefRole::Metadata);
 
   auto *global = SB.finishAndCreateGlobal(symbolName, IGM.getPointerAlignment(),
@@ -2341,7 +2341,7 @@ EnumTypeLayoutEntry::layoutString(IRGenModule &IGM,
     std::string symbolName =
         mangler.mangleSymbolNameForMangledMetadataAccessorString(
             "type_layout_string", genericSig.getCanonicalSignature(),
-            ty.getASTType()->mapTypeOutOfContext()->getCanonicalType(),
+            ty.getASTType()->mapTypeOutOfEnvironment()->getCanonicalType(),
             MangledTypeRefRole::Metadata);
 
     auto *global = SB.finishAndCreateGlobal(symbolName, IGM.getPointerAlignment(),

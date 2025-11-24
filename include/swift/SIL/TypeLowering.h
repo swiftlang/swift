@@ -198,6 +198,10 @@ public:
     return Properties.isTypeExpansionSensitive();
   }
 
+  IsInfiniteType_t isInfinite() const {
+    return Properties.isInfinite();
+  }
+
   /// Should a value of this type have its lifetime tied to its lexical scope?
   bool isLexical() const {
     return Properties.isLexical();
@@ -596,6 +600,17 @@ class TypeConverter {
         return isa<FunctionType>(type) && type->hasTypeParameter();
       });
     }
+
+    friend bool operator==(const TypeKey &lhs,
+                           const TypeKey &rhs) {
+      return lhs.OrigType == rhs.OrigType && lhs.SubstType == rhs.SubstType
+        && lhs.expansionContext == rhs.expansionContext
+        && lhs.IsCacheable == rhs.IsCacheable;
+    }
+    friend bool operator!=(const TypeKey &lhs,
+                           const TypeKey &rhs) {
+      return !(lhs == rhs);
+    }
   };
 
   friend struct llvm::DenseMapInfo<CachingTypeKey>;
@@ -660,6 +675,13 @@ class TypeConverter {
   llvm::DenseMap<AbstractClosureExpr *, FunctionTypeInfo> ClosureInfos;
   llvm::DenseMap<SILDeclRef, TypeExpansionContext>
     CaptureTypeExpansionContexts;
+
+  /// True while lowering a non-layout type.
+  bool isLoweringNonLayoutType = false;
+
+  /// True if this lowering should be cached.
+  ///
+  bool isCacheableLowering(const TypeLowering *tl);
 
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
@@ -730,6 +752,28 @@ public:
 
     ~GenericContextRAII() {
       TC.CurGenericSignature = SavedSig;
+    }
+  };
+
+  // Wraps lowering of any type that does not contribute to the layout of its
+  // parent type. Avoids caching incomplete 'isInfinite' properties for types
+  // with complete layouts.
+  class NonLayoutTypeRAII {
+    TypeConverter &TC;
+
+  public:
+    const bool wasLoweringNonFieldType;
+
+    NonLayoutTypeRAII(TypeConverter &TC)
+      : TC(TC), wasLoweringNonFieldType(TC.isLoweringNonLayoutType)
+    {
+      TC.isLoweringNonLayoutType = true;
+    }
+    NonLayoutTypeRAII(const NonLayoutTypeRAII &) = delete;
+    NonLayoutTypeRAII &operator=(const NonLayoutTypeRAII &) = delete;
+
+    ~NonLayoutTypeRAII() {
+      TC.isLoweringNonLayoutType = wasLoweringNonFieldType;
     }
   };
 

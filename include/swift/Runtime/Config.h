@@ -252,7 +252,7 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 // differs from the standard calling convention. Currently this is only used for
 // swift_retain, swift_release, and some internal helper functions that they
 // call.
-#if defined(__aarch64__)
+#if defined(__aarch64__) && !SWIFT_RUNTIME_EMBEDDED
 #define SWIFT_REFCOUNT_CC SWIFT_CC_PreserveMost
 #define SWIFT_REFCOUNT_CC_PRESERVEMOST 1
 #else

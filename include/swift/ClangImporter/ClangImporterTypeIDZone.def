@@ -48,9 +48,6 @@ SWIFT_REQUEST(ClangImporter, ClangTypeEscapability,
 SWIFT_REQUEST(ClangImporter, CxxValueSemantics,
               CxxValueSemanticsKind(CxxValueSemanticsDescriptor), Cached,
               NoLocationInfo)
-SWIFT_REQUEST(ClangImporter, ClangTypeExplicitSafety,
-              ExplicitSafety(ClangTypeExplicitSafetyDescriptor), Cached,
-              NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, ClangDeclExplicitSafety,
-              ExplicitSafety(CxxDeclExplicitSafetyDescriptor), Cached,
+              ExplicitSafety(ClangDeclExplicitSafetyDescriptor), Cached,
               NoLocationInfo)

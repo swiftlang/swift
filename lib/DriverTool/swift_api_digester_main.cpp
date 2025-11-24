@@ -38,7 +38,6 @@
 #include "swift/Option/Options.h"
 #include "swift/Parse/ParseVersion.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
@@ -2365,7 +2364,6 @@ public:
     Triple = ParsedArgs.getLastArgValue(OPT_target).str();
     SwiftVersion = ParsedArgs.getLastArgValue(OPT_swift_version).str();
     SystemFrameworkPaths = ParsedArgs.getAllArgValues(OPT_Fsystem);
-    llvm::append_range(SystemFrameworkPaths, ParsedArgs.getAllArgValues(OPT_iframework));
     BaselineFrameworkPaths = ParsedArgs.getAllArgValues(OPT_BF);
     FrameworkPaths = ParsedArgs.getAllArgValues(OPT_F);
     SystemModuleImportPaths = ParsedArgs.getAllArgValues(OPT_Isystem);

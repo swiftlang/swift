@@ -179,6 +179,8 @@ return 42 // expected-error {{return invalid outside of a func}}
 
 return // expected-error {{return invalid outside of a func}}
 
+return VoidReturn1() // expected-error {{return invalid outside of a func}}
+
 func NonVoidReturn1() -> Int {
   _ = 0
   return // expected-error {{non-void function should return a value}}
@@ -560,6 +562,9 @@ func bad_if() {
   if (x: false) {} // expected-error {{cannot convert value of type '(x: Bool)' to expected condition type 'Bool'}}
   if (x: 1) {} // expected-error {{cannot convert value of type '(x: Int)' to expected condition type 'Bool'}}
   if nil {} // expected-error {{'nil' is not compatible with expected condition type 'Bool'}}
+  if undefined {} // expected-error {{cannot find 'undefined' in scope}}
+  if [undefined] {} // expected-error {{cannot find 'undefined' in scope}}
+  // expected-error@-1 {{cannot convert value of type '[Element]' to expected condition type 'Bool'}}
 }
 
 // Typo correction for loop labels

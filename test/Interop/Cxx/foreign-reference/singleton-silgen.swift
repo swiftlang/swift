@@ -35,4 +35,4 @@ public func test() {
 
 // CHECK-LABEL: sil {{.*}}[asmname "{{.*}}test{{.*}}"] [clang DeletedSpecialMembers.test] @$sSo21DeletedSpecialMembersV4tests5Int32VyFTo : $@convention(cxx_method) (DeletedSpecialMembers) -> Int32
 
-// CHECK-LABEL: sil [serialized] [asmname "{{.*}}mutate{{.*}}"] [clang mutateIt] @$sSo8mutateItyySo21DeletedSpecialMembersVFTo : $@convention(c) (DeletedSpecialMembers) -> ()
+// CHECK-LABEL: sil [asmname "{{.*}}mutate{{.*}}"] [clang mutateIt] @$sSo8mutateItyySo21DeletedSpecialMembersVFTo : $@convention(c) (DeletedSpecialMembers) -> ()

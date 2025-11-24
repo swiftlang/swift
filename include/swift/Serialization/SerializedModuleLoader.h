@@ -373,11 +373,14 @@ public:
   /// FIXME: make this an actual import *path* once submodules are designed.
   bool registerMemoryBuffer(StringRef importPath,
                             std::unique_ptr<llvm::MemoryBuffer> input,
-                            llvm::VersionTuple version) {
-    return MemoryBuffers
-        .insert({importPath, MemoryBufferInfo(std::move(input), version)})
-        .second;
-  }
+                            llvm::VersionTuple version);
+
+  /// During the transtion to explicitly tracked module dependencies LLDB may
+  /// instruct this loader to forget one of the (now redundant) MemoryBuffers
+  /// because it found an explicit module file on disk.
+  ///
+  /// \return true if the importPath existed.
+  bool unregisterMemoryBuffer(StringRef importPath);
 
   void collectVisibleTopLevelModuleNames(
       SmallVectorImpl<Identifier> &names) const override {}

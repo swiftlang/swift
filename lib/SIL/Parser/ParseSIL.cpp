@@ -1095,7 +1095,7 @@ bool SILParser::parseASTType(CanType &result,
       parsedType.get(), /*isSILType=*/false, genericSig, genericParams);
   if (wantContextualType && genericSig) {
     resolvedType = genericSig.getGenericEnvironment()
-        ->mapTypeIntoContext(resolvedType);
+        ->mapTypeIntoEnvironment(resolvedType);
   }
 
   if (resolvedType->hasError())
@@ -1131,7 +1131,7 @@ bool SILParser::parseASTTypeOrValue(CanType &result,
       parsedType.get(), /*isSILType=*/false, genericSig, genericParams);
   if (wantContextualType && genericSig) {
     resolvedType = genericSig.getGenericEnvironment()
-        ->mapTypeIntoContext(resolvedType);
+        ->mapTypeIntoEnvironment(resolvedType);
   }
 
   if (resolvedType->hasError())
@@ -1241,7 +1241,7 @@ bool SILParser::parseSILType(SILType &Result,
   auto Ty = performTypeResolution(attrRepr, /*IsSILType=*/true, OuterGenericSig,
                                   OuterGenericParams);
   if (OuterGenericSig) {
-    Ty = OuterGenericSig.getGenericEnvironment()->mapTypeIntoContext(Ty);
+    Ty = OuterGenericSig.getGenericEnvironment()->mapTypeIntoEnvironment(Ty);
   }
 
   if (Ty->hasError())
@@ -1843,7 +1843,7 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
     auto Ty = performTypeResolution(TyR.get(), /*IsSILType=*/false, GenericSig,
                                     GenericParams);
     if (GenericSig) {
-      Ty = GenericSig.getGenericEnvironment()->mapTypeIntoContext(Ty);
+      Ty = GenericSig.getGenericEnvironment()->mapTypeIntoEnvironment(Ty);
     }
 
     if (Ty->hasError())
@@ -2366,7 +2366,7 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
          
          if (patternSig)
            loweredTy = SILType::getPrimitiveType(loweredTy.getRawASTType()
-                                                     ->mapTypeOutOfContext()
+                                                     ->mapTypeOutOfEnvironment()
                                                      ->getCanonicalType(),
                                                  loweredTy.getCategory());
 
@@ -2375,7 +2375,7 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
          Type contextFormalTy = formalTy;
          if (patternSig) {
            contextFormalTy = patternSig.getGenericEnvironment()
-              ->mapTypeIntoContext(formalTy);
+              ->mapTypeIntoEnvironment(formalTy);
          }
          auto lookup = lookupConformance(contextFormalTy, proto);
          if (lookup.isInvalid()) {
@@ -2509,7 +2509,7 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
           // Map the substitutions out of the pattern context so that they
           // use interface types.
           externalSubs =
-            externalSubs.mapReplacementTypesOutOfContext().getCanonical();
+            externalSubs.mapReplacementTypesOutOfEnvironment().getCanonical();
         }
 
       } else {
@@ -3291,7 +3291,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
 
     // Map it out of context.  It should be a type pack parameter.
-    shapeClass = shapeClass->mapTypeOutOfContext()->getCanonicalType();
+    shapeClass = shapeClass->mapTypeOutOfEnvironment()->getCanonicalType();
     auto shapeParam = dyn_cast<GenericTypeParamType>(shapeClass);
     if (!shapeParam || !shapeParam->isParameterPack()) {
       P.diagnose(shapeClassLoc, diag::opened_shape_class_not_pack_param);
@@ -8157,7 +8157,7 @@ ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
                                             witnessSig, witnessParams);
   if (witnessSig) {
     ConformingTy = witnessSig.getGenericEnvironment()
-        ->mapTypeIntoContext(ConformingTy);
+        ->mapTypeIntoEnvironment(ConformingTy);
   }
 
   if (ConformingTy->hasError())
@@ -8282,7 +8282,7 @@ static bool parseSILWitnessTableEntry(
                                        witnessSig, &silContext,
                                        &P.SF);
       if (witnessSig) {
-        Ty = witnessSig.getGenericEnvironment()->mapTypeIntoContext(Ty);
+        Ty = witnessSig.getGenericEnvironment()->mapTypeIntoEnvironment(Ty);
       }
 
       if (Ty->hasError())
@@ -8325,7 +8325,7 @@ static bool parseSILWitnessTableEntry(
                                        witnessSig, &silContext,
                                        &P.SF);
       if (witnessSig) {
-        Ty = witnessSig.getGenericEnvironment()->mapTypeIntoContext(Ty);
+        Ty = witnessSig.getGenericEnvironment()->mapTypeIntoEnvironment(Ty);
       }
 
       if (Ty->hasError())
@@ -8366,7 +8366,7 @@ static bool parseSILWitnessTableEntry(
                                      witnessSig, &silContext,
                                      &P.SF);
     if (witnessSig) {
-      Ty = witnessSig.getGenericEnvironment()->mapTypeIntoContext(Ty);
+      Ty = witnessSig.getGenericEnvironment()->mapTypeIntoEnvironment(Ty);
     }
 
     if (Ty->hasError())

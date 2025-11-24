@@ -520,7 +520,7 @@ public:
         new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                               SourceLoc(), Context.getIdentifier(NameBuf),
                               TypeCheckDC);
-    VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
+    VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfEnvironment());
     VD->setImplicit();
 
     NamedPattern *NP = NamedPattern::createImplicit(Context, VD, VD->getTypeInContext());

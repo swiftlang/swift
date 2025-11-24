@@ -1992,6 +1992,14 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
     }
   }
 
+  // Pass the -sdk flag to make the system header VFS overlay finable
+  // for the -direct-clang-cc1-module-build emit-pcm command on Windows.
+  StringRef SDKPath = ScanASTContext.SearchPathOpts.getSDKPath();
+  if (!SDKPath.empty()) {
+    swiftArgs.push_back("-sdk");
+    swiftArgs.push_back(SDKPath.str());
+  }
+
   // Add args reported by the scanner.
   auto clangArgs = invocation.getCC1CommandLine();
   llvm::for_each(clangArgs, addClangArg);

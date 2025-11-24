@@ -385,20 +385,12 @@ static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C, StringRef name) {
       /*default=*/nullptr);
 }
 
-FuncDecl *SILGenModule::getAsyncLetStart() {
-  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLetStart");
-}
-
 FuncDecl *SILGenModule::getAsyncLetGet() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_get");
 }
 
 FuncDecl *SILGenModule::getAsyncLetGetThrowing() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_get_throwing");
-}
-
-FuncDecl *SILGenModule::getFinishAsyncLet() {
-  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_finish");
 }
 
 FuncDecl *SILGenModule::getTaskFutureGet() {
@@ -2088,7 +2080,7 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
     // See the call to getClassFieldOffsetOffset() inside
     // emitKeyPathComponent().
     if (auto *parentClass = dyn_cast<ClassDecl>(decl->getDeclContext())) {
-      if (parentClass->isGeneric()) {
+      if (parentClass->hasGenericParamList()) {
         auto ancestry = parentClass->checkAncestry();
         if (ancestry.contains(AncestryFlags::ResilientOther))
           return false;
@@ -2100,7 +2092,7 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
     auto componentObjTy = decl->getValueInterfaceType();
     if (auto genericEnv =
               decl->getInnermostDeclContext()->getGenericEnvironmentOfContext())
-      componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
+      componentObjTy = genericEnv->mapTypeIntoEnvironment(componentObjTy);
     auto storageTy = M.Types.getSubstitutedStorageType(
         TypeExpansionContext::minimal(), decl, componentObjTy);
     auto opaqueTy = M.Types.getLoweredRValueType(

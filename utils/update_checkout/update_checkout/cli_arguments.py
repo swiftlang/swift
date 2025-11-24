@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 from typing import List, Optional
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
@@ -22,7 +23,7 @@ class CliArguments(argparse.Namespace):
     tag: Optional[str]
     match_timestamp: bool
     n_processes: int
-    source_root: str
+    source_root: Path
     use_submodules: bool
     verbose: bool
 
@@ -37,7 +38,7 @@ repositories.
         )
         parser.add_argument(
             "--clone",
-            help="obtain sources for Swift and related projects",
+            help="Obtain sources for Swift and related projects",
             action="store_true",
         )
         parser.add_argument(
@@ -139,6 +140,7 @@ repositories.
             "--source-root",
             help="The root directory to checkout repositories",
             default=SWIFT_SOURCE_ROOT,
+            type=Path,
         )
         parser.add_argument(
             "--use-submodules",

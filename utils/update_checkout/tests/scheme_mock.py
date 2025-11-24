@@ -94,6 +94,7 @@ class CallQuietlyException(Exception):
 
 def call_quietly(*args, **kwargs):
     kwargs["stderr"] = subprocess.STDOUT
+    kwargs["encoding"] = "utf-8"
     try:
         return subprocess.check_output(*args, **kwargs)
     except subprocess.CalledProcessError as e:

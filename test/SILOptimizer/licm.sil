@@ -1014,8 +1014,7 @@ bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
 bb1:
   %val1 = load %outerAddr1 : $*Index
   %val2 = load %middleAddr1 : $*Int64
-  %outerAddr2 = pointer_to_address %1 : $Builtin.RawPointer to $*Index
-  %middleAddr2 = struct_element_addr %outerAddr2 : $*Index, #Index.value
+  %middleAddr2 = struct_element_addr %outerAddr1 : $*Index, #Index.value
   store %0 to %middleAddr2 : $*Int64
   %innerAddr1 = struct_element_addr %middleAddr1 : $*Int64, #Int64._value
   %val3 = load %innerAddr1 : $*Builtin.Int64
@@ -1060,8 +1059,7 @@ bb1:
   %zero = integer_literal $Builtin.Int1, 0
   %add = builtin "uadd_with_overflow_Int32"(%innerVal : $Builtin.Int64, %one : $Builtin.Int64, %zero : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %inc = tuple_extract %add : $(Builtin.Int64, Builtin.Int1), 0
-  %outerAddr2 = pointer_to_address %1 : $Builtin.RawPointer to $*Index
-  %middleAddr2 = struct_element_addr %outerAddr2 : $*Index, #Index.value
+  %middleAddr2 = struct_element_addr %outerAddr1 : $*Index, #Index.value
   %newVal = struct $Int64 (%inc : $Builtin.Int64)
   store %newVal to %middleAddr2 : $*Int64
   %middleVal = load %middleAddr1 : $*Int64
@@ -1094,6 +1092,8 @@ struct State {
 // ...Split element 0
 // CHECK:     [[ELT0:%.*]] = load [[HOISTADR]] : $*Int64
 // CHECK:     [[HOISTVAL:%.*]] = struct_extract [[ELT0]] : $Int64, #Int64._value
+// CHECK:     [[HOISTADR2:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 0
+// CHECK:     [[ELT0B:%.*]] = load [[HOISTADR2]] : $*Int64
 // ...Split element 2
 // CHECK:     [[SPLIT2:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 2
 // CHECK:     [[ELT2:%.*]] = load [[SPLIT2]] : $*Int64
@@ -1104,7 +1104,7 @@ struct State {
 // CHECK:     br bb1([[PRELOAD]] : $Int64)
 // ...Loop
 // CHECK:   bb1([[PHI:%.*]] : $Int64):
-// CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[ELT0]] : $Int64, [[PHI]] : $Int64, [[ELT2]] : $Int64)
+// CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[ELT0B]] : $Int64, [[PHI]] : $Int64, [[ELT2]] : $Int64)
 // CHECK-NEXT: [[STRUCT:%.*]] = struct $State ([[TUPLE]] : $(Int64, Int64, Int64), [[SINGLEVAL]] : $Int64)
 // CHECK-NEXT: [[ADDEND:%.*]] = struct_extract [[PHI]] : $Int64, #Int64._value
 // CHECK-NEXT: [[UADD:%.*]] = builtin "uadd_with_overflow_Int32"([[HOISTVAL]] : $Builtin.Int64, [[ADDEND]] : $Builtin.Int64, %{{.*}} : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
@@ -1324,12 +1324,10 @@ bb3:
 //
 // CHECK:   [[ADDR1:%.*]] = tuple_element_addr %{{.*}}, 0
 // CHECK:   [[V1:%.*]] = load [[ADDR1]] : $*Int64
-// CHECK:   [[ADDR0:%.*]] = tuple_element_addr %{{.*}}, 1
-// CHECK:   [[V0:%.*]] = load [[ADDR0]] : $*Int64
 // CHECK:   [[OUTER:%.*]] = tuple (%{{.*}} : $Int64, %{{.*}} : $(Int64, Int64))
 // CHECK:   br bb1([[V1]] : $Int64)
 // CHECK: bb1([[PHI:%.*]] : $Int64):
-// CHECK:   [[INNER:%.*]] = tuple ([[PHI]] : $Int64, [[V0]] : $Int64)
+// CHECK:   [[INNER:%.*]] = tuple ([[PHI]] : $Int64, {{%[0-9]+}} : $Int64)
 // CHECK:   cond_br undef, bb2, bb3
 // CHECK: bb2:
 // CHECK:   br bb1(%0 : $Int64)
@@ -1369,11 +1367,10 @@ bb3:
 // CHECK: [[ARG0:%.*]] = tuple (%0 : $Int64, %0 : $Int64)
 // CHECK: [[ARG1:%.*]] = tuple (%1 : $Int64, %1 : $Int64)
 // CHECK: [[ELT_0:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 0
-// CHECK: [[V0:%.*]] = load %9 : $*Int64
 // CHECK: [[ARG0_0:%.*]] = tuple_extract [[ARG0]] : $(Int64, Int64), 0
 // CHECK:   br bb1([[V1]] : $(Int64, Int64))
 // CHECK: bb1([[PHI:%.*]] : $(Int64, Int64)):
-// CHECK:   [[LOOPVAL:%.*]] = tuple ([[V0]] : $Int64, [[PHI]] : $(Int64, Int64))
+// CHECK:   [[LOOPVAL:%.*]] = tuple ({{%[0-9]+}} : $Int64, [[PHI]] : $(Int64, Int64))
 // CHECK:   cond_br undef, bb2, bb3
 // CHECK: bb2:
 // CHECK:   br bb1([[ARG1]] : $(Int64, Int64))
@@ -1610,7 +1607,7 @@ sil @$get_array_from_inner : $@convention(method) (Inner) -> (ContiguousArray<Do
 //
 // CHECK-LABEL: sil @project_load_path_before_splitting_crash :
 // CHECK:         load
-// CHECK:       bb1(%8 : $ContiguousArray<Double>):
+// CHECK:       bb1({{%[0-9]+}} : $ContiguousArray<Double>):
 // CHECK:       bb3:
 // CHECK:         store
 // CHECK:       } // end sil function 'project_load_path_before_splitting_crash'
@@ -2175,6 +2172,37 @@ bb2:
   br bb1
 
 bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_load_with_idential_load_in_preheader :
+// CHECK:         store
+// CHECK:         load
+// CHECK:         store
+// CHECK:         [[L:%.*]] = load
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    apply undef([[L]])
+// CHECK-LABEL: } // end sil function 'hoist_load_with_idential_load_in_preheader'
+sil [ossa] @hoist_load_with_idential_load_in_preheader : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = alloc_stack $Int
+  store %0 to [trivial] %2
+  %3 = load [trivial] %2
+  store %1 to [trivial] %2
+  br bb1
+
+bb1:
+  %6 = load [trivial] %2
+  %7 = apply undef(%6) : $(Int) -> ()
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  dealloc_stack %2
   %r = tuple ()
   return %r
 }

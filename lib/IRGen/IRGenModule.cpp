@@ -392,6 +392,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     TypeMetadataStructTy
   });
 
+  EmbeddedExistentialsMetadataStructTy = createStructType(*this, "swift.embedded_existential_type", {
+    WitnessTablePtrTy,
+    TypeMetadataStructTy
+  });
+
   // A full heap metadata is basically just an additional small prefix
   // on a full metadata, used for metadata corresponding to heap
   // allocations.
@@ -566,7 +571,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DereferenceableID = getLLVMContext().getMDKindID("dereferenceable");
 
   C_CC = getOptions().PlatformCCallingConvention;
-  SwiftClientRR_CC = llvm::CallingConv::PreserveMost;
+  SwiftDirectRR_CC = llvm::CallingConv::PreserveMost;
   // TODO: use "tinycc" on platforms that support it
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
 
@@ -771,10 +776,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
 
-  CoroFunctionPointerTy = createStructType(*this, "swift.coro_func_pointer",
-                                           {RelativeAddressTy, Int32Ty}, true);
+  CoroFunctionPointerTy =
+      createStructType(*this, "swift.coro_func_pointer",
+                       {RelativeAddressTy, Int32Ty, Int64Ty}, true);
   CoroAllocateFnTy = llvm::FunctionType::get(
-      CoroAllocationTy, {CoroAllocationTy, CoroAllocatorPtrTy, SizeTy}, /*isVarArg*/ false);
+      CoroAllocationTy, {CoroAllocationTy, CoroAllocatorPtrTy, SizeTy, Int64Ty},
+      /*isVarArg*/ false);
   CoroDeallocateFnTy = llvm::FunctionType::get(
       VoidTy, {CoroAllocationTy, CoroAllocatorPtrTy, CoroAllocationTy}, /*isVarArg*/ false);
   CoroAllocatorFlagsTy = Int32Ty;
@@ -1409,13 +1416,13 @@ llvm::Module *IRGenModule::getModule() const {
   return ClangCodeGen->GetModule();
 }
 
-bool IRGenModule::IsWellKnownBuiltinOrStructralType(CanType T) const {
+bool IRGenModule::isWellKnownBuiltinOrStructuralType(CanType T) const {
   if (T == Context.TheEmptyTupleType || T == Context.TheNativeObjectType ||
       T == Context.TheBridgeObjectType || T == Context.TheRawPointerType ||
       T == Context.getAnyObjectType())
     return true;
 
-  if (auto IntTy = dyn_cast_or_null<BuiltinIntegerType>(T)) {
+  if (auto IntTy = dyn_cast<BuiltinIntegerType>(T)) {
     auto Width = IntTy->getWidth();
     if (Width.isPointerWidth())
       return true;
@@ -1479,7 +1486,9 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 
 void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
   // In Embedded Swift, only class-bound wtables are allowed.
-  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+  auto &langOpts = SIL.getASTContext().LangOpts;
+  if (langOpts.hasFeature(Feature::Embedded) &&
+      !langOpts.hasFeature(Feature::EmbeddedExistentials)) {
     assert(Conf->getProtocol()->requiresClass());
   }
 
@@ -1733,9 +1742,9 @@ void IRGenModule::addLinkLibraries() {
     registerLinkLibrary(
         LinkLibrary{"objc", LibraryKind::Library, /*static=*/false});
 
-  if (TargetInfo.HasSwiftClientRRLibrary &&
-      getOptions().EnableClientRetainRelease)
-    registerLinkLibrary(LinkLibrary{"swiftClientRetainRelease",
+  if (TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
+      getOptions().EnableSwiftDirectRuntime)
+    registerLinkLibrary(LinkLibrary{"swiftSwiftDirectRuntime",
                                     LibraryKind::Library, /*static=*/true});
 
   // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
@@ -2331,9 +2340,8 @@ IRGenModule *IRGenerator::getGenModule(SILGlobalVariable *v) {
   if (found != DefaultIGMForGlobalVariable.end())
     return found->second;
 
-  if (auto decl = v->getDecl()) {
-    return getGenModule(decl->getDeclContext());
-  }
+  if (auto *dc = v->getDeclContext())
+    return getGenModule(dc);
 
   return getPrimaryIGM();
 }

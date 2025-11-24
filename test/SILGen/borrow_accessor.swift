@@ -699,7 +699,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:  [[REG3:%.*]] = struct_element_addr [[REG2]], #GenNCWrapper._w
 // CHECK:  [[REG4:%.*]] = function_ref @$s15borrow_accessor15SimpleNCWrapperVAARi_zrlE4propxvz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout SimpleNCWrapper<τ_0_0>) -> @inout τ_0_0
 // CHECK:  [[REG5:%.*]] = apply [[REG4]]<T>([[REG3]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout SimpleNCWrapper<τ_0_0>) -> @inout τ_0_0
-// CHECK:  [[REG6:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG5]]
+// CHECK:  [[REG6:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[REG5]]
 // CHECK:  return [[REG6]]
 // CHECK: }
 
@@ -719,7 +719,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:  [[REG2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[REG0]]
 // CHECK:  [[REG3:%.*]] = function_ref @$s15borrow_accessor12GenNCWrapperVAARi_zrlE4propxvz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout GenNCWrapper<τ_0_0>) -> @inout τ_0_0
 // CHECK:  [[REG4:%.*]] = apply [[REG3]]<T>([[REG2]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout GenNCWrapper<τ_0_0>) -> @inout τ_0_0
-// CHECK:  [[REG5:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG4]]
+// CHECK:  [[REG5:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[REG4]]
 // CHECK:  return [[REG5]]
 // CHECK: }
 
@@ -748,7 +748,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:  [[REG3:%.*]] = struct_element_addr [[REG2]], #GenNCWrapper._ncw
 // CHECK:  [[REG4:%.*]] = function_ref @$s15borrow_accessor9NCWrapperV2ncAA2NCVvz : $@convention(method) (@inout NCWrapper) -> @inout NC
 // CHECK:  [[REG5:%.*]] = apply [[REG4]]([[REG3]]) : $@convention(method) (@inout NCWrapper) -> @inout NC
-// CHECK:  [[REG6:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG5]]
+// CHECK:  [[REG6:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[REG5]]
 // CHECK:  return [[REG6]]
 // CHECK: }
 
@@ -779,10 +779,10 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:  [[REG2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[REG0]]
 // CHECK:  [[REG3:%.*]] = function_ref @$s15borrow_accessor12GenNCWrapperVAARi_zrlE3ncwAA0D0Vvz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout GenNCWrapper<τ_0_0>) -> @inout NCWrapper
 // CHECK:  [[REG4:%.*]] = apply [[REG3]]<T>([[REG2]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@inout GenNCWrapper<τ_0_0>) -> @inout NCWrapper
-// CHECK:  [[REG5:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG4]]
+// CHECK:  [[REG5:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[REG4]]
 // CHECK:  [[REG6:%.*]] = function_ref @$s15borrow_accessor9NCWrapperV2ncAA2NCVvz : $@convention(method) (@inout NCWrapper) -> @inout NC
 // CHECK:  [[REG7:%.*]] = apply [[REG6]]([[REG5]]) : $@convention(method) (@inout NCWrapper) -> @inout NC
-// CHECK:  [[REG8:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG7]]
+// CHECK:  [[REG8:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[REG7]]
 // CHECK:  return [[REG8]]
 // CHECK: }
 
@@ -828,7 +828,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK:  [[REG6:%.*]] = apply [[REG5]]([[REG3]], [[REG4]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:  [[REG7:%.*]] = function_ref @$s15borrow_accessor12GenNCWrapperVAARi_zrlEyxSiciz : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @inout GenNCWrapper<τ_0_0>) -> @inout τ_0_0
 // CHECK:  [[REG8:%.*]] = apply [[REG7]]<T>([[REG6]], [[REG2]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @inout GenNCWrapper<τ_0_0>) -> @inout τ_0_0
-// CHECK:  [[REG9:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG8]]
+// CHECK:  [[REG9:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[REG8]]
 // CHECK:  return [[REG9]]
 // CHECK: }
 

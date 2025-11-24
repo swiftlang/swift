@@ -1,3 +1,6 @@
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -o /dev/null -I %S/Inputs/custom-modules %s -verify -parse-as-library -Wwarning ExplicitSendable
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -o /dev/null -I %S/Inputs/custom-modules %s -verify -parse-as-library -Wwarning ExplicitSendable -strict-concurrency=targeted
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -o /dev/null -I %S/Inputs/custom-modules %s -verify -parse-as-library -Wwarning ExplicitSendable -strict-concurrency=complete
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -o /dev/null -I %S/Inputs/custom-modules %s -verify -parse-as-library -require-explicit-sendable
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -o /dev/null -I %S/Inputs/custom-modules %s -verify -parse-as-library -require-explicit-sendable -strict-concurrency=targeted
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -o /dev/null -I %S/Inputs/custom-modules %s -verify -parse-as-library -require-explicit-sendable -strict-concurrency=complete

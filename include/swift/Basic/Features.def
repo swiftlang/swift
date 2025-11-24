@@ -495,10 +495,6 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 /// Import inherited non-public members when importing C++ classes.
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
-/// Suppress the synthesis of static factory methods for C++ foreign reference
-/// types and importing them as Swift initializers.
-EXPERIMENTAL_FEATURE(SuppressCXXForeignReferenceTypeInitializers, true)
-
 /// modify/read single-yield coroutines
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 
@@ -540,7 +536,7 @@ EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, false)
 
 /// Allow use of @inline(always) attribute
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(InlineAlways, false)
+SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
 
 /// Allow use of 'Swift' (Swift runtime version) in @available attributes
 EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
@@ -557,6 +553,16 @@ EXPERIMENTAL_FEATURE(EmbeddedExistentials, false)
 
 /// Allow use of the 'anyAppleOS' availability domain.
 EXPERIMENTAL_FEATURE(AnyAppleOSAvailability, true)
+
+/// Check @_implementationOnly imports in non-library-evolution mode.
+EXPERIMENTAL_FEATURE(CheckImplementationOnly, true)
+
+/// Extends CheckImplementationOnly with an extra check at serialization to
+/// report references to implementation-only imported modules.
+EXPERIMENTAL_FEATURE(CheckImplementationOnlyStrict, false)
+
+/// Check that use sites have the required @_spi import for operators.
+EXPERIMENTAL_FEATURE(EnforceSPIOperatorGroup, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

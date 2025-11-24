@@ -416,21 +416,22 @@ protected:
         });
       }
 
-      SubsMap = SubsMap.mapReplacementTypesOutOfContext();
+      SubsMap = SubsMap.mapReplacementTypesOutOfEnvironment();
     }
 
     // One abstract function in the debug info can only have one set of variables
     // and types. We check if the function is called with non-identity substitutions
     // to decide whether it's necessary to clone a unique copy of the function
     // declaration with the substitutions applied for the debug info.
-    if (SubsMap.isIdentity())
+    if (SubsMap.isIdentity() &&
+        !SubsMap.getRecursiveProperties().hasTypeParameter())
       return ParentFunction;
 
-    // Note that mapReplacementTypesOutOfContext() can't do anything for
+    // Note that mapReplacementTypesOutOfEnvironment() can't do anything for
     // opened existentials, and since archetypes can't be mangled, ignore
     // this case for now.
     if (SubsMap.getRecursiveProperties().hasLocalArchetype())
-      return ParentFunction;
+      SubsMap = {};
 
     // Clone the function with the substituted type for the debug info.
     Mangle::GenericSpecializationMangler Mangler(M.getASTContext(), ParentFunction,

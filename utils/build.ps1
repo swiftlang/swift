@@ -120,7 +120,7 @@ Skip building the MSI installers and packaging. Useful for development builds.
 
 .PARAMETER Test
 An array of names of projects to run tests for. Use '*' to run all tests.
-Available tests: lld, lldb, swift, dispatch, foundation, xctest, swift-format, sourcekit-lsp
+Available tests: lld, lldb, lldb-swift, swift, dispatch, foundation, xctest, swift-format, sourcekit-lsp
 
 .PARAMETER IncludeDS2
 Include the ds2 remote debug server in the SDK.
@@ -157,6 +157,10 @@ param
   [switch] $EnableCaching,
   [ValidatePattern('^\d+(\.\d+)*$')]
   [string] $SCCacheVersion = "0.10.0",
+
+  # Build with CAS
+  [switch] $EnableCAS = $false,
+  [string] $CASPath = "$ImageRoot\cas",
 
   # SBoM Support
   [switch] $IncludeSBoM = $false,
@@ -258,7 +262,7 @@ if ($Test.Length -eq 1) { $Test = $Test[0].Split(",") }
 
 if ($Test -contains "*") {
   # Explicitly don't include llbuild yet since tests are known to fail on Windows
-  $Test = @("lld", "lldb", "swift", "dispatch", "foundation", "xctest", "swift-format", "sourcekit-lsp")
+  $Test = @("lld", "lldb", "lldb-swift", "swift", "dispatch", "foundation", "xctest", "swift-format", "sourcekit-lsp")
 }
 
 if ($UseHostToolchain -is [string]) {
@@ -269,14 +273,14 @@ if ($UseHostToolchain -is [string]) {
 
 $DefaultPinned = @{
   AMD64 = @{
-    PinnedBuild = "https://download.swift.org/swift-6.1.2-release/windows10/swift-6.1.2-RELEASE/swift-6.1.2-RELEASE-windows10.exe";
-    PinnedSHA256 = "92A0323ED7DD333C3B05E6E0E428F3A91C77D159F6CCFC8626A996F2ACE09A0B";
-    PinnedVersion = "6.1.2";
+    PinnedBuild = "https://download.swift.org/development/windows10/swift-DEVELOPMENT-SNAPSHOT-2025-11-03-a/swift-DEVELOPMENT-SNAPSHOT-2025-11-03-a-windows10.exe";
+    PinnedSHA256 = "1B93C9B419070925E5ABCD1A273C510121E9928554876EC0DCA530121D8C93D3";
+    PinnedVersion = "0.0.0";
   };
   ARM64 = @{
-    PinnedBuild = "https://download.swift.org/swift-6.1.2-release/windows10-arm64/swift-6.1.2-RELEASE/swift-6.1.2-RELEASE-windows10-arm64.exe";
-    PinnedSHA256 = "121FB407E578178F82DCCF39A4D03527873D8F7611A801A8FC26DA52503A0C5C";
-    PinnedVersion = "6.1.2";
+    PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2025-11-03-a/swift-DEVELOPMENT-SNAPSHOT-2025-11-03-a-windows10-arm64.exe"
+    PinnedSHA256 = "A4394A53082BC0346A0D85C6B4A52F540A29517D594288707B8C1D6BAA0B9E55";
+    PinnedVersion = "0.0.0";
   };
 }
 
@@ -415,9 +419,17 @@ $KnownPythons = @{
       URL = "https://www.nuget.org/api/v2/package/python/3.10.1";
       SHA256 = "987a0e446d68900f58297bc47dc7a235ee4640a49dace58bc9f573797d3a8b33";
     };
+    AMD64_Embedded = @{
+      URL = "https://www.python.org/ftp/python/3.10.1/python-3.10.1-embed-amd64.zip";
+      SHA256 = "502670dcdff0083847abf6a33f30be666594e7e5201cd6fccd4a523b577403de";
+    };
     ARM64 = @{
       URL = "https://www.nuget.org/api/v2/package/pythonarm64/3.10.1";
       SHA256 = "16becfccedf1269ff0b8695a13c64fac2102a524d66cecf69a8f9229a43b10d3";
+    };
+    ARM64_Embedded = @{
+      URL = "https://www.python.org/ftp/python/3.10.1/python-3.10.1-embed-arm64.zip";
+      SHA256 = "1f9e215fe4e8f22a8e8fba1859efb1426437044fb3103ce85794630e3b511bc2";
     };
   };
 }
@@ -559,6 +571,12 @@ if (-not $PinnedBuild) {
 }
 
 $PinnedToolchain = [IO.Path]::GetFileNameWithoutExtension($PinnedBuild)
+# Use a shorter name in paths to avoid going over the path length limit.
+$ToolchainVersionIdentifier = $PinnedToolchain -replace 'swift-(.+?)-windows10.*', '$1'
+
+if ($EnableCAS -and ($UseHostToolchain -or ($PinnedVersion -ne "0.0.0"))) {
+  throw "CAS currently requires using a main-branch pinned toolchain."
+}
 
 $HostPlatform = switch ($HostArchName) {
   "AMD64" { $KnownPlatforms[$HostOS.ToString() + "X64"] }
@@ -743,12 +761,20 @@ function Get-PythonPath([Hashtable] $Platform) {
   return [IO.Path]::Combine("$BinaryCache\", "Python$($Platform.Architecture.CMakeName)-$PythonVersion")
 }
 
+function Get-EmbeddedPythonPath([Hashtable] $Platform) {
+  return [IO.Path]::Combine("$BinaryCache\", "EmbeddedPython$($Platform.Architecture.CMakeName)-$PythonVersion")
+}
+
 function Get-PythonExecutable {
   return [IO.Path]::Combine((Get-PythonPath $BuildPlatform), "tools", "python.exe")
 }
 
 function Get-PythonScriptsPath {
   return [IO.Path]::Combine((Get-PythonPath $BuildPlatform), "tools", "Scripts")
+}
+
+function Get-EmbeddedPythonInstallDir() {
+  return [IO.Path]::Combine("$ImageRoot\", "Program Files", "Swift", "Python-$PythonVersion")
 }
 
 function Get-Syft {
@@ -835,6 +861,7 @@ enum Project {
   RegsGen2
   BootstrapFoundationMacros
   BootstrapTestingMacros
+  EarlySwiftDriver
 
   CDispatch
   Compilers
@@ -851,6 +878,7 @@ enum Project {
   Certificates
   System
   Subprocess
+  ToolsProtocols
   Build
   PackageManager
   PackageManagerRuntime
@@ -1119,6 +1147,10 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
   }
 }
 
+function Get-PythonLibName() {
+  return "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
+}
+
 function Get-Dependencies {
   Record-OperationTime $BuildPlatform "Get-Dependencies" {
     function Write-Success([string] $Description) {
@@ -1252,18 +1284,20 @@ function Get-Dependencies {
       Write-Success "syft $SyftVersion"
     }
 
-    function Get-KnownPython([string] $ArchName) {
+    function Get-KnownPython([string] $ArchName, [bool] $EmbeddedPython = $false) {
       if (-not $KnownPythons.ContainsKey($PythonVersion)) {
         throw "Unknown python version: $PythonVersion"
       }
-      return $KnownPythons[$PythonVersion].$ArchName
+      $Key = $(if ($EmbeddedPython) { "${ArchName}_Embedded" } else { $ArchName })
+      return $KnownPythons[$PythonVersion][$Key]
     }
 
-    function Install-Python([string] $ArchName) {
-      $Python = Get-KnownPython $ArchName
-      DownloadAndVerify $Python.URL "$BinaryCache\Python$ArchName-$PythonVersion.zip" $Python.SHA256
+    function Install-Python([string] $ArchName, [bool] $EmbeddedPython = $false) {
+      $Python = Get-KnownPython $ArchName $EmbeddedPython
+      $FileName = $(if ($EmbeddedPython) { "EmbeddedPython$ArchName-$PythonVersion" } else { "Python$ArchName-$PythonVersion" })
+      DownloadAndVerify $Python.URL "$BinaryCache\$FileName.zip" $Python.SHA256
       if (-not $ToBatch) {
-        Expand-ZipFile Python$ArchName-$PythonVersion.zip "$BinaryCache" Python$ArchName-$PythonVersion
+        Expand-ZipFile "$FileName.zip" "$BinaryCache" "$FileName"
         Write-Success "$ArchName Python $PythonVersion"
       }
     }
@@ -1311,15 +1345,17 @@ function Get-Dependencies {
       Install-PIPIfNeeded
       Install-PythonModule "packaging"  # For building LLVM 18+
       Install-PythonModule "setuptools" # Required for SWIG support
-      if ($Test -contains "lldb") {
+      if ($Test -contains "lldb" -or $Test -contains "lldb-swift") {
         Install-PythonModule "psutil"   # Required for testing LLDB
       }
     }
 
     # Ensure Python modules that are required as host build tools
     Install-Python $HostArchName
+    Install-Python $HostArchName $true
     if ($IsCrossCompiling) {
       Install-Python $BuildArchName
+      Install-Python $BuildArchName $true
     }
     Install-PythonModules
 
@@ -1345,7 +1381,7 @@ function Get-Dependencies {
 
     DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
 
-    if ($Test -contains "lldb") {
+    if ($Test -contains "lldb" -or $Test -contains "lldb-swift") {
       # The make tool isn't part of MSYS
       $GnuWin32MakeURL = "https://downloads.sourceforge.net/project/ezwinports/make-4.4.1-without-guile-w32-bin.zip"
       $GnuWin32MakeHash = "fb66a02b530f7466f6222ce53c0b602c5288e601547a034e4156a512dd895ee7"
@@ -1356,7 +1392,7 @@ function Get-Dependencies {
 
     # TODO(compnerd) stamp/validate that we need to re-extract
     New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
-    Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain.TrimStart("swift-").TrimEnd("-a-windows10")
+    Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $ToolchainVersionIdentifier
     Write-Success "Swift Toolchain $PinnedVersion"
 
     if ($Android) {
@@ -1410,9 +1446,7 @@ function Get-Dependencies {
 }
 
 function Get-PinnedToolchainToolsDir() {
-  $ToolchainName = $PinnedToolchain.TrimStart("swift-").TrimEnd("-a-windows10")
-
-  $ToolchainsRoot = [IO.Path]::Combine("$BinaryCache\toolchains", "$ToolchainName", "LocalApp", "Programs", "Swift", "Toolchains")
+  $ToolchainsRoot = [IO.Path]::Combine("$BinaryCache\toolchains", "$ToolchainVersionIdentifier", "LocalApp", "Programs", "Swift", "Toolchains")
 
   # NOTE: Add a workaround for the main snapshots that inadvertently used the
   # wrong version when they were built. This allows use of the nightly snapshot
@@ -1437,17 +1471,13 @@ function Get-PinnedToolchainToolsDir() {
 }
 
 function Get-PinnedToolchainSDK([OS] $OS = $BuildPlatform.OS, [string] $Identifier = $OS.ToString()) {
-  $ToolchainName = $PinnedToolchain.TrimStart("swift-").TrimEnd("-a-windows10")
-
-  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $ToolchainName,
+  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $ToolchainVersionIdentifier,
     "LocalApp", "Programs", "Swift", "Platforms", (Get-PinnedToolchainVersion),
     "$($OS.ToString()).platform", "Developer", "SDKs", "$Identifier.sdk")
 }
 
 function Get-PinnedToolchainRuntime() {
-  $ToolchainName = $PinnedToolchain.TrimStart("swift-").TrimEnd("-a-windows10")
-
-  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $ToolchainName,
+  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $ToolchainVersionIdentifier,
     "LocalApp", "Programs", "Swift", "Runtimes", (Get-PinnedToolchainVersion),
     "usr", "bin")
 }
@@ -1616,6 +1646,14 @@ function Build-CMakeProject {
             @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline")
           }
 
+          if ($EnableCAS -and $UsePinnedCompilers.Contains("C")) {
+            $CFLAGS += if ($UseGNUDriver) {
+              @("-fdepscan=inline", "-fdepscan-include-tree", "-Xclang", "-fcas-path", "-Xclang", $CASPath)
+            } else {
+              @("/clang:-fdepscan=inline", "/clang:-fdepscan-include-tree", "-Xclang", "-fcas-path", "-Xclang", $CASPath)
+            }
+          }
+
           if ($DebugInfo) {
             if ($UsePinnedCompilers.Contains("C") -or $UseBuiltCompilers.Contains("C")) {
               if ($CDebugFormat -eq "dwarf") {
@@ -1656,6 +1694,14 @@ function Build-CMakeProject {
             @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:__cplusplus")
           }
 
+          if ($EnableCAS -and $UsePinnedCompilers.Contains("CXX")) {
+            $CXXFLAGS += if ($UseGNUDriver) {
+              @("-fdepscan=inline", "-fdepscan-include-tree", "-Xclang", "-fcas-path", "-Xclang", $CASPath)
+            } else {
+              @("/clang:-fdepscan=inline", "/clang:-fdepscan-include-tree", "-Xclang", "-fcas-path", "-Xclang", $CASPath)
+            }
+          }
+
           if ($DebugInfo) {
             if ($UsePinnedCompilers.Contains("CXX") -or $UseBuiltCompilers.Contains("CXX")) {
               if ($CDebugFormat -eq "dwarf") {
@@ -1684,9 +1730,6 @@ function Build-CMakeProject {
 
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
-
-          # TODO(compnerd): remove this once we have the early swift-driver
-          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
 
           [string[]] $SwiftFlags = @();
 
@@ -1803,9 +1846,6 @@ function Build-CMakeProject {
           }
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER $SWIFTC
           Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_TARGET $Platform.Triple
-
-          # TODO(compnerd) remove this once we have the early swift-driver
-          Add-KeyValueIfNew $Defines CMAKE_Swift_COMPILER_USE_OLD_DRIVER "YES"
 
           [string[]] $SwiftFlags = @()
 
@@ -2120,6 +2160,26 @@ function Build-BuildTools([Hashtable] $Platform) {
     }
 }
 
+function Build-EarlySwiftDriver {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-driver `
+    -Bin (Get-ProjectBinaryCache $Platform EarlySwiftDriver) `
+    -Platform $BuildPlatform `
+    -UsePinnedCompilers C,CXX,Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK -OS $BuildPlatform.OS -Identifier "$($BuildPlatform.OS)Experimental") `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      BUILD_TESTING = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      # TODO(compnerd) - remove `-Xfrontend -use-static-resource-dir` - this is inferred by the `-static-stdlib`.
+      CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
+      SWIFT_DRIVER_BUILD_TOOLS = "NO";
+      SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
+      SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib";
+    }
+}
+
 function Write-PList {
   [CmdletBinding(PositionalBinding = $false)]
   param
@@ -2169,7 +2229,7 @@ function Build-CDispatch([Hashtable] $Platform, [switch] $Static = $false) {
 function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch] $Test) {
   $BuildTools = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform BuildTools), "bin")
   $PythonRoot = [IO.Path]::Combine((Get-PythonPath $Platform), "tools")
-  $PythonLibName = "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
+  $PythonLibName = Get-PythonLibName
 
   $TestDefines = if ($Test) {
     @{
@@ -2206,12 +2266,14 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
   return $TestDefines + $DebugDefines + @{
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
+    CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     CMAKE_Swift_FLAGS = $SwiftFlags;
     LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
     LLDB_LIBXML2_VERSION = "2.11.5";
     LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
     LLDB_PYTHON_EXT_SUFFIX = ".pyd";
     LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
+    LLDB_PYTHON_DLL_RELATIVE_PATH = "../../../../Python-$PythonVersion";
     LLDB_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "lldb-tblgen.exe");
     LLDB_TEST_MAKE = "$BinaryCache\GnuWin32Make-4.4.1\bin\make.exe";
     LLVM_CONFIG_PATH = (Join-Path -Path $BuildTools -ChildPath "llvm-config.exe");
@@ -2236,9 +2298,11 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     Python3_INCLUDE_DIR = "$PythonRoot\include";
     Python3_LIBRARY = "$PythonRoot\libs\$PythonLibName.lib";
     Python3_ROOT_DIR = $PythonRoot;
+    Python3_VERSION = $PythonVersion;
     SWIFT_TOOLCHAIN_VERSION = "${ToolchainIdentifier}";
     SWIFT_BUILD_SWIFT_SYNTAX = "YES";
     SWIFT_CLANG_LOCATION = (Get-PinnedToolchainToolsDir);
+    SWIFT_EARLY_SWIFT_DRIVER_BUILD = "$(Get-ProjectBinaryCache $BuildPlatform EarlySwiftDriver)\bin";
     SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING = "YES";
@@ -2279,7 +2343,7 @@ function Build-Compilers([Hashtable] $Platform, [string] $Variant) {
   Write-PList -Settings $Settings -Path "$($Platform.ToolchainInstallRoot)\ToolchainInfo.plist"
 }
 
-function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLVM, [switch] $TestSwift) {
+function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift) {
   Invoke-IsolatingEnvVars {
     $env:Path = "$(Get-CMarkBinaryCache $Platform)\src;$(Get-ProjectBinaryCache $BuildPlatform Compilers)\tools\swift\libdispatch-windows-$($Platform.Architecture.LLVMName)-prefix\bin;$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
     $TestingDefines = Get-CompilersDefines $Platform $Variant -Test
@@ -2287,9 +2351,9 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
     if ($TestSwift) { $Targets += @("check-swift", "SwiftCompilerPlugin") }
-    if ($TestLLDB) {
-      $Targets += @("check-lldb")
-
+    if ($TestLLDB) { $Targets += @("check-lldb") }
+    if ($TestLLDBSwift) { $Targets += @("check-lldb-swift") }
+    if ($TestLLDB -or $TestLLDBSwift) {
       # Override test filter for known issues in downstream LLDB
       Load-LitTestOverrides ([IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, "..", "..", "llvm-project", "lldb", "test", "windows-swift-llvm-lit-test-overrides.txt")))
 
@@ -3107,6 +3171,7 @@ function Test-Foundation {
     -Src $SourceCache\swift-foundation `
     -Bin "$ScratchPath" `
     -Platform $BuildPlatform `
+    -Configuration $FoundationTestConfiguration `
     --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
     --test-product swift-foundationPackageTests
 
@@ -3123,6 +3188,7 @@ function Test-Foundation {
       -Src $SourceCache\swift-corelibs-foundation `
       -Bin "$ScratchPath" `
       -Platform $BuildPlatform `
+      -Configuration $FoundationTestConfiguration `
       --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
       --test-product swift-corelibs-foundationPackageTests
   }
@@ -3443,6 +3509,20 @@ function Build-Subprocess([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      SwiftSystem_DIR = (Get-ProjectCMakeModules $Platform System);
+    }
+}
+
+function Build-ToolsProtocols([Hashtable] $Platform) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-tools-protocols `
+    -Bin (Get-ProjectBinaryCache $Platform ToolsProtocols) `
+    -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX,Swift `
+    -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
     }
 }
 
@@ -3466,6 +3546,7 @@ function Build-Build([Hashtable] $Platform) {
       SwiftDriver_DIR = (Get-ProjectCMakeModules $Platform Driver);
       SwiftSystem_DIR = (Get-ProjectCMakeModules $Platform System);
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
+      SwiftToolsProtocols_DIR = (Get-ProjectCMakeModules $Platform ToolsProtocols);
       SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
       SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib";
     } + $ArchSpecificOptions)
@@ -3659,6 +3740,7 @@ function Build-PackageManager([Hashtable] $Platform) {
       ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
       SwiftDriver_DIR = (Get-ProjectCMakeModules $Platform Driver);
       SwiftBuild_DIR = (Get-ProjectCMakeModules $Platform Build);
+      SwiftToolsProtocols_DIR = (Get-ProjectCMakeModules $Platform ToolsProtocols);
       SwiftCrypto_DIR = (Get-ProjectCMakeModules $Platform Crypto);
       SwiftCollections_DIR = (Get-ProjectCMakeModules $Platform Collections);
       SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
@@ -3812,6 +3894,7 @@ function Build-SourceKitLSP([Hashtable] $Platform) {
       SwiftPM_DIR = (Get-ProjectCMakeModules $Platform PackageManager);
       LMDB_DIR = (Get-ProjectCMakeModules $Platform LMDB);
       IndexStoreDB_DIR = (Get-ProjectCMakeModules $Platform IndexStoreDB);
+      SwiftToolsProtocols_DIR = (Get-ProjectCMakeModules $Platform ToolsProtocols);
     }
 }
 
@@ -3870,6 +3953,10 @@ function Test-SourceKitLSP {
     "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform IndexStoreDB)\Sources\IndexStoreDB_Index\Index.lib",
     "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform IndexStoreDB)\Sources\IndexStoreDB_LLVMSupport\LLVMSupport.lib",
     "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform IndexStoreDB)\Sources\IndexStoreDB_Support\Support.lib",
+    # swift-tools-protocols
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform ToolsProtocols)\swift",
+    "-Xswiftc", "-I$SourceCache\swift-tools-protocols\Sources\ToolsProtocolsCAtomics\include",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform ToolsProtocols)\lib",
     # LMDB
     "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform LMDB)\lib\CLMDB.lib",
     # sourcekit-lsp
@@ -3938,6 +4025,12 @@ function Install-HostToolchain() {
   Copy-Item -Force `
     -Path $SwiftDriver `
     -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swiftc.exe"
+
+  # Copy embeddable Python
+  New-Item -Type Directory -Path "$(Get-EmbeddedPythonInstallDir)" -ErrorAction Ignore | Out-Null
+  Copy-Item -Force -Recurse `
+    -Path "$(Get-EmbeddedPythonPath $HostPlatform)\*" `
+    -Destination "$(Get-EmbeddedPythonInstallDir)"
 }
 
 function Build-Inspect([Hashtable] $Platform) {
@@ -3974,13 +4067,38 @@ function Build-Inspect([Hashtable] $Platform) {
     }
 }
 
-function Build-DocC() {
-  Build-SPMProject `
-    -Action Build `
+function Build-SymbolKit([hashtable] $Platform) {
+  Build-CMakeProject `
+    -Src $SourceCache\swift-docc-symbolkit `
+    -Bin $(Get-ProjectBinaryCache $Platform SymbolKit) `
+    -BuildTargets default `
+    -Platform $Platform `
+    -UseBuiltCompilers C,Swift `
+    -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
+    -Defines @{
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+    }
+}
+
+function Build-DocC([hashtable] $Platform) {
+  Build-CMakeProject `
     -Src $SourceCache\swift-docc `
-    -Bin $(Get-ProjectBinaryCache $BuildPlatform DocC) `
-    -Platform $BuildPlatform `
-    --product docc
+    -Bin (Get-ProjectBinaryCache $BuildPlatform DocC) `
+    -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+    -Platform $Platform `
+    -UseBuiltCompilers C,Swift `
+    -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
+    -Defines @{
+      BUILD_SHARED_LIBS = "YES";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
+      SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
+      SwiftCrypto_DIR = (Get-ProjectCMakeModules $Platform Crypto);
+      SwiftMarkdown_DIR = (Get-ProjectCMakeModules $Platform Markdown);
+      LMDB_DIR = (Get-ProjectCMakeModules $Platform LMDB);
+      SymbolKit_DIR = (Get-ProjectCMakeModules $Platform SymbolKit);
+      "cmark-gfm_DIR" = "$($Platform.ToolchainInstallRoot)\usr\lib\cmake";
+    }
 }
 
 function Test-PackageManager() {
@@ -4011,6 +4129,7 @@ function Build-Installer([Hashtable] $Platform) {
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     SWIFT_DOCC_BUILD = "$(Get-ProjectBinaryCache $HostPlatform DocC)\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
+    PythonVersion = $PythonVersion
   }
 
   Invoke-IsolatingEnvVars {
@@ -4114,6 +4233,8 @@ if (-not $SkipBuild) {
 
   Invoke-BuildStep Build-CMark $BuildPlatform
   Invoke-BuildStep Build-BuildTools $BuildPlatform
+  Invoke-BuildStep Build-SQLite $BuildPlatform
+  Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
   if ($IsCrossCompiling) {
     Invoke-BuildStep Build-XML2 $BuildPlatform
     Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts"
@@ -4196,12 +4317,12 @@ if (-not $SkipBuild) {
           foreach ($Build in $WindowsSDKBuilds) {
             Invoke-BuildStep Build-ExperimentalSDK $Build
 
-            Get-ChildItem "${SDKROOT}\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+            Get-ChildItem -ErrorAction Ignore "${SDKROOT}\usr\lib\swift\windows" -Filter "*.lib" -File | ForEach-Object {
               Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
               Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\windows\$($Build.Architecture.LLVMName)\" | Out-Null
             }
 
-            Get-ChildItem "${SDKROOT}\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+            Get-ChildItem -ErrorAction Ignore "${SDKROOT}\usr\lib\swift_static\windows" -Filter "*.lib" -File | ForEach-Object {
               Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
               Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\windows\$($Build.Architecture.LLVMName)\" | Out-Null
             }
@@ -4278,7 +4399,7 @@ if (-not $SkipBuild) {
               Move-Item $_.FullName "${SDKROOT}\usr\lib\swift\android\$($Build.Architecture.LLVMName)\" | Out-Null
             }
 
-            Get-ChildItem "${SDKROOT}\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+            Get-ChildItem -ErrorAction Ignore "${SDKROOT}\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
               Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
               Move-Item $_.FullName "${SDKROOT}\usr\lib\swift_static\android\$($Build.Architecture.LLVMName)\" | Out-Null
             }
@@ -4331,6 +4452,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Certificates $HostPlatform
   Invoke-BuildStep Build-System $HostPlatform
   Invoke-BuildStep Build-Subprocess $HostPlatform
+  Invoke-BuildStep Build-ToolsProtocols $HostPlatform
   Invoke-BuildStep Build-Build $HostPlatform
   Invoke-BuildStep Build-PackageManager $HostPlatform
   Invoke-BuildStep Build-Markdown $HostPlatform
@@ -4351,7 +4473,8 @@ if (-not $SkipBuild -and $IncludeNoAsserts) {
   Build-NoAssertsToolchain
 }
 
-if (-not $SkipBuild -and -not $IsCrossCompiling) {
+if (-not $SkipBuild) {
+  Invoke-BuildStep Build-SymbolKit $HostPlatform
   Invoke-BuildStep Build-DocC $HostPlatform
 }
 
@@ -4368,12 +4491,13 @@ if ($Stage) {
 }
 
 if (-not $IsCrossCompiling) {
-  $CompilersTests = @("clang", "lld", "lldb", "llvm", "swift")
+  $CompilersTests = @("clang", "lld", "lldb", "lldb-swift", "llvm", "swift")
   if ($Test | Where-Object { $CompilersTests -contains $_ }) {
     $Tests = @{
       "-TestClang" = $Test -contains "clang";
       "-TestLLD" = $Test -contains "lld";
       "-TestLLDB" = $Test -contains "lldb";
+      "-TestLLDBSwift" = $Test -contains "lldb-swift";
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
     }

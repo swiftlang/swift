@@ -209,7 +209,7 @@ public:
 
   /// Swap archetypes in the substitution map's replacement types with their
   /// interface types.
-  SubstitutionMap mapReplacementTypesOutOfContext() const;
+  SubstitutionMap mapReplacementTypesOutOfEnvironment() const;
 
   /// Verify that the conformances stored in this substitution map match the
   /// replacement types provided.

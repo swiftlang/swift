@@ -775,7 +775,7 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
 
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
     let user = operand.instruction
-    if user is ReturnInst {
+    if user is ReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }
@@ -805,7 +805,7 @@ private struct PartialApplyEffectsVisitor : EscapeVisitorWithResult {
 
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
     let user = operand.instruction
-    if user is ReturnInst {
+    if user is ReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }
@@ -848,7 +848,7 @@ private struct EscapesToInstructionVisitor : EscapeVisitor {
     if user == target {
       return .abort
     }
-    if user is ReturnInst {
+    if user is ReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }

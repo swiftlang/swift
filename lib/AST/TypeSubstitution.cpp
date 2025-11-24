@@ -87,7 +87,7 @@ operator()(InFlightSubstitution &IFS, Type dependentType,
            ProtocolDecl *conformedProtocol) const {
   if (dependentType->is<PrimaryArchetypeType>() ||
       dependentType->is<PackArchetypeType>())
-    dependentType = dependentType->mapTypeOutOfContext();
+    dependentType = dependentType->mapTypeOutOfEnvironment();
 
   auto result = Subs.lookupConformance(
       dependentType->getCanonicalType(),
@@ -760,7 +760,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     if (baseTy && baseTy->is<ErrorType>())
       substTy = ErrorType::get(baseTy->getASTContext());
     else if (genericEnv)
-      substTy = genericEnv->mapTypeIntoContext(gp);
+      substTy = genericEnv->mapTypeIntoEnvironment(gp);
 
     if (gp->isParameterPack() && !substTy->hasError())
       substTy = PackType::getSingletonPackExpansion(substTy);
@@ -819,7 +819,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
                 param);
           }
           if (genericEnv) {
-            substGenericParam = genericEnv->mapTypeIntoContext(
+            substGenericParam = genericEnv->mapTypeIntoEnvironment(
                 substGenericParam);
           }
 
@@ -1123,7 +1123,7 @@ ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
 ProtocolConformanceRef ReplaceOpaqueTypesWithUnderlyingTypes::
 operator()(InFlightSubstitution &IFS, Type maybeOpaqueType,
            ProtocolDecl *protocol) const {
-  auto archetype = dyn_cast<OpaqueTypeArchetypeType>(maybeOpaqueType);
+  auto *archetype = maybeOpaqueType->getAs<OpaqueTypeArchetypeType>();
   if (!archetype)
     return ProtocolConformanceRef::forAbstract(maybeOpaqueType, protocol);
 
@@ -1194,7 +1194,7 @@ Type ReplaceExistentialArchetypesWithConcreteTypes::operator()(
 
 ProtocolConformanceRef ReplaceExistentialArchetypesWithConcreteTypes::operator()(
     InFlightSubstitution &IFS, Type origType, ProtocolDecl *proto) const {
-  auto existentialArchetype = dyn_cast<ExistentialArchetypeType>(origType);
+  auto *existentialArchetype = origType->getAs<ExistentialArchetypeType>();
   if (!existentialArchetype ||
       existentialArchetype->getGenericEnvironment() != env)
     return ProtocolConformanceRef::forAbstract(origType.subst(IFS), proto);

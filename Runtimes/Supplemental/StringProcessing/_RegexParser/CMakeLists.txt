@@ -32,7 +32,8 @@ add_library(swift_RegexParser
   Utility/MissingUnicode.swift)
 
 target_link_libraries(swift_RegexParser PRIVATE
-  swiftCore)
+  swiftCore
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
 set_target_properties(swift_RegexParser PROPERTIES
   Swift_MODULE_NAME _RegexParser)

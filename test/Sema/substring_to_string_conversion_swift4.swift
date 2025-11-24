@@ -30,7 +30,7 @@ do {
   func foo(x: String = ss) {} // expected-error {{default argument value of type 'Substring' cannot be converted to type 'String'}} {{24-24=String(}} {{26-26=)}}
 }
 
-// CTP_CalleeResult
+// CTP_Initialization
 do {
   func getSubstring() -> Substring { return ss }
   let gottenString : String = getSubstring() // expected-error {{cannot convert value of type 'Substring' to specified type 'String'}} {{31-31=String(}} {{45-45=)}}

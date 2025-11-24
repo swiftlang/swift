@@ -996,11 +996,6 @@ void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
                                insert->getResultInterfaceType());
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSet});
 
-  // If this isn't a std::multiset, try to also synthesize the conformance to
-  // CxxUniqueSet.
-  if (!isStdDecl(clangDecl, {"set", "unordered_set"}))
-    return;
-
   ProtocolDecl *cxxInputIteratorProto =
       ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
   if (!cxxInputIteratorProto)
@@ -1025,6 +1020,12 @@ void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
                                rawIteratorTy);
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
                                rawMutableIteratorTy);
+
+  // If this isn't a std::multiset, try to also synthesize the conformance to
+  // CxxUniqueSet.
+  if (!isStdDecl(clangDecl, {"set", "unordered_set"}))
+    return;
+
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxUniqueSet});
 }
 

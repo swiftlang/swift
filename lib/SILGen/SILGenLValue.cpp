@@ -35,7 +35,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/SILGenUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -708,9 +708,7 @@ SILValue UnenforcedAccess::beginAccess(SILGenFunction &SGF, SILLocation loc,
   if (!SGF.getOptions().VerifyExclusivity)
     return address;
 
-  auto storage = AccessStorage::compute(address);
-  // Unsafe access may have invalid storage (e.g. a RawPointer).
-  if (storage && !isPossibleFormalAccessStorage(storage, &SGF.F))
+  if (isPossibleUnsafeAccessInvalidStorage(address, &SGF.F))
     return address;
 
   auto BAI =

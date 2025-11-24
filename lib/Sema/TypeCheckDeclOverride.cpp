@@ -177,15 +177,15 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
     // behavior by not considering generic declarations in protocols as
     // overrides at all.
     if (decl->getDeclContext()->getSelfProtocolDecl() &&
-        declCtx->isGeneric())
+        declCtx->hasGenericParamList())
       return false;
 
     auto *parentCtx = parentDecl->getAsGenericContext();
 
-    if (declCtx->isGeneric() != parentCtx->isGeneric())
+    if (declCtx->hasGenericParamList() != parentCtx->hasGenericParamList())
       return false;
 
-    if (declCtx->isGeneric() &&
+    if (declCtx->hasGenericParamList() &&
         (declCtx->getGenericParams()->size() !=
          parentCtx->getGenericParams()->size()))
       return false;
@@ -318,10 +318,10 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
   // If their genericity is different, they aren't compatible.
   if (auto genDecl = decl->getAsGenericContext()) {
     auto genParentDecl = parentDecl->getAsGenericContext();
-    if (genDecl->isGeneric() != genParentDecl->isGeneric())
+    if (genDecl->hasGenericParamList() != genParentDecl->hasGenericParamList())
       return false;
 
-    if (genDecl->isGeneric() &&
+    if (genDecl->hasGenericParamList() &&
         (genDecl->getGenericParams()->size() !=
          genParentDecl->getGenericParams()->size()))
       return false;
@@ -1600,6 +1600,7 @@ namespace  {
     UNINTERESTING_ATTR(DynamicCallable)
     UNINTERESTING_ATTR(DynamicMemberLookup)
     UNINTERESTING_ATTR(SILGenName)
+    UNINTERESTING_ATTR(Export)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ForbidSerializingReference)
     UNINTERESTING_ATTR(GKInspectable)
@@ -2085,11 +2086,11 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     if (baseThrownError && baseThrownError->hasTypeParameter()) {
       auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
       baseThrownError = baseThrownError.subst(subs);
-      baseThrownError = overrideFn->mapTypeIntoContext(baseThrownError);
+      baseThrownError = overrideFn->mapTypeIntoEnvironment(baseThrownError);
     }
 
     if (overrideThrownError)
-      overrideThrownError = overrideFn->mapTypeIntoContext(overrideThrownError);
+      overrideThrownError = overrideFn->mapTypeIntoEnvironment(overrideThrownError);
 
     // Check for a subtyping relationship.
     switch (compareThrownErrorsForSubtyping(

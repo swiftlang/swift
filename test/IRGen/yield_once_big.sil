@@ -129,6 +129,14 @@ entry(%flag : $Builtin.Int1):
   // CHECK-NEXT:    [[R6:%.*]] = load ptr, ptr [[T0]], align
   // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds{{.*}} [[BIGSUB]], ptr [[PTR]], i32 0, i32 7
   // CHECK-NEXT:    [[R7:%.*]] = load ptr, ptr [[T0]], align
+  // CHECK:         call void @swift_release(ptr [[R0]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R1]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R2]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R3]])
+  // CHECK:         call void @swift_release(ptr [[R4]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R5]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R6]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R7]])
 
   //   Branch.
   // CHECK-NEXT:    br i1 %0,
@@ -155,17 +163,9 @@ no:
   br cont
 
 cont:
-  // CHECK:         call void @swift_release(ptr [[R0]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R1]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R2]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R3]])
-  // CHECK:         call void @swift_release(ptr [[R4]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R5]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R6]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R7]])
   destroy_value %value : $Big<SomeSubclass>
 
-  // CHECK-NEXT:    ret void
+  // CHECK:         ret void
   %ret = tuple ()
   return %ret : $()
 }

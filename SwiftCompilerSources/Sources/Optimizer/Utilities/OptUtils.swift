@@ -72,10 +72,10 @@ extension Value {
       switch v {
       case let fw as ForwardingInstruction:
         worklist.pushIfNotVisited(contentsOf: fw.definedOperands.values)
+      case let ot as OwnershipTransitionInstruction where !(ot is CopyingInstruction):
+        worklist.pushIfNotVisited(ot.operand.value)
       case let bf as BorrowedFromInst:
         worklist.pushIfNotVisited(bf.borrowedValue)
-      case let bb as BeginBorrowInst:
-        worklist.pushIfNotVisited(bb.borrowedValue)
       case let arg as Argument:
         if let phi = Phi(arg) {
           worklist.pushIfNotVisited(contentsOf: phi.incomingValues)
@@ -880,7 +880,7 @@ private struct EscapesToValueVisitor : EscapeVisitor {
     if operand.value == target.value && path.projectionPath.mayOverlap(with: target.path) {
       return .abort
     }
-    if operand.instruction is ReturnInst {
+    if operand.instruction is ReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }
@@ -1001,6 +1001,23 @@ func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalTy
   }
 }
 
+func isCastSupportedInEmbeddedSwift(from sourceType: Type,
+                                    to destType: Type ) -> Bool {
+  if !sourceType.isExistential {
+    return false
+  }
+  if destType.hasArchetype {
+    return false
+  }
+
+  // Tuple?
+  if !destType.isStruct && !destType.isClass && !destType.isEnum {
+    return false
+  }
+
+  return true
+}
+
 extension CheckedCastAddrBranchInst {
   var dynamicCastResult: Bool? {
     switch classifyDynamicCastBridged(bridged) {
@@ -1009,6 +1026,18 @@ extension CheckedCastAddrBranchInst {
       case .willFail:    return false
       default: fatalError("unknown result from classifyDynamicCastBridged")
     }
+  }
+
+  var supportedInEmbeddedSwift: Bool {
+    return isCastSupportedInEmbeddedSwift(from: source.type,
+                                          to: destination.type)
+  }
+}
+
+extension UnconditionalCheckedCastAddrInst {
+  var supportedInEmbeddedSwift: Bool {
+    return isCastSupportedInEmbeddedSwift(from: source.type,
+                                          to: destination.type)
   }
 }
 
@@ -1100,9 +1129,6 @@ extension Type {
   /// False if expanding a type is invalid. For example, expanding a
   /// struct-with-deinit drops the deinit.
   func shouldExpand(_ context: some Context) -> Bool {
-    if !context.options.useAggressiveReg2MemForCodeSize {
-      return true
-    }
     return context.bridgedPassContext.shouldExpand(self.bridged)
   }
 }

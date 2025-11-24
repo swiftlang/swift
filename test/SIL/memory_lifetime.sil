@@ -532,6 +532,17 @@ bb0(%0 :  @guaranteed $T):
   return %res : $()
 }
 
+sil [ossa] @test_store_borrow_nested : $@convention(thin) (@guaranteed Inner) -> () {
+bb0(%0 :  @guaranteed $Inner):
+  %s = alloc_stack $Inner
+  %sb = store_borrow %0 to %s
+  %elem = struct_element_addr %sb, #Inner.a
+  end_borrow %sb
+  dealloc_stack %s
+  %res = tuple ()
+  return %res : $()
+}
+
 sil [ossa] @test_cast_br_take_always : $@convention(thin) <U, V> (@in U) -> () {
 bb0(%0 : $*U):
   %s = alloc_stack $V

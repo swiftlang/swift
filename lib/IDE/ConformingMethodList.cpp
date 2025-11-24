@@ -135,7 +135,7 @@ void ConformingMethodListCallbacks::readyForTypeChecking(SourceFile *SrcFile) {
 
   auto interfaceTy = T;
   if (T->hasArchetype())
-    interfaceTy = interfaceTy->mapTypeOutOfContext();
+    interfaceTy = interfaceTy->mapTypeOutOfEnvironment();
 
   llvm::SmallPtrSet<ProtocolDecl*, 8> expectedProtocols;
   for (auto Name: ExpectedTypeNames) {

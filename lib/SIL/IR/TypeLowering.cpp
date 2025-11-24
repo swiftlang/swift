@@ -258,6 +258,8 @@ namespace {
     }
 
     RetTy handleReference(CanType type) {
+      // TODO: Consider final classes with no user deinit to be
+      // HasOnlyDefaultDeinit.
       return handleReference(type, SILTypeProperties::forReference());
     }
 
@@ -754,6 +756,7 @@ namespace {
     RetTy
     visitArchetypeType(CanArchetypeType type, AbstractionPattern origType,
                        IsTypeExpansionSensitive_t isSensitive) {
+      // TODO: Add a HasOnlyDefaultDeinit "layout protocol".
       auto LayoutInfo = type->getLayoutConstraint();
       if (LayoutInfo) {
         if (LayoutInfo->isFixedSizeTrivial()) {
@@ -2625,6 +2628,9 @@ namespace {
       if (origType.isNoncopyable(structType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
+        if (D->getValueTypeDestructor()) {
+          properties.setCustomDeinit(MayHaveCustomDeinit);
+        }
         if (properties.isAddressOnly())
           return handleMoveOnlyAddressOnly(structType, properties);
         return new (TC) MoveOnlyLoadableStructTypeLowering(
@@ -2634,6 +2640,13 @@ namespace {
       // for lifetime diagnostics.
       if (!origType.isEscapable(structType)) {
         properties.setNonTrivial();
+      }
+      // Merge the CustomDeinit properties of the type parameters.
+      if (hasConditionalDefaultDeinit(structType, D)) {
+        auto genericProps = classifyTypeParameters(structType, TC, Expansion);
+        if (genericProps.mayHaveCustomDeinit() == HasOnlyDefaultDeinit) {
+          properties.setCustomDeinit(HasOnlyDefaultDeinit);
+        }
       }
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
                                                                     properties);
@@ -2728,6 +2741,9 @@ namespace {
       if (origType.isNoncopyable(enumType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
+        if (D->getValueTypeDestructor()) {
+          properties.setCustomDeinit(MayHaveCustomDeinit);
+        }
         if (properties.isAddressOnly())
           return handleMoveOnlyAddressOnly(enumType, properties);
         return new (TC)
@@ -2768,6 +2784,43 @@ namespace {
         return handleTrivial(type, props);
       }
       return new (TC) LoadableLoweringClass(type, props, Expansion);
+    }
+
+  private:
+    bool hasConditionalDefaultDeinit(CanType type, StructDecl *structDecl) {
+      if (type->isArray() || type->is_ArrayBuffer()
+          || type->is_ContiguousArrayBuffer() || type->isDictionary()) {
+        return true;
+      }
+      if (ProtocolDecl *DestructorSafeContainer =
+          TC.Context.getProtocol(KnownProtocolKind::DestructorSafeContainer)) {
+        return bool(lookupConformance(type, DestructorSafeContainer));
+      }
+      return false;
+    }
+
+    // Merge the type properties of all the generic parameters. Useful for
+    // summarizing the properties of indirectly stored types, such as Array
+    // elements. Only non-layout flags, such as CustomDeinitFlag are relevant in
+    // the result.
+    //
+    // This may return an incomplete 'isInfinite' lowering on self-recursion. In
+    // this case, the non-layout flags have their default values.
+    SILTypeProperties classifyTypeParameters(CanType type, TypeConverter &tc,
+                                             TypeExpansionContext expansion) {
+      TypeConverter::NonLayoutTypeRAII nonLayoutLowering(tc);
+      SILTypeProperties props;
+      if (auto bgt = dyn_cast<BoundGenericType>(type)) {
+        for (auto paramType : bgt->getGenericArgs()) {
+          // Use an opaque abstraction pattern for the element type because
+          // abstraction does not apply to the generic parameter itself.
+          AbstractionPattern origElementType = AbstractionPattern::getOpaque();
+          auto &lowering = tc.getTypeLowering(origElementType, paramType,
+                                              expansion);
+          props.addSubobject(lowering.getRecursiveProperties());
+        }
+      }
+      return props;
     }
   };
 } // end anonymous namespace
@@ -2823,7 +2876,22 @@ void TypeConverter::removeNullEntry(const TypeKey &k) {
 void TypeConverter::insert(const TypeKey &k, const TypeLowering *tl) {
   if (!k.isCacheable()) return;
 
-  LoweredTypes[k.getCachingKey()] = tl;
+  if (isCacheableLowering(tl)) {
+    LoweredTypes[k.getCachingKey()] = tl;
+    if (k == k.getKeyForMinimalExpansion())
+      return;
+  }
+#ifndef NDEBUG
+  removeNullEntry(k.getKeyForMinimalExpansion());
+#endif
+}
+
+// Infinite lowerings are incomplete. They are only cached when they
+// correspond to a self-recursive layout, which can never have a complete
+// lowering. Avoid caching an infinite non-layout lowering so that the
+// complete layout can be lowered later.
+bool TypeConverter::isCacheableLowering(const TypeLowering *tl) {
+  return !tl || !isLoweringNonLayoutType || !tl->isInfinite();
 }
 
 /// Lower each of the elements of the substituted type according to
@@ -2981,9 +3049,6 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     insert(key.getKeyForMinimalExpansion(), lowering);
   } else {
     insert(key, lowering);
-#ifndef NDEBUG
-    removeNullEntry(key.getKeyForMinimalExpansion());
-#endif
   }
 
 #ifndef NDEBUG
@@ -3168,7 +3233,7 @@ void TypeConverter::verifyLowering(const TypeLowering &lowering,
                                    AbstractionPattern origType,
                                    CanType substType,
                                    TypeExpansionContext forExpansion) {
-  if (TypeLoweringDisableVerification) {
+  if (TypeLoweringDisableVerification || !isCacheableLowering(&lowering)) {
     return;
   }
   verifyLexicalLowering(lowering, origType, substType, forExpansion);
@@ -3815,9 +3880,6 @@ const TypeLowering &TypeConverter::getTypeLoweringForLoweredType(
     insert(key.getKeyForMinimalExpansion(), lowering);
   else {
     insert(key, lowering);
-#ifndef NDEBUG
-    removeNullEntry(key.getKeyForMinimalExpansion());
-#endif
   }
 
   return *lowering;
@@ -3923,7 +3985,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   Type resultTy;
 
   if (auto type = pd->getTypeOfDefaultExpr()) {
-    resultTy = type->mapTypeOutOfContext();
+    resultTy = type->mapTypeOutOfEnvironment();
   } else {
     resultTy = pd->getInterfaceType();
   }
@@ -3954,7 +4016,7 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
                                                      VarDecl *VD) {
   auto *DC = VD->getDeclContext();
   CanType resultTy =
-    VD->getParentPattern()->getType()->mapTypeOutOfContext()
+    VD->getParentPattern()->getType()->mapTypeOutOfEnvironment()
           ->getCanonicalType();
 
   // If this is the backing storage for a property with an attached
@@ -5499,6 +5561,10 @@ void TypeLowering::print(llvm::raw_ostream &os) const {
      << ".\n"
      << "isLexical: " << BOOL(Properties.isLexical()) << ".\n"
      << "isOrContainsPack: " << BOOL(Properties.isOrContainsPack()) << ".\n"
+     << "isAddressableForDependencies: "
+     << BOOL(Properties.isAddressableForDependencies()) << ".\n"
+     << "hasOnlyDefaultDeinit: "
+     << BOOL(Properties.mayHaveCustomDeinit() == HasOnlyDefaultDeinit) << ".\n"
      << "\n";
 }
 

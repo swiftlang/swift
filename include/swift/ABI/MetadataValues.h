@@ -2910,9 +2910,9 @@ enum class TaskOptionRecordKind : uint8_t {
   InitialSerialExecutor = 0,
   /// Request a child task to be part of a specific task group.
   TaskGroup = 1,
-  /// DEPRECATED. AsyncLetWithBuffer is used instead.
+  /// UNUSED. AsyncLetWithBuffer is used instead.
   /// Request a child task for an 'async let'.
-  AsyncLet = 2,
+  // AsyncLet = 2,
   /// Request a child task for an 'async let'.
   AsyncLetWithBuffer = 3,
   /// Information about the result type of the task, used in embedded Swift.
