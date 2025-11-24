@@ -491,3 +491,15 @@ func toReplaceWith(arg: Int) {}
 func moduleTypeUSRRegressionTest() {
     Swift.print("")
 }
+
+// Regression test: When a function captures another function, don't print the
+// entire captured decl. This causes infinite recursion in the dumper when a
+// local (nested) function captures itself.
+func outerFn() {
+    func innerFun(shouldRecurse: Bool) {
+        if shouldRecurse {
+            innerFun(shouldRecurse: false)
+        }
+    }
+    innerFun(shouldRecurse: true)
+}
