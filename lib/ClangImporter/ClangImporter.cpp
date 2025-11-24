@@ -2286,7 +2286,7 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
                                     /*ShouldOwnClient=*/false);
   clonedInstance->createSourceManager();
   clonedInstance->setTarget(&Impl.Instance->getTarget());
-  clonedInstance->setOutputBackend(Impl.SwiftContext.OutputBackend);
+  clonedInstance->setOutputManager(Impl.SwiftContext.OutputBackend);
 
   return clonedInstance;
 }
