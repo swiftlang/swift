@@ -2330,6 +2330,7 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
 //===----------------------------------------------------------------------===//
 
 void index::indexDeclContext(DeclContext *DC, IndexDataConsumer &consumer) {
+  PrettyStackTraceDeclContext trace("indexing decl context", DC);
   assert(DC);
   SourceFile *SF = DC->getParentSourceFile();
   IndexSwiftASTWalker walker(consumer, DC->getASTContext(), SF);
@@ -2338,6 +2339,7 @@ void index::indexDeclContext(DeclContext *DC, IndexDataConsumer &consumer) {
 }
 
 void index::indexSourceFile(SourceFile *SF, IndexDataConsumer &consumer) {
+  PrettyStackTraceDeclContext trace("indexing source file", SF);
   assert(SF);
   IndexSwiftASTWalker walker(consumer, SF->getASTContext(), SF);
   walker.visitModule(*SF->getParentModule());
