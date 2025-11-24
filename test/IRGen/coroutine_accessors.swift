@@ -49,7 +49,7 @@
 // CHECK-arm64e-SAME:    i64 40879 },
 // CHECK-arm64e-SAME:  section "llvm.ptrauth",
 // CHECK-arm64e-SAME:  align 8
-// CHECK-arm64e-LABEL: _swift_coro_malloc.ptrauth.1 = private constant {
+// CHECK-arm64e-LABEL: _swift_coro_malloc.ptrauth.{{.*}} = private constant {
 // CHECK-arm64e-SAME:    ptr @_swift_coro_malloc,
 // CHECK-arm64e-SAME:    i32 0,
 // CHECK-arm64e-SAME:    i64 ptrtoint (
@@ -62,7 +62,7 @@
 // CHECK-arm64e-SAME:    i64 53841 }
 // CHECK-arm64e-SAME:  section "llvm.ptrauth"
 // CHECK-arm64e-SAME:  align 8
-// CHECK-arm64e-LABEL: _swift_coro_free.ptrauth.2 = private constant {
+// CHECK-arm64e-LABEL: _swift_coro_free.ptrauth.{{.*}} = private constant {
 // CHECK-arm64e-SAME:    ptr @_swift_coro_free,
 // CHECK-arm64e-SAME:    i32 0,
 // CHECK-arm64e-SAME:    i64 ptrtoint (
@@ -82,9 +82,9 @@
 // CHECK-SAME:       _swift_coro_free
 // CHECK-ar64e-SAME:     .ptrauth
 // CHECK-SAME:       _swift_coro_malloc
-// CHECK-ar64e-SAME:     .ptrauth.1
+// CHECK-ar64e-SAME:     .ptrauth.{{.*}}
 // CHECK-SAME:       _swift_coro_free
-// CHECK-ar64e-SAME:     .ptrauth.2
+// CHECK-ar64e-SAME:     .ptrauth.{{.*}}
 // CHECK-SAME:  }
 // CHECK-arm64e-LABEL: _swift_coro_task_alloc.ptrauth = private constant {
 // CHECK-arm64e-SAME:    ptr @_swift_coro_task_alloc,
@@ -112,7 +112,7 @@
 // CHECK-arm64e-SAME:    i64 40879 },
 // CHECK-arm64e-SAME:  section "llvm.ptrauth",
 // CHECK-arm64e-SAME:  align 8
-// CHECK-arm64e-LABEL: _swift_coro_task_alloc.ptrauth.3 = private constant {
+// CHECK-arm64e-LABEL: _swift_coro_task_alloc.ptrauth.{{.*}} = private constant {
 // CHECK-arm64e-SAME:    ptr @_swift_coro_task_alloc,
 // CHECK-arm64e-SAME:    i32 0,
 // CHECK-arm64e-SAME:    i64 ptrtoint (
@@ -125,7 +125,7 @@
 // CHECK-arm64e-SAME:    i64 53841 }
 // CHECK-arm64e-SAME:  section "llvm.ptrauth"
 // CHECK-arm64e-SAME:  align 8
-// CHECK-arm64e-LABEL: @_swift_coro_task_dealloc.ptrauth.4 = private constant {
+// CHECK-arm64e-LABEL: @_swift_coro_task_dealloc.ptrauth.{{.*}} = private constant {
 // CHECK-arm64e-SAME:    ptr @_swift_coro_task_dealloc,
 // CHECK-arm64e-SAME:    i32 0,
 // CHECK-arm64e-SAME:    i64 ptrtoint (
@@ -145,9 +145,9 @@
 // CHECK-SAME:      _swift_coro_task_dealloc
 // CHECK-ar64e-SAME:     .ptrauth
 // CHECK-SAME:      _swift_coro_task_alloc
-// CHECK-ar64e-SAME:     .ptrauth.3
+// CHECK-ar64e-SAME:     .ptrauth.{{.*}}
 // CHECK-SAME:      _swift_coro_task_dealloc
-// CHECK-ar64e-SAME:     .ptrauth.4
+// CHECK-ar64e-SAME:     .ptrauth.{{.*}}
 // CHECK-SAME:  }
 
 // CHECK-LABEL: @_swift_coro_alloc(
