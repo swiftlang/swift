@@ -657,20 +657,15 @@ class BridgedArchetypeSubstClonerImpl : public TypeSubstCloner<BridgedArchetypeS
   llvm::SmallDenseMap<GenericEnvironment*, llvm::SmallVector<Type, 2>> mappings;
 
 public:
-  BridgedArchetypeSubstClonerImpl(SILInstruction *insertionPoint, llvm::ArrayRef<std::tuple<GenericEnvironment*, llvm::ArrayRef<SILType>>> typeMappings)
+  BridgedArchetypeSubstClonerImpl(SILInstruction *insertionPoint, llvm::ArrayRef<std::pair<Type, Type>> typeMappings)
     : TypeSubstCloner<BridgedArchetypeSubstClonerImpl>(*insertionPoint->getFunction(), SubstitutionMap()){
     Builder.setInsertionPoint(insertionPoint);
-    for (auto& [i,j] : typeMappings) {
-      std::vector<Type> types;
-      std::transform(j.vec().begin(), j.vec().end(), types.begin(), [](SILType t) {return t.getRawASTType();});
-      mappings[i] = SmallVector<Type>(types.begin(), types.end());
-    }
+    // BUILD DENSE MAP HERE
   }
 
   SILType remapType(SILType Ty) {
-    // FIXIME: lower this type
-    // SILType &Sty = replaceLocalArchetypes(mappings, Ty.getRawASTType());
-    SILType Sty;
+    Type ty = replaceLocalArchetypes(mappings, Ty.getRawASTType());
+    SILType Sty = Original.getLoweredType(ty);
     if (!Sty)
       Sty = SILClonerWithScopes<BridgedArchetypeSubstClonerImpl>::remapType(Ty);
     return Sty;
@@ -794,7 +789,7 @@ BridgedArchetypeSubstCloner::BridgedArchetypeSubstCloner(BridgedInstruction inst
                                                BridgedArrayRef types,
                                                BridgedContext context)
   : cloner(new BridgedArchetypeSubstClonerImpl(inst.unbridged(),
-                                          types.unbridged<std::tuple<GenericEnvironment*, ArrayRef<SILType>>>())) {
+                                          types.unbridged<std::pair<Type, Type>>())) {
   context.context->notifyNewCloner();
 }
 

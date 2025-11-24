@@ -36,16 +36,16 @@ extension OpenPackElementInst {
 
       let packElementTypes = dpi.indexedPackType.packElements
 
-      var replacementTypes = [AST.Type]()
+      var replacementTypes = Array<(AST.`Type`,AST.`Type`)>()
       for type in packElementTypes {
-        replacementTypes.append(type.canonical.rawType)
+        replacementTypes.append((type, type.canonical.rawType))
       }
 
-      /*
-      var cloner = ArchetypeSubstitutionCloner(inst: self, substitutions:,
-              context: context)
+      let mappedTypes = replacementTypes.map({($0.0.bridged,$0.1.bridged)})
+      var cloner = ArchetypeSubstitutionCloner(cloneBefore: self, substitutions:
+              mappedTypes,
+              context)
       defer { cloner.deinitialize() }
-      */
 
       // FIXME think about prefix of non-expansion element types
       // FIXME think about terminator instructions and successor BBs (TermInst)

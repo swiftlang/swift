@@ -83,8 +83,7 @@ extension ClonerCommonUtils {
     }
 
     for op in inst.operands {
-      if let clonedOp = cloneRecursively(value: op.value, customGetCloned: customGetCloned),
-         clonedOp == nil {
+      if cloneRecursively(value: op.value, customGetCloned: customGetCloned) == nil {
         return nil
       }
     }
@@ -231,9 +230,9 @@ public struct ArchetypeSubstitutionCloner<Context: MutatingContext>: ClonerCommo
   public let target: Target
 
   public init(cloneBefore inst: Instruction,
-              substitutions: BridgedArrayRef, _ context: Context) {
-    self.bridged = BridgedArchetypeSubstCloner(inst.bridged,
-                                          substitutions, context._bridged)
+              substitutions: Array<(BridgedASTType, BridgedASTType)>, _ context: Context) {
+    self.bridged = substitutions.withBridgedArrayRef{BridgedArchetypeSubstCloner(inst.bridged,
+                                         $0, context._bridged)}
     self.context = context
     self.target = .function(inst.parentFunction)
   }
