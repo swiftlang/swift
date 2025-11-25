@@ -98,6 +98,38 @@ public func stripWhitespace<S: StringProtocol>(_ s: S)
   return s[firstNonWhitespace...lastNonWhitespace]
 }
 
+/// Escape a JSON string
+@_spi(Utils)
+public func escapeJSON(_ s: String) -> String {
+  var result = ""
+  let utf8View = s.utf8
+  var chunk = utf8View.startIndex
+  var pos = chunk
+  let end = utf8View.endIndex
+
+  result.reserveCapacity(utf8View.count)
+
+  while pos != end {
+    let scalar = utf8View[pos]
+    switch scalar {
+      case 0x22, 0x5c, 0x00...0x1f:
+        result += s[chunk..<pos]
+        result += "\\"
+        result += String(Unicode.Scalar(scalar))
+        pos = utf8View.index(after: pos)
+        chunk = pos
+      default:
+        pos = utf8View.index(after: pos)
+    }
+  }
+
+  if chunk != end {
+    result += s[chunk..<pos]
+  }
+
+  return result
+}
+
 /// Strip any Optional from a value.
 ///
 /// This is useful when interfacing with the system C library, because some
