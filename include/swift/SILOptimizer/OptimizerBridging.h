@@ -274,7 +274,7 @@ struct BridgedPassContext {
                                                         const BridgedResultInfo *_Nullable specializedBridgedResults,
                                                         SwiftInt resultCount,
                                                         BridgedFunction bridgedOriginal,
-                                                        bool makeThin,
+                                                        BridgedASTType::FunctionTypeRepresentation representation,
                                                         bool makeBare,
                                                         bool preserveGenericSignature) const;
 
