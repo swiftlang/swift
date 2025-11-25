@@ -1146,7 +1146,7 @@ extension String {
   /// identical.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
+  @available(SwiftStdlib 9999, *)
   public func isTriviallyIdentical(to other: Self) -> Bool {
     self._guts.rawBits == other._guts.rawBits
   }
