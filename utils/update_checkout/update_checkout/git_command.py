@@ -1,9 +1,10 @@
-import os
 from pathlib import Path
 import shlex
 import subprocess
 import sys
-from typing import List, Any, Optional, Dict, Tuple
+from typing import List, Any, Optional, Dict, Set, Tuple
+
+from .runner_arguments import RunnerArguments
 
 
 class GitException(Exception):
@@ -119,3 +120,45 @@ class Git:
     @staticmethod
     def _quote_command(command: List[Any]) -> str:
         return " ".join(Git._quote(arg) for arg in command)
+
+
+def is_git_repository(path: Path) -> bool:
+    """Returns whether a Path object is a Git repository.
+
+    Args:
+        path (Path): The path object to check.
+
+    Returns:
+        bool: Whether the path is a Git repository.
+    """
+
+    if not path.is_dir():
+        return False
+    git_dir_path = path.joinpath(".git")
+    return git_dir_path.exists() and git_dir_path.is_dir()
+
+
+def is_any_repository_locked(pool_args: List[RunnerArguments]) -> Set[str]:
+    """Returns the set of locked repositories.
+
+    A repository is considered to be locked if its .git directory contains a
+    file ending in ".lock".
+
+    Args:
+        pool_args (List[RunnerArguments]): List of arguments passed to the
+        `update_single_repository` function.
+
+    Returns:
+        Set[str]: The names of the locked repositories if any.
+    """
+
+    repos = [(x.source_root, x.repo_name) for x in pool_args]
+    locked_repositories = set()
+    for source_root, repo_name in repos:
+        dot_git_path = source_root.joinpath(repo_name, ".git")
+        if not dot_git_path.exists() or not dot_git_path.is_dir():
+            continue
+        for file in dot_git_path.iterdir():
+            if file.suffix == ".lock":
+                locked_repositories.add(repo_name)
+    return locked_repositories
