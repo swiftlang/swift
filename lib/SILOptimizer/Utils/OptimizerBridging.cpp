@@ -393,7 +393,7 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
                                      const BridgedResultInfo * _Nullable specializedBridgedResults,
                                      SwiftInt resultCount,
                                      BridgedFunction bridgedOriginal,
-                                     bool makeThin,
+                                     BridgedASTType::FunctionTypeRepresentation representation,
                                      bool makeBare,
                                      bool preserveGenericSignature) const {
   auto *original = bridgedOriginal.getFunction();
@@ -415,9 +415,7 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
   // The specialized function is always a thin function. This is important
   // because we may add additional parameters after the Self parameter of
   // witness methods. In this case the new function is not a method anymore.
-  auto extInfo = originalType->getExtInfo();
-  if (makeThin)
-    extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+  auto extInfo = originalType->getExtInfo().withRepresentation((SILFunctionTypeRepresentation)representation);
 
   auto ClonedTy = SILFunctionType::get(
       preserveGenericSignature ? originalType->getInvocationGenericSignature() : GenericSignature(),

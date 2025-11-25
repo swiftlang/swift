@@ -410,7 +410,7 @@ private struct SpecializationInfo {
         // The specialized function is always a thin function. This is important because we add additional
         // parameters after the Self parameter of witness methods. In this case the new function is not a
         // method anymore.
-        makeThin: true, makeBare: true)
+        withRepresentation: .thin, makeBare: true)
 
     context.buildSpecializedFunction(
       specializedFunction: specializedFunction,
