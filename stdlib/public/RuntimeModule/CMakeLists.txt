@@ -35,6 +35,7 @@ set(RUNTIME_SOURCES
   Backtrace.swift
   Backtrace+Codable.swift
   BacktraceFormatter.swift
+  BacktraceJSONFormatter.swift
   Base64.swift
   ByteSwapping.swift
   CachingMemoryReader.swift
