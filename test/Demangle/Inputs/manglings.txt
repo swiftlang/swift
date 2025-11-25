@@ -442,6 +442,7 @@ $s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFHF ---> accessible fun
 $s1A3bar1aySSYt_tF ---> A.bar(a: _const Swift.String) -> ()
 $s1t1fyyFSiAA3StrVcs7KeyPathCyADSiGcfu_SiADcfu0_33_556644b740b1b333fecb81e55a7cce98ADSiTf3npk_n ---> function signature specialization <Arg[1] = [Constant Propagated KeyPath : _556644b740b1b333fecb81e55a7cce98<t.Str,Swift.Int>]> of implicit closure #2 (t.Str) -> Swift.Int in implicit closure #1 (Swift.KeyPath<t.Str, Swift.Int>) -> (t.Str) -> Swift.Int in t.f() -> ()
 $s3foo4main1SVs5Int32VSbTf3npSSi3Si0_n ---> function signature specialization <Arg[1] = [Constant Propagated Struct : main.S][Constant Propagated Struct : Swift.Int32][Constant Propagated Integer : 3][Constant Propagated Struct : Swift.Bool][Constant Propagated Integer : 0]> of foo
+$e4test4BaseCyxGAA1PA2aEP3fooyyFTWTfr9 ---> representation changed of protocol witness for test.P.foo() -> () in conformance test.Base<A> : test.P in test
 $s21back_deploy_attribute0A12DeployedFuncyyFTwb ---> back deployment thunk for back_deploy_attribute.backDeployedFunc() -> ()
 $s21back_deploy_attribute0A12DeployedFuncyyFTwB ---> back deployment fallback for back_deploy_attribute.backDeployedFunc() -> ()
 $s4test3fooyyAA1P_px1TRts_XPlF ---> test.foo<A>(any test.P<Self.T == A>) -> ()
