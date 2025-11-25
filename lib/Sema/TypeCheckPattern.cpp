@@ -1234,7 +1234,7 @@ Pattern *TypeChecker::coercePatternToType(
       // synchronous function in an async context. As a policy choice, don't
       // diagnose an inferred Void type (or optional thereof) on such bindings
       // as potentially unexpected.
-      shouldRequireType = var->isAsyncLet() ? false : true;
+      shouldRequireType = !var->isAsyncLet();
     } else if (auto MTT = diagTy->getAs<AnyMetatypeType>()) {
       if (MTT->getInstanceType()->isAnyObject())
         shouldRequireType = true;
