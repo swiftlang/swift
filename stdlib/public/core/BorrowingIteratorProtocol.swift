@@ -94,7 +94,7 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable {
   @_alwaysEmitIntoClient
   @_lifetime(&self)
   @_lifetime(self: copy self)
-  @_transparent
+  @inlinable
   public mutating func nextSpan() -> Span<Element> {
     nextSpan(maximumCount: Int.max)
   }
@@ -141,6 +141,7 @@ extension Span: BorrowingIteratorProtocol where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_lifetime(&self)
   @_lifetime(self: copy self)
+  @inlinable
   public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
     let result = extracting(first: maximumCount)
     self = extracting(droppingFirst: maximumCount)
@@ -154,6 +155,7 @@ extension Span: Sequence /* where Element: ~Copyable */ {
   
   @_alwaysEmitIntoClient
   @_lifetime(borrow self)
+  @inlinable
   public func makeBorrowingIterator() -> Span<Element> {
     self
   }

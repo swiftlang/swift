@@ -511,6 +511,18 @@ extension Array: _ArrayProtocol {
   }
 }
 
+extension Array: Sequence {
+  @available(SwiftStdlib 6.3, *)
+  public typealias BorrowingIterator = Span<Element>
+
+  @available(SwiftStdlib 6.3, *)
+  @lifetime(borrow self)
+  @_transparent
+  public func makeBorrowingIterator() -> BorrowingIterator {
+    span
+  }
+}
+
 extension Array: RandomAccessCollection, MutableCollection {
   /// The index type for arrays, `Int`.
   public typealias Index = Int
