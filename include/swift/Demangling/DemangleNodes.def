@@ -399,6 +399,8 @@ NODE(OutlinedEnumProjectDataForLoad)
 NODE(OutlinedEnumGetTag)
 // Added in Swift 5.9 + 1
 NODE(AsyncRemoved)
+// Added in Swift 6.3 + 1
+NODE(RepresentationChanged)
 
 // Added in Swift 5.TBD
 NODE(ObjectiveCProtocolSymbolicReference)
