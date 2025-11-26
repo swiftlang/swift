@@ -1146,7 +1146,3 @@ Added: __swift_debug_metadataAllocatorPageSize
 
 // New debug environment variable for the concurrency runtime.
 Added: _concurrencyEnableTaskSlabAllocator
-
-//  String and Substring Trivially Identical added in 6.4
-Added: sSS20isTriviallyIdentical2toSbSS_tF
-Added: sSs20isTriviallyIdentical2toSbSs_tF
