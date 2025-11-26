@@ -351,6 +351,17 @@ BridgedOwnedString BridgedPassContext::mangleWithExplodedPackArgs(
   return BridgedOwnedString(mangler.mangle());
 }
 
+BridgedOwnedString BridgedPassContext::mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const {
+  auto pass = Demangle::SpecializationPass::EmbeddedWitnessCallSpecialization;
+
+  Mangle::FunctionSignatureSpecializationMangler mangler(
+      applySiteCallee.getFunction()->getASTContext(),
+      pass, IsNotSerialized, applySiteCallee.getFunction());
+
+  mangler.setChangedRepresentation();
+  return BridgedOwnedString(mangler.mangle());
+}
+
 void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
   switch (StackNesting::fixNesting(function.getFunction())) {
     case StackNesting::Changes::None:
