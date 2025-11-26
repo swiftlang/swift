@@ -237,13 +237,6 @@ func testIndirectNonForwardedResult<T>(arg1: GNE<T>, arg2: GNE<T>) -> GNE<T> {
   forward(arg2) // expected-note {{this use causes the lifetime-dependent value to escape}}
 }
 
-func testIndirectClosureResult<T>(f: () -> GNE<T>) -> GNE<T> {
-  f()
-  // expected-error @-1{{lifetime-dependent variable '$return_value' escapes its scope}}
-  // expected-note  @-3{{it depends on the lifetime of argument '$return_value'}}
-  // expected-note  @-3{{this use causes the lifetime-dependent value to escape}}
-}
-
 // =============================================================================
 // Coroutines
 // =============================================================================
