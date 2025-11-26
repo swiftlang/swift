@@ -650,8 +650,9 @@ def repo_hashes(args: CliArguments, config: Dict[str, Any]) -> Dict[str, str]:
 
 def print_repo_hashes(args: CliArguments, config: Dict[str, Any]):
     repos = repo_hashes(args, config)
+    max_length = max(len(name) for name in repos.keys())
     for repo_name, repo_hash in sorted(repos.items(), key=lambda x: x[0]):
-        print("{:<35}: {:<35}".format(repo_name, repo_hash))
+        print(f"{repo_name:<{max_length + 1}}: {repo_hash}")
 
 
 def merge_no_duplicates(
