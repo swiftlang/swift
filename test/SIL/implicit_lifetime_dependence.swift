@@ -5,6 +5,16 @@
 
 // REQUIRES: swift_feature_Lifetimes
 
+struct NE: ~Escapable {}
+
+// CHECK-LABEL: typealias ImplicitNestedType = ((NE, inout NE) -> NE, consuming NE, inout NE) -> NE
+typealias ImplicitNestedType = ((NE, inout NE) -> NE, consuming NE, inout NE) -> NE
+
+// CHECK-LABEL: func takeImplicitNestedType(f: (@_lifetime(copy 0) @_lifetime(1: copy 1) (NE, inout NE) -> NE, consuming NE, inout NE) -> NE)
+
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence14takeNestedType1fyAA2NEVA2E_AEztXE_AEnAEztXE_tF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed @noescape @callee_guaranteed (@guaranteed NE, @lifetime(copy 1) @inout NE) -> @lifetime(copy 0) @owned NE, @owned NE, @lifetime(copy 2) @inout NE) -> @lifetime(copy 1) @owned NE) -> () {
+func takeImplicitNestedType(f: ImplicitNestedType) {}
+
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
   let c: Int
@@ -227,4 +237,42 @@ public struct OuterNE: ~Escapable {
   mutating func setInner(value: InnerNE) {
     self.inner1 = value
   }
+}
+
+// rdar://160894371 (Infer @_lifetime(param: copy param) for inout closure arguments)
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence20inoutClosureArgument1a1fySaySiGz_ys11MutableSpanVySiGzXEtF : $@convention(thin) (@inout Array<Int>, @guaranteed @noescape @callee_guaranteed (@lifetime(copy 0) @inout MutableSpan<Int>) -> ()) -> () {
+// CHECK: bb0(%0 : $*Array<Int>, %1 : $@noescape @callee_guaranteed (@lifetime(copy 0) @inout MutableSpan<Int>) -> ()):
+// CHECK-LABEL: } // end sil function '$s28implicit_lifetime_dependence20inoutClosureArgument1a1fySaySiGz_ys11MutableSpanVySiGzXEtF'
+func inoutClosureArgument(a: inout [Int], f: (inout MutableSpan<Int>) -> ()) {
+  var span = a.mutableSpan
+  f(&span)
+  a.append(1)
+  span = a.mutableSpan
+  f(&span)
+}
+
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence10modifySpanyys07MutableE0VySiGzF : $@convention(thin) (@lifetime(copy 0) @inout MutableSpan<Int>) -> () {
+func modifySpan(_ span: inout MutableSpan<Int>) {
+  span[0] = 3
+}
+
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence19passLifetimeClosureyyF : $@convention(thin) () -> () {
+func passLifetimeClosure() {
+  var a = [1,2]
+  inoutClosureArgument(a: &a, f: modifySpan)
+}
+
+// rdar://166912068 (Incorrect error when passing a local function with a non-escapable parameter)
+struct NEWithSpan {
+  var span: RawSpan
+
+  @_lifetime(copy span)
+  init(span: RawSpan) {
+    self.span = span
+  }
+}
+func takeBody(body: (inout NEWithSpan) -> Void) {}
+func checkNestedFunctions() {
+  func doIt(ne: inout NEWithSpan) {}
+  takeBody(body: doIt)
 }

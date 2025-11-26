@@ -8,6 +8,19 @@
 
 import Builtin
 
+struct NE: ~Escapable {}
+
+// CHECK-LABEL: typealias NestedType = @_lifetime(copy ne2) @_lifetime(ne3: copy ne2) (@_lifetime(copy ne0) @_lifetime(ne1: copy ne1) (_ ne0: NE, _ ne1: inout NE) -> NE, _ ne2: consuming NE, _ ne3: inout NE) -> NE
+typealias NestedType =
+  @_lifetime(copy ne2) @_lifetime(ne3: copy ne2)
+  (@_lifetime(copy ne0) @_lifetime(ne1: copy ne1) (_ ne0: NE, _ ne1: inout NE) -> NE,
+   _ ne2: consuming NE, _ ne3: inout NE) -> NE
+
+// CHECK-LABEL: func takeNestedType(f: @_lifetime(copy ne2) @_lifetime(ne3: copy ne2) (@_lifetime(copy ne0) @_lifetime(ne1: copy ne1) (_ ne0: NE, _ ne1: inout NE) -> NE, _ ne2: consuming NE, _ ne3: inout NE) -> NE)
+
+// CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers14takeNestedType1fyAA2NEVA2E_AEztXE_AEnAEztXE_tF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed @noescape @callee_guaranteed (@guaranteed NE, @lifetime(copy 1) @inout NE) -> @lifetime(copy 0) @owned NE, @owned NE, @lifetime(copy 1) @inout NE) -> @lifetime(copy 1) @owned NE) -> () {
+func takeNestedType(f: NestedType) {}
+
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
 // CHECK-LABEL: sil hidden @$s39explicit_lifetime_dependence_specifiers10BufferViewVyACSWcfC : $@convention(method) (UnsafeRawBufferPointer, @thin BufferView.Type) -> @lifetime(borrow 0)  @owned BufferView {
