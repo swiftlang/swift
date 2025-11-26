@@ -73,6 +73,7 @@ private func registerSwiftPasses() {
   registerPass(allocBoxToStack, { allocBoxToStack.run($0) })
   registerPass(asyncDemotion, { asyncDemotion.run($0) })
   registerPass(booleanLiteralFolding, { booleanLiteralFolding.run($0) })
+  registerPass(embeddedWitnessCallSpecialization, { embeddedWitnessCallSpecialization.run($0) })
   registerPass(letPropertyLowering, { letPropertyLowering.run($0) })
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
   registerPass(constantCapturePropagation, { constantCapturePropagation.run($0) })
