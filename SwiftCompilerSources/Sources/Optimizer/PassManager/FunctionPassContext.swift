@@ -164,6 +164,10 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
+  func mangle(withChangedRepresentation original: Function) -> String {
+    String(taking: bridgedPassContext.mangleWithChangedRepresentation(original.bridged))
+  }
+
   func createSpecializedFunctionDeclaration(
     from original: Function, withName specializedFunctionName: String,
     withParams specializedParameters: [ParameterInfo],

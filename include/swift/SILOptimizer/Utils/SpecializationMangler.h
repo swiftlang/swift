@@ -104,6 +104,8 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
 
   ReturnValueModifierIntBase ReturnValue;
 
+  bool changedRepresentation = false;
+
 public:
   FunctionSignatureSpecializationMangler(ASTContext &Ctx, SpecializationPass Pass,
                                          swift::SerializedKind_t Serialized,
@@ -123,6 +125,7 @@ public:
   void setArgumentBoxToStack(unsigned OrigArgIdx);
   void setArgumentInOutToOut(unsigned OrigArgIdx);
   void setReturnValueOwnedToUnowned();
+  void setChangedRepresentation() { changedRepresentation = true; }
 
   // For effects
   void setRemovedEffect(EffectKind effect);
