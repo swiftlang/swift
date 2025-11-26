@@ -2266,12 +2266,21 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     clang::Expr *argExpr = new (clangCtx) clang::DeclRefExpr(
         clangCtx, param, false, type.getNonReferenceType(),
         clang::ExprValueKind::VK_LValue, clang::SourceLocation());
-    if (type->isRValueReferenceType()) {
+    bool isMoveOnly = false;
+    if (!type->isReferenceType())
+      if (evaluateOrDefault(
+              ImporterImpl.SwiftContext.evaluator,
+              CxxValueSemantics({type.getTypePtr(), &ImporterImpl}),
+              {}) == CxxValueSemanticsKind::MoveOnly)
+        isMoveOnly = true;
+    if (type->isRValueReferenceType() || isMoveOnly) {
       argExpr = clangSema
                     .BuildCXXNamedCast(
                         clang::SourceLocation(), clang::tok::kw_static_cast,
-                        clangCtx.getTrivialTypeSourceInfo(type), argExpr,
-                        clang::SourceRange(), clang::SourceRange())
+                        clangCtx.getTrivialTypeSourceInfo(
+                            isMoveOnly ? clangCtx.getRValueReferenceType(type)
+                                       : type),
+                        argExpr, clang::SourceRange(), clang::SourceRange())
                     .get();
     }
     args.push_back(argExpr);
