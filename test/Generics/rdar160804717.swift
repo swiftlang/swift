@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir %s -target %target-swift-5.9-abi-triple
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=watchos
+// rdar://163379698
 
 // This used to trigger an infinite loop in conformance substitution
 // when emitting the opaque type descriptor in IRGen.
