@@ -123,3 +123,28 @@ import lifetime_underscored_dependence
 // CHECK:   }
 // CHECK:   #endif
 // CHECK: }
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK: #if compiler(>=5.3) && $Lifetimes
+// CHECK: @_lifetime(copy ne0)
+// CHECK: @inlinable public func takeCopier(f: @_lifetime(io: copy io) (consuming main.NE, _ io: inout main.NE, Swift.Int, Swift.Int, Swift.Int) -> main.NE, ne0: consuming main.NE) -> main.NE
+// CHECK: #else
+// CHECK: @lifetime(copy ne0)
+// CHECK: @inlinable public func takeCopier(f: @_lifetime(io: copy io) (consuming main.NE, _ io: inout main.NE, Swift.Int, Swift.Int, Swift.Int) -> main.NE, ne0: consuming main.NE) -> main.NE
+// CHECK: #endif
+// CHECK: #endif
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK: @inlinable public func takeCopierUnannotated(f: (consuming main.NE, inout main.NE) -> main.NE) {}
+// CHECK: #endif
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK: public typealias ExplicitNestedType = @_lifetime(copy ne0) @_lifetime(ne1: copy ne0) ((main.NE, inout main.NE) -> main.NE, _ ne0: consuming main.NE, _ ne1: inout main.NE) -> main.NE
+// CHECK: #endif
+
+#if compiler(>=5.3) && $ClosureLifetimes
+@inlinable public func
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK: public typealias ImplicitNestedType = ((main.NE, inout main.NE) -> main.NE, _ ne0: consuming main.NE, _ ne1: inout main.NE) -> main.NE
+// CHECK: #endif

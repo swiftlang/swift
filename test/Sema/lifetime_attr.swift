@@ -178,4 +178,3 @@ func getGeneric<T : ~Escapable>(_ inValue: T) -> T {
 func getGeneric<T : ~Escapable>(_outValue: inout T, _ inValue: T)  {
   _outValue = inValue
 }
-
