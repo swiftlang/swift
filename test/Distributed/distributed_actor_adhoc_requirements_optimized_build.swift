@@ -9,11 +9,10 @@
 
 import Distributed
 
-// NOTE: None of the ad-hoc protocol requirement implementations
-
 public protocol Transferable: Sendable {}
 
 // NOT final on purpose
+@available(SwiftStdlib 5.7, *)
 public class TheSpecificResultHandlerWhichIsANonFinalClass: DistributedTargetInvocationResultHandler {
   public typealias SerializationRequirement = Transferable
 
@@ -30,6 +29,7 @@ public class TheSpecificResultHandlerWhichIsANonFinalClass: DistributedTargetInv
 }
 
 // NOT final on purpose
+@available(SwiftStdlib 5.7, *)
 public class FakeInvocationDecoder: DistributedTargetInvocationDecoder {
   public typealias SerializationRequirement = Transferable
 
@@ -51,6 +51,7 @@ public class FakeInvocationDecoder: DistributedTargetInvocationDecoder {
 }
 
 // NOT final on purpose
+@available(SwiftStdlib 5.7, *)
 public class FakeInvocationEncoder : DistributedTargetInvocationEncoder {
   public typealias SerializationRequirement = Transferable
 
@@ -72,6 +73,7 @@ public class FakeInvocationEncoder : DistributedTargetInvocationEncoder {
 }
 
 // NOT final on purpose
+@available(SwiftStdlib 5.7, *)
 public class NotFinalActorSystemForAdHocRequirementTest: DistributedActorSystem, @unchecked Sendable {
   public typealias ActorID = String
   public typealias InvocationEncoder = FakeInvocationEncoder
