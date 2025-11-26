@@ -6035,7 +6035,7 @@ GROUPED_ERROR(existential_requires_any,ExistentialAny,none,
               "use of %select{protocol |}2%0 as a type must be written %1",
               (Type, Type, bool))
 GROUPED_ERROR(existential_requires_any_or_some,ExistentialAny,none,
-              "use of %select{protocol |}2%0 as type must be written %1 or 'some %2'",
+              "use of %select{protocol |}3%0 as a type must be written %1 or 'some %2'",
               (Type, Type, StringRef, bool))
 NOTE(suggest_any_fixit,none,
     "use %0 to create an existential type",

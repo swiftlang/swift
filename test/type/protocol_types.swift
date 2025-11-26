@@ -4,6 +4,7 @@ protocol HasSelfRequirements {
   func foo(_ x: Self)
 
   func returnsOwnProtocol() -> HasSelfRequirements // expected-warning {{use of protocol 'HasSelfRequirements' as a type must be written 'any HasSelfRequirements'}}
+  // expected-note@-1 {{use 'any HasSelfRequirements' to create an existential type}}
 }
 protocol Bar {
   // init() methods should not prevent use as an existential.
@@ -75,6 +76,7 @@ do {
   func checkIt(_ js: Any) throws {
     switch js {
     case let dbl as HasAssoc: // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    // expected-note@-1 {{use 'any HasAssoc' to create an existential type}}
       throw MyError.bad(dbl)
 
     default:
@@ -83,7 +85,9 @@ do {
   }
 }
 
-func testHasAssoc(_ x: Any, _: HasAssoc) { // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+func testHasAssoc(_ x: Any, _: HasAssoc) { // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc' or 'some HasAssoc'}}
+  // expected-note@-1 {{use 'any HasAssoc' to create an existential type}}
+  // expected-note@-2 {{use 'some HasAssoc' to create an opaque type}}
   if let p = x as? any HasAssoc {
     p.foo() // don't crash here.
   }
@@ -93,11 +97,13 @@ func testHasAssoc(_ x: Any, _: HasAssoc) { // expected-warning {{use of protocol
     func foo() {}
 
     func method() -> HasAssoc {} // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    // expected-note@-1 {{use 'any HasAssoc' to create an existential type}}
   }
 }
 
 // https://github.com/apple/swift/issues/42661
 var b: HasAssoc // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+// expected-note@-1 {{use 'any HasAssoc' to create an existential type}}
 
 // Further generic constraint error testing - typealias used inside statements
 protocol P {}
@@ -119,12 +125,14 @@ _ = Struct1<Pub & Bar>.self
 
 typealias AliasWhere<T> = T
 where T : HasAssoc, T.Assoc == HasAssoc // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+// expected-note@-1 {{use 'any HasAssoc' to create an existential type}}
 
 struct StructWhere<T>
 where T : HasAssoc,
       T.Assoc == any HasAssoc {}
 
 protocol ProtocolWhere where T == HasAssoc { // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+  // expected-note@-1 {{use 'any HasAssoc' to create an existential type}}
   associatedtype T
 
   associatedtype U : HasAssoc
@@ -132,6 +140,7 @@ protocol ProtocolWhere where T == HasAssoc { // expected-warning {{use of protoc
 }
 
 extension HasAssoc where Assoc == HasAssoc {} // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+// expected-note@-1 {{use 'any HasAssoc' to create an existential type}}
 
 func FunctionWhere<T>(_: T)
 where T : HasAssoc,
@@ -156,6 +165,7 @@ func testExistentialInCase(_ x: Any) {
   switch x {
   case is HasAssoc:
     // expected-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    // expected-note@-2 {{use 'any HasAssoc' to create an existential type}}
     break
   default:
     break
@@ -164,6 +174,7 @@ func testExistentialInCase(_ x: Any) {
     switch x {
     case is HasAssoc:
       // expected-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+      // expected-note@-2 {{use 'any HasAssoc' to create an existential type}}
       break
     default:
       break
@@ -172,6 +183,7 @@ func testExistentialInCase(_ x: Any) {
   switch x {
   case is HasAssocAlias:
     // expected-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+    // expected-note@-2 {{use 'any HasAssocAlias' (aka 'any HasAssoc') to create an existential type}}
     break
   default:
     break
@@ -180,6 +192,7 @@ func testExistentialInCase(_ x: Any) {
     switch x {
     case is HasAssocAlias:
       // expected-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+      // expected-note@-2 {{use 'any HasAssocAlias' (aka 'any HasAssoc') to create an existential type}}
       break
     default:
       break
@@ -214,21 +227,25 @@ func testExistentialInCatch() throws {
     try throwingFn()
   } catch is HasAssoc {}
   // expected-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+  // expected-note@-2 {{use 'any HasAssoc' to create an existential type}}
   _ = {
     do {
       try throwingFn()
     } catch is HasAssoc {}
     // expected-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    // expected-note@-2 {{use 'any HasAssoc' to create an existential type}}
   }
   do {
     try throwingFn()
   } catch is HasAssocAlias {}
   // expected-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+  // expected-note@-2 {{use 'any HasAssocAlias' (aka 'any HasAssoc') to create an existential type}}
   _ = {
     do {
       try throwingFn()
     } catch is HasAssocAlias {}
     // expected-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+    // expected-note@-2 {{use 'any HasAssocAlias' (aka 'any HasAssoc') to create an existential type}}
   }
   do {
     try throwingFn()

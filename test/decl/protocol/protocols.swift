@@ -476,6 +476,7 @@ func i<T : C3>(_ x : T?) -> Bool {
 }
 func j(_ x : C1) -> Bool {
   return x is P1 // expected-warning {{use of protocol 'P1' as a type must be written 'any P1'}}
+  // expected-note@-1 {{use 'any P1' to create an existential type}}
 }
 func k(_ x : C1?) -> Bool {
   return x is any P1

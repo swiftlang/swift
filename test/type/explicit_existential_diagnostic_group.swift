@@ -7,6 +7,7 @@ do {
 
   let _: P
   // expected-error@-1{{use of protocol 'P' as a type must be written 'any P'; this will be an error in a future Swift language mode}}
+  // expected-note@-2 {{use 'any P' to create an existential type}}
   let _: ~Copyable
   // expected-error@-1 {{constraint that suppresses conformance requires 'any'; this will be an error in a future Swift language mode}}
 }

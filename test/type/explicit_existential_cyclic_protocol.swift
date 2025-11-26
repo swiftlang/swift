@@ -19,6 +19,7 @@ do {
     // "HasSelfOrAssociatedTypeRequirements" should.
     let _: P2
     // expected-explicit-any-warning@-1 {{use of protocol 'P2' as a type must be written 'any P2'}}
+    // expected-explicit-any-note@-2 {{use 'any P2' to create an existential type}}
   }
   do {
     protocol P0 { associatedtype A }
@@ -31,5 +32,6 @@ do {
 
     let _: P2
     // expected-warning@-1 {{use of protocol 'P2' as a type must be written 'any P2'}}
+    // expected-note@-2 {{use 'any P2' to create an existential type}}
   }
 }

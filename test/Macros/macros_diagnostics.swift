@@ -197,8 +197,10 @@ struct MyStruct<T: MyProto> {
 struct SomeType {
   #genericUnary<Equatable>(0 as Hashable)
   // expected-warning@-1{{use of protocol 'Equatable' as a type must be written 'any Equatable'}}
-  // expected-warning@-2{{use of protocol 'Hashable' as a type must be written 'any Hashable'}}
-  // expected-error@-3{{external macro implementation type}}
+  // expected-note@-2 {{use 'any Equatable' to create an existential type}}
+  // expected-warning@-3{{use of protocol 'Hashable' as a type must be written 'any Hashable'}}
+  // expected-note@-4 {{use 'any Hashable' to create an existential type}}
+  // expected-error@-5{{external macro implementation type}}
 }
 
 

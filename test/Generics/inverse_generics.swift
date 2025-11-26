@@ -477,7 +477,9 @@ func checkExistentials() {
 typealias NotCopyable = ~Copyable
 typealias EmptyComposition = ~Copyable & ~Escapable
 func test(_ t: borrowing NotCopyable) {} // expected-warning {{use of 'NotCopyable' (aka '~Copyable') as a type must be written 'any NotCopyable'}}
+// expected-note@-1 {{use 'any NotCopyable' (aka 'any ~Copyable') to create an existential type}}
 func test(_ t: borrowing EmptyComposition) {} // expected-warning {{use of 'EmptyComposition' (aka '~Copyable & ~Escapable') as a type must be written 'any EmptyComposition' (aka 'any ~Copyable & ~Escapable')}}
+// expected-note@-1 {{use 'any EmptyComposition' (aka 'any ~Copyable & ~Escapable') to create an existential type}}
 
 typealias Copy = Copyable
 func test(_ z1: Copy, _ z2: Copyable) {}

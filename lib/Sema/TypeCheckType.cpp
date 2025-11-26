@@ -6794,11 +6794,21 @@ private:
       return;
     }
 
+    bool isTopLevelFunctionParam = [&] {
+      if (reprStack.size() != 1) return false;
+
+      auto *parentTypeRepr = Parent.getAsTypeRepr();
+      if(parentTypeRepr) return false;
+
+      auto *ParentDecl = Parent.getAsDecl();
+      return ParentDecl && isa<ParamDecl>(ParentDecl);
+    }();
+
     std::optional<InFlightDiagnostic> diag;
     if (outerInversion) {
       diag.emplace(Ctx.Diags.diagnose(outerInversion->getTildeLoc(),
                                       diag::inverse_requires_any));
-    } else {
+    } else if (isTopLevelFunctionParam) {
       diag.emplace(Ctx.Diags.diagnose(T->getNameLoc(),
                                       diag::existential_requires_any_or_some, type,
                                       ExistentialType::get(type),
@@ -6811,6 +6821,14 @@ private:
       Ctx.Diags.diagnose(T->getNameLoc(),
                          diag::suggest_some_fixit,
                          type->getAnyGeneric()->getNameStr());
+    } else {
+      diag.emplace(Ctx.Diags.diagnose(T->getNameLoc(),
+                                      diag::existential_requires_any, type,
+                                      ExistentialType::get(type),
+                                      /*isAlias=*/isa<TypeAliasDecl>(decl)));
+      Ctx.Diags.diagnose(T->getNameLoc(),
+                         diag::suggest_any_fixit, 
+                         ExistentialType::get(type));
     }
 
     // If `ExistentialAny` is enabled in migration mode, warn unconditionally.

@@ -15,5 +15,7 @@ public protocol P {}
 #else
 import M
 func test(_: P) {}
-// expected-warning@-1 {{use of protocol 'P' as a type must be written 'any P'}}
+// expected-warning@-1 {{use of protocol 'P' as a type must be written 'any P' or 'some P'}}
+// expected-note@-2 {{use 'any P' to create an existential type}}
+// expected-note@-3 {{use 'some P' to create an opaque type}}
 #endif

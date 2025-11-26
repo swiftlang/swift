@@ -16,21 +16,25 @@ func testExistentialInCatch() throws {
     try throwingFn()
   } catch is HasAssoc {}
   // expected-error@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+  // expected-note@-2 {{use 'any HasAssoc' to create an existential type}}
   _ = {
     do {
       try throwingFn()
     } catch is HasAssoc {}
     // expected-error@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    // expected-note@-2 {{use 'any HasAssoc' to create an existential type}}
   }
   do {
     try throwingFn()
   } catch is HasAssocAlias {}
   // expected-error@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+  // expected-note@-2 {{use 'any HasAssocAlias' (aka 'any HasAssoc') to create an existential type}}
   _ = {
     do {
       try throwingFn()
     } catch is HasAssocAlias {}
     // expected-error@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+    // expected-note@-2 {{use 'any HasAssocAlias' (aka 'any HasAssoc') to create an existential type}}
   }
   do {
     try throwingFn()
