@@ -116,7 +116,7 @@ extension Value {
   /// ```
   /// Returns self if this value has no uses which are ForwardingInstructions.
   func lookThroughOwnedConvertibaleForwardingChain() -> Value {
-    if let singleUse = uses.ignore(usersOfType: EndBorrowInst.self).singleUse,
+    if let singleUse = uses.ignore(usersOfType: EndBorrowInst.self).ignoreDebugUses.singleUse,
        let fwdInst = singleUse.instruction as? (SingleValueInstruction & ForwardingInstruction),
        fwdInst.canConvertToOwned,
        fwdInst.isSingleForwardedOperand(singleUse),
@@ -179,7 +179,7 @@ private extension ForwardingInstruction {
 ///
 /// Returns the last owned value in a forwarding-chain or `ownedValue` if `value` has
 /// no forwarding uses.
-func replaceGuaranteed(value: Value, withOwnedValue ownedValue: Value, _ context: SimplifyContext) -> Value {
+func replaceGuaranteed(value: SingleValueInstruction, withOwnedValue ownedValue: Value, _ context: SimplifyContext) -> Value {
   var result = ownedValue
   var numForwardingUses = 0
   for use in value.uses {
@@ -204,6 +204,11 @@ func replaceGuaranteed(value: Value, withOwnedValue ownedValue: Value, _ context
       result = replaceGuaranteed(value: fwdInst, withOwnedValue: fwdInst, context)
     case is EndBorrowInst:
       break
+    case let dv as DebugValueInst where dv != value.next:
+      // Move the debug_value immediatly after the value definition to avoid a use-after-consume
+      // in case the debug_value is originally located after the forwarding instruction.
+      dv.move(before: value.next!, context)
+      fallthrough
     default:
       precondition(use.canAccept(ownership: .owned))
       use.set(to: ownedValue, context)
