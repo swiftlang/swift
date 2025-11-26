@@ -15,7 +15,6 @@ import platform
 import re
 import sys
 import traceback
-from multiprocessing import freeze_support
 from typing import Any, Dict, Hashable, Optional, Set, List, Tuple, Union
 
 from .cli_arguments import CliArguments
@@ -768,7 +767,6 @@ def skip_list_for_platform(config: Dict[str, Any], all_repos: bool) -> List[str]
 
 
 def main() -> int:
-    freeze_support()
     args = CliArguments.parse_args()
 
     if not args.scheme:
