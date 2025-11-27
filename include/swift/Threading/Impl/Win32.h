@@ -19,7 +19,8 @@
 
 #include "Win32/Win32Defs.h"
 
-#include "chrono_utils.h"
+#include <chrono>
+#include <type_traits>
 
 #include <atomic>
 
@@ -140,7 +141,7 @@ inline void cond_wait(cond_handle &handle) {
 template <class Rep, class Period>
 inline bool cond_wait(cond_handle &handle,
                       std::chrono::duration<Rep, Period> duration) {
-  auto ms = chrono_utils::ceil<std::chrono::milliseconds>(duration);
+  auto ms = std::chrono::ceil<std::chrono::milliseconds>(duration);
 
   /* If you are paying attention to the next line, you are now asking
 
