@@ -280,7 +280,7 @@ bool BindingSet::isDelayed() const {
       if (Bindings.empty())
         return true;
 
-      if (Bindings[0].BindingType->is<ProtocolType>()) {
+      if (Bindings[0].BindingType->isConstraintType()) {
         auto *bindingLoc = Bindings[0].getLocator();
         // This set shouldn't be delayed because there won't be any
         // other inference sources when the protocol binding got
@@ -421,7 +421,7 @@ bool BindingSet::isPotentiallyIncomplete() const {
     // let's consider this binding set to be potentially incomplete since
     // that's done as a last resort effort at resolving first member.
     if (auto *constraint = binding.getSource()) {
-      if (binding.BindingType->is<ProtocolType>() &&
+      if (binding.BindingType->is<ProtocolType, ProtocolCompositionType>() &&
           (constraint->getKind() == ConstraintKind::ConformsTo ||
            constraint->getKind() == ConstraintKind::NonisolatedConformsTo))
         return true;
@@ -811,9 +811,12 @@ void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
         // \endcode
         inferTransitiveProtocolRequirements();
 
+        SmallVector<Type, 4> protocols;
+        std::optional<Constraint*> constraintSource;
         if (TransitiveProtocols.has_value()) {
           for (auto *constraint : *TransitiveProtocols) {
             Type protocolTy = constraint->getSecondType();
+            assert(protocolTy->is<ProtocolType>());
 
             // Compiler-known marker protocols cannot be extended with members,
             // so do not consider them.
@@ -838,9 +841,17 @@ void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
                   continue;
               }
             }
-
-            addBinding({protocolTy, AllowedBindingKind::Fallback, constraint});
-
+            protocols.push_back(protocolTy);
+            if (!constraintSource.has_value())
+              constraintSource = constraint;
+          }
+          if (protocols.size() > 0) {
+            assert(constraintSource.has_value());
+            auto ty = ProtocolCompositionType::get(CS.getASTContext(),
+                                                   protocols,
+                                                   InvertibleProtocolSet(),
+                                                   false /*anyObject*/);
+            addBinding({ty, AllowedBindingKind::Fallback, constraintSource.value()});
             // Note the fact that we modified the binding set.
             markDirty();
           }
@@ -2119,7 +2130,8 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     // type of a chain, Result should always be a concrete type which conforms
     // to the protocol inferred for the base.
     if (constraint->getKind() == ConstraintKind::UnresolvedMemberChainBase &&
-        kind == AllowedBindingKind::Subtypes && type->is<ProtocolType>()) {
+        kind == AllowedBindingKind::Subtypes &&
+        type->is<ProtocolType, ProtocolCompositionType>()) {
       DEBUG_BAILOUT("Unresolved member chain base");
       return std::nullopt;
     }
