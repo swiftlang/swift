@@ -90,15 +90,15 @@ func genericSubscript<T>(_ t: T,
 
 // <rdar://problem/21364448> QoI: Poor error message for ambiguous subscript call
 extension String {
-  func number() -> Int {  }     // expected-note {{found this candidate}}
-  func number() -> Double {  }  // expected-note {{found this candidate}}
+  func number() -> Int {  }     // expected-note {{found candidate with type '() -> Int'}}
+  func number() -> Double {  }  // expected-note {{found candidate with type '() -> Double'}}
 }
 
 let _ = "a".number  // expected-error {{ambiguous use of 'number()'}}
 
 extension Int {
-  subscript(key: String) -> Int { get {} }      // expected-note {{found this candidate}}
-  subscript(key: String) -> Double {  get {} }   // expected-note {{found this candidate}}
+  subscript(key: String) -> Int { get {} }      // expected-note {{found candidate with type '(String) -> Int'}}
+  subscript(key: String) -> Double {  get {} }   // expected-note {{found candidate with type '(String) -> Double'}}
 }
 
 let _ = 1["1"]  // expected-error {{ambiguous use of 'subscript(_:)'}}

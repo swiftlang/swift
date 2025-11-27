@@ -1375,7 +1375,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
     ctx.Diags.diagnose(importLoc, diag::ambiguous_decl_in_module,
                        accessPath.front().Item, module->getName());
     for (auto next : decls)
-      ctx.Diags.diagnose(next, diag::found_candidate);
+      ctx.Diags.diagnose(next, diag::found_candidate_decl, next);
 
   } else if (!isCompatibleImportKind(importKind, *actualKind)) {
     std::optional<InFlightDiagnostic> emittedDiag;

@@ -2704,7 +2704,7 @@ static bool diagnoseAmbiguity(
           if (candidateTypes.insert(type->getCanonicalType()).second)
             DE.diagnose(getLoc(commonAnchor), diag::found_candidate_type, type);
         } else {
-          DE.diagnose(noteLoc, diag::found_candidate);
+          DE.diagnose(noteLoc, diag::found_candidate_type, type);
         }
       };
 
@@ -3362,8 +3362,10 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
         if (EmittedDecls.insert(decl).second) {
           auto declModule = decl->getDeclContext()->getParentModule();
           bool printModuleName = declModule != DC->getParentModule();
+          auto diagnoseType = decl->getInterfaceTypeNoSelfParam();
+          
           DE.diagnose(decl, diag::found_candidate_in_module,
-                      printModuleName, declModule);
+                      printModuleName, declModule, diagnoseType);
         }
         break;
       }
