@@ -6797,6 +6797,10 @@ private:
     bool isTopLevelFunctionParam = [&] {
       if (reprStack.size() != 1) return false;
 
+      // Check if we can get the type name
+      auto *genericDecl = type->getAnyGeneric();
+      if (!genericDecl) return false;
+
       auto *parentTypeRepr = Parent.getAsTypeRepr();
       if(parentTypeRepr) return false;
 

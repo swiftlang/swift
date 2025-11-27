@@ -313,10 +313,11 @@ func testFunctionAlias(fn: ExistentialFunction) {}
 typealias Constraint = Input
 typealias ConstraintB = Input & InputB
 
-//expected-warning@+4{{use of 'Constraint' (aka 'Input') as a type must be written 'any Constraint' (aka 'any Input')}}
-// expected-note@+3 {{use 'any Constraint' (aka 'Input') to create an existential type}}
+//expected-warning@+5{{use of 'Constraint' (aka 'Input') as a type must be written 'any Constraint' (aka 'any Input')}}
+// expected-note@+4 {{use 'any Constraint' (aka 'any Input') to create an existential type}}
+// expected-note@+3 {{use 'some Constraint' (aka 'some Input') to create an opaque type}}
 //expected-warning@+2 {{use of 'ConstraintB' (aka 'Input & InputB') as a type must be written 'any ConstraintB' (aka 'any Input & InputB')}}
-// expected-note@+1 {{use 'any ConstraintB' (aka 'Input & InputB') to create an existential type}}
+// expected-note@+1 {{use 'any ConstraintB' (aka 'any Input & InputB') to create an existential type}}
 func testConstraintAlias(x: Constraint, y: ConstraintB) {}
 
 typealias Existential = any Input
@@ -423,21 +424,22 @@ func testAnyFixIt() {
   // expected-warning@+2 {{constraint that suppresses conformance requires 'any'}}{{24-33=any ~Copyable}}
   // expected-warning@+1 {{constraint that suppresses conformance requires 'any'}}{{49-58=any ~Copyable}}
   let _: NonCopyable_G<~Copyable>.NonCopyable_G<~Copyable>.S
-  // expected-note@+2 {{use of 'any S.HasAssoc_Alias' (aka 'any HasAssoc') to create an existential type}}
+  // expected-note@+2 {{use 'any S.HasAssoc_Alias' (aka 'any HasAssoc') to create an existential type}}
   // expected-warning@+1 {{use of 'S.HasAssoc_Alias' (aka 'HasAssoc') as a type must be written 'any S.HasAssoc_Alias' (aka 'any HasAssoc')}}{{10-26=any S.HasAssoc_Alias}}
   let _: S.HasAssoc_Alias
   // expected-warning@+1 {{constraint that suppresses conformance requires 'any'}}{{10-27=any ~S.Copyable_Alias}}
   let _: ~S.Copyable_Alias
   // expected-note@+4 {{use 'any HasAssoc' to create an existential type}}
-  // expected-note@+3 {{use of 'any S.HasAssoc_Alias' (aka 'any HasAssoc') to create an existential type}}
+  // expected-note@+3 {{use 'any S.HasAssoc_Alias' (aka 'any HasAssoc') to create an existential type}}
   // expected-warning@+2 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{12-20=any HasAssoc}}
   // expected-warning@+1 {{use of 'S.HasAssoc_Alias' (aka 'HasAssoc') as a type must be written 'any S.HasAssoc_Alias' (aka 'any HasAssoc')}}{{10-36=any G<HasAssoc>.HasAssoc_Alias}}
   let _: G<HasAssoc>.HasAssoc_Alias
+  // expected-note@+3 {{use 'any HasAssoc' to create an existential type}}
   // expected-warning@+2 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{13-21=any HasAssoc}}
   // expected-warning@+1 {{constraint that suppresses conformance requires 'any'}}{{10-37=any ~G<HasAssoc>.Copyable_Alias}}
   let _: ~G<HasAssoc>.Copyable_Alias
   // expected-note@+4 {{use 'any HasAssoc' to create an existential type}}
-  // expected-note@+3 {{use of 'any S.HasAssoc_Alias' (aka 'any HasAssoc') to create an existential type}}
+  // expected-note@+3 {{use 'any S.HasAssocGeneric_Alias' (aka 'any HasAssocGeneric') to create an existential type}}
   // expected-warning@+2:12 {{use of 'S.HasAssocGeneric_Alias' (aka 'HasAssocGeneric') as a type must be written 'any S.HasAssocGeneric_Alias' (aka 'any HasAssocGeneric')}} {{10-43=any S.HasAssocGeneric_Alias<HasAssoc>}}
   // expected-warning@+1:34 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{34-42=any HasAssoc}}
   let _: S.HasAssocGeneric_Alias<HasAssoc>
@@ -590,9 +592,12 @@ func testAnyFixIt() {
 
   // Misc. compound cases.
 
+  // expected-note@+3 {{use 'any NonCopyableHasAssoc' to create an existential type}}
   // expected-warning@+2 {{constraint that suppresses conformance requires 'any'}}{{21-52=any NonCopyableHasAssoc & ~Copyable}}
   // expected-warning@+1 {{use of protocol 'NonCopyableHasAssoc' as a type must be written 'any NonCopyableHasAssoc'}}{{21-52=any NonCopyableHasAssoc & ~Copyable}}
   let _: (borrowing NonCopyableHasAssoc & ~Copyable) -> Void
+  // expected-note@+5 {{use 'any NonCopyableHasAssoc' to create an existential type}}
+  // expected-note@+4 {{use 'any NonCopyableHasAssoc' to create an existential type}}
   // expected-warning@+3:15 {{constraint that suppresses conformance requires 'any'}}{{10-88=(any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type)}}
   // expected-warning@+2:28 {{use of protocol 'NonCopyableHasAssoc' as a type must be written 'any NonCopyableHasAssoc'}}{{10-88=(any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type)}}
   // expected-warning@+1:51 {{use of protocol 'NonCopyableHasAssoc' as a type must be written 'any NonCopyableHasAssoc'}}{{10-88=(any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type)}}

@@ -99,24 +99,24 @@ func testGlobalVariable() {
 
 #if TEST_DIAGNOSTICS
 
-// expected-note @+1 6 {{in expansion of macro 'anonymousTypes' here}}
+// expected-note @+1 8 {{in expansion of macro 'anonymousTypes' here}}
 #anonymousTypes(causeErrors: true) { "foo" }
 /*
 expected-expansion@-2:1 {{
   expected-warning@23:8{{same-type requirement makes generic parameter 'T' non-generic; this is an error in the Swift 6 language mode}}
   expected-note@23:135{{'T' previously declared here}}
   expected-warning@23:149{{use of protocol 'Equatable' as a type must be written 'any Equatable'; this will be an error in a future Swift language mode}}
-  expected-note@23:149{{use of protocol 'any Equatabl' to create an existential type}}
-  expected-note@24:3 3{{in expansion of macro 'introduceTypeCheckingErrors' here}}
+  expected-note @23:149 {{use 'any Equatable' to create an existential type}}
+  expected-note@24:3 4{{in expansion of macro 'introduceTypeCheckingErrors' here}}
   expected-expansion@24:3 {{
     expected-warning@2:10{{same-type requirement makes generic parameter 'T' non-generic; this is an error in the Swift 6 language mode}}
     expected-warning@2:259{{generic parameter 'T' shadows generic parameter from outer scope with the same name; this is an error in the Swift 6 language mode}}
     expected-warning@2:273{{use of protocol 'Hashable' as a type must be written 'any Hashable'; this will be an error in a future Swift language mode}}
-    expected-note@2:273 {{use 'any Hashable' to create an existential type}}
+    expected-note @2:273 {{use 'any Hashable' to create an existential type}}
   }}
 }}
 */
-// expected-note @+1 2 {{in expansion of macro 'anonymousTypes' here}}
+// expected-note @+1 4 {{in expansion of macro 'anonymousTypes' here}}
 #anonymousTypes { () -> String in
   // expected-warning @+2 {{use of protocol 'Equatable' as a type must be written 'any Equatable'}}
   // expected-note @+1 {{use 'any Equatable' to create an existential type}}
@@ -124,10 +124,11 @@ expected-expansion@-2:1 {{
   return "foo"
 }
 /*
-expected-expansion@-6:1{{
-  expected-warning@5:16{{use of protocol 'Equatable' as a type must be written 'any Equatable'; this will be an error in a future Swift language mode}}
-  expected-warning@20:16{{use of protocol 'Equatable' as a type must be written 'any Equatable'; this will be an error in a future Swift language mode}}
-  expected-note@20:16 {{use 'any Equatable' to create an existential type}}
+expected-expansion@-7:1{{
+  expected-warning@6:16{{use of protocol 'Equatable' as a type must be written 'any Equatable'; this will be an error in a future Swift language mode}}
+  expected-warning@22:16{{use of protocol 'Equatable' as a type must be written 'any Equatable'; this will be an error in a future Swift language mode}}
+  expected-note @6:16 {{use 'any Equatable' to create an existential type}}
+  expected-note @22:16 {{use 'any Equatable' to create an existential type}}
 }}
 */
 
