@@ -344,6 +344,7 @@ extension MutableSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func swapAt(_ i: Index, _ j: Index) {
+    guard i != j else { return }
     _precondition(indices.contains(Index(i)))
     _precondition(indices.contains(Index(j)))
     unsafe swapAt(unchecked: i, unchecked: j)
