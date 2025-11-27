@@ -123,8 +123,8 @@ bb2(%48 : $Builtin.Word):
 
 // CHECK-LABEL: sil @hoist_outer_loop
 // CHECK: bb0([[ADDR:%.*]] : $*Builtin.Int1
-// CHECK:  load [[ADDR]]
 // CHECK:  integer_literal $Builtin.Word, 101
+// CHECK:  load [[ADDR]]
 // CHECK: br bb1
 // CHECK: return
 
@@ -1096,9 +1096,9 @@ struct State {
 // CHECK:     [[ELT0B:%.*]] = load [[HOISTADR2]] : $*Int64
 // ...Split element 2
 // CHECK:     [[SPLIT2:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 2
+// CHECK:     [[SINGLEADR:%.*]] = struct_element_addr %{{.*}} : $*State, #State.singleValue
 // CHECK:     [[ELT2:%.*]] = load [[SPLIT2]] : $*Int64
 // ...Split State.singlevalue
-// CHECK:     [[SINGLEADR:%.*]] = struct_element_addr %{{.*}} : $*State, #State.singleValue
 // CHECK:     [[SINGLEVAL:%.*]] = load [[SINGLEADR]] : $*Int64
 // ...Hoisted element 0
 // CHECK:     br bb1([[PRELOAD]] : $Int64)
@@ -1155,8 +1155,8 @@ bb3:
 // CHECK-LABEL: sil shared @testCommonSplitLoad : $@convention(method) (Int64, Builtin.RawPointer) -> (Int64, Int64, Int64) {
 // CHECK: bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
 // CHECK:   [[ELT0:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 0
-// CHECK:   [[V0:%.*]] = load [[ELT0]] : $*Int64
 // CHECK:   [[ELT2:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 2
+// CHECK:   [[V0:%.*]] = load [[ELT0]] : $*Int64
 // CHECK:   [[V2:%.*]] = load [[ELT2]] : $*Int64
 // CHECK:   [[ELT1:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 1
 // CHECK:   [[V1:%.*]] = load [[ELT1]] : $*Int64
@@ -1239,9 +1239,9 @@ bb3:
 // CHECK-LABEL: sil shared @testResplit : $@convention(method) (Int64, Builtin.RawPointer) -> (Int64, (Int64, Int64)) {
 // CHECK: bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
 // CHECK:   [[ELT_0:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, (Int64, Int64)), 0
-// CHECK:   [[V0:%.*]] = load [[ELT_0]] : $*Int64
 // CHECK:   [[ELT_1a:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, (Int64, Int64)), 1
 // CHECK:   [[ELT_1_0:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64), 0
+// CHECK:   [[V0:%.*]] = load [[ELT_0]] : $*Int64
 // CHECK:   [[V_1_0:%.*]] = load [[ELT_1_0]] : $*Int64
 // CHECK:   [[ELT_1_1:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64), 1
 // CHECK:   [[V_1_1:%.*]] = load [[ELT_1_1]] : $*Int64
