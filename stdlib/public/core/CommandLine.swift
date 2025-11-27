@@ -18,6 +18,12 @@ import SwiftShims
 internal func _swift_stdlib_getUnsafeArgvArgc(_: UnsafeMutablePointer<Int32>)
   -> UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
 
+@_silgen_name("_swift_stdlib_copyExecutablePath")
+private func _copyExecutablePath() -> UnsafeMutablePointer<CChar>
+
+@_silgen_name("_swift_stdlib_deallocExecutablePath")
+private func _deallocExecutablePath(_ path: UnsafeMutablePointer<CChar>)
+
 /// Command-line arguments for the current process.
 @frozen // namespace
 public enum CommandLine: ~BitwiseCopyable {}
@@ -117,6 +123,61 @@ extension CommandLine {
       _arguments = newValue
     }
   }
-}
 
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+  @_extern(c, "_NSGetExecutablePath")
+  @usableFromInline
+  internal static func _NSGetExecutablePath(
+    _ buf: UnsafeMutablePointer<CChar>,
+    _ bufsize: UnsafeMutablePointer<UInt32>
+  ) -> CInt
+
+  /// The path to the current executable.
+  ///
+  /// - Important: On some systems, it is possible to move an executable file on
+  ///   disk while it is running. If the current executable file is moved, the
+  ///   value of this property is not updated to its new path.
+  @_unavailableInEmbedded
+  @available(SwiftStdlib 6.3, *)
+  @_alwaysEmitIntoClient
+  public static var executablePath: String { // NOTE: can't be AEIC and stored!
+    // _NSGetExecutablePath() returns non-zero if the provided buffer is too
+    // small and updates its *bufsize argument to the required value, so we can
+    // just set a reasonable initial value, then loop and try again on failure.
+    var byteCount = UInt32(128)
+    while true {
+      let result: String? = unsafe withUnsafeTemporaryAllocation(
+        of: CChar.self,
+        capacity: Int(byteCount)
+      ) { buffer in
+        if (unsafe 0 == _NSGetExecutablePath(buffer.baseAddress!, &byteCount)) {
+          return unsafe String(cString: buffer.baseAddress!)
+        }
+        return nil
+      }
+      if let result {
+        return result
+      }
+    }
+  }
+#else
+  /// The path to the current executable.
+  ///
+  /// - Important: On some systems, it is possible to move an executable file on
+  ///   disk while it is running. If the current executable file is moved, the
+  ///   value of this property is not updated to its new path.
+  @_unavailableInEmbedded
+#if os(WASI)
+  @available(*, unavailable, message: "Unavailable on WASI")
+#endif
+  public static let executablePath: String = {
+    // FIXME: avoid needing to allocate and free a temp C string (if possible)
+    let cString = unsafe _copyExecutablePath()
+    defer {
+      unsafe _deallocExecutablePath(cString)
+    }
+    return unsafe String(cString: cString)
+  }()
+#endif
+}
 #endif // SWIFT_STDLIB_HAS_COMMANDLINE
