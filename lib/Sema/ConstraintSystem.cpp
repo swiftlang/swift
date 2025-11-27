@@ -1811,6 +1811,17 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
 
     return std::nullopt;
   }
+
+  std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
+    ty = simplify(ty);
+
+    // If we still have type variables, we keep the dependence.
+    if (ty->hasTypeVariable())
+      return std::pair(ty, false);
+
+    // Otherwise we've flattened the dependence, evaluate Sendable.
+    return std::make_pair(Type(), ty->isSendableType());
+  }
 };
 
 } // end anonymous namespace
@@ -3709,7 +3720,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
 
     case ConstraintLocator::GlobalActorType:
-    case ConstraintLocator::ContextualType: {
+    case ConstraintLocator::ContextualType:
+    case ConstraintLocator::FunctionSendability: {
       // This was just for identifying purposes, strip it off.
       path = path.slice(1);
       continue;
