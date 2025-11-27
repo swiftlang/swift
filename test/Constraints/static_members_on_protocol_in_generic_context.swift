@@ -250,12 +250,12 @@ test(.genericWithReqs(()))
 // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 // expected-error@-3 {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
 
-test_combo(.doesntExist) // expected-error {{reference to member 'doesntExist' cannot be resolved without a contextual type}}
-test_combo(.doesnt.exist()) // expected-error {{reference to member 'doesnt' cannot be resolved without a contextual type}}
+test_combo(.doesntExist) // expected-error {{type 'P & Q' has no member 'doesntExist'}}
+test_combo(.doesnt.exist()) // expected-error {{type 'P & Q' has no member 'doesnt'}}
 test_combo(.invalidProp)
 // expected-error@-1 {{contextual member reference to static property 'invalidProp' requires 'Self' constraint in the protocol extension}}
 test_combo(.invalidMethod())
-// expected-error@-1 {{contextual member reference to static method 'invalidMethod()' requires 'Self' constraint in the protocol extension}}
+// expected-error@-1{{contextual member reference to static method 'invalidMethod()' requires 'Self' constraint in the protocol extension}}
 test_combo(.generic(42))
 // expected-error@-1 {{contextual member reference to static method 'generic' requires 'Self' constraint in the protocol extension}}
 test_combo(.generic(S())) // expected-error {{contextual member reference to static method 'generic' requires 'Self' constraint in the protocol extension}}
@@ -382,3 +382,21 @@ test(.instanceProp)
 test(.instanceProp2)
 // expected-error@-1 {{instance member 'instanceProp2' cannot be used on type 'P'}}
 // expected-error@-2 {{property 'instanceProp2' requires the types 'Self' and 'S' be equivalent}}
+
+protocol P1 {
+  associatedtype X
+}
+
+protocol Q1{}
+
+struct I: P1 {
+  typealias X = Int
+}
+extension Int: Q1 {}
+
+extension P1 where Self == I {
+  static var sbar: I { I() }
+}
+
+func subconformance<T: P1, U>(_ x: T, _ y: U) where U == T.X, T.X: Q1 {}
+subconformance(.sbar, 5)
