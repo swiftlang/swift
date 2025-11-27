@@ -52,6 +52,15 @@ public func unqualifiedLookup(
   }
   let sourceLocationConverter = sourceFile.pointee.sourceLocationConverter
   let configuredRegions = sourceFile.pointee.configuredRegions(astContext: astContext)
+  
+  let lookupCache: LookupCache
+  
+  if let sourceFileCache = sourceFile.pointee.lookupCache {
+    lookupCache = sourceFileCache
+  } else {
+    lookupCache = LookupCache(capacity: 100, drop: 4)
+    sourceFile.pointee.lookupCache = lookupCache
+  }
 
   guard let lookupPosition = sourceFile.pointee.position(of: lookupAt),
     let lookupToken = sourceFileSyntax.token(at: lookupPosition)
@@ -70,7 +79,8 @@ public func unqualifiedLookup(
   let sllResults = sllConsumedResults(
     lookupToken: lookupToken,
     finishInSequentialScope: finishInSequentialScope,
-    configuredRegions: configuredRegions
+    configuredRegions: configuredRegions,
+    cache: lookupCache
   )
 
   // Add header to the output
@@ -196,12 +206,15 @@ private func astConsumedResults(
 private func sllConsumedResults(
   lookupToken: TokenSyntax,
   finishInSequentialScope: Bool,
-  configuredRegions: ConfiguredRegions
+  configuredRegions: ConfiguredRegions,
+  cache: LookupCache
 ) -> [ConsumedLookupResult] {
   let resultsWithoutMacroReordering = lookupToken.lookup(
     nil,
-    with: LookupConfig(finishInSequentialScope: finishInSequentialScope, configuredRegions: configuredRegions)
+    with: LookupConfig(finishInSequentialScope: finishInSequentialScope, configuredRegions: configuredRegions),
+    cache: cache
   )
+  cache.evictEntriesWithoutHit()
 
   // Early reordering of macro declaration parameters with its generic parameters.
   var results: [LookupResult] = []
@@ -413,7 +426,7 @@ private func flaggingPass(
       }
 
       // Check if next results at this position should be ignored. If so, set ignoreAt and omit this name.
-      if sllResult.ignoreNextFromHere && sllResult.position != ignoreAt {
+      if sllResult.ignoreNextFromHere {
         ignoreAt = sllResult.position
         sllResult.flags.insert(.shouldBeOmitted)
       }
