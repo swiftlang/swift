@@ -18,7 +18,7 @@ extension Sequence where Element: BinaryInteger {
 // CHECK:   cond_br [[T5]], bb3, bb1
 
 // CHECK: bb1:
-// CHECK:   [[T6:%.*]] = function_ref @$sSTsE6reduceyqd__qd___qd__qd___7ElementQztKXEtKlF
+// CHECK:   [[T6:%.*]] = function_ref @$sSTsE6reduceyqd__qd__n_qd__qd__n_7ElementQztKXEtKRi_d__lF
 // CHECK:   apply {{.*}} [[T6]]<Self, Double>(
 // CHECK:   br bb2(
 
