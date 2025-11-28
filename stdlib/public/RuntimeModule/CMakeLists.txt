@@ -44,6 +44,8 @@ set(RUNTIME_SOURCES
   Compression.swift
   Context.swift
   CoreSymbolication.swift
+  CrashLog.swift
+  CrashLogCapture.swift
   Dwarf.swift
   EightByteBuffer.swift
   Elf.swift

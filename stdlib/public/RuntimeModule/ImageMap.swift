@@ -33,7 +33,8 @@ public struct ImageMap: Collection, Sendable, Hashable {
 
   /// Tells us what size of machine words were used when capturing the
   /// image map.
-  enum WordSize: Sendable {
+  @_spi(Testing)
+  public enum WordSize: Sendable {
     case sixteenBit
     case thirtyTwoBit
     case sixtyFourBit
@@ -43,7 +44,8 @@ public struct ImageMap: Collection, Sendable, Hashable {
   typealias Address = UInt64
 
   /// The internal representation of an image.
-  struct Image: Sendable, Hashable {
+  @_spi(Formatting)
+  public struct Image: Sendable, Hashable {
     var name: String?
     var path: String?
     var uniqueID: [UInt8]?
@@ -55,7 +57,8 @@ public struct ImageMap: Collection, Sendable, Hashable {
   public private(set) var platform: String
 
   /// The actual image storage.
-  var images: [Image]
+  @_spi(Formatting)
+  public var images: [Image]
 
   /// The size of words used when capturing.
   var wordSize: WordSize
