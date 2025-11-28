@@ -22,7 +22,11 @@ public func readFile(_ path: String) -> String {
 
 public func write(_ data: String, to path: String) {
   do {
-    try data.write(toFile: path, atomically: false, encoding: .utf8)
+    let url = URL(fileURLWithPath: path)
+    let directoryURL = url.deletingLastPathComponent()
+    try FileManager.default
+      .createDirectory(at: directoryURL, withIntermediateDirectories: true)
+    try data.write(to: url, atomically: false, encoding: .utf8)
   } catch {
     fatalError(error.localizedDescription)
   }
