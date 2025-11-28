@@ -25,7 +25,7 @@
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSCAN_VERSION_MAJOR 2
-#define SWIFTSCAN_VERSION_MINOR 2
+#define SWIFTSCAN_VERSION_MINOR 3
 
 SWIFTSCAN_BEGIN_DECLS
 
@@ -116,6 +116,25 @@ typedef struct {
   swiftscan_diagnostic_info_t *diagnostics;
   size_t count;
 } swiftscan_diagnostic_set_t;
+
+/// This enum denotes the kind of scanning file system cache out-of-date entries.
+typedef enum {
+  /// The entry is negatively stat cached (which indicates the file did not
+  /// exist the first time it was looked up during scanning), but the cached
+  /// file exists on the underlying file system.
+  SWIFTSCAN_OOD_FS_ENTRY_NEGATIVELY_CACHED,
+  /// The entry indicates that for the cached file, its cached size
+  /// is different from its size reported by the underlying file system.
+  SWIFTSCAN_OOD_FS_ENTRY_SIZE_CHANGED
+} swiftscan_scanner_out_of_date_file_system_entry_kind;
+
+/// Opaque type for the out-of-date file system entry set.
+typedef struct swiftscan_scanner_out_of_date_file_system_entry_set_s
+    *swiftscan_scanner_out_of_date_file_system_entry_set_t;
+
+/// Opaque type for the out-of-date file system entry.
+typedef struct swift_scanner_out_of_date_file_system_entry_s
+    *swiftscan_scanner_out_of_date_file_system_entry_t;
 
 //=== Batch Scan Input Specification -------DEPRECATED--------------------===//
 
@@ -506,6 +525,47 @@ swiftscan_diagnostic_get_source_location(swiftscan_diagnostic_info_t diagnostic)
 
 SWIFTSCAN_PUBLIC void
 swiftscan_diagnostics_set_dispose(swiftscan_diagnostic_set_t* diagnostics);
+
+//=== Scanner File System Cache Diagnostics -------------------------------===//
+/// Obtain the out-of-date file system entry set from a scanner.
+/// This function is intended to be called after all scans finish (ideally when
+/// the whole build finishes).
+SWIFTSCAN_PUBLIC swiftscan_scanner_out_of_date_file_system_entry_set_t
+    swiftscan_scanner_get_out_of_date_file_system_entry_set(
+        swiftscan_scanner_t);
+
+SWIFTSCAN_PUBLIC
+size_t swiftscan_scanner_out_of_date_file_system_entry_set_get_size(
+    swiftscan_scanner_out_of_date_file_system_entry_set_t);
+
+SWIFTSCAN_PUBLIC swiftscan_scanner_out_of_date_file_system_entry_t
+swiftscan_scanner_out_of_date_file_system_entry_set_get_entry(
+    swiftscan_scanner_out_of_date_file_system_entry_set_t, size_t);
+
+SWIFTSCAN_PUBLIC swiftscan_scanner_out_of_date_file_system_entry_kind
+    swiftscan_scanner_out_of_date_file_system_entry_get_kind(
+        swiftscan_scanner_out_of_date_file_system_entry_t);
+
+/// Get the path of the out-of-date entry. The returned
+/// \c swiftscan_string_ref_t does not own the string, so there is no need to
+/// dispose it. The string is a reference to data in the
+/// \c swiftscan_scanner_out_of_date_file_system_entry_set_t and
+/// will be disposed when the entry set is disposed.
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+    swiftscan_scanner_out_of_date_file_system_entry_get_path(
+        swiftscan_scanner_out_of_date_file_system_entry_t);
+
+SWIFTSCAN_PUBLIC
+uint64_t swiftscan_scanner_out_of_date_file_system_entry_get_cached_size(
+    swiftscan_scanner_out_of_date_file_system_entry_t);
+
+SWIFTSCAN_PUBLIC
+uint64_t swiftscan_scanner_out_of_date_file_system_entry_get_actual_size(
+    swiftscan_scanner_out_of_date_file_system_entry_t);
+
+SWIFTSCAN_PUBLIC void
+    swiftscan_scanner_out_of_date_file_system_entry_set_dispose(
+        swiftscan_scanner_out_of_date_file_system_entry_set_t);
 
 //=== Source Location -----------------------------------------------------===//
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
