@@ -605,7 +605,19 @@ public protocol ExecutorFactory {
 }
 
 @available(StdlibDeploymentTarget 6.3, *)
-typealias DefaultExecutorFactory = PlatformExecutorFactory
+extension ExecutorFactory {
+  public static var mainExecutor: any MainExecutor {
+    return PlatformExecutorFactory.mainExecutor
+  }
+
+  public static var defaultExecutor: any TaskExecutor {
+    return PlatformExecutorFactory.defaultExecutor
+  }
+}
+
+@available(StdlibDeploymentTarget 6.3, *)
+public struct DefaultExecutorFactory: ExecutorFactory {
+}
 
 @available(StdlibDeploymentTarget 6.2, *)
 @_silgen_name("swift_createExecutors")
@@ -688,7 +700,7 @@ extension Task where Success == Never, Failure == Never {
   ///  If none of these exist, returns the default executor.
   @available(StdlibDeploymentTarget 6.2, *)
   @_unavailableInEmbedded
-  public static var currentExecutor: any Executor {
+  static var currentExecutor: any Executor {
     if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor() {
       return activeExecutor
     } else if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor() {
@@ -714,7 +726,7 @@ extension Task where Success == Never, Failure == Never {
   /// This follows the same logic as `currentExecutor`, except that it ignores
   /// any executor that isn't a `SchedulingExecutor`.
   @available(StdlibDeploymentTarget 6.2, *)
-  public static var currentSchedulingExecutor: (any SchedulingExecutor)? {
+  static var currentSchedulingExecutor: (any SchedulingExecutor)? {
     if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor(),
        let scheduling = activeExecutor.asSchedulingExecutor {
       return scheduling
