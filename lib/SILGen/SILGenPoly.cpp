@@ -2109,7 +2109,7 @@ private:
 
     // If our inner is guaranteed or unowned, we need to create a copy here.
     if (inner.getOwnershipKind() != OwnershipKind::Owned)
-      inner = inner.copyUnmanaged(SGF, Loc);
+      inner = inner.copy(SGF, Loc);
 
     return inner;
   }
@@ -2190,7 +2190,7 @@ private:
     if (outer.getType() == innerParam.getType()) {
       if (isConsumedParameterInCaller(innerParam.getConvention()) &&
           !outer.isPlusOne(SGF)) {
-        outer = outer.copyUnmanaged(SGF, Loc);
+        outer = outer.copy(SGF, Loc);
       }
 
       return outer;
