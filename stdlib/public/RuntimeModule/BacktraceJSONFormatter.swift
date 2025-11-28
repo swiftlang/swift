@@ -13,133 +13,119 @@
 //  Provides functionality to format JSON backtraces.
 //
 //===----------------------------------------------------------------------===//
+
 import Swift
 
-@_spi(Formatting)
-public enum BacktraceJSONFormatterBacktrace {
-  case raw(Backtrace)
-  case symbolicated(SymbolicatedBacktrace)
-}
+public struct BacktraceJSONFormatterOptions: OptionSet {
+  public let rawValue: Int
 
-@_spi(Formatting)
-public protocol BacktraceJSONFormatterThread {
-  associatedtype ThreadID: Equatable
-
-  var id: ThreadID { get }
-  var name: String { get }
-  func getBacktrace() -> BacktraceJSONFormatterBacktrace
-}
-
-@_spi(Formatting)
-public protocol BacktraceJSONFormatter {
-  associatedtype ThreadType: BacktraceJSONFormatterThread
-
-  static func write(_ string: String, flush: Bool) 
-  static func writeln(_ string: String, flush: Bool)
-
-  static func getDescription() -> String?
-  static func getArchitecture() -> String?
-  static func getPlatform() -> String?
-  static func getFaultAddress() -> String?
-  static func allThreads() -> [ThreadType]
-  static func crashingThreadIndex() -> Int?
-  static func writeThreadRegisters(thread: ThreadType, capturedBytes: inout [UInt64:Array<UInt8>])
-  static func getImages() -> ImageMap?
-
-  // settings for the output format
-  static func getShouldShowAllThreads() -> Bool
-  static func getShouldShowAllRegisters() -> Bool
-  static func getShouldDemangle() -> Bool
-  static func getShouldSanitize() -> Bool
-  static func getShowMentionedImages() -> Bool
-}
-
-@_spi(Formatting)
-public extension BacktraceJSONFormatter {
-    static func writeRegister<T: FixedWidthInteger>(
-      name: String, value: T, first: Bool = false,
-      captureMemory: ((T) -> Void)
-    ) {
-      if !first {
-        write(", ", flush: false)
-      }
-      write("\"\(name)\": \"\(hex(value))\"", flush: false)
-
-      captureMemory(value)
-    }
-
-    static func writeRegister<C: Context>(
-      name: String, context: C, register: C.Register, first: Bool = false,
-      captureMemory: ((C.GPRValue) -> Void)
-    ) {
-      let value = context.getRegister(register)!
-      writeRegister(name: name, value: value, first: first, captureMemory: captureMemory)
-    }
-
-    static func writeGPRs<C: Context, Rs: Sequence>(_ context: C, range: Rs,
-      captureMemory: ((C.GPRValue) -> Void))
-      where Rs.Element == C.Register
-    {
-      var first = true
-      for reg in range {
-        writeRegister(name: "\(reg)", context: context, register: reg,
-                           first: first, captureMemory: captureMemory)
-        if first {
-          first = false
-        }
-      }
-    }
-
-    static func writeRegisterDump(_ context: X86_64Context, captureMemory: ((X86_64Context.GPRValue) -> Void)) {
-      writeGPRs(context, range: .rax ... .r15, captureMemory: captureMemory)
-      writeRegister(name: "rip", value: context.programCounter, captureMemory: captureMemory)
-      writeRegister(name: "rflags", context: context, register: .rflags, captureMemory: captureMemory)
-      writeRegister(name: "cs", context: context, register: .cs, captureMemory: captureMemory)
-      writeRegister(name: "fs", context: context, register: .fs, captureMemory: captureMemory)
-      writeRegister(name: "gs", context: context, register: .gs, captureMemory: captureMemory)
-    }
-
-    static func writeRegisterDump(_ context: I386Context, captureMemory: ((I386Context.GPRValue) -> Void)) {
-      writeGPRs(context, range: .eax ... .edi, captureMemory: captureMemory)
-      writeRegister(name: "eip", value: context.programCounter, captureMemory: captureMemory)
-      writeRegister(name: "eflags", context: context, register: .eflags, captureMemory: captureMemory)
-      writeRegister(name: "es", context: context, register: .es, captureMemory: captureMemory)
-      writeRegister(name: "cs", context: context, register: .cs, captureMemory: captureMemory)
-      writeRegister(name: "ss", context: context, register: .ss, captureMemory: captureMemory)
-      writeRegister(name: "ds", context: context, register: .ds, captureMemory: captureMemory)
-      writeRegister(name: "fs", context: context, register: .fs, captureMemory: captureMemory)
-      writeRegister(name: "gs", context: context, register: .gs, captureMemory: captureMemory)
-    }
-
-    static func writeRegisterDump(_ context: ARM64Context, captureMemory: ((ARM64Context.GPRValue) -> Void)) {
-      writeGPRs(context, range: .x0 ..< .x29, captureMemory: captureMemory)
-      writeRegister(name: "fp", context: context, register: .x29, captureMemory: captureMemory)
-      writeRegister(name: "lr", context: context, register: .x30, captureMemory: captureMemory)
-      writeRegister(name: "sp", context: context, register: .sp, captureMemory: captureMemory)
-      writeRegister(name: "pc", context: context, register: .pc, captureMemory: captureMemory)
-    }
-
-    static func writeRegisterDump(_ context: ARMContext, captureMemory: ((ARMContext.GPRValue) -> Void)) {
-      writeGPRs(context, range: .r0 ... .r10, captureMemory: captureMemory)
-      writeRegister(name: "fp", context: context, register: .r11, captureMemory: captureMemory)
-      writeRegister(name: "ip", context: context, register: .r12, captureMemory: captureMemory)
-      writeRegister(name: "sp", context: context, register: .r13, captureMemory: captureMemory)
-      writeRegister(name: "lr", context: context, register: .r14, captureMemory: captureMemory)
-      writeRegister(name: "pc", context: context, register: .r15, captureMemory: captureMemory)
-    }
-}
-
-@_spi(Formatting)
-public extension BacktraceJSONFormatter {
-  static func crashingThreadID() -> ThreadType.ThreadID? {
-    guard let crashingThreadIndex = crashingThreadIndex() else { return nil }
-    let crashingThread = allThreads()[crashingThreadIndex]
-    return crashingThread.id
+  public init(rawValue: Int) {
+    self.rawValue = rawValue
   }
 
-  static func writePreamble(now: String) {
-    guard let description = getDescription(), let faultAddress = getFaultAddress(),
-    let platform = getPlatform(), let architecture = getArchitecture() else { return }
+  public static let allRegisters = BacktraceJSONFormatterOptions(rawValue: 1<<0)
+  public static let demangle = BacktraceJSONFormatterOptions(rawValue: 1<<1)
+  public static let sanitize = BacktraceJSONFormatterOptions(rawValue: 1<<2)
+  public static let mentionedImages = BacktraceJSONFormatterOptions(rawValue: 1<<3)
+  public static let allThreads = BacktraceJSONFormatterOptions(rawValue: 1<<4)
+}
+
+extension BacktraceJSONFormatterOptions {
+  // this is not the form we want but will do for now
+  // we are going to turn this into an OptionSet or similar
+  var showAllRegisters: Bool { contains(.allRegisters) }
+  var shouldDemangle: Bool { contains(.demangle) }
+  var shouldSanitize: Bool { contains(.sanitize) }
+  var showMentionedImages: Bool { contains(.mentionedImages) }
+  var showAllThreads: Bool { contains(.allThreads) }
+}
+
+public protocol BacktraceJSONWriter {
+  func write(_ string: String, flush: Bool)
+  func writeln(_ string: String, flush: Bool)
+}
+
+@_spi(Formatting)
+public struct BacktraceJSONFormatter<
+Address: FixedWidthInteger,
+Writer: BacktraceJSONWriter> {
+
+  var writer: Writer
+  var options: BacktraceJSONFormatterOptions
+
+  typealias Log = CrashLog<Address>
+
+  var crashLog: Log
+  var imageMap: ImageMap?
+
+  var mentionedImages: Set<Int> = []
+
+  @_spi(Formatting)
+  public init(
+    crashLog: CrashLog<Address>,
+    writer: Writer,
+    options: BacktraceJSONFormatterOptions)
+  {
+    self.crashLog = crashLog
+    self.writer = writer
+    self.options = options
+    self.imageMap = crashLog.imageMap()
+  }
+}
+
+extension BacktraceJSONFormatter {
+  func write(_ string: String, flush: Bool) {
+    writer.write(string, flush: flush)
+  }
+  func writeln(_ string: String, flush: Bool) {
+    writer.writeln(string, flush: flush)
+  }
+
+  func getDescription() -> String? {
+    crashLog.description
+  }
+
+  func getArchitecture() -> String? {
+    crashLog.architecture
+  }
+
+  func getPlatform() -> String? {
+    crashLog.platform
+  }
+
+  func getFaultAddress() -> String? {
+    crashLog.faultAddress
+  }
+
+  // settings for the output format
+  func getShouldShowAllThreads() -> Bool {
+    options.showAllThreads
+  }
+
+  func getShouldShowAllRegisters() -> Bool {
+    options.showAllRegisters
+  }
+
+  func getShouldDemangle() -> Bool {
+    options.shouldDemangle
+  }
+
+  func getShouldSanitize() -> Bool {
+    options.shouldDemangle
+  }
+
+  func getShowMentionedImages() -> Bool {
+    options.showMentionedImages
+  }
+}
+
+@_spi(Formatting)
+public extension BacktraceJSONFormatter {
+  func writePreamble(now: String) {
+    guard let description = getDescription(),
+    let faultAddress = getFaultAddress(),
+    let platform = getPlatform(),
+    let architecture = getArchitecture() else { return }
 
     write("""
         { \
@@ -153,170 +139,252 @@ public extension BacktraceJSONFormatter {
     flush: false)
   }
 
-  static func writeThreads(
-    mentionedImages: inout Set<Int>,
-    capturedBytes: inout [UInt64:Array<UInt8>]) {
+  // this updates the mentionedImages and omittedImages properties
+  // it's done here rather than in capture for efficiency, as at that
+  // point we are not sure if we are limiting to mentioned images or not
+  mutating func writeThreads() {
 
     write(#", "threads": [ "#, flush: false)
-    if getShouldShowAllThreads() {
-      let crashingThreadId = crashingThreadID()
+    let showAllThreads = getShouldShowAllThreads()
+
+    let threads = crashLog.threads.filter { showAllThreads || $0.crashed }
+
+    var first = true
+    for thread in threads {
+      if first {
+        first = false
+      } else {
+        write(", ", flush: false)
+      }
+
+      writeThread(thread: thread)
+    }
+
+    write(" ]", flush: false)
+
+    if !showAllThreads && crashLog.threads.count > 1 {
+      write(", \"omittedThreads\": \(crashLog.threads.count - 1)", flush: false)
+    }
+
+    if let images = crashLog.images, getShowMentionedImages() {
+      self.crashLog.omittedImages = images.count - mentionedImages.count
+    }
+  }
+
+  func writeCapturedMemory() {
+    // suppress writing captured memory if we should sanitize
+    if !options.shouldSanitize, let capturedMemory = crashLog.capturedMemory {
+      write(#", "capturedMemory": {"#, flush: false)
       var first = true
-      for (ndx, thread) in allThreads().enumerated() {
+      for (address, bytes) in capturedMemory {
+        if first {
+          first = false
+        } else {
+          write(",", flush: false)
+        }
+        write(" \"\(address)\": \"\(bytes)\"", flush: false)
+      }
+      write(" }", flush: false)
+    }
+  }
+
+  // note: this updates the crash log with the ommitted image count
+  func writeImages() {
+    if let images = crashLog.images {
+      var imagesToWrite = images
+
+      if getShowMentionedImages() {
+        let mentioned =
+          images.enumerated()
+            .filter { mentionedImages.contains($0.0) }
+            .map { $0.1 }
+
+        imagesToWrite = mentioned
+        
+        write(", \"omittedImages\": \(self.crashLog.omittedImages ?? 0)",
+        flush: false)
+      }
+
+      write(", \"images\": [ ", flush: false)
+      var first = true
+      for image in imagesToWrite {
+        writeImage(image, first: first)
+        if first {
+          first = false
+        }
+      }
+      write(" ] ", flush: false)
+    }
+  }
+
+  func writeFooter() {
+    write(", \"backtraceTime\": \(crashLog.backtraceTime) ", flush: false)
+
+    writeln("}", flush: false)
+  }
+}
+
+extension BacktraceJSONFormatter {
+  func writeThreadRegisters(thread: Log.Thread) {
+    guard let registers = thread.registers else { return }
+
+    var first = true
+    let registerOrder = HostContext.registerDumpOrder
+    for registerName in registerOrder {
+      if let value = registers[registerName] {
         if first {
           first = false
         } else {
           write(", ", flush: false)
         }
 
-        writeThread(index: ndx,
-          thread: thread,
-          isCrashingThread: thread.id == crashingThreadId,
-          mentionedImages: &mentionedImages,
-          capturedBytes: &capturedBytes)
+        write("\"\(registerName)\": \"\(value)\"", flush: false)
       }
-    } else {
-      if let crashingThreadIndex = crashingThreadIndex() {
-        let crashingThread = allThreads()[crashingThreadIndex]
-        writeThread(index: crashingThreadIndex,
-                    thread: crashingThread,
-                    isCrashingThread: true,
-                    mentionedImages: &mentionedImages,
-                    capturedBytes: &capturedBytes)
-      }
-    }
-
-    write(" ]", flush: false)
-
-    if !getShouldShowAllThreads() && allThreads().count > 1 {
-      write(", \"omittedThreads\": \(allThreads().count - 1)", flush: false)
     }
   }
 
-  static func writeThread(
-    index: Int,
-    thread: ThreadType,
-    isCrashingThread: Bool,
-    mentionedImages: inout Set<Int>,
-    capturedBytes: inout [UInt64:Array<UInt8>]) {
+  func imageByAddress(_ address: Address) -> Int? {
+    guard let address = Backtrace.Address(address) else { return nil }
+    return imageMap?.indexOfImage(at: address)
+  }
+
+  // note: this updates the mentioned images
+  mutating func writeThread(
+    thread: Log.Thread) {
 
       write("{ ", flush: false)
 
-      if !thread.name.isEmpty {
-        write("\"name\": \"\(escapeJSON(thread.name))\", ", flush: false)
+      if let name = thread.name, !name.isEmpty {
+        write("\"name\": \"\(escapeJSON(name))\", ", flush: false)
       }
+
+      let isCrashingThread = thread.crashed
+
       if isCrashingThread {
         write(#""crashed": true, "#, flush: false)
       }
+
       if getShouldShowAllRegisters() || isCrashingThread {
         write(#""registers": {"#, flush: false)
-        writeThreadRegisters(thread: thread, capturedBytes: &capturedBytes)
+        writeThreadRegisters(thread: thread)
         write(" }, ", flush: false)
       }
 
       write(#""frames": ["#, flush: false)
       var first = true
-      switch thread.getBacktrace() {
-        case let .raw(backtrace):
-          for frame in backtrace.frames {
-            if first {
-              first = false
+      for frame in thread.frames {
+        if first {
+          first = false
+        } else {
+          write(",", flush: false)
+        }
+
+        write(" { ", flush: false)
+
+        write(frame.jsonBody, flush: false)
+
+        if frame.inlined {
+          write(#", "inlined": true"#, flush: false)
+        }
+        if frame.isSwiftRuntimeFailure {
+          write(#", "runtimeFailure": true"#, flush: false)
+        }
+        if frame.isSwiftThunk {
+          write(#", "thunk": true"#, flush: false)
+        }
+        if frame.isSystem {
+          write(#", "system": true"#, flush: false)
+        }
+
+        if let symbol = frame.symbol {
+          write("""
+                  , "symbol": "\(escapeJSON(symbol))"\
+                  , "offset": \(frame.offset ?? 0)
+                  """, flush: false)
+
+          if getShouldDemangle() {
+            let formattedOffset: String
+            if (frame.offset ?? 0) > 0 {
+              formattedOffset = " + \(frame.offset!)"
+            } else if (frame.offset ?? 0) < 0 {
+              formattedOffset = " - \(frame.offset!)"
             } else {
-              write(",", flush: false)
+              formattedOffset = ""
             }
 
-            write(" { \(frame.jsonBody) }", flush: false)
+            write("""
+                    , "description": \"\(escapeJSON(symbol))\(formattedOffset)\"
+                    """, flush: false)
           }
-        case let .symbolicated(backtrace):
-          for frame in backtrace.frames {
-            if first {
-              first = false
-            } else {
-              write(",", flush: false)
+
+          if let image = frame.image {
+            write(", \"image\": \"\(image)\"", flush: false)
+          }
+
+          if var sourceLocation = frame.sourceLocation {
+            if getShouldSanitize() {
+              sourceLocation.file = sanitizePath(sourceLocation.file)
             }
+            write(#", "sourceLocation": { "#, flush: false)
 
-            write(" { ", flush: false)
+            write("""
+                    "file": "\(escapeJSON(sourceLocation.file))", \
+                    "line": \(sourceLocation.line), \
+                    "column": \(sourceLocation.column)
+                    """, flush: false)
 
-            write(frame.captured.jsonBody, flush: false)
-
-            if frame.inlined {
-              write(#", "inlined": true"#, flush: false)
-            }
-            if frame.isSwiftRuntimeFailure {
-              write(#", "runtimeFailure": true"#, flush: false)
-            }
-            if frame.isSwiftThunk {
-              write(#", "thunk": true"#, flush: false)
-            }
-            if frame.isSystem {
-              write(#", "system": true"#, flush: false)
-            }
-
-            if let symbol = frame.symbol {
-              write("""
-                      , "symbol": "\(escapeJSON(symbol.rawName))"\
-                      , "offset": \(symbol.offset)
-                      """, flush: false)
-
-              if getShouldDemangle() {
-                let formattedOffset: String
-                if symbol.offset > 0 {
-                  formattedOffset = " + \(symbol.offset)"
-                } else if symbol.offset < 0 {
-                  formattedOffset = " - \(symbol.offset)"
-                } else {
-                  formattedOffset = ""
-                }
-
-                write("""
-                        , "description": \"\(escapeJSON(symbol.name))\(formattedOffset)\"
-                        """, flush: false)
-              }
-
-              if symbol.imageIndex >= 0 {
-                write(", \"image\": \"\(symbol.imageName)\"", flush: false)
-              }
-
-              if var sourceLocation = symbol.sourceLocation {
-                if getShouldSanitize() {
-                  sourceLocation.path = sanitizePath(sourceLocation.path)
-                }
-                write(#", "sourceLocation": { "#, flush: false)
-
-                write("""
-                        "file": "\(escapeJSON(sourceLocation.path))", \
-                        "line": \(sourceLocation.line), \
-                        "column": \(sourceLocation.column)
-                        """, flush: false)
-
-                write(" }", flush: false)
-              }
-            }
             write(" }", flush: false)
           }
+        }
+        write(" }", flush: false)
       }
+      
       write(" ] ", flush: false)
 
       write("}", flush: false)
 
       if getShowMentionedImages() {
-        switch thread.getBacktrace() {
-          case let .raw(backtrace):
-            for frame in backtrace.frames {
-              let address = frame.adjustedProgramCounter
-              if let images = getImages(), let imageNdx = images.firstIndex(
-                   where: { address >= $0.baseAddress
-                              && address < $0.endOfText }
-                 ) {
-                mentionedImages.insert(imageNdx)
-              }
-            }
-          case let .symbolicated(backtrace):
-            for frame in backtrace.frames {
-              if let symbol = frame.symbol, symbol.imageIndex >= 0 {
-                mentionedImages.insert(symbol.imageIndex)
-              }
-            }
+        for frame in thread.frames {
+          if let imageName = frame.image,
+            let imageIndex = crashLog.images?
+            .firstIndex(where: { $0.name == imageName }) {
+            mentionedImages.insert(imageIndex)
+          } else if let addressString = frame.address,
+              let address = Log.addressFromString(addressString),
+              let imageIndex = imageByAddress(address) {
+            mentionedImages.insert(imageIndex)
+          }
         }
       }    
-  }  
+  }
+
+  func writeImage(_ image: Log.Image, first: Bool) {
+    if !first {
+      write(", ", flush: false)
+    }
+
+    write("{ ", flush: false)
+
+    if let name = image.name {
+      write("\"name\": \"\(escapeJSON(name))\", ", flush: false)
+    }
+
+    if let buildId = image.buildId {
+      write("\"buildId\": \"\(buildId)\", ", flush: false)
+    }
+
+    if var path = image.path {
+      if options.shouldSanitize {
+        path = sanitizePath(path)
+      }
+      write("\"path\": \"\(path)\", ", flush: false)
+    }
+
+    write("""
+            "baseAddress": "\(image.baseAddress)", \
+            "endOfText": "\(image.endOfText)"
+            """, flush: false)
+
+    write(" }", flush: false)
+  }
 }

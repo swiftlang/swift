@@ -491,6 +491,16 @@ Generate a backtrace for the parent process.
     sigprocmask(SIG_UNBLOCK, &mask, nil)
   }
 
+  static func getJsonBacktraceFormatterOptions() -> BacktraceJSONFormatterOptions {
+    var options = BacktraceJSONFormatterOptions(rawValue: 0)
+    if (args.registers == .all) { options.formUnion(.allRegisters) }
+    if (args.demangle) { options.formUnion(.demangle) }
+    if (args.sanitize == true) { options.formUnion(.sanitize) }
+    if (args.showImages == .mentioned) { options.formUnion(.mentionedImages) }
+    if (args.threads == true) { options.formUnion(.allThreads) }
+    return options
+  }
+
   static func main() {
     unblockSignals()
     parseArguments()
@@ -669,7 +679,23 @@ Generate a backtrace for the parent process.
         writeln("Backtrace took \(formattedDuration)s")
         writeln("")
       case .json:
-        outputJSONCrashLog()
+        guard let target = target else {
+          print("swift-backtrace: unable to get target",
+                to: &standardError)
+          return
+        }
+
+        let crashLog = captureCrashLog(
+          imageMap: target.images,
+          backtraceDuration: backtraceDuration)
+
+        guard let crashLog else {
+          print("swift-backtrace: unable to build crash log",
+                to: &standardError)
+          return
+        }
+
+        outputJSONCrashLog(crashLog: crashLog, options: getJsonBacktraceFormatterOptions())
     }
 
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)

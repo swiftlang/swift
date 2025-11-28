@@ -27,7 +27,11 @@ import CRT
 @_spi(MemoryReaders) import Runtime
 @_spi(Utils) import Runtime
 
-extension TargetThread: BacktraceJSONFormatterThread {
+public enum BacktraceJSONFormatterBacktrace {
+  case raw(Backtrace)
+  case symbolicated(SymbolicatedBacktrace)
+}
+extension TargetThread {
   func getBacktrace() -> BacktraceJSONFormatterBacktrace {
     switch backtrace {
       case .raw(let bt):
@@ -38,8 +42,28 @@ extension TargetThread: BacktraceJSONFormatterThread {
   }
 }
 
-extension SwiftBacktrace: BacktraceJSONFormatter {
-  static func getDescription() -> String? {
+extension CrashLog.Thread {
+  init(backtraceThread: TargetThread, isCrashingThread: Bool) {
+    let frames = switch backtraceThread.getBacktrace() {
+      case .raw(let backtrace):
+        backtrace.frames.compactMap { CrashLog.Frame(fromFrame: $0) }
+      case .symbolicated(let backtrace):
+        backtrace.frames.compactMap { CrashLog.Frame(fromFrame: $0) }
+    }
+
+    self.init(
+      name: backtraceThread.name,
+      crashed: isCrashingThread,
+      registers: [:],
+      frames: frames)
+  }
+}
+
+extension SwiftBacktrace {
+  static func captureCrashLog(
+    imageMap: ImageMap,
+    backtraceDuration: timespec) -> CrashLog<HostContext.Address>? {
+
     guard let target = target else {
       print("swift-backtrace: unable to get target",
             to: &standardError)
@@ -49,21 +73,12 @@ extension SwiftBacktrace: BacktraceJSONFormatter {
     let crashingThread = target.threads[target.crashingThreadNdx]
 
     let description: String
-
     if case let .symbolicated(symbolicated) = crashingThread.backtrace,
        let failure = symbolicated.swiftRuntimeFailure {
       description = failure
     } else {
       description = target.signalDescription
     }
-
-    return description
-  }
-
-  static func getArchitecture() -> String? {
-    guard let target else { return nil }
-
-    let crashingThread = target.threads[target.crashingThreadNdx]
 
     let architecture: String
     switch crashingThread.backtrace {
@@ -73,163 +88,81 @@ extension SwiftBacktrace: BacktraceJSONFormatter {
         architecture = backtrace.architecture
     }
 
-    return architecture
-  }
+    let images = imageMap.images.map { CrashLog<HostContext.Address>.Image(fromImageMapImage: $0) }
 
-  static func getPlatform() -> String? {
-    guard let target else { return nil }
+    let backtraceTime = Double(backtraceDuration.tv_sec)
+        + 1.0e-9 * Double(backtraceDuration.tv_nsec)
 
-    return target.images.platform
-  }
+    var capturedMemory: [String:String] = [:]
 
-  static func getFaultAddress() -> String? {
-    guard let target else { return nil }
+    let crashLogCapture = CrashLogCapture<HostContext.GPRValue> { value in
+      if let bytes = try? target.reader.fetch(
+          from: RemoteMemoryReader.Address(value),
+          count: 16,
+          as: UInt8.self)
+      {
+        let formattedBytes = bytes
+          .map{ hex($0, withPrefix: false) }
+          .joined(separator: "")
 
-    return hex(target.faultAddress)
-  }
-
-  static func getShouldShowAllThreads() -> Bool {
-    args.threads!
-  }
-
-  static func getShouldShowAllRegisters() -> Bool {
-    args.registers! == .all
-  }
-
-  static func getShouldDemangle() -> Bool {
-    args.demangle
-  }
-
-  static func getShouldSanitize() -> Bool {
-    args.sanitize ?? false
-  }
-
-  static func getShowMentionedImages() -> Bool {
-    args.showImages! == .mentioned
-  }
-
-  static func crashingThreadIndex() -> Int? {
-    target?.crashingThreadNdx
-  }
-
-  static func allThreads() -> [TargetThread] {
-    target?.threads ?? []
-  }
-
-  static func writeThreadRegisters(thread: TargetThread, capturedBytes: inout [UInt64:Array<UInt8>]) {
-    if let context = thread.context {
-      writeRegisterDump(context) { addressValue in
-        if let bytes = try? target?.reader.fetch(
-            from: RemoteMemoryReader.Address(addressValue),
-            count: 16,
-            as: UInt8.self) {
-          capturedBytes[UInt64(truncatingIfNeeded: addressValue)] = bytes
-        }
+        let memoryAddress = hex(UInt64(truncatingIfNeeded: value))
+        capturedMemory[memoryAddress] = formattedBytes
       }
     }
+    
+    let threads = target.threads.map {
+      var thread = CrashLog<HostContext.Address>.Thread(
+        backtraceThread: $0,
+        isCrashingThread: $0.id == target.crashingThread)
+
+      if let context = $0.context {
+        crashLogCapture.captureRegisterDump(context, into: &thread)
+      }
+
+      return thread
+    }
+
+    return CrashLog<HostContext.Address>(
+      timestamp: formatISO8601(now),
+      kind: "crashReport",
+      description: description,
+      faultAddress: hex(target.faultAddress),
+      platform: target.images.platform,
+      architecture: architecture,
+      threads: threads,
+      capturedMemory: capturedMemory,
+      omittedImages: 0, // this will be calculated during write out
+      images: images,
+      backtraceTime: backtraceTime )
+  }
+}
+
+struct SwiftBacktraceWriter: BacktraceJSONWriter {
+  func write(_ string: String, flush: Bool) {
+    SwiftBacktrace.write(string, flush: flush)
   }
 
-  static func getImages() -> ImageMap? {
-    target?.images
+  func writeln(_ string: String, flush: Bool) {
+    SwiftBacktrace.writeln(string, flush: flush)
   }
 }
 
 extension SwiftBacktrace {
-  static func outputJSONCrashLog() {
-    guard let target = target else {
-      print("swift-backtrace: unable to get target",
-            to: &standardError)
-      return
-    }
+  static func outputJSONCrashLog(crashLog: CrashLog<HostContext.Address>,
+  options: BacktraceJSONFormatterOptions) {
+    var jsonFormatter = BacktraceJSONFormatter(
+      crashLog: crashLog,
+      writer: SwiftBacktraceWriter(),
+      options: options)
 
-    var mentionedImages = Set<Int>()
-    var capturedBytes: [UInt64:Array<UInt8>] = [:]
+    jsonFormatter.writePreamble(now: formatISO8601(now))
 
-    writePreamble(now: formatISO8601(now))
+    jsonFormatter.writeThreads()
 
-    writeThreads(mentionedImages: &mentionedImages, capturedBytes: &capturedBytes)
+    jsonFormatter.writeCapturedMemory()
 
-    if !capturedBytes.isEmpty && !getShouldSanitize() {
-      write(#", "capturedMemory": {"#)
-      var first = true
-      for (address, bytes) in capturedBytes {
-        let formattedBytes = bytes
-          .map{ hex($0, withPrefix: false) }
-          .joined(separator: "")
-        if first {
-          first = false
-        } else {
-          write(",")
-        }
-        write(" \"\(hex(address))\": \"\(formattedBytes)\"")
-      }
-      write(" }")
-    }
+    jsonFormatter.writeImages()
 
-    func outputJSONImage(_ image: Backtrace.Image, first: Bool) {
-      if !first {
-        write(", ")
-      }
-
-      write("{ ")
-
-      if let name = image.name {
-        write("\"name\": \"\(escapeJSON(name))\", ")
-      }
-
-      if let bytes = image.uniqueID {
-        let buildID = hex(bytes)
-        write("\"buildId\": \"\(buildID)\", ")
-      }
-
-      if var path = image.path {
-        if args.sanitize ?? false {
-          path = sanitizePath(path)
-        }
-        write("\"path\": \"\(path)\", ")
-      }
-
-      write("""
-              "baseAddress": "\(image.baseAddress)", \
-              "endOfText": "\(image.endOfText)"
-              """)
-
-      write(" }")
-    }
-
-    switch args.showImages! {
-      case .none:
-        break
-      case .mentioned:
-        let images = mentionedImages.sorted().map{ target.images[$0] }
-        let omitted = target.images.count - images.count
-        write(", \"omittedImages\": \(omitted), \"images\": [ ")
-        var first = true
-        for image in images {
-          outputJSONImage(image, first: first)
-          if first {
-            first = false
-          }
-        }
-        write(" ] ")
-      case .all:
-        write(#", "images": [ "#)
-        var first = true
-        for image in target.images {
-          outputJSONImage(image, first: first)
-          if first {
-            first = false
-          }
-        }
-        write(" ] ")
-    }
-
-    let secs = Double(backtraceDuration.tv_sec)
-      + 1.0e-9 * Double(backtraceDuration.tv_nsec)
-
-    write(", \"backtraceTime\": \(secs) ")
-
-    writeln("}")
+    jsonFormatter.writeFooter()
   }
-
 }
