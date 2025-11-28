@@ -87,6 +87,10 @@ SILPrintTypes("sil-print-types", llvm::cl::init(false),
                    llvm::cl::desc("always print type annotations for instruction operands in SIL output"));
 
 llvm::cl::opt<bool>
+SILPrintOwnership("sil-print-ownership", llvm::cl::init(false),
+                   llvm::cl::desc("print ownership of instruction results in SIL output"));
+
+llvm::cl::opt<bool>
 SILPrintNoUses("sil-print-no-uses", llvm::cl::init(false),
                    llvm::cl::desc("omit use comments in SIL output"));
 
@@ -693,6 +697,35 @@ protected:
   }
 };
 
+static bool hasNonAddressResults(const SILInstruction *inst) {
+  for (SILValue result : inst->getResults()) {
+    if (result->getType().isObject())
+      return true;
+  }
+  return false;
+}
+
+/// Returns true if the ownership of a result of `inst` mismatches with its type.
+/// That can happen e.g. for non-trivial enums which are constructed with a trivial case:
+/// ```
+/// enum E {
+///   case A
+///   case B(AnyObject)
+/// }
+///
+///   %1 = enum $E, #E.A!enumelt  // type of %1 is non trivial, but ownership is "none"
+/// ```
+static bool hasUnusualResultOwnership(const SILInstruction *inst) {
+  for (SILValue result : inst->getResults()) {
+    if (result->getType().isObject() &&
+        result->getOwnershipKind() == OwnershipKind::None &&
+        !result->getType().isTrivial(*inst->getFunction())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 } // namespace
 
 namespace swift {
@@ -1092,6 +1125,28 @@ public:
     printBranchTargets(inst);
   }
 
+  void printOwnershipOfInstruction(const SILInstruction *inst) {
+
+    if (!inst->isStaticInitializerInst() &&
+        inst->getFunction()->hasOwnership() &&
+        hasNonAddressResults(inst) &&
+        (SILPrintOwnership || hasUnusualResultOwnership(inst)))
+    {
+      lineComments.delim();
+
+      *this << "ownership: ";
+      llvm::interleave(inst->getResults(),
+        [&](SILValue result) {
+          if (result->getType().isAddress()) {
+            *this << '-';
+          } else {
+            *this << result->getOwnershipKind();
+          }
+        },
+        [&] { *this << ", "; });
+    }
+  }
+
   void printUserList(ArrayRef<SILValue> values, SILNodePointer node) {
     if (SILPrintNoUses)
       return;
@@ -1363,6 +1418,8 @@ public:
 
     // Print users, or id for valueless instructions.
     printUsersOfInstruction(I);
+
+    printOwnershipOfInstruction(I);
 
     // Print SIL location.
     if (Ctx.printVerbose()) {
