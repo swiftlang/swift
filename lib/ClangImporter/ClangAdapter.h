@@ -152,7 +152,8 @@ bool isRequiredInitializer(const clang::ObjCMethodDecl *method);
 
 /// Determine whether this property should be imported as its getter and setter
 /// rather than as a Swift property.
-bool shouldImportPropertyAsAccessors(const clang::ObjCPropertyDecl *prop);
+bool shouldImportPropertyAsAccessors(const clang::ObjCPropertyDecl *prop,
+                                     ImportNameVersion importVersion);
 
 /// Determine whether this method is an Objective-C "init" method
 /// that will be imported as a Swift initializer.
@@ -173,8 +174,73 @@ bool isUnavailableInSwift(const clang::Decl *decl, const PlatformAvailability *,
 /// \param knownNonNull Whether a function- or method-level "nonnull" attribute
 /// applies to this parameter.
 OptionalTypeKind getParamOptionality(const clang::ParmVarDecl *param,
+                                     ImportNameVersion importVersion,
                                      bool knownNonNull);
+
+/// Determine if, for a given \c attrKind at a specific \c attrVersion there
+/// exists a better attribute option which takes precedence - i.e. if there
+/// exists another versioned attr wrapper for this attribute kind with a
+/// **valid** version that is lower than the one of the attribute we are
+/// considering.
+bool haveBetterAttr(const SmallVector<clang::SwiftVersionedAdditionAttr *, 4>
+                        &versionedAttributes,
+                    clang::attr::Kind attrKind, clang::VersionTuple attrVersion,
+                    ImportNameVersion importVersion);
+
+/// An attribute version is valid to apply if it is greater than the current
+/// version or is unversioned.
+bool isApplicableAttrVersion(clang::VersionTuple attrVersion,
+                             ImportNameVersion importVersion);
+
+/// A Clang attribute getter specific to queries of attributes which
+/// may originate from APINotes, which may all be carried as wrapped
+/// in versioned attributes (in version-independent-APINotes compilation mode).
+/// If a non-versioned attribute is carried by the \c decl, it will be returned.
+/// If a versioned attribute is carried, it will be checked against the current
+/// \c importVersion for applicability and precedence order with other versioned
+/// attributes of the same kind.
+template <typename T>
+T *getSwiftAttr(const clang::Decl *decl, ImportNameVersion importVersion) {
+  static_assert(std::is_base_of<clang::Attr, T>::value,
+                "T not derived from Attr");
+
+  if (!decl->hasAttrs())
+    return nullptr;
+
+  if (auto plainAttr = decl->getAttr<T>())
+    return plainAttr;
+
+  if (decl->getASTContext().getLangOpts().SwiftVersionIndependentAPINotes) {
+    // Scan through Swift-Versioned clang attributes and select which one to
+    // apply if multiple candidates exist.
+    SmallVector<clang::SwiftVersionedAdditionAttr *, 4>
+        swiftVersionedAttributes;
+    for (auto *versionedAttr :
+         decl->specific_attrs<clang::SwiftVersionedAdditionAttr>())
+      swiftVersionedAttributes.push_back(versionedAttr);
+
+    for (auto *versionedAttr : swiftVersionedAttributes) {
+      auto possibleSubAttr =
+          llvm::dyn_cast<T>(versionedAttr->getAdditionalAttr());
+      if (possibleSubAttr &&
+          isApplicableAttrVersion(versionedAttr->getVersion(), importVersion) &&
+          !haveBetterAttr(swiftVersionedAttributes, versionedAttr->getKind(),
+                          versionedAttr->getVersion(), importVersion))
+        return possibleSubAttr;
+    }
+  }
+
+  return nullptr;
 }
+
+/// A Clang attribute existence query specific to queries of attributes which
+/// may originate from APINotes, which may all be carried as wrapped
+/// in versioned attributes.  
+template <typename T>
+bool hasSwiftAttr(const clang::Decl *decl, ImportNameVersion importVersion) {
+  return decl->hasAttrs() && getSwiftAttr<T>(decl, importVersion);
 }
+} // namespace importer
+} // namespace swift
 
 #endif
