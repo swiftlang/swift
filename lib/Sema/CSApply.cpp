@@ -9452,17 +9452,17 @@ applySolutionToForEachStmtPreamble(ForEachStmt *stmt,
   if (!optPatternType->isEqual(nextResultType)) {
     OpaqueValueExpr *elementExpr = new (ctx) OpaqueValueExpr(
         stmt->getInLoc(), nextResultType->getOptionalObjectType(),
-        /*isPlaceholder=*/true);
-    Expr *convertElementExpr = elementExpr;
-    if (TypeChecker::typeCheckExpression(convertElementExpr, dc,
-                                         /*contextualInfo=*/
-                                         {info.initType, CTP_CoerceOperand})
-            .isNull()) {
+        /*isPlaceholder=*/false);
+    cs.cacheExprTypes(elementExpr);
+
+    auto *loc = cs.getConstraintLocator(parsedSequence,
+                                        ConstraintLocator::SequenceElementType);
+    auto *convertExpr = solution.coerceToType(elementExpr, info.initType, loc);
+    if (!convertExpr)
       return std::nullopt;
-    }
-    elementExpr->setIsPlaceholder(false);
+
     stmt->setElementExpr(elementExpr);
-    stmt->setConvertElementExpr(convertElementExpr);
+    stmt->setConvertElementExpr(convertExpr);
   }
 
   // Get the conformance of the sequence type to the Sequence protocol.
