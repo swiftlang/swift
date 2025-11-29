@@ -294,7 +294,7 @@ class r15117741S {
   static func g() {}
 }
 func test15117741(_ s: r15117741S) {
-  s.g() // expected-error {{static member 'g' cannot be used on instance of type 'r15117741S'}}
+  s.g() // expected-error {{static member 'g' can only be used on the type 'r15117741S', not on the instance }}
 }
 
 
@@ -366,7 +366,7 @@ class C_25341015 {
   static func baz(_ x: Int, _ y: Int) {}
   func baz() {}
   func qux() {
-    baz(1, 2) // expected-error {{static member 'baz' cannot be used on instance of type 'C_25341015'}} {{5-5=C_25341015.}}
+    baz(1, 2) // expected-error {{static member 'baz' can only be used on the type 'C_25341015', not on the instance self}} {{5-5=C_25341015.}}
   }
 }
 
@@ -375,7 +375,7 @@ struct S_25341015 {
 
   func foo(z: Int) {}
   func bar() {
-    foo(1, y: 2) // expected-error {{static member 'foo' cannot be used on instance of type 'S_25341015'}} {{5-5=S_25341015.}}
+    foo(1, y: 2) // expected-error {{static member 'foo' can only be used on the type 'S_25341015', not on the instance self}} {{5-5=S_25341015.}}
   }
 }
 
@@ -545,7 +545,7 @@ class D {
   static func foo() {}
 
   func bar() {
-    foo() // expected-error {{static member 'foo' cannot be used on instance of type 'D'}}
+    foo() // expected-error {{static member 'foo' can only be used on the type 'D', not on the instance self}}
   }
 }
 
@@ -645,7 +645,7 @@ func rdar_50467583_and_50909555() {
   }
 
   func test(_ s: S) {
-    s[1] // expected-error {{static member 'subscript' cannot be used on instance of type 'S'}} {{5-6=S}}
+    s[1] // expected-error {{static member 'subscript' can only be used on the type 'S', not on the instance instance}}
     // expected-error@-1 {{missing argument for parameter #2 in subscript}} {{8-8=, <#Int#>}}
   }
 }
