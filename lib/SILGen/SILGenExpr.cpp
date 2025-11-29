@@ -3485,7 +3485,21 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
 
 RValue RValueEmitter::
 visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C) {
-  return visit(E->getSemanticExpr(), C);
+  if (auto *undefinedFn = SGF.getASTContext().getUndefinedEditorPlaceholder()) {
+    auto args = SGF.emitSourceLocationArgs(E->getLoc(), E);
+    SGF.emitApplyOfLibraryIntrinsic(E, undefinedFn, SubstitutionMap(),
+                                    {
+                                        args.filenameStartPointer,
+                                        args.filenameLength,
+                                        args.filenameIsAscii,
+                                        args.line,
+                                    },
+                                    SGFContext());
+  } else {
+    SGF.B.createUnconditionalFail(E, "attempt to evaluate editor placeholder");
+  }
+  SGF.B.createUnreachable(E);
+  return emitUnreachableValue(E, E->getType()->getCanonicalType());
 }
 
 RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {
