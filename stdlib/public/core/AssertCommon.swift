@@ -293,8 +293,8 @@ func _unimplementedInitializer(className: StaticString,
 #if !$Embedded
 
 /// Previously used to evaluate editor placeholders.
-public // COMPILER_INTRINSIC
-func _undefined<T>(
+@usableFromInline // COMPILER_INTRINSIC
+internal func _undefined<T>(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
@@ -304,8 +304,8 @@ func _undefined<T>(
 #else
 
 /// Previously used to evaluate editor placeholders.
-public // COMPILER_INTRINSIC
-func _undefined<T>(
+@usableFromInline // COMPILER_INTRINSIC
+internal func _undefined<T>(
   _ message: @autoclosure () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
