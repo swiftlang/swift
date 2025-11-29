@@ -829,7 +829,7 @@ func invalid_refs_through_dynamic_lookup() {
     _ = lens.foo           // expected-error {{static member 'foo' cannot be used on instance of type 'S'}}
     _ = lens.bar()
     _ = lens.bar().faz + 1 
-    _ = lens.baz("hello")  // expected-error {{static member 'baz' cannot be used on instance of type 'S'}}
+    _ = lens.baz("hello")  // expected-error {{static member 'baz' can only be used on the type 'S', not on the instance lens}}
   }
   
   func testStatic(_ lens: AMetatype<S>) {

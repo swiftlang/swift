@@ -4823,6 +4823,27 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
   return true;
 }
 
+StringRef AllowTypeOrInstanceMemberFailure::getInstanceNameFromBaseExpr() const {
+
+  if (!BaseExpr)
+    return "instance";
+
+  Expr *semantic = BaseExpr->getSemanticsProvidingExpr();
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(semantic)) {
+    return DRE->getDecl()->getBaseName().userFacingName();
+  }
+
+  auto &SM = getASTContext().SourceMgr;
+  auto SR = semantic->getSourceRange();
+
+  if (SR.isValid()) {
+    auto CSR = Lexer::getCharSourceRangeFromSourceRange(SM, SR);
+    return SM.extractText(CSR);
+  }
+  return "instance";
+}
+
 bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   auto loc = getLoc();
   auto *DC = getDC();
@@ -5068,33 +5089,8 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       Diag.emplace(
           emitDiagnostic(diag::could_not_use_enum_element_on_instance, Name));
     } else {
-      StringRef instanceName = "instance";
-      Expr *baseExpr = nullptr;
-      Expr *anchor = getRawAnchor().dyn_cast<Expr*>();
-
-      if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
-          baseExpr = UDE->getBase();
-      }
-      else if (auto *MRE = dyn_cast<MemberRefExpr>(anchor)) {
-          baseExpr = MRE->getBase();
-      }
-
-      if (baseExpr) {
-        Expr *semantic = baseExpr->getSemanticsProvidingExpr();
-        if (auto *DRE = dyn_cast<DeclRefExpr>(semantic)) {
-          instanceName = DRE->getDecl()->getBaseName().userFacingName();
-        }
-        else {
-          auto &SM = getASTContext().SourceMgr;
-          auto SR = semantic->getSourceRange();
-          if (SR.isValid()) {
-            auto CSR = Lexer::getCharSourceRangeFromSourceRange(SM,SR);
-            instanceName = SM.extractText(CSR);
-          }
-        }
-      }
       Diag.emplace(emitDiagnostic(diag::static_can_only_be_used_on_type_not_instance,
-                                  Name, baseTy, instanceName));
+                                  Name, baseTy, getInstanceNameFromBaseExpr()));
     }
 
     Diag->highlight(getSourceRange());
