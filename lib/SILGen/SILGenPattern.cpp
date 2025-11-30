@@ -2672,7 +2672,9 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
         for (unsigned i = 0, e = p->getNumElements(); i < e; ++i) {
           SILValue element = SGF.B.createTupleElementAddr(p, baseAddr, i);
           if (element->getType().isLoadable(SGF.F)) {
-            element = SGF.B.createLoad(p, element, LoadOwnershipQualifier::Take);
+            element =
+                SGF.getTypeLowering(element->getType())
+                    .emitLoad(SGF.B, p, element, LoadOwnershipQualifier::Take);
           }
           visit(p->getElement(i).getPattern(),
                 SGF.emitManagedRValueWithCleanup(element));
