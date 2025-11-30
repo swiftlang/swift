@@ -92,9 +92,8 @@ extension IntArray {
   func flam() {}
 }
 
-// FIXME: Column 22 here is wrong...
 extension ArrayOf<Int> {
-  // CHECK:      [[@LINE-1]]:22 | extension/ext-struct/Swift | Array | s:e:s:Sa14swift_ide_testSiRszlE4bishyyF | Def | rel: 0
+  // CHECK:      [[@LINE-1]]:11 | extension/ext-struct/Swift | Array | s:e:s:Sa14swift_ide_testSiRszlE4bishyyF | Def | rel: 0
   // CHECK-NEXT: [[@LINE-2]]:11 | type-alias/Swift | ArrayOf | s:3Lib7ArrayOfa | Ref | rel: 0
   // CHECK-NEXT: [[@LINE-3]]:11 | struct/Swift | Array | s:Sa | Ref,Impl,RelExt | rel: 1
   // CHECK-NEXT:   RelExt | extension/ext-struct/Swift | Array | s:e:s:Sa14swift_ide_testSiRszlE4bishyyF

@@ -565,9 +565,8 @@ class Subclass: BaseClass {
   }
 }
 
-// FIXME: Column 15 here is wrong...
 extension [Int] {
-  // CHECK:      [[@LINE-1]]:15 | extension/ext-struct/Swift | Array | s:e:s:Sa14swift_ide_testSiRszlE3fooyyF | Def | rel: 0
+  // CHECK:      [[@LINE-1]]:11 | extension/ext-struct/Swift | Array | s:e:s:Sa14swift_ide_testSiRszlE3fooyyF | Def | rel: 0
   // CHECK-NEXT: [[@LINE-2]]:11 | struct/Swift | Array | s:Sa | Ref,Impl,RelExt | rel: 1
   // CHECK-NEXT:   RelExt | extension/ext-struct/Swift | Array | s:e:s:Sa14swift_ide_testSiRszlE3fooyyF
   // CHECK-NEXT: [[@LINE-4]]:12 | struct/Swift | Int | s:Si | Ref | rel: 0
@@ -602,9 +601,8 @@ extension IntArray {
   func flam() {}
 }
 
-// FIXME: Column 22 here is wrong...
 extension ArrayOf<Int> {
-  // CHECK:      [[@LINE-1]]:22 | extension/ext-struct/Swift | Array | s:e:s:Sa14swift_ide_testSiRszlE4bishyyF | Def | rel: 0
+  // CHECK:      [[@LINE-1]]:11 | extension/ext-struct/Swift | Array | s:e:s:Sa14swift_ide_testSiRszlE4bishyyF | Def | rel: 0
   // CHECK-NEXT: [[@LINE-2]]:11 | type-alias/Swift | ArrayOf | s:14swift_ide_test7ArrayOfa | Ref | rel: 0
   // CHECK-NEXT: [[@LINE-3]]:11 | struct/Swift | Array | s:Sa | Ref,Impl,RelExt | rel: 1
   // CHECK-NEXT:   RelExt | extension/ext-struct/Swift | Array | s:e:s:Sa14swift_ide_testSiRszlE4bishyyF
