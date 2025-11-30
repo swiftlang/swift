@@ -142,15 +142,59 @@ static bool isUsefulForReferencedVars(Constraint *constraint) {
   }
 }
 
+void ConstraintGraphNode::updateTypeVariableAssociations(Constraint *constraint,
+                                                         bool retraction) {
+  if (constraint->getKind() != ConstraintKind::Subtype)
+    return;
+
+  if (constraint->getFirstType()->isEqual(TypeVar)) {
+    if (auto *typeVar =
+            constraint->getSecondType()->getAs<TypeVariableType>()) {
+      if (retraction) {
+        SubtypeOf.remove(typeVar);
+      } else if (SupertypeOf.count(typeVar)) {
+        // Handles situations where we have: `T0 subtype T1` where
+        // the current type variable is T1 and new constraint is
+        // `T1 subtype T0`. This situation could happen when i.e.
+        // a generic parameter is used both in a parameter and a
+        // result position of a function type that is converted to
+        // some other function type with type variables.
+        //
+        // In such cases we consider the type variables to be equivalent.
+        SupertypeOf.remove(typeVar);
+      } else {
+        SubtypeOf.insert(typeVar);
+      }
+    }
+  }
+
+  if (constraint->getSecondType()->isEqual(TypeVar)) {
+    if (auto *typeVar = constraint->getFirstType()->getAs<TypeVariableType>()) {
+      if (retraction) {
+        SupertypeOf.remove(typeVar);
+      } else if (SubtypeOf.count(typeVar)) {
+        // See the comment above, this is a reverse situation.
+        SubtypeOf.remove(typeVar);
+      } else {
+        SupertypeOf.insert(typeVar);
+      }
+    }
+  }
+}
+
 void ConstraintGraphNode::addConstraint(Constraint *constraint) {
   assert(ConstraintIndex.count(constraint) == 0 && "Constraint re-insertion");
   ConstraintIndex[constraint] = Constraints.size();
   Constraints.push_back(constraint);
+
+  updateTypeVariableAssociations(constraint, /*retraction=*/false);
 }
 
 void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   auto pos = ConstraintIndex.find(constraint);
   assert(pos != ConstraintIndex.end());
+
+  updateTypeVariableAssociations(constraint, /*retraction=*/true);
 
   // Remove this constraint from the constraint mapping.
   auto index = pos->second;
