@@ -639,6 +639,10 @@ BridgedCanType BridgedASTType::getBuiltinFixedArraySizeType() const {
   return unbridged()->castTo<swift::BuiltinFixedArrayType>()->getSize();
 }
 
+BridgedASTType BridgedASTType::getOptionalObjectType() const {
+  return {unbridged()->getOptionalObjectType().getPointer()};
+}
+
 bool BridgedASTType::isBuiltinFixedWidthInteger(SwiftInt width) const {
   if (auto *intTy = unbridged()->getAs<swift::BuiltinIntegerType>())
     return intTy->isFixedWidth((unsigned)width);

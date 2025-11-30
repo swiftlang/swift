@@ -573,6 +573,16 @@ public struct Builder {
     return notifyNew(enumInst.getAs(EnumInst.self))
   }
 
+  public func createOptionalSome(operand: Value, type: Type) -> EnumInst {
+    let optionalSome = bridged.createOptionalSome(operand.bridged, type.bridged)
+    return notifyNew(optionalSome.getAs(EnumInst.self))
+  }
+
+  public func createOptionalNone(type: Type) -> EnumInst {
+    let optionalNone = bridged.createOptionalNone(type.bridged)
+    return notifyNew(optionalNone.getAs(EnumInst.self))
+  }
+
   public func createThinToThickFunction(thinFunction: Value, resultType: Type) -> ThinToThickFunctionInst {
     let tttf = bridged.createThinToThickFunction(thinFunction.bridged, resultType.bridged)
     return notifyNew(tttf.getAs(ThinToThickFunctionInst.self))

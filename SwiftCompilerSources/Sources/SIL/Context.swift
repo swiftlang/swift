@@ -65,6 +65,10 @@ extension Context {
       AST.`Type`(bridged: _bridged.getTupleTypeWithLabels(types, labels))}}
   }
 
+  public func getOptionalType(baseType: AST.`Type`) -> AST.`Type` {
+    return AST.`Type`(bridged: _bridged.getOptionalType(baseType.bridged))
+  }
+
   public var swiftArrayDecl: NominalTypeDecl {
     _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
   }

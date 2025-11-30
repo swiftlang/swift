@@ -63,6 +63,11 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
 
   public var builtinVectorElementType: Type { Type(bridged: bridged.getBuiltinVectorElementType()) }
 
+  public var optionalObjectType: Type {
+    assert(self.isOptional)
+    return Type(bridged: bridged.getOptionalObjectType())
+  }
+
   public func subst(with substitutionMap: SubstitutionMap) -> Type {
     return Type(bridged: bridged.subst(substitutionMap.bridged))
   }

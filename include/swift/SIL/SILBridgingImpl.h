@@ -467,6 +467,11 @@ BridgedType BridgedType::getEnumCasePayload(EnumElementIterator i, BridgedFuncti
   return swift::SILType();
 }
 
+BridgedStringRef BridgedType::getEnumCaseName(EnumElementIterator i) const {
+  swift::EnumElementDecl *elt = *unbridge(i);
+  return elt->getNameStr();
+}
+
 BridgedDeclObj BridgedType::getEnumElementDecl(EnumElementIterator i) const {
   swift::EnumElementDecl *elt = *unbridge(i);
   return {elt};
@@ -2946,6 +2951,17 @@ BridgedInstruction BridgedBuilder::createConvertEscapeToNoEscape(BridgedValue or
   return {unbridged().createConvertEscapeToNoEscape(regularLoc(), originalFunction.getSILValue(), resultType.unbridged(), isLifetimeGuaranteed)};
 }
 
+BridgedInstruction BridgedBuilder::createOptionalSome(BridgedValue operand,
+                                                      BridgedType type) const {
+  return {unbridged().createOptionalSome(
+      loc.getLoc().getLocation(), operand.getSILValue(), type.unbridged())};
+}
+
+BridgedInstruction BridgedBuilder::createOptionalNone(BridgedType type) const {
+  return {unbridged().createOptionalNone(loc.getLoc().getLocation(),
+                                         type.unbridged())};
+}
+
 //===----------------------------------------------------------------------===//
 //                            BridgedBasicBlockSet
 //===----------------------------------------------------------------------===//
@@ -3119,6 +3135,10 @@ BridgedContext::getTupleTypeWithLabels(BridgedArrayRef elementTypes,
   }
   return {
       swift::TupleType::get(elements, context->getModule()->getASTContext())};
+}
+
+BridgedASTType BridgedContext::getOptionalType(BridgedASTType baseTy) const {
+  return {swift::OptionalType::get(baseTy.unbridged())};
 }
 
 BridgedDeclObj BridgedContext::getSwiftArrayDecl() const {
