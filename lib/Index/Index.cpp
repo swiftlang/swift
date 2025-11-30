@@ -103,12 +103,8 @@ static bool isMemberwiseInit(swift::ValueDecl *D) {
 }
 
 static SourceLoc getLocForExtension(ExtensionDecl *D) {
-  // Use the 'End' token of the range, in case it is a compound name, e.g.
-  //   extension A.B {}
-  // we want the location of 'B' token.
-  if (auto *repr = D->getExtendedTypeRepr()) {
-    return repr->getSourceRange().End;
-  }
+  if (auto *repr = D->getExtendedTypeRepr())
+    return repr->getLoc();
   return SourceLoc();
 }
 
