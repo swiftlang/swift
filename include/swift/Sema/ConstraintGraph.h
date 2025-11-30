@@ -177,6 +177,15 @@ private:
       llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
   /// }
 
+  /// If the given constraint represents a subtype/supertype relationship
+  /// between this type variable and some other one, let's note that in the
+  /// node.
+  ///
+  /// \param constraint The constraint that is either added or removed.
+  /// \param retraction Indicates whether the given constraint is being
+  /// removed from the graph.
+  void updateTypeVariableAssociations(Constraint *constraint, bool retraction);
+
   /// The constraint graph this node belongs to.
   ConstraintGraph &CG;
 
@@ -206,6 +215,13 @@ private:
   /// The set of type variables that occur within the fixed binding of
   /// this type variable.
   llvm::SmallSetVector<TypeVariableType *, 2> References;
+
+  /// The set of type variables that are connected to this type variable
+  /// via a Subtype constraint where this type variable appears on the right.
+  llvm::SmallSetVector<TypeVariableType *, 2> SupertypeOf;
+  /// The set of type variables that are connected to this type variable
+  /// via a Subtype constraint where this type variable appears on the left.
+  llvm::SmallSetVector<TypeVariableType *, 2> SubtypeOf;
 
   /// All of the type variables in the same equivalence class as this
   /// representative type variable.
