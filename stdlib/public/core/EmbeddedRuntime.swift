@@ -432,7 +432,7 @@ func isValidPointerForNativeRetain(object: Builtin.RawPointer) -> Bool {
   #if _pointerBitWidth(_64)
   if unsafe (objectBits & HeapObject.immortalObjectPointerBit) != 0 { return false }
   #endif
-  
+
   return true
 }
 
@@ -749,4 +749,20 @@ func _embeddedReportFatalErrorInFile(prefix: StaticString, message: UnsafeBuffer
   print(prefix, terminator: "")
   if message.count > 0 { print(": ", terminator: "") }
   unsafe print(message)
+}
+
+// CXX Exception Personality
+
+public typealias _Unwind_Action = CInt
+public typealias _Unwind_Reason_Code = CInt
+
+@c @used
+public func _swift_exceptionPersonality(
+  version: CInt,
+  actions: _Unwind_Action,
+  exceptionClass: UInt64,
+  exceptionObject: UnsafeMutableRawPointer,
+  context: UnsafeMutableRawPointer
+) -> _Unwind_Reason_Code {
+  fatalError("C++ exception handling detected but the Embedded Swift runtime does not support exceptions")
 }
