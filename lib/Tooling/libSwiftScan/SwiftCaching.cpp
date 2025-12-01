@@ -397,9 +397,8 @@ createCachedCompilation(SwiftScanCAS &CAS, const llvm::cas::CASID &ID,
     return KeyProxy.takeError();
   auto Input = KeyProxy->getData();
 
-  unsigned Index =
-      llvm::support::endian::read<uint32_t, llvm::endianness::little,
-                                  llvm::support::unaligned>(Input.data());
+  unsigned Index = llvm::support::endian::read<uint32_t>(
+      Input.data(), llvm::endianness::little);
   {
     swift::cas::CompileJobResultSchema Schema(CAS.getCAS());
     if (Schema.isRootNode(*Proxy)) {
