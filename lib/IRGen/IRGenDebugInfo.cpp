@@ -3775,7 +3775,7 @@ struct DbgIntrinsicEmitter {
   PointerUnion<llvm::BasicBlock *, llvm::Instruction *> InsertPt;
   irgen::IRBuilder &IRBuilder;
   llvm::DIBuilder &DIBuilder;
-  AddrDbgInstrKind ForceDbgDeclareOrCoro;
+  AddrDbgInstrKind ForceDbgDeclareOrDeclareValue;
 
   /// Initialize the emitter and initialize the emitter to assume that it is
   /// going to insert an llvm.dbg.declare or an llvm.dbg.addr either at the
@@ -3784,7 +3784,7 @@ struct DbgIntrinsicEmitter {
   DbgIntrinsicEmitter(irgen::IRBuilder &IRBuilder, llvm::DIBuilder &DIBuilder,
                       AddrDbgInstrKind AddrDInstrKind)
       : InsertPt(), IRBuilder(IRBuilder), DIBuilder(DIBuilder),
-        ForceDbgDeclareOrCoro(AddrDInstrKind) {
+        ForceDbgDeclareOrDeclareValue(AddrDInstrKind) {
     auto *ParentBB = IRBuilder.GetInsertBlock();
     auto InsertBefore = IRBuilder.GetInsertPoint();
 
@@ -3811,13 +3811,13 @@ struct DbgIntrinsicEmitter {
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::Instruction *InsertBefore) {
-    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgDeclare)
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL,
                                      InsertBefore->getIterator());
 
-    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgCoroFrameEntry)
-      return DIBuilder.insertCoroFrameEntry(Addr, VarInfo, Expr, DL,
-                                            InsertBefore->getIterator());
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclareValue)
+      return DIBuilder.insertDeclareValue(Addr, VarInfo, Expr, DL,
+                                          InsertBefore->getIterator());
 
     Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
     return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL,
@@ -3828,11 +3828,11 @@ struct DbgIntrinsicEmitter {
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::BasicBlock *Block) {
-    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgDeclare)
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, Block);
 
-    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgCoroFrameEntry)
-      return DIBuilder.insertCoroFrameEntry(Addr, VarInfo, Expr, DL, Block);
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclareValue)
+      return DIBuilder.insertDeclareValue(Addr, VarInfo, Expr, DL, Block);
 
     Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
     return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL, Block);
@@ -3894,7 +3894,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     AddrDInstKind = AddrDbgInstrKind::DbgValueDeref;
 
   if (InCoroContext && AddrDInstKind != AddrDbgInstrKind::DbgValueDeref)
-    AddrDInstKind = AddrDbgInstrKind::DbgCoroFrameEntry;
+    AddrDInstKind = AddrDbgInstrKind::DbgDeclareValue;
 
   DbgIntrinsicEmitter inserter{Builder, DBuilder, AddrDInstKind};
 
@@ -3903,7 +3903,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     auto InsertBefore = Builder.GetInsertPoint();
 
     if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare ||
-        AddrDInstKind == AddrDbgInstrKind::DbgCoroFrameEntry) {
+        AddrDInstKind == AddrDbgInstrKind::DbgDeclareValue) {
       ParentBlock = Alloca->getParent();
       InsertBefore = std::next(Alloca->getIterator());
     }
@@ -3931,7 +3931,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     // in the coroutine context by creating a llvm.dbg.declare for the variable
     // in the entry block of each funclet.
     if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare ||
-        AddrDInstKind == AddrDbgInstrKind::DbgCoroFrameEntry) {
+        AddrDInstKind == AddrDbgInstrKind::DbgDeclareValue) {
       // Function arguments in async functions are emitted without a shadow copy
       // (that would interfere with coroutine splitting) but with a
       // llvm.dbg.declare to give CoroSplit.cpp license to emit a shadow copy
