@@ -70,7 +70,54 @@ public struct Worklist<Set: IntrusiveSet> : CustomStringConvertible, NoReflectio
   }
 }
 
+/// Like `Worklist` but can store an additional arbitrary payload per element.
+public struct WorklistWithPayload<Set: IntrusiveSet, Payload> : CustomStringConvertible, NoReflectionChildren {
+  public typealias Element = Set.Element
+  private var worklist: Stack<(Element, Payload)>
+  private var pushedElements: Set
+
+  public init(_ context: some Context) {
+    self.worklist = Stack(context)
+    self.pushedElements = Set(context)
+  }
+
+  public mutating func pop() -> (Element, Payload)? { return worklist.pop() }
+
+  public mutating func pushIfNotVisited(_ element: Element, with payload: Payload) {
+    if pushedElements.insert(element) {
+      worklist.append((element, payload))
+    }
+  }
+
+  public mutating func pushIfNotVisited<S: Sequence>(contentsOf other: S, with payload: Payload)
+                  where S.Element == Element
+  {
+    for element in other {
+      pushIfNotVisited(element, with: payload)
+    }
+  }
+
+  /// Returns true if \p element was pushed to the worklist, regardless if it's already popped or not.
+  public func hasBeenPushed(_ element: Element) -> Bool { pushedElements.contains(element) }
+
+  public var isEmpty: Bool { worklist.isEmpty }
+
+  public var description: String {
+    """
+    worklist: \(worklist)
+    pushed:   \(pushedElements)
+    """
+  }
+
+  /// TODO: once we have move-only types, make this a real deinit.
+  public mutating func deinitialize() {
+    pushedElements.deinitialize()
+    worklist.deinitialize()
+  }
+}
+
 public typealias BasicBlockWorklist = Worklist<BasicBlockSet>
+public typealias BasicBlockWorklistWithPayload<Payload> = WorklistWithPayload<BasicBlockSet, Payload>
 public typealias InstructionWorklist = Worklist<InstructionSet>
 public typealias SpecificInstructionWorklist<InstType: Instruction> = Worklist<SpecificInstructionSet<InstType>>
 public typealias ValueWorklist = Worklist<ValueSet>

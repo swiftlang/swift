@@ -94,6 +94,7 @@ private func registerSwiftPasses() {
   registerPass(cleanupDebugStepsPass, { cleanupDebugStepsPass.run($0) })
   registerPass(namedReturnValueOptimization, { namedReturnValueOptimization.run($0) })
   registerPass(stripObjectHeadersPass, { stripObjectHeadersPass.run($0) })
+  registerPass(deadAccessScopeElimination, { deadAccessScopeElimination.run($0) })
   registerPass(deadStoreElimination, { deadStoreElimination.run($0) })
   registerPass(redundantLoadElimination, { redundantLoadElimination.run($0) })
   registerPass(mandatoryRedundantLoadElimination, { mandatoryRedundantLoadElimination.run($0) })

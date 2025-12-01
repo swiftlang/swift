@@ -54,7 +54,7 @@ static bool seemsUseful(SILInstruction *I) {
   // Even though begin_access/destroy_value/copy_value/end_lifetime have
   // side-effects, they can be DCE'ed if they do not have useful
   // dependencies/reverse dependencies
-  if (isa<BeginAccessInst>(I) || isa<CopyValueInst>(I) ||
+  if (isa<CopyValueInst>(I) ||
       isa<DestroyValueInst>(I) || isa<EndLifetimeInst>(I) ||
       isa<EndBorrowInst>(I))
     return false;
@@ -359,12 +359,6 @@ void DCE::markLive() {
         } else {
           markInstructionLive(&I);
         }
-        break;
-      }
-      case SILInstructionKind::EndAccessInst: {
-        // An end_access is live only if it's begin_access is also live.
-        auto *beginAccess = cast<EndAccessInst>(&I)->getBeginAccess();
-        addReverseDependency(beginAccess, &I);
         break;
       }
       case SILInstructionKind::DestroyValueInst: {
