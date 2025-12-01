@@ -128,6 +128,8 @@ final public class ClassDecl: NominalTypeDecl {
   final public var destructor: DestructorDecl {
     bridged.Class_getDestructor().getAs(DestructorDecl.self)
   }
+
+  public var isForeign: Bool { bridged.Class_isForeign() }
 }
 
 final public class ProtocolDecl: NominalTypeDecl {

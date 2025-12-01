@@ -256,6 +256,10 @@ BridgedDeclObj BridgedDeclObj::Class_getDestructor() const {
   return {getAs<swift::ClassDecl>()->getDestructor()};
 }
 
+bool BridgedDeclObj::Class_isForeign() const {
+  return getAs<swift::ClassDecl>()->isForeign();
+}
+
 bool BridgedDeclObj::ProtocolDecl_requiresClass() const {
   return getAs<swift::ProtocolDecl>()->requiresClass();
 }
