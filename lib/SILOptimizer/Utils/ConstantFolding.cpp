@@ -20,6 +20,7 @@
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "llvm/ADT/APFloat.h"
@@ -1232,8 +1233,8 @@ static SILValue constantFoldIsConcrete(BuiltinInst *BI) {
   return inst;
 }
 
-SILValue swift::constantFoldBuiltin(BuiltinInst *BI,
-                                    std::optional<bool> &ResultsInError) {
+static SILValue constantFoldBuiltinWithoutSalvagingDebugInfo(BuiltinInst *BI,
+                                                             std::optional<bool> &ResultsInError) {
   const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
   SILModule &M = BI->getModule();
 
@@ -1442,6 +1443,20 @@ case BuiltinValueKind::id:
   }
   }
   return nullptr;
+}
+
+SILValue swift::constantFoldBuiltin(BuiltinInst *BI,
+                                    std::optional<bool> &ResultsInError) {
+  const auto value =
+      constantFoldBuiltinWithoutSalvagingDebugInfo(BI, ResultsInError);
+  // Salvage debug info of BI arguments if it was successfully folded.
+  if (value) {
+    for (auto arg : BI->getArguments()) {
+      if (auto *argInst = arg.getDefiningInstruction())
+        swift::salvageDebugInfo(argInst);
+    }
+  }
+  return value;
 }
 
 /// On success this places a new value for each result of Op->getUser() into
