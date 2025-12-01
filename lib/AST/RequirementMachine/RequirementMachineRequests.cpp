@@ -451,7 +451,9 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
       }
     }
 
-    // FIXME: We don't have the inverses from desugaring available here!
+    // FIXME: We should pass proto->getInverseRequirements() instead of
+    //        an empty vector, but this makes the requirement machine angry.
+    //        For now, we check them in `checkProtocolRefinementRequirements`.
     SmallVector<InverseRequirement, 2> missingInverses;
 
     // Diagnose redundant requirements and conflicting requirements.
