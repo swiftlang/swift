@@ -1146,3 +1146,13 @@ Added: __swift_debug_metadataAllocatorPageSize
 
 // New debug environment variable for the concurrency runtime.
 Added: _concurrencyEnableTaskSlabAllocator
+
+// SE-0489 Better debugDescription for EncodingError and DecodingError
+Added: _$ss13DecodingErrorO16debugDescriptionSSvg
+Added: _$ss13DecodingErrorO16debugDescriptionSSvpMV
+Added: _$ss13DecodingErrorOs28CustomDebugStringConvertiblesMc
+Added: _$ss13DecodingErrorOs28CustomDebugStringConvertiblesWP
+Added: _$ss13EncodingErrorO16debugDescriptionSSvg
+Added: _$ss13EncodingErrorO16debugDescriptionSSvpMV
+Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesMc
+Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesWP
