@@ -225,12 +225,13 @@ linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT, StringRef(#CC) == "C_CC");    \
     }
 
     for (auto *F : Functions) {
-      auto declRef = SILDeclRef(F, SILDeclRef::Kind::Func);
+      auto declRef = SILDeclRef(F, SILDeclRef::Kind::Func,
+                                F->hasOnlyCEntryPoint());
       auto *Fn = linkUsedFunctionByName(declRef.mangle(), /*Linkage*/{},
                                         /*byAsmName=*/false);
 
       // If we have @_cdecl or @_silgen_name, also link the foreign thunk
-      if (Fn->hasCReferences()) {
+      if (Fn->hasCReferences() && !F->hasOnlyCEntryPoint()) {
         auto declRef = SILDeclRef(F, SILDeclRef::Kind::Func, /*isForeign*/true);
         linkUsedFunctionByName(declRef.mangle(), /*Linkage*/{},
                                /*byAsmName=*/false);

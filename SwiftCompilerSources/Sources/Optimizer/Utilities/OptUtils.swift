@@ -1051,8 +1051,7 @@ func isCastSupportedInEmbeddedSwift(from sourceType: Type,
     return false
   }
 
-  // Tuple?
-  if !destType.isStruct && !destType.isClass && !destType.isEnum {
+  if !destType.isStruct && !destType.isClass && !destType.isEnum && !destType.isTuple {
     return false
   }
 
