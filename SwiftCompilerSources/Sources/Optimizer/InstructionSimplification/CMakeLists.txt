@@ -33,7 +33,6 @@ swift_compiler_sources(Optimizer
   SimplifyLoad.swift
   SimplifyLoadBorrow.swift
   SimplifyMarkDependence.swift
-  SimplifyMisc.swift
   SimplifyPartialApply.swift
   SimplifyPointerToAddress.swift
   SimplifyRefCasts.swift
@@ -44,6 +43,7 @@ swift_compiler_sources(Optimizer
   SimplifySwitchEnum.swift
   SimplifyTuple.swift
   SimplifyTupleExtract.swift
+  SimplifyTypeValue.swift
   SimplifyUncheckedAddrCast.swift
   SimplifyUncheckedEnumData.swift
   SimplifyValueToBridgeObject.swift
