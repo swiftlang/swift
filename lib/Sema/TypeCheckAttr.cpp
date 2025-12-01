@@ -8609,6 +8609,11 @@ public:
     attr->setInvalid();
   }
 
+  void visitLifetimeAttr(LifetimeAttr *attr) {
+    // Caches lifetimes and raises diagnostics if there's an error.
+    closure->getLifetimeDependencies();
+  }
+
   void visitSendableAttr(SendableAttr *attr) {
     // Nothing else to check.
   }

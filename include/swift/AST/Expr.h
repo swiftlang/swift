@@ -4045,6 +4045,13 @@ class AbstractClosureExpr : public DeclContext, public Expr {
   /// Actor isolation of the closure.
   ActorIsolation actorIsolation;
 
+protected:
+  friend class LifetimeDependenceInfoRequest;
+
+  struct {
+    unsigned NoLifetimeDependenceInfo : 1;
+  } LazySemanticInfo = { };
+
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
                       DeclContext *Parent)
@@ -4084,6 +4091,9 @@ public:
     assert(captures.hasBeenComputed());
     Captures = captures;
   }
+
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+  getLifetimeDependencies() const;
 
   /// Retrieve the parameters of this closure.
   ParameterList *getParameters() { return parameterList; }

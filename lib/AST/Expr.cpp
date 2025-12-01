@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Expr.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Unicode.h"
@@ -2005,6 +2006,14 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   }
 
   return getRawDiscriminator();
+}
+
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+AbstractClosureExpr::getLifetimeDependencies() const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      LifetimeDependenceInfoRequest{const_cast<AbstractClosureExpr *>(this)},
+      std::nullopt);
 }
 
 void AbstractClosureExpr::setParameterList(ParameterList *P) {

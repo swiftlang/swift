@@ -13,6 +13,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -2747,6 +2748,8 @@ LifetimeDependenceInfoRequest::getCachedResult() const {
 
   if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
     noLifetimeDependenceInfo = func->LazySemanticInfo.NoLifetimeDependenceInfo;
+  } else if (auto *clos = dyn_cast<AbstractClosureExpr>(decl)) {
+    noLifetimeDependenceInfo = clos->LazySemanticInfo.NoLifetimeDependenceInfo;
   } else {
     auto *eed = cast<EnumElementDecl>(decl);
     noLifetimeDependenceInfo = eed->LazySemanticInfo.NoLifetimeDependenceInfo;
@@ -2767,6 +2770,11 @@ void LifetimeDependenceInfoRequest::cacheResult(
       func->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
       return;
     }
+    if (auto *clos = dyn_cast<AbstractClosureExpr>(decl)) {
+      clos->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
+      return;
+    }
+
     auto *eed = cast<EnumElementDecl>(decl);
     eed->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
   }
