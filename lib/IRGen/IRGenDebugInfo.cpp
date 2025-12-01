@@ -69,6 +69,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -1730,6 +1731,21 @@ private:
         llvm::dwarf::DW_LANG_Swift, nullptr);
   }
 
+  /// Create struct with a single member, used for Swift types that do not yet
+  /// have specialized DIDerivedTypes.
+  llvm::DIType *createSingleMemberStruct(
+      llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File, unsigned Line,
+      unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
+      StringRef MangledName, StringRef MemberName, llvm::DIType *MemberType) {
+    llvm::Metadata *Elements[] = {
+        DBuilder.createMemberType(Scope, MemberName, File, 0, SizeInBits,
+                                  AlignInBits, 0, Flags, MemberType)};
+    return DBuilder.createStructType(
+        Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
+        /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
+        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName, nullptr, 0);
+  }
+
   llvm::DIType *createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
                                       unsigned SizeInBits, unsigned AlignInBits,
                                       llvm::DINode::DIFlags Flags,
@@ -2062,18 +2078,29 @@ private:
                                       SpecificationOf);
     }
 
-    case TypeKind::Protocol: {
-      auto *ProtocolTy = BaseTy->castTo<ProtocolType>();
-      auto *Decl = ProtocolTy->getDecl();
-      // FIXME: (LLVM branch) This should probably be a DW_TAG_interface_type.
-      auto L = getFileAndLocation(Decl);
-      unsigned FwdDeclLine = 0;
-      return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
-                                L.File, FwdDeclLine, SizeInBits, AlignInBits,
-                                Flags, MangledName);
+    case TypeKind::Existential: {
+      auto *ExistentialTy = BaseTy->castTo<ExistentialType>();
+      Type ConstraintTy = ExistentialTy->getConstraintType();
+      TypeBase *TyPtr = ConstraintTy.getPointer();
+      if (!isa<ProtocolType>(TyPtr) && !isa<ProtocolCompositionType>(TyPtr) &&
+          !isa<ParameterizedProtocolType>(TyPtr)) {
+        // This could be an alias type, which we need to anchor in DWARF.
+        auto *Decl = DbgTy.getDecl();
+        auto L = getFileAndLocation(Decl);
+        unsigned FwdDeclLine = 0;
+        return createSingleMemberStruct(
+            Scope, Decl ? Decl->getNameStr() : MangledName, L.File, FwdDeclLine,
+            SizeInBits, AlignInBits, Flags, MangledName, "$swift.constraint",
+            getOrCreateType(ConstraintTy));
+      }
+      // If the existential is just a protocol type it shares its mangled name
+      // with it, so we can just represent it directly as a protocol.
+      BaseTy = TyPtr;
     }
+      LLVM_FALLTHROUGH;
 
-    case TypeKind::Existential:
+    // FIXME: (LLVM branch) This should probably be a DW_TAG_interface_type.
+    case TypeKind::Protocol:
     case TypeKind::ProtocolComposition:
     case TypeKind::ParameterizedProtocol: {
       auto *Decl = DbgTy.getDecl();
