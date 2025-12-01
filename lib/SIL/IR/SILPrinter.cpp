@@ -3505,18 +3505,18 @@ void SILFunction::dump(const char *FileName) const {
   print(os);
 }
 
-static StringRef getLinkageString(SILLinkage linkage) {
+StringRef swift::getLinkageString(SILLinkage linkage) {
   switch (linkage) {
-  case SILLinkage::Public: return "public ";
-  case SILLinkage::PublicNonABI: return "non_abi ";
-  case SILLinkage::Package: return "package ";
-  case SILLinkage::PackageNonABI: return "package_non_abi ";
-  case SILLinkage::Hidden: return "hidden ";
-  case SILLinkage::Shared: return "shared ";
-  case SILLinkage::Private: return "private ";
-  case SILLinkage::PublicExternal: return "public_external ";
-  case SILLinkage::PackageExternal: return "package_external ";
-  case SILLinkage::HiddenExternal: return "hidden_external ";
+  case SILLinkage::Public: return "public";
+  case SILLinkage::PublicNonABI: return "non_abi";
+  case SILLinkage::Package: return "package";
+  case SILLinkage::PackageNonABI: return "package_non_abi";
+  case SILLinkage::Hidden: return "hidden";
+  case SILLinkage::Shared: return "shared";
+  case SILLinkage::Private: return "private";
+  case SILLinkage::PublicExternal: return "public_external";
+  case SILLinkage::PackageExternal: return "package_external";
+  case SILLinkage::HiddenExternal: return "hidden_external";
   }
   llvm_unreachable("bad linkage");
 }
@@ -3527,7 +3527,7 @@ static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
       (!isDefinition && linkage == SILLinkage::DefaultForDeclaration))
     return;
 
-  OS << getLinkageString(linkage);
+  OS << getLinkageString(linkage) << ' ';
 }
 
 

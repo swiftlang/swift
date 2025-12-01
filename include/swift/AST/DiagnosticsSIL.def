@@ -142,6 +142,10 @@ ERROR(deserialize_function_type_mismatch,Fatal,
       "type mismatch of function '%0', declared as %1 but used in a swift module as %2",
       (StringRef, Type, Type))
 
+ERROR(deserialize_function_linkage_mismatch,Fatal,
+      "linkage mismatch of function '%0', declared as %1 but expected as %2",
+      (StringRef, StringRef, StringRef))
+
 ERROR(without_actually_escaping_on_isolated_any,none,
       "withoutActuallyEscaping is currently unimplemented for '@isolated(any)' "
       "function values", ())
