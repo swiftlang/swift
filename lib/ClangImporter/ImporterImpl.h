@@ -1985,6 +1985,10 @@ bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
 
+/// Checks whether this type is bool or is a C++ enum with a bool underlying
+/// type.
+bool isBoolOrBoolEnumType(Type ty);
+
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
