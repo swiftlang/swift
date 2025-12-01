@@ -553,6 +553,38 @@ irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
   return call;
 }
 
+StackAddress IRGenFunction::emitDynamicStackAllocation(
+    SILType T, StackAllocationIsNested_t isNested, const llvm::Twine &name) {
+  if (isNested) {
+    return emitDynamicAlloca(T, name);
+  }
+
+  // First malloc the memory.
+  auto mallocFn = IGM.getMallocFunctionPointer();
+  auto *size = emitLoadOfSize(*this, T);
+  auto *call = Builder.CreateCall(mallocFn, {size});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.C_CC);
+
+  // Then create the dynamic alloca to store the malloc pointer into.
+
+  // TODO: Alignment should be platform specific.
+  auto address = Address(call, IGM.Int8Ty, Alignment(16));
+  return StackAddress{address};
+}
+
+void IRGenFunction::emitDynamicStackDeallocation(
+    StackAddress address, StackAllocationIsNested_t isNested) {
+  if (isNested) {
+    return emitDeallocateDynamicAlloca(address);
+  }
+
+  auto *call = Builder.CreateCall(IGM.getFreeFunctionPointer(),
+                                  {address.getAddressPointer()});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.C_CC);
+}
+
 /// Emit a dynamic alloca call to allocate enough memory to hold an object of
 /// type 'T' and an optional llvm.stackrestore point if 'isInEntryBlock' is
 /// false.

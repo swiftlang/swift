@@ -229,7 +229,8 @@ protected:
                  lexical : 1,
                  fromVarDecl : 1,
                  usesMoveableValueDebugInfo : 1,
-                 hasInvalidatedVarInfo : 1);
+                 hasInvalidatedVarInfo : 1,
+                 isNested : 1);
 
     SHARED_FIELD(AllocBoxInst, uint8_t
                  dynamicLifetime : 1,

@@ -4994,6 +4994,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     auto isFromVarDecl = IsNotFromVarDecl;
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
         DoesNotUseMoveableValueDebugInfo;
+    auto isNested = StackAllocationIsNested;
 
     StringRef attributeName;
     SourceLoc attributeLoc;
@@ -5006,6 +5007,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         isFromVarDecl = IsFromVarDecl;
       else if (attributeName == "moveable_value_debuginfo")
         usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
+      else if (attributeName == "non_nested")
+        isNested = StackAllocationIsNotNested;
       else {
         P.diagnose(attributeLoc, diag::sil_invalid_attribute_for_instruction,
                    attributeName, "alloc_stack");
@@ -5025,14 +5028,16 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
 
     // It doesn't make sense to attach a debug var info if the name is empty
+    AllocStackInst *ASI;
     if (VarInfo.Name.size())
-      ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime,
-                                     isLexical, isFromVarDecl,
-                                     usesMoveableValueDebugInfo);
+      ASI = B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime,
+                               isLexical, isFromVarDecl,
+                               usesMoveableValueDebugInfo);
     else
-      ResultVal =
-          B.createAllocStack(InstLoc, Ty, {}, hasDynamicLifetime, isLexical,
-                             isFromVarDecl, usesMoveableValueDebugInfo);
+      ASI = B.createAllocStack(InstLoc, Ty, {}, hasDynamicLifetime, isLexical,
+                               isFromVarDecl, usesMoveableValueDebugInfo);
+    ASI->setStackAllocationIsNested(isNested);
+    ResultVal = ASI;
     break;
   }
   case SILInstructionKind::MetatypeInst: {

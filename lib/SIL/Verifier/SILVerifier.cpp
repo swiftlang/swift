@@ -95,22 +95,14 @@ static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
                                               llvm::cl::init(true));
 extern llvm::cl::opt<bool> SILPrintDebugInfo;
 
-void swift::verificationFailure(const Twine &complaint,
-              const SILInstruction *atInstruction,
-              const SILArgument *atArgument,
-              llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+void swift::verificationFailure(
+    const Twine &complaint, const SILInstruction *atInstruction,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
   llvm::raw_ostream &out = llvm::dbgs();
   SILPrintContext ctx(out);
 
-  const SILFunction *f = nullptr;
-  StringRef funcName = "?";
-  if (atInstruction) {
-    f = atInstruction->getFunction();
-    funcName = f->getName();
-  } else if (atArgument) {
-    f = atArgument->getFunction();
-    funcName = f->getName();
-  }
+  auto *f = atInstruction->getFunction();
+  StringRef funcName = f->getName();
   if (ContinueOnFailure) {
     out << "Begin Error in function " << funcName << "\n";
   }
@@ -119,13 +111,8 @@ void swift::verificationFailure(const Twine &complaint,
   if (extraContext)
     extraContext(ctx);
 
-  if (atInstruction) {
-    out << "Verifying instruction:\n";
-    atInstruction->printInContext(ctx);
-  } else if (atArgument) {
-    out << "Verifying argument:\n";
-    atArgument->printInContext(ctx);
-  }
+  out << "Verifying instruction:\n";
+  atInstruction->printInContext(ctx);
   if (ContinueOnFailure) {
     out << "End Error in function " << funcName << "\n";
     return;
@@ -149,6 +136,129 @@ void swift::verificationFailure(const Twine &complaint,
     exit(1);
 }
 
+void swift::verificationFailure(
+    const Twine &complaint, const SILArgument *atArgument,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
+
+  auto *f = atArgument->getFunction();
+  StringRef funcName = f->getName();
+
+  if (ContinueOnFailure) {
+    out << "Begin Error in function " << funcName << "\n";
+  }
+
+  out << "SIL verification failed: " << complaint << "\n";
+  if (extraContext)
+    extraContext(ctx);
+
+  out << "Verifying argument:\n";
+  atArgument->printInContext(ctx);
+
+  if (ContinueOnFailure) {
+    out << "End Error in function " << funcName << "\n";
+    return;
+  }
+
+  if (f) {
+    out << "In function:\n";
+    f->print(out);
+    if (DumpModuleOnFailure) {
+      // Don't do this by default because modules can be _very_ large.
+      out << "In module:\n";
+      f->getModule().print(out);
+    }
+  }
+
+  // We abort by default because we want to always crash in
+  // the debugger.
+  if (AbortOnFailure)
+    abort();
+  else
+    exit(1);
+}
+
+void swift::verificationFailure(
+    const Twine &complaint, SILValue atValue,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
+
+  const SILFunction *f = atValue->getFunction();
+  StringRef funcName = f->getName();
+  if (ContinueOnFailure) {
+    out << "Begin Error in function " << funcName << "\n";
+  }
+
+  out << "SIL verification failed: " << complaint << "\n";
+  if (extraContext)
+    extraContext(ctx);
+
+  out << "Verifying value:\n";
+  atValue->printInContext(ctx);
+
+  if (ContinueOnFailure) {
+    out << "End Error in function " << funcName << "\n";
+    return;
+  }
+
+  if (f) {
+    out << "In function:\n";
+    f->print(out);
+    if (DumpModuleOnFailure) {
+      // Don't do this by default because modules can be _very_ large.
+      out << "In module:\n";
+      f->getModule().print(out);
+    }
+  }
+
+  // We abort by default because we want to always crash in
+  // the debugger.
+  if (AbortOnFailure)
+    abort();
+  else
+    exit(1);
+}
+
+void swift::verificationFailure(
+    const Twine &complaint, const SILFunction *f,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
+
+  StringRef funcName = f->getName();
+
+  if (ContinueOnFailure) {
+    out << "Begin Error in function " << funcName << "\n";
+  }
+
+  out << "SIL verification failed: " << complaint << "\n";
+  if (extraContext)
+    extraContext(ctx);
+
+  if (ContinueOnFailure) {
+    out << "End Error in function " << funcName << "\n";
+    return;
+  }
+
+  if (f) {
+    out << "In function:\n";
+    f->print(out);
+    if (DumpModuleOnFailure) {
+      // Don't do this by default because modules can be _very_ large.
+      out << "In module:\n";
+      f->getModule().print(out);
+    }
+  }
+
+  // We abort by default because we want to always crash in
+  // the debugger.
+  if (AbortOnFailure)
+    abort();
+  else
+    exit(1);
+}
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
@@ -258,11 +368,13 @@ class SILVerifierBase : public SILInstructionVisitor<Impl> {
 public:
   // visitCLASS calls visitPARENT and checkCLASS.
   // checkCLASS does nothing by default.
-#define INST(CLASS, PARENT)                                     \
-  void visit##CLASS(CLASS *I) {                                 \
-    static_cast<Impl*>(this)->visit##PARENT(I);                 \
-    static_cast<Impl*>(this)->check##CLASS(I);                  \
-  }                                                             \
+#define INST(CLASS, PARENT)                                                    \
+  void visit##CLASS(CLASS *I) {                                                \
+    typename Impl::VerifierErrorEmitterGuard guard(static_cast<Impl *>(this),  \
+                                                   I);                         \
+    static_cast<Impl *>(this)->visit##PARENT(I);                               \
+    static_cast<Impl *>(this)->check##CLASS(I);                                \
+  }                                                                            \
   void check##CLASS(CLASS *I) {}
 #include "swift/SIL/SILNodes.def"
 
@@ -924,8 +1036,79 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   bool checkLinearLifetime = false;
 
   SmallVector<std::pair<StringRef, SILType>, 16> DebugVars;
-  const SILInstruction *CurInstruction = nullptr;
-  const SILArgument *CurArgument = nullptr;
+
+public:
+  class VerifierErrorEmitter {
+    std::optional<std::variant<const SILInstruction *, const SILArgument *,
+                               const SILFunction *>>
+        value;
+
+  public:
+    class VerifierErrorEmitterGuard {
+      SILVerifier *verifier;
+
+      VerifierErrorEmitter &getEmitter() const {
+        return verifier->ErrorEmitter;
+      }
+
+    public:
+      VerifierErrorEmitterGuard(SILVerifier *verifier,
+                                const SILInstruction *inst)
+          : verifier(verifier) {
+        assert(!bool(getEmitter().value) &&
+               "Cannot emit errors for two different "
+               "constructs at the same time?!");
+        getEmitter().value = inst;
+      }
+
+      VerifierErrorEmitterGuard(SILVerifier *verifier, const SILFunction *f)
+          : verifier(verifier) {
+        assert(!bool(getEmitter().value) &&
+               "Cannot emit errors for two different "
+               "constructs at the same time?!");
+        getEmitter().value = f;
+      }
+
+      VerifierErrorEmitterGuard(SILVerifier *verifier, const SILArgument *arg)
+          : verifier(verifier) {
+        assert(!bool(getEmitter().value) &&
+               "Cannot emit errors for two different "
+               "constructs at the same time?!");
+        getEmitter().value = arg;
+      }
+      ~VerifierErrorEmitterGuard() { getEmitter().value = {}; }
+    };
+
+    void emitError(const Twine &complaint,
+                   llvm::function_ref<void(SILPrintContext &)> extraContext) {
+      if (!value.has_value()) {
+        llvm::report_fatal_error("Must have a construct to emit for");
+      }
+
+      auto v = *value;
+      if (std::holds_alternative<const SILInstruction *>(v)) {
+        return verificationFailure(
+            complaint, std::get<const SILInstruction *>(v), extraContext);
+      }
+
+      if (std::holds_alternative<const SILArgument *>(v)) {
+        return verificationFailure(complaint, std::get<const SILArgument *>(v),
+                                   extraContext);
+      }
+
+      if (std::holds_alternative<const SILFunction *>(v)) {
+        return verificationFailure(complaint, std::get<const SILFunction *>(v),
+                                   extraContext);
+      }
+
+      llvm::report_fatal_error("Unhandled case?!");
+    }
+  };
+  using VerifierErrorEmitterGuard =
+      VerifierErrorEmitter::VerifierErrorEmitterGuard;
+
+private:
+  VerifierErrorEmitter ErrorEmitter;
   std::unique_ptr<DominanceInfo> Dominance;
 
   // Used for dominance checking within a basic block.
@@ -983,7 +1166,7 @@ public:
                   = nullptr) {
     if (condition) return;
 
-    verificationFailure(complaint, CurInstruction, CurArgument, extraContext);
+    ErrorEmitter.emitError(complaint, extraContext);
   }
 #define require(condition, complaint) \
   _require(bool(condition), complaint ": " #condition)
@@ -1292,7 +1475,7 @@ public:
   }
 
   void visitSILArgument(SILArgument *arg) {
-    CurArgument = arg;
+    VerifierErrorEmitterGuard guard(this, arg);
     checkLegalType(arg->getFunction(), arg, nullptr);
 
     if (checkLinearLifetime) {
@@ -1327,7 +1510,6 @@ public:
   }
 
   void visitSILInstruction(SILInstruction *I) {
-    CurInstruction = I;
     checkSILInstruction(I);
 
     // Check the SILLLocation attached to the instruction,
@@ -6595,6 +6777,7 @@ public:
   // This verifies that the entry block of a SIL function doesn't have
   // any predecessors and also verifies the entry point arguments.
   void verifyEntryBlock(SILBasicBlock *entry) {
+    VerifierErrorEmitterGuard guard(this, entry->getParent());
     require(entry->pred_empty(), "entry block cannot have predecessors");
 
     LLVM_DEBUG(
@@ -6834,6 +7017,7 @@ public:
   }
 
   void verifyEpilogBlocks(SILFunction *F) {
+    VerifierErrorEmitterGuard guard(this, F);
     bool FoundReturnBlock = false;
     bool FoundThrowBlock = false;
     bool FoundUnwindBlock = false;
@@ -6899,8 +7083,8 @@ public:
     struct BBState {
       std::vector<SILValue> Stack;
 
-      /// Contents: BeginAccessInst*, BeginApplyInst*.
-      std::set<SILInstruction*> ActiveOps;
+      /// Contents: Results of BeginAccessInst*, BeginApplyInst*.
+      std::set<SILValue> ActiveOps;
 
       CFGState CFG = Normal;
 
@@ -6990,13 +7174,13 @@ public:
         // conservative merge regardless of failure so that we're in a
         // coherent state in the successor block.
         auto fail = [&](StringRef complaint,
-                        llvm::function_ref<void(SILPrintContext &out)> extra
-                          = nullptr) {
-          verificationFailure(complaint, term, nullptr,
-                              [&](SILPrintContext &ctx) {
+                        llvm::function_ref<void(SILPrintContext & out)> extra =
+                            nullptr) {
+          verificationFailure(complaint, term, [&](SILPrintContext &ctx) {
             ctx.OS() << "Entering basic block " << ctx.getID(succBB) << "\n";
 
-            if (extra) extra(ctx);
+            if (extra)
+              extra(ctx);
           });
         };
 
@@ -7052,6 +7236,19 @@ public:
           }
         }
       }
+
+      void handleScopeInst(SILValue i) {
+        if (!ActiveOps.insert(i).second) {
+          verificationFailure("operation was not ended before re-beginning it",
+                              i, nullptr);
+        }
+      }
+
+      void handleScopeEndingInst(const SILInstruction &i) {
+        if (!ActiveOps.erase(i.getOperand(0))) {
+          verificationFailure("operation has already been ended", &i, nullptr);
+        }
+      }
     };
 
     struct DeadEndRegionState {
@@ -7063,23 +7260,30 @@ public:
     };
   };
 
-  static bool isScopeInst(SILInstruction *i) {
-    if (isa<BeginAccessInst>(i) ||
-        isa<BeginApplyInst>(i) ||
-        isa<StoreBorrowInst>(i)) {
-      return true;
-    } else if (auto bi = dyn_cast<BuiltinInst>(i)) {
+  /// If this is a scope ending inst, return the result from the instruction
+  /// that provides the scoped value whose lifetime must be ended by some other
+  /// scope ending instruction.
+  static SILValue isScopeInst(SILInstruction *i) {
+    if (auto *bai = dyn_cast<BeginAccessInst>(i))
+      return bai;
+    if (auto *bai = dyn_cast<BeginApplyInst>(i))
+      return bai->getTokenResult();
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(i))
+      return sbi;
+
+    if (auto bi = dyn_cast<BuiltinInst>(i)) {
       if (auto bk = bi->getBuiltinKind()) {
         switch (*bk) {
         case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
-          return true;
+          return bi->getResult(0);
 
         default:
-          return false;
+          return SILValue();
         }
       }
     }
-    return false;
+
+    return SILValue();
   }
 
   static bool isScopeEndingInst(SILInstruction *i) {
@@ -7087,7 +7291,9 @@ public:
         isa<AbortApplyInst>(i) ||
         isa<EndApplyInst>(i)) {
       return true;
-    } else if (auto bi = dyn_cast<BuiltinInst>(i)) {
+    }
+
+    if (auto bi = dyn_cast<BuiltinInst>(i)) {
       if (auto bk = bi->getBuiltinKind()) {
         switch (*bk) {
         case BuiltinValueKind::FinishAsyncLet:
@@ -7135,7 +7341,7 @@ public:
       BBState state = visitedBBs[BB];
 
       for (SILInstruction &i : *BB) {
-        CurInstruction = &i;
+        VerifierErrorEmitterGuard guard(this, &i);
 
         if (i.maySuspend()) {
           // Instructions that may suspend an async context must not happen
@@ -7152,46 +7358,51 @@ public:
         }
 
         if (i.isAllocatingStack()) {
-          if (auto *BAI = dyn_cast<BeginApplyInst>(&i)) {
-            state.Stack.push_back(BAI->getCalleeAllocationResult());
+          // Nested stack allocations are pushed on the stack. Non-nested stack
+          // allocations are treated as active ops so that we can at least
+          // verify their joint post-dominance.
+          if (i.isStackAllocationNested()) {
+            state.Stack.push_back(i.getStackAllocation());
+
+            // Also track begin_apply as a scope instruction.
+            if (auto *bai = dyn_cast<BeginApplyInst>(&i)) {
+              state.handleScopeInst(bai->getStackAllocation());
+              state.handleScopeInst(bai->getTokenResult());
+            }
           } else {
-            state.Stack.push_back(cast<SingleValueInstruction>(&i));
+            state.handleScopeInst(i.getStackAllocation());
           }
-          // Not "else if": begin_apply both allocates stack and begins an
-          // operation.
-        }
-        if (i.isDeallocatingStack()) {
+        } else if (i.isDeallocatingStack()) {
           SILValue op = i.getOperand(0);
           while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
             op = mvi->getOperand();
           }
 
-          if (!state.Stack.empty() && op == state.Stack.back()) {
+          auto beginInst = op->getDefiningInstruction();
+          if (beginInst && (!beginInst->isAllocatingStack() ||
+                            !beginInst->isStackAllocationNested())) {
+            state.handleScopeEndingInst(i);
+          } else if (!state.Stack.empty() && op == state.Stack.back()) {
             state.Stack.pop_back();
+            if (beginInst && isa<BeginApplyInst>(beginInst))
+              state.handleScopeEndingInst(i);
           } else {
-            verificationFailure("deallocating allocation that is not the top of the stack",
-                                &i, nullptr,
-                                [&](SILPrintContext &ctx) {
-              state.printStack(ctx, "Current stack state");
-              ctx.OS() << "Stack allocation:\n" << *op;
-              // The deallocation is printed out as the focus of the failure.
-            });
+            verificationFailure(
+                "deallocating allocation that is not the top of the stack", &i,
+                [&](SILPrintContext &ctx) {
+                  state.printStack(ctx, "Current stack state");
+                  ctx.OS() << "Stack allocation:\n" << *op;
+                  // The deallocation is printed out as the focus of the
+                  // failure.
+                });
           }
-        } else if (isScopeInst(&i)) {
-          bool notAlreadyPresent = state.ActiveOps.insert(&i).second;
-          require(notAlreadyPresent,
-                  "operation was not ended before re-beginning it");
+        } else if (auto scopeEndingValue = isScopeInst(&i)) {
+          state.handleScopeInst(scopeEndingValue);
         } else if (isScopeEndingInst(&i)) {
-          if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
-            bool present = state.ActiveOps.erase(beginOp);
-            require(present, "operation has already been ended");
-          }
+          state.handleScopeEndingInst(i);
         } else if (auto *endBorrow = dyn_cast<EndBorrowInst>(&i)) {
           if (isa<StoreBorrowInst>(endBorrow->getOperand())) {
-            if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
-              bool present = state.ActiveOps.erase(beginOp);
-              require(present, "operation has already been ended");
-            }
+            state.handleScopeEndingInst(i);
           }
         } else if (auto gaci = dyn_cast<GetAsyncContinuationInstBase>(&i)) {
           require(!state.GotAsyncContinuation,
@@ -7392,7 +7603,7 @@ public:
 
     for (auto &bb : *F) {
       const TermInst *termInst = bb.getTerminator();
-      CurInstruction = termInst;
+      VerifierErrorEmitterGuard guard(this, termInst);
 
       if (isSILOwnershipEnabled() && F->hasOwnership()) {
         requireNonCriticalSucc(termInst, "critical edges not allowed in OSSA");
@@ -7406,6 +7617,7 @@ public:
 
   /// This pass verifies that there are no hole in debug scopes at -Onone.
   void verifyDebugScopeHoles(SILBasicBlock *BB) {
+    VerifierErrorEmitterGuard guard(this, BB->getParent());
     if (!VerifyDIHoles)
       return;
 
@@ -7522,7 +7734,6 @@ public:
   }
 
   void visitBasicBlockArguments(SILBasicBlock *BB) {
-    CurInstruction = nullptr;
     for (auto argI = BB->args_begin(), argEnd = BB->args_end(); argI != argEnd;
          ++argI)
       visitSILArgument(*argI);
@@ -7612,6 +7823,7 @@ public:
   void visitSILFunction(SILFunction *F) {
     PrettyStackTraceSILFunction stackTrace("verifying", F);
 
+    std::optional<VerifierErrorEmitterGuard> functionTypeErrorGuard{{this, F}};
     CanSILFunctionType FTy = F->getLoweredFunctionType();
     verifySILFunctionType(FTy);
     verifyParentFunctionSILFunctionType(FTy);
@@ -7699,6 +7911,7 @@ public:
       require(!FTy->isPolymorphic(),
               "generic function definition must have a generic environment");
     }
+    functionTypeErrorGuard.reset();
 
     // Before verifying the body of the function, validate the SILUndef map to
     // make sure that all SILUndef in the function's map point at the function
