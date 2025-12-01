@@ -83,6 +83,11 @@ module VirtMethodWithRvalRef {
   requires cplusplus
 }
 
+module VirtMethodWitMoveOnly {
+  header "virtual-methods-move-only-type.h"
+  requires cplusplus
+}
+
 module LoggingFrts {
     header "logging-frts.h"
     requires cplusplus
