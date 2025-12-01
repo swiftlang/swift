@@ -1111,18 +1111,6 @@ public:
         outAdjArgs.push_back(materializeAdjointDirect(argAdj, loc));
       }
 
-      cleanUpTemporariesForBlock(errorPbBB, loc);
-      builder.createBranch(loc, afterTryApplyPbBB, outAdjArgs);
-    }
-
-    {
-      builder.setInsertionPoint(normalPbBB);
-      buildPullbackCall(tai, applyInfo, pullback);
-
-      SmallVector<SILValue> outAdjArgs;
-      for (auto arg : adjArgs) {
-        auto argAdj = getAdjointValue(originalBB, arg);
-        outAdjArgs.push_back(materializeAdjointDirect(argAdj, loc));
       }
 
       cleanUpTemporariesForBlock(normalPbBB, loc);
