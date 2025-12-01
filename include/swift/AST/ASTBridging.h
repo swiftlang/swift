@@ -346,6 +346,7 @@ struct BridgedDeclObj {
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Class_getDestructor() const;
+  BRIDGED_INLINE bool Class_isForeign() const;
   BRIDGED_INLINE bool ProtocolDecl_requiresClass() const;
   BRIDGED_INLINE bool AbstractFunction_isOverridden() const;
   BRIDGED_INLINE bool Destructor_isIsolated() const;
@@ -2985,6 +2986,22 @@ struct BridgedASTType {
     ObjC
   };
 
+  enum class FunctionTypeRepresentation {
+    Thick = 0,
+    Block,
+    Thin,
+    CFunctionPointer,
+    Method = 8,
+    ObjCMethod,
+    WitnessMethod,
+    Closure,
+    CXXMethod,
+    KeyPathAccessorGetter,
+    KeyPathAccessorSetter,
+    KeyPathAccessorEquals,
+    KeyPathAccessorHash
+  };
+
   swift::TypeBase * _Nullable type;
 
   BRIDGED_INLINE swift::Type unbridged() const;
@@ -3047,6 +3064,7 @@ struct BridgedASTType {
   BRIDGED_INLINE BridgedOptionalInt getValueOfIntegerType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getInvocationGenericSignatureOfFunctionType() const;
+  BRIDGED_INLINE FunctionTypeRepresentation getFunctionTypeRepresentation() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapOutOfEnvironment() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType

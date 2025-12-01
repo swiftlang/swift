@@ -256,6 +256,10 @@ BridgedDeclObj BridgedDeclObj::Class_getDestructor() const {
   return {getAs<swift::ClassDecl>()->getDestructor()};
 }
 
+bool BridgedDeclObj::Class_isForeign() const {
+  return getAs<swift::ClassDecl>()->isForeign();
+}
+
 bool BridgedDeclObj::ProtocolDecl_requiresClass() const {
   return getAs<swift::ProtocolDecl>()->requiresClass();
 }
@@ -711,6 +715,25 @@ BridgedSubstitutionMap BridgedASTType::getContextSubstitutionMap() const {
 
 BridgedGenericSignature BridgedASTType::getInvocationGenericSignatureOfFunctionType() const {
   return {unbridged()->castTo<swift::SILFunctionType>()->getInvocationGenericSignature().getPointer()};
+}
+
+BridgedASTType::FunctionTypeRepresentation BridgedASTType::getFunctionTypeRepresentation() const {
+  static_assert((int)FunctionTypeRepresentation::Thick == (int)swift::SILFunctionTypeRepresentation::Thick);
+  static_assert((int)FunctionTypeRepresentation::Block == (int)swift::SILFunctionTypeRepresentation::Block);
+  static_assert((int)FunctionTypeRepresentation::Thin == (int)swift::SILFunctionTypeRepresentation::Thin);
+  static_assert((int)FunctionTypeRepresentation::CFunctionPointer == (int)swift::SILFunctionTypeRepresentation::CFunctionPointer);
+  static_assert((int)FunctionTypeRepresentation::Method == (int)swift::SILFunctionTypeRepresentation::Method);
+  static_assert((int)FunctionTypeRepresentation::ObjCMethod == (int)swift::SILFunctionTypeRepresentation::ObjCMethod);
+  static_assert((int)FunctionTypeRepresentation::WitnessMethod == (int)swift::SILFunctionTypeRepresentation::WitnessMethod);
+  static_assert((int)FunctionTypeRepresentation::Closure == (int)swift::SILFunctionTypeRepresentation::Closure);
+  static_assert((int)FunctionTypeRepresentation::CXXMethod == (int)swift::SILFunctionTypeRepresentation::CXXMethod);
+  static_assert((int)FunctionTypeRepresentation::KeyPathAccessorGetter == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorGetter);
+  static_assert((int)FunctionTypeRepresentation::KeyPathAccessorSetter == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorSetter);
+  static_assert((int)FunctionTypeRepresentation::KeyPathAccessorEquals == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorEquals);
+  static_assert((int)FunctionTypeRepresentation::KeyPathAccessorHash == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorHash);
+
+  auto fnType = unbridged()->castTo<swift::SILFunctionType>();
+  return (FunctionTypeRepresentation)(fnType->getRepresentation());
 }
 
 BridgedASTType BridgedASTType::subst(BridgedSubstitutionMap substMap) const {

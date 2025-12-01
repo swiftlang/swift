@@ -553,7 +553,7 @@ private struct PackExplodedFunction {
         withParams: newParameters,
         withResults: newResults,
         // If a method has a dynamic self parameter, it cannot be converted into a thin function (non-method).
-        makeThin: !original.mayBindDynamicSelf)
+        withRepresentation: original.mayBindDynamicSelf ? nil : .thin)
 
       self.buildSpecializedFunction(context)
     }

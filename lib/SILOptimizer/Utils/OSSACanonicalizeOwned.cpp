@@ -203,11 +203,11 @@ bool OSSACanonicalizeOwned::computeCanonicalLiveness() {
       // escape. Is it legal to canonicalize ForwardingUnowned?
       case OperandOwnership::ForwardingUnowned:
       case OperandOwnership::PointerEscape:
+      case OperandOwnership::BitwiseEscape:
         LLVM_DEBUG(llvm::dbgs() << "      Value escaped! Giving up\n");
         return false;
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
-      case OperandOwnership::BitwiseEscape:
         liveness->updateForUse(user, /*lifetimeEnding*/ false);
         break;
       case OperandOwnership::ForwardingConsume:
