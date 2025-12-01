@@ -410,7 +410,7 @@ private struct SpecializationInfo {
         // The specialized function is always a thin function. This is important because we add additional
         // parameters after the Self parameter of witness methods. In this case the new function is not a
         // method anymore.
-        makeThin: true, makeBare: true)
+        withRepresentation: .thin, makeBare: true)
 
     context.buildSpecializedFunction(
       specializedFunction: specializedFunction,
@@ -538,38 +538,7 @@ private struct SpecializationInfo {
 
     let newApplyArgs = getNewApplyArguments(context)
 
-    let builder = Builder(before: apply, context)
-    let funcRef = builder.createFunctionRef(specializedFunction)
-
-    switch apply {
-    case let oldPartialApply as PartialApplyInst:
-      let newPartialApply = builder.createPartialApply(
-        function: funcRef, substitutionMap: SubstitutionMap(),
-        capturedArguments: newApplyArgs, calleeConvention: oldPartialApply.calleeConvention,
-        hasUnknownResultIsolation: oldPartialApply.hasUnknownResultIsolation,
-        isOnStack: oldPartialApply.isOnStack)
-      oldPartialApply.replace(with: newPartialApply, context)
-
-    case let oldApply as ApplyInst:
-      let newApply = builder.createApply(function: funcRef, SubstitutionMap(), arguments: newApplyArgs,
-                                         isNonThrowing: oldApply.isNonThrowing,
-                                         isNonAsync: oldApply.isNonAsync)
-      oldApply.replace(with: newApply, context)
-
-    case let oldTryApply as TryApplyInst:
-      builder.createTryApply(function: funcRef, SubstitutionMap(), arguments: newApplyArgs,
-                             normalBlock: oldTryApply.normalBlock, errorBlock: oldTryApply.errorBlock,
-                             isNonAsync: oldTryApply.isNonAsync)
-      context.erase(instruction: oldTryApply)
-
-    case let oldBeginApply as BeginApplyInst:
-      let newApply = builder.createBeginApply(function: funcRef, SubstitutionMap(), arguments: newApplyArgs,
-                                              isNonThrowing: oldBeginApply.isNonThrowing,
-                                              isNonAsync: oldBeginApply.isNonAsync)
-      oldBeginApply.replace(with: newApply, context)
-    default:
-      fatalError("unknown apply")
-    }
+    apply.replace(withCallTo: specializedFunction, arguments: newApplyArgs, context)
   }
 
   private func insertCompensatingDestroysForOwnedClosureArguments(_ context: FunctionPassContext) {

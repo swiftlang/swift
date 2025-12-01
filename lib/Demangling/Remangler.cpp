@@ -1518,6 +1518,9 @@ ManglingError Remangler::mangleFunctionSignatureSpecialization(Node *node,
   Buffer << "Tf";
   bool returnValMangled = false;
   for (NodePointer Child : *node) {
+    if (Child->getKind() == Node::Kind::RepresentationChanged) {
+      returnValMangled = true;
+    }
     if (Child->getKind() == Node::Kind::FunctionSignatureSpecializationReturn) {
       Buffer << '_';
       returnValMangled = true;
@@ -3190,6 +3193,11 @@ ManglingError Remangler::mangleIsSerialized(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleAsyncRemoved(Node *node, unsigned depth) {
   Buffer << 'a';
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleRepresentationChanged(Node *node, unsigned depth) {
+  Buffer << 'r';
   return ManglingError::Success;
 }
 
