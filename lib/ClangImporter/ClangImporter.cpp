@@ -440,6 +440,22 @@ bool importer::isForwardDeclOfType(const clang::Decl *D) {
   return false;
 }
 
+bool importer::isBoolOrBoolEnumType(Type ty) {
+  if (ty->isBool())
+    return true;
+
+  // Check if this is a C++ enum with an underlying type of "bool".
+  if (auto *SD = ty->getStructOrBoundGenericStruct()) {
+    if (auto *clangD = SD->getClangDecl()) {
+      if (auto *ED = dyn_cast<clang::EnumDecl>(clangD)) {
+        if (ED->getIntegerType()->isBooleanType())
+          return true;
+      }
+    }
+  }
+  return false;
+}
+
 bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
     clang::Decl *D) {
   return importer::isForwardDeclOfType(D);
