@@ -216,6 +216,92 @@ func test7(_ p: any Any) {
   c.a()
 }
 
+class BaseClass {
+  func foo() { print("BaseClass.foo") }
+  deinit {
+    print("BaseClass.deinit")
+  }
+}
+
+class SubClass : BaseClass {
+  override func foo() { print("SubClass.foo") }
+}
+
+func test8(_ p: any Any) {
+  print("test any as? SubClass")
+  if let c = p as? SubClass {
+    print("success")
+    c.foo()
+  } else {
+    print("cast failed")
+  }
+}
+
+func test9(_ p: any Any) {
+  print("test any as? BaseClass")
+  if let c = p as? BaseClass {
+    print("success")
+    c.foo()
+  } else {
+    print("cast failed")
+  }
+}
+
+func test10(_ p: any Any) {
+  print("test any as! BaseClass")
+  let c = p as! BaseClass
+  c.foo()
+}
+
+func test11(_ p: any Any) {
+  print("test any as! SubClass")
+  let c = p as! SubClass
+  c.foo()
+}
+
+func test12(_ p: any Any) {
+  print("test any as! (Int, Int, Int, Int)")
+  if let c = p as? (Int, Int, Int, Int) {
+    print("success")
+    print("tuple: \(c.0)")
+  } else {
+    print("cast failed")
+  }
+}
+
+protocol Q {
+  func printit()
+}
+
+protocol P4<T> {
+  associatedtype T: Q
+
+  var t: T { get }
+}
+
+struct QConformer : Q {
+  var x = (0, 1, 2,3)
+
+  func printit() {
+      print("QConformer \(x.3)")
+  }
+}
+
+struct P4Conformer : P4 {
+  var q = QConformer()
+
+  var t : QConformer {
+    get {
+      return q
+    }
+  }
+}
+
+func test13(_ p: any P4) {
+  print("test13")
+  p.t.printit()
+}
+
 @main
 struct Main {
   static func main() {
@@ -262,7 +348,7 @@ struct Main {
 // OUTPUT:  deinit called
 // OUTPUT: cast failed
 // OUTPUT-NOT:  deinit called
-   test5(GenericStructWithClass<Int>())
+    test5(GenericStructWithClass<Int>())
 // OUTPUT: test any as? MyStruct
 // OUTPUT: cast failed
 // OUTPUT:  deinit called
@@ -289,5 +375,53 @@ struct Main {
 // OUTPUT: a LargeMyStruct 5
 // OUTPUT:  deinit called
 // OUTPUT-NOT:  deinit called
+    test8(SubClass())
+// OUTPUT:  success
+// OUTPUT:  SubClass.foo
+// OUTPUT:  BaseClass.deinit
+// OUTPUT-NOT:  deinit
+    test8(BaseClass())
+// OUTPUT: test any as? SubClass
+// OUTPUT: cast failed
+// OUTPUT: BaseClass.deinit
+// OUTPUT-NOT:  deinit
+    test9(SubClass())
+// OUTPUT: test any as? BaseClass
+// OUTPUT:  success
+// OUTPUT:  SubClass.foo
+// OUTPUT:  BaseClass.deinit
+// OUTPUT-NOT:  deinit
+    test9(BaseClass())
+// OUTPUT: test any as? BaseClass
+// OUTPUT:  success
+// OUTPUT:  BaseClass.foo
+// OUTPUT:  BaseClass.deinit
+// OUTPUT-NOT:  deinit
+    test9(C())
+// OUTPUT: test any as? BaseClass
+// OUTPUT: cast failed
+// OUTPUT-NOT:  deinit
+    test10(BaseClass())
+// OUTPUT: test any as! BaseClass
+// OUTPUT:  BaseClass.foo
+// OUTPUT:  BaseClass.deinit
+// OUTPUT-NOT:  deinit
+    test10(SubClass())
+// OUTPUT: test any as! BaseClass
+// OUTPUT:  SubClass.foo
+// OUTPUT:  BaseClass.deinit
+// OUTPUT-NOT:  deinit
+    test11(SubClass())
+// OUTPUT: test any as! SubClass
+// OUTPUT:  SubClass.foo
+// OUTPUT:  BaseClass.deinit
+// OUTPUT-NOT:  deinit
+    test12((0, 1, 2, 3))
+// OUTPUT: test any as! (Int, Int, Int, Int)
+// OUTPUT:   success
+// OUTPUT:   tuple: 0
+    test13(P4Conformer())
+// OUTPUT: test13
+// OUTPUT:  QConformer 3
   }
 }
