@@ -293,6 +293,8 @@ EXPECTED_DEFAULTS = {
     'swift_user_visible_version': defaults.SWIFT_USER_VISIBLE_VERSION,
     'build_stdlib_docs': False,
     'preview_stdlib_docs': False,
+    'stdlib_docs_static_hosting': False,
+    'stdlib_docs_hosting_base_path': '/',
     'symbols_package': None,
     'clean_libdispatch': True,
     'clean_foundation': True,
@@ -609,6 +611,7 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--wasmkit', dest='build_wasmkit'),
     SetTrueOption('--build-stdlib-docs'),
     SetTrueOption('--preview-stdlib-docs'),
+    SetTrueOption('--stdlib-docs-static-hosting'),
     SetTrueOption('-B', dest='benchmark'),
     SetTrueOption('-S', dest='skip_build'),
     SetTrueOption('-b', dest='build_llbuild'),
@@ -838,6 +841,8 @@ EXPECTED_OPTIONS = [
     StrOption('--swift-darwin-supported-archs'),
     SetTrueOption('--swift-freestanding-is-darwin'),
     AppendOption('--extra-swift-cmake-options'),
+
+    StrOption('--stdlib-docs-hosting-base-path'),
 
     StrOption('--linux-archs'),
     StrOption('--linux-static-archs'),
