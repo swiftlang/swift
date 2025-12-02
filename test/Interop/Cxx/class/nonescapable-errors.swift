@@ -118,34 +118,31 @@ struct SWIFT_ESCAPABLE Invalid {
 
 struct SWIFT_NONESCAPABLE NonEscapable {};
 
-template<typename T>
-struct HasAnonUnion {
-    union {
-        int known;
-        T unknown;
-    };
-};
-
-template<typename T>
-struct HasAnonStruct {
-    struct {
-        int known;
-        T unknown;
-    };
-};
-
-template<typename T>
-struct SWIFT_NONESCAPABLE NonEscapableHasAnonUnion {
-    union {
-        int known;
-        T unknown;
-    };
-};
-
-using HasAnonUnionNonEscapable = HasAnonUnion<NonEscapable>;
-using HasAnonStructNonEscapable = HasAnonStruct<NonEscapable>;
-using NonEscapableHasAnonUnionNonEscapable = NonEscapableHasAnonUnion<NonEscapable>;
 using NonEscapableOptional = std::optional<NonEscapable>;
+
+// Infered as non-escapable 
+struct Aggregate {
+  int a;
+  View b;
+  bool c;
+
+  void someMethod() {}
+}; 
+
+// This is a complex record (has user-declared constructors), so we don't infer escapability.
+// By default, it's imported as escapable, which generates an error 
+// because of the non-escapable field 'View'
+struct ComplexRecord {
+  int a;
+  View b;
+  bool c;
+
+  ComplexRecord() : a(1), b(), c(false) {}
+  ComplexRecord(const ComplexRecord &other) = default;
+}; 
+
+Aggregate m1();
+ComplexRecord m2();
 
 //--- test.swift
 import Test
@@ -233,18 +230,22 @@ public func test3(_ x: inout View) {
     // CHECK-NO-LIFETIMES: pointer to non-escapable type 'View' cannot be imported
 }
 
-public func anonymousUnions() {
-    _ = HasAnonUnionNonEscapable()
-    // CHECK: error: cannot find 'HasAnonUnionNonEscapable' in scope
-    // CHECK-NO-LIFETIMES: error: cannot find 'HasAnonUnionNonEscapable' in scope
-    _ = HasAnonStructNonEscapable()
-    // CHECK: error: cannot find 'HasAnonStructNonEscapable' in scope
-    // CHECK-NO-LIFETIMES: error: cannot find 'HasAnonStructNonEscapable' in scope
-    _ = NonEscapableHasAnonUnionNonEscapable()
+public func optional() {
     _ = NonEscapableOptional()
     // CHECK: error: cannot infer the lifetime dependence scope on an initializer with a ~Escapable parameter, specify '@_lifetime(borrow {{.*}})' or '@_lifetime(copy {{.*}})'
     // CHECK-NO-LIFETIMES: error: an initializer cannot return a ~Escapable result
     // CHECK-NO-LIFETIMES: error: an initializer cannot return a ~Escapable result
+}
+
+public func inferedEscapability() {
+    m1()
+    // CHECK: nonescapable.h:130:11: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:130:11: error: a function cannot return a ~Escapable result
+    m2()
+    // CHECK: error: 'm2()' is unavailable: return type is unavailable in Swift
+    // CHECK: note: 'm2()' has been explicitly marked unavailable here
+    // CHECK-NO-LIFETIMES: error: 'm2()' is unavailable: return type is unavailable in Swift
+    // CHECK-NO-LIFETIMES: note: 'm2()' has been explicitly marked unavailable here
 }
 
     // CHECK-NOT: error
