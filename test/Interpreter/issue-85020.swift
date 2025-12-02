@@ -2,6 +2,8 @@
 
 // https://github.com/swiftlang/swift/issues/85020
 
+// REQUIRES: executable_test
+
 struct Store {
   let theType: Any.Type
 
