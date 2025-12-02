@@ -19,6 +19,7 @@
 #include "OpenedExistentials.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckEffects.h"
+#include "clang/Sema/Sema.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -2468,7 +2469,8 @@ isSubtypeOf(FunctionTypeRepresentation potentialSubRepr,
 }
 
 /// Returns true if `constraint extInfo1 extInfo2` is satisfied.
-static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
+static bool matchFunctionRepresentations(ASTContext &ctx,
+                                         FunctionType::ExtInfo einfo1,
                                          FunctionType::ExtInfo einfo2,
                                          ConstraintKind kind,
                                          ConstraintSystemOptions options) {
@@ -2528,6 +2530,30 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
     // let _ : @convention(c, cType: "void (*)(MyCtx *)")
     //           (OpaquePointer?) -> () = g // error
     if ((rep1 == rep2) && clangTypeMismatch) {
+      const clang::Type *fromType = einfo1.getClangTypeInfo().getType();
+      const clang::Type *toType = einfo2.getClangTypeInfo().getType();
+
+      if (fromType && toType) {
+        // We need to deal with cases where we're taking or returning
+        // ObjC types; in those cases, we may be permitted to have
+        // clang types that differ (e.g. it's OK to convert a function
+        // type that takes a supertype argument to a function that
+        // takes a subtype argument, and it's likewise OK to convert a
+        // function type that returns a subtype argument to a function
+        // type that returns a supertype argument).
+        //
+        // Defer to code in Clang to make this decision.
+        clang::Sema &S = ctx.getClangModuleLoader()->getClangSema();
+        clang::QualType convertedType;
+        bool incompatibleObjC;
+
+        if (S.isObjCPointerConversion(clang::QualType(fromType, 0),
+                                      clang::QualType(toType, 0),
+                                      convertedType,
+                                      incompatibleObjC))
+          return true;
+      }
+
       return false;
     }
     return true;
@@ -3238,7 +3264,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     increaseScore(SK_FunctionConversion, locator);
   }
 
-  if (!matchFunctionRepresentations(func1->getExtInfo(), func2->getExtInfo(),
+  if (!matchFunctionRepresentations(getASTContext(),
+                                    func1->getExtInfo(), func2->getExtInfo(),
                                     kind, Options)) {
     return getTypeMatchFailure(locator);
   }
