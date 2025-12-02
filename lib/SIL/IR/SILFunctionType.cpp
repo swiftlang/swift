@@ -4053,11 +4053,19 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
+    auto silRep = extInfoBuilder.getRepresentation();
     auto clangType = func->getType().getTypePtr();
 
-    if (clangType) {
-      // Pass the Clang type through, so we can extract information from it
-      // later on.
+    if (shouldStoreClangType(silRep) && clangType) {
+      // According to [NOTE: ClangTypeInfo-contents], we need to wrap a function
+      // type in an additional clang::PointerType.
+      if (clangType->isFunctionType()) {
+        clangType =
+          static_cast<ClangImporter *>(TC.Context.getClangModuleLoader())
+            ->getClangASTContext()
+              .getPointerType(clang::QualType(clangType, 0))
+              .getTypePtr();
+      }
       extInfoBuilder = extInfoBuilder.withClangFunctionType(clangType);
     }
 
