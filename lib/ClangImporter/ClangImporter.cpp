@@ -3452,11 +3452,11 @@ class DarwinLegacyFilterDeclConsumer : public swift::VisibleDeclConsumer {
       if (!VD->hasName() || VD->getBaseName().isSpecial())
         return true;
       return llvm::StringSwitch<bool>(VD->getBaseName().userFacingName())
-          .Cases("OSErr", "OSStatus", "OptionBits", false)
-          .Cases("FourCharCode", "OSType", false)
+          .Cases({"OSErr", "OSStatus", "OptionBits"}, false)
+          .Cases({"FourCharCode", "OSType"}, false)
           .Case("Boolean", false)
           .Case("kUnknownType", false)
-          .Cases("UTF32Char", "UniChar", "UTF16Char", "UTF8Char", false)
+          .Cases({"UTF32Char", "UniChar", "UTF16Char", "UTF8Char"}, false)
           .Case("ProcessSerialNumber", false)
           .Default(true);
     }
@@ -3464,7 +3464,7 @@ class DarwinLegacyFilterDeclConsumer : public swift::VisibleDeclConsumer {
     if (clangModule->Parent &&
         clangModule->Parent->Name == "CarbonCore") {
       return llvm::StringSwitch<bool>(clangModule->Name)
-          .Cases("BackupCore", "DiskSpaceRecovery", "MacErrors", false)
+          .Cases({"BackupCore", "DiskSpaceRecovery", "MacErrors"}, false)
           .Case("UnicodeUtilities", false)
           .Default(true);
     }
@@ -3474,9 +3474,9 @@ class DarwinLegacyFilterDeclConsumer : public swift::VisibleDeclConsumer {
       // Note that this is a list of things to /drop/ rather than to /keep/.
       // We're more likely to see new, modern headers added to OSServices.
       return llvm::StringSwitch<bool>(clangModule->Name)
-          .Cases("IconStorage", "KeychainCore", "Power", true)
-          .Cases("SecurityCore", "SystemSound", true)
-          .Cases("WSMethodInvocation", "WSProtocolHandler", "WSTypes", true)
+          .Cases({"IconStorage", "KeychainCore", "Power"}, true)
+          .Cases({"SecurityCore", "SystemSound"}, true)
+          .Cases({"WSMethodInvocation", "WSProtocolHandler", "WSTypes"}, true)
           .Default(false);
     }
 
