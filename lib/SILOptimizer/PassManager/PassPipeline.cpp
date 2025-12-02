@@ -265,6 +265,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
   P.addInitializeStaticGlobals();
+  P.addEmbeddedWitnessCallSpecialization();
 
   P.addMandatoryDestroyHoisting();
 
@@ -892,6 +893,10 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   if (P.getOptions().AssumeSingleThreaded) {
     P.addAssumeSingleThreaded();
   }
+
+  // Needs to run again at the end of the pipeline (after all de-virtualizations
+  // are done) in case an optimization pass de-virtualizes a witness method call.
+  P.addEmbeddedWitnessCallSpecialization();
 
   // Emits remarks on all functions with @_assemblyVision attribute.
   P.addAssemblyVisionRemarkGenerator();
