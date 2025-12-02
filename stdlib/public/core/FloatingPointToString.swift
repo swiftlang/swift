@@ -158,7 +158,7 @@ public func _float16ToStringImpl(
     _unchecked: textBuffer,
     count: Int(bufferLength))
   for i in 0..<Int(bufferLength) {
-      buffer[unchecked: i] = 0x30
+    unsafe buffer[unchecked: i] = 0x30
   }
   let textRange = _Float16ToASCII(value: value, buffer: &buffer)
   let textLength = textRange.upperBound - textRange.lowerBound
@@ -450,7 +450,7 @@ internal func _float32ToStringImpl(
     _unchecked: textBuffer,
     count: Int(bufferLength))
   for i in 0..<Int(bufferLength) {
-      buffer[unchecked: i] = 0x30
+    unsafe buffer[unchecked: i] = 0x30
   }
   let textRange = _Float32ToASCII(value: value, buffer: &buffer)
   let textLength = textRange.upperBound - textRange.lowerBound
@@ -701,7 +701,7 @@ internal func _float64ToStringImpl(
     _unchecked: textBuffer,
     count: Int(bufferLength))
   for i in 0..<Int(bufferLength) {
-      buffer[unchecked: i] = 0x30
+    unsafe buffer[unchecked: i] = 0x30
   }
   let textRange = _Float64ToASCII(value: value, buffer: &buffer)
   let textLength = textRange.upperBound - textRange.lowerBound
@@ -1207,7 +1207,7 @@ internal func _float80ToStringImpl(
     _unchecked: textBuffer,
     count: Int(bufferLength))
   for i in 0..<Int(bufferLength) {
-      buffer[unchecked: i] = 0x30
+    unsafe buffer[unchecked: i] = 0x30
   }
   let textRange = _Float80ToASCII(value: value, buffer: &buffer)
   let textLength = textRange.upperBound - textRange.lowerBound
