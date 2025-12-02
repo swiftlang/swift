@@ -114,6 +114,9 @@ namespace irgen {
   /// Emit the metadata associated with a given tuple type.
   void emitLazyTupleMetadata(IRGenModule &IGM, CanType type);
 
+  /// Emit the metadata associated with a given function type.
+  void emitLazyFunctionMetadata(IRGenModule &IGM, CanType funTy);
+
   /// Emit the metadata associated with a given instantiation of a generic
   // class.
   void emitSpecializedGenericClassMetadata(IRGenModule &IGM, CanType type,

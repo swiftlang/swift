@@ -134,6 +134,7 @@ final public class ClassDecl: NominalTypeDecl {
 
 final public class ProtocolDecl: NominalTypeDecl {
   public var requiresClass: Bool { bridged.ProtocolDecl_requiresClass() }
+  public var isMarkerProtocol: Bool { bridged.ProtocolDecl_isMarkerProtocol() }
 }
 
 final public class BuiltinTupleDecl: NominalTypeDecl {}

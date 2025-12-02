@@ -925,6 +925,10 @@ class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {
   public var conformances: ConformanceArray {
     ConformanceArray(bridged: bridged.InitExistentialAddrInst_getConformances())
   }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.InitExistentialAddrInst_getFormalConcreteType())
+  }
 }
 
 final public

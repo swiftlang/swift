@@ -698,7 +698,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
     // In embedded existenitals mode we generate metadata for tuple types.
     if (getType()->getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials) &&
-        isa<TupleType>(getType())) {
+        (isa<TupleType>(getType()) ||
+         isa<FunctionType>(getType()))) {
       return SILLinkage::Shared;
     }
 
