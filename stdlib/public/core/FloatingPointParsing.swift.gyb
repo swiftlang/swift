@@ -191,14 +191,54 @@ extension ${Self}: LosslessStringConvertible {
   %end
   }
 
-  // Caveat:  This implementation used to be inlineable.
-  // In particular, we still have to export
-  // _swift_stdlib_strtoXYZ_clocale()
-  // as ABI to support old compiled code that still requires it.
+  // Caveat: Prior to Swift 5.3, there was an implementation of this
+  // function that was inlineable and which called a C shim called
+  // _swift_stdlib_strtoX_clocale() (where `X` was f/d/ld) for the
+  // low-level work.
+
+  // So we have to preserve that C ABI to support extant
+  // compiled code that still requires it.  In particular, any code
+  // that was built to support macOS < 11.0, iOS/tvOS < 14.0, or watchOS
+  // < 7.0 will need that function.
+
+  // Important: This function is very deliberately NOT inlineable.
+  // The `swift_float${bits}_parse` functions are internal implementation
+  // details that should not be directly exposed.  (But maybe we should
+  // someday expose a new `init?(_ text: UTF8Span)`?)
+  % if bits in [16, 32, 64]:
+  // All-Swift implementation for Float16/32/64
+  @available(SwiftStdlib 5.3, *)
+  public init?(_ text: Substring) {
+    // TODO: Someday, this whole function should simplify down to just
+    // the following, but it's hard to do that today without relying on
+    // `if #available`, which inserts a pointless runtime check.  Someday,
+    // a richer availability story might make this possible.
+    /*
+     guard let parsed = parse_float${bits}(text.utf8.span) else {
+       return nil
+     }
+     self = parsed
+    */
+
+    let parsed = unsafe text.base._guts.withFastUTF8 { chars -> ${Self}? in
+      unsafe parse_float${bits}(chars.span)
+    }
+
+    if let parsed {
+      self = parsed
+    } else {
+      return nil
+    }
+  }
+  % else:
+
+  // For now, continue relying on libc for Float80 support
   @available(SwiftStdlib 5.3, *)
   public init?(_ text: Substring) {
     self = 0.0
     let success = unsafe _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
+      // Make a copy of `text` to ensure we have a null-terminated C string
+      // to pass to the libc API:
       unsafe text.withCString { chars -> Bool in
         switch unsafe chars[0] {
         case 9, 10, 11, 12, 13, 32:
@@ -217,7 +257,9 @@ extension ${Self}: LosslessStringConvertible {
       return nil
     }
   }
+  % end
 }
+
 
 % if bits in [16,80]:
 #endif
