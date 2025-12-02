@@ -2476,7 +2476,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   auto rep2 = einfo2.getRepresentation();
   bool clangTypeMismatch =
       (options.contains(ConstraintSystemFlags::UseClangFunctionTypes) &&
-       (einfo1.getClangTypeInfo() != einfo2.getClangTypeInfo()));
+       !einfo1.getClangTypeInfo().isEquivalentType(einfo2.getClangTypeInfo()));
   switch (kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::BindParam:
