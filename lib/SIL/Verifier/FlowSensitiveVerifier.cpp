@@ -349,7 +349,7 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
           state.handleScopeEndingInst(i);
         } else if (!state.Stack.empty() && op == state.Stack.back()) {
           state.Stack.pop_back();
-          if (beginInst && isa<BeginApplyInst>(beginInst))
+          if (llvm::isa_and_present<BeginApplyInst>(beginInst))
             state.handleScopeEndingInst(i);
         } else {
           verificationFailure(
