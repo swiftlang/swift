@@ -66,7 +66,7 @@ import SwiftShims
 ///     var asciiLogger = ASCIILogger()
 ///     print(s, to: &asciiLogger)
 ///     // Prints "Hearts \u{2661} and Diamonds \u{2662}"
-public protocol TextOutputStream {
+public protocol TextOutputStream: ~Copyable & ~Escapable {
   mutating func _lock()
   mutating func _unlock()
 
@@ -76,10 +76,13 @@ public protocol TextOutputStream {
   mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>)
 }
 
-extension TextOutputStream {
+extension TextOutputStream where Self: ~Copyable & ~Escapable {
+  @_preInverseGenerics
   public mutating func _lock() {}
+  @_preInverseGenerics
   public mutating func _unlock() {}
 
+  @_preInverseGenerics
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
     unsafe write(String._fromASCII(buffer))
   }
@@ -99,7 +102,7 @@ extension TextOutputStream {
 /// To add `TextOutputStreamable` conformance to a custom type, implement the
 /// required `write(to:)` method. Call the given output stream's `write(_:)`
 /// method in your implementation.
-public protocol TextOutputStreamable {
+public protocol TextOutputStreamable: ~Copyable, ~Escapable {
   /// Writes a textual representation of this instance into the given output
   /// stream.
   func write<Target: TextOutputStream>(to target: inout Target)
@@ -147,7 +150,7 @@ public protocol TextOutputStreamable {
 ///
 ///     print(p)
 ///     // Prints "(21, 30)"
-public protocol CustomStringConvertible {
+public protocol CustomStringConvertible: ~Copyable, ~Escapable {
   /// A textual representation of this instance.
   ///
   /// Calling this property directly is discouraged. Instead, convert an
@@ -182,7 +185,7 @@ public protocol CustomStringConvertible {
 /// The description property of a conforming type must be a value-preserving
 /// representation of the original value. As such, it should be possible to
 /// re-create an instance from its string representation.
-public protocol LosslessStringConvertible: CustomStringConvertible {
+public protocol LosslessStringConvertible: CustomStringConvertible, ~Copyable {
   /// Instantiates an instance of the conforming type from a string
   /// representation.
   init?(_ description: String)
@@ -239,7 +242,7 @@ public protocol LosslessStringConvertible: CustomStringConvertible {
 ///
 ///     print(String(reflecting: p))
 ///     // Prints "(21, 30)"
-public protocol CustomDebugStringConvertible {
+public protocol CustomDebugStringConvertible: ~Copyable, ~Escapable {
   /// A textual representation of this instance, suitable for debugging.
   ///
   /// Calling this property directly is discouraged. Instead, convert an

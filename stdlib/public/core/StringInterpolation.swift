@@ -105,8 +105,9 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
-  public mutating func appendInterpolation<T>(_ value: T)
-    where T: TextOutputStreamable, T: CustomStringConvertible
+  @_preInverseGenerics
+  public mutating func appendInterpolation<T>(_ value: borrowing T)
+    where T: TextOutputStreamable, T: CustomStringConvertible, T: ~Copyable & ~Escapable
   {
     value.write(to: &self)
   }
@@ -127,8 +128,9 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
-  public mutating func appendInterpolation<T>(_ value: T)
-    where T: TextOutputStreamable
+  @_preInverseGenerics
+  public mutating func appendInterpolation<T>(_ value: borrowing T)
+    where T: TextOutputStreamable & ~Copyable & ~Escapable
   {
     value.write(to: &self)
   }
@@ -151,8 +153,9 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
-  public mutating func appendInterpolation<T>(_ value: T)
-    where T: CustomStringConvertible
+  @_preInverseGenerics
+  public mutating func appendInterpolation<T>(_ value: borrowing T)
+    where T: CustomStringConvertible, T: ~Copyable & ~Escapable
   {
     value.description.write(to: &self)
   }
@@ -175,7 +178,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol, Sendable 
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
-  public mutating func appendInterpolation<T>(_ value: T) {
+  public mutating func appendInterpolation<T>(_ value: borrowing T) {
     #if !$Embedded
     _print_unlocked(value, &self)
     #else
@@ -217,13 +220,15 @@ extension DefaultStringInterpolation {
   ///   - value: The value to include in a string interpolation, if non-`nil`.
   ///   - default: The string to include if `value` is `nil`.
   @_alwaysEmitIntoClient
+  @_preInverseGenerics
   public mutating func appendInterpolation<T>(
-    _ value: T?,
+    _ value: borrowing T?,
     default: @autoclosure () -> some StringProtocol
-  ) where T: TextOutputStreamable, T: CustomStringConvertible {
-    if let value {
+  ) where T: TextOutputStreamable, T: CustomStringConvertible, T: ~Copyable & ~Escapable {
+    switch value {
+    case let value?:
       self.appendInterpolation(value)
-    } else {
+    case nil:
       self.appendInterpolation(`default`())
     }
   }
@@ -247,13 +252,15 @@ extension DefaultStringInterpolation {
   ///   - value: The value to include in a string interpolation, if non-`nil`.
   ///   - default: The string to include if `value` is `nil`.
   @_alwaysEmitIntoClient
+  @_preInverseGenerics
   public mutating func appendInterpolation<T>(
-    _ value: T?,
+    _ value: borrowing T?,
     default: @autoclosure () -> some StringProtocol
-  ) where T: TextOutputStreamable {
-    if let value {
+  ) where T: TextOutputStreamable & ~Copyable & ~Escapable {
+    switch value {
+    case let value?:
       self.appendInterpolation(value)
-    } else {
+    case nil:
       self.appendInterpolation(`default`())
     }
   }
@@ -277,13 +284,15 @@ extension DefaultStringInterpolation {
   ///   - value: The value to include in a string interpolation, if non-`nil`.
   ///   - default: The string to include if `value` is `nil`.
   @_alwaysEmitIntoClient
+  @_preInverseGenerics
   public mutating func appendInterpolation<T>(
-    _ value: T?, 
+    _ value: borrowing T?, 
     default: @autoclosure () -> some StringProtocol
-  ) where T: CustomStringConvertible {
-    if let value {
+  ) where T: CustomStringConvertible, T: ~Copyable & ~Escapable {
+    switch value {
+    case let value?:
       self.appendInterpolation(value)
-    } else {
+    case nil:
       self.appendInterpolation(`default`())
     }
   }
@@ -311,9 +320,10 @@ extension DefaultStringInterpolation {
     _ value: T?, 
     default: @autoclosure () -> some StringProtocol
   ) {
-    if let value {
+    switch value {
+    case let value?:
       self.appendInterpolation(value)
-    } else {
+    case nil:
       self.appendInterpolation(`default`())
     }
   }

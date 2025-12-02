@@ -522,7 +522,8 @@ func _diagnoseUnexpectedNilOptional(
   }
 }
 
-extension Optional: Equatable where Wrapped: Equatable {
+@_preInverseGenerics
+extension Optional: Equatable where Wrapped: Equatable & ~Copyable & ~Escapable {
   /// Returns a Boolean value indicating whether two optional instances are
   /// equal.
   ///
@@ -568,25 +569,32 @@ extension Optional: Equatable where Wrapped: Equatable {
   ///   - lhs: An optional value to compare.
   ///   - rhs: Another optional value to compare.
   @_transparent
-  public static func ==(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
-    switch (lhs, rhs) {
-    case let (l?, r?):
-      return l == r
-    case (nil, nil):
-      return true
-    default:
-      return false
+  @_preInverseGenerics
+  public static func ==(lhs: borrowing Wrapped?, rhs: borrowing Wrapped?) -> Bool {
+    switch lhs {
+    case let l?:
+      switch rhs {
+      case let r?: l == r
+      case nil: false
+      }
+    case nil:
+      switch rhs {
+      case _?: false
+      case nil: true
+      }
     }
   }
 }
 
-extension Optional: Hashable where Wrapped: Hashable {
+@_preInverseGenerics
+extension Optional: Hashable where Wrapped: Hashable & ~Copyable & ~Escapable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
   @inlinable
+  @_preInverseGenerics
   public func hash(into hasher: inout Hasher) {
     switch self {
     case .none:
@@ -595,6 +603,13 @@ extension Optional: Hashable where Wrapped: Hashable {
       hasher.combine(1 as UInt8)
       hasher.combine(wrapped)
     }
+  }
+
+  @_preInverseGenerics
+  public var hashValue: Int {
+    var hasher = Hasher()
+    hash(into: &hasher)
+    return hasher.finalize()
   }
 }
 
