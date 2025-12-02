@@ -99,6 +99,13 @@ func cFuncPtrConversion(_ x: @escaping @convention(c) (A) -> ()) -> @convention(
   return x
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s24function_conversion_objc19cFuncPtrConversion2yAA1ACyXCAA1BCyXCF
+func cFuncPtrConversion2(_ x: @escaping @convention(c) () -> B) -> @convention(c) () -> A {
+// CHECK:         convert_function %0 : $@convention(c) () -> @autoreleased B to $@convention(c) () -> @autoreleased A
+// CHECK:         return
+  return x
+}
+
 func cFuncPtr(_ a: A) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s24function_conversion_objc19cFuncDeclConversionyAA1BCXCyF
@@ -107,9 +114,4 @@ func cFuncDeclConversion() -> @convention(c) (B) -> () {
 // CHECK:         convert_function %0 : $@convention(c) (A) -> () to $@convention(c) (B) -> ()
 // CHECK:         return
   return cFuncPtr
-}
-
-func cFuncPtrConversionUnsupported(_ x: @escaping @convention(c) (@convention(block) () -> ()) -> ())
-    -> @convention(c) (@convention(c) () -> ()) -> () {
-  return x  // expected-error{{C function pointer signature '@convention(c) (@convention(block) () -> ()) -> ()' is not compatible with expected type '@convention(c) (@convention(c) () -> ()) -> ()'}}
 }

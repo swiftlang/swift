@@ -36,7 +36,7 @@ public func testClosureToBlockReturnNonTrivial() {
   cfuncReturnNonTrivial({() -> NonTrivial in return NonTrivial() })
 }
 
-// CHECK-LABEL: sil private [thunk] [ossa] @$s4main22testConstRefNonTrivialyyFySo0eF0VcfU_To : $@convention(c) (@in_guaranteed NonTrivial) -> () {
+// CHECK-LABEL: sil private [thunk] [ossa] @$s4main22testConstRefNonTrivialyyFySo0eF0VcfU_To : $@convention(c) (@in_cxx NonTrivial) -> () {
 // CHECK: bb0(%[[V0:.*]] : $*NonTrivial):
 // CHECK: %[[V1:.*]] = alloc_stack $NonTrivial
 // CHECK: copy_addr %[[V0]] to [init] %[[V1]] : $*NonTrivial
@@ -50,7 +50,7 @@ public func testConstRefNonTrivial() {
   cfuncConstRefNonTrivial({S in });
 }
 
-// CHECK-LABEL: sil private [thunk] [ossa] @$s4main23testConstRefNonTrivial2yyFySo0E7TrivialVcfU_To : $@convention(c) (@in_guaranteed NonTrivial) -> () {
+// CHECK-LABEL: sil private [thunk] [ossa] @$s4main23testConstRefNonTrivial2yyFySo0E7TrivialVcfU_To : $@convention(c) (@in_cxx NonTrivial) -> () {
 // CHECK: bb0(%[[V0:.*]] : $*NonTrivial):
 // CHECK: %[[V1:.*]] = alloc_stack $NonTrivial
 // CHECK: copy_addr %[[V0]] to [init] %[[V1]] : $*NonTrivial
