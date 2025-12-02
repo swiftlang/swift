@@ -221,6 +221,8 @@ def crosscheck_unqualified_lookup : Flag<["-"], "crosscheck-unqualified-lookup">
 
 def use_clang_function_types : Flag<["-"], "use-clang-function-types">,
   HelpText<"Use stored Clang function types for computing canonical types.">;
+def no_use_clang_function_types : Flag<["-"], "no-use-clang-function-types">,
+  HelpText<"Do not use stored Clang function types.">;
 
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
