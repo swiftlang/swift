@@ -47,7 +47,7 @@ llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Comma
   llvm::StringSaver Saver(Alloc);
   // Ensure that we use the Windows command line parsing on Windows as we need
   // to ensure that we properly handle paths.
-  if (llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows()) 
+  if (llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows())
     llvm::cl::TokenizeWindowsCommandLine(CommandString, Saver, Args);
   else
     llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
@@ -115,6 +115,12 @@ void DepScanInMemoryDiagnosticCollector::addDiagnostic(
     auto Msg = SM.GetMessage(Info.Loc, SMKind, Text, Ranges, FixIts, true);
     Msg.print(nullptr, Stream, false, false, false);
     Stream.flush();
+  }
+
+  if (SMKind == llvm::SourceMgr::DK_Note &&
+      FormattedMessage.find("#import \"EmbeddedShims.h\"") !=
+          std::string::npos) {
+    assert(0 && "Why are we here?");
   }
 
   if (Info.Loc && Info.Loc.isValid()) {
