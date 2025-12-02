@@ -334,7 +334,10 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
         } else {
           state.handleScopeInst(i.getStackAllocation());
         }
-      } else if (i.isDeallocatingStack()) {
+        continue;
+      }
+
+      if (i.isDeallocatingStack()) {
         SILValue op = i.getOperand(0);
         while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
           op = mvi->getOperand();
@@ -358,188 +361,204 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
                 // failure.
               });
         }
-      } else if (auto scopeEndingValue = isScopeInst(&i)) {
+        continue;
+      }
+
+      if (auto scopeEndingValue = isScopeInst(&i)) {
         state.handleScopeInst(scopeEndingValue);
-      } else if (isScopeEndingInst(&i)) {
+        continue;
+      }
+
+      if (isScopeEndingInst(&i)) {
         state.handleScopeEndingInst(i);
-      } else if (auto *endBorrow = dyn_cast<EndBorrowInst>(&i)) {
+        continue;
+      }
+
+      if (auto *endBorrow = dyn_cast<EndBorrowInst>(&i)) {
         if (isa<StoreBorrowInst>(endBorrow->getOperand())) {
           state.handleScopeEndingInst(i);
         }
-      } else if (auto gaci = dyn_cast<GetAsyncContinuationInstBase>(&i)) {
+        continue;
+      }
+
+      if (auto gaci = dyn_cast<GetAsyncContinuationInstBase>(&i)) {
         require(!state.GotAsyncContinuation,
                 "get_async_continuation while unawaited continuation is "
                 "already active");
         state.GotAsyncContinuation = gaci;
-      } else if (auto term = dyn_cast<TermInst>(&i)) {
-        if (term->isFunctionExiting()) {
-          require(state.Stack.empty(),
-                  "return with stack allocs that haven't been deallocated");
-          require(state.ActiveOps.empty(),
-                  "return with operations still active");
-          require(!state.GotAsyncContinuation,
-                  "return with unawaited async continuation");
+        continue;
+      }
 
-          if (isa<UnwindInst>(term)) {
-            require(state.CFG == CFGState::YieldUnwind,
-                    "encountered 'unwind' when not on unwind path");
+      auto *term = dyn_cast<TermInst>(&i);
+      if (!term)
+        continue;
+
+      if (term->isFunctionExiting()) {
+        require(state.Stack.empty(),
+                "return with stack allocs that haven't been deallocated");
+        require(state.ActiveOps.empty(), "return with operations still active");
+        require(!state.GotAsyncContinuation,
+                "return with unawaited async continuation");
+
+        if (isa<UnwindInst>(term)) {
+          require(state.CFG == CFGState::YieldUnwind,
+                  "encountered 'unwind' when not on unwind path");
+        } else {
+          require(state.CFG != CFGState::YieldUnwind,
+                  "encountered 'return' or 'throw' when on unwind path");
+          if (isa<ReturnInst>(term) &&
+              F->getLoweredFunctionType()->getCoroutineKind() ==
+                  SILCoroutineKind::YieldOnce &&
+              F->getModule().getStage() != SILStage::Raw) {
+            require(state.CFG == CFGState::YieldOnceResume,
+                    "encountered 'return' before yielding a value in "
+                    "yield_once coroutine");
+          }
+        }
+      }
+
+      if (isa<YieldInst>(term)) {
+        require(state.CFG != CFGState::YieldOnceResume,
+                "encountered multiple 'yield's along single path");
+        require(state.CFG == CFGState::Normal,
+                "encountered 'yield' on abnormal CFG path");
+        require(!state.GotAsyncContinuation,
+                "encountered 'yield' while an unawaited continuation is "
+                "active");
+      }
+
+      auto successors = term->getSuccessors();
+      for (auto i : indices(successors)) {
+        SILBasicBlock *succBB = successors[i].getBB();
+        auto succStateRef = move_if(state, i + 1 == successors.size());
+
+        // Some successors (currently just `yield`) have state
+        // transitions on the edges themselves. Fortunately,
+        // these successors all require their destination blocks
+        // to be uniquely referenced, so we never have to combine
+        // the state change with merging or consistency checking.
+
+        // Check whether this edge enters a dead-end region.
+        if (auto deadEndRegion = deadEnds.entersDeadEndRegion(BB, succBB)) {
+          // If so, record it in the visited set, which will tell us
+          // whether it's the last remaining edge to the region.
+          bool isLastDeadEndEdge = visitedDeadEndEdges.visitEdgeTo(succBB);
+
+          // Check for an existing shared state for the region.
+          auto &regionInfo = deadEndRegionStates[*deadEndRegion];
+
+          // If we don't have an existing shared state, and this is the
+          // last edge to the region, just fall through and process it
+          // like a normal edge.
+          if (!regionInfo && isLastDeadEndEdge) {
+            // This can only happen if there's exactly one edge to the
+            // block, so we will end up in the insertion success case below.
+            // Note that the state-changing terminators like `yield`
+            // always take this path: since this must be the unique edge
+            // to the successor, it must be in its own dead-end region.
+
+            // fall through to the main path
+
+            // Otherwise, we need to merge this into the shared state.
           } else {
-            require(state.CFG != CFGState::YieldUnwind,
-                    "encountered 'return' or 'throw' when on unwind path");
-            if (isa<ReturnInst>(term) &&
-                F->getLoweredFunctionType()->getCoroutineKind() ==
-                    SILCoroutineKind::YieldOnce &&
-                F->getModule().getStage() != SILStage::Raw) {
-              require(state.CFG == CFGState::YieldOnceResume,
-                      "encountered 'return' before yielding a value in "
-                      "yield_once coroutine");
-            }
-          }
-        }
+            require(!isa<YieldInst>(term),
+                    "successor of 'yield' should not be encountered twice");
 
-        if (isa<YieldInst>(term)) {
-          require(state.CFG != CFGState::YieldOnceResume,
-                  "encountered multiple 'yield's along single path");
-          require(state.CFG == CFGState::Normal,
-                  "encountered 'yield' on abnormal CFG path");
-          require(!state.GotAsyncContinuation,
-                  "encountered 'yield' while an unawaited continuation is "
-                  "active");
-        }
+            // Copy/move our current state into the shared state if it
+            // doesn't already exist.
+            if (!regionInfo) {
+              regionInfo.emplace(std::move(succStateRef));
 
-        auto successors = term->getSuccessors();
-        for (auto i : indices(successors)) {
-          SILBasicBlock *succBB = successors[i].getBB();
-          auto succStateRef = move_if(state, i + 1 == successors.size());
-
-          // Some successors (currently just `yield`) have state
-          // transitions on the edges themselves. Fortunately,
-          // these successors all require their destination blocks
-          // to be uniquely referenced, so we never have to combine
-          // the state change with merging or consistency checking.
-
-          // Check whether this edge enters a dead-end region.
-          if (auto deadEndRegion = deadEnds.entersDeadEndRegion(BB, succBB)) {
-            // If so, record it in the visited set, which will tell us
-            // whether it's the last remaining edge to the region.
-            bool isLastDeadEndEdge = visitedDeadEndEdges.visitEdgeTo(succBB);
-
-            // Check for an existing shared state for the region.
-            auto &regionInfo = deadEndRegionStates[*deadEndRegion];
-
-            // If we don't have an existing shared state, and this is the
-            // last edge to the region, just fall through and process it
-            // like a normal edge.
-            if (!regionInfo && isLastDeadEndEdge) {
-              // This can only happen if there's exactly one edge to the
-              // block, so we will end up in the insertion success case below.
-              // Note that the state-changing terminators like `yield`
-              // always take this path: since this must be the unique edge
-              // to the successor, it must be in its own dead-end region.
-
-              // fall through to the main path
-
-              // Otherwise, we need to merge this into the shared state.
+              // Otherwise, merge our current state into the shared state.
             } else {
-              require(!isa<YieldInst>(term),
-                      "successor of 'yield' should not be encountered twice");
-
-              // Copy/move our current state into the shared state if it
-              // doesn't already exist.
-              if (!regionInfo) {
-                regionInfo.emplace(std::move(succStateRef));
-
-                // Otherwise, merge our current state into the shared state.
-              } else {
-                regionInfo->sharedState.handleJoinPoint(
-                    succStateRef.get(), /*dead end*/ true, term, succBB);
-              }
-
-              // Add the successor block to the state's set of entry blocks.
-              regionInfo->entryBlocks.insert(succBB);
-
-              // If this was the last branch to the region, act like we
-              // just saw the edges to each of its entry blocks.
-              if (isLastDeadEndEdge) {
-                for (auto ebi = regionInfo->entryBlocks.begin(),
-                          ebe = regionInfo->entryBlocks.end();
-                     ebi != ebe;) {
-                  auto *regionEntryBB = *ebi++;
-
-                  // Copy/move the shared state to be the state for the
-                  // region entry block.
-                  auto insertResult = visitedBBs.try_emplace(
-                      regionEntryBB,
-                      move_if(regionInfo->sharedState, ebi == ebe));
-                  assert(insertResult.second &&
-                         "already visited edge to dead-end region!");
-                  (void)insertResult;
-
-                  // Add the region entry block to the worklist.
-                  Worklist.push_back(regionEntryBB);
-                }
-              }
-
-              // Regardless, don't fall through to the main path.
-              continue;
+              regionInfo->sharedState.handleJoinPoint(
+                  succStateRef.get(), /*dead end*/ true, term, succBB);
             }
-          }
 
-          // Okay, either this isn't an edge to a dead-end region or it
-          // was a unique edge to it.
+            // Add the successor block to the state's set of entry blocks.
+            regionInfo->entryBlocks.insert(succBB);
 
-          // Optimistically try to set our current state as the state
-          // of the successor.  We can use a move on the final successor;
-          // note that if the insertion fails, the move won't actually
-          // happen, which is important because we'll still need it
-          // to compare against the already-recorded state for the block.
-          auto insertResult =
-              visitedBBs.try_emplace(succBB, std::move(succStateRef));
+            // If this was the last branch to the region, act like we
+            // just saw the edges to each of its entry blocks.
+            if (isLastDeadEndEdge) {
+              for (auto ebi = regionInfo->entryBlocks.begin(),
+                        ebe = regionInfo->entryBlocks.end();
+                   ebi != ebe;) {
+                auto *regionEntryBB = *ebi++;
 
-          // If the insertion was successful, we need to add the successor
-          // block to the worklist.
-          if (insertResult.second) {
-            auto &insertedState = insertResult.first->second;
+                // Copy/move the shared state to be the state for the
+                // region entry block.
+                auto insertResult = visitedBBs.try_emplace(
+                    regionEntryBB,
+                    move_if(regionInfo->sharedState, ebi == ebe));
+                assert(insertResult.second &&
+                       "already visited edge to dead-end region!");
+                (void)insertResult;
 
-            // 'yield' has successor-specific state updates, so we do that
-            // now. 'yield' does not permit critical edges, so we don't
-            // have to worry about doing this in the case below where
-            // insertion failed.
-            if (isa<YieldInst>(term)) {
-              // Enforce that the unwind logic is segregated in all stages.
-              if (i == 1) {
-                insertedState.CFG = CFGState::YieldUnwind;
-
-                // We check the yield_once rule in the mandatory analyses,
-                // so we can't assert it yet in the raw stage.
-              } else if (F->getLoweredFunctionType()->getCoroutineKind() ==
-                             SILCoroutineKind::YieldOnce &&
-                         F->getModule().getStage() != SILStage::Raw) {
-                insertedState.CFG = CFGState::YieldOnceResume;
+                // Add the region entry block to the worklist.
+                Worklist.push_back(regionEntryBB);
               }
             }
 
-            // Go ahead and add the block.
-            Worklist.push_back(succBB);
+            // Regardless, don't fall through to the main path.
             continue;
           }
-
-          // This rule is checked elsewhere, but we'd want to assert it
-          // here anyway.
-          require(!isa<YieldInst>(term),
-                  "successor of 'yield' should not be encountered twice");
-
-          // Okay, we failed to insert. That means there's an existing
-          // state for the successor block. That existing state generally
-          // needs to match the current state, but certain rules are
-          // relaxed for branches that enter dead-end regions.
-          auto &foundState = insertResult.first->second;
-
-          // Join the states into `foundState`. We can still validly use
-          // succStateRef here because the insertion didn't work.
-          foundState.handleJoinPoint(succStateRef.get(), /*dead-end*/ false,
-                                     term, succBB);
         }
+
+        // Okay, either this isn't an edge to a dead-end region or it
+        // was a unique edge to it.
+
+        // Optimistically try to set our current state as the state
+        // of the successor.  We can use a move on the final successor;
+        // note that if the insertion fails, the move won't actually
+        // happen, which is important because we'll still need it
+        // to compare against the already-recorded state for the block.
+        auto insertResult =
+            visitedBBs.try_emplace(succBB, std::move(succStateRef));
+
+        // If the insertion was successful, we need to add the successor
+        // block to the worklist.
+        if (insertResult.second) {
+          auto &insertedState = insertResult.first->second;
+
+          // 'yield' has successor-specific state updates, so we do that
+          // now. 'yield' does not permit critical edges, so we don't
+          // have to worry about doing this in the case below where
+          // insertion failed.
+          if (isa<YieldInst>(term)) {
+            // Enforce that the unwind logic is segregated in all stages.
+            if (i == 1) {
+              insertedState.CFG = CFGState::YieldUnwind;
+
+              // We check the yield_once rule in the mandatory analyses,
+              // so we can't assert it yet in the raw stage.
+            } else if (F->getLoweredFunctionType()->getCoroutineKind() ==
+                           SILCoroutineKind::YieldOnce &&
+                       F->getModule().getStage() != SILStage::Raw) {
+              insertedState.CFG = CFGState::YieldOnceResume;
+            }
+          }
+
+          // Go ahead and add the block.
+          Worklist.push_back(succBB);
+          continue;
+        }
+
+        // This rule is checked elsewhere, but we'd want to assert it
+        // here anyway.
+        require(!isa<YieldInst>(term),
+                "successor of 'yield' should not be encountered twice");
+
+        // Okay, we failed to insert. That means there's an existing
+        // state for the successor block. That existing state generally
+        // needs to match the current state, but certain rules are
+        // relaxed for branches that enter dead-end regions.
+        auto &foundState = insertResult.first->second;
+
+        // Join the states into `foundState`. We can still validly use
+        // succStateRef here because the insertion didn't work.
+        foundState.handleJoinPoint(succStateRef.get(), /*dead-end*/ false, term,
+                                   succBB);
       }
     }
   }
