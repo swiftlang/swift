@@ -866,12 +866,16 @@ clang::QualType ClangTypeConverter::visit(Type type) {
 }
 
 clang::QualType ClangTypeConverter::convert(Type type) {
+  // We have to do this first, otherwise we will fail to locate
+  // ObjC protocol types in the cache, and instead create a new one
+  // every time (which is bad).
+  if (auto existential = type->getAs<ExistentialType>())
+    type = existential->getConstraintType();
+
+  // Now search the cache
   auto it = Cache.find(type);
   if (it != Cache.end())
     return it->second;
-
-  if (auto existential = type->getAs<ExistentialType>())
-    type = existential->getConstraintType();
 
   // Try to do this without making cache entries for obvious cases.
   if (auto nominal = type->getAs<NominalType>()) {
