@@ -528,7 +528,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // of embedded Swift.
   if (!P.getOptions().EmbeddedSwift) {
     P.addGenericSpecializer();
-    // P.addPackSpecialization();
+    P.addPackSpecialization();
     // Run devirtualizer after the specializer, because many
     // class_method/witness_method instructions may use concrete types now.
     P.addDevirtualizer();
