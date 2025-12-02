@@ -207,6 +207,7 @@ SubstringTests.test("Mutate Substring through utf16 view") {
   expectEqual(s.startIndex, ss.startIndex)
   expectEqual(s.count, ss.count)
   let first = ss.utf16.removeFirst()
+  expectEqual(first, UInt16(97))
   expectEqual(s.index(after: s.startIndex), ss.startIndex)
   expectEqual(s.count - 1, ss.count)
 }
@@ -232,7 +233,6 @@ SubstringTests.test("UTF8View") {
   ]
 
   for s in strs {
-    let count = s.count
     let t = s.utf8.dropFirst(2)
     let u = t.dropFirst(2)
 
@@ -254,8 +254,8 @@ SubstringTests.test("UTF8View") {
     checkHasContiguousStorageSubstring(u)
     checkMatchContiguousStorage(Array(s.utf8), s.utf8)
 
-    // The specialization for Substring.withContiguousStorageIfAvailable was
-    // added in https://github.com/apple/swift/pull/29146.
+    // The specialization for Substring.UTF8View.withContiguousStorageIfAvailable
+    // was added in https://github.com/apple/swift/pull/29146.
     guard #available(SwiftStdlib 5.3, *) else {
       return
     }
