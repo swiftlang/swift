@@ -210,6 +210,13 @@ struct BBState {
       verificationFailure("operation has already been ended", &i, nullptr);
     }
   }
+
+  void handleScopeEndingUse(SILValue value, SILInstruction *origUser) {
+    if (!ActiveOps.erase(value)) {
+      verificationFailure("operation has already been ended", origUser,
+                          nullptr);
+    }
+  }
 };
 
 struct DeadEndRegionState {
@@ -224,7 +231,7 @@ struct DeadEndRegionState {
 /// If this is a scope ending inst, return the result from the instruction
 /// that provides the scoped value whose lifetime must be ended by some other
 /// scope ending instruction.
-static SILValue isScopeInst(SILInstruction *i) {
+static SILValue getScopeEndingValueOfScopeInst(SILInstruction *i) {
   if (auto *bai = dyn_cast<BeginAccessInst>(i))
     return bai;
   if (auto *bai = dyn_cast<BeginApplyInst>(i))
@@ -325,14 +332,14 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
         // verify their joint post-dominance.
         if (i.isStackAllocationNested()) {
           state.Stack.push_back(i.getStackAllocation());
-
-          // Also track begin_apply as a scope instruction.
-          if (auto *bai = dyn_cast<BeginApplyInst>(&i)) {
-            state.handleScopeInst(bai->getStackAllocation());
-            state.handleScopeInst(bai->getTokenResult());
-          }
         } else {
           state.handleScopeInst(i.getStackAllocation());
+        }
+
+        // Also track begin_apply's token as an ActiveOp so we can also verify
+        // its joint dominance.
+        if (auto *bai = dyn_cast<BeginApplyInst>(&i)) {
+          state.handleScopeInst(bai->getTokenResult());
         }
         continue;
       }
@@ -343,28 +350,48 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
           op = mvi->getOperand();
         }
 
-        auto beginInst = op->getDefiningInstruction();
-        if (beginInst && (!beginInst->isAllocatingStack() ||
-                          !beginInst->isStackAllocationNested())) {
-          state.handleScopeEndingInst(i);
-        } else if (!state.Stack.empty() && op == state.Stack.back()) {
-          state.Stack.pop_back();
-          if (llvm::isa_and_present<BeginApplyInst>(beginInst))
-            state.handleScopeEndingInst(i);
-        } else {
-          verificationFailure(
-              "deallocating allocation that is not the top of the stack", &i,
-              [&](SILPrintContext &ctx) {
-                state.printStack(ctx, "Current stack state");
-                ctx.OS() << "Stack allocation:\n" << *op;
-                // The deallocation is printed out as the focus of the
-                // failure.
-              });
+        auto *definingInst = op->getDefiningInstruction();
+
+        // First see if we have a begin_inst. In such a case, we need to handle
+        // the token result first.
+        if (auto *beginInst =
+                llvm::dyn_cast_if_present<BeginApplyInst>(definingInst)) {
+          // Check if our value is the token result... in such a case, we need
+          // to handle scope ending inst and continue.
+          if (op == beginInst->getTokenResult()) {
+            state.handleScopeEndingUse(op, &i);
+            continue;
+          }
         }
+
+        // Ok, we have some sort of memory. Lets check if our definingInst is
+        // unnested stack memory. In such a case, we want to just verify post
+        // dominance and not validate that we are in stack order.
+        if (definingInst && definingInst->isAllocatingStack() &&
+            !definingInst->isStackAllocationNested()) {
+          state.handleScopeEndingUse(op, &i);
+          continue;
+        }
+
+        // Ok, we have nested stack memory. Lets try to pop the stack. If we
+        // fail due to an empty stack or a lack of a match, emit an error.
+        if (!state.Stack.empty() && op == state.Stack.back()) {
+          state.Stack.pop_back();
+          continue;
+        }
+
+        verificationFailure(
+            "deallocating allocation that is not the top of the stack", &i,
+            [&](SILPrintContext &ctx) {
+              state.printStack(ctx, "Current stack state");
+              ctx.OS() << "Stack allocation:\n" << *op;
+              // The deallocation is printed out as the focus of the
+              // failure.
+            });
         continue;
       }
 
-      if (auto scopeEndingValue = isScopeInst(&i)) {
+      if (auto scopeEndingValue = getScopeEndingValueOfScopeInst(&i)) {
         state.handleScopeInst(scopeEndingValue);
         continue;
       }
