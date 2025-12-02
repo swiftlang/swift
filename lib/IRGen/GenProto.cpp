@@ -1750,7 +1750,11 @@ public:
       (void)entry;
 #endif
 
-      auto typeWitness = Conformance.getTypeWitness(assocType);
+      Type typeWitness;
+      if (SILWT->isSpecialized())
+        typeWitness = entry.getAssociatedTypeWitness().Witness;
+      else
+        typeWitness = Conformance.getTypeWitness(assocType);
 
       if (IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
         // In Embedded Swift associated type witness point to the metadata.

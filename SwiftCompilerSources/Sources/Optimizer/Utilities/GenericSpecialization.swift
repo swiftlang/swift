@@ -151,7 +151,7 @@ func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassC
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
             context.loadFunction(function: origMethod, loadCalleesRecursively: true),
             let specializedMethod = context.specialize(function: origMethod, for: methodSubs,
-                                                       convertIndirectToDirect: true, isMandatory: true)
+                                                       convertIndirectToDirect: false, isMandatory: true)
       else {
         return origEntry
       }
@@ -218,7 +218,7 @@ private func specializeDefaultMethods(for conformance: Conformance,
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
             context.loadFunction(function: origMethod, loadCalleesRecursively: true),
             let specializedMethod = context.specialize(function: origMethod, for: methodSubs,
-                                                       convertIndirectToDirect: true, isMandatory: true)
+                                                       convertIndirectToDirect: false, isMandatory: true)
       else {
         return origEntry
       }

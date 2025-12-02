@@ -1568,6 +1568,9 @@ static CanPackType getInducedPackType(AnyFunctionType::CanParamArrayRef params,
 static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
                                                     CanFunctionType type,
                                                     DynamicMetadataRequest request) {
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+    return MetadataResponse::forComplete(IGF.IGM.getAddrOfTypeMetadata(type));
+  }
   auto result =
     IGF.emitAbstractTypeMetadataRef(type->getResult()->getCanonicalType());
 

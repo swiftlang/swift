@@ -143,6 +143,14 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
           }
         }
 
+      case let initExAddr as InitExistentialAddrInst:
+        if context.options.enableEmbeddedSwift {
+          for c in initExAddr.conformances where c.isConcrete && !c.protocol.isMarkerProtocol {
+            specializeWitnessTable(for: c, moduleContext)
+            worklist.addWitnessMethods(of: c, moduleContext)
+          }
+        }
+
       case let bi as BuiltinInst:
         switch bi.id {
         case .BuildOrdinaryTaskExecutorRef,

@@ -76,6 +76,7 @@
 #include "StructLayout.h"
 #include "StructMetadataVisitor.h"
 #include "TupleMetadataVisitor.h"
+#include "FunctionMetadataVisitor.h"
 
 #include "GenMeta.h"
 
@@ -5615,6 +5616,8 @@ void irgen::emitLazySpecializedValueMetadata(IRGenModule &IGM,
 
   if (isa<TupleType>(valueTy)) {
     emitLazyTupleMetadata(IGM, valueTy);
+  } else if (isa<FunctionType>(valueTy)) {
+    emitLazyFunctionMetadata(IGM, valueTy);
   } else if (valueTy->getStructOrBoundGenericStruct()) {
     emitSpecializedGenericStructMetadata(IGM, valueTy,
                                          *valueTy.getStructOrBoundGenericStruct());
@@ -6326,6 +6329,66 @@ void irgen::emitLazyTupleMetadata(IRGenModule &IGM, CanType tupleTy) {
 
   IGM.defineTypeMetadata(tupleTy, isPattern, canBeConstant,
                          init.finishAndCreateFuture());
+}
+
+// Functions (only used in embedded existentials mode)
+//
+namespace {
+class FunctionMetadataBuilder : public FunctionMetadataVisitor<FunctionMetadataBuilder> {
+  using super = FunctionMetadataVisitor<FunctionMetadataBuilder>;
+
+  ConstantStructBuilder &B;
+
+protected:
+
+  using super::asImpl;
+  using super::IGM;
+  using super::Target;
+
+public:
+  FunctionMetadataBuilder(IRGenModule &IGM, CanType funTy, ConstantStructBuilder &B) :
+    super(IGM, cast<FunctionType>(funTy)), B(B) {}
+
+  ConstantReference emitValueWitnessTable(bool relativeReference) {
+    return irgen::emitValueWitnessTable(IGM, Target->getCanonicalType(),
+                                        false, relativeReference);
+  }
+
+  void addMetadataFlags() {
+    B.addInt(IGM.MetadataKindTy, unsigned(MetadataKind::Function));
+  }
+
+  void addValueWitnessTable() {
+    auto vwtPointer = emitValueWitnessTable(false).getValue();
+    B.addSignedPointer(vwtPointer,
+                       IGM.getOptions().PointerAuth.ValueWitnessTable,
+                       PointerAuthEntity());
+  }
+};
+} // end anonymous namespace
+
+void irgen::emitLazyFunctionMetadata(IRGenModule &IGM, CanType funTy) {
+  assert(IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials));
+  assert(isa<FunctionType>(funTy));
+
+  Type ty = funTy.getPointer();
+  auto &context = ty->getASTContext();
+  PrettyStackTraceType stackTraceRAII(
+      context, "emitting prespecialized metadata for", ty);
+
+  ConstantInitBuilder initBuilder(IGM);
+  auto init = initBuilder.beginStruct();
+  init.setPacked(true);
+
+  bool isPattern = false;
+  bool canBeConstant = true;
+
+  FunctionMetadataBuilder builder(IGM, funTy, init);
+  builder.embeddedLayout();
+
+  IGM.defineTypeMetadata(funTy, isPattern, canBeConstant,
+                         init.finishAndCreateFuture());
+
 }
 // Enums
 
