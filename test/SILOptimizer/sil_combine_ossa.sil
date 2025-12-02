@@ -5544,3 +5544,37 @@ entry(%e_addr : $*NoncopyableEnum):
   end_borrow %i : $CopyableStruct
   return undef : $()
 }
+
+// CHECK-LABEL:      sil [ossa] @simplify_copy_take_init :
+// CHECK:              {{ }}copy_addr [take] %1 to [init] %0
+// CHECK-NEXT:         %3 = tuple ()
+// CHECK:            } // end sil function 'simplify_copy_take_init'
+sil [ossa] @simplify_copy_take_init : $@convention(thin) (@in String) -> @out String {
+bb0(%0 : $*String, %1 : $*String):
+  explicit_copy_addr [take] %1 to [init] %0
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL:      sil [ossa] @simplify_copy_assign :
+// CHECK:              {{ }}copy_addr %1 to %0
+// CHECK-NEXT:         %3 = tuple ()
+// CHECK:            } // end sil function 'simplify_copy_assign'
+sil [ossa] @simplify_copy_assign : $@convention(thin) (@inout String, @inout String) -> () {
+bb0(%0 : $*String, %1 : $*String):
+  explicit_copy_addr %1 to %0
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @simplify_explicit_copy_value :
+// CHECK:         %1 = copy_value %0
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'simplify_explicit_copy_value'
+sil [ossa] @simplify_explicit_copy_value : $@convention(thin) (@guaranteed String) -> @owned String {
+bb0(%0 : @guaranteed $String):
+  %1 = explicit_copy_value %0
+  return %1
+}
+
+
