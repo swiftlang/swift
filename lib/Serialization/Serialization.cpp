@@ -3182,7 +3182,18 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       };
 
       auto domainKind = getDomainKind(domain);
-      const Decl *domainDecl = domain.getDecl();
+
+      // Custom availablity domains provided via the command line don't have
+      // corresponding declarations. Serialize them as identifiers instead.
+      DeclID customDomainID = 0;
+      if (auto custom = domain.getCustomDomain()) {
+        if (auto customDecl = custom->getDecl()) {
+          customDomainID = S.addDeclRef(customDecl) << 1;
+        } else {
+          // emit the name,
+          customDomainID = (S.addDeclBaseNameRef(custom->getName()) << 1) | 0x1;
+        }
+      }
 
       llvm::SmallString<32> blob;
       blob.append(theAttr->getMessage());
@@ -3197,7 +3208,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isSPI(),
           static_cast<uint8_t>(domainKind),
           static_cast<unsigned>(domain.getPlatformKind()),
-          S.addDeclRef(domainDecl),
+          customDomainID,
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
