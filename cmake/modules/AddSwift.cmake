@@ -58,8 +58,6 @@ function(_compute_lto_flag option out_var)
     set(${out_var} "-flto=full" PARENT_SCOPE)
   elseif (lowercase_option STREQUAL "thin")
     set(${out_var} "-flto=thin" PARENT_SCOPE)
-  else()
-    set(${out_var} "-fno-lto" PARENT_SCOPE)
   endif()
 endfunction()
 
