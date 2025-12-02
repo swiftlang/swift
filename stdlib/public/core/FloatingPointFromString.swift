@@ -816,9 +816,6 @@ fileprivate func fastParse64(
         }
       }
     } else if (first | 0x20) == 0x73 && i &+ 3 < input.count { // 's' or 'S'
-      // TODO: Is sNaN support a good idea?  It would bring us
-      // closer to perfect round-tripping for the IEEE754 formats,
-      // but I don't know if there are potential pitfalls here.
       if ((second | 0x20) == 0x6e // 'n' or 'N'
           && (third | 0x20) == 0x61 // 'a' or 'A'
           && (input[i &+ 3] | 0x20) == 0x6e) { // 'n' or 'N'
@@ -1905,32 +1902,19 @@ fileprivate func slowDecimalToBinary(
 // ================================================================
 
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
-// Caveat:  This function was called directly from inlineable
-// code until Feb 2020 (commit 4d0e2adbef4d changed this),
-// so it still needs to be exported with the same C-callable ABI
-// for as long as we support code compiled with Swift 5.3.
 
-// FIXME: This needs to be @c to preserve ABI
-//@c(_swift_stdlib_strtof16_clocale)
+@available(SwiftStdlib 5.3, *)
+@c(_swift_stdlib_strtof16_clocale)
 @usableFromInline
 internal func _swift_stdlib_strtof16_clocale(
-  cText: UnsafePointer<CChar>,
-  output: UnsafeMutableRawPointer
+  _ cText: Optional<UnsafePointer<CChar>>,
+  _ output: Optional<UnsafeMutablePointer<Float16>>
 ) -> Optional<UnsafePointer<CChar>>
 {
-  var i = 0
-  while unsafe cText[i] != 0 {
-    i &+= 1
-  }
-
-  let charSpan = unsafe Span<UInt8>(_unchecked: cText, count: i)
-  let result = parse_float16(charSpan)
-  if let result {
-    unsafe output.initializeMemory(as: Float16.self, to: result)
-    return unsafe cText + i
-  } else {
-    return nil
-  }
+  // FIXME: This function was added during the Float16 bringup, but Unlike the
+  // Float and Double versions of this function, it was never actually called
+  // from inline code.  Can we just drop the whole thing?
+  fatalError()
 }
 
 internal func parse_float16(_ span: Span<UInt8>) -> Optional<Float16> {
@@ -2062,14 +2046,16 @@ internal func parse_float16(_ span: Span<UInt8>) -> Optional<Float16> {
 // so it still needs to be exported with the same C-callable ABI
 // for as long as we support code compiled with Swift 5.3.
 
-// FIXME: This needs to be @c to preserve ABI
-//@c(_swift_stdlib_strtof_clocale)
+@c(_swift_stdlib_strtof_clocale)
 @usableFromInline
 internal func _swift_stdlib_strtof_clocale(
-  cText: UnsafePointer<UInt8>,
-  output: UnsafeMutableRawPointer
-) -> Optional<UnsafePointer<UInt8>>
+  _ cText: Optional<UnsafePointer<CChar>>,
+  _ output: Optional<UnsafeMutablePointer<Float>>
+) -> Optional<UnsafePointer<CChar>>
 {
+  guard let cText = unsafe cText, let output = unsafe output else {
+    return unsafe cText
+  }
   var i = 0
   while unsafe cText[i] != 0 {
     i &+= 1
@@ -2078,7 +2064,7 @@ internal func _swift_stdlib_strtof_clocale(
   let charSpan = unsafe Span<UInt8>(_unchecked: cText, count: i)
   let result = parse_float32(charSpan)
   if let result {
-    unsafe output.initializeMemory(as: Float32.self, to: result)
+    unsafe output.pointee = result
     return unsafe cText + i
   } else {
     return nil
@@ -2236,14 +2222,17 @@ internal func parse_float32(_ span: Span<UInt8>) -> Optional<Float32> {
 // so it still needs to be exported with the same C-callable ABI
 // for as long as we support code compiled with Swift 5.3.
 
-// FIXME: This needs to be @c to preserve ABI
-//@c(_swift_stdlib_strtod_clocale)
+@c(_swift_stdlib_strtod_clocale)
 @usableFromInline
 internal func _swift_stdlib_strtod_clocale(
-  cText: UnsafePointer<UInt8>,
-  output: UnsafeMutableRawPointer
-) -> Optional<UnsafePointer<UInt8>>
+  _ cText: Optional<UnsafePointer<CChar>>,
+  _ output: Optional<UnsafeMutablePointer<Double>>
+) -> Optional<UnsafePointer<CChar>>
 {
+  guard let cText = unsafe cText, let output = unsafe output else {
+    return unsafe cText
+  }
+
   // i = strlen(cText)
   var i = 0
   while unsafe cText[i] != 0 {
@@ -2253,7 +2242,7 @@ internal func _swift_stdlib_strtod_clocale(
   let charSpan = unsafe Span<UInt8>(_unchecked: cText, count: i)
   let result = parse_float64(charSpan)
   if let result {
-    unsafe output.initializeMemory(as: Float64.self, to: result)
+    unsafe output.pointee = result
     return unsafe cText + i
   } else {
     return nil

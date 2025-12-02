@@ -163,11 +163,22 @@ extension ${Self}: LosslessStringConvertible {
   @inlinable
   public init?<S: StringProtocol>(_ text: S) {
   %if bits == 16:
+    // Float16 has only been supported since Swift 5.3, so it can
+    // unconditionally delegate to init(_:Substring)
     self.init(Substring(text))
   %else:
-    if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) { //SwiftStdlib 5.3
+    if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+      // On SwiftStdlib 5.3 and later, we can just delegate to the
+      // init(_:Substring) initializer:
       self.init(Substring(text))
     } else {
+      // When running on SwiftStdlib <5.3, we can't just delegate to
+      // the init(_:Substring) initializer, so we have to inline the whole thing...
+
+      // This means we must preserve the _swift_stdlib_strto{f16,f,d,ld}_clocale
+      // ABI for as long as we support code compiled for Swift < 5.3, which
+      // includes macOS < 11.0, iOS/tvOS < 14.0, or watchOS < 7.0
+
       self = 0.0
       let success = unsafe _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
         unsafe text.withCString { chars -> Bool in
@@ -190,16 +201,6 @@ extension ${Self}: LosslessStringConvertible {
     }
   %end
   }
-
-  // Caveat: Prior to Swift 5.3, there was an implementation of this
-  // function that was inlineable and which called a C shim called
-  // _swift_stdlib_strtoX_clocale() (where `X` was f/d/ld) for the
-  // low-level work.
-
-  // So we have to preserve that C ABI to support extant
-  // compiled code that still requires it.  In particular, any code
-  // that was built to support macOS < 11.0, iOS/tvOS < 14.0, or watchOS
-  // < 7.0 will need that function.
 
   // Important: This function is very deliberately NOT inlineable.
   // The `swift_float${bits}_parse` functions are internal implementation
