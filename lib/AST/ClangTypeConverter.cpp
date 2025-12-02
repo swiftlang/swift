@@ -30,6 +30,7 @@
 #include "swift/AST/ClangSwiftTypeCorrespondence.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
@@ -485,6 +486,40 @@ clang::QualType ClangTypeConverter::visitProtocolType(ProtocolType *type) {
                   clangCtx.getTranslationUnitDecl(), name,
                   clang::SourceLocation(), clang::SourceLocation(), nullptr);
 
+  // Mark this as a (pseudo-)definition
+  PDecl->startDuplicateDefinitionForComparison();
+
+  // Also wire-up any inherited protocols
+  SmallVector<clang::ObjCProtocolDecl *, 16> clangProtocols;
+  SmallVector<clang::SourceLocation, 16> clangLocs;
+  for (auto protocolDecl: proto->getInheritedProtocols()) {
+    if (!protocolDecl->isObjC())
+      continue;
+
+    const clang::ObjCProtocolDecl *protocolCDecl
+      = cast_or_null<clang::ObjCProtocolDecl>(protocolDecl->getClangDecl());
+    if (!protocolCDecl) {
+      auto clangTy = convert(protocolDecl->getDeclaredInterfaceType());
+      if (clangTy.isNull())
+        continue;
+
+      // clangTy will be of the form NSObject<Protocol> *; grab just the
+      // ObjCProtocolDecl.
+      auto classTy = clangCtx.getCanonicalType(
+        clangTy->getAs<clang::ObjCObjectPointerType>()->getPointeeType()
+      )->getAs<clang::ObjCObjectType>()->getTypePtr();
+
+      protocolCDecl = classTy->getProtocol(0);
+    }
+
+    clangProtocols.push_back(
+      const_cast<clang::ObjCProtocolDecl *>(protocolCDecl)
+    );
+    clangLocs.push_back(clang::SourceLocation());
+  }
+  PDecl->setProtocolList(clangProtocols.data(), clangProtocols.size(),
+                         clangLocs.data(), clangCtx);
+
   // Attach an objc_runtime_name attribute with the Objective-C name to use
   // for this protocol.
   SmallString<64> runtimeNameBuffer;
@@ -531,10 +566,78 @@ clang::QualType ClangTypeConverter::visitClassType(ClassType *type) {
   clang::IdentifierInfo *ForwardClassId =
     &clangCtx.Idents.get(swiftDecl->getName().get());
   auto *CDecl = clang::ObjCInterfaceDecl::Create(
-                        clangCtx, clangCtx.getTranslationUnitDecl(),
-                        clang::SourceLocation(), ForwardClassId,
-                        /*typeParamList*/nullptr, /*PrevDecl=*/nullptr,
-                        clang::SourceLocation());
+    clangCtx, clangCtx.getTranslationUnitDecl(),
+    clang::SourceLocation(), ForwardClassId,
+    /*typeParamList*/nullptr, /*PrevDecl=*/nullptr,
+    clang::SourceLocation());
+
+  // Mark this as a pseudo-definition
+  CDecl->startDuplicateDefinitionForComparison();
+
+  // Wire-up the superclass, if any
+  Type superClass = type->getSuperclass();
+  if (superClass) {
+    auto superDecl = superClass->castTo<ClassType>()->getDecl();
+    const clang::ObjCInterfaceDecl *superCDecl
+      = cast_or_null<clang::ObjCInterfaceDecl>(superDecl->getClangDecl());
+
+    if (!superCDecl) {
+      auto clangTy = convert(superClass);
+      if (!clangTy.isNull()) {
+        // clangTy will be of the form SomeObject *; we want the interface
+        // decl.
+
+        auto superTy = clangCtx.getCanonicalType(
+          clangTy->getAs<clang::ObjCObjectPointerType>()->getPointeeType()
+        )->getAs<clang::ObjCObjectType>();
+
+        superCDecl = superTy->getInterface();
+      }
+    }
+
+    if (superCDecl) {
+      clang::QualType superCType
+        = clangCtx.getObjCInterfaceType(superCDecl);
+
+      auto *superTSI = clangCtx.getTrivialTypeSourceInfo(superCType);
+      CDecl->setSuperClass(superTSI);
+    }
+  }
+
+  // Also wire-up any protocols
+  SmallVector<clang::ObjCProtocolDecl *, 16> clangProtocols;
+  SmallVector<clang::SourceLocation, 16> clangLocs;
+  auto idc = swiftDecl->getImplementationContext();
+  for (auto conformance: idc->getLocalConformances(
+         ConformanceLookupKind::OnlyExplicit)) {
+    ProtocolDecl *protocolDecl = conformance->getProtocol();
+
+    if (!protocolDecl->isObjC())
+      continue;
+
+    const clang::ObjCProtocolDecl *protocolCDecl
+      = cast_or_null<clang::ObjCProtocolDecl>(protocolDecl->getClangDecl());
+    if (!protocolCDecl) {
+      auto clangTy = convert(protocolDecl->getDeclaredInterfaceType());
+      if (clangTy.isNull())
+        continue;
+
+      // clangTy will be of the form NSObject<Protocol> *; grab just the
+      // ObjCProtocolDecl.
+      auto classTy = clangCtx.getCanonicalType(
+        clangTy->getAs<clang::ObjCObjectPointerType>()->getPointeeType()
+      )->getAs<clang::ObjCObjectType>()->getTypePtr();
+
+      protocolCDecl = classTy->getProtocol(0);
+    }
+
+    clangProtocols.push_back(
+      const_cast<clang::ObjCProtocolDecl *>(protocolCDecl)
+    );
+    clangLocs.push_back(clang::SourceLocation());
+  }
+  CDecl->setProtocolList(clangProtocols.data(), clangProtocols.size(),
+                         clangLocs.data(), clangCtx);
 
   // Attach an objc_runtime_name attribute with the Objective-C name to use
   // for this class.
