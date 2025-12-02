@@ -830,6 +830,7 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
 
 /// Emits index data for all primary inputs, or the main module.
 static void emitIndexData(const CompilerInstance &Instance) {
+  llvm::PrettyStackTraceFormat trace("While emitting index data");
   if (Instance.getPrimarySourceFiles().empty()) {
     emitIndexDataForSourceFile(nullptr, Instance);
   } else {
