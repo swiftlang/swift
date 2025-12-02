@@ -5578,6 +5578,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class StructuralRequirementsRequest;
   friend class TypeAliasRequirementsRequest;
   friend class ProtocolDependenciesRequest;
+  friend class ProtocolInversesRequest;
   friend class RequirementSignatureRequest;
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;

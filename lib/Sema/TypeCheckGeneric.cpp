@@ -942,45 +942,17 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
     auto *extendedNominal = ext->getExtendedNominal();
 
-    // Avoid building a generic signature if we have an unconstrained protocol
-    // extension of a protocol that does not suppress conformance to ~Copyable
-    // or ~Escapable. This avoids a request cycle when referencing a protocol
-    // extension type alias via an unqualified name from a `where` clause on
-    // the protocol.
+    // Optimization: avoid building a generic signature if we have an
+    // unconstrained protocol extension, as they have the same signature as the
+    // protocol itself.
+    //
+    // Protocols who suppress conformance to ~Copyable or ~Escapable either on
+    // Self or its associated types will infer default requirements in
+    // ordinary extensions of that protocol, so the signature can differ there.
     if (auto *proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
-      if (extraReqs.empty() &&
-          !ext->getTrailingWhereClause()) {
-        // Check for inverse requirements on Self or any associated types.
-        auto reqSig = proto->getRequirementSignature();
-        SmallVector<Requirement, 2> _ignored;
-        SmallVector<InverseRequirement, 2> inverses;
-        reqSig.getRequirementsWithInverses(proto, _ignored, inverses);
-
-        if (inverses.empty())
-          return extendedNominal->getGenericSignatureOfContext();
-
-        if (ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypes) &&
-            !ctx.LangOpts.hasFeature(
-                Feature::SuppressedAssociatedTypesWithDefaults)) {
-          // NOTE: remove this once SuppressedAssociatedTypes is deprecated.
-          //
-          // We don't infer defaults for the associated types in the legacy
-          // version of the feature, only for Self. If there's no inverse on
-          // Self, then we need to reuse the generic signature of the context,
-          // or else we'll crash with some generic signature verifier error.
-          //
-          // We can assume the subject is Self if it's a GenericTypeParamType.
-          bool hasInverseOnSelf = false;
-          for (auto const &ir : inverses) {
-            if (ir.subject->getAs<GenericTypeParamType>()) {
-              hasInverseOnSelf = true;
-              break;
-            }
-          }
-          if (!hasInverseOnSelf) {
-            return extendedNominal->getGenericSignatureOfContext();
-          }
-        }
+      if (extraReqs.empty() && !ext->getTrailingWhereClause() &&
+          proto->getInverseRequirements().empty()) {
+        return extendedNominal->getGenericSignatureOfContext();
       }
     }
 

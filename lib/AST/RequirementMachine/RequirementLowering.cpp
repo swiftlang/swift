@@ -1329,3 +1329,26 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
 
   return ctx.AllocateCopy(result);
 }
+
+ArrayRef<InverseRequirement>
+ProtocolInversesRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *proto) const {
+  auto &ctx = proto->getASTContext();
+
+  // If we have a serialized requirement signature, deserialize it and
+  // query it for the inverses.
+  if (proto->hasLazyRequirementSignature()) {
+    SmallVector<Requirement, 2> _ignored;
+    SmallVector<InverseRequirement, 2> result;
+    auto reqSig = proto->getRequirementSignature();
+    reqSig.getRequirementsWithInverses(proto, _ignored, result);
+    return ctx.AllocateCopy(result);
+  }
+
+  // Otherwise, we must avoid building a RequirementSignature, as this query
+  // needs to be safe to ask while building the protocol's RequirementSignature.
+  //
+  // So, use a StructuralRequirementsRequest to get the inverses.
+  return evaluateOrDefault(ctx.evaluator,
+     StructuralRequirementsRequest{proto}, {}).second;
+}

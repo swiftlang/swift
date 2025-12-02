@@ -7478,8 +7478,8 @@ ProtocolDecl::getStructuralRequirements() const {
 ArrayRef<InverseRequirement>
 ProtocolDecl::getInverseRequirements() const {
   return evaluateOrDefault(
-      getASTContext().evaluator,
-      StructuralRequirementsRequest{const_cast<ProtocolDecl *>(this)}, {}).second;
+    getASTContext().evaluator,
+    ProtocolInversesRequest{const_cast<ProtocolDecl *>(this)}, {});
 }
 
 ArrayRef<Requirement>
