@@ -733,9 +733,9 @@ fileprivate func fastParse64(
   var sign: FloatingPointSign
 
   // Reject empty strings or grotesquely overlong ones
-  // The latter guards against overflowing 32-bit integer
-  // exponent calculations below.
-  if input.count == 0 || input.count > 1000000000 {
+  // Among other concerns, we want to be sure that 32-bit and 16-bit
+  // exponent calculations below don't overflow.
+  if input.count == 0 || input.count > 16384 {
     return .failure
   }
   // Is this positive or negative?
@@ -834,7 +834,7 @@ fileprivate func fastParse64(
     return .failure
   }
 
-  var base10Exponent = 0
+  var base10Exponent = Int32(0)
 
   //
   // Collect digits before the decimal point (if any)
@@ -913,7 +913,7 @@ fileprivate func fastParse64(
       }
     }
     nonZeroDigitCount &+= i &- firstSignificantDigitAfterDecimalPointOffset
-    base10Exponent &-= (i &- firstDigitAfterDecimalPointOffset)
+    base10Exponent &-= Int32(i &- firstDigitAfterDecimalPointOffset)
 
     if i == firstDigitOffset &+ 1 {
       return .failure // No digits, only a '.'
@@ -925,7 +925,7 @@ fileprivate func fastParse64(
   // Parse an exponent phrase "e+123"
   if i < input.count && (input[i] | 0x20) == 0x65 { // 'e' or 'E'
     i &+= 1
-    var exponentSign = 1
+    var exponentSign = Int32(1)
     if i >= input.count {
       // Truncated exponent phrase: "1.234e"
       return .failure
@@ -943,12 +943,12 @@ fileprivate func fastParse64(
     }
 
     // For speed, we let the exponent overflow here.
-    var explicitExponent = 0
+    var explicitExponent = Int32(0)
     let firstExponentDigitOffset = i
     var byte = unsafe input[unchecked: i]
     while i < input.count && byte >= 0x30 && byte <= 0x39 {
       explicitExponent &*= 10
-      explicitExponent &+= Int(byte) &- 0x30
+      explicitExponent &+= Int32(byte) &- 0x30
       i &+= 1
       byte = unsafe input[unchecked: i]
     }
@@ -964,9 +964,10 @@ fileprivate func fastParse64(
         if  byte < 0x30 || byte > 0x39 {
           return .failure
         }
-        if explicitExponent < 9999999 {
-          explicitExponent *= 10
-          explicitExponent += Int(byte) - 0x30
+
+        if explicitExponent < 999999 {
+            explicitExponent *= 10
+            explicitExponent += Int32(byte) - 0x30
         }
         i &+= 1
       } while i < input.count
@@ -990,11 +991,11 @@ fileprivate func fastParse64(
   // Round rediculously large values to infinity
   // In particular, this ensures that downstream calculations
   // will never be faced with an outrageous value for `base10Exponent`
-  if base10Exponent &+ nonZeroDigitCount > targetFormat.maxDecimalExponent {
+  if base10Exponent &+ Int32(truncatingIfNeeded: nonZeroDigitCount) > targetFormat.maxDecimalExponent {
     return .infinity(sign: sign)
   }
   // Round rediculously small values to zero
-  if base10Exponent &+ nonZeroDigitCount < targetFormat.minDecimalExponent {
+  if base10Exponent &+ Int32(truncatingIfNeeded: nonZeroDigitCount) < targetFormat.minDecimalExponent {
     return .zero(sign: sign)
   }
 
@@ -1023,7 +1024,7 @@ fileprivate func fastParse64(
     }
     firstUnparsedDigitOffset = UInt16(i)
     unparsedDigitCount = nonZeroDigitCount - 19
-    base10Exponent &+= nonZeroDigitCount - 19
+    base10Exponent &+= Int32(truncatingIfNeeded: nonZeroDigitCount - 19)
   }
 
   return .decimal(digits: leadingDigits,
