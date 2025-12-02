@@ -71,8 +71,60 @@ MyPair<int, NonCopyableRequires> p7();
 
 template<typename T>
 struct SWIFT_COPYABLE_IF(T) SWIFT_NONCOPYABLE DoubleAnnotation {};
+// expected-warning@-1 {{multiple Swift attributes of the same kind found on 'DoubleAnnotation<int>'; there must be at most one '~Copyable' or 'copyable_if:' attribute}}
+// expected-warning@-2 {{multiple Swift attributes of the same kind found on 'DoubleAnnotation<bool>'; there must be at most one '~Copyable' or 'copyable_if:' attribute}}
 
-using DoubleAnnotationInt = DoubleAnnotation<int>;
+// The SWIFT_COPYABLE_IF annotation is ignored because of the presence of SWIFT_NONCOPYABLE
+// We emit a warning to make the user aware but still parse the SWIFT_COPYABLE_IF annotation
+template<typename F, typename S>
+struct SWIFT_NONCOPYABLE SWIFT_COPYABLE_IF(F, Missing) DoubleAnnotationWithInvalidArg {}; 
+// expected-error@-1 {{template parameter 'Missing' does not exist}}
+// expected-warning@-2 {{multiple Swift attributes of the same kind found on 'DoubleAnnotationWithInvalidArg<int, int>'; there must be at most one '~Copyable' or 'copyable_if:' attribute}}
+
+// Currently, we merge all the SWIFT_COPYABLE_IF annotations
+// This means the double annotation below is equivalent to SWIFT_COPYABLE_IF(F, S)
+template<typename F, typename S>
+struct SWIFT_COPYABLE_IF(F) SWIFT_COPYABLE_IF(S) DoubleCopyableIf {};
+// expected-warning@-1 {{multiple Swift attributes of the same kind found on 'DoubleCopyableIf<int, NonCopyable>'; there must be at most one '~Copyable' or 'copyable_if:' attribute}}
+
+template<typename F, typename S>
+struct SWIFT_NONCOPYABLE SWIFT_COPYABLE_IF(F, S) DoubleAnnotationPair {};
+// expected-warning@-1 {{multiple Swift attributes of the same kind found on 'DoubleAnnotationPair<int, DoubleAnnotationWithInvalidArg<int, int>>'; there must be at most one '~Copyable' or 'copyable_if:' attribute}}
+
+struct SWIFT_NONCOPYABLE SWIFT_NONCOPYABLE DoubleNonCopyable {};
+// expected-warning@-1 {{multiple Swift attributes of the same kind found on 'DoubleNonCopyable'; there must be at most one '~Copyable' or 'copyable_if:' attribute}}
+
+struct SWIFT_COPYABLE_IF(NonCopyable) NonTemplateCopyableIf {}; 
+// expected-warning@-1 {{swift attribute 'copyable_if:' ignored because it is only supported in templates}}
+
+struct SWIFT_NONCOPYABLE SWIFT_COPYABLE_IF() SWIFT_NONCOPYABLE TripleAnnotation {};
+// expected-warning@-1 {{multiple Swift attributes of the same kind found on 'TripleAnnotation'; there must be at most one '~Copyable' or 'copyable_if:' attribute}}
+// expected-warning@-2 {{swift attribute 'copyable_if:' ignored because it is only supported in templates}}
+
+template <typename F, typename S>
+struct SWIFT_COPYABLE_IF(F) MyPair2 {};
+
+template <>
+struct SWIFT_NONCOPYABLE SWIFT_NONCOPYABLE MyPair2<int, bool> {};
+// expected-warning@-1 {{multiple Swift attributes of the same kind found on 'MyPair2<int, bool>'; there must be at most one '~Copyable' or 'copyable_if:' attribute}}
+
+template <>
+struct SWIFT_COPYABLE_IF(S) MyPair2<int, NonCopyable> {};
+template <typename F>
+struct MyPair2<F, int> {};
+
+DoubleAnnotation<int> q1();
+DoubleAnnotation<bool> q2();
+DoubleAnnotationWithInvalidArg<int, int> q3();
+DoubleCopyableIf<int, NonCopyable> q4();
+DoubleAnnotationPair<int, DoubleAnnotationWithInvalidArg<int, int>> q5();
+DoubleNonCopyable q6();
+NonTemplateCopyableIf q7();
+TripleAnnotation q8();
+MyPair2<int, bool> q9();
+MyPair2<int, NonCopyable> q10();
+MyPair2<NonCopyable, int> q11();
+MyPair2<NonCopyable, bool> q12();
 
 struct SWIFT_NONCOPYABLE NonCopyableNonMovable { // expected-note {{record 'NonCopyableNonMovable' is not automatically available: it must have a copy/move constructor and a destructor; does this type have reference semantics?}}
     NonCopyableNonMovable() {}
@@ -177,9 +229,19 @@ func useOfRequires() {
 }
 #endif
 
-func doubleAnnotation() {
-    let s = DoubleAnnotationInt()
-    takeCopyable(s) // expected-error {{global function 'takeCopyable' requires that 'DoubleAnnotationInt' (aka 'DoubleAnnotation<CInt>') conform to 'Copyable'}}
+func diagnoseInvalidSwiftAttributes() {
+    takeCopyable(q1()) // expected-error {{global function 'takeCopyable' requires that 'DoubleAnnotation<CInt>' conform to 'Copyable'}}
+    takeCopyable(q2()) // expected-error {{global function 'takeCopyable' requires that 'DoubleAnnotation<CBool>' conform to 'Copyable'}}
+    takeCopyable(q3()) // expected-error {{global function 'takeCopyable' requires that 'DoubleAnnotationWithInvalidArg<CInt, CInt>' conform to 'Copyable'}}
+    takeCopyable(q4()) // expected-error {{global function 'takeCopyable' requires that 'DoubleCopyableIf<CInt, NonCopyable>' conform to 'Copyable'}}
+    takeCopyable(q5()) // expected-error {{global function 'takeCopyable' requires that 'DoubleAnnotationPair<CInt, DoubleAnnotationWithInvalidArg<CInt, CInt>>' conform to 'Copyable'}}
+    takeCopyable(q6()) // expected-error {{global function 'takeCopyable' requires that 'DoubleNonCopyable' conform to 'Copyable'}}
+    takeCopyable(q7())
+    takeCopyable(q8()) // expected-error {{global function 'takeCopyable' requires that 'TripleAnnotation' conform to 'Copyable'}}
+    takeCopyable(q9()) // expected-error {{global function 'takeCopyable' requires that 'MyPair2<CInt, CBool>' conform to 'Copyable'}}
+    takeCopyable(q10()) // expected-error {{global function 'takeCopyable' requires that 'MyPair2<CInt, NonCopyable>' conform to 'Copyable'}}
+    takeCopyable(q11())
+    takeCopyable(q12()) // expected-error {{global function 'takeCopyable' requires that 'MyPair2<NonCopyable, CBool>' conform to 'Copyable'}}
 }
 
 func missingLifetimeOperation() {

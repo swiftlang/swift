@@ -144,6 +144,38 @@ struct ComplexRecord {
 Aggregate m1();
 ComplexRecord m2();
 
+struct SWIFT_NONESCAPABLE SWIFT_NONESCAPABLE DoubleNonEscapableAnnotation {};
+struct SWIFT_ESCAPABLE SWIFT_ESCAPABLE DoubleEscapableAnnotation {};
+
+template<typename F, typename S>
+struct SWIFT_ESCAPABLE_IF(F) SWIFT_ESCAPABLE_IF(S) DoubleEscapableIfAnnotation {};
+
+struct SWIFT_ESCAPABLE SWIFT_NONESCAPABLE EscapableNonEscapable {};
+struct SWIFT_ESCAPABLE SWIFT_NONESCAPABLE SWIFT_NONESCAPABLE SWIFT_ESCAPABLE DoubleEscapableNonEscapable {};
+
+template<typename T>
+struct SWIFT_ESCAPABLE_IF(T) SWIFT_ESCAPABLE EscapableIfEscapable {};
+
+template<typename T>
+struct SWIFT_ESCAPABLE_IF(T) SWIFT_NONESCAPABLE NonEscapableIfEscapable {};
+
+struct SWIFT_ESCAPABLE SWIFT_ESCAPABLE_IF(T) NonTemplateEscapableIf {};
+
+DoubleNonEscapableAnnotation n1();
+DoubleEscapableAnnotation n2();
+DoubleEscapableIfAnnotation<Owner, NonEscapable> n3();
+DoubleEscapableIfAnnotation<Owner, DoubleEscapableAnnotation> n4();
+EscapableNonEscapable n5();
+DoubleEscapableNonEscapable n6();
+EscapableIfEscapable<NonEscapable> n7();
+NonEscapableIfEscapable<Owner> n8();
+NonTemplateEscapableIf n9();
+// We infer that MyPair is ~Escapable from `NonEscapable`, but still emit diagnostics for `Missing`
+MyPair<NonEscapable, MyPair<Owner, MyPair2<NonEscapable, DoubleEscapableAnnotation>>> n10();
+// Don't emit the same diagnostic twice
+MyPair<DoubleEscapableAnnotation, DoubleEscapableAnnotation> n11();
+
+
 //--- test.swift
 import Test
 import CxxStdlib
@@ -216,6 +248,56 @@ public func noAnnotations() -> View {
     // CHECK-NO-LIFETIMES: nonescapable.h:94:12: error: a function cannot return a ~Escapable result
     l2();
     return View()
+}
+
+public func diagnoseInvalidSwiftAttributes() {
+    n1()
+    // CHECK: nonescapable.h:133:46: warning: multiple Swift attributes of the same kind found on 'DoubleNonEscapableAnnotation'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    // CHECK: nonescapable.h:150:30: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:133:46: warning: multiple Swift attributes of the same kind found on 'DoubleNonEscapableAnnotation'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:150:30: error: a function cannot return a ~Escapable result
+    n2()
+    // CHECK: nonescapable.h:134:40: warning: multiple Swift attributes of the same kind found on 'DoubleEscapableAnnotation'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:134:40: warning: multiple Swift attributes of the same kind found on 'DoubleEscapableAnnotation'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    n3()
+    // CHECK: nonescapable.h:137:52: warning: multiple Swift attributes of the same kind found on 'DoubleEscapableIfAnnotation<Owner, NonEscapable>'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    // CHECK: nonescapable.h:152:50: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:137:52: warning: multiple Swift attributes of the same kind found on 'DoubleEscapableIfAnnotation<Owner, NonEscapable>'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:152:50: error: a function cannot return a ~Escapable result
+    n4()
+    // CHECK: nonescapable.h:137:52: warning: multiple Swift attributes of the same kind found on 'DoubleEscapableIfAnnotation<Owner, DoubleEscapableAnnotation>'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:137:52: warning: multiple Swift attributes of the same kind found on 'DoubleEscapableIfAnnotation<Owner, DoubleEscapableAnnotation>'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    n5()
+    // CHECK: nonescapable.h:154:23: warning: the returned type 'EscapableNonEscapable' is annotated as non-escapable; its lifetime dependencies must be annotated [#ClangDeclarationImport]
+    // CHECK: nonescapable.h:154:23: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:154:23: warning: the returned type 'EscapableNonEscapable' is annotated as non-escapable; its lifetime dependencies must be annotated [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:154:23: error: a function cannot return a ~Escapable result
+    n6()
+    // CHECK: nonescapable.h:155:29: warning: the returned type 'DoubleEscapableNonEscapable' is annotated as non-escapable; its lifetime dependencies must be annotated [#ClangDeclarationImport]
+    // CHECK: nonescapable.h:140:78: warning: multiple Swift attributes of the same kind found on 'DoubleEscapableNonEscapable'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    // CHECK: nonescapable.h:155:29: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:155:29: warning: the returned type 'DoubleEscapableNonEscapable' is annotated as non-escapable; its lifetime dependencies must be annotated [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:140:78: warning: multiple Swift attributes of the same kind found on 'DoubleEscapableNonEscapable'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:155:29: error: a function cannot return a ~Escapable result
+    n7()
+    // CHECK: nonescapable.h:143:46: warning: multiple Swift attributes of the same kind found on 'EscapableIfEscapable<NonEscapable>'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:143:46: warning: multiple Swift attributes of the same kind found on 'EscapableIfEscapable<NonEscapable>'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    n8()
+    // CHECK: nonescapable.h:146:49: warning: multiple Swift attributes of the same kind found on 'NonEscapableIfEscapable<Owner>'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:146:49: warning: multiple Swift attributes of the same kind found on 'NonEscapableIfEscapable<Owner>'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    // CHECK: nonescapable.h:157:32: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:157:32: error: a function cannot return a ~Escapable result
+    n9()
+    // CHECK: nonescapable.h:148:46: warning: swift attribute 'escapable_if:' ignored because it is only supported in templates [#ClangDeclarationImport]
+    // CHECK: nonescapable.h:148:46: warning: multiple Swift attributes of the same kind found on 'NonTemplateEscapableIf'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:148:46: warning: swift attribute 'escapable_if:' ignored because it is only supported in templates [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIME: nonescapable.h:148:46: warning: multiple Swift attributes of the same kind found on 'NonTemplateEscapableIf'; there must be at most one 'Escapable', '~Escapable' or 'escapable_if:' attribute [#ClangDeclarationImport]
+    n10()
+    // CHECK: nonescapable.h:56:39: error: template parameter 'Missing' does not exist
+    // CHECK: nonescapable.h:160:87: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:56:39: error: template parameter 'Missing' does not exist
+    // CHECK-NO-LIFETIMES: nonescapable.h:160:87: error: a function cannot return a ~Escapable result
+    n11() 
 }
 
 public func test3(_ x: inout View) {
