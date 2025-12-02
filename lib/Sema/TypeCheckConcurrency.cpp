@@ -7183,14 +7183,6 @@ static bool checkSendableInstanceStorage(
     }
   }
 
-  if (nominal->suppressesConformance(KnownProtocolKind::Sendable)) {
-    auto *conformanceDecl = dc->getAsDecl() ? dc->getAsDecl() : nominal;
-    if (!isImplicitSendableCheck(check)) {
-      conformanceDecl->diagnose(diag::non_sendable_type_suppressed);
-    }
-    return true;
-  }
-
   // Stored properties of structs and classes must have
   // Sendable-conforming types.
   class Visitor: public StorageVisitor {
@@ -7465,6 +7457,25 @@ bool swift::checkSendableConformance(
   // and not some (possibly constrained) extension.
   if (wasImplied)
     conformanceDC = nominal;
+
+  // Sendable supression allows conditional conformances only.
+  if (nominal->suppressesConformance(KnownProtocolKind::Sendable)) {
+    bool hasUnconditionalConformance = false;
+    if (auto *normalConf = dyn_cast<NormalProtocolConformance>(conformance)) {
+      hasUnconditionalConformance =
+          normalConf->getConditionalRequirements().empty();
+    }
+
+    if (hasUnconditionalConformance) {
+      if (!isImplicitSendableCheck(check)) {
+        auto *conformanceDecl =
+            conformanceDC->getAsDecl() ? conformanceDC->getAsDecl() : nominal;
+        conformanceDecl->diagnose(diag::non_sendable_type_suppressed);
+      }
+      return true;
+    }
+  }
+
   return checkSendableInstanceStorage(nominal, conformanceDC, check);
 }
 
