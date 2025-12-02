@@ -5352,9 +5352,15 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
     auto param1 = getParameters()[i];
     auto param2 = other->getParameters()[i];
 
-    if (param1.getConvention() != param2.getConvention())
+    // Special case for C++: it's OK to pass things to an @in_guaranteed
+    // function where @in_cxx would be OK, since the callee behaves in
+    // a compatible manner.
+    if (param1.getConvention() != param2.getConvention()
+        && (param1.getConvention() != ParameterConvention::Indirect_In_CXX
+            || (param2.getConvention()
+                != ParameterConvention::Indirect_In_Guaranteed)))
       return {ABICompatibilityCheckResult::DifferingParameterConvention, i};
-    // Note that the diretionality here is reversed from the other cases
+    // Note that the directionality here is reversed from the other cases
     // because of contravariance: parameters of the *second* type will be
     // trivially converted to be parameters of the *first* type.
     if (!areABICompatibleParamsOrReturns(
