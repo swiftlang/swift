@@ -1438,11 +1438,12 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
   // Bridge the input types.
   assert(bridgedArgs.size() == nativeInputs.size() - bool(nativeInputsHasImplicitIsolatedParam));
   for (unsigned i = 0, size = bridgedArgs.size(); i < size; ++i) {
+    unsigned nativeParamIndex = i + nativeInputsHasImplicitIsolatedParam;
     // Consider the bridged values to be "call results" since they're coming
     // from potentially nil-unsound ObjC callers.
     ManagedValue native = SGF.emitBridgedToNativeValue(
         loc, bridgedArgs[i], bridgedFormalTypes[i], nativeFormalTypes[i],
-        swiftFnTy->getParameters()[i].getSILStorageType(
+        swiftFnTy->getParameters()[nativeParamIndex].getSILStorageType(
             SGF.SGM.M, swiftFnTy, SGF.getTypeExpansionContext()),
         SGFContext(),
         /*isCallResult*/ true);
