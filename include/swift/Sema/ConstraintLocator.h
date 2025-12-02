@@ -83,8 +83,6 @@ enum ContextualTypePurpose : uint8_t {
 
   CTP_ExprPattern,      ///< `~=` operator application associated with expression
                         /// pattern.
-
-  CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
 
 namespace constraints {

@@ -5764,14 +5764,13 @@ class EditorPlaceholderExpr : public Expr {
   SourceLoc Loc;
   TypeRepr *PlaceholderTy;
   TypeRepr *ExpansionTyR;
-  Expr *SemanticExpr;
 
 public:
   EditorPlaceholderExpr(Identifier Placeholder, SourceLoc Loc,
                         TypeRepr *PlaceholderTy, TypeRepr *ExpansionTyR)
       : Expr(ExprKind::EditorPlaceholder, /*Implicit=*/false),
         Placeholder(Placeholder), Loc(Loc), PlaceholderTy(PlaceholderTy),
-        ExpansionTyR(ExpansionTyR), SemanticExpr(nullptr) {}
+        ExpansionTyR(ExpansionTyR) {}
 
   Identifier getPlaceholder() const { return Placeholder; }
   SourceRange getSourceRange() const { return Loc; }
@@ -5783,9 +5782,6 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::EditorPlaceholder;
   }
-
-  Expr *getSemanticExpr() const { return SemanticExpr; }
-  void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
 };
 
 /// A LazyInitializerExpr is used to embed an existing typechecked
