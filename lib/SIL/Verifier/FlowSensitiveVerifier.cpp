@@ -50,6 +50,15 @@ struct BBState {
   BBState(maybe_movable_ref<BBState> other)
       : BBState(std::move(other).construct()) {}
 
+  /// Print for dumping all information.
+  void print(llvm::raw_ostream &os) const {
+    SILPrintContext ctx(os);
+    printStack(ctx, "stack");
+    printActiveOps(ctx, "active_ops");
+  }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
   void printStack(SILPrintContext &ctx, StringRef label) const {
     ctx.OS() << label << ": [";
     if (!Stack.empty())
