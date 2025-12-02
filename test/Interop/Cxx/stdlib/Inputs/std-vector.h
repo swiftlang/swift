@@ -40,4 +40,10 @@ struct NonCopyable {
 using VectorOfNonCopyable = std::vector<NonCopyable>;
 using VectorOfPointer = std::vector<NonCopyable *>;
 
+struct HasVector {
+  std::vector<NonCopyable> field;
+};
+
+struct BaseHasVector : HasVector {};
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_VECTOR_H

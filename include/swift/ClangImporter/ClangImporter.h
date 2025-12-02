@@ -737,6 +737,12 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
 /// as permissive as the input C++ access.
 AccessLevel convertClangAccess(clang::AccessSpecifier access);
 
+/// Lookup and return the copy constructor of \a decl
+///
+/// Returns nullptr if \a decl doesn't have a valid copy constructor
+const clang::CXXConstructorDecl *
+findCopyConstructor(const clang::CXXRecordDecl *decl);
+
 /// Read file IDs from 'private_fileid' Swift attributes on a Clang decl.
 ///
 /// May return >1 fileID when a decl is annotated more than once, which should
