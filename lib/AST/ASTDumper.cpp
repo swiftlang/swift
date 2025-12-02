@@ -1913,10 +1913,8 @@ namespace {
       printFoot();
     }
     void visitAnyPattern(AnyPattern *P, Label label) {
-      if (P->isAsyncLet()) {
-        printCommon(P, "async_let ", label);
-      }
       printCommon(P, "pattern_any", label);
+      printFlag(P->isAsyncLet(), "async_let", DeclModifierColor);
       printFoot();
     }
     void visitTypedPattern(TypedPattern *P, Label label) {
