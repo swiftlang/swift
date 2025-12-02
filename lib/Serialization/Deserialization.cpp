@@ -183,8 +183,8 @@ const char InvalidEnumValueError::ID = '\0';
 void InvalidEnumValueError::anchor() {}
 const char ConformanceXRefError::ID = '\0';
 void ConformanceXRefError::anchor() {}
-const char InavalidAvailabilityDomainError::ID = '\0';
-void InavalidAvailabilityDomainError::anchor() {}
+const char InvalidAvailabilityDomainError::ID = '\0';
+void InvalidAvailabilityDomainError::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
@@ -5877,14 +5877,14 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
       if (decodedDomainDecl) {
         auto domainDecl = dyn_cast<ValueDecl>(decodedDomainDecl);
         if (!domainDecl)
-          return llvm::make_error<InavalidAvailabilityDomainError>();
+          return llvm::make_error<InvalidAvailabilityDomainError>();
 
         if (auto customDomain = AvailabilityDomain::forCustom(domainDecl))
           domain = *customDomain;
         else
-          return llvm::make_error<InavalidAvailabilityDomainError>();
+          return llvm::make_error<InvalidAvailabilityDomainError>();
       } else {
-        return llvm::make_error<InavalidAvailabilityDomainError>();
+        return llvm::make_error<InvalidAvailabilityDomainError>();
       }
     }
   } else {
