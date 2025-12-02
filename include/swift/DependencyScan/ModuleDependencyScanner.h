@@ -51,6 +51,16 @@ public:
       llvm::PrefixMapper *mapper, DiagnosticEngine &diags);
 
 private:
+  /// Initialize/finalize the clang compiler scanning tool.
+  /// Behind the scenes, the clang scanning tool maintains
+  /// a single clang compiler instance to perform all by-name
+  /// dependency scans. initializeClangScanningTool() initializes
+  /// the clang compiler instance, and returns an error if the
+  /// initialization fails. Once successfully initialized,
+  /// the same clang compiler instance is reused whenever
+  /// scanFilesystemForClangModuleDependency is called,
+  /// throughout the lifetime of the ModuleDependencyScanningWorker
+  /// instance.
   llvm::Error initializeClangScanningTool();
   llvm::Error finalizeClangScanningTool();
 
