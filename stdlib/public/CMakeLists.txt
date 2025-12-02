@@ -241,6 +241,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
         "avr  avr-none-none-elf    avr-none-none-elf"
       )
     endif()
+
+    if("M68k" IN_LIST LLVM_EXPERIMENTAL_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "m68k  m68k-apple-none    m68k-apple-none"
+      )
+    endif()
   endif()
 endif()
 
