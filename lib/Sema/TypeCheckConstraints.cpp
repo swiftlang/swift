@@ -214,6 +214,10 @@ bool TypeVariableType::Implementation::isTernary() const {
   return locator && locator->directlyAt<TernaryExpr>();
 }
 
+bool TypeVariableType::Implementation::isUnresolvedMemberBase() const {
+  return locator && locator->isLastElement<LocatorPathElt::MemberRefBase>();
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);

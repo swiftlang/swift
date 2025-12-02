@@ -60,6 +60,7 @@ LOCATOR_CHANGE(ResolvedOverload, ResolvedOverloads)
 LOCATOR_CHANGE(RecordedArgumentList, ArgumentLists)
 LOCATOR_CHANGE(RecordedImplicitCallAsFunctionRoot, ImplicitCallAsFunctionRoots)
 LOCATOR_CHANGE(RecordedSynthesizedConformance, SynthesizedConformances)
+LOCATOR_CHANGE(RecordedUnresolvedMemberBase, UnresolvedMemberBaseTypes)
 
 EXPR_CHANGE(AppliedPropertyWrapper)
 EXPR_CHANGE(RecordedImpliedResult)
