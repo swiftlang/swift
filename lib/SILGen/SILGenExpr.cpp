@@ -499,6 +499,9 @@ namespace {
     emitFunctionCvtFromExecutionCallerToGlobalActor(FunctionConversionExpr *E,
                                                     SGFContext C);
 
+    /// Helper to emit a value of arbitrary type in an unreachable codepath.
+    RValue emitUnreachableValue(SILLocation loc, CanType ty);
+
     RValue visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
                                           SGFContext C);
     RValue visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
@@ -2136,6 +2139,32 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
   return RValue(SGF, e, destType, result);
 }
 
+RValue RValueEmitter::emitUnreachableValue(SILLocation loc, CanType ty) {
+  ASSERT(!SGF.B.hasValidInsertionPoint() && "Must be unreachable");
+
+  // Continue code generation in a block with no predecessors.
+  // Whatever code is emitted here is guaranteed to be removed by SIL passes.
+  SGF.B.emitBlock(SGF.createBasicBlock());
+
+  // Since the type is uninhabited, use a SILUndef of so that we can return
+  // some sort of RValue from this API.
+  auto &lowering = SGF.getTypeLowering(ty);
+  auto loweredTy = lowering.getLoweredType();
+  auto undef = SILUndef::get(SGF.F, loweredTy);
+
+  // Create an alloc initialized with contents from the undefined addr type.
+  // It seems pack addresses do not satisfy isPlusOneOrTrivial, so we need an
+  // actual allocation.
+  if (loweredTy.isAddress()) {
+    auto resultAddr = SGF.emitTemporaryAllocation(loc, loweredTy);
+    SGF.emitSemanticStore(loc, undef, resultAddr, lowering, IsInitialization);
+    return RValue(SGF, loc, ty, SGF.emitManagedRValueWithCleanup(resultAddr));
+  }
+
+  // Otherwise, if it's not an address, just emit the undef value itself.
+  return RValue(SGF, loc, ty, ManagedValue::forRValueWithoutOwnership(undef));
+}
+
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
                                                   SGFContext C) {
   CanAnyFunctionType srcType =
@@ -2660,28 +2689,7 @@ RValue RValueEmitter::visitUnreachableExpr(UnreachableExpr *E, SGFContext C) {
   // Emit the expression, followed by an unreachable.
   SGF.emitIgnoredExpr(E->getSubExpr());
   SGF.B.createUnreachable(E);
-
-  // Continue code generation in a block with no predecessors.
-  // Whatever code is emitted here is guaranteed to be removed by SIL passes.
-  SGF.B.emitBlock(SGF.createBasicBlock());
-
-  // Since the type is uninhabited, use a SILUndef of so that we can return
-  // some sort of RValue from this API.
-  auto &lowering = SGF.getTypeLowering(E->getType());
-  auto loweredTy = lowering.getLoweredType();
-  auto undef = SILUndef::get(SGF.F, loweredTy);
-
-  // Create an alloc initialized with contents from the undefined addr type.
-  // It seems pack addresses do not satisfy isPlusOneOrTrivial, so we need an
-  // actual allocation.
-  if (loweredTy.isAddress()) {
-    auto resultAddr = SGF.emitTemporaryAllocation(E, loweredTy);
-    SGF.emitSemanticStore(E, undef, resultAddr, lowering, IsInitialization);
-    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(resultAddr));
-  }
-
-  // Otherwise, if it's not an address, just emit the undef value itself.
-  return RValue(SGF, E, ManagedValue::forRValueWithoutOwnership(undef));
+  return emitUnreachableValue(E, E->getType()->getCanonicalType());
 }
 
 static SILValue getArrayBuffer(SILValue array, SILGenFunction &SGF, SILLocation loc) {
@@ -3477,7 +3485,21 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
 
 RValue RValueEmitter::
 visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C) {
-  return visit(E->getSemanticExpr(), C);
+  if (auto *undefinedFn = SGF.getASTContext().getUndefinedEditorPlaceholder()) {
+    auto args = SGF.emitSourceLocationArgs(E->getLoc(), E);
+    SGF.emitApplyOfLibraryIntrinsic(E, undefinedFn, SubstitutionMap(),
+                                    {
+                                        args.filenameStartPointer,
+                                        args.filenameLength,
+                                        args.filenameIsAscii,
+                                        args.line,
+                                    },
+                                    SGFContext());
+  } else {
+    SGF.B.createUnconditionalFail(E, "attempt to evaluate editor placeholder");
+  }
+  SGF.B.createUnreachable(E);
+  return emitUnreachableValue(E, E->getType()->getCanonicalType());
 }
 
 RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {

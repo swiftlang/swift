@@ -2370,8 +2370,6 @@ NOTE(note_no_in_class_init_3plus,none,
      (Identifier, Identifier, Identifier, bool))
 ERROR(missing_unimplemented_init_runtime,none,
       "standard library error: missing _unimplementedInitializer", ())
-ERROR(missing_undefined_runtime,none,
-      "standard library error: missing _undefined", ())
 
 ERROR(inherited_default_value_not_in_designated_constructor,none,
       "default value inheritance via 'super' is only valid on the parameters of "

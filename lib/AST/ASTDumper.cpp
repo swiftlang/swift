@@ -4430,9 +4430,6 @@ public:
     if (ExpTyR && ExpTyR != TyR) {
       printRec(ExpTyR, Label::optional("type_repr_for_expansion"));
     }
-    if (auto *SE = E->getSemanticExpr()) {
-      printRec(SE, Label::always("semantic_expr"));
-    }
     printFoot();
   }
   void visitLazyInitializerExpr(LazyInitializerExpr *E, Label label) {
