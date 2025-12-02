@@ -1947,8 +1947,6 @@ internal func parse_float16(_ span: Span<UInt8>) -> Optional<Float16> {
   var parsed = fastParse64(targetFormat: targetFormat, input: span)
 
   // If we parsed a decimal, use `slowDecimalToBinary` to convert to binary
-  // For Float16, the limited exponent range means that `slowDecimalToBinary`
-  // isn't really all that slow, so we don't need accelerated paths here.  ;-)
   if case .decimal(digits: let digits,
                    base10Exponent: let base10Exponent,
                    unparsedDigitCount: let unparsedDigitCount,
@@ -2130,10 +2128,11 @@ internal func parse_float32(_ span: Span<UInt8>) -> Optional<Float32> {
     // ================================================================
     // This uses fast 64-bit fixed-precision arithmetic to compute
     // upper and lower bounds for the significand.  If those bounds
-    // agree, we can return the result.  With 40 fractional bits, only
-    // 1 attempt in a billion should fall through, even with the
-    // pessimized interval width here.  (The interval for <= 19 digits
-    // could be reduced to 4, but the saved branch is more valuable here.)
+    // agree, we can return the result.  With 40 fractional bits, this
+    // should very rarely fall through, even with the pessimized
+    // interval width here.  (The interval for <= 19 digits could be
+    // reduced to 4, but the saved branch is more valuable here.)
+    // The Float64 version of this code is extensively commented...
     let intervalWidth: UInt64 = 36
     let powerOfTenRoundedDown = powersOf10_Float[Int(base10Exponent) + 70]
     let powerOfTenExponent = binaryExponentFor10ToThe(Int(base10Exponent))
@@ -2443,10 +2442,10 @@ internal func parse_float64(_ span: Span<UInt8>) -> Optional<Float64> {
       parsed = .infinity(sign: sign) // Overflow
     } else if binaryExponent < targetFormat.minBinaryExponent - targetFormat.significandBits {
       parsed = .zero(sign: sign) // Underflow
-      /*
-       } else if binaryExponent <= targetFormat.minBinaryExponent {
-       // TODO: Process subnormal here
-       */
+    /*
+    } else if binaryExponent <= targetFormat.minBinaryExponent {
+      // TODO: Process subnormal here
+    */
     } else if (binaryExponent > targetFormat.minBinaryExponent
                  && upperSignificand == lowerSignificand) {
       parsed = .binary(significand: lowerSignificand,
