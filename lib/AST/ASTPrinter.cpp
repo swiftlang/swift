@@ -4870,7 +4870,9 @@ void PrintAST::visitMacroExpansionDecl(MacroExpansionDecl *decl) {
 void CustomAttr::printCustomAttr(ASTPrinter &Printer, const PrintOptions &Options) const {
   Printer.callPrintNamePre(PrintNameContext::Attribute);
   Printer << "@";
-  if (auto type = getType())
+  if (auto *init = getSemanticInit(); init && Options.IsForSwiftInterface)
+    init->getType().print(Printer, Options);
+  else if (auto type = getType())
     type.print(Printer, Options);
   else
     getTypeRepr()->print(Printer, Options);
