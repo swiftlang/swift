@@ -64,6 +64,7 @@ extension Unicode {
       rawValue & 0x1 == 0
     }
 
+    @available(UnicodeNormalization)
     init(_ scalar: Unicode.Scalar, fastUpperbound: UInt32 = 0xC0) {
       if _fastPath(scalar.value < fastUpperbound) {
         // CCC = 0, NFC_QC = Yes, NFD_QC = Yes
@@ -186,8 +187,22 @@ extension Unicode {
       )
     }
 
+    @available(UnicodeNormalization)
     init(_ scalar: Unicode.Scalar) {
       rawValue = _swift_stdlib_getDecompositionEntry(scalar.value)
     }
   }
 }
+
+// Implemented in the C++ Unicode tables
+@available(UnicodeNormalization)
+@_extern(c)
+func _swift_stdlib_getNormData(_ scalar: UInt32) -> UInt16
+
+@available(UnicodeNormalization)
+@_extern(c)
+func _swift_stdlib_getDecompositionEntry(_ scalar: UInt32) -> UInt32
+
+@available(UnicodeNormalization)
+@_extern(c)
+func _swift_stdlib_getComposition(_ x: UInt32, _ y: UInt32) -> UInt32

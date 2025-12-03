@@ -182,11 +182,13 @@ extension StaticBigInt: CustomDebugStringConvertible {
       return capacity
     }
 
-    // Overwrite leading zeros with the "±0x" indicator.
-    if let upToIndex = result.firstIndex(where: { $0 != "0" }) {
-      result.replaceSubrange(..<upToIndex, with: indicator)
-    } else {
-      result = "+0x0"
+    if #available(UnicodeNormalization) {
+      // Overwrite leading zeros with the "±0x" indicator.
+      if let upToIndex = result.firstIndex(where: { $0 != "0" }) {
+        result.replaceSubrange(..<upToIndex, with: indicator)
+      } else {
+        result = "+0x0"
+      }
     }
     return result
   }

@@ -27,6 +27,7 @@ extension Unicode {
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFD: Sendable {}
 
+@available(UnicodeNormalization)
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFD {
   @_spi(_Unicode)
@@ -36,9 +37,11 @@ extension Unicode._NFD {
   }
 }
 
+@available(UnicodeNormalization)
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFD.Iterator: Sendable {}
 
+@available(UnicodeNormalization)
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFD.Iterator: IteratorProtocol {
   @_spi(_Unicode)
@@ -48,6 +51,7 @@ extension Unicode._NFD.Iterator: IteratorProtocol {
   }
 }
 
+@available(UnicodeNormalization)
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFD: Sequence {
   @_spi(_Unicode)
@@ -57,6 +61,7 @@ extension Unicode._NFD: Sequence {
   }
 }
 
+@available(UnicodeNormalization)
 extension String {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
@@ -65,6 +70,7 @@ extension String {
   }
 }
 
+@available(UnicodeNormalization)
 extension Substring {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
@@ -77,6 +83,7 @@ extension Substring {
 // Unicode.NFC
 //===----------------------------------------------------------------------===//
 
+@available(UnicodeNormalization)
 extension Unicode {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
@@ -85,9 +92,11 @@ extension Unicode {
   }
 }
 
+@available(UnicodeNormalization)
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFC: Sendable {}
 
+@available(UnicodeNormalization)
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFC {
   @_spi(_Unicode)
@@ -97,9 +106,11 @@ extension Unicode._NFC {
   }
 }
 
+@available(UnicodeNormalization)
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFC.Iterator: Sendable {}
 
+@available(UnicodeNormalization)
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFC.Iterator: IteratorProtocol {
   @_spi(_Unicode)
@@ -109,6 +120,7 @@ extension Unicode._NFC.Iterator: IteratorProtocol {
   }
 }
 
+@available(UnicodeNormalization)
 @available(SwiftStdlib 5.7, *)
 extension Unicode._NFC: Sequence {
   @_spi(_Unicode)
@@ -118,6 +130,7 @@ extension Unicode._NFC: Sequence {
   }
 }
 
+@available(UnicodeNormalization)
 extension String {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
@@ -126,6 +139,7 @@ extension String {
   }
 }
 
+@available(UnicodeNormalization)
 extension Substring {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)

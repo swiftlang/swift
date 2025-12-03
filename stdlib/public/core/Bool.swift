@@ -197,6 +197,7 @@ extension Bool: Hashable {
   }
 }
 
+@available(UnicodeNormalization)
 extension Bool: LosslessStringConvertible {
   /// Creates a new Boolean value from the given string.
   ///

@@ -23,6 +23,7 @@ extension Character {
   }
 
   /// A Boolean value indicating whether this is an ASCII character.
+  @available(UnicodeNormalization)
   @inlinable
   public var isASCII: Bool {
     return asciiValue != nil
@@ -48,6 +49,7 @@ extension Character {
   ///     // lf.asciiValue == 10
   ///     let crlf = "\r\n" as Character
   ///     // crlf.asciiValue == 10
+  @available(UnicodeNormalization)
   @inlinable
   public var asciiValue: UInt8? {
     if _slowPath(self == "\r\n") { return 0x000A /* LINE FEED (LF) */ }
@@ -235,8 +237,11 @@ extension Character {
   ///     // 1 --> 1
   public func lowercased() -> String { return String(self).lowercased() }
 
+  @available(UnicodeNormalization)
   @usableFromInline
   internal var _isUppercased: Bool { return String(self) == self.uppercased() }
+
+  @available(UnicodeNormalization)
   @usableFromInline
   internal var _isLowercased: Bool { return String(self) == self.lowercased() }
 
@@ -248,6 +253,7 @@ extension Character {
   /// - "É" (U+0045 LATIN CAPITAL LETTER E, U+0301 COMBINING ACUTE ACCENT)
   /// - "И" (U+0418 CYRILLIC CAPITAL LETTER I)
   /// - "Π" (U+03A0 GREEK CAPITAL LETTER PI)
+  @available(UnicodeNormalization)
   @inlinable
   public var isUppercase: Bool {
     if _fastPath(_isSingleScalar && _firstScalar.properties.isUppercase) {
@@ -264,6 +270,7 @@ extension Character {
   /// - "é" (U+0065 LATIN SMALL LETTER E, U+0301 COMBINING ACUTE ACCENT)
   /// - "и" (U+0438 CYRILLIC SMALL LETTER I)
   /// - "π" (U+03C0 GREEK SMALL LETTER PI)
+  @available(UnicodeNormalization)
   @inlinable
   public var isLowercase: Bool {
     if _fastPath(_isSingleScalar && _firstScalar.properties.isLowercase) {
@@ -274,6 +281,7 @@ extension Character {
 
   /// A Boolean value indicating whether this character changes under any form
   /// of case conversion.
+  @available(UnicodeNormalization)
   @inlinable
   public var isCased: Bool {
     if _fastPath(_isSingleScalar && _firstScalar.properties.isCased) {

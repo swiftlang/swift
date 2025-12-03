@@ -83,6 +83,7 @@ extension UTF8Span {
   /// Updates the `isKnownNFC` bit.
   ///
   /// - Complexity: O(n)
+  @available(UnicodeNormalization)
   @_unavailableInEmbedded
   @lifetime(self: copy self)
   public mutating func checkForNFC(

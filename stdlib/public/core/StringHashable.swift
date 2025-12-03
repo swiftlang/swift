@@ -12,6 +12,7 @@
 
 import SwiftShims
 
+@available(UnicodeNormalization)
 extension String: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
@@ -30,6 +31,7 @@ extension String: Hashable {
   }
 }
 
+@available(UnicodeNormalization)
 extension StringProtocol {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
@@ -43,6 +45,7 @@ extension StringProtocol {
   }
 }
 
+@available(UnicodeNormalization)
 extension _StringGutsSlice {
   @_effects(releasenone) @inline(never) // slow-path
   internal func _normalizedHash(into hasher: inout Hasher) {
