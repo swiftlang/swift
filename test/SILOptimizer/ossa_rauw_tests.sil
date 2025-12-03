@@ -140,11 +140,8 @@ bb0(%0 : @owned $Klass):
   return %2 : $Klass
 }
 
-// We get ARC traffic here today since we do not get rid of PhiArguments kept
-// alive only by destroys/end_borrows. We will eventually though.
-//
 // CHECK-LABEL: sil [ossa] @owned_to_owned_consuming : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
-// CHECK: copy_value
+// CHECK-NOT: copy_value
 // CHECK-NOT: enum $FakeOptional<Klass>, #FakeOptional.some!enumelt
 // CHECK: } // end sil function 'owned_to_owned_consuming'
 sil [ossa] @owned_to_owned_consuming : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
