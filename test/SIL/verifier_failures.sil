@@ -104,3 +104,37 @@ bb2:
   abort_apply %3
   unwind
 }
+
+// We shouldn't error here. Make sure that we properly handle the dealloc_stack
+// user vs the end_apply user.
+sil [ossa] @test_begin_apply_1 : $@yield_once @convention(method) (@guaranteed Builtin.Int32) -> @yields Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  (%3, %4, %5) = begin_apply undef(%0) : $@yield_once_2 @convention(method) (@guaranteed Builtin.Int32) -> @yields Builtin.Int32
+  %6 = end_apply %4 as $()
+  yield %3 : $Builtin.Int32, resume bb1, unwind bb2
+
+bb1:
+  dealloc_stack %5 : $*Builtin.SILToken
+  %9 = tuple ()
+  return %9 : $()
+
+bb2:
+  dealloc_stack %5 : $*Builtin.SILToken
+  unwind
+}
+
+sil [ossa] @test_begin_apply_2 : $@yield_once @convention(method) (@guaranteed Builtin.Int32) -> @yields Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  (%3, %4, %5) = begin_apply undef(%0) : $@yield_once_2 @convention(method) (@guaranteed Builtin.Int32) -> @yields Builtin.Int32
+  dealloc_stack %5 : $*Builtin.SILToken
+  yield %3 : $Builtin.Int32, resume bb1, unwind bb2
+
+bb1:
+  %6 = end_apply %4 as $()
+  %9 = tuple ()
+  return %9 : $()
+
+bb2:
+  %7 = end_apply %4 as $()
+  unwind
+}

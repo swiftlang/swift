@@ -89,6 +89,7 @@ extension MutableSpan where Element: ~Copyable {
 
   @unsafe
   @_alwaysEmitIntoClient
+  @_transparent
   @lifetime(borrow start)
   public init(
     _unsafeStart start: UnsafeMutablePointer<Element>,
@@ -295,10 +296,12 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
+    @_transparent
     unsafeAddress {
       _checkIndex(position)
       return unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: position))
     }
+    @_transparent
     @lifetime(self: copy self)
     unsafeMutableAddress {
       _checkIndex(position)
@@ -317,9 +320,11 @@ extension MutableSpan where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
+    @_transparent
     unsafeAddress {
       unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: position))
     }
+    @_transparent
     @lifetime(self: copy self)
     unsafeMutableAddress {
       unsafe _unsafeAddressOfElement(unchecked: position)
