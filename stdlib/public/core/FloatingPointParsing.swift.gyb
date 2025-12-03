@@ -210,22 +210,15 @@ extension ${Self}: LosslessStringConvertible {
   // All-Swift implementation for Float16/32/64
   @available(SwiftStdlib 5.3, *)
   public init?(_ text: Substring) {
-    // TODO: Someday, this whole function should simplify down to just
-    // the following, but it's hard to do that today without relying on
-    // `if #available`, which inserts a pointless runtime check.  Someday,
-    // a richer availability story might make this possible.
-    /*
-     guard let parsed = parse_float${bits}(text.utf8.span) else {
-       return nil
-     }
-     self = parsed
-    */
-  // Always fail on 16-bit targets
+    // TODO: Someday, this whole function should simplify down to just:
+    // ${Self}(text.utf8.span)
   #if _pointerBitWidth(_16)
+    // Always fail on 16-bit targets
     return nil
   #else
+    // Work around span availability limits
     let parsed = unsafe text.base._guts.withFastUTF8 { chars -> ${Self}? in
-      unsafe parse_float${bits}(chars.span)
+      unsafe ${Self}(chars.span)
     }
 
     if let parsed {
