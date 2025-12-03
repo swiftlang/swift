@@ -812,8 +812,8 @@ public struct UnownedSerialExecutor: Sendable {
     // any SerialExecutor needs a raw witness table pointer, so mask off the low
     // bits, knowing the witness table pointer is aligned to the pointer size.
     let rawExecutorData = unsafe unsafeBitCast(executor, to: (UInt, UInt).self)
-    let mask = ~(UInt(MemoryLayout<UnsafeRawPointer>.alignment) - 1)
-    let alignedExecutor = unsafe (rawExecutorData.0, rawExecutorData.1 & mask)
+    let mask = unsafe ~(UInt(MemoryLayout<UnsafeRawPointer>.alignment) - 1)
+    let alignedExecutor = (rawExecutorData.0, rawExecutorData.1 & mask)
     return unsafe unsafeBitCast(alignedExecutor, to: (any SerialExecutor)?.self)
   }
 }
