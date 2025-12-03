@@ -940,6 +940,46 @@ void swift::conformToCxxSequenceIfNeeded(
   }
 }
 
+void swift::conformToCxxStackIfNeeded(ClangImporter::Implementation &impl,
+                                      NominalTypeDecl *decl,
+                                      const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("conforming to CxxStack", decl);
+  assert(decl);
+  assert(clangDecl);
+  ASTContext &ctx = decl->getASTContext();
+  if (!isStdDecl(clangDecl, {"stack"}))
+    return;
+  auto valueType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("value_type"));
+  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("size_type"));
+  if (!valueType || !sizeType)
+    return;
+  impl.addSynthesizedTypealias(decl, ctx.Id_Element,
+                               valueType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
+                               sizeType->getUnderlyingType());
+
+  ProtocolDecl *cxxInputIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
+  if (!cxxInputIteratorProto)
+    return;
+
+  auto rawReferenceType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("const_reference"));
+  if (!rawReferenceType)
+    return;
+
+  auto rawReferenceTy = rawReferenceType->getUnderlyingType();
+
+  if (!checkConformance(rawReferenceTy, cxxInputIteratorProto))
+    return;
+
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawReference"),
+                               rawReferenceTy);
+  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxStack});
+}
+
 static bool isStdSetType(const clang::CXXRecordDecl *clangDecl) {
   return isStdDecl(clangDecl, {"set", "unordered_set", "multiset"});
 }
@@ -953,6 +993,10 @@ bool swift::isUnsafeStdMethod(const clang::CXXMethodDecl *methodDecl) {
       dyn_cast<clang::CXXRecordDecl>(methodDecl->getDeclContext());
   if (!parentDecl)
     return false;
+  if (isStdDecl(parentDecl, {"stack"}) &&
+      methodDecl->getDeclName().isIdentifier() &&
+      methodDecl->getName() == "pop")
+    return true;
   if (!isStdSetType(parentDecl) && !isStdMapType(parentDecl))
     return false;
   if (methodDecl->getDeclName().isIdentifier() &&
