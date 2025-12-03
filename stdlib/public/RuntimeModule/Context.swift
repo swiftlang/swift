@@ -985,7 +985,7 @@ extension arm_gprs {
   #endif
 }
 
-extension ARM64Context {
+@_spi(Contexts) extension ARM64Context {
     public static var registerDumpOrder: [String] {
         get {
             let r = (Register.x0 ..< Register.x29).map { "\($0)" }
@@ -994,7 +994,7 @@ extension ARM64Context {
     }
 }
 
-extension ARMContext {
+@_spi(Contexts) extension ARMContext {
     public static var registerDumpOrder: [String] {
         get {
             let r = (Register.r0 ... Register.r10).map { "\($0)" }
@@ -1003,7 +1003,7 @@ extension ARMContext {
     }
 }
 
-extension I386Context {
+@_spi(Contexts) extension I386Context {
     public static var registerDumpOrder: [String] {
         get {
             let r = (Register.eax ... Register.edi).map { "\($0)" }
@@ -1012,7 +1012,7 @@ extension I386Context {
     }
 }
 
-extension X86_64Context {
+@_spi(Contexts) extension X86_64Context {
     public static var registerDumpOrder: [String] {
         get {
             let r = (Register.rax ... Register.r15).map { "\($0)" }

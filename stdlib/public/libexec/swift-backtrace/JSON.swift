@@ -26,36 +26,27 @@ import CRT
 @_spi(Internal) import Runtime
 @_spi(MemoryReaders) import Runtime
 @_spi(Utils) import Runtime
+@_spi(CrashLog) import Runtime
 
-public enum BacktraceJSONFormatterBacktrace {
-  case raw(Backtrace)
-  case symbolicated(SymbolicatedBacktrace)
-}
 extension TargetThread {
-  func getBacktrace() -> BacktraceJSONFormatterBacktrace {
+  func getBacktrace<Address:FixedWidthInteger>() ->
+  [CrashLog<Address>.Frame] {
     switch backtrace {
       case .raw(let bt):
-        return .raw(bt)
+        bt.frames.compactMap { CrashLog<Address>.Frame(fromFrame: $0) }
       case .symbolicated(let sbt):
-        return .symbolicated(sbt)
+        sbt.frames.compactMap { CrashLog<Address>.Frame(fromFrame: $0) }
     }
   }
 }
 
 extension CrashLog.Thread {
   init(backtraceThread: TargetThread, isCrashingThread: Bool) {
-    let frames = switch backtraceThread.getBacktrace() {
-      case .raw(let backtrace):
-        backtrace.frames.compactMap { CrashLog.Frame(fromFrame: $0) }
-      case .symbolicated(let backtrace):
-        backtrace.frames.compactMap { CrashLog.Frame(fromFrame: $0) }
-    }
-
     self.init(
       name: backtraceThread.name,
       crashed: isCrashingThread,
       registers: [:],
-      frames: frames)
+      frames: backtraceThread.getBacktrace())
   }
 }
 
@@ -88,27 +79,16 @@ extension SwiftBacktrace {
         architecture = backtrace.architecture
     }
 
-    let images = imageMap.images.map { CrashLog<HostContext.Address>.Image(fromImageMapImage: $0) }
+    let images =
+      imageMap.images.map {
+        CrashLog<HostContext.Address>.Image(fromImageMapImage: $0)
+      }
 
     let backtraceTime = Double(backtraceDuration.tv_sec)
         + 1.0e-9 * Double(backtraceDuration.tv_nsec)
 
-    var capturedMemory: [String:String] = [:]
-
-    let crashLogCapture = CrashLogCapture<HostContext.GPRValue> { value in
-      if let bytes = try? target.reader.fetch(
-          from: RemoteMemoryReader.Address(value),
-          count: 16,
-          as: UInt8.self)
-      {
-        let formattedBytes = bytes
-          .map{ hex($0, withPrefix: false) }
-          .joined(separator: "")
-
-        let memoryAddress = hex(UInt64(truncatingIfNeeded: value))
-        capturedMemory[memoryAddress] = formattedBytes
-      }
-    }
+    let crashLogCapture =
+      CrashLogCapture<HostContext.GPRValue>(memoryReader: target.reader)
     
     let threads = target.threads.map {
       var thread = CrashLog<HostContext.Address>.Thread(
@@ -130,7 +110,7 @@ extension SwiftBacktrace {
       platform: target.images.platform,
       architecture: architecture,
       threads: threads,
-      capturedMemory: capturedMemory,
+      capturedMemory: crashLogCapture.capturedMemory,
       omittedImages: 0, // this will be calculated during write out
       images: images,
       backtraceTime: backtraceTime )
@@ -144,25 +124,5 @@ struct SwiftBacktraceWriter: BacktraceJSONWriter {
 
   func writeln(_ string: String, flush: Bool) {
     SwiftBacktrace.writeln(string, flush: flush)
-  }
-}
-
-extension SwiftBacktrace {
-  static func outputJSONCrashLog(crashLog: CrashLog<HostContext.Address>,
-  options: BacktraceJSONFormatterOptions) {
-    var jsonFormatter = BacktraceJSONFormatter(
-      crashLog: crashLog,
-      writer: SwiftBacktraceWriter(),
-      options: options)
-
-    jsonFormatter.writePreamble(now: formatISO8601(now))
-
-    jsonFormatter.writeThreads()
-
-    jsonFormatter.writeCapturedMemory()
-
-    jsonFormatter.writeImages()
-
-    jsonFormatter.writeFooter()
   }
 }

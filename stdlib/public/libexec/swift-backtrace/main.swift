@@ -26,6 +26,7 @@ import CRT
 @_spi(Contexts) import Runtime
 @_spi(Registers) import Runtime
 @_spi(MemoryReaders) import Runtime
+@_spi(CrashLog) import Runtime
 
 @main
 internal struct SwiftBacktrace {
@@ -497,6 +498,7 @@ Generate a backtrace for the parent process.
     if (args.demangle) { options.formUnion(.demangle) }
     if (args.sanitize == true) { options.formUnion(.sanitize) }
     if (args.showImages == .mentioned) { options.formUnion(.mentionedImages) }
+    if (args.showImages != ImagesToShow.none) { options.formUnion(.images) }
     if (args.threads == true) { options.formUnion(.allThreads) }
     return options
   }
@@ -695,7 +697,15 @@ Generate a backtrace for the parent process.
           return
         }
 
-        outputJSONCrashLog(crashLog: crashLog, options: getJsonBacktraceFormatterOptions())
+        let writer = SwiftBacktraceWriter()
+        let options = getJsonBacktraceFormatterOptions()
+
+        var backtraceFormatter = BacktraceJSONFormatter(
+          crashLog: crashLog,
+          writer: writer,
+          options: options)
+
+        backtraceFormatter.writeCrashLog(now: formatISO8601(now))
     }
 
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)

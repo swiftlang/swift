@@ -16,21 +16,38 @@
 
 import Swift
 
-@_spi(Formatting)
+@_spi(CrashLog)
 public class CrashLogCapture<Address: FixedWidthInteger> {
   public typealias Thread = CrashLog<Address>.Thread
 
-  public let captureMemory: ((Address) -> Void)
+  private(set) public var capturedMemory: [String:String] = [:]
 
-  public init(captureMemory: @escaping (Address) -> Void) {
-    self.captureMemory = captureMemory
+  private let memoryReader: MemoryReader
+
+  public init(memoryReader: MemoryReader) {
+    self.memoryReader = memoryReader
+  }
+
+  private func captureMemory(value: Address) -> Void {
+    if let bytes = try? memoryReader.fetch(
+        from: MemoryReader.Address(value),
+        count: 16,
+        as: UInt8.self)
+    {
+      let formattedBytes = bytes
+        .map{ hex($0, prefix: false) }
+        .joined(separator: "")
+
+      let memoryAddress = hex(UInt64(truncatingIfNeeded: value), prefix: true)
+      capturedMemory[memoryAddress] = formattedBytes
+    }
   }
 
   func captureRegister(name: String,
   value: Address,
   into thread: inout Thread) {
     thread.registers?[name] = hex(value)
-    captureMemory(value)
+    captureMemory(value: value)
   }
 
   func captureRegister<C: Context>(

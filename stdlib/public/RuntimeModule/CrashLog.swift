@@ -16,6 +16,7 @@
 
 import Swift
 
+@_spi(CrashLog)
 public struct CrashLog<Address: FixedWidthInteger>: Codable {
     public struct Frame: Codable {
         enum CodingKeys: String, CodingKey {
@@ -61,6 +62,10 @@ public struct CrashLog<Address: FixedWidthInteger>: Codable {
         public var description: String?
         public var image: String?
         public var sourceLocation: SourceLocation?
+        // this variable is not intended to be directly streamed to/from JSON
+        // but is used internally from capture to construct the description
+        // for JSON
+        public var demangledName: String?
 
         public var inlined: Bool = false
         public var isSwiftRuntimeFailure: Bool = false
@@ -80,6 +85,39 @@ public struct CrashLog<Address: FixedWidthInteger>: Codable {
               case .truncated:
                 "\"kind\": \"truncated\""
             }
+        }
+
+        public init(kind: Kind, address: String?) {
+            self.kind = kind
+            self.address = address
+        }
+
+        public init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            kind = try values.decode(Kind.self, forKey: .kind)
+            address = try values.decodeIfPresent(String.self, forKey: .address)
+            count = try values.decodeIfPresent(Int.self, forKey: .count)
+            symbol = try values.decodeIfPresent(String.self, forKey: .symbol)
+            offset = try values.decodeIfPresent(Int.self, forKey: .offset)
+            description = try values.decodeIfPresent(String.self, forKey: .description)
+            image = try values.decodeIfPresent(String.self, forKey: .image)
+            sourceLocation = try values.decodeIfPresent(SourceLocation.self, forKey: .sourceLocation)
+
+            inlined = try values.decodeIfPresent(
+                Bool.self,
+                forKey: .inlined) ?? false
+
+            isSwiftRuntimeFailure = try values.decodeIfPresent(
+                Bool.self,
+                forKey: .isSwiftRuntimeFailure) ?? false
+
+            isSwiftThunk = try values.decodeIfPresent(
+                Bool.self,
+                forKey: .isSwiftThunk) ?? false
+
+            isSystem = try values.decodeIfPresent(
+                Bool.self,
+                forKey: .isSystem) ?? false
         }
     }
 
@@ -106,6 +144,19 @@ public struct CrashLog<Address: FixedWidthInteger>: Codable {
         public var path: String?
         public var baseAddress: String
         public var endOfText: String
+
+        public init(
+            name: String?,
+            buildId: String?,
+            path: String?,
+            baseAddress: String,
+            endOfText: String) {
+                self.name = name
+                self.buildId = buildId
+                self.path = path
+                self.baseAddress = baseAddress
+                self.endOfText = endOfText
+            }
     }
 
     // all of these fields are present in all crash logs from swift-backtrace
@@ -164,17 +215,64 @@ extension CrashLog.Frame.SourceLocation {
         line = symbol.line
         column = symbol.column
     }
+
+    func symbolicatedSourceLocation() -> SymbolicatedBacktrace.SourceLocation {
+        .init(path: file, line: line, column: column)
+    }
 }
 
 extension CrashLog.Frame {
     func richFrame() -> RichFrame<Address>? {
         switch (kind, CrashLog.addressFromString(address), count) {
-            case (.programCounter, let addr?, _): return .programCounter(addr)
-            case (.returnAddress, let addr?, _): return .returnAddress(addr)
-            case (.asyncResumePoint, let addr?, _): return .asyncResumePoint(addr)
-            case (.omittedFrames, _, let ommittedFrames?): return .omittedFrames(ommittedFrames)
-            case (.truncated, _, _): return .truncated
-            default: return nil
+            case (.programCounter, let addr?, _):
+                .programCounter(addr)
+            case (.returnAddress, let addr?, _):
+                .returnAddress(addr)
+            case (.asyncResumePoint, let addr?, _):
+                .asyncResumePoint(addr)
+            case (.omittedFrames, _, let ommittedFrames?):
+                .omittedFrames(ommittedFrames)
+            case (.truncated, _, _):
+                .truncated
+            default:
+                nil
+        }
+    }
+
+    func backtraceFrame() -> Backtrace.Frame? {
+        switch (kind, address != nil ? Backtrace.Address(address!) : nil, count) {
+        case (.programCounter, let address?, _):
+            .programCounter(address)
+        case (.returnAddress, let address?, _):
+            .returnAddress(address)
+        case (.asyncResumePoint, let address?, _):
+            .asyncResumePoint(address)
+        case (.omittedFrames, _, let count?):
+            .omittedFrames(count)
+        case (.truncated, _, _):
+            .truncated
+        default:
+            nil
+        }
+    }
+
+    func symbol(imageIndex: Int) -> SymbolicatedBacktrace.Symbol {
+        .init(
+            imageIndex: imageIndex,
+            imageName: image ?? "???",
+            rawName: symbol ?? "???",
+            offset: offset ?? 0,
+            sourceLocation: sourceLocation?.symbolicatedSourceLocation())
+    }
+
+    func symbolicatedFrame(imageIndex: Int) -> SymbolicatedBacktrace.Frame? {
+        if let backtraceFrame = backtraceFrame() {
+            .init(
+                captured: backtraceFrame,
+                symbol: symbol(imageIndex: imageIndex),
+                inlined: inlined)
+        } else {
+            nil
         }
     }
 
@@ -194,7 +292,7 @@ extension CrashLog.Frame {
             }
 
             address = addr.hexRepresentation(nullAs: Address.self)
-            symbol = sbtSymbol.name
+            symbol = sbtSymbol.rawName
             offset = sbtSymbol.offset
             description = sbtSymbol.description
             image = sbtSymbol.imageName
@@ -203,6 +301,7 @@ extension CrashLog.Frame {
             isSwiftRuntimeFailure = frame.isSwiftRuntimeFailure
             isSwiftThunk = frame.isSwiftThunk
             isSystem = frame.isSystem
+            demangledName = sbtSymbol.name
 
             case (.omittedFrames(let count), _):
             self.count = count
@@ -269,6 +368,19 @@ public extension CrashLog.Thread {
     func backtrace(architecture: String, images: ImageMap?) -> Backtrace {
         let frames = self.frames.compactMap { $0.richFrame() }
         return Backtrace(architecture: architecture, frames: frames, images: images)
+    }
+
+    func symbolicatedBacktrace(architecture: String, images: ImageMap?) -> SymbolicatedBacktrace? {
+        guard let images else { return nil }
+        let backtrace = backtrace(architecture: architecture, images: images)
+        let frames = self.frames.compactMap { frame in
+            frame.symbolicatedFrame(imageIndex:
+                images.images.firstIndex(where:
+                    { $0.name == frame.image }
+                ) ?? -1
+            )
+        }
+        return .init(backtrace: backtrace, images: images, frames: frames)
     }
 
     mutating func updateWithBacktrace(symbolicatedBacktrace: SymbolicatedBacktrace) {
@@ -338,11 +450,11 @@ extension CrashLog {
         }
 
         guard let address,
-         let addressValue = Int(trimOx(address), radix: 16) else {
+         let addressValue = Address(trimOx(address), radix: 16) else {
             return nil
         }
         
-        return Address(addressValue)
+        return addressValue
     }
 
     @_spi(Testing)

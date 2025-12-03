@@ -41,16 +41,22 @@ public struct ImageMap: Collection, Sendable, Hashable {
   }
 
   /// We use UInt64s for addresses here.
-  typealias Address = UInt64
+  @_spi(Testing)
+  public typealias Address = UInt64
 
   /// The internal representation of an image.
   @_spi(Formatting)
   public struct Image: Sendable, Hashable {
-    var name: String?
-    var path: String?
-    var uniqueID: [UInt8]?
-    var baseAddress: Address
-    var endOfText: Address
+    @_spi(Testing)
+    public var name: String?
+    @_spi(Testing)
+    public var path: String?
+    @_spi(Testing)
+    public var uniqueID: [UInt8]?
+    @_spi(Testing)
+    public var baseAddress: Address
+    @_spi(Testing)
+    public var endOfText: Address
   }
 
   /// The name of the platform that captured this image map.
@@ -61,7 +67,8 @@ public struct ImageMap: Collection, Sendable, Hashable {
   public var images: [Image]
 
   /// The size of words used when capturing.
-  var wordSize: WordSize
+  @_spi(Testing)
+  public var wordSize: WordSize
 
   /// Construct an ImageMap.
   init(platform: String, images: [Image], wordSize: WordSize) {
