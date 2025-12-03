@@ -4622,9 +4622,13 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
         }
         genericParamCounts.push_back(genericParamCount);
 
+        SmallVector<Requirement, 2> reqs;
+        SmallVector<InverseRequirement, 2> inverses;
+        signature->getRequirementsWithInverses(reqs, inverses);
+
         auto flags = GenericEnvironmentFlags()
           .withNumGenericParameterLevels(genericParamCounts.size())
-          .withNumGenericRequirements(signature.getRequirements().size());
+          .withNumGenericRequirements(reqs.size());
 
         ConstantStructBuilder fields = builder.beginStruct();
         fields.setPacked(true);
@@ -4651,7 +4655,7 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
         fields.addAlignmentPadding(Alignment(4));
 
         // Generic requirements
-        irgen::addGenericRequirements(*this, fields, signature);
+        irgen::addGenericRequirements(*this, fields, signature, reqs, inverses);
         return fields.finishAndCreateFuture();
       });
 }
