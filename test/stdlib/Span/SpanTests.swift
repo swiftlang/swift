@@ -635,11 +635,22 @@ func elementsEqual<S1: Sequence, S2: Sequence>(
   var iter1 = lhs.makeBorrowingIterator()
   var iter2 = rhs.makeBorrowingIterator()
   while true {
-    let el1 = iter1.nextSpan(maximumCount: 1)
-    let el2 = iter2.nextSpan(maximumCount: 1)
-    if el1.isEmpty && el2.isEmpty { return true }
-    if el1.isEmpty || el2.isEmpty { return false }
-    if el1[0] != el2[0] { return false }
+    var el1 = iter1.nextSpan(maximumCount: .max)
+    
+    if el1.isEmpty {
+      // LHS is empty - sequences are equal iff RHS is also empty
+      let el2 = iter2.nextSpan(maximumCount: 1)
+      return el2.isEmpty
+    }
+    
+    while el1.count > 0 {
+      let el2 = iter2.nextSpan(maximumCount: el1.count)
+      if el2.isEmpty { return false }
+      for i in 0..<el2.count {
+        if el1[i] != el2[i] { return false }
+      }
+      el1 = el1.extracting(droppingFirst: el2.count)
+    }
   }
 }
 
