@@ -306,8 +306,6 @@ struct BridgedType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE EnumElementIterator getFirstEnumCaseIterator() const;
   BRIDGED_INLINE bool isEndCaseIterator(EnumElementIterator i) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getEnumCasePayload(EnumElementIterator i, BridgedFunction f) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef
-  getEnumCaseName(EnumElementIterator i) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType
   getEnumCasePayload(SwiftInt caseIndex, BridgedFunction f) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj
@@ -1442,11 +1440,6 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createConvertEscapeToNoEscape(BridgedValue originalFunction, BridgedType resultType, bool isLifetimeGuaranteed) const;
 
   SWIFT_IMPORT_UNSAFE void destroyCapturedArgs(BridgedInstruction partialApply) const;
-
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
-  createOptionalSome(BridgedValue operand, BridgedType type) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
-  createOptionalNone(BridgedType type) const;
 };
 
 // Context
@@ -1521,8 +1514,6 @@ struct BridgedContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getTupleType(BridgedArrayRef elementTypes) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getTupleTypeWithLabels(
       BridgedArrayRef elementTypes, BridgedArrayRef labels) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType
-  getOptionalType(BridgedASTType baseTy) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftArrayDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftMutableSpanDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getSILUndef(BridgedType type) const;

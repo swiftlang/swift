@@ -290,8 +290,8 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
 public struct EnumCase {
   public let enumElementDecl : EnumElementDecl
   public let payload: Type?
-  public let name: StringRef
   public let index: Int
+  public var name: StringRef { enumElementDecl.name }
 }
 
 public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
@@ -314,7 +314,6 @@ public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
       }
       return EnumCase(enumElementDecl: enumType.bridged.getEnumElementDecl(caseIterator).getAs(EnumElementDecl.self),
                       payload: enumType.bridged.getEnumCasePayload(caseIterator, function.bridged).typeOrNil,
-                      name: StringRef(bridged: enumType.bridged.getEnumCaseName(caseIterator)),
                       index: caseIndex)
     }
     return nil
@@ -331,7 +330,6 @@ public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
     if currentIndex == index && !enumType.bridged.isEndCaseIterator(iterator) {
       return EnumCase(enumElementDecl: enumType.bridged.getEnumElementDecl(iterator).getAs(EnumElementDecl.self),
                       payload: enumType.bridged.getEnumCasePayload(iterator, function.bridged).typeOrNil,
-                      name: StringRef(bridged: enumType.bridged.getEnumCaseName(iterator)),
                       index: index)
     }
     return nil
