@@ -3140,7 +3140,7 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
 
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
-                                        DeclContext *decl) const {
+                                        ValueDecl *decl) const {
   return LifetimeDependenceInfo::get(decl);
 }
 

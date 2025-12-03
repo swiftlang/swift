@@ -8610,8 +8610,8 @@ public:
   }
 
   void visitLifetimeAttr(LifetimeAttr *attr) {
-    // Caches lifetimes and raises diagnostics if there's an error.
-    closure->getLifetimeDependencies();
+    // Lifetime dependencies cannot be processed until the closure's type is known:
+    // Nothing to do for now.
   }
 
   void visitSendableAttr(SendableAttr *attr) {

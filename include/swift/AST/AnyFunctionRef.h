@@ -97,8 +97,6 @@ public:
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *FD = dyn_cast<FuncDecl>(AFD))
         return FD->mapTypeIntoEnvironment(FD->getResultInterfaceType());
-      if (auto *CD = dyn_cast<ConstructorDecl>(AFD))
-        return CD->mapTypeIntoEnvironment(CD->getResultInterfaceType());
       return TupleType::getEmpty(AFD->getASTContext());
     }
     return cast<AbstractClosureExpr *>(TheFunction)->getResultType();
@@ -207,42 +205,7 @@ public:
     }
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
-
-  bool isImplicit() const {
-    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      return afd->isImplicit();
-    }
-
-    return cast<AbstractClosureExpr *>(TheFunction)->isImplicit();
-  }
-
-  bool hasImplicitSelfDecl() const {
-    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      return afd->hasImplicitSelfDecl();
-    }
-    if (TheFunction.dyn_cast<AbstractClosureExpr *>()) {
-      // Closures never have an implicit self decl.
-      return false;
-    }
-    llvm_unreachable("unexpected AnyFunctionRef representation");
-  }
-
-  ParamDecl *getImplicitSelfDecl(bool createIfNeeded) {
-    if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      return afd->getImplicitSelfDecl(createIfNeeded);
-    }
-    if (TheFunction.dyn_cast<AbstractClosureExpr *>()) {
-      // Closures never have an implicit self decl.
-      return nullptr;
-    }
-    llvm_unreachable("unexpected AnyFunctionRef representation");
-  }
-
-  ParamDecl *getImplicitSelfDeclWithoutCreating() const {
-    // getImplicitSelfDecl only mutates if createIfNeeded is true.
-    return const_cast<AnyFunctionRef*>(this)->getImplicitSelfDecl(false);
-  }
-
+  
   SourceLoc getLoc(bool SerializedOK = true) const {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       return afd->getLoc(SerializedOK);
