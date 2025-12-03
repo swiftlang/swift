@@ -183,8 +183,8 @@ const char InvalidEnumValueError::ID = '\0';
 void InvalidEnumValueError::anchor() {}
 const char ConformanceXRefError::ID = '\0';
 void ConformanceXRefError::anchor() {}
-const char InavalidAvailabilityDomainError::ID = '\0';
-void InavalidAvailabilityDomainError::anchor() {}
+const char InvalidAvailabilityDomainError::ID = '\0';
+void InvalidAvailabilityDomainError::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
@@ -5777,9 +5777,9 @@ decodeDomainKind(uint8_t kind) {
   }
 }
 
-static std::optional<AvailabilityDomain>
-decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
-                         PlatformKind platformKind, ValueDecl *decl) {
+static AvailabilityDomain
+decodeNonCustomAvailabilityDomain(AvailabilityDomainKind domainKind,
+                                  PlatformKind platformKind) {
   switch (domainKind) {
   case AvailabilityDomainKind::Universal:
     return AvailabilityDomain::forUniversal();
@@ -5794,7 +5794,8 @@ decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
   case AvailabilityDomainKind::Platform:
     return AvailabilityDomain::forPlatform(platformKind);
   case AvailabilityDomainKind::Custom:
-    return AvailabilityDomain::forCustom(decl);
+    llvm_unreachable("custom domains aren't handled here");
+    return AvailabilityDomain::forUniversal();
   }
 }
 
@@ -5808,7 +5809,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   bool isSPI;
   uint8_t rawDomainKind;
   unsigned rawPlatform;
-  DeclID domainDeclID;
+  DeclID customDomainID;
   DEF_VER_TUPLE_PIECES(Introduced);
   DEF_VER_TUPLE_PIECES(Deprecated);
   DEF_VER_TUPLE_PIECES(Obsoleted);
@@ -5817,7 +5818,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   // Decode the record, pulling the version tuple information.
   serialization::decls_block::AvailableDeclAttrLayout::readRecord(
       scratch, isImplicit, isUnavailable, isDeprecated, isNoAsync, isSPI,
-      rawDomainKind, rawPlatform, domainDeclID,
+      rawDomainKind, rawPlatform, customDomainID,
       LIST_VER_TUPLE_PIECES(Introduced), LIST_VER_TUPLE_PIECES(Deprecated),
       LIST_VER_TUPLE_PIECES(Obsoleted), messageSize, renameSize);
 
@@ -5849,24 +5850,49 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   else
     kind = AvailableAttr::Kind::Default;
 
-  ValueDecl *domainDecl = nullptr;
-  if (domainDeclID) {
-    Decl *decodedDomainDecl = nullptr;
-    SET_OR_RETURN_ERROR(decodedDomainDecl, MF.getDeclChecked(domainDeclID));
+  AvailabilityDomain domain;
+  if (domainKind == AvailabilityDomainKind::Custom) {
+    if (customDomainID & 0x01) {
+      IdentifierID customDomainNameID = customDomainID >> 1;
+      Identifier customDomainName = MF.getIdentifier(customDomainNameID);
+      SmallVector<AvailabilityDomain, 1> foundDomains;
+      if (ctx.MainModule) {
+        ctx.MainModule->lookupAvailabilityDomains(
+            customDomainName, foundDomains);
+      }
 
-    if (decodedDomainDecl) {
-      domainDecl = dyn_cast<ValueDecl>(decodedDomainDecl);
-      if (!domainDecl)
-        return llvm::make_error<InavalidAvailabilityDomainError>();
+      if (foundDomains.size() == 1) {
+        domain = foundDomains[0];
+      } else {
+        ctx.Diags.diagnose(
+            SourceLoc(), diag::serialization_dropped_custom_availability,
+            customDomainName);
+        domain = AvailabilityDomain::forUniversal();
+      }
+    } else {
+      DeclID domainDeclID = customDomainID >> 1;
+      Decl *decodedDomainDecl = nullptr;
+      SET_OR_RETURN_ERROR(decodedDomainDecl, MF.getDeclChecked(domainDeclID));
+
+      if (decodedDomainDecl) {
+        auto domainDecl = dyn_cast<ValueDecl>(decodedDomainDecl);
+        if (!domainDecl)
+          return llvm::make_error<InvalidAvailabilityDomainError>();
+
+        if (auto customDomain = AvailabilityDomain::forCustom(domainDecl))
+          domain = *customDomain;
+        else
+          return llvm::make_error<InvalidAvailabilityDomainError>();
+      } else {
+        return llvm::make_error<InvalidAvailabilityDomainError>();
+      }
     }
+  } else {
+    domain = decodeNonCustomAvailabilityDomain(domainKind, platform);
   }
 
-  auto domain = decodeAvailabilityDomain(domainKind, platform, domainDecl);
-  if (!domain)
-    return llvm::make_error<InavalidAvailabilityDomainError>();
-
   auto attr = new (ctx)
-      AvailableAttr(SourceLoc(), SourceRange(), *domain, SourceLoc(), kind,
+      AvailableAttr(SourceLoc(), SourceRange(), domain, SourceLoc(), kind,
                     message, rename, Introduced, SourceRange(), Deprecated,
                     SourceRange(), Obsoleted, SourceRange(), isImplicit, isSPI);
   return attr;

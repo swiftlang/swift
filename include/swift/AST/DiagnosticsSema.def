@@ -893,7 +893,8 @@ ERROR(serialization_xref_to_hidden_dependency,none,
       "invalid reference to implementation-only imported module %0"
       "%select{| for %1}1",
       (const ModuleDecl *, const Decl *))
-
+WARNING(serialization_dropped_custom_availability,none,
+        "ignoring unresolved custom availability domain %0", (Identifier))
 WARNING(can_import_invalid_swiftmodule,none,
         "canImport() evaluated to false due to invalid swiftmodule: %0", (StringRef))
 
