@@ -1,5 +1,5 @@
 import sys
-from multiprocessing import cpu_count
+import os
 import time
 from typing import Callable, List, Any, Optional, Tuple, Union
 from threading import Lock, Thread, Event
@@ -91,7 +91,7 @@ class ParallelRunner:
         if n_threads == 0:
             # Limit the number of threads as the performance regresses if the
             # number is too high.
-            n_threads = min(cpu_count() * 2, 16)
+            n_threads = min(os.cpu_count() * 2, 16)
         self._n_threads = n_threads
         self._monitor_polling_period = 0.1
         self._terminal_width = shutil.get_terminal_size().columns
