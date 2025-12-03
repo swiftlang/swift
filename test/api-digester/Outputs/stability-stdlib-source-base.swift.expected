@@ -379,3 +379,6 @@ Accessor UnsafeMutableBufferPointer.indices.Get() has generic signature change f
 
 Func type(of:) has generic signature change from <T, Metatype> to <T, Metatype where T : ~Copyable, T : ~Escapable>
 Func type(of:) has parameter 0 changing from Default to Shared
+
+Func Sequence.reduce(_:_:) has generic signature change from <Self, Result where Self : Swift.Sequence> to <Self, Result where Self : Swift.Sequence, Result : ~Copyable>
+Func Sequence.reduce(_:_:) has parameter 0 changing from Default to Owned

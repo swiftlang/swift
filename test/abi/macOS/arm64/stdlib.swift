@@ -1161,3 +1161,6 @@ Added: _$ss13EncodingErrorO16debugDescriptionSSvg
 Added: _$ss13EncodingErrorO16debugDescriptionSSvpMV
 Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesMc
 Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesWP
+
+// Change reduce to take args consuming
+Added: _$sSTsE6reduceyqd__qd__n_qd__qd__n_7ElementQztKXEtKRi_d__lF

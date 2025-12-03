@@ -664,8 +664,8 @@ extension Sequence {
   ///   the result is `initialResult`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @inlinable
-  public func reduce<Result>(
+  @usableFromInline
+  internal func reduce<Result>(
     _ initialResult: Result,
     _ nextPartialResult:
       (_ partialResult: Result, Element) throws -> Result
@@ -675,6 +675,20 @@ extension Sequence {
       accumulator = try nextPartialResult(accumulator, element)
     }
     return accumulator
+  }
+  
+  @inlinable
+  @available(SwiftStdLib 5.0)
+  @backDeployed(before: SwiftStdLib 6.3)
+  public func reduce<Result: ~Copyable>(
+    _ initialResult: consuming Result,
+    _ nextPartialResult:
+      (_ partialResult: consuming Result, Element) throws -> Result
+  ) rethrows -> Result {
+    for element in self {
+      initialResult = try nextPartialResult(initialResult, element)
+    }
+    return initialResult
   }
 
   /// Returns the result of combining the elements of the sequence using the

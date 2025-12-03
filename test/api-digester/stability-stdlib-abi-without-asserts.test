@@ -883,4 +883,7 @@ Func _uint64ToStringImpl(_:_:_:_:_:) is a new API without '@available'
 Enum DecodingError has added a conformance to an existing protocol CustomDebugStringConvertible
 Enum EncodingError has added a conformance to an existing protocol CustomDebugStringConvertible
 
+// Make Reduce consume initial value. Old one is still there @usableFromInline and confuses the ABI checker
+Func Sequence.reduce(_:_:) is a new API without '@available'
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
