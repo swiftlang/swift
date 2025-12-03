@@ -1921,6 +1921,7 @@ internal func _swift_stdlib_strtof16_clocale(
   fatalError()
 }
 
+@available(SwiftStdlib 5.3, *)
 internal func parse_float16(_ span: Span<UInt8>) -> Optional<Float16> {
   let targetFormat = TargetFormat(
     significandBits: 11,
