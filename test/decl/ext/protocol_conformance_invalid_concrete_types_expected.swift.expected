@@ -1,0 +1,11 @@
+// CHECK: protocol_conformance_invalid_concrete_types_expected.swift:8:17: error: non-protocol type 'S' cannot be used in a conformance list
+// CHECK: extension C2: S {}
+// CHECK:                 ^
+//
+// CHECK: protocol_conformance_invalid_concrete_types_expected.swift:9:17: error: non-protocol type 'C1' cannot be used in a conformance list
+// CHECK: extension C2: C1 {}
+// CHECK:                  ^
+//
+// CHECK: protocol_conformance_invalid_concrete_types_expected.swift:10:17: error: protocol conformance list cannot contain concrete type 'C1'
+// CHECK: extension C2: C1 & P {}
+// CHECK:                  ^
