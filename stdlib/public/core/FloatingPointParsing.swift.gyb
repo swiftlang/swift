@@ -220,7 +220,10 @@ extension ${Self}: LosslessStringConvertible {
      }
      self = parsed
     */
-
+  // Always fail on 16-bit targets
+  #if _pointerBitWidth(_16)
+    return nil
+  #else
     let parsed = unsafe text.base._guts.withFastUTF8 { chars -> ${Self}? in
       unsafe parse_float${bits}(chars.span)
     }
@@ -230,6 +233,7 @@ extension ${Self}: LosslessStringConvertible {
     } else {
       return nil
     }
+  #endif
   }
   % else:
 

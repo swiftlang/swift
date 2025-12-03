@@ -1,3 +1,4 @@
+
 //===--- FloatingPointFromString.swift -----------------------*- Swift -*-===//
 //
 // This source file is part of the Swift.org open source project
@@ -160,6 +161,8 @@
 // only using the first digits of the significand in cases where the
 // additional digits do not affect the result.
 
+// Not supported on 16-bit platforms at all right now.
+#if !_pointerBitWidth(_16)
 
 // Table for fast parsing of octal/decimal/hex strings
 fileprivate let _hexdigit : _InlineArray<256, UInt8> = [
@@ -2505,3 +2508,5 @@ internal func parse_float64(_ span: Span<UInt8>) -> Optional<Float64> {
     return nil
   }
 }
+
+#endif // !_pointerBitWidth(_16)
