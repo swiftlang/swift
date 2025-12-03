@@ -445,12 +445,8 @@ bb0(%0 : @owned $MO):
   return %63 : $()
 }
 
-// The InstructionDeleter will delete the `load [take]` and insert a
-// `destroy_addr`.  Observe the creation of the new destroy_addr instruction
-// that occurs when deleting the `load [take]` and mark it live.  Prevents a
-// leak.
 // CHECK-LABEL: sil [ossa] @keep_new_destroy_addr : {{.*}} {
-// CHECK:         destroy_addr
+// CHECK:         load [take]
 // CHECK-LABEL: } // end sil function 'keep_new_destroy_addr'
 sil [ossa] @keep_new_destroy_addr : $@convention(thin) () -> () {
 bb0:

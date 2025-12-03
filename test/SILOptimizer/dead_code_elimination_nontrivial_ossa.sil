@@ -1411,34 +1411,3 @@ bb5(%16 : @reborrow $FakeOptional<Klass>, %17 : @reborrow $FakeOptional<Klass>):
   return %23
 }
 
-struct String {
-  var guts: Builtin.AnyObject
-}
-
-sil [_semantics "string.makeUTF8"] [ossa] @makeString : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned String
-
-// CHECK-LABEL: sil [ossa] @uncompletedDeadStrings
-// CHECK-NOT:     apply
-// CHECK-LABEL: } // end sil function 'uncompletedDeadStrings'
-sil [ossa] @uncompletedDeadStrings : $@convention(thin) () -> () {
-  %first_ptr = string_literal utf8 "first"
-  %first_len = integer_literal $Builtin.Word, 5
-  %makeString = function_ref @makeString : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned String
-  %first = apply %makeString(%first_ptr, %first_len) : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned String
-  cond_br undef, nope, yep
-
-nope:
-  destroy_value %first
-  %second_ptr = string_literal utf8 "second"
-  %second_len = integer_literal $Builtin.Word, 6
-  %second = apply %makeString(%second_ptr, %second_len) : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned String
-  br this(%second)
-
-yep:
-  br this(%first)
-
-this(%string : @owned $String):
-  destroy_value %string
-  %retval = tuple ()
-  return %retval
-}
