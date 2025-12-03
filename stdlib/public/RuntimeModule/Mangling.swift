@@ -53,7 +53,7 @@ internal import BacktracingImpl.Runtime
 ///   │ Swift 5+            ║   $s   │
 ///   └─────────────────────╨────────┘
 /// 
-/// This function also attempts to demangle C++ symbols starting with `_Z`.
+/// This function also attempts to demangle C++ symbols, where possible.
 ///
 /// - Parameters:
 ///   - mangledName: A mangled Swift symbol.
