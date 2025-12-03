@@ -260,6 +260,12 @@ std::string typeUSR(Type type) {
   if (!type)
     return "";
 
+  if (type->is<ModuleType>()) {
+    // ASTMangler does not support "module types". This can appear, for
+    // example, on the left-hand side of a `DotSyntaxBaseIgnoredExpr` for a
+    // module-qualified free function call: `Swift.print()`.
+    return "";
+  }
   if (type->hasArchetype()) {
     type = type->mapTypeOutOfEnvironment();
   }
@@ -279,6 +285,13 @@ std::string typeUSR(Type type) {
 std::string declTypeUSR(const ValueDecl *D) {
   if (!D)
     return "";
+
+  if (isa<ModuleDecl>(D)) {
+    // ASTMangler does not support "module types". This can appear, for
+    // example, on the left-hand side of a `DotSyntaxBaseIgnoredExpr` for a
+    // module-qualified free function call: `Swift.print()`.
+    return "";
+  }
 
   std::string usr;
   llvm::raw_string_ostream os(usr);
@@ -1471,7 +1484,11 @@ namespace {
         printFlag(value.isLocalCapture(), "is_local_capture");
         printFlag(value.isDynamicSelfMetadata(), "is_dynamic_self_metadata");
         if (auto *D = value.getDecl()) {
-          printRec(D, Label::always("decl"));
+          // We print the decl ref, not the full decl, to avoid infinite
+          // recursion when a function captures itself (and also because
+          // those decls are already printed elsewhere, so we don't need to
+          // print what could be a very large amount of information twice).
+          printDeclRefField(D, Label::always("decl"));
         }
         if (auto *E = value.getExpr()) {
           printRec(E, Label::always("expr"));
@@ -1896,10 +1913,8 @@ namespace {
       printFoot();
     }
     void visitAnyPattern(AnyPattern *P, Label label) {
-      if (P->isAsyncLet()) {
-        printCommon(P, "async_let ", label);
-      }
       printCommon(P, "pattern_any", label);
+      printFlag(P->isAsyncLet(), "async_let", DeclModifierColor);
       printFoot();
     }
     void visitTypedPattern(TypedPattern *P, Label label) {
