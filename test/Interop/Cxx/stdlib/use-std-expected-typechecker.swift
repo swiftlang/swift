@@ -1,7 +1,7 @@
 // RUN: not %target-swift-frontend %s -typecheck -I %S/Inputs -cxx-interoperability-mode=default -Xcc -std=c++23 -diagnostic-style llvm 2>&1 | %FileCheck %s
 
 // TODO <expected> not yet supported with libstdc++
-// XFAIL: OS=linux-gnu
+// UNSUPPORTED: OS=linux-gnu
 
 // https://github.com/apple/swift/issues/70226
 // UNSUPPORTED: OS=windows-msvc
