@@ -77,7 +77,7 @@ extension NoValues: Codable {}
 // Witness tables for Enum
 
 // CHECK-LABEL: sil_witness_table hidden <T where T : Equatable> Enum<T>: Equatable module synthesized_conformance_enum {
-// CHECK-NEXT:   method #Equatable."==": <Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool : @$s28synthesized_conformance_enum4EnumOyxGSQAASQRzlSQ2eeoiySbx_xtFZTW	// protocol witness for static Equatable.== infix(_:_:) in conformance <A> Enum<A>
+// CHECK-NEXT:   method #Equatable."==": <Self where Self : Equatable, Self : ~Copyable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool : @$s28synthesized_conformance_enum4EnumOyxGSQAASQRzlSQ2eeoiySbx_xtFZTW	// protocol witness for static Equatable.== infix(_:_:) in conformance <A> Enum<A>
 // CHECK-NEXT:   conditional_conformance (T: Equatable): dependent
 // CHECK-NEXT: }
 

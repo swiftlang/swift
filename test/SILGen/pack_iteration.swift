@@ -84,8 +84,8 @@ func iterateTrivial<each Element>(over element: repeat each Element) {
 // CHECK: tuple_pack_element_addr [[DYN_PACK_IDX]] of [[STACK1]] : $*(repeat each Element) as $*@pack_element("[[UUID]]") each Element
 // CHECK: tuple_pack_element_addr [[DYN_PACK_IDX]] of [[STACK2]] : $*(repeat each Element) as $*@pack_element("[[UUID]]") each Element
 // CHECK: [[METATYPE:%.*]] = metatype $@thick (@pack_element("[[UUID]]") each Element).Type
-// CHECK: [[WITNESS_METHOD:%.*]] = witness_method $@pack_element("[[UUID]]") each Element, #Equatable."==" : <Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool, [[OPEN_PACK_ELT]] : $Builtin.SILToken : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
-// CHECK: apply [[WITNESS_METHOD]]<@pack_element("[[UUID]]") each Element>([[STACK_LEFT]], [[STACK_RIGHT]], [[METATYPE]]) : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
+// CHECK: [[WITNESS_METHOD:%.*]] = witness_method $@pack_element("[[UUID]]") each Element, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool, [[OPEN_PACK_ELT]] : $Builtin.SILToken : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable, τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
+// CHECK: apply [[WITNESS_METHOD]]<@pack_element("[[UUID]]") each Element>([[STACK_LEFT]], [[STACK_RIGHT]], [[METATYPE]]) : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable, τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
 //
 // CHECK: } // end sil function '$s14pack_iteration11equalTuples3lhs3rhsSbxxQp_t_xxQp_ttRvzSQRzlF'
 func equalTuples<each Element: Equatable>(lhs: (repeat each Element), rhs: (repeat each Element)) -> Bool {
