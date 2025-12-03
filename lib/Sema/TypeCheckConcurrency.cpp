@@ -7378,6 +7378,12 @@ bool swift::checkSendableConformance(
   // Sendable supression allows conditional conformances only.
   if (nominal->suppressesConformance(KnownProtocolKind::Sendable)) {
     bool hasUnconditionalConformance = false;
+
+    if (auto *inherited = dyn_cast<InheritedProtocolConformance>(conformance)) {
+      hasUnconditionalConformance =
+          inherited->getConditionalRequirements().empty();
+    }
+
     if (auto *normalConf = dyn_cast<NormalProtocolConformance>(conformance)) {
       hasUnconditionalConformance =
           normalConf->getConditionalRequirements().empty();

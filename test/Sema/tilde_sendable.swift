@@ -119,4 +119,16 @@ do {
 
   testSendable(IsolatedC())
   // expected-warning@-1 {{type 'IsolatedC' does not conform to the 'Sendable' protocol}}
+
+  @MainActor
+  class IsolatedBase {} // derived as Sendable
+
+  class Child1: IsolatedBase, ~Sendable {}
+  // expected-error@-1 {{cannot both conform to and suppress conformance to 'Sendable'}}
+
+  class Base: Sendable {}
+  // expected-warning@-1 {{non-final class 'Base' cannot conform to the 'Sendable' protocol}}
+
+  class Child2: Base, ~Sendable {}
+  // expected-error@-1 {{cannot both conform to and suppress conformance to 'Sendable'}}
 }
