@@ -405,7 +405,9 @@ public:
   void enableErrorCache() {
     ErrorCache = std::make_unique<llvm::DenseMap<KeyT, TCError>>();
   }
-  void setError(const char *msg, const TypeRef *TR) { LastError = {msg, TR}; }
+
+  /// Set the LastError variable.
+  void setError(const char *msg, const TypeRef *TR = nullptr);
 
   /// Retreive the error and reset it.
   std::string takeLastError();
