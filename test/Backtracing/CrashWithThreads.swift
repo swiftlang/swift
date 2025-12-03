@@ -57,7 +57,7 @@ func spawnThread(_ shouldCrash: Bool) {
 
 let crashingThreadIndex = (1..<10).randomElement()
 
-for threadIndex in 0..<10 {
+for threadIndex in 1..<10 {
   spawnThread(threadIndex == crashingThreadIndex)
 }
 
