@@ -405,6 +405,9 @@ public:
   /// Suppress @_lifetime attribute and emit @lifetime instead.
   bool SuppressLifetimes = false;
 
+  /// Suppress custom availability domains.
+  bool SuppressCustomAvailability = false;
+
   /// Suppress @inline(always) attribute and emit @inline(__always) instead.
   bool SuppressInlineAlways = false;
 

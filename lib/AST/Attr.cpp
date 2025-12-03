@@ -2323,6 +2323,16 @@ AvailableAttr::AvailableAttr(
   Bits.AvailableAttr.IsGroupedWithWildcard = false;
 }
 
+void AvailableAttr::attachToDeclImpl(Decl *D) {
+  // Prefer to set the parent PatternBindingDecl as the owner for a VarDecl,
+  // this ensures we can handle PBDs with multiple vars.
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    if (auto *PBD = VD->getParentPatternBinding())
+      D = PBD;
+  }
+  Owner = D;
+}
+
 AvailableAttr *AvailableAttr::createUniversallyUnavailable(ASTContext &C,
                                                            StringRef Message,
                                                            StringRef Rename) {

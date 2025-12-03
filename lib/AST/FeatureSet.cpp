@@ -352,7 +352,15 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
-UNINTERESTING_FEATURE(CustomAvailability)
+
+static bool usesFeatureCustomAvailability(Decl *decl) {
+  for (auto attr : decl->getSemanticAvailableAttrs()) {
+    if (attr.getDomain().isCustom())
+      return true;
+  }
+
+  return false;
+}
 
 static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   // Explicit `@concurrent` attribute on the declaration.

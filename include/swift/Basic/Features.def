@@ -505,7 +505,7 @@ EXPERIMENTAL_FEATURE(AddressableParameters, true)
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
 
 /// Allow custom availability domains to be defined and referenced.
-EXPERIMENTAL_FEATURE(CustomAvailability, true)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
 
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
