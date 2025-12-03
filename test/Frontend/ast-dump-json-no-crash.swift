@@ -503,3 +503,11 @@ func outerFn() {
     }
     innerFun(shouldRecurse: true)
 }
+
+// Regression test: Discarded async lets were calling `printCommon` twice,
+// which resulted in invalid JSON (and not-so-great S-expression output)
+// either.
+func discardedAsyncLet() async {
+    func someTask() async {}
+    async let _ = someTask()
+}
