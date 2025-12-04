@@ -245,10 +245,7 @@ func emitLargestNameCount(_ names: [(UInt32, String)], into result: inout String
   }
   
   print("""
-  Please copy and paste the following into 'stdlib/public/SwiftShims/swift/shims/UnicodeData.h':
-  
-  #define SWIFT_STDLIB_LARGEST_NAME_COUNT \(largestCount)
-  
+  Please update the longest name count in 'stdlib/public/core/UnicodeScalarProperties.swift' to \(largestCount)
   """)
 }
 
