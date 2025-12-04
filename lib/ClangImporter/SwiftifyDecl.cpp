@@ -24,8 +24,10 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
+#include "clang/Basic/Module.h"
 
 using namespace swift;
 using namespace importer;
@@ -271,14 +273,15 @@ struct CountedByExpressionValidator
 };
 
 
-// Don't try to transform any Swift types that _SwiftifyImport doesn't know how
-// to handle.
-static bool SwiftifiableCountedByPointerType(Type swiftType) {
+static bool IsConcretePointerType(Type swiftType) {
   Type nonnullType = swiftType->lookThroughSingleOptionalType();
   PointerTypeKind PTK;
   return nonnullType->getAnyPointerElementType(PTK) &&
     (PTK == PTK_UnsafePointer || PTK == PTK_UnsafeMutablePointer);
 }
+
+// Don't try to transform any Swift types that _SwiftifyImport doesn't know how
+// to handle.
 static bool SwiftifiableSizedByPointerType(const clang::ASTContext &ctx,
                                            Type swiftType,
                                            const clang::CountAttributedType *CAT) {
@@ -311,7 +314,7 @@ static bool SwiftifiableCAT(const clang::ASTContext &ctx,
   return CAT && CountedByExpressionValidator().Visit(CAT->getCountExpr()) &&
     (CAT->isCountInBytes() ?
        SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
-     : SwiftifiableCountedByPointerType(swiftType));
+     : IsConcretePointerType(swiftType));
 }
 
 // Searches for template instantiations that are not behind type aliases.
@@ -328,6 +331,36 @@ struct UnaliasedInstantiationVisitor
     hasUnaliasedInstantiation = true;
     DLOG("Signature contains raw template, skipping");
     return false;
+  }
+};
+
+struct ForwardDeclaredConcreteTypeVisitor
+    : clang::RecursiveASTVisitor<ForwardDeclaredConcreteTypeVisitor> {
+  bool hasForwardDeclaredConcreteType = false;
+  clang::Module *Owner;
+
+  ForwardDeclaredConcreteTypeVisitor(clang::Module *Owner) : Owner(Owner) {};
+
+  bool VisitRecordType(clang::RecordType *RT) {
+    const clang::RecordDecl *RD = RT->getDecl()->getDefinition();
+    ASSERT(RD && "pointer to concrete type without type definition?");
+    const clang::Module *M = RD->getOwningModule();
+    if (!Owner->isModuleVisible(M)) {
+      hasForwardDeclaredConcreteType = true;
+      DLOG("Imported signature contains concrete type not available in clang module, skipping");
+      LLVM_DEBUG(DUMP(RD));
+      return false;
+    }
+    return true;
+  }
+
+  bool IsIncompatibleImport(Type SwiftTy, clang::QualType ClangTy) {
+    DLOG_SCOPE("Checking compatibility of type: " << ClangTy << "\n");
+    if (!IsConcretePointerType(SwiftTy)) {
+      return false;
+    }
+    TraverseType(ClangTy);
+    return hasForwardDeclaredConcreteType;
   }
 };
 
@@ -375,6 +408,8 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
 
   clang::ASTContext &clangASTContext = Self.getClangASTContext();
 
+  ForwardDeclaredConcreteTypeVisitor CheckForwardDecls(ClangDecl->getOwningModule());
+
   // We only attach the macro if it will produce an overload. Any __counted_by
   // will produce an overload, since UnsafeBufferPointer is still an improvement
   // over UnsafePointer, but std::span will only produce an overload if it also
@@ -389,6 +424,10 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     else
       ABORT("Unexpected AbstractFunctionDecl subclass.");
     clang::QualType clangReturnTy = ClangDecl->getReturnType();
+
+    if (CheckForwardDecls.IsIncompatibleImport(swiftReturnTy, clangReturnTy))
+      return false;
+
     bool returnIsStdSpan = printer.registerStdSpanTypeMapping(
         swiftReturnTy, clangReturnTy);
     auto *CAT = clangReturnTy->getAs<clang::CountAttributedType>();
@@ -440,6 +479,10 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       }
       ASSERT(swiftParam);
       Type swiftParamTy = swiftParam->getInterfaceType();
+
+      if (CheckForwardDecls.IsIncompatibleImport(swiftParamTy, clangParamTy))
+        return false;
+
       bool paramHasBoundsInfo = false;
       auto *CAT = clangParamTy->getAs<clang::CountAttributedType>();
       if (CAT && mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX) {
