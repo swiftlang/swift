@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bitset>
+#include <functional>
 #include <optional>
 #include <string>
 
