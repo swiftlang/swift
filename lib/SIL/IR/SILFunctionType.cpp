@@ -18,6 +18,7 @@
 
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
+#include "swift/SIL/AbstractionPattern.h"
 #define DEBUG_TYPE "libsil"
 
 #include "swift/AST/AnyFunctionRef.h"
@@ -1467,7 +1468,10 @@ public:
     ResultConvention convention;
 
     if (isBorrowAccessor(constant)) {
-      if (substResultTL.isTrivial()) {
+      if (substResultTL.getRecursiveProperties()
+                       .isAddressableForDependencies()) {
+        convention = ResultConvention::GuaranteedAddress;
+      } else if (substResultTL.isTrivial()) {
         convention = ResultConvention::Unowned;
       } else if (isFormallyReturnedIndirectly(origType, substType,
                                               substResultTLForConvention)) {
@@ -1674,6 +1678,7 @@ class DestructureInputs {
     AnyFunctionType::CanParam SubstSelfParam;
   };
   std::optional<ForeignSelfInfo> ForeignSelf;
+  std::optional<SILDeclRef> Constant;
   AbstractionPattern TopLevelOrigType = AbstractionPattern::getInvalid();
   SmallVectorImpl<SILParameterInfo> &Inputs;
   SmallVectorImpl<int> &ParameterMap;
@@ -1695,9 +1700,11 @@ public:
                     SmallVectorImpl<SILParameterInfo> &inputs,
                     SmallVectorImpl<int> &parameterMap,
                     SmallBitVector &addressableParams,
-                    SmallBitVector &conditionallyAddressableParams)
+                    SmallBitVector &conditionallyAddressableParams,
+                    std::optional<SILDeclRef> constant)
     : expansion(expansion), TC(TC), Convs(conventions), Foreign(foreign),
-      IsolationInfo(isolationInfo), Inputs(inputs),
+      IsolationInfo(isolationInfo),
+      Constant(constant), Inputs(inputs),
       ParameterMap(parameterMap),
       AddressableLoweredParameters(addressableParams),
       ConditionallyAddressableLoweredParameters(conditionallyAddressableParams)
@@ -1851,8 +1858,20 @@ private:
     // parameter, we should have processed it earlier in a call to
     // maybeAddForeignParameters().
     if (hasSelf && !hasForeignSelf) {
-      auto origParamType = origType.getFunctionParamType(numOrigParams - 1);
+      auto origParamType
+        = origType.getFunctionParamType(numOrigParams - 1);
       auto substParam = params.back();
+
+      // If the self type is addressable-for-dependencies, and this is a
+      // borrow accessor, then we should pass it indirectly, as an abstract.
+      // parameter.
+      if (isBorrowAccessor(Constant)
+          && TC.getTypeLowering(origParamType,
+                                substParam.getParameterType(), expansion)
+               .getRecursiveProperties()
+               .isAddressableForDependencies()) {
+        origParamType = AbstractionPattern::getOpaque();
+      }
       visit(origParamType, substParam,
             params.size() - 1,
             /*forSelf*/true,
@@ -2717,7 +2736,8 @@ static CanSILFunctionType getSILFunctionType(
                                    foreignInfo, actorIsolation, inputs,
                                    parameterMap,
                                    addressableParams,
-                                   conditionallyAddressableParams);
+                                   conditionallyAddressableParams,
+                                   constant);
     destructurer.destructure(origType, substFnInterfaceType.getParams(),
                              extInfoBuilder, unimplementable);
   }
@@ -2923,7 +2943,8 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
                                    actorIsolation, inputs,
                                    unusedParameterMap,
                                    unusedAddressableParams,
-                                   unusedConditionalAddressableParams);
+                                   unusedConditionalAddressableParams,
+                                   constant);
     destructurer.destructure(
         origType, substAccessorType.getParams(),
         extInfoBuilder.withRepresentation(SILFunctionTypeRepresentation::Thin),

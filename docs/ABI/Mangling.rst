@@ -1350,7 +1350,7 @@ Some kinds need arguments, which precede ``Tf``.
   spec-arg ::= identifier
   spec-arg ::= type
 
-  SPEC-INFO ::= FRAGILE? ASYNC-REMOVED? PASSID
+  SPEC-INFO ::= FRAGILE? (ASYNC-REMOVED|REPR-CHANGED)? PASSID
 
   PASSID ::= '0'                             // AllocBoxToStack,
   PASSID ::= '1'                             // ClosureSpecializer,
@@ -1361,10 +1361,12 @@ Some kinds need arguments, which precede ``Tf``.
   PASSID ::= '6'                             // MoveDiagnosticInOutToOut,
   PASSID ::= '7'                             // AsyncDemotion,
   PASSID ::= '8'                             // PackSpecialization,
+  PASSID ::= '9'                             // EmbeddedWitnessCallSpecialization
 
   FRAGILE ::= 'q'
 
   ASYNC-REMOVED ::= 'a'                      // async effect removed
+  REPR-CHANGED ::= 'r'                       // function type representation changed
 
   ARG-SPEC-KIND ::= 'n'                      // Unmodified argument
   ARG-SPEC-KIND ::= 'c'                      // Consumes n 'type' arguments which are closed over types in argument order

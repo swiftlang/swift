@@ -138,9 +138,18 @@ if(${PROJECT_NAME}_SINGLE_THREADED_MODE)
 else()
   target_sources(swiftSynchronization PRIVATE
     Mutex/Mutex.swift
+    # Apple Sources
     $<$<PLATFORM_ID:Darwin>:Mutex/DarwinImpl.swift>
+    # Android and Linux Sources
     $<$<PLATFORM_ID:Android,Linux>:Mutex/LinuxImpl.swift>
-    $<$<PLATFORM_ID:Android,WASI>:Mutex/SpinLoopHint.swift>
+    $<$<PLATFORM_ID:Android,Linux>:Mutex/SpinLoopHint.swift>
+    # FreeBSD Sources
+    $<$<PLATFORM_ID:FreeBSD>:Mutex/FreeBSDImpl.swift>
+    # OpenBSD Sources
+    $<$<PLATFORM_ID:OpenBSD>:Mutex/OpenBSDImpl.swift>
+    # Wasm Sources
+    $<$<PLATFORM_ID:WASI>:Mutex/WasmImpl.swift>
+    # Windows Sources
     $<$<PLATFORM_ID:Windows>:Mutex/WindowsImpl.swift>)
 endif()
 

@@ -53,7 +53,7 @@ enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 enum class AddrDbgInstrKind : uint8_t {
   DbgDeclare,
   DbgValueDeref,
-  DbgCoroFrameEntry,
+  DbgDeclareValue,
 };
 
 /// Helper object that keeps track of the current CompileUnit, File,

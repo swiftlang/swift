@@ -133,6 +133,17 @@ public:
     }
 
     if (auto *TD = dyn_cast<const TypeDecl *>(decl)) {
+      if (rpk == RepressibleProtocolKind::Sendable) {
+        auto *C = dyn_cast<ClassDecl>(TD);
+        if (C && C->isActor()) {
+          diagnoseInvalid(
+              repr, repr.getLoc(),
+              diag::conformance_repression_only_on_struct_class_enum,
+              ctx.getProtocol(*kp));
+          return Type();
+        }
+      }
+
       if (!(isa<StructDecl>(TD) || isa<ClassDecl>(TD) || isa<EnumDecl>(TD))) {
         diagnoseInvalid(repr, repr.getLoc(),
                         diag::conformance_repression_only_on_struct_class_enum,
@@ -2002,23 +2013,26 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
     return;
 
   // If we make a ~P marking but our protocol Self type still conforms to P,
-  // diagnose an error.
+  // diagnose an error. Same goes for associated types like Self.A.
   //
-  // FIXME: This duplicates logic from computeRequirementDiagnostics().
-  // Get the list of written inverses.
-  InvertibleProtocolSet inverses;
-  bool anyObject = false;
-  (void) getDirectlyInheritedNominalTypeDecls(proto, inverses, anyObject);
-
-  for (auto ip : inverses) {
-    auto kp = getKnownProtocolKind(ip);
-    auto *otherProto = ctx.getProtocol(kp);
-    if (!genericSig->requiresProtocol(selfTy, otherProto))
+  // NOTE: This duplicates logic from computeRequirementDiagnostics().
+  for (auto ir : proto->getInverseRequirements()) {
+    if (!genericSig->requiresProtocol(ir.subject, ir.protocol))
       continue;
 
-    ctx.Diags.diagnose(proto,
-                       diag::inverse_generic_but_also_conforms,
-                       selfTy, getProtocolName(kp));
+    // We didn't diagnose this as an error for associated types prior to
+    // SuppressedAssociatedTypesWithDefaults.
+    //
+    // FIXME: Once feature is enabled always, this exception should be lifted!
+    if (ir.subject->getAs<DependentMemberType>() &&
+        !ctx.LangOpts.hasFeature(
+            Feature::SuppressedAssociatedTypesWithDefaults)) {
+      continue;
+    }
+
+    auto name = getProtocolName(ir.protocol->getKnownProtocolKind().value());
+    ctx.Diags.diagnose(ir.loc, diag::inverse_generic_but_also_conforms,
+                       ir.subject, name);
   }
 
   auto requiredProtos = genericSig->getRequiredProtocols(selfTy);

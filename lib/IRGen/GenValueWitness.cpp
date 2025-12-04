@@ -1387,7 +1387,8 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
   // reasons to continue using "generic" value witness table functions i.e the
   // same once used for runtime instantiated generic metadata.
   if (!IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
-    if (auto boundGenericType = dyn_cast<BoundGenericType>(abstractType)) {
+    auto *nomDecl = abstractType->getNominalOrBoundGenericNominal();
+    if (abstractType->isSpecialized() && nomDecl) {
       CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);
 
       auto concreteLoweredType = IGM.getLoweredType(concreteFormalType);
@@ -1395,8 +1396,7 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
       auto packing = boundConcreteTI->getFixedPacking(IGM);
       boundGenericCharacteristics = {concreteLoweredType, boundConcreteTI,
                                      packing};
-      abstractType =
-          boundGenericType->getDecl()->getDeclaredType()->getCanonicalType();
+      abstractType = nomDecl->getDeclaredType()->getCanonicalType();
     }
   }
   CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);

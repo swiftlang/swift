@@ -75,6 +75,8 @@ PASS(MandatoryDestroyHoisting, "mandatory-destroy-hoisting",
      "Hoist destroy_value instructions for non-lexical values")
 PASS(DeadEndBlockDumper, "dump-deadendblocks",
      "Tests the DeadEndBlocks utility")
+PASS(EmbeddedWitnessCallSpecialization, "embedded-witness-call-specialization",
+     "Mandatory witness method call specialization")
 PASS(EscapeInfoDumper, "dump-escape-info",
      "Dumps escape information")
 PASS(AddressEscapeInfoDumper, "dump-addr-escape-info",
@@ -101,6 +103,8 @@ PASS(EarlyRedundantLoadElimination, "early-redundant-load-elimination",
      "Early Redundant Load Elimination")
 PASS(RedundantLoadElimination, "redundant-load-elimination",
      "Redundant Load Elimination")
+PASS(DeadAccessScopeElimination, "dead-access-scope-elimination",
+     "Removes dead, non-conflicting access scopes")
 PASS(DeadStoreElimination, "dead-store-elimination",
      "Dead Store Elimination")
 PASS(LifetimeDependenceDiagnostics,

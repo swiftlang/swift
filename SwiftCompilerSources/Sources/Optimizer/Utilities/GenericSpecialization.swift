@@ -48,6 +48,9 @@ private struct VTableSpecializer {
     }
 
     let classDecl = classType.nominal! as! ClassDecl
+    if classDecl.isForeign {
+      return
+    }
     guard let origVTable = context.lookupVTable(for: classDecl) else {
       if context.enableWMORequiredDiagnostics {
         context.diagnosticEngine.diagnose(.cannot_specialize_class, classType, at: errorLocation)
@@ -148,7 +151,7 @@ func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassC
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
             context.loadFunction(function: origMethod, loadCalleesRecursively: true),
             let specializedMethod = context.specialize(function: origMethod, for: methodSubs,
-                                                       convertIndirectToDirect: true, isMandatory: true)
+                                                       convertIndirectToDirect: false, isMandatory: true)
       else {
         return origEntry
       }
@@ -215,7 +218,7 @@ private func specializeDefaultMethods(for conformance: Conformance,
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
             context.loadFunction(function: origMethod, loadCalleesRecursively: true),
             let specializedMethod = context.specialize(function: origMethod, for: methodSubs,
-                                                       convertIndirectToDirect: true, isMandatory: true)
+                                                       convertIndirectToDirect: false, isMandatory: true)
       else {
         return origEntry
       }

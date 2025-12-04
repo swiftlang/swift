@@ -64,7 +64,6 @@ namespace {
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
     SILValue visitEndCOWMutationInst(EndCOWMutationInst *ECM);
-    SILValue visitBeginAccessInst(BeginAccessInst *BAI);
     SILValue visitMetatypeInst(MetatypeInst *MTI);
     SILValue visitConvertFunctionInst(ConvertFunctionInst *cfi);
 
@@ -416,16 +415,6 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
     if (Op->getOperand()->getType() == UBCI->getType())
       return Op->getOperand();
 
-  return SILValue();
-}
-
-SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
-  // Remove "dead" begin_access.
-  if (llvm::all_of(BAI->getUses(), [](Operand *operand) -> bool {
-        return isIncidentalUse(operand->getUser());
-      })) {
-    return BAI->getOperand();
-  }
   return SILValue();
 }
 

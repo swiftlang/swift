@@ -1373,12 +1373,13 @@ namespace {
     llvm::Constant *getStaticStride(IRGenModule &IGM) const override {
       return nullptr;
     }
-    StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                               const llvm::Twine &name) const override {
+    StackAddress
+    allocateStack(IRGenFunction &IGF, SILType T, const llvm::Twine &name,
+                  StackAllocationIsNested_t isNested) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
-    void deallocateStack(IRGenFunction &IGF, StackAddress addr,
-                         SILType T) const override {
+    void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T,
+                         StackAllocationIsNested_t isNested) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
     void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,

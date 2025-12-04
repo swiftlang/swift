@@ -864,7 +864,6 @@ GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_ThrowStmt:
   case CTP_ForEachSequence:
   case CTP_Unused:
-  case CTP_CannotFail:
   case CTP_YieldByReference:
   case CTP_EnumCaseRawValue:
   case CTP_ExprPattern:
@@ -973,7 +972,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
 
     case ConstraintLocator::ContextualType: {
       auto purpose = getContextualTypePurpose();
-      assert(!(purpose == CTP_Unused || purpose == CTP_CannotFail));
+      assert(purpose != CTP_Unused);
 
       // If this is call to a closure e.g. `let _: A = { B() }()`
       // let's point diagnostic to its result.
@@ -2949,9 +2948,7 @@ static std::optional<Diag<Type>>
 getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   switch (CTP) {
   case CTP_Unused:
-  case CTP_CannotFail:
-    llvm_unreachable("These contextual type purposes cannot fail with a "
-                     "conversion type specified!");
+    llvm_unreachable("Expected a contextual purpose");
   case CTP_Initialization:
     return diag::cannot_convert_initializer_value_nil;
 
@@ -3749,7 +3746,6 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_ThrowStmt:
   case CTP_ForEachSequence:
   case CTP_Unused:
-  case CTP_CannotFail:
   case CTP_YieldByReference:
   case CTP_ExprPattern:
     break;

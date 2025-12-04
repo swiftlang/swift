@@ -1487,13 +1487,13 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.RuntimeVariant =
           llvm::StringSwitch<std::optional<OutputInfo::MSVCRuntime>>(
               A->getValue())
-              .Cases("MD", "MultiThreadedDLL", "shared-ucrt",
+              .Cases({"MD", "MultiThreadedDLL", "shared-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreadedDLL)
-              .Cases("MDd", "MultiThreadedDebugDLL", "shared-debug-ucrt",
+              .Cases({"MDd", "MultiThreadedDebugDLL", "shared-debug-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreadedDebugDLL)
-              .Cases("MT", "MultiThreaded", "static-ucrt",
+              .Cases({"MT", "MultiThreaded", "static-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreaded)
-              .Cases("MTd", "MultiThreadedDebug", "static-debug-ucrt",
+              .Cases({"MTd", "MultiThreadedDebug", "static-debug-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreadedDebug)
               .Default(std::nullopt);
       if (!OI.RuntimeVariant)

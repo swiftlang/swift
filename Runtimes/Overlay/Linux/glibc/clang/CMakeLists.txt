@@ -28,6 +28,8 @@ add_library(SwiftGlibcClangOverlay INTERFACE
 target_compile_options(SwiftGlibcClangOverlay INTERFACE
   "$<BUILD_INTERFACE:$<$<COMPILE_LANGUAGE:Swift>:SHELL:-vfsoverlay ${CMAKE_CURRENT_BINARY_DIR}/glibc-overlay.yml>>")
 
+install(TARGETS SwiftGlibcClangOverlay EXPORT SwiftOverlayTargets)
+
 install(
   FILES
     "${CMAKE_CURRENT_BINARY_DIR}/glibc.modulemap"

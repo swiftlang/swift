@@ -19,7 +19,7 @@ func more() {
   let _: ~AnyObject // expected-error {{type 'AnyObject' cannot be suppressed}}
 }
 
-struct S4: ~(Copyable & Equatable) {} // expected-error {{conformance to 'Equatable' cannot be suppressed}}
+struct S4: ~(Copyable & Equatable) {} // expected-error {{type 'Copyable & Equatable' cannot be suppressed}}
 
 func blah<T>(_ t: borrowing T) where T: ~Copyable,
                                      T: ~Hashable {}  // expected-error@:41 {{type 'Hashable' cannot be suppressed}}

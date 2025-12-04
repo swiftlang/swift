@@ -1,0 +1,30 @@
+// RUN: %target-sil-opt -copy-propagation -enable-lexical-lifetimes=false %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class C {}
+
+// CHECK-LABEL: sil [ossa] @bitwise_escape :
+// CHECK-NOT:     destroy_value
+// CHECK:         strong_copy_unmanaged_value
+// CHECK:         destroy_value
+// CHECK-LABEL: } // end sil function 'bitwise_escape'
+sil [ossa] @bitwise_escape : $@convention(thin) (@owned Builtin.BridgeObject) -> @owned C {
+bb0(%0 : @owned $Builtin.BridgeObject):
+  %1 = unchecked_trivial_bit_cast %0 to $UInt64
+  %2 = struct_extract %1, #UInt64._value
+  %3 = builtin "truncOrBitCast_Int64_Word"(%2) : $Builtin.Word
+  %4 = builtin "inttoptr_Word"(%3) : $Builtin.RawPointer
+  %5 = struct $UnsafeRawPointer (%4)
+  %6 = unchecked_trivial_bit_cast %5 to $Unmanaged<C>
+  %7 = struct_extract %6, #Unmanaged._value
+  %8 = strong_copy_unmanaged_value %7
+  destroy_value %0
+  return %8
+}
+
+

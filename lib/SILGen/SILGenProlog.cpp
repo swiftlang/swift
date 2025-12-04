@@ -1343,31 +1343,14 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     arg = SILValue(fArg);
     
     if (isNoImplicitCopy && !arg->getType().isMoveOnly()) {
-      // FIXME: this incompatible with -enable-sil-opaque-values
-      switch (fnConv.getSILArgumentConvention(argIndex)) {
-      case SILArgumentConvention::Indirect_Inout:
-      case SILArgumentConvention::Indirect_InoutAliasable:
-      case SILArgumentConvention::Indirect_In:
-      case SILArgumentConvention::Indirect_In_Guaranteed:
-      case SILArgumentConvention::Indirect_In_CXX:
-      case SILArgumentConvention::Pack_Inout:
-      case SILArgumentConvention::Pack_Owned:
-      case SILArgumentConvention::Pack_Guaranteed:
+      if (fnConv.isSILIndirect(paramInfo)) {
         arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(VD, arg);
-        break;
-        
-      case SILArgumentConvention::Direct_Owned:
-        arg = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(VD, arg);
-        break;
-      
-      case SILArgumentConvention::Direct_Guaranteed:
+
+      } else if (paramInfo.isGuaranteedInCallee()) {
         arg = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(VD, arg);
-        break;
-      
-      case SILArgumentConvention::Direct_Unowned:
-      case SILArgumentConvention::Indirect_Out:
-      case SILArgumentConvention::Pack_Out:
-        llvm_unreachable("should be impossible");
+
+      } else {
+        arg = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(VD, arg);
       }
     }
 

@@ -146,15 +146,16 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
       }
 
       // Make sure the destination type actually conforms to the builtin literal
-      // protocol before attempting to import, otherwise we'll crash since
-      // `createConstant` expects it to.
+      // protocol or is Bool before attempting to import, otherwise we'll crash
+      // since `createConstant` expects it to.
       // FIXME: We ought to be careful checking conformance here since it can
       // result in cycles. Additionally we ought to consider checking for the
       // non-builtin literal protocol to allow any ExpressibleByIntegerLiteral
       // type to be supported.
-      if (!ctx.getIntBuiltinInitDecl(constantTyNominal))
+      if (!isBoolOrBoolEnumType(constantType) &&
+          !ctx.getIntBuiltinInitDecl(constantTyNominal)) {
         return nullptr;
-
+      }
       return createMacroConstant(Impl, MI, name, DC, constantType,
                                  clang::APValue(value),
                                  ConstantConvertKind::None,

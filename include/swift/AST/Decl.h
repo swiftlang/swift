@@ -761,6 +761,11 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
+  SWIFT_INLINE_BITFIELD(OpaqueTypeDecl, GenericTypeDecl, 1,
+    /// Whether we have lazily-loaded underlying substitutions.
+    HasLazyUnderlyingSubstitutions : 1
+  );
+
   SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
@@ -3646,7 +3651,8 @@ private:
   OpaqueTypeDecl(ValueDecl *NamingDecl, GenericParamList *GenericParams,
                  DeclContext *DC,
                  GenericSignature OpaqueInterfaceGenericSignature,
-                 ArrayRef<TypeRepr *> OpaqueReturnTypeReprs);
+                 ArrayRef<TypeRepr *> OpaqueReturnTypeReprs,
+                 bool hasLazyUnderlyingSubstitutions);
 
   unsigned getNumOpaqueReturnTypeReprs() const {
     return NamingDeclAndHasOpaqueReturnTypeRepr.getInt()
@@ -3658,12 +3664,20 @@ private:
     return getNumOpaqueReturnTypeReprs();
   }
 
+  void loadLazyUnderlyingSubstitutions();
+
 public:
-  static OpaqueTypeDecl *get(
+  static OpaqueTypeDecl *create(
       ValueDecl *NamingDecl, GenericParamList *GenericParams,
       DeclContext *DC,
       GenericSignature OpaqueInterfaceGenericSignature,
       ArrayRef<TypeRepr *> OpaqueReturnTypeReprs);
+
+  static OpaqueTypeDecl *createDeserialized(
+      GenericParamList *GenericParams,
+      DeclContext *DC,
+      GenericSignature OpaqueInterfaceGenericSignature,
+      LazyMemberLoader *lazyLoader, uint64_t underlyingSubsData);
 
   ValueDecl *getNamingDecl() const {
     return NamingDeclAndHasOpaqueReturnTypeRepr.getPointer();
@@ -3720,19 +3734,19 @@ public:
       bool typeCheckFunctionBodies=true) const;
 
   void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
-    assert(!UniqueUnderlyingType.has_value() && "resetting underlying type?!");
+    ASSERT(!Bits.OpaqueTypeDecl.HasLazyUnderlyingSubstitutions);
+    ASSERT(!UniqueUnderlyingType.has_value() && "resetting underlying type?!");
     UniqueUnderlyingType = subs;
   }
 
   bool hasConditionallyAvailableSubstitutions() const {
+    const_cast<OpaqueTypeDecl *>(this)->loadLazyUnderlyingSubstitutions();
+
     return ConditionallyAvailableTypes.has_value();
   }
 
   ArrayRef<ConditionallyAvailableSubstitutions *>
-  getConditionallyAvailableSubstitutions() const {
-    assert(ConditionallyAvailableTypes);
-    return ConditionallyAvailableTypes.value();
-  }
+  getConditionallyAvailableSubstitutions() const;
 
   void setConditionallyAvailableSubstitutions(
       ArrayRef<ConditionallyAvailableSubstitutions *> substitutions);
@@ -5578,6 +5592,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class StructuralRequirementsRequest;
   friend class TypeAliasRequirementsRequest;
   friend class ProtocolDependenciesRequest;
+  friend class ProtocolInversesRequest;
   friend class RequirementSignatureRequest;
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
@@ -5810,6 +5825,11 @@ public:
   /// requirements. Almost everywhere else should use getRequirementSignature()
   /// instead.
   ArrayRef<StructuralRequirement> getStructuralRequirements() const;
+
+  /// Retrieves the original inverse requirements written in source.
+  ///
+  /// The structural requirements already have had these applied to them.
+  ArrayRef<InverseRequirement> getInverseRequirements() const;
 
   /// Retrieve same-type requirements implied by protocol typealiases with the
   /// same name as associated types, and diagnose cases that are better expressed

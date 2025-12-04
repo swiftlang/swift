@@ -8,6 +8,9 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 
+// For some reason integer hashing results in an undefined symbol "arc4random_buf" linker error on linux
+// REQUIRES: OS=macosx
+
 public class C {
   public var x: Int {
     _read {
@@ -19,6 +22,25 @@ public class C {
   }
 
   var y: Int = 27
+}
+
+public protocol P {
+  var d: [Int : WrappedBool] { get set }
+}
+
+extension P {
+  mutating func set(key: Int) {
+    d[key]?.b = true
+  }
+}
+
+public struct WrappedBool {
+  public var b: Bool = true
+}
+
+public class S: P {
+  public var d: [Int : WrappedBool] = [:]
+  public func foo() {}
 }
 
 @main
@@ -33,5 +55,11 @@ struct Main {
 
     print("2") // CHECK: 2
     print("")
+
+    var handler = S()
+    handler.d[27] = WrappedBool(b: false)
+    handler.set(key: 27)
+    // CHECK: true
+    print(handler.d[27]!.b ? "true" : "false") 
   }
 }

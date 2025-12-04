@@ -276,16 +276,9 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
     // Create the expression node.
     StringRef printedValueCopy(context.AllocateCopy(printedValue));
     if (value.getKind() == clang::APValue::Int) {
-      bool isBool = type->getCanonicalType()->isBool();
-      // Check if "type" is a C++ enum with an underlying type of "bool".
-      if (!isBool && type->getStructOrBoundGenericStruct() &&
-          type->getStructOrBoundGenericStruct()->getClangDecl()) {
-        if (auto enumDecl = dyn_cast<clang::EnumDecl>(
-                type->getStructOrBoundGenericStruct()->getClangDecl())) {
-          isBool = enumDecl->getIntegerType()->isBooleanType();
-        }
-      }
-      if (isBool) {
+      // Check if "type" is Bool or a C++ enum with an underlying type of Bool.
+      // NOTE: This must match the condition in `importNumericLiteral`.
+      if (isBoolOrBoolEnumType(type)) {
         auto *boolExpr = new (context)
             BooleanLiteralExpr(value.getInt().getBoolValue(), SourceLoc(),
                                /*Implicit=*/true);
@@ -2266,12 +2259,21 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     clang::Expr *argExpr = new (clangCtx) clang::DeclRefExpr(
         clangCtx, param, false, type.getNonReferenceType(),
         clang::ExprValueKind::VK_LValue, clang::SourceLocation());
-    if (type->isRValueReferenceType()) {
+    bool isMoveOnly = false;
+    if (!type->isReferenceType())
+      if (evaluateOrDefault(
+              ImporterImpl.SwiftContext.evaluator,
+              CxxValueSemantics({type.getTypePtr(), &ImporterImpl}),
+              {}) == CxxValueSemanticsKind::MoveOnly)
+        isMoveOnly = true;
+    if (type->isRValueReferenceType() || isMoveOnly) {
       argExpr = clangSema
                     .BuildCXXNamedCast(
                         clang::SourceLocation(), clang::tok::kw_static_cast,
-                        clangCtx.getTrivialTypeSourceInfo(type), argExpr,
-                        clang::SourceRange(), clang::SourceRange())
+                        clangCtx.getTrivialTypeSourceInfo(
+                            isMoveOnly ? clangCtx.getRValueReferenceType(type)
+                                       : type),
+                        argExpr, clang::SourceRange(), clang::SourceRange())
                     .get();
     }
     args.push_back(argExpr);
@@ -3074,8 +3076,7 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
       ctx.evaluator, 
       CxxValueSemantics({clangType->getTypeForDecl(), &ImporterImpl}), {});
 
-  if (valueSemanticsKind != CxxValueSemanticsKind::Copyable &&
-      valueSemanticsKind != CxxValueSemanticsKind::MoveOnly)
+  if (valueSemanticsKind == CxxValueSemanticsKind::Unknown)
     return nullptr;
 
   auto cxxRecordSemanticsKind = evaluateOrDefault(

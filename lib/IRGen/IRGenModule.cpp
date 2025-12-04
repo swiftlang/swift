@@ -1416,13 +1416,13 @@ llvm::Module *IRGenModule::getModule() const {
   return ClangCodeGen->GetModule();
 }
 
-bool IRGenModule::IsWellKnownBuiltinOrStructralType(CanType T) const {
+bool IRGenModule::isWellKnownBuiltinOrStructuralType(CanType T) const {
   if (T == Context.TheEmptyTupleType || T == Context.TheNativeObjectType ||
       T == Context.TheBridgeObjectType || T == Context.TheRawPointerType ||
       T == Context.getAnyObjectType())
     return true;
 
-  if (auto IntTy = dyn_cast_or_null<BuiltinIntegerType>(T)) {
+  if (auto IntTy = dyn_cast<BuiltinIntegerType>(T)) {
     auto Width = IntTy->getWidth();
     if (Width.isPointerWidth())
       return true;

@@ -15,7 +15,6 @@ import platform
 import re
 import sys
 import traceback
-from multiprocessing import freeze_support
 from typing import Any, Dict, Hashable, Optional, Set, List, Tuple, Union
 
 from .cli_arguments import CliArguments
@@ -650,8 +649,9 @@ def repo_hashes(args: CliArguments, config: Dict[str, Any]) -> Dict[str, str]:
 
 def print_repo_hashes(args: CliArguments, config: Dict[str, Any]):
     repos = repo_hashes(args, config)
+    max_length = max(len(name) for name in repos.keys())
     for repo_name, repo_hash in sorted(repos.items(), key=lambda x: x[0]):
-        print("{:<35}: {:<35}".format(repo_name, repo_hash))
+        print(f"{repo_name:<{max_length + 1}}: {repo_hash}")
 
 
 def merge_no_duplicates(
@@ -768,7 +768,6 @@ def skip_list_for_platform(config: Dict[str, Any], all_repos: bool) -> List[str]
 
 
 def main() -> int:
-    freeze_support()
     args = CliArguments.parse_args()
 
     if not args.scheme:

@@ -352,6 +352,11 @@ std::string FunctionSignatureSpecializationMangler::mangle() {
   ArgOpStorage.clear();
   beginMangling();
 
+  if (changedRepresentation) {
+    appendSpecializationOperator("Tfr");
+    return finalize();
+  }
+
   for (unsigned i : indices(OrigArgs)) {
     mangleArgument(OrigArgs[i]);
   }

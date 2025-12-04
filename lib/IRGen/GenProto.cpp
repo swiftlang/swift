@@ -1750,7 +1750,11 @@ public:
       (void)entry;
 #endif
 
-      auto typeWitness = Conformance.getTypeWitness(assocType);
+      Type typeWitness;
+      if (SILWT->isSpecialized())
+        typeWitness = entry.getAssociatedTypeWitness().Witness;
+      else
+        typeWitness = Conformance.getTypeWitness(assocType);
 
       if (IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
         // In Embedded Swift associated type witness point to the metadata.
@@ -4665,9 +4669,13 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
         }
         genericParamCounts.push_back(genericParamCount);
 
+        SmallVector<Requirement, 2> reqs;
+        SmallVector<InverseRequirement, 2> inverses;
+        signature->getRequirementsWithInverses(reqs, inverses);
+
         auto flags = GenericEnvironmentFlags()
           .withNumGenericParameterLevels(genericParamCounts.size())
-          .withNumGenericRequirements(signature.getRequirements().size());
+          .withNumGenericRequirements(reqs.size());
 
         ConstantStructBuilder fields = builder.beginStruct();
         fields.setPacked(true);
@@ -4694,7 +4702,7 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
         fields.addAlignmentPadding(Alignment(4));
 
         // Generic requirements
-        irgen::addGenericRequirements(*this, fields, signature);
+        irgen::addGenericRequirements(*this, fields, signature, reqs, inverses);
         return fields.finishAndCreateFuture();
       });
 }

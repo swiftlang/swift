@@ -165,7 +165,8 @@ enum class SpecializationPass : uint8_t {
   MoveDiagnosticInOutToOut,
   AsyncDemotion,
   PackSpecialization,
-  LAST = PackSpecialization
+  EmbeddedWitnessCallSpecialization,
+  LAST = EmbeddedWitnessCallSpecialization
 };
 
 constexpr uint8_t MAX_SPECIALIZATION_PASS = 10;

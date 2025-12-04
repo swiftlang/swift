@@ -52,6 +52,7 @@ benefit of all Swift developers.
     - [Viewing allocation history, references, and page-level info](#viewing-allocation-history-references-and-page-level-info)
     - [Printing memory contents](#printing-memory-contents)
     - [Windows Error Codes](#windows-error-codes)
+    - [Debugging Simulator Apps](#working-simulator-apps)
 - [Debugging LLDB failures](#debugging-lldb-failures)
     - ["Types" Log](#types-log)
     - ["Expression" Log](#expression-log)
@@ -1200,6 +1201,15 @@ Some relevant Microsoft documentation:
 * https://learn.microsoft.com/en-us/windows/win32/seccrypto/common-hresult-values
 * https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/0642cb2f-2075-4469-918c-4441e69c548a
 * https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
+
+## Debugging Simulator Apps
+
+Sometimes one has to debug apps compiled for one of the simulators (e.x.: iOS
+simulator). To manipulate the simulator from the command line, one uses the tool
+called `simctl`. This lets one perform actions such as installing apps,
+uninstalling apps, and of course launching apps. To pass through environment
+variables to launched apps, one sets them in the calling environment using the
+environment variable prefix `SIMCTL_CHILD_$ACTUAL_ENV_VAR_NAME`.
 
 # Debugging LLDB failures
 

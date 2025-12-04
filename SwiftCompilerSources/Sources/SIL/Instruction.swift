@@ -102,6 +102,13 @@ public class Instruction : CustomStringConvertible, Hashable {
     context.notifyInstructionsChanged()
   }
 
+  /// Transfer debug info associated with (the result of) this instruction to a
+  /// new `debug_value` instruction before this instruction is deleted.
+  public final func salvageDebugInfo(_ context: some MutatingContext) {
+    BridgedContext.salvageDebugInfo(self.bridged)
+    context.notifyInstructionsChanged()
+  }
+
   public var mayTrap: Bool { false }
 
   final public var mayHaveSideEffects: Bool {
@@ -142,6 +149,11 @@ public class Instruction : CustomStringConvertible, Hashable {
   public final var mayAccessPointer: Bool {
     return bridged.mayAccessPointer()
   }
+
+  /// True if arbitrary functions may be called by this instruction.
+  /// This can be either directly, e.g. by an `apply` instruction, or indirectly by destroying a value which
+  /// might have a deinitializer which can call functions.
+  public var mayCallFunction: Bool { false }
 
   public final var mayLoadWeakOrUnowned: Bool {
     return bridged.mayLoadWeakOrUnowned()
@@ -331,6 +343,8 @@ final public class StoreInst : Instruction, StoringInstruction {
   public var storeOwnership: StoreOwnership {
     StoreOwnership(rawValue: bridged.StoreInst_getStoreOwnership())!
   }
+
+  public override var mayCallFunction: Bool { storeOwnership == .assign }
 }
 
 final public class StoreWeakInst : Instruction, StoringInstruction { }
@@ -344,6 +358,15 @@ final public class AssignInst : Instruction, StoringInstruction {
 
   public var assignOwnership: AssignOwnership {
     AssignOwnership(rawValue: bridged.AssignInst_getAssignOwnership())!
+  }
+
+  public override var mayCallFunction: Bool {
+    switch assignOwnership {
+    case .unknown, .reassign, .reinitialize:
+      true
+    case .initialize:
+      false
+    }
   }
 }
 
@@ -382,6 +405,7 @@ final public class CopyAddrInst : Instruction, SourceDestAddrInstruction {
     bridged.CopyAddrInst_setIsInitializationOfDest(isInitializationOfDestination)
     context.notifyInstructionChanged(self)
   }
+  public override var mayCallFunction: Bool { !isInitializationOfDestination }
 }
 
 final public class ExplicitCopyAddrInst : Instruction, SourceDestAddrInstruction {
@@ -394,6 +418,7 @@ final public class ExplicitCopyAddrInst : Instruction, SourceDestAddrInstruction
   public var isInitializationOfDestination: Bool {
     bridged.ExplicitCopyAddrInst_isInitializationOfDest()
   }
+  public override var mayCallFunction: Bool { !isInitializationOfDestination }
 }
 
 final public class MarkUninitializedInst : SingleValueInstruction, UnaryInstruction {
@@ -639,10 +664,12 @@ final public class RetainValueAddrInst : RefCountingInst {
 }
 
 final public class ReleaseValueAddrInst : RefCountingInst {
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class StrongReleaseInst : RefCountingInst {
   public var instance: Value { operand.value }
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class UnownedReleaseInst : RefCountingInst {
@@ -651,10 +678,12 @@ final public class UnownedReleaseInst : RefCountingInst {
 
 final public class ReleaseValueInst : RefCountingInst {
   public var value: Value { return operand.value }
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class UnmanagedReleaseValueInst : RefCountingInst {
   public var value: Value { return operand.value }
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class AutoreleaseValueInst : RefCountingInst {}
@@ -667,10 +696,14 @@ final public class DestroyValueInst : Instruction, UnaryInstruction {
   /// end the lifetime of its operand.
   /// Such `destroy_value` instructions are lowered to no-ops.
   public var isDeadEnd: Bool { bridged.DestroyValueInst_isDeadEnd() }
+
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class DestroyAddrInst : Instruction, UnaryInstruction {
   public var destroyedAddress: Value { operand.value }
+
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class EndLifetimeInst : Instruction, UnaryInstruction {}
@@ -761,6 +794,15 @@ final public class BuiltinInst : SingleValueInstruction {
 
   public var arguments: LazyMapSequence<OperandArray, Value> {
     operands.values
+  }
+
+  public override var mayCallFunction: Bool {
+    switch id {
+    case .Once, .OnFastPath, .Destroy, .DestroyArray, .DestroyTaskGroup, .DestroyDefaultActor, .Release:
+      true
+    default:
+      false
+    }
   }
 }
 
@@ -879,7 +921,15 @@ final public
 class OpenExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
+class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.InitExistentialAddrInst_getConformances())
+  }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.InitExistentialAddrInst_getFormalConcreteType())
+  }
+}
 
 final public
 class DeinitExistentialAddrInst : Instruction, UnaryInstruction {}
@@ -1367,6 +1417,8 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
   public typealias SpecializationInfo = BridgedGenericSpecializationInformation
 
   public var specializationInfo: SpecializationInfo { bridged.ApplyInst_getSpecializationInfo() }
+
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class FunctionExtractIsolationInst : SingleValueInstruction {}
@@ -1644,7 +1696,12 @@ final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
     case read = 1
     case modify = 2
     case `deinit` = 3
+
+    public func conflicts(with other: AccessKind) -> Bool {
+      return self != .read || other != .read
+    }
   }
+
   public var accessKind: AccessKind {
     AccessKind(rawValue: bridged.BeginAccessInst_getAccessKind())!
   }
@@ -1726,11 +1783,15 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
 
   public var isNonThrowing: Bool { bridged.BeginApplyInst_getNonThrowing() }
   public var isNonAsync: Bool { bridged.BeginApplyInst_getNonAsync() }
+
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class EndApplyInst : SingleValueInstruction, UnaryInstruction {
   public var token: MultipleValueInstructionResult { operand.value as! MultipleValueInstructionResult }
   public var beginApply: BeginApplyInst { token.parentInstruction as! BeginApplyInst }
+
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class AbortApplyInst : Instruction, UnaryInstruction {
@@ -1927,6 +1988,8 @@ final public class TryApplyInst : TermInst, FullApplySite {
 
   public var isNonAsync: Bool { bridged.TryApplyInst_getNonAsync() }
   public var specializationInfo: ApplyInst.SpecializationInfo { bridged.TryApplyInst_getSpecializationInfo() }
+
+  public override var mayCallFunction: Bool { true }
 }
 
 final public class BranchInst : TermInst {
@@ -1992,10 +2055,16 @@ final public class SwitchEnumInst : TermInst {
     zip(caseIndices, successors)
   }
 
+  public var numCases: Int { caseIndices.count }
+
   // This does not handle the special case where the default covers exactly
   // the "missing" case.
   public func getUniqueSuccessor(forCaseIndex: Int) -> BasicBlock? {
     cases.first(where: { $0.0 == forCaseIndex })?.1
+  }
+
+  public func getSuccessorForDefault() -> BasicBlock? {
+    return self.bridged.SwitchEnumInst_getSuccessorForDefault().block
   }
 
   // This does not handle the special case where the default covers exactly

@@ -171,20 +171,6 @@ static SILInstruction *getStackInitInst(SILValue allocStackAddr,
   if (auto *ASI = dyn_cast<AllocStackInst>(CAI->getSrc()))
     return getStackInitInst(ASI, CAI, isCopied);
 
-  // Peek through a stack location holding an Enum.
-  //   %stack_adr = alloc_stack
-  //   %data_adr  = init_enum_data_addr %stk_adr
-  //   %enum_adr  = inject_enum_addr %stack_adr
-  //   %copy_src  = unchecked_take_enum_data_addr %enum_adr
-  // Replace %copy_src with %data_adr and recurse.
-  //
-  // TODO: a general Optional elimination sil-combine could
-  // supersede this check.
-  if (auto *UTEDAI = dyn_cast<UncheckedTakeEnumDataAddrInst>(CAI->getSrc())) {
-    if (InitEnumDataAddrInst *IEDAI = findInitAddressForTrivialEnum(UTEDAI))
-      return getStackInitInst(IEDAI, CAI, isCopied);
-  }
-
   // Check if the CAISrc is a global_addr.
   if (auto *GAI = dyn_cast<GlobalAddrInst>(CAI->getSrc()))
     return findInitExistentialFromGlobalAddr(GAI, CAI);

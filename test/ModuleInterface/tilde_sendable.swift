@@ -33,3 +33,18 @@ protocol P {
 public struct S: P, ~Sendable {
   public let x: Int
 }
+
+// CHECK: #if compiler(>=5.3) && $TildeSendable
+// CHECK: public struct B<T> : ~Swift.Sendable {
+// CHECK: }
+// CHECK: #else
+// CHECK: public struct B<T> {
+// CHECK: }
+// CHECK: #endif
+public struct B<T>: ~Sendable {
+}
+
+// CHECK: extension Library.B : Swift.Sendable where T : Swift.Sendable {
+// CHECK: }
+extension B: Sendable where T: Sendable {
+}

@@ -290,11 +290,10 @@ bb3:
   br bb1
 }
 
-// Check that DCE eliminates dead access instructions.
+// Dead accesses must not be removed
 // CHECK-LABEL: sil [ossa] @dead_access :
-// CHECK: bb0
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK:         begin_access
+// CHECK:         begin_access
 // CHECK-LABEL: } // end sil function 'dead_access'
 sil [ossa] @dead_access : $@convention(thin) (@in Container) -> () {
 bb0(%0 : $*Container):
@@ -311,7 +310,8 @@ bb0(%0 : $*Container):
 // CHECK-LABEL: sil [ossa] @nested_destructure_tuple :
 // CHECK:      bb0(%0 : @owned $(String, (Int, Int, String))):
 // CHECK-NEXT:   (%1, %2) = destructure_tuple %0 : $(String, (Int, Int, String))
-// CHECK-NEXT:   destroy_value %2
+// CHECK-NEXT:   (%3, %4, %5) = destructure_tuple %2
+// CHECK-NEXT:   destroy_value %5
 // CHECK-NEXT:   return %1
 // CHECK:      } // end sil function 'nested_destructure_tuple'
 sil [ossa] @nested_destructure_tuple : $@convention(thin) (@owned (String, (Int, Int, String))) -> @owned String {
@@ -446,12 +446,8 @@ bb0(%0 : @owned $MO):
   return %63 : $()
 }
 
-// The InstructionDeleter will delete the `load [take]` and insert a
-// `destroy_addr`.  Observe the creation of the new destroy_addr instruction
-// that occurs when deleting the `load [take]` and mark it live.  Prevents a
-// leak.
 // CHECK-LABEL: sil [ossa] @keep_new_destroy_addr : {{.*}} {
-// CHECK:         destroy_addr
+// CHECK:         load [take]
 // CHECK-LABEL: } // end sil function 'keep_new_destroy_addr'
 sil [ossa] @keep_new_destroy_addr : $@convention(thin) () -> () {
 bb0:

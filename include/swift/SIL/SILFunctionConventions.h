@@ -31,6 +31,7 @@
 #define SWIFT_SIL_FUNCTIONCONVENTIONS_H
 
 #include "swift/AST/Types.h"
+#include "swift/Basic/AccessControls.h"
 #include "swift/SIL/SILArgumentConvention.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -526,11 +527,9 @@ public:
                                          - getNumIndirectSILErrorResults()];
   }
 
-  /// WARNING: Do not use this from SILGen!
-  /// Use methods such as `isSILIndirect` or query the ParameterInfo instead.
-  ///
   /// Return the SIL argument convention of apply/entry argument at
   /// the given argument index.
+  SWIFT_UNAVAILABLE_IN_SILGEN_MSG("Use methods such as `isSILIndirect` or query the ParameterInfo instead.")
   SILArgumentConvention getSILArgumentConvention(unsigned index) const;
 
   /// Return the SIL type of the apply/entry argument at the given index.

@@ -19,16 +19,22 @@
 public protocol CxxSet<Element>: ExpressibleByArrayLiteral {
   associatedtype Element
   associatedtype Size: BinaryInteger
+  associatedtype RawIterator: UnsafeCxxInputIterator
+    where RawIterator.Pointee == Element
+  associatedtype RawMutableIterator: UnsafeCxxInputIterator
+    where RawMutableIterator.Pointee == Element
 
   // std::pair<iterator, bool> for std::set and std::unordered_set
   // iterator for std::multiset
-  associatedtype InsertionResult 
+  associatedtype InsertionResult
 
   init()
 
+  func __endUnsafe() -> RawIterator
+  func __findUnsafe(_ value: Element) -> RawIterator
+
   @discardableResult
   mutating func __insertUnsafe(_ element: Element) -> InsertionResult
-
   func count(_ element: Element) -> Size
 }
 
@@ -56,7 +62,7 @@ extension CxxSet {
   /// in the set.
   @inlinable
   public func contains(_ element: Element) -> Bool {
-    return count(element) > 0
+    return self.__findUnsafe(element) != self.__endUnsafe()
   }
 }
 
@@ -65,23 +71,11 @@ extension CxxSet {
 /// C++ standard library types such as `std::set` and `std::unordered_set`
 /// conform to this protocol.
 public protocol CxxUniqueSet<Element>: CxxSet {
-  override associatedtype Element
-  override associatedtype Size: BinaryInteger
-  associatedtype RawIterator: UnsafeCxxInputIterator
-    where RawIterator.Pointee == Element
-  associatedtype RawMutableIterator: UnsafeCxxInputIterator
-    where RawMutableIterator.Pointee == Element
   override associatedtype InsertionResult
     where InsertionResult: CxxPair<RawMutableIterator, Bool>
 
   @discardableResult
-  mutating func __findUnsafe(_ value: Element) -> RawIterator
-
-  @discardableResult
   mutating func __eraseUnsafe(_ iter: RawIterator) -> RawMutableIterator
-
-  @discardableResult
-  mutating func __endUnsafe() -> RawIterator
 }
 
 extension CxxUniqueSet {

@@ -591,11 +591,10 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
         typeDecl = assocType->getAssociatedTypeAnchor();
       } else if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-        if (isa<ProtocolDecl>(typeDecl->getDeclContext()) &&
-            getStage() == TypeResolutionStage::Structural) {
-          if (aliasDecl && !aliasDecl->hasGenericParamList()) {
-            return adjustAliasType(aliasDecl->getStructuralType());
-          }
+        if (typeDecl->getDeclContext()->getSelfProtocolDecl() &&
+            getStage() == TypeResolutionStage::Structural &&
+            !aliasDecl->hasGenericParamList()) {
+          return adjustAliasType(aliasDecl->getStructuralType());
         }
       }
 
