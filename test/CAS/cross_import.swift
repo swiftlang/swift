@@ -21,8 +21,18 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -O \
 // RUN:   -o %t/deps.json -I %t -cache-compile-job -cas-path %t/cas -swift-version 5 -enable-cross-import-overlays -module-load-mode prefer-serialized
 
+// RUN: %if OS=windows-msvc %{ %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SAL > %t/SAL.cmd %}
+// RUN: %if OS=windows-msvc %{ %swift_frontend_plain @%t/SAL.cmd %}
+
+// RUN: %if OS=windows-msvc %{ %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:vcruntime > %t/vcruntime.cmd %}
+// RUN: %if OS=windows-msvc %{ %swift_frontend_plain @%t/vcruntime.cmd %}
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_stdint > %t/_Builtin_stdint.cmd
+// RUN: %swift_frontend_plain @%t/_Builtin_stdint.cmd
+
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
 // RUN: %swift_frontend_plain @%t/shim.cmd
+
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:C > %t/C.cmd
 // RUN: %swift_frontend_plain @%t/C.cmd
 

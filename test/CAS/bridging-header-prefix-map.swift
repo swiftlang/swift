@@ -25,9 +25,20 @@
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps-2.json Test casFSRootID > %t/root-2.casid
 // RUN: diff %t/root-1.casid %t/root-2.casid
 
+// RUN: %if OS=windows-msvc %{ %{python} %S/Inputs/BuildCommandExtractor.py %t/deps-1.json clang:SAL > %t/SAL.cmd %}
+// RUN: %if OS=windows-msvc %{ %swift_frontend_plain @%t/SAL.cmd %}
+
+// RUN: %if OS=windows-msvc %{ %{python} %S/Inputs/BuildCommandExtractor.py %t/deps-1.json clang:vcruntime > %t/vcruntime.cmd %}
+// RUN: %if OS=windows-msvc %{ %swift_frontend_plain @%t/vcruntime.cmd %}
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps-1.json clang:_Builtin_stdint > %t/_Builtin_stdint.cmd
+// RUN: %swift_frontend_plain @%t/_Builtin_stdint.cmd
+
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps-1.json clang:SwiftShims > %t/shim.cmd
 // RUN: %swift_frontend_plain @%t/shim.cmd
+
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps-1.json bridgingHeader > %t/header.cmd
+
 // RUN: %target-swift-frontend @%t/header.cmd /^header/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
 // RUN:   %target-swift-frontend @%t/header.cmd /^header/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch > %t/keys.json

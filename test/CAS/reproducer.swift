@@ -6,10 +6,21 @@
 // RUN:   -import-objc-header %t/Bridging.h -scanner-output-dir %t -auto-bridging-header-chaining -scanner-debug-write-output \
 // RUN:   %t/test.swift %t/foo.swift -I %t/include -o %t/deps.json -cache-compile-job -cas-path %t/cas
 
+// RUN: %if OS=windows-msvc %{ %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SAL > %t/SAL.cmd %}
+// RUN: %if OS=windows-msvc %{ %swift_frontend_plain @%t/SAL.cmd %}
+
+// RUN: %if OS=windows-msvc %{ %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:vcruntime > %t/vcruntime.cmd %}
+// RUN: %if OS=windows-msvc %{ %swift_frontend_plain @%t/vcruntime.cmd %}
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_stdint > %t/_Builtin_stdint.cmd
+// RUN: %swift_frontend_plain @%t/_Builtin_stdint.cmd
+
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
 // RUN: %swift_frontend_plain @%t/shim.cmd
+
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:Dummy > %t/dummy.cmd
 // RUN: %swift_frontend_plain @%t/dummy.cmd
+
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Simple > %t/simple.cmd
 // RUN: %swift_frontend_plain @%t/simple.cmd
 

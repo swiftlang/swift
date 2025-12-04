@@ -16,6 +16,16 @@
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s --check-prefix=FS
 
 // FS: MacroDefinition
+
+// RUN: %if OS=windows-msvc %{ %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SAL > %t/SAL.cmd %}
+// RUN: %if OS=windows-msvc %{ %swift_frontend_plain @%t/SAL.cmd %}
+
+// RUN: %if OS=windows-msvc %{ %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:vcruntime > %t/vcruntime.cmd %}
+// RUN: %if OS=windows-msvc %{ %swift_frontend_plain @%t/vcruntime.cmd %}
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_stdint > %t/_Builtin_stdint.cmd
+// RUN: %swift_frontend_plain @%t/_Builtin_stdint.cmd
+
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
 // RUN: %swift_frontend_plain @%t/SwiftShims.cmd
 

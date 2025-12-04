@@ -7,6 +7,15 @@
 // RUN:   -file-compilation-dir %t \
 // RUN:   -I %t/include -module-load-mode prefer-serialized
 
+// RUN: %if OS=windows-msvc %{ %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SAL > %t/SAL.cmd %}
+// RUN: %if OS=windows-msvc %{ %swift_frontend_plain @%t/SAL.cmd %}
+
+// RUN: %if OS=windows-msvc %{ %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:vcruntime > %t/vcruntime.cmd %}
+// RUN: %if OS=windows-msvc %{ %swift_frontend_plain @%t/vcruntime.cmd %}
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_stdint > %t/_Builtin_stdint.cmd
+// RUN: %swift_frontend_plain @%t/_Builtin_stdint.cmd
+
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shims.cmd
 // RUN: %swift_frontend_plain @%t/shims.cmd
 

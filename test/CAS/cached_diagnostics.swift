@@ -4,10 +4,20 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %s -o %t/deps.json -cache-compile-job -cas-path %t/cas -module-load-mode prefer-serialized -scanner-output-dir %t
 
+// RUN: %if OS=windows-msvc %{ %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SAL > %t/SAL.cmd %}
+// RUN: %if OS=windows-msvc %{ %swift_frontend_plain @%t/SAL.cmd %}
+
+// RUN: %if OS=windows-msvc %{ %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:vcruntime > %t/vcruntime.cmd %}
+// RUN: %if OS=windows-msvc %{ %swift_frontend_plain @%t/vcruntime.cmd %}
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_stdint > %t/_Builtin_stdint.cmd
+// RUN: %swift_frontend_plain @%t/_Builtin_stdint.cmd
+
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
 // RUN: %swift_frontend_plain @%t/shim.cmd
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader > %t/header.cmd
+
 // RUN: %target-swift-frontend @%t/header.cmd %S/Inputs/objc.h -disable-implicit-swift-modules -O -o %t/objc.pch 2>&1 | %FileCheck %s -check-prefix CHECK-BRIDGE
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
 // RUN:   %target-swift-frontend @%t/header.cmd %S/Inputs/objc.h -disable-implicit-swift-modules -O -o %t/objc.pch > %t/keys.json
