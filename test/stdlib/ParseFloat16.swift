@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// UNSUPPORTED: CPU=x86_64 && OS=macOS
+
 // Cannot test with old OS stdlib, because that used libc strtof
 // for parsing, which results in incorrect results.
 // UNSUPPORTED: use_os_stdlib
