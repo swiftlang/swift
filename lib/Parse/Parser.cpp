@@ -1199,6 +1199,8 @@ struct ParserUnit::Implementation {
   SerializationOptions SerializationOpts;
   DiagnosticEngine Diags;
   ASTContext &Ctx;
+  SourceManager &SM;
+  unsigned BufferID;
   SourceFile *SF;
   std::unique_ptr<Parser> TheParser;
 
@@ -1208,7 +1210,8 @@ struct ParserUnit::Implementation {
         SILOpts(SILOptions()), Diags(SM),
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
                              clangImporterOpts, symbolGraphOpts, CASOpts,
-                             SerializationOpts, SM, Diags)) {
+                             SerializationOpts, SM, Diags)),
+        SM(SM), BufferID(BufferID) {
     registerParseRequestFunctions(Ctx.evaluator);
 
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
@@ -1222,6 +1225,7 @@ struct ParserUnit::Implementation {
 
   ~Implementation() {
     TheParser.reset();
+    SM.deleteSourceFile(BufferID);
     delete &Ctx;
   }
 };
