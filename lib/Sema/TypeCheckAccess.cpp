@@ -2383,8 +2383,12 @@ public:
     if (seenVars.count(theVar))
       return;
 
+    ExportabilityReason reason =
+      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
+        ExportabilityReason::ImplicitlyPublicVarDecl :
+        ExportabilityReason::PublicVarDecl;
     checkType(theVar->getValueInterfaceType(), /*typeRepr*/nullptr, theVar,
-              ExportabilityReason::PublicVarDecl);
+              reason);
 
     for (auto attr : theVar->getAttachedPropertyWrappers()) {
       checkType(attr->getType(), attr->getTypeRepr(), theVar,
@@ -2405,9 +2409,13 @@ public:
       anyVar = V;
     });
 
+    ExportabilityReason reason =
+      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
+        ExportabilityReason::ImplicitlyPublicVarDecl :
+        ExportabilityReason::PublicVarDecl;
     checkType(TP->hasType() ? TP->getType() : Type(),
               TP->getTypeRepr(), anyVar ? (Decl *)anyVar : (Decl *)PBD,
-              ExportabilityReason::PublicVarDecl);
+              reason);
 
     // Check the property wrapper types.
     if (anyVar) {

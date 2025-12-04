@@ -261,6 +261,7 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
   case ExportabilityReason::ResultBuilder:
   case ExportabilityReason::PropertyWrapper:
   case ExportabilityReason::PublicVarDecl:
+  case ExportabilityReason::ImplicitlyPublicVarDecl:
     return false;
   }
 }

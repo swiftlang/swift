@@ -120,7 +120,7 @@ class ExportContext {
   unsigned SPI : 1;
   unsigned Exported : 2;
   unsigned Implicit : 1;
-  unsigned Reason : 3;
+  unsigned Reason : 4;
 
   ExportContext(DeclContext *DC, AvailabilityContext availability,
                 FragileFunctionKind kind,

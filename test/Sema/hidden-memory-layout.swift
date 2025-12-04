@@ -381,33 +381,33 @@ public struct ExposedLayoutPublicUser: ProtocolFromDirect {
   // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
 
   private var privateField: StructFromDirect
-  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
+  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
-  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private var ca: ExposedClassPublic
   private var cb: ExposedClassInternal
   private var cc: ExposedClassPrivate
   private var cd: HiddenClass
-  // expected-opt-in-error @-1 {{cannot use class 'HiddenClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenClass' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use class 'HiddenClass' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
-  // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private var pp: ProtocolFromDirect
-  // expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
+  // expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
   private var j: HiddenProtocol
-  // expected-opt-in-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenProtocol' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {}
   // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
@@ -419,30 +419,30 @@ internal struct ExposedLayoutInternalUser: ProtocolFromDirect {
 // expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
 
   private var privateField: StructFromDirect
-  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
+  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
-  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private var ca: ExposedClassPublic
   private var cb: ExposedClassInternal
   private var cc: ExposedClassPrivate
   private var cd: HiddenClass
-  // expected-opt-in-error @-1 {{cannot use class 'HiddenClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenClass' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use class 'HiddenClass' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
-  // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
   private var j: HiddenProtocol
-  // expected-opt-in-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenProtocol' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {}
   // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
@@ -454,30 +454,30 @@ private struct ExposedLayoutPrivateUser: ProtocolFromDirect {
 // expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
 
   private var privateField: StructFromDirect
-  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
+  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
-  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private var ca: ExposedClassPublic
   private var cb: ExposedClassInternal
   private var cc: ExposedClassPrivate
   private var cd: HiddenClass
-  // expected-opt-in-error @-1 {{cannot use class 'HiddenClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenClass' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use class 'HiddenClass' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
-  // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
   private var j: HiddenProtocol
-  // expected-opt-in-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenProtocol' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {}
   // expected-embedded-opt-in-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
@@ -637,23 +637,23 @@ public class PublicClassUser: ProtocolFromDirect {
   // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
 
   private var privateField: StructFromDirect
-  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
+  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
-  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
-  // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
   private var j: HiddenProtocol
-  // expected-opt-in-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenProtocol' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
 
   @export(interface)
   private func privateFunc(h: HiddenLayout) {}
@@ -665,26 +665,26 @@ internal class InternalClassUser: ProtocolFromDirect {
   public init() { fatalError() }
 
   public var publicField: StructFromDirect
-  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
+  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
   private var privateField: StructFromDirect
-  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
+  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
-  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
-  // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
   private var j: HiddenProtocol
-  // expected-opt-in-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenProtocol' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {} // expected-embedded-opt-in-error {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 }
@@ -695,26 +695,26 @@ private class PrivateClassUser: ProtocolFromDirect {
   public init() { fatalError() }
 
   public var publicField: StructFromDirect
-  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
+  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
   private var privateField: StructFromDirect
-  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
+  // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
-  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
-  // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
   private var j: HiddenProtocol
-  // expected-opt-in-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'HiddenProtocol' is marked '@_implementationOnly'}}
+  // expected-opt-in-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {} // expected-embedded-opt-in-error {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 }
