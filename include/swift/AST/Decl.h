@@ -5592,6 +5592,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class StructuralRequirementsRequest;
   friend class TypeAliasRequirementsRequest;
   friend class ProtocolDependenciesRequest;
+  friend class ProtocolInversesRequest;
   friend class RequirementSignatureRequest;
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
@@ -5824,6 +5825,11 @@ public:
   /// requirements. Almost everywhere else should use getRequirementSignature()
   /// instead.
   ArrayRef<StructuralRequirement> getStructuralRequirements() const;
+
+  /// Retrieves the original inverse requirements written in source.
+  ///
+  /// The structural requirements already have had these applied to them.
+  ArrayRef<InverseRequirement> getInverseRequirements() const;
 
   /// Retrieve same-type requirements implied by protocol typealiases with the
   /// same name as associated types, and diagnose cases that are better expressed

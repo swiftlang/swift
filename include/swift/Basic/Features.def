@@ -438,8 +438,12 @@ EXPERIMENTAL_FEATURE(Embedded, true)
 /// Enables importing the Volatile module
 EXPERIMENTAL_FEATURE(Volatile, true)
 
-// Enables ~Copyable and ~Escapable annotations on associatedtype declarations.
+// LEGACY: Enables ~Copyable and ~Escapable annotations on associatedtype declarations.
 EXPERIMENTAL_FEATURE(SuppressedAssociatedTypes, true)
+
+// Enables ~Copyable and ~Escapable annotations on associatedtype declarations,
+// and infers defaults for them.
+EXPERIMENTAL_FEATURE(SuppressedAssociatedTypesWithDefaults, true)
 
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)

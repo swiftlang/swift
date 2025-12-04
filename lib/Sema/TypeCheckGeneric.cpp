@@ -942,22 +942,17 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
     auto *extendedNominal = ext->getExtendedNominal();
 
-    // Avoid building a generic signature if we have an unconstrained protocol
-    // extension of a protocol that does not suppress conformance to ~Copyable
-    // or ~Escapable. This avoids a request cycle when referencing a protocol
-    // extension type alias via an unqualified name from a `where` clause on
-    // the protocol.
+    // Optimization: avoid building a generic signature if we have an
+    // unconstrained protocol extension, as they have the same signature as the
+    // protocol itself.
+    //
+    // Protocols who suppress conformance to ~Copyable or ~Escapable either on
+    // Self or its associated types will infer default requirements in
+    // ordinary extensions of that protocol, so the signature can differ there.
     if (auto *proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
-      if (extraReqs.empty() &&
-          !ext->getTrailingWhereClause()) {
-        InvertibleProtocolSet protos;
-        for (auto *inherited : proto->getAllInheritedProtocols()) {
-          if (auto kind = inherited->getInvertibleProtocolKind())
-            protos.insert(*kind);
-        }
-
-        if (protos == InvertibleProtocolSet::allKnown())
-          return extendedNominal->getGenericSignatureOfContext();
+      if (extraReqs.empty() && !ext->getTrailingWhereClause() &&
+          proto->getInverseRequirements().empty()) {
+        return extendedNominal->getGenericSignatureOfContext();
       }
     }
 
