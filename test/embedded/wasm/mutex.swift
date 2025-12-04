@@ -1,0 +1,21 @@
+// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -wmo) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: OS=wasip1
+// REQUIRES: swift_feature_Embedded
+
+import Mutex
+@main struct Main {
+  static func main() {
+    let m = Mutex(42)
+
+    m.withLock {
+      puts("Hello \($0)")  // CHECK: Hello 42
+      $0 = 37
+    }
+    
+    m.withLock {
+      puts("Hello \($0)")  // CHECK: Hello 37
+    }
+  }
+}
