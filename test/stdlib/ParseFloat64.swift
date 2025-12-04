@@ -1,4 +1,8 @@
-// RUN: %target-run-simple-swift
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -g %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out
+
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -204,6 +208,7 @@ tests.test("HexFloats") {
 }
 
 tests.test("Decimal Floats") {
+  expectParse("1e-163", 1e-163)
   expectParse("9007199254740992.0", 9007199254740992.0)
   expectParse("-9007199254740992.0", -9007199254740992.0)
   expectParse("4503599627370496.0", 4503599627370496.0)
@@ -216,6 +221,8 @@ tests.test("Decimal Floats") {
   expectParse("000000000000000000000000000000", 0.0)
   expectParse(".000000000000000000000000000000", 0.0)
   expectParse("000000000000000000000000000000.0000000000000000000000000000", 0.0)
+  expectParse("0000000000000000.000000000000000e9999999999", 0.0)
+  expectParse("0e9999999999", 0.0)
   expectParse("1", 1.0)
   expectParse("2", 2.0)
   expectParse("1e0", 1.0)
