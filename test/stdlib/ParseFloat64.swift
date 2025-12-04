@@ -118,8 +118,12 @@ tests.test("NaNs") {
   expectParse("nan(000000000000000000000000000000000000000)", Float64.nan)
   expectParse("nan(0x00000000000000000000000000000000000000)", Float64.nan)
   expectParse("nan(10)", Float64(nan:10, signaling:false))
+  expectParse("nan(1234567890)", Float64(nan:1234567890, signaling:false))
   expectParse("nan(0x10)", Float64(nan:16, signaling:false))
+  expectParse("nan(0x12345678)", Float64(nan:0x12345678, signaling:false))
+  expectParse("nan(0x9abcdef)", Float64(nan:0x9abcdef, signaling:false))
   expectParse("nan(010)", Float64(nan:8, signaling:false))
+  expectParse("nan(01234567)", Float64(nan:0o1234567, signaling:false))
   expectParse("nan(9)", Float64(nan:9, signaling:false))
   expectParse("nan(99)", Float64(nan:99, signaling:false))
   expectParse("nan(255)", Float64(nan:255, signaling:false))
@@ -132,6 +136,24 @@ tests.test("NaNs") {
   expectParseFails("na")
   expectParseFails("nann")
   expectParseFails("nananananana")
+  expectParseFails("nan(xyz)")
+  expectParseFails("nan(01238)")
+  expectParseFails("nan(01239)")
+  expectParseFails("nan(0123a)")
+  expectParseFails("nan(0123b)")
+  expectParseFails("nan(0123c)")
+  expectParseFails("nan(0123d)")
+  expectParseFails("nan(0123e)")
+  expectParseFails("nan(0123f)")
+  expectParseFails("nan(0123g)")
+  expectParseFails("nan(123a)")
+  expectParseFails("nan(123b)")
+  expectParseFails("nan(123c)")
+  expectParseFails("nan(123d)")
+  expectParseFails("nan(123e)")
+  expectParseFails("nan(123f)")
+  expectParseFails("nan(123g)")
+  expectParseFails("nan(0x123g)")
 }
 
 tests.test("HexFloats") {
@@ -198,7 +220,7 @@ tests.test("HexFloats") {
   // * Define a synthetic finite successor to Float64.gFM as Float64.gFM + epsilon
   // * Assertion:  the value above should round to infinity
   // * Assertion:  the value above should be treated as having an even significand
-  // * Conclusion:  Exact halfway between Float64.gFM and lIM is the smallest magnitude that should round to infinity
+  // * Conclusion:  Exact halfway between Float64.gFM and the value above is the smallest magnitude that should round to infinity
   expectParse("0x1.fffffffffffffp+1023", Float64.greatestFiniteMagnitude) // Exact
   expectParse("0x1.fffffffffffff7fffffffffffffffffffffp+1023", Float64.greatestFiniteMagnitude) // .gFM + less than 1/2 epsilon
   expectParse("0x1.fffffffffffff8p+1023", Float64.infinity) // .gFM + 1/2 epsilon
