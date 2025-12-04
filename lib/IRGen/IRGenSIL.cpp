@@ -3593,13 +3593,12 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
 }
 
 static std::unique_ptr<CallEmission> getCallEmissionForLoweredValue(
-    IRGenSILFunction &IGF, CanSILFunctionType origCalleeType,
-    CanSILFunctionType substCalleeType, const LoweredValue &lv,
-    llvm::Value *selfValue, SubstitutionMap substitutions,
-    WitnessMetadata *witnessMetadata) {
-  Callee callee = lv.getCallee(IGF, selfValue,
-                               CalleeInfo(origCalleeType, substCalleeType,
-                                          substitutions));
+    IRGenSILFunction &IGF, const LoweredValue &lv, CalleeInfo &&info,
+    llvm::Value *selfValue, WitnessMetadata *witnessMetadata) {
+  auto origCalleeType = info.OrigFnType;
+  auto substCalleeType = info.SubstFnType;
+
+  Callee callee = lv.getCallee(IGF, selfValue, std::move(info));
 
   switch (origCalleeType->getRepresentation()) {
   case SILFunctionType::Representation::WitnessMethod: {
@@ -3891,11 +3890,12 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   GenericContextScope scope(IGM,
                             origCalleeType->getInvocationGenericSignature());
 
+  CalleeInfo info(origCalleeType, substCalleeType, site.getSubstitutionMap());
+
   Explosion llArgs;
   WitnessMetadata witnessMetadata;
   auto emission = getCallEmissionForLoweredValue(
-      *this, origCalleeType, substCalleeType, calleeLV, selfValue,
-      site.getSubstitutionMap(), &witnessMetadata);
+      *this, calleeLV, std::move(info), selfValue, &witnessMetadata);
 
   if (site.hasIndirectSILResults()) {
     emission->setIndirectReturnAddress(getLoweredAddress(site.getIndirectSILResults()[0]));
