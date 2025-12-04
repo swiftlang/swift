@@ -388,8 +388,8 @@ namespace swift {
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &limitBehaviorUntilSwiftVersion(
-        DiagnosticBehavior limit, unsigned majorVersion);
+    InFlightDiagnostic &limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
+                                                       unsigned majorVersion);
 
     /// Limits the diagnostic behavior to \c limit accordingly if
     /// preconcurrency applies. Otherwise, the behavior limit only applies
@@ -412,7 +412,7 @@ namespace swift {
         return limitBehavior(limit);
       }
 
-      return limitBehaviorUntilSwiftVersion(limit, languageMode);
+      return limitBehaviorUntilLanguageMode(limit, languageMode);
     }
 
     /// Limit the diagnostic behavior to warning until the next future
@@ -424,19 +424,19 @@ namespace swift {
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &warnUntilFutureSwiftVersion();
+    InFlightDiagnostic &warnUntilFutureLanguageMode();
 
-    InFlightDiagnostic &warnUntilFutureSwiftVersionIf(bool shouldLimit) {
+    InFlightDiagnostic &warnUntilFutureLanguageModeIf(bool shouldLimit) {
       if (!shouldLimit)
         return *this;
-      return warnUntilFutureSwiftVersion();
+      return warnUntilFutureLanguageMode();
     }
 
     /// Limit the diagnostic behavior to warning until the specified version.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &warnUntilSwiftVersion(unsigned majorVersion);
+    InFlightDiagnostic &warnUntilLanguageMode(unsigned majorVersion);
 
     /// Limit the diagnostic behavior to warning if the context is a
     /// swiftinterface.
@@ -453,10 +453,10 @@ namespace swift {
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &warnUntilSwiftVersionIf(bool shouldLimit,
+    InFlightDiagnostic &warnUntilLanguageModeIf(bool shouldLimit,
                                                 unsigned majorVersion) {
       if (!shouldLimit) return *this;
-      return warnUntilSwiftVersion(majorVersion);
+      return warnUntilLanguageMode(majorVersion);
     }
 
     /// Wraps this diagnostic in another diagnostic. That is, \p wrapper will be
@@ -887,7 +887,7 @@ namespace swift {
     version::Version languageVersion;
 
     /// The stats reporter used to keep track of Swift 6 errors
-    /// diagnosed via \c warnUntilSwiftVersion(6).
+    /// diagnosed via \c warnUntilLanguageMode(6).
     UnifiedStatsReporter *statsReporter = nullptr;
 
     /// Whether we are actively pretty-printing a declaration as part of

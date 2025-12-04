@@ -739,12 +739,12 @@ static void computeEnabledFeatures(ASTContext &ctx,
 
   static const FeatureAndName features[] = {
 #define FEATURE_ENTRY(FeatureName) {Feature::FeatureName, #FeatureName},
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Version)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)                     \
   FEATURE_ENTRY(FeatureName)
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version)                       \
+#define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)                  \
   FEATURE_ENTRY(FeatureName)
-#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Version)              \
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)          \
   FEATURE_ENTRY(FeatureName)
 #include "swift/Basic/Features.def"
   };
