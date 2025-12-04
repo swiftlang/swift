@@ -491,10 +491,6 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_STDLIB_TRACING")
   endif()
 
-  if(SWIFT_STDLIB_CONCURRENCY_TRACING)
-    list(APPEND result "-DSWIFT_STDLIB_CONCURRENCY_TRACING")
-  endif()
-
   if(SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES)
     list(APPEND result "-DSWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES")
   endif()
