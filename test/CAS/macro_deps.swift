@@ -28,19 +28,23 @@
 // APP-DEPS: MacroTwo
 
 /// Build all dependencies.
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
 // RUN: %swift_frontend_plain @%t/SwiftShims.cmd
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json Foo > %t/Foo.cmd
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Foo > %t/Foo.cmd
 // RUN: %swift_frontend_plain @%t/Foo.cmd
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json Bar > %t/Bar.cmd
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Bar > %t/Bar.cmd
 // RUN: %swift_frontend_plain @%t/Bar.cmd
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json Baz > %t/Baz.cmd
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Baz > %t/Baz.cmd
 // RUN: %swift_frontend_plain @%t/Baz.cmd
 
 // RUN: %FileCheck %s --check-prefix=PLUGIN_SEARCH --input-file=%t/Bar.cmd
 // PLUGIN_SEARCH-NOT: -external-plugin-path
 
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json MyApp > %t/MyApp.cmd
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json MyApp > %t/MyApp.cmd
+
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
 // RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
 
