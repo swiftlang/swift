@@ -27,6 +27,9 @@ extension InExt: ~Sendable { // expected-error {{conformance to inferrable proto
 func test<T: ~Sendable>(_: T) {} // expected-error {{conformance to 'Sendable' can only be suppressed on structs, classes, and enums}}
 func test<Q>(other: Q) where Q: ~Sendable {} // expected-error {{type 'Sendable' cannot be suppressed}}
 
+func testSendable<T: Sendable>(_: T) {}
+
+
 struct Generic<T: ~Sendable> { // expected-error {{conformance to 'Sendable' can only be suppressed on structs, classes, and enums}}
   var x: T
 }
@@ -47,10 +50,8 @@ do {
     // expected-error@-1 {{cannot both conform to and suppress conformance to 'Sendable'}}
   }
 
-  func check<T: Sendable>(_: T) {}
-
-  check(NonSendable()) // expected-warning {{type 'NonSendable' does not conform to the 'Sendable' protocol}}
-  check(NoInference()) // Ok
+  testSendable(NonSendable()) // expected-warning {{type 'NonSendable' does not conform to the 'Sendable' protocol}}
+  testSendable(NoInference()) // Ok
 }
 
 func takesSendable<T: Sendable>(_: T) {}
@@ -91,3 +92,47 @@ extension H: Sendable where T: Sendable, U: Sendable { }
 
 takesSendable(H(t: "", u: 42))
 takesSendable(H(t: "", u: MyValue())) // expected-warning {{type 'MyValue' does not conform to the 'Sendable' protocol}}
+
+@MainActor
+protocol IsolatedP {
+}
+
+@MainActor
+protocol IsolatedSendableP: Sendable {
+}
+
+do {
+  struct S1: ~Sendable, W {
+    // expected-error@-1 {{cannot both conform to and suppress conformance to 'Sendable'}}
+  }
+
+  struct S2: IsolatedP, ~Sendable { // Ok (because isolated protocol is not Sendable unless explicitly stated)
+  }
+
+  struct S3: IsolatedSendableP, ~Sendable {
+    // expected-error@-1 {{cannot both conform to and suppress conformance to 'Sendable'}}
+  }
+
+  @MainActor
+  class IsolatedC: ~Sendable {}
+  // expected-note@-1 {{class 'IsolatedC' explicitly suppresses conformance to 'Sendable' protocol}}
+
+  testSendable(IsolatedC())
+  // expected-warning@-1 {{type 'IsolatedC' does not conform to the 'Sendable' protocol}}
+
+  @MainActor
+  class IsolatedBase {} // derived as Sendable
+
+  class Child1: IsolatedBase, ~Sendable {}
+  // expected-error@-1 {{cannot both conform to and suppress conformance to 'Sendable'}}
+
+  class Base: Sendable {}
+  // expected-warning@-1 {{non-final class 'Base' cannot conform to the 'Sendable' protocol}}
+
+  class Child2: Base, ~Sendable {}
+  // expected-error@-1 {{cannot both conform to and suppress conformance to 'Sendable'}}
+
+  actor A: ~Sendable {
+    // expected-error@-1 {{conformance to 'Sendable' can only be suppressed on structs, classes, and enums}}
+  }
+}
