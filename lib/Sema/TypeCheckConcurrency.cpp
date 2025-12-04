@@ -7375,6 +7375,30 @@ bool swift::checkSendableConformance(
       return false;
   }
 
+  // Sendable supression allows conditional conformances only.
+  if (nominal->suppressesConformance(KnownProtocolKind::Sendable)) {
+    bool hasUnconditionalConformance = false;
+
+    if (auto *inherited = dyn_cast<InheritedProtocolConformance>(conformance)) {
+      hasUnconditionalConformance =
+          inherited->getConditionalRequirements().empty();
+    }
+
+    if (auto *normalConf = dyn_cast<NormalProtocolConformance>(conformance)) {
+      hasUnconditionalConformance =
+          normalConf->getConditionalRequirements().empty();
+    }
+
+    if (hasUnconditionalConformance) {
+      if (!isImplicitSendableCheck(check)) {
+        auto *conformanceDecl =
+            conformanceDC->getAsDecl() ? conformanceDC->getAsDecl() : nominal;
+        conformanceDecl->diagnose(diag::non_sendable_type_suppressed);
+      }
+      return true;
+    }
+  }
+
   // Global-actor-isolated types can be Sendable. We do not check the
   // instance data because it's all isolated to the global actor.
   switch (getActorIsolation(nominal)) {
@@ -7457,24 +7481,6 @@ bool swift::checkSendableConformance(
   // and not some (possibly constrained) extension.
   if (wasImplied)
     conformanceDC = nominal;
-
-  // Sendable supression allows conditional conformances only.
-  if (nominal->suppressesConformance(KnownProtocolKind::Sendable)) {
-    bool hasUnconditionalConformance = false;
-    if (auto *normalConf = dyn_cast<NormalProtocolConformance>(conformance)) {
-      hasUnconditionalConformance =
-          normalConf->getConditionalRequirements().empty();
-    }
-
-    if (hasUnconditionalConformance) {
-      if (!isImplicitSendableCheck(check)) {
-        auto *conformanceDecl =
-            conformanceDC->getAsDecl() ? conformanceDC->getAsDecl() : nominal;
-        conformanceDecl->diagnose(diag::non_sendable_type_suppressed);
-      }
-      return true;
-    }
-  }
 
   return checkSendableInstanceStorage(nominal, conformanceDC, check);
 }
