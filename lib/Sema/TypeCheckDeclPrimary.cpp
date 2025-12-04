@@ -2455,6 +2455,7 @@ public:
           } else {
             VD->diagnose(diag::property_does_not_override, isClassContext)
                 .highlight(OA->getLocation());
+            diagnoseOverridenProperty(VD, DC, OA);
           }
           OA->setInvalid();
         }
@@ -2519,6 +2520,32 @@ public:
               SD->diagnose(diag::attr_static_exclusive_only_type_nonmutating,
                            SD->getDeclaredInterfaceType());
             });
+      }
+    }
+  }
+
+  static void diagnoseOverridenProperty(VarDecl *VD, DeclContext *DC,
+                                        OverrideAttr *OA) {
+    auto declName = VD->getBaseName();
+    auto declType = VD->getInterfaceType()->getRValueType();
+
+    auto inherited = DC->getSelfClassDecl()->getInherited();
+    if (!inherited.empty()) {
+      auto superClassType = inherited.getResolvedType(0);
+      auto lookupResult =
+          TypeChecker::lookupMember(DC, superClassType, DeclNameRef(declName));
+      for (auto &candidate : lookupResult) {
+        auto *valueDecl = candidate.getValueDecl();
+        if (auto funcDecl = dyn_cast<FuncDecl>(valueDecl)) {
+          if (funcDecl->getBaseName() == declName &&
+              funcDecl->getParameters()->size() == 0) {
+            std::string funcDeclTypeStr = " -> " + declType.getString();
+            VD->diagnose(diag::override_method_not_property,
+                         funcDecl->getBaseName().getIdentifier())
+                .highlight(OA->getLocation())
+                .fixItReplace(getFixItLocForVarToLet(VD), "func");
+          }
+        }
       }
     }
   }
@@ -3509,6 +3536,7 @@ public:
           } else {
             FD->diagnose(diag::method_does_not_override, isClassContext)
                 .highlight(OA->getLocation());
+            diagnoseOverridenMethod(FD, DC, OA);
           }
           OA->setInvalid();
         }
@@ -3583,6 +3611,37 @@ public:
     }
 
     TypeChecker::checkObjCImplementation(FD);
+  }
+
+  static void diagnoseOverridenMethod(FuncDecl *FD, DeclContext *DC,
+                                      OverrideAttr *OA) {
+    if (FD->getParameters()->size() == 0) {
+      auto declName = FD->getBaseName();
+      auto declRetType = FD->getResultInterfaceType()->getRValueType();
+
+      auto inherited = DC->getSelfClassDecl()->getInherited();
+      if (!inherited.empty()) {
+        auto superClassType = inherited.getResolvedType(0);
+        auto lookupResult = TypeChecker::lookupMember(DC, superClassType,
+                                                      DeclNameRef(declName));
+        for (auto &candidate : lookupResult) {
+          auto *valueDecl = candidate.getValueDecl();
+          if (auto vardecl = dyn_cast<VarDecl>(valueDecl)) {
+            if (vardecl->getBaseName() == declName) {
+              std::string varDeclTypeStr = ": " + declRetType.getString();
+              FD->diagnose(diag::override_property_not_method,
+                           vardecl->getBaseName().getIdentifier())
+                  .highlight(OA->getLocation())
+                  .fixItReplace(FD->getFuncLoc(), "var")
+                  .fixItReplaceChars(
+                      FD->getParameters()->getLParenLoc(),
+                      FD->getBody()->getLBraceLoc().getAdvancedLoc(-1),
+                      varDeclTypeStr);
+            }
+          }
+        }
+      }
+    }
   }
 
   void visitModuleDecl(ModuleDecl *) { }
