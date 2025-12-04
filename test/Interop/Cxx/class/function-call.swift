@@ -44,7 +44,7 @@ public func testDestroyAddr() {
 }
 
 // CHECK: sil @$s4main29testNonTrivialFunctionPointeryyF : $@convention(thin) () -> () {
-// CHECK: %[[V0:.*]] = function_ref @$sSo8getFnPtrySo10NonTrivialVXCyFTo : $@convention(c) () -> @convention(c) (@in_cxx NonTrivial) -> ()
+// CHECK: %[[V0:.*]] = function_ref @$sSo8getFnPtrySo10NonTrivialVXzC22_ZTSPDoFv10NonTrivialEyFTo : $@convention(c) () -> @convention(c) (@in_cxx NonTrivial) -> ()
 // CHECK: %[[V1:.*]] = apply %[[V0]]() : $@convention(c) () -> @convention(c) (@in_cxx NonTrivial) -> ()
 // CHECK: %[[V3:.*]] = alloc_stack $NonTrivial
 // CHECK: %[[V7:.*]] = function_ref @$sSo10NonTrivialVABycfCTo : $@convention(c) () -> @out NonTrivial

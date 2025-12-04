@@ -52,7 +52,7 @@ public func testClosureToFuncPtr() {
 }
 
 // CHECK: sil @$s4main13returnFuncPtrySo10NonTrivialVcyF : $@convention(thin) () -> @owned @callee_guaranteed (@in_guaranteed NonTrivial) -> () {
-// CHECK: %[[V0:.*]] = function_ref @$sSo8getFnPtrySo10NonTrivialVXCyFTo : $@convention(c) () -> @convention(c) (@in_cxx NonTrivial) -> ()
+// CHECK: %[[V0:.*]] = function_ref @$sSo8getFnPtrySo10NonTrivialVXzC22_ZTSPDoFv10NonTrivialEyFTo : $@convention(c) () -> @convention(c) (@in_cxx NonTrivial) -> ()
 // CHECK: %[[V1:.*]] = apply %[[V0]]() : $@convention(c) () -> @convention(c) (@in_cxx NonTrivial) -> ()
 // CHECK: %[[V2:.*]] = function_ref @$sSo10NonTrivialVIetzC22_ZTSPDoFv10NonTrivialEX_ABIegn_TR : $@convention(thin) (@in_guaranteed NonTrivial, @convention(c) (@in_cxx NonTrivial) -> ()) -> ()
 // CHECK: %[[V3:.*]] = partial_apply [callee_guaranteed] %[[V2]](%[[V1]]) : $@convention(thin) (@in_guaranteed NonTrivial, @convention(c) (@in_cxx NonTrivial) -> ()) -> ()
