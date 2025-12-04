@@ -358,7 +358,7 @@ static void collectClangModuleHeaderIncludes(
          dir != end && !errorCode; dir.increment(errorCode)) {
 
       if (llvm::StringSwitch<bool>(llvm::sys::path::extension(dir->path()))
-              .Cases(".h", ".H", ".hh", ".hpp", true)
+              .Cases({".h", ".H", ".hh", ".hpp"}, true)
               .Default(false)) {
 
         // Compute path to the header relative to the root of the module

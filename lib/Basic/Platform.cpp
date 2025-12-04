@@ -367,18 +367,18 @@ getArchForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleArchName = triple.getArchName();
 
   return llvm::StringSwitch<StringRef>(tripleArchName)
-              .Cases("arm64", "aarch64", "arm64")
-              .Cases("arm64_32", "aarch64_32", "arm64_32")
-              .Cases("x86_64", "amd64", "x86_64")
-              .Cases("i386", "i486", "i586", "i686", "i786", "i886", "i986",
-                     "i386")
-              .Cases("unknown", "", "unknown")
-  // These values are also supported, but are handled by the default case below:
-  //          .Case ("armv7s", "armv7s")
-  //          .Case ("armv7k", "armv7k")
-  //          .Case ("armv7", "armv7")
-  //          .Case ("arm64e", "arm64e")
-              .Default(tripleArchName);
+      .Cases({"arm64", "aarch64"}, "arm64")
+      .Cases({"arm64_32", "aarch64_32"}, "arm64_32")
+      .Cases({"x86_64", "amd64"}, "x86_64")
+      .Cases({"i386", "i486", "i586", "i686", "i786", "i886", "i986"}, "i386")
+      .Cases({"unknown", ""}, "unknown")
+      // These values are also supported, but are handled by the default case
+      // below:
+      //          .Case ("armv7s", "armv7s")
+      //          .Case ("armv7k", "armv7k")
+      //          .Case ("armv7", "armv7")
+      //          .Case ("arm64e", "arm64e")
+      .Default(tripleArchName);
 }
 
 static StringRef
@@ -405,20 +405,21 @@ getOSForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleOSNameNoVersion = tripleOSName.take_until(llvm::isDigit);
 
   return llvm::StringSwitch<StringRef>(tripleOSNameNoVersion)
-              .Cases("macos", "macosx", "darwin", "macos")
-              .Cases("unknown", "", "unknown")
-  // These values are also supported, but are handled by the default case below:
-  //          .Case ("ios", "ios")
-  //          .Case ("tvos", "tvos")
-  //          .Case ("watchos", "watchos")
-              .Default(tripleOSNameNoVersion);
+      .Cases({"macos", "macosx", "darwin"}, "macos")
+      .Cases({"unknown", ""}, "unknown")
+      // These values are also supported, but are handled by the default case
+      // below:
+      //          .Case ("ios", "ios")
+      //          .Case ("tvos", "tvos")
+      //          .Case ("watchos", "watchos")
+      .Default(tripleOSNameNoVersion);
 }
 
 static std::optional<StringRef>
 getEnvironmentForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleEnvironment = triple.getEnvironmentName();
   return llvm::StringSwitch<std::optional<StringRef>>(tripleEnvironment)
-      .Cases("unknown", "", std::nullopt)
+      .Cases({"unknown", ""}, std::nullopt)
       // These values are also supported, but are handled by the default case
       // below:
       //          .Case ("simulator", StringRef("simulator"))
