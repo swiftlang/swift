@@ -51,12 +51,9 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
-  // Even though begin_access/destroy_value/copy_value/end_lifetime have
-  // side-effects, they can be DCE'ed if they do not have useful
-  // dependencies/reverse dependencies
-  if (isa<CopyValueInst>(I) ||
-      isa<DestroyValueInst>(I) || isa<EndLifetimeInst>(I) ||
-      isa<EndBorrowInst>(I))
+  // Even though end_lifetime has side-effects, it can be DCE'ed if it does not
+  // have useful dependencies/reverse dependencies
+  if (isa<EndLifetimeInst>(I))
     return false;
 
   if (isa<UnconditionalCheckedCastInst>(I)) {
@@ -359,16 +356,6 @@ void DCE::markLive() {
         } else {
           markInstructionLive(&I);
         }
-        break;
-      }
-      case SILInstructionKind::DestroyValueInst: {
-        auto phi = PhiValue(I.getOperand(0));
-        // Disable DCE of phis which are lexical or may have a pointer escape.
-        if (phi && (phi->isLexical() || findPointerEscape(phi))) {
-          markInstructionLive(&I);
-        }
-        // The instruction is live only if it's operand value is also live
-        addReverseDependency(I.getOperand(0), &I);
         break;
       }
       case SILInstructionKind::EndBorrowInst: {

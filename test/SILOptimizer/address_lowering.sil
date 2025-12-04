@@ -2934,6 +2934,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @test_store_borrow_1_copy_addr : {{.*}} {
+// CHECK:         alloc_stack
 // CHECK:         [[ADDR:%[^,]+]] = alloc_stack
 // CHECK:         apply undef<T>([[ADDR]])
 // CHECK:         [[COPY:%[^,]+]] = alloc_stack

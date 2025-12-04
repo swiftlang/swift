@@ -539,8 +539,8 @@ void decodeRequirement(
               .Case("D", LayoutConstraintKind::NativeClass)
               .Case("T", LayoutConstraintKind::Trivial)
               .Case("B", LayoutConstraintKind::BridgeObject)
-              .Cases("E", "e", LayoutConstraintKind::TrivialOfExactSize)
-              .Cases("M", "m", LayoutConstraintKind::TrivialOfAtMostSize)
+              .Cases({"E", "e"}, LayoutConstraintKind::TrivialOfExactSize)
+              .Cases({"M", "m"}, LayoutConstraintKind::TrivialOfAtMostSize)
               .Case("S", LayoutConstraintKind::TrivialStride)
               .Default(std::nullopt);
 

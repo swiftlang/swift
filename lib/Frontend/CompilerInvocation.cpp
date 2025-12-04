@@ -568,9 +568,10 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
                    OPT_disable_module_selectors_in_module_interface,
                    false);
   } else if (auto envValue = ::getenv("SWIFT_MODULE_SELECTORS_IN_INTERFACES")) {
-    Opts.UseModuleSelectors = llvm::StringSwitch<bool>(envValue)
-        .CasesLower("false", "no", "off", "0", false)
-        .Default(true);
+    Opts.UseModuleSelectors =
+        llvm::StringSwitch<bool>(envValue)
+            .CasesLower({"false", "no", "off", "0"}, false)
+            .Default(true);
   } else {
     // Any heuristics we might add would go here.
     Opts.UseModuleSelectors = false;

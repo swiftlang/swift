@@ -1444,12 +1444,13 @@ bool Parser::parseDifferentiableAttributeArguments(
   // Parse optional differentiability parameters.
   // Parse differentiability kind (optional).
   if (Tok.is(tok::identifier)) {
-    diffKind = llvm::StringSwitch<DifferentiabilityKind>(Tok.getText())
-        .Case("reverse", DifferentiabilityKind::Reverse)
-        .Cases("wrt", "withRespectTo", DifferentiabilityKind::Normal)
-        .Case("_linear", DifferentiabilityKind::Linear)
-        .Case("_forward", DifferentiabilityKind::Forward)
-        .Default(DifferentiabilityKind::NonDifferentiable);
+    diffKind =
+        llvm::StringSwitch<DifferentiabilityKind>(Tok.getText())
+            .Case("reverse", DifferentiabilityKind::Reverse)
+            .Cases({"wrt", "withRespectTo"}, DifferentiabilityKind::Normal)
+            .Case("_linear", DifferentiabilityKind::Linear)
+            .Case("_forward", DifferentiabilityKind::Forward)
+            .Default(DifferentiabilityKind::NonDifferentiable);
 
     switch (diffKind) {
     // Reject unsupported differentiability kinds.
