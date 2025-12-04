@@ -399,11 +399,13 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
             // If different isolated stored properties require different
             // global actors, it is impossible to initialize this type.
             if (existingIsolation != isolation) {
-              ctx.Diags.diagnose(decl->getLoc(),
-                  diag::conflicting_stored_property_isolation,
-                  ICK == ImplicitConstructorKind::Memberwise,
-                  decl->getDeclaredType(), existingIsolation, isolation)
-                .warnUntilSwiftVersion(6);
+              ctx.Diags
+                  .diagnose(decl->getLoc(),
+                            diag::conflicting_stored_property_isolation,
+                            ICK == ImplicitConstructorKind::Memberwise,
+                            decl->getDeclaredType(), existingIsolation,
+                            isolation)
+                  .warnUntilLanguageMode(6);
               if (previousVar) {
                 previousVar->diagnose(diag::property_requires_actor,
                                       previousVar, existingIsolation);
@@ -944,11 +946,12 @@ static void diagnoseMissingRequiredInitializer(
   }
 
   // Complain.
-  ctx.Diags.diagnose(insertionLoc, diag::required_initializer_missing,
-                     superInitializer->getName(),
-                     superInitializer->getDeclContext()->getDeclaredInterfaceType())
-    .warnUntilSwiftVersionIf(downgradeToWarning, 6)
-    .fixItInsert(insertionLoc, initializerText);
+  ctx.Diags
+      .diagnose(insertionLoc, diag::required_initializer_missing,
+                superInitializer->getName(),
+                superInitializer->getDeclContext()->getDeclaredInterfaceType())
+      .warnUntilLanguageModeIf(downgradeToWarning, 6)
+      .fixItInsert(insertionLoc, initializerText);
 
   ctx.Diags.diagnose(findNonImplicitRequiredInit(superInitializer),
                      diag::required_initializer_here);

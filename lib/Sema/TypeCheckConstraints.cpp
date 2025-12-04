@@ -695,10 +695,10 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       // In Swift 6.2 and below we incorrectly missed checking this rule for
       // methods, downgrade to a warning until the next language mode.
       auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-      if (!anchor->hasCurriedSelf() || ctx.isSwiftVersionAtLeast(futureVersion))
+      if (!anchor->hasCurriedSelf() || ctx.isLanguageModeAtLeast(futureVersion))
         return Type();
 
-      diag.warnUntilFutureSwiftVersion();
+      diag.warnUntilFutureLanguageMode();
     }
   }
 

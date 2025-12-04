@@ -314,7 +314,7 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
   if (D->getFormalAccess() == AccessLevel::Open) {
     auto &context = D->getASTContext();
     auto diagID = diag::implicitly_final_cannot_be_open;
-    if (!context.isSwiftVersionAtLeast(5))
+    if (!context.isLanguageModeAtLeast(5))
       diagID = diag::implicitly_final_cannot_be_open_swift4;
     auto inFlightDiag = context.Diags.diagnose(D, diagID,
                                     static_cast<unsigned>(reason.value()));
@@ -408,11 +408,12 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
       if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
         if (classDecl->isAnyActor()) {
           // For an actor "convenience" is not required, but we'll honor it.
-          diags.diagnose(decl->getLoc(),
-                diag::no_convenience_keyword_init, "actors")
-            .fixItRemove(convenAttr->getLocation())
-            .warnInSwiftInterface(dc)
-            .warnUntilSwiftVersion(6);
+          diags
+              .diagnose(decl->getLoc(), diag::no_convenience_keyword_init,
+                        "actors")
+              .fixItRemove(convenAttr->getLocation())
+              .warnInSwiftInterface(dc)
+              .warnUntilLanguageMode(6);
 
         } else { // not an actor
           // Forbid convenience inits on Foreign CF types, as Swift does not yet
@@ -640,7 +641,7 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       // be delegating because, well, we don't know the layout.
       // A dynamic replacement is permitted to be non-delegating.
       if (NTD->isResilient() ||
-          (ctx.isSwiftVersionAtLeast(5) &&
+          (ctx.isLanguageModeAtLeast(5) &&
            !decl->getAttrs().getAttribute<DynamicReplacementAttr>())) {
         if (decl->getParentModule() != NTD->getParentModule())
           Kind = BodyInitKind::Delegating;
@@ -842,7 +843,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           if (VD->getFormalAccess() == AccessLevel::Open) {
             auto &context = decl->getASTContext();
             auto diagID = diag::implicitly_final_cannot_be_open;
-            if (!context.isSwiftVersionAtLeast(5))
+            if (!context.isLanguageModeAtLeast(5))
               diagID = diag::implicitly_final_cannot_be_open_swift4;
             auto inFlightDiag =
               context.Diags.diagnose(decl, diagID,
