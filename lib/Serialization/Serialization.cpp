@@ -4915,41 +4915,50 @@ public:
 
     auto genericSigID = S.addGenericSignatureRef(opaqueDecl->getGenericSignature());
 
+    uint8_t rawAccessLevel =
+        getRawStableAccessLevel(opaqueDecl->getFormalAccess());
+    bool exportUnderlyingType = opaqueDecl->exportUnderlyingType();
+
+    bool hasUnderlyingType = false;
     SubstitutionMapID underlyingSubsID = 0;
     if (auto underlying = opaqueDecl->getUniqueUnderlyingTypeSubstitutions()) {
       underlyingSubsID = S.addSubstitutionMapRef(*underlying);
+      hasUnderlyingType = true;
     } else if (opaqueDecl->hasConditionallyAvailableSubstitutions()) {
       // Universally available type doesn't have any availability conditions
-      // so it could be serialized into "unique" slot to safe space.
+      // so it could be serialized into "unique" slot to save space.
       auto universal =
           opaqueDecl->getConditionallyAvailableSubstitutions().back();
       underlyingSubsID = S.addSubstitutionMapRef(universal->getSubstitutions());
+      hasUnderlyingType = true;
     }
-    uint8_t rawAccessLevel =
-        getRawStableAccessLevel(opaqueDecl->getFormalAccess());
-    bool exportDetails = opaqueDecl->exportUnderlyingType();
 
-    unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code];
-    OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+    OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord,
+                                 S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code],
                                  contextID.getOpaqueValue(), namingDeclID,
                                  interfaceSigID, interfaceTypeID, genericSigID,
-                                 underlyingSubsID, rawAccessLevel,
-                                 exportDetails);
+                                 rawAccessLevel, hasUnderlyingType,
+                                 exportUnderlyingType);
     writeGenericParams(opaqueDecl->getGenericParams());
+
+    if (!hasUnderlyingType)
+      return;
+
+    UnderlyingSubstitutionLayout::emitRecord(
+        S.Out, S.ScratchRecord,
+        S.DeclTypeAbbrCodes[UnderlyingSubstitutionLayout::Code],
+        underlyingSubsID);
 
     // Serialize all of the conditionally available substitutions expect the
     // last one - universal, it's serialized into "unique" slot.
     if (opaqueDecl->hasConditionallyAvailableSubstitutions()) {
-      unsigned abbrCode =
-          S.DeclTypeAbbrCodes[ConditionalSubstitutionLayout::Code];
       for (const auto *subs :
            opaqueDecl->getConditionallyAvailableSubstitutions().drop_back()) {
         ConditionalSubstitutionLayout::emitRecord(
-            S.Out, S.ScratchRecord, abbrCode,
+            S.Out, S.ScratchRecord,
+            S.DeclTypeAbbrCodes[ConditionalSubstitutionLayout::Code],
             S.addSubstitutionMapRef(subs->getSubstitutions()));
 
-        unsigned condAbbrCode =
-            S.DeclTypeAbbrCodes[ConditionalSubstitutionConditionLayout::Code];
         for (const auto &query : subs->getAvailabilityQueries()) {
           // FIXME: [availability] Support arbitrary domains (rdar://156513787).
           DEBUG_ASSERT(query.getDomain().isPlatform());
@@ -4961,8 +4970,9 @@ public:
                            std::optional<llvm::VersionTuple>(
                                availableRange.getRawMinimumVersion()));
           ConditionalSubstitutionConditionLayout::emitRecord(
-              S.Out, S.ScratchRecord, condAbbrCode, query.isUnavailability(),
-              LIST_VER_TUPLE_PIECES(osVersion));
+              S.Out, S.ScratchRecord,
+              S.DeclTypeAbbrCodes[ConditionalSubstitutionConditionLayout::Code],
+              query.isUnavailability(), LIST_VER_TUPLE_PIECES(osVersion));
         }
       }
     }
@@ -6559,6 +6569,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<MembersLayout>();
   registerDeclTypeAbbr<XRefLayout>();
 
+  registerDeclTypeAbbr<UnderlyingSubstitutionLayout>();
   registerDeclTypeAbbr<ConditionalSubstitutionLayout>();
   registerDeclTypeAbbr<ConditionalSubstitutionConditionLayout>();
 
