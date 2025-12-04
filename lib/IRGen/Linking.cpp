@@ -1767,7 +1767,8 @@ bool LinkEntity::hasNonUniqueDefinition() const {
       getKind() == Kind::ReadOnlyGlobalObject)
     return getSILGlobalVariable()->hasNonUniqueDefinition();
 
-  if (getKind() == Kind::TypeMetadata) {
+  if (getKind() == Kind::TypeMetadata ||
+      getKind() == Kind::ValueWitnessTable) {
     // For a nominal type, check its declaration.
     CanType type = getType();
     if (auto nominal = type->getAnyNominal()) {
