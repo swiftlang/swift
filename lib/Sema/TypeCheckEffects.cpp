@@ -4672,7 +4672,8 @@ private:
         .highlight(E->getAwaitLoc());
       return;
     }
-    Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await);
+    Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await)
+        .fixItRemove(E->getAwaitLoc());
   }
 
   void diagnoseRedundantUnsafe(UnsafeExpr *E) const {

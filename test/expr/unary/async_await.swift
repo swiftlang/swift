@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 // REQUIRES: concurrency
 
@@ -238,4 +238,29 @@ func testAsyncExprWithoutAwait() async {
   let a = f("a") // expected-error {{expression is 'async' but is not marked with 'await'}} {{11-11=await }}
   // expected-warning@-1 {{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
   // expected-note@-2 {{call is 'async'}}
+}
+
+// https://github.com/swiftlang/swift/issues/85818
+func testNoAsyncInAwait() async {
+  func g() {}
+  await g() // expected-warning {{no 'async' operations occur within 'await' expression}}{{3-9=}}
+  _ = (g(), await (g())) // expected-warning {{no 'async' operations occur within 'await' expression}}{{13-19=}}
+
+  @MainActor struct MA {
+    func f() {}
+    func g() async {
+      await f() // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
+    }
+
+    static func h(_ ma: MA) async {
+      await ma.f() // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
+    }
+  }
+
+  actor A {
+    func f() {}
+    func g() async {
+      await f() // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
+    }
+  }
 }
