@@ -63,6 +63,15 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
 
   public var builtinVectorElementType: Type { Type(bridged: bridged.getBuiltinVectorElementType()) }
 
+  public var optionalObjectType: Type {
+    assert(self.isOptional)
+    return genericArgumentsOfBoundGenericType[0]
+  }
+
+  public var optionalType: Type {
+    return Type(bridged: bridged.getOptionalType())
+  }
+
   public func subst(with substitutionMap: SubstitutionMap) -> Type {
     return Type(bridged: bridged.subst(substitutionMap.bridged))
   }
@@ -91,6 +100,10 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
 
   public var kindOfGenericTypeParameter: GenericTypeParameterKind {
     bridged.GenericTypeParam_getParamKind()
+  }
+
+  public var genericArgumentsOfBoundGenericType: TypeArray {
+    TypeArray(bridged: bridged.BoundGenericType_getGenericArgs())
   }
 }
 

@@ -639,6 +639,10 @@ BridgedCanType BridgedASTType::getBuiltinFixedArraySizeType() const {
   return unbridged()->castTo<swift::BuiltinFixedArrayType>()->getSize();
 }
 
+BridgedASTType BridgedASTType::getOptionalType() const {
+  return {swift::OptionalType::get(unbridged())};
+}
+
 bool BridgedASTType::isBuiltinFixedWidthInteger(SwiftInt width) const {
   if (auto *intTy = unbridged()->getAs<swift::BuiltinIntegerType>())
     return intTy->isFixedWidth((unsigned)width);
@@ -780,6 +784,10 @@ SwiftInt BridgedASTType::GenericTypeParam_getIndex() const {
 swift::GenericTypeParamKind
 BridgedASTType::GenericTypeParam_getParamKind() const {
   return llvm::cast<swift::GenericTypeParamType>(type)->getParamKind();
+}
+
+BridgedASTTypeArray BridgedASTType::BoundGenericType_getGenericArgs() const {
+  return {llvm::cast<swift::BoundGenericType>(type)->getGenericArgs()};
 }
 
 static_assert((int)BridgedASTType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);

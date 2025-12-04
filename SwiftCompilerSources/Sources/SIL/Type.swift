@@ -291,6 +291,7 @@ public struct EnumCase {
   public let enumElementDecl : EnumElementDecl
   public let payload: Type?
   public let index: Int
+  public var name: StringRef { enumElementDecl.name }
 }
 
 public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
@@ -329,7 +330,7 @@ public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
     if currentIndex == index && !enumType.bridged.isEndCaseIterator(iterator) {
       return EnumCase(enumElementDecl: enumType.bridged.getEnumElementDecl(iterator).getAs(EnumElementDecl.self),
                       payload: enumType.bridged.getEnumCasePayload(iterator, function.bridged).typeOrNil,
-                      index: caseIndex)
+                      index: index)
     }
     return nil
   }
