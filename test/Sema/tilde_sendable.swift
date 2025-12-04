@@ -131,4 +131,8 @@ do {
 
   class Child2: Base, ~Sendable {}
   // expected-error@-1 {{cannot both conform to and suppress conformance to 'Sendable'}}
+
+  actor A: ~Sendable {
+    // expected-error@-1 {{conformance to 'Sendable' can only be suppressed on structs, classes, and enums}}
+  }
 }

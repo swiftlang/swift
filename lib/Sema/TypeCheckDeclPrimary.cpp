@@ -133,6 +133,17 @@ public:
     }
 
     if (auto *TD = dyn_cast<const TypeDecl *>(decl)) {
+      if (rpk == RepressibleProtocolKind::Sendable) {
+        auto *C = dyn_cast<ClassDecl>(TD);
+        if (C && C->isActor()) {
+          diagnoseInvalid(
+              repr, repr.getLoc(),
+              diag::conformance_repression_only_on_struct_class_enum,
+              ctx.getProtocol(*kp));
+          return Type();
+        }
+      }
+
       if (!(isa<StructDecl>(TD) || isa<ClassDecl>(TD) || isa<EnumDecl>(TD))) {
         diagnoseInvalid(repr, repr.getLoc(),
                         diag::conformance_repression_only_on_struct_class_enum,
