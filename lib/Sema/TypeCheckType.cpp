@@ -5412,7 +5412,7 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
     unwrappedType = wrappedOptionalType;
   }
 
-  if (auto dynamicSelfType = dyn_cast<DynamicSelfType>(unwrappedType)) {
+  if (auto *dynamicSelfType = unwrappedType->getAs<DynamicSelfType>()) {
     unwrappedType = dynamicSelfType->getSelfType();
   }
 

@@ -4397,8 +4397,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
       if (decl->hasSendingResult()) {
         Printer << "sending ";
-      } else if (auto *ft = llvm::dyn_cast_if_present<AnyFunctionType>(
-                     decl->getInterfaceType())) {
+      } else if (auto *ft =
+                     decl->getInterfaceType()->getAs<AnyFunctionType>()) {
         if (ft->hasExtInfo() && ft->hasSendingResult()) {
           Printer << "sending ";
         }

@@ -3601,7 +3601,7 @@ bool swift::irgen::hasValidSignatureForEmbedded(SILFunction *f) {
   auto s = f->getLoweredFunctionType()->getInvocationGenericSignature();
   for (auto genParam : s.getGenericParams()) {
     auto mappedParam = f->getGenericEnvironment()->mapTypeIntoEnvironment(genParam);
-    if (auto archeTy = dyn_cast<ArchetypeType>(mappedParam)) {
+    if (auto *archeTy = mappedParam->getAs<ArchetypeType>()) {
       if (archeTy->requiresClass())
         continue;
     }

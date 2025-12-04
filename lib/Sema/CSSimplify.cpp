@@ -9977,7 +9977,7 @@ ConstraintSystem::matchPackElementType(Type elementType, Type patternType,
       return tryFix([&]() {
         auto envShape = genericEnv->mapTypeIntoEnvironment(
             genericEnv->getOpenedElementShapeClass());
-        if (auto *pack = dyn_cast<PackType>(envShape))
+        if (auto *pack = dyn_cast<PackType>(envShape.getPointer()))
           envShape = pack->unwrapSingletonPackExpansion()->getPatternType();
 
         return SkipSameShapeRequirement::create(
