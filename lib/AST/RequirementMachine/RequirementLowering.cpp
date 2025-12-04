@@ -862,7 +862,10 @@ void swift::rewriting::realizeInheritedRequirements(
 ///
 /// This request is invoked by RequirementSignatureRequest for each protocol
 /// in the connected component.
-ArrayRef<StructuralRequirement>
+///
+/// The returned array of StructuralRequirements have already had the
+/// InverseRequirements applied to them.
+std::pair<ArrayRef<StructuralRequirement>, ArrayRef<InverseRequirement>>
 StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
                                         ProtocolDecl *proto) const {
   ASSERT(!proto->hasLazyRequirementSignature());
@@ -921,15 +924,17 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     desugarRequirements(result, inverses, errors);
 
     SmallVector<StructuralRequirement, 2> defaults;
-    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, defaults);
-    applyInverses(ctx, needsDefaultRequirements, inverses, result,
+    SmallVector<Type, 2> expandedGPs;
+    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result,
+                                       defaults, expandedGPs);
+    applyInverses(ctx, expandedGPs, inverses, result,
                   defaults, errors);
     result.append(defaults);
 
     diagnoseRequirementErrors(ctx, errors,
                               AllowConcreteTypePolicy::NestedAssocTypes);
 
-    return ctx.AllocateCopy(result);
+    return std::make_pair(ctx.AllocateCopy(result), ctx.AllocateCopy(inverses));
   }
 
   // Add requirements for each associated type.
@@ -990,21 +995,27 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   desugarRequirements(result, inverses, errors);
 
   SmallVector<StructuralRequirement, 2> defaults;
+  SmallVector<Type, 2> expandedGPs;
   // We do not expand defaults for invertible protocols themselves.
   // HACK: We don't expand for Sendable either. This shouldn't be needed after
   // Swift 6.0
-  if (!proto->getInvertibleProtocolKind()
-      && !proto->isSpecificProtocol(KnownProtocolKind::Sendable))
-    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, defaults);
+  if (!proto->getInvertibleProtocolKind() &&
+      !proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result,
+                                       defaults, expandedGPs);
+  } else {
+    // populate with valid subjects for inverses, despite skipping expansion.
+    expandedGPs.assign(needsDefaultRequirements);
+  }
 
-  applyInverses(ctx, needsDefaultRequirements, inverses, result,
+  applyInverses(ctx, expandedGPs, inverses, result,
                 defaults, errors);
   result.append(defaults);
 
   diagnoseRequirementErrors(ctx, errors,
                             AllowConcreteTypePolicy::NestedAssocTypes);
 
-  return ctx.AllocateCopy(result);
+  return std::make_pair(ctx.AllocateCopy(result), ctx.AllocateCopy(inverses));
 }
 
 /// This request primarily emits diagnostics about typealiases and associated
@@ -1317,4 +1328,27 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
   }
 
   return ctx.AllocateCopy(result);
+}
+
+ArrayRef<InverseRequirement>
+ProtocolInversesRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *proto) const {
+  auto &ctx = proto->getASTContext();
+
+  // If we have a serialized requirement signature, deserialize it and
+  // query it for the inverses.
+  if (proto->hasLazyRequirementSignature()) {
+    SmallVector<Requirement, 2> _ignored;
+    SmallVector<InverseRequirement, 2> result;
+    auto reqSig = proto->getRequirementSignature();
+    reqSig.getRequirementsWithInverses(proto, _ignored, result);
+    return ctx.AllocateCopy(result);
+  }
+
+  // Otherwise, we must avoid building a RequirementSignature, as this query
+  // needs to be safe to ask while building the protocol's RequirementSignature.
+  //
+  // So, use a StructuralRequirementsRequest to get the inverses.
+  return evaluateOrDefault(ctx.evaluator,
+     StructuralRequirementsRequest{proto}, {}).second;
 }
