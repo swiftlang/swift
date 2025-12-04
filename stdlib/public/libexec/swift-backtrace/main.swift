@@ -497,6 +497,7 @@ Generate a backtrace for the parent process.
     if (args.demangle) { options.formUnion(.demangle) }
     if (args.sanitize == true) { options.formUnion(.sanitize) }
     if (args.showImages == .mentioned) { options.formUnion(.mentionedImages) }
+    if (args.showImages != ImagesToShow.none) { options.formUnion(.images) }
     if (args.threads == true) { options.formUnion(.allThreads) }
     return options
   }

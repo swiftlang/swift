@@ -28,6 +28,7 @@ public struct BacktraceJSONFormatterOptions: OptionSet {
   public static let sanitize = BacktraceJSONFormatterOptions(rawValue: 1<<2)
   public static let mentionedImages = BacktraceJSONFormatterOptions(rawValue: 1<<3)
   public static let allThreads = BacktraceJSONFormatterOptions(rawValue: 1<<4)
+  public static let images = BacktraceJSONFormatterOptions(rawValue: 1<<5)
 }
 
 extension BacktraceJSONFormatterOptions {
@@ -38,6 +39,7 @@ extension BacktraceJSONFormatterOptions {
   var shouldSanitize: Bool { contains(.sanitize) }
   var showMentionedImages: Bool { contains(.mentionedImages) }
   var showAllThreads: Bool { contains(.allThreads) }
+  var showImages: Bool { contains(.images) }
 }
 
 public protocol BacktraceJSONWriter {
@@ -96,27 +98,6 @@ extension BacktraceJSONFormatter {
   func getFaultAddress() -> String? {
     crashLog.faultAddress
   }
-
-  // settings for the output format
-  func getShouldShowAllThreads() -> Bool {
-    options.showAllThreads
-  }
-
-  func getShouldShowAllRegisters() -> Bool {
-    options.showAllRegisters
-  }
-
-  func getShouldDemangle() -> Bool {
-    options.shouldDemangle
-  }
-
-  func getShouldSanitize() -> Bool {
-    options.shouldDemangle
-  }
-
-  func getShowMentionedImages() -> Bool {
-    options.showMentionedImages
-  }
 }
 
 @_spi(Formatting)
@@ -145,9 +126,8 @@ public extension BacktraceJSONFormatter {
   mutating func writeThreads() {
 
     write(#", "threads": [ "#, flush: false)
-    let showAllThreads = getShouldShowAllThreads()
 
-    let threads = crashLog.threads.filter { showAllThreads || $0.crashed }
+    let threads = crashLog.threads.filter { options.showAllThreads || $0.crashed }
 
     var first = true
     for thread in threads {
@@ -162,11 +142,11 @@ public extension BacktraceJSONFormatter {
 
     write(" ]", flush: false)
 
-    if !showAllThreads && crashLog.threads.count > 1 {
+    if !options.showAllThreads && crashLog.threads.count > 1 {
       write(", \"omittedThreads\": \(crashLog.threads.count - 1)", flush: false)
     }
 
-    if let images = crashLog.images, getShowMentionedImages() {
+    if let images = crashLog.images, options.showMentionedImages {
       self.crashLog.omittedImages = images.count - mentionedImages.count
     }
   }
@@ -190,10 +170,10 @@ public extension BacktraceJSONFormatter {
 
   // note: this updates the crash log with the ommitted image count
   func writeImages() {
-    if let images = crashLog.images {
+    if options.showImages, let images = crashLog.images {
       var imagesToWrite = images
 
-      if getShowMentionedImages() {
+      if options.showMentionedImages {
         let mentioned =
           images.enumerated()
             .filter { mentionedImages.contains($0.0) }
@@ -264,7 +244,7 @@ extension BacktraceJSONFormatter {
         write(#""crashed": true, "#, flush: false)
       }
 
-      if getShouldShowAllRegisters() || isCrashingThread {
+      if options.showAllRegisters || isCrashingThread {
         write(#""registers": {"#, flush: false)
         writeThreadRegisters(thread: thread)
         write(" }, ", flush: false)
@@ -302,7 +282,7 @@ extension BacktraceJSONFormatter {
                   , "offset": \(frame.offset ?? 0)
                   """, flush: false)
 
-          if getShouldDemangle() {
+          if options.shouldDemangle, let demangledName = frame.demangledName {
             let formattedOffset: String
             if (frame.offset ?? 0) > 0 {
               formattedOffset = " + \(frame.offset!)"
@@ -313,7 +293,7 @@ extension BacktraceJSONFormatter {
             }
 
             write("""
-                    , "description": \"\(escapeJSON(symbol))\(formattedOffset)\"
+                    , "description": \"\(escapeJSON(demangledName))\(formattedOffset)\"
                     """, flush: false)
           }
 
@@ -322,7 +302,7 @@ extension BacktraceJSONFormatter {
           }
 
           if var sourceLocation = frame.sourceLocation {
-            if getShouldSanitize() {
+            if options.shouldSanitize {
               sourceLocation.file = sanitizePath(sourceLocation.file)
             }
             write(#", "sourceLocation": { "#, flush: false)
@@ -343,7 +323,7 @@ extension BacktraceJSONFormatter {
 
       write("}", flush: false)
 
-      if getShowMentionedImages() {
+      if options.showMentionedImages {
         for frame in thread.frames {
           if let imageName = frame.image,
             let imageIndex = crashLog.images?

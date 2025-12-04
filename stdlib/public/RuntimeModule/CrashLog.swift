@@ -61,6 +61,10 @@ public struct CrashLog<Address: FixedWidthInteger>: Codable {
         public var description: String?
         public var image: String?
         public var sourceLocation: SourceLocation?
+        // this variable is not intended to be directly streamed to/from JSON
+        // but is used internally from capture to construct the description
+        // for JSON
+        public var demangledName: String?
 
         public var inlined: Bool = false
         public var isSwiftRuntimeFailure: Bool = false
@@ -194,7 +198,7 @@ extension CrashLog.Frame {
             }
 
             address = addr.hexRepresentation(nullAs: Address.self)
-            symbol = sbtSymbol.name
+            symbol = sbtSymbol.rawName
             offset = sbtSymbol.offset
             description = sbtSymbol.description
             image = sbtSymbol.imageName
@@ -203,6 +207,7 @@ extension CrashLog.Frame {
             isSwiftRuntimeFailure = frame.isSwiftRuntimeFailure
             isSwiftThunk = frame.isSwiftThunk
             isSystem = frame.isSystem
+            demangledName = sbtSymbol.name
 
             case (.omittedFrames(let count), _):
             self.count = count
