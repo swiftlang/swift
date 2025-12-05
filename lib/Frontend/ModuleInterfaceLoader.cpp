@@ -1805,7 +1805,7 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
 
   if (casOpts.EnableCaching) {
     genericSubInvocation.getCASOptions().EnableCaching = casOpts.EnableCaching;
-    genericSubInvocation.getCASOptions().Config = casOpts.Config;
+    genericSubInvocation.getCASOptions().CASOpts = casOpts.CASOpts;
     genericSubInvocation.getCASOptions().HasImmutableFileSystem =
         casOpts.HasImmutableFileSystem;
     casOpts.enumerateCASConfigurationFlags(

@@ -804,15 +804,15 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   Opts.EnableCachingRemarks |= Args.hasArg(OPT_cache_remarks);
   Opts.CacheSkipReplay |= Args.hasArg(OPT_cache_disable_replay);
   if (const Arg *A = Args.getLastArg(OPT_cas_path))
-    Opts.Config.CASPath = A->getValue();
+    Opts.CASOpts.CASPath = A->getValue();
 
   if (const Arg *A = Args.getLastArg(OPT_cas_plugin_path))
-    Opts.Config.PluginPath = A->getValue();
+    Opts.CASOpts.PluginPath = A->getValue();
 
   for (StringRef Opt : Args.getAllArgValues(OPT_cas_plugin_option)) {
     StringRef Name, Value;
     std::tie(Name, Value) = Opt.split('=');
-    Opts.Config.PluginOptions.emplace_back(std::string(Name),
+    Opts.CASOpts.PluginOptions.emplace_back(std::string(Name),
                                             std::string(Value));
   }
 
