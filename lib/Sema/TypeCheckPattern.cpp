@@ -1230,7 +1230,11 @@ Pattern *TypeChecker::coercePatternToType(
       // If the whole pattern is implicit, the user didn't write it.
       // Assume the compiler knows what it's doing.
     } else if (diagTy->isEqual(Context.TheEmptyTupleType)) {
-      shouldRequireType = true;
+      // Async-let bindings are commonly used to run a Void-returning
+      // synchronous function in an async context. As a policy choice, don't
+      // diagnose an inferred Void type (or optional thereof) on such bindings
+      // as potentially unexpected.
+      shouldRequireType = !var->isAsyncLet();
     } else if (auto MTT = diagTy->getAs<AnyMetatypeType>()) {
       if (MTT->getInstanceType()->isAnyObject())
         shouldRequireType = true;
