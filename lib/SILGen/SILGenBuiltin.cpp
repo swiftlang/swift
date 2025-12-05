@@ -2200,6 +2200,26 @@ static ManagedValue emitBuiltinTaskAddPriorityEscalationHandler(
   return ManagedValue::forRValueWithoutOwnership(b);
 }
 
+// static ManagedValue emitBuiltinTaskCancellationShieldPush(
+//     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+//     ArrayRef<ManagedValue> args, SGFContext C) {
+//   auto *b =
+//       SGF.B.createBuiltin(loc, BuiltinNames::TaskCancellationShieldPush,
+//                           SILType::getUnsafeRawPointer(SGF.getASTContext()),
+//                           subs, {});
+//   return ManagedValue::forRValueWithoutOwnership(b);
+// }
+
+// static ManagedValue emitBuiltinTaskCancellationShieldPop(
+//     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+//     ArrayRef<ManagedValue> args, SGFContext C) {
+//   auto *b =
+//       SGF.B.createBuiltin(loc, BuiltinNames::TaskCancellationShieldPop,
+//                           SILType::getUnsafeRawPointer(SGF.getASTContext()),
+//                           subs, {});
+//   return ManagedValue::forRValueWithoutOwnership(b);
+// }
+
 std::optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.

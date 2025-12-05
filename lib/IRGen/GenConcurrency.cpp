@@ -368,6 +368,24 @@ void irgen::emitBuiltinTaskLocalValuePop(IRGenFunction &IGF) {
   call->setCallingConv(IGF.IGM.SwiftCC);
 }
 
+void irgen::emitBuiltinTaskCancellationShieldPush(IRGenFunction &IGF) {
+  auto *call =
+      IGF.Builder.CreateCall(IGF.IGM.getTaskCancellationShieldPushFunctionPointer(), {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  // llvm::Value *identity =
+  //   IGF.Builder.CreatePtrToInt(executor, IGF.IGM.ExecutorFirstTy);
+
+  // out.add
+}
+
+void irgen::emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF) {
+  auto *call =
+      IGF.Builder.CreateCall(IGF.IGM.getTaskCancellationShieldPopFunctionPointer(), {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
 void irgen::emitFinishAsyncLet(IRGenFunction &IGF,
                                llvm::Value *asyncLet,
                                llvm::Value *resultBuffer) {
