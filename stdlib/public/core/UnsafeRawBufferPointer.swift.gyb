@@ -162,6 +162,10 @@ extension UnsafeRawBufferPointer {
 extension UnsafeRawBufferPointer.Iterator: Sendable { }
 
 extension UnsafeRawBufferPointer.Iterator: @unsafe IteratorProtocol, @unsafe Sequence {
+  public typealias Element = UInt8
+  public typealias Iterator = Self
+  public typealias BorrowingIterator = BorrowingIteratorAdapter<Self>
+
   /// Advances to the next byte and returns it, or `nil` if no next byte
   /// exists.
   ///
@@ -200,7 +204,9 @@ extension UnsafeMutableRawBufferPointer {
 
 extension Unsafe${Mutable}RawBufferPointer: @unsafe Sequence {
   public typealias SubSequence = Slice<${Self}>
-
+  public typealias Element = UInt8
+  public typealias BorrowingIterator = BorrowingIteratorAdapter<Iterator>
+  
   /// Returns an iterator over the bytes of this sequence.
   @inlinable
   public func makeIterator() -> Iterator {
@@ -230,7 +236,6 @@ extension Unsafe${Mutable}RawBufferPointer: @unsafe Sequence {
 extension Unsafe${Mutable}RawBufferPointer: @unsafe ${Mutable}Collection {
   // TODO: Specialize `index` and `formIndex` and
   // `_failEarlyRangeCheck` as in `UnsafeBufferPointer`.
-  public typealias Element = UInt8
   public typealias Index = Int
   public typealias Indices = Range<Int>
 

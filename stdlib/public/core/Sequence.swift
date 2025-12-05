@@ -176,7 +176,7 @@
 ///     // Prints "1..."
 public protocol IteratorProtocol<Element> {
   /// The type of element traversed by the iterator.
-  associatedtype Element
+  associatedtype Element: ~Copyable
 
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
@@ -324,15 +324,17 @@ public protocol IteratorProtocol<Element> {
 /// otherwise.
 public protocol Sequence<Element>: ~Copyable, ~Escapable {
   /// A type representing the sequence's elements.
-  associatedtype Element
+  associatedtype Element: ~Copyable
 
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
   associatedtype Iterator: IteratorProtocol<Element>
+    where Iterator.Element == Element
 
   @available(SwiftStdlib 6.3, *)
   associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = BorrowingIteratorAdapter<Iterator>
-  
+    where BorrowingIterator.Element == Element
+
   // FIXME: <rdar://problem/34142121>
   // This typealias should be removed as it predates the source compatibility
   // guarantees of Swift 3, but it cannot due to a bug.
@@ -390,7 +392,7 @@ public protocol Sequence<Element>: ~Copyable, ~Escapable {
   ///    (O(1)) time. If this returns non-`nil`, then it must have better than linear
   ///    (O(*n*)) complexity.
   func _customContainsEquatableElement(
-    _ element: Element
+    _ element: borrowing Element
   ) -> Bool?
 
   /// Create a native array buffer containing the elements of `self`,
@@ -460,8 +462,8 @@ public protocol Sequence<Element>: ~Copyable, ~Escapable {
 
 @available(SwiftStdlib 6.3, *)
 @frozen
-public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: /* & ~Copyable & ~Escapable */
-  BorrowingIteratorProtocol where Iterator.Element: Copyable
+public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: ~Copyable & ~Escapable &
+  BorrowingIteratorProtocol
 {
   @usableFromInline
   var iterator: Iterator
@@ -731,7 +733,7 @@ extension Sequence where Self: ~Copyable & ~Escapable {
   @inlinable
   @inline(__always)
   public func _customContainsEquatableElement(
-    _ element: Iterator.Element
+    _ element: Element
   ) -> Bool? {
     return nil
   }

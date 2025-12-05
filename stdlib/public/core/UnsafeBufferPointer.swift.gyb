@@ -184,6 +184,9 @@ extension UnsafeMutableBufferPointer {
 %end
 
 extension Unsafe${Mutable}BufferPointer: @unsafe Sequence {
+  public typealias Element = Element
+  public typealias BorrowingIterator = BorrowingIteratorAdapter<Iterator>
+
   /// Returns an iterator over the elements of this buffer.
   ///
   /// - Returns: An iterator over the elements of this buffer.

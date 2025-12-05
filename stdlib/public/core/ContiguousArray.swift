@@ -36,7 +36,7 @@
 @frozen
 @_eagerMove
 @safe
-public struct ContiguousArray<Element>: _DestructorSafeContainer {
+public struct ContiguousArray<Element: ~Copyable>: _DestructorSafeContainer {
   @usableFromInline
   internal typealias _Buffer = _ContiguousArrayBuffer<Element>
 
