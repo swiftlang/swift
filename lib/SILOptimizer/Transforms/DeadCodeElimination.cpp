@@ -203,6 +203,7 @@ class DCE {
 
   void markValueLive(SILValue V);
   void markInstructionLive(SILInstruction *Inst);
+  void markOwnedDeadValueLive(SILValue v);
   void markTerminatorArgsLive(SILBasicBlock *Pred, SILBasicBlock *Succ,
                               size_t ArgIndex);
   void markControllingTerminatorsLive(SILBasicBlock *Block);
@@ -263,6 +264,20 @@ void DCE::markInstructionLive(SILInstruction *Inst) {
   LLVM_DEBUG(llvm::dbgs() << "Marking as live: " << *Inst);
 
   Worklist.push_back(Inst);
+}
+
+void DCE::markOwnedDeadValueLive(SILValue v) {
+  if (v->getOwnershipKind() == OwnershipKind::Owned) {
+    // When an owned value has no lifetime ending uses it means that it is in a
+    // dead-end region. We must not remove and inserting compensating destroys
+    // for it because that would potentially destroy the value too early.
+    // TODO: we can remove this once we have complete OSSA lifetimes
+    for (Operand *use : v->getUses()) {
+      if (use->isLifetimeEnding())
+        return;
+    }
+    markValueLive(v);
+  }
 }
 
 /// Gets the producing instruction of a cond_fail condition. Currently these
@@ -331,6 +346,9 @@ void DCE::markLive() {
   // to be live in the sense that they are not trivially something we
   // can delete by examining only that instruction.
   for (auto &BB : *F) {
+    for (SILArgument *arg : BB.getArguments()) {
+      markOwnedDeadValueLive(arg);
+    }
     for (auto &I : BB) {
       switch (I.getKind()) {
       case SILInstructionKind::CondFailInst: {
@@ -395,6 +413,9 @@ void DCE::markLive() {
       default:
         if (seemsUseful(&I))
           markInstructionLive(&I);
+        for (SILValue result : I.getResults()) {
+          markOwnedDeadValueLive(result);
+        }
       }
     }
   }
