@@ -278,20 +278,13 @@ public func withTemporaryAllocation<T: ~Copyable, R: ~Copyable, E: Error>(
 ) throws(E) -> R where T : ~Copyable, R : ~Copyable {
   try withUnsafeTemporaryAllocation(of: type, capacity: capacity) { (buffer) throws(E) in
     var span = OutputSpan(buffer: buffer, initializedCount: 0)
-
-    do throws(E) {
-      let result = try body(&span)
-
+    defer {
       let initializedCount = span.finalize(for: buffer)
+      span = OutputSpan()
       buffer.extracting(..<initializedCount).deinitialize()
-
-      return result
-    } catch {
-      let initializedCount = span.finalize(for: buffer)
-      buffer.extracting(..<initializedCount).deinitialize()
-
-      throw error
     }
+
+    return try body(&span)
   }
 }
 
