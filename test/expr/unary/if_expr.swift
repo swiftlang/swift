@@ -1647,3 +1647,14 @@ func testCaptureList() {
   let _ = { [x = (if .random() { 0 } else { 1 })] in x }
   // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 }
+
+func testUseBeforeDecl() throws {
+  let x = if .random() { // expected-note {{'x' declared here}}
+    print(y) // expected-error {{use of local variable 'y' before its declaration}}
+    let y = 0 // expected-note {{'y' declared here}}
+    print(x) // expected-error {{use of local variable 'x' before its declaration}}
+    throw Err()
+  } else {
+    0
+  }
+}
