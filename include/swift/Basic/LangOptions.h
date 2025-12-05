@@ -333,10 +333,6 @@ namespace swift {
     /// disabled because it is not complete.
     bool EnableCXXInterop = false;
 
-    /// The C++ interoperability source compatibility version. Defaults
-    /// to the Swift language version.
-    version::Version cxxInteropCompatVersion;
-
     /// What version of C++ interoperability a textual interface was originally
     /// generated with (if at all).
     std::optional<version::Version> FormalCxxInteropMode;
