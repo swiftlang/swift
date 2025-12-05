@@ -4,7 +4,7 @@
 // REQUIRES: OS=wasip1
 // REQUIRES: swift_feature_Embedded
 
-import Mutex
+import Synchronization
 @main struct Main {
   static func main() {
     let m = Mutex(42)
