@@ -405,3 +405,9 @@ func nonGenericParam2(x: Int) {}
 @_specialize(where T == Int)
 @_specialize(where T == Int)
 func genericParamDuplicate<T>(t: T) {}
+
+struct GG<T: P> {}
+
+// expected-error@+1 {{type 'String' does not conform to protocol 'P'}}
+@_specialize(where T == GG<String>)
+func genericArgInvalidSpecialize<T>(t: T) {}
