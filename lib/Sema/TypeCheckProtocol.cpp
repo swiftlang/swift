@@ -3658,6 +3658,57 @@ public:
 
 /// Helper function for diagnostics when a witness needs to be seated at a
 /// required access level.
+static void diagnoseImplicitInitWitnessFixAccessLevel(
+    DiagnosticEngine &diags, ConstructorDecl *decl, AccessLevel requiredAccess,
+    SourceLoc diagLoc) {
+  DeclContext *DC = decl->getDeclContext();
+  auto *typeDecl = dyn_cast<NominalTypeDecl>(DC);
+  ASSERT(typeDecl);
+
+  SourceRange typeBraces = typeDecl->getBraces();
+
+  ASTContext &Ctx = decl->getASTContext();
+  StringRef ExtraIndent;
+  StringRef CurrentIndent = Lexer::getIndentationForLine(
+      Ctx.SourceMgr, typeDecl->getStartLoc(), &ExtraIndent);
+  std::string StubIndent = (CurrentIndent + ExtraIndent).str();
+
+  std::string FixitString;
+  llvm::raw_string_ostream FixitStream(FixitString);
+
+  ExtraIndentStreamPrinter Printer(FixitStream, StubIndent);
+  Printer.printNewline();
+  PrintOptions Options = PrintOptions::printForDiagnostics(
+      requiredAccess, Ctx.TypeCheckerOpts.PrintFullConvention);
+  Options.FunctionDefinitions = true;
+
+  Options.FunctionBody = [&](const ValueDecl *VD, ASTPrinter &Printer) {
+    Printer << " {";
+    Printer.printNewline();
+    for (auto var : *decl->getParameters()) {
+      Printer << ExtraIndent << "self." << var->getParameterName() << " = "
+              << var->getParameterName();
+      Printer.printNewline();
+    }
+    Printer << "}";
+    Printer.printNewline();
+    Printer.forceNewlines();
+  };
+
+  Options.CurrentModule = typeDecl->getParentModule();
+
+  decl->overwriteAccess(requiredAccess);
+
+  decl->print(Printer, Options);
+
+  auto fixItDiag = diags.diagnose(
+      diagLoc, diag::implicit_init_witness_fix_access, decl, requiredAccess);
+
+  fixItDiag.fixItInsertAfter(typeBraces.Start, FixitString);
+}
+
+/// Helper function for diagnostics when a witness needs to be seated at a
+/// required access level.
 static void diagnoseWitnessFixAccessLevel(DiagnosticEngine &diags,
                                           ValueDecl *decl,
                                           AccessLevel requiredAccess,
@@ -4442,25 +4493,37 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
         bool protoForcesAccess =
-          requiredAccessScope.hasEqualDeclContextWith(protoAccessScope);
-        auto diagKind = protoForcesAccess
-                          ? diag::witness_not_accessible_proto
-                          : diag::witness_not_accessible_type;
+            requiredAccessScope.hasEqualDeclContextWith(protoAccessScope);
         bool isSetter = check.isForSetterAccess();
 
         auto &diags = DC->getASTContext().Diags;
-        diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
-                       diagKind, getProtocolRequirementKind(requirement),
-                       witness, isSetter, requiredAccess,
-                       protoAccessScope.accessLevelForDiagnostics(),
-                       proto);
-
         auto *decl = dyn_cast<AbstractFunctionDecl>(witness);
-        if (decl && decl->isSynthesized())
-          return;
+        auto *ctor = dyn_cast<ConstructorDecl>(witness);
 
-        diagnoseWitnessFixAccessLevel(diags, witness, requiredAccess,
-                                      isSetter);
+        SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
+
+        if (protoForcesAccess && ctor && ctor->isMemberwiseInitializer()) {
+          diags.diagnose(diagLoc,
+                         diag::implicit_init_witness_not_accessible_proto, ctor,
+                         requiredAccess,
+                         protoAccessScope.accessLevelForDiagnostics(), proto);
+          diagnoseImplicitInitWitnessFixAccessLevel(diags, ctor, requiredAccess,
+                                                    diagLoc);
+        } else {
+          auto diagKind = protoForcesAccess ? diag::witness_not_accessible_proto
+                                            : diag::witness_not_accessible_type;
+
+          diags.diagnose(diagLoc, diagKind,
+                         getProtocolRequirementKind(requirement), witness,
+                         isSetter, requiredAccess,
+                         protoAccessScope.accessLevelForDiagnostics(), proto);
+
+          if (decl && decl->isSynthesized())
+            return;
+
+          diagnoseWitnessFixAccessLevel(diags, witness, requiredAccess,
+                                        isSetter);
+        }
       });
       break;
     }
