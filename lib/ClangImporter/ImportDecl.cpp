@@ -3798,7 +3798,8 @@ namespace {
           if (auto file = sourceManager.getFileEntryRefForID(
                   sourceManager.getFileID(decl->getLocation()))) {
             auto filename = file->getName();
-            if ((file->getDir() == owningModule->Directory) &&
+            // owningModule->Directory can be null in an explicit module build
+            if ((!owningModule->Directory || file->getDir() == owningModule->Directory) &&
                 (filename.ends_with("cmath") || filename.ends_with("math.h") ||
                  filename.ends_with("stdlib.h") || filename.ends_with("cstdlib"))) {
               return nullptr;
