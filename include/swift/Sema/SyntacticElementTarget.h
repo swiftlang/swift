@@ -41,12 +41,6 @@ struct SequenceIterationInfo {
 
   /// The type of the pattern that matches the elements.
   Type initType;
-
-  /// Implicit `$iterator = <sequence>.makeIterator()`
-  PatternBindingDecl *makeIteratorVar;
-
-  /// Implicit `$iterator.next()` call.
-  Expr *nextCall;
 };
 
 /// Describes information about a for-in loop over a pack that needs to be
@@ -605,6 +599,7 @@ public:
     case CTP_Initialization:
     case CTP_ForEachSequence:
     case CTP_ExprPattern:
+    case CTP_ForEachElement:
       break;
     default:
       assert(false && "Unexpected contextual type purpose");

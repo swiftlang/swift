@@ -16701,6 +16701,7 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_WrappedProperty:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
+  case CTP_ForEachElement:
     break;
   }
 

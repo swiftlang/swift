@@ -1003,13 +1003,13 @@ class ForEachStmt : public LabeledStmt {
   SourceLoc WhereLoc;
   Expr *WhereExpr = nullptr;
   BraceStmt *Body;
+  DeclContext* DC = nullptr;
 
   // Set by Sema:
   ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
   Type sequenceType;
-  PatternBindingDecl *iteratorVar = nullptr;
   Expr *nextCall = nullptr;
-  OpaqueValueExpr *elementExpr = nullptr;
+  BraceStmt *desugaredStmt = nullptr;
   Expr *convertElementExpr = nullptr;
 
 public:
@@ -1017,7 +1017,7 @@ public:
               SourceLoc AwaitLoc, SourceLoc UnsafeLoc, Pattern *Pat,
               SourceLoc InLoc, Expr *Sequence,
               SourceLoc WhereLoc, Expr *WhereExpr, BraceStmt *Body,
-              std::optional<bool> implicit = std::nullopt)
+              DeclContext* DC, std::optional<bool> implicit = std::nullopt)
       : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                     LabelInfo),
         ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc), UnsafeLoc(UnsafeLoc),
@@ -1026,14 +1026,8 @@ public:
     setPattern(Pat);
   }
 
-  void setIteratorVar(PatternBindingDecl *var) { iteratorVar = var; }
-  PatternBindingDecl *getIteratorVar() const { return iteratorVar; }
-
   void setNextCall(Expr *next) { nextCall = next; }
   Expr *getNextCall() const { return nextCall; }
-
-  void setElementExpr(OpaqueValueExpr *expr) { elementExpr = expr; }
-  OpaqueValueExpr *getElementExpr() const { return elementExpr; }
 
   void setConvertElementExpr(Expr *expr) { convertElementExpr = expr; }
   Expr *getConvertElementExpr() const { return convertElementExpr; }
@@ -1076,20 +1070,23 @@ public:
   Expr *getParsedSequence() const { return Sequence; }
   void setParsedSequence(Expr *S) { Sequence = S; }
 
-  /// Type-checked version of the sequence or nullptr if this statement
-  /// yet to be type-checked.
-  Expr *getTypeCheckedSequence() const;
-
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *B) { Body = B; }
   
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(ForLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
+
+  DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *newDC) { DC = newDC; }
   
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::ForEach;
   }
+
+  BraceStmt* desugar();
+  BraceStmt* getDesugaredStmt() const { return desugaredStmt; }
+  void setDesugaredStmt(BraceStmt* newStmt) { desugaredStmt = newStmt; }
 };
 
 /// A pattern and an optional guard expression used in a 'case' statement.
@@ -1538,6 +1535,31 @@ public:
 
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::DoCatch;
+  }
+};
+
+/// OpaqueStmt - created to serve as an indirection to a ForEachStmt's body
+/// to avoid visiting it twice in the ASTWalker after having desugared the loop.
+/// This ensures we only visit the body once, and this OpaqueStmt will only be
+/// visited to emit the underlying statement in SILGen.
+class OpaqueStmt final : public Stmt {
+  SourceLoc StartLoc;
+  SourceLoc EndLoc;
+  BraceStmt *Body; // FIXME: should I just use Stmt * so that this is more versatile?
+                   // If not, should the class be renamed to be more specific?
+  public:
+    OpaqueStmt(BraceStmt* body, SourceLoc startLoc, SourceLoc endLoc)
+    : Stmt(StmtKind::Opaque, true /*always implicit*/),
+      StartLoc(startLoc), EndLoc(endLoc), Body(body) {}
+
+  SourceLoc getLoc() const { return StartLoc; }
+  SourceLoc getStartLoc() const { return StartLoc; }
+  SourceLoc getEndLoc() const { return EndLoc; }
+
+  BraceStmt* getUnderlyingStmt() { return Body; }
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Opaque;
   }
 };
 

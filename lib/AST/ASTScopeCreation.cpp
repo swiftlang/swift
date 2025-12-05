@@ -414,6 +414,7 @@ public:
   VISIT_AND_IGNORE(ContinueStmt)
   VISIT_AND_IGNORE(FallthroughStmt)
   VISIT_AND_IGNORE(FailStmt)
+  VISIT_AND_IGNORE(OpaqueStmt)
 
 #undef VISIT_AND_IGNORE
 

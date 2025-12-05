@@ -6724,6 +6724,27 @@ public:
   }
 };
 
+/// OpaqueExpr - created to serve as an indirection to a ForEachStmt's sequence
+/// expr and where clause to avoid visiting it twice in the ASTWalker after
+/// having desugared the loop. This will only be processed in SILGen to emit
+/// the underlying expression.
+class OpaqueExpr final : public Expr {
+  Expr *OriginalExpr;
+
+public:
+  OpaqueExpr(Expr* originalExpr)
+    : Expr(ExprKind::Opaque, /*implicit*/ true, originalExpr->getType()),
+      OriginalExpr(originalExpr) {}
+
+  Expr *getOriginalExpr() const { return OriginalExpr; }
+  SourceLoc getStartLoc() const { return OriginalExpr->getStartLoc(); }
+  SourceLoc getEndLoc() const { return OriginalExpr->getEndLoc(); }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Opaque;
+  }
+};
+
 inline bool Expr::isInfixOperator() const {
   return isa<BinaryExpr>(this) || isa<TernaryExpr>(this) ||
          isa<AssignExpr>(this) || isa<ExplicitCastExpr>(this);

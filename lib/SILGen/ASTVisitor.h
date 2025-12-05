@@ -56,6 +56,10 @@ public:
     llvm_unreachable("expression kind should not survive to SILGen");
   }
 
+  ExprRetTy visitOpaqueExpr(OpaqueExpr *E, Args...AA) {
+    llvm_unreachable("expression kind should not survive to SILGen");
+  }
+
   ExprRetTy visitDefaultArgumentExpr(DefaultArgumentExpr *E, Args...AA) {
     llvm_unreachable("DefaultArgumentExpr should not appear in this position");
   }
