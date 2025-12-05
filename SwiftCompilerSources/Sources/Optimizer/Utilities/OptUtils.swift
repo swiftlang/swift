@@ -883,11 +883,6 @@ extension SimplifyContext {
     second.replace(with: replacement, self)
 
     if canEraseFirst {
-      // We only need to salvage first's debug info when !preserveDebugInfo and
-      // it has no non-debug uses.
-      if !preserveDebugInfo {
-        first.salvageDebugInfo(self)
-      }
       erase(instructionIncludingDebugUses: first)
     }
   }
