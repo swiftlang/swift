@@ -278,6 +278,9 @@ SIMPLE_LOCATOR_PATH_ELT(GlobalActorType)
 /// The thrown error of a function type.
 SIMPLE_LOCATOR_PATH_ELT(ThrownErrorType)
 
+/// The sendable dependence of a function type.
+SIMPLE_LOCATOR_PATH_ELT(FunctionSendability)
+
 /// A type coercion operand.
 SIMPLE_LOCATOR_PATH_ELT(CoercionOperand)
 
