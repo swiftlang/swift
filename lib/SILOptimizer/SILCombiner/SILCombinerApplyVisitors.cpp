@@ -1561,14 +1561,6 @@ SILInstruction *SILCombiner::legacyVisitApplyInst(ApplyInst *AI) {
   }
 
   if (SF) {
-    if (SF->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED)) {
-      UserListTy Users;
-      // If the uninitialized array is only written into then it can be removed.
-      if (recursivelyCollectARCUsers(Users, AI)) {
-        if (eraseApply(AI, Users))
-          return nullptr;
-      }
-    }
     if (SF->hasSemanticsAttr(semantics::ARRAY_GET_CONTIGUOUSARRAYSTORAGETYPE)) {
       auto silTy = AI->getType();
       auto storageTy = AI->getType().getASTType();
