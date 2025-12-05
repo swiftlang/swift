@@ -9,7 +9,7 @@
 // RUN: %swiftc_driver -driver-print-jobs -target arm64-apple-tvos9 %S/../Inputs/empty.swift | %FileCheck -check-prefix NO_ARCLITE %s
 // RUN: %swiftc_driver -driver-print-jobs -target armv7k-apple-watchos2 %S/../Inputs/empty.swift | %FileCheck -check-prefix NO_ARCLITE %s
 
-// NO_ARCLITE: bin/ld{{"? }}
+// NO_ARCLITE: /ld{{"? }}
 // NO_ARCLITE-NOT: arclite
 // NO_ARCLITE-NOT: CoreFoundation
 // NO_ARCLITE: -o {{[^ ]+}}
