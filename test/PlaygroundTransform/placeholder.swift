@@ -34,7 +34,9 @@ func f(crash crash: Bool) -> Int {
 }
 
 if CommandLine.arguments.last == "--crash" {
-  print("the value is \(f(crash: true))")
+  // FIXME: This intemediate binding is necessary to workaround https://github.com/swiftlang/swift/issues/85851
+  let val: Any = f(crash: true)
+  print("the value is \(val)")
 } else {
   print("the value is \(f(crash: false))")
   // CHECK: the value is 42
