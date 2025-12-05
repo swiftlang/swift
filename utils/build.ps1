@@ -419,9 +419,17 @@ $KnownPythons = @{
       URL = "https://www.nuget.org/api/v2/package/python/3.10.1";
       SHA256 = "987a0e446d68900f58297bc47dc7a235ee4640a49dace58bc9f573797d3a8b33";
     };
+    AMD64_Embedded = @{
+      URL = "https://www.python.org/ftp/python/3.10.1/python-3.10.1-embed-amd64.zip";
+      SHA256 = "502670dcdff0083847abf6a33f30be666594e7e5201cd6fccd4a523b577403de";
+    };
     ARM64 = @{
       URL = "https://www.nuget.org/api/v2/package/pythonarm64/3.10.1";
       SHA256 = "16becfccedf1269ff0b8695a13c64fac2102a524d66cecf69a8f9229a43b10d3";
+    };
+    ARM64_Embedded = @{
+      URL = "https://www.python.org/ftp/python/3.10.1/python-3.10.1-embed-arm64.zip";
+      SHA256 = "1f9e215fe4e8f22a8e8fba1859efb1426437044fb3103ce85794630e3b511bc2";
     };
   };
 }
@@ -751,12 +759,20 @@ function Get-PythonPath([Hashtable] $Platform) {
   return [IO.Path]::Combine("$BinaryCache\", "Python$($Platform.Architecture.CMakeName)-$PythonVersion")
 }
 
+function Get-EmbeddedPythonPath([Hashtable] $Platform) {
+  return [IO.Path]::Combine("$BinaryCache\", "EmbeddedPython$($Platform.Architecture.CMakeName)-$PythonVersion")
+}
+
 function Get-PythonExecutable {
   return [IO.Path]::Combine((Get-PythonPath $BuildPlatform), "tools", "python.exe")
 }
 
 function Get-PythonScriptsPath {
   return [IO.Path]::Combine((Get-PythonPath $BuildPlatform), "tools", "Scripts")
+}
+
+function Get-EmbeddedPythonInstallDir() {
+  return [IO.Path]::Combine("$ImageRoot\", "Program Files", "Swift", "Python-$PythonVersion")
 }
 
 function Get-Syft {
@@ -1129,6 +1145,10 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
   }
 }
 
+function Get-PythonLibName() {
+  return "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
+}
+
 function Get-Dependencies {
   Record-OperationTime $BuildPlatform "Get-Dependencies" {
     function Write-Success([string] $Description) {
@@ -1262,18 +1282,20 @@ function Get-Dependencies {
       Write-Success "syft $SyftVersion"
     }
 
-    function Get-KnownPython([string] $ArchName) {
+    function Get-KnownPython([string] $ArchName, [bool] $EmbeddedPython = $false) {
       if (-not $KnownPythons.ContainsKey($PythonVersion)) {
         throw "Unknown python version: $PythonVersion"
       }
-      return $KnownPythons[$PythonVersion].$ArchName
+      $Key = $(if ($EmbeddedPython) { "${ArchName}_Embedded" } else { $ArchName })
+      return $KnownPythons[$PythonVersion][$Key]
     }
 
-    function Install-Python([string] $ArchName) {
-      $Python = Get-KnownPython $ArchName
-      DownloadAndVerify $Python.URL "$BinaryCache\Python$ArchName-$PythonVersion.zip" $Python.SHA256
+    function Install-Python([string] $ArchName, [bool] $EmbeddedPython = $false) {
+      $Python = Get-KnownPython $ArchName $EmbeddedPython
+      $FileName = $(if ($EmbeddedPython) { "EmbeddedPython$ArchName-$PythonVersion" } else { "Python$ArchName-$PythonVersion" })
+      DownloadAndVerify $Python.URL "$BinaryCache\$FileName.zip" $Python.SHA256
       if (-not $ToBatch) {
-        Expand-ZipFile Python$ArchName-$PythonVersion.zip "$BinaryCache" Python$ArchName-$PythonVersion
+        Expand-ZipFile "$FileName.zip" "$BinaryCache" "$FileName"
         Write-Success "$ArchName Python $PythonVersion"
       }
     }
@@ -1328,8 +1350,10 @@ function Get-Dependencies {
 
     # Ensure Python modules that are required as host build tools
     Install-Python $HostArchName
+    Install-Python $HostArchName $true
     if ($IsCrossCompiling) {
       Install-Python $BuildArchName
+      Install-Python $BuildArchName $true
     }
     Install-PythonModules
 
@@ -2209,7 +2233,7 @@ function Build-CDispatch([Hashtable] $Platform, [switch] $Static = $false) {
 function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch] $Test) {
   $BuildTools = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform BuildTools), "bin")
   $PythonRoot = [IO.Path]::Combine((Get-PythonPath $Platform), "tools")
-  $PythonLibName = "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
+  $PythonLibName = Get-PythonLibName
 
   $TestDefines = if ($Test) {
     @{
@@ -2253,6 +2277,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
     LLDB_PYTHON_EXT_SUFFIX = ".pyd";
     LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
+    LLDB_PYTHON_DLL_RELATIVE_PATH = "../../../../Python-$PythonVersion/usr/bin";
     LLDB_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "lldb-tblgen.exe");
     LLDB_TEST_MAKE = "$BinaryCache\GnuWin32Make-4.4.1\bin\make.exe";
     LLVM_CONFIG_PATH = (Join-Path -Path $BuildTools -ChildPath "llvm-config.exe");
@@ -2277,6 +2302,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     Python3_INCLUDE_DIR = "$PythonRoot\include";
     Python3_LIBRARY = "$PythonRoot\libs\$PythonLibName.lib";
     Python3_ROOT_DIR = $PythonRoot;
+    Python3_VERSION = $PythonVersion;
     SWIFT_TOOLCHAIN_VERSION = "${ToolchainIdentifier}";
     SWIFT_BUILD_SWIFT_SYNTAX = "YES";
     SWIFT_CLANG_LOCATION = (Get-PinnedToolchainToolsDir);
@@ -4002,6 +4028,12 @@ function Install-HostToolchain() {
   Copy-Item -Force `
     -Path $SwiftDriver `
     -Destination "$($HostPlatform.ToolchainInstallRoot)\usr\bin\swiftc.exe"
+
+  # Copy embeddable Python
+  New-Item -Type Directory -Path "$(Get-EmbeddedPythonInstallDir)" -ErrorAction Ignore | Out-Null
+  Copy-Item -Force -Recurse `
+    -Path "$(Get-EmbeddedPythonPath $HostPlatform)\*" `
+    -Destination "$(Get-EmbeddedPythonInstallDir)"
 }
 
 function Build-Inspect([Hashtable] $Platform) {
@@ -4100,6 +4132,7 @@ function Build-Installer([Hashtable] $Platform) {
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     SWIFT_DOCC_BUILD = "$(Get-ProjectBinaryCache $HostPlatform DocC)\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
+    PythonVersion = $PythonVersion
   }
 
   Invoke-IsolatingEnvVars {
