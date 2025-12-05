@@ -753,13 +753,6 @@ namespace swift {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
-    /// Whether the C++ interoperability compatibility version is at least
-    /// 'major'.
-    bool isCxxInteropCompatVersionAtLeast(unsigned major,
-                                          unsigned minor = 0) const {
-      return cxxInteropCompatVersion.isVersionAtLeast(major, minor);
-    }
-
     /// Sets the "_hasAtomicBitWidth" conditional.
     void setHasAtomicBitWidth(llvm::Triple triple);
 
