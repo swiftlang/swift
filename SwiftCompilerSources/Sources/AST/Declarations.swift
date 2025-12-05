@@ -182,10 +182,12 @@ final public class ParamDecl: VarDecl {
 final public class SubscriptDecl: AbstractStorageDecl, GenericContext {}
 
 public class AbstractFunctionDecl: ValueDecl, GenericContext {
-  public var isOverridden: Bool { bridged.AbstractFunction_isOverridden() }
+  final public var isOverridden: Bool { bridged.AbstractFunction_isOverridden() }
 }
 
-final public class ConstructorDecl: AbstractFunctionDecl {}
+final public class ConstructorDecl: AbstractFunctionDecl {
+  public var isInheritable: Bool { bridged.Constructor_isInheritable() }
+}
 
 final public class DestructorDecl: AbstractFunctionDecl {
   final public var isIsolated: Bool { bridged.Destructor_isIsolated() }
