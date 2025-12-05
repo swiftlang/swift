@@ -1495,7 +1495,6 @@ static clang::ClassTemplateSpecializationDecl *
 lookupAndSpecializeFunctionObject(ClangImporter::Implementation &impl,
                                   const clang::CXXRecordDecl *clangDecl,
                                   std::string name) {
-  ASSERT(clangDecl);
   clang::ASTContext &Ctx = impl.getClangASTContext();
   clang::Sema &clangSema = impl.getClangSema();
 

@@ -2009,7 +2009,7 @@ synthesizeHashFuncBody(AbstractFunctionDecl *afd, void *context) {
         init->getParameters()->size() == 0)
       break;
   }
-  assert(init && "did not find init() for std::hash<T>");
+  ASSERT(init && "did not find init() for std::hash<T>");
 
   // init: (std::hash<T>.Type) -> () -> std::hash<T>
   auto initTy = init->getInterfaceType();
