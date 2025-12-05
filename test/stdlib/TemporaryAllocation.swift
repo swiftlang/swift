@@ -102,12 +102,33 @@ TemporaryAllocationTestSuite.test("typedAllocationOnStack") {
   }
 }
 
+TemporaryAllocationTestSuite.test("spanOnStack") {
+  withTemporaryAllocation(of: Int.self, capacity: 1) { span in
+    span.withUnsafeMutableBufferPointer { buffer, initializedCount in
+      expectStackAllocated(buffer.baseAddress!)
+      initializedCount = 0
+    }
+  }
+}
+
 TemporaryAllocationTestSuite.test("typedAllocationOnHeap") {
   // EXPECTATION: a very large allocated buffer is heap-allocated. (Note if
   // swift_stdlib_isStackAllocationSafe() gets fleshed out, this test may need
   // to be changed.)
   withUnsafeTemporaryAllocation(of: Int.self, capacity: 100_000) { buffer in
       expectNotStackAllocated(buffer.baseAddress!)
+  }
+}
+
+TemporaryAllocationTestSuite.test("spanOnHeap") {
+  // EXPECTATION: a very large allocated buffer is heap-allocated. (Note if
+  // swift_stdlib_isStackAllocationSafe() gets fleshed out, this test may need
+  // to be changed.)
+  withTemporaryAllocation(of: Int.self, capacity: 100_000) { span in
+    span.withUnsafeMutableBufferPointer { buffer, initializedCount in
+      expectNotStackAllocated(buffer.baseAddress!)
+      initializedCount = 0
+    }
   }
 }
 
@@ -132,9 +153,27 @@ TemporaryAllocationTestSuite.test("typedEmptyAllocationIsStackAllocated") {
   }
 }
 
+TemporaryAllocationTestSuite.test("emptySpanHasNoBuffer") {
+  withTemporaryAllocation(of: Int.self, capacity: 0) { span in
+    span.withUnsafeMutableBufferPointer { buffer, initializedCount in
+      expectTrue(buffer.baseAddress == nil)
+      initializedCount = 0
+    }
+  }
+}
+
 TemporaryAllocationTestSuite.test("voidAllocationIsStackAllocated") {
   withUnsafeTemporaryAllocation(of: Void.self, capacity: 1) { buffer in
+    expectStackAllocated(buffer.baseAddress!)
+  }
+}
+
+TemporaryAllocationTestSuite.test("voidSpanIsStackAllocated") {
+  withTemporaryAllocation(of: Void.self, capacity: 1) { span in
+    span.withUnsafeMutableBufferPointer { buffer, initializedCount in
       expectStackAllocated(buffer.baseAddress!)
+      initializedCount = 0
+    }
   }
 }
 
@@ -143,6 +182,13 @@ TemporaryAllocationTestSuite.test("crashOnNegativeValueCount") {
   expectCrash {
     let capacity = Int.random(in: -2 ..< -1)
     withUnsafeTemporaryAllocation(of: Int.self, capacity: capacity) { _ in }
+  }
+}
+
+TemporaryAllocationTestSuite.test("spanCrashOnNegativeValueCount") {
+  expectCrash {
+    let capacity = Int.random(in: -2 ..< -1)
+    withTemporaryAllocation(of: Int.self, capacity: capacity) { _ in }
   }
 }
 #endif
@@ -155,6 +201,17 @@ TemporaryAllocationTestSuite.test("typedAllocationIsAligned") {
   }
 }
 
+TemporaryAllocationTestSuite.test("spanIsAligned") {
+  withTemporaryAllocation(of: Int.self, capacity: 1) { span in
+    span.withUnsafeMutableBufferPointer { buffer, initializedCount in
+      let pointerBits = Int(bitPattern: buffer.baseAddress!)
+      let alignmentMask = MemoryLayout<Int>.alignment - 1
+      expectEqual(pointerBits & alignmentMask, 0)
+      initializedCount = 0
+    }
+  }
+}
+
 // MARK: Typed throws
 enum HomeworkError: Error, Equatable {
 case dogAteIt
@@ -164,6 +221,17 @@ case forgot
 TemporaryAllocationTestSuite.test("typedAllocationWithThrow") {
   do throws(HomeworkError) {
     try withUnsafeTemporaryAllocation(of: Int.self, capacity: 1) { (buffer) throws(HomeworkError) -> Void in
+      throw HomeworkError.forgot
+    }
+    fatalError("did not throw!?!")
+  } catch {
+    expectEqual(error, .forgot)
+  }
+}
+
+TemporaryAllocationTestSuite.test("spanWithThrow") {
+  do throws(HomeworkError) {
+    try withTemporaryAllocation(of: Int.self, capacity: 1) { (span) throws(HomeworkError) -> Void in
       throw HomeworkError.forgot
     }
     fatalError("did not throw!?!")
