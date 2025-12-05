@@ -3692,6 +3692,10 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::Condition: {
       if (auto *condStmt = getAsStmt<LabeledConditionalStmt>(anchor)) {
         anchor = &condStmt->getCond().front();
+      } else if (auto *whileStmt = getAsStmt<RepeatWhileStmt>(anchor)) {
+        anchor = whileStmt->getCond();
+      } else if (auto *assertStmt = getAsStmt<PoundAssertStmt>(anchor)) {
+        anchor = assertStmt->getCondition();
       } else {
         anchor = castToExpr<TernaryExpr>(anchor)->getCondExpr();
       }
