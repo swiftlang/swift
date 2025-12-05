@@ -8484,6 +8484,14 @@ inline TypeBase *TypeBase::getDesugaredType() {
   return cast<SugarType>(this)->getSinglyDesugaredType()->getDesugaredType();
 }
 
+/// Builds LifetimeDependenceInfo from a swift type, either from the explicit
+/// lifetime attribute, or by inference based on types and
+/// ownership modifiers.
+std::optional<ArrayRef<LifetimeDependenceInfo>> getLifetimeDependenceFromAST(
+    FunctionTypeRepr *funcRepr, ArrayRef<AnyFunctionType::Param> params,
+    Type resultType, LifetimeEntry * /* nullable */ lifetimeEntry,
+    DeclContext *dc);
+
 } // end namespace swift
 
 namespace llvm {

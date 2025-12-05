@@ -8608,6 +8608,11 @@ public:
     attr->setInvalid();
   }
 
+  void visitLifetimeAttr(LifetimeAttr *attr) {
+    // Lifetime dependencies cannot be processed until the closure's type is known:
+    // Nothing to do for now.
+  }
+
   void visitSendableAttr(SendableAttr *attr) {
     // Nothing else to check.
   }
