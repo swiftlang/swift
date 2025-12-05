@@ -906,8 +906,8 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     // If the current language mode enables the feature by default then
     // diagnose and skip it.
-    if (auto firstVersion = feature->getLanguageVersion()) {
-      if (Opts.isSwiftVersionAtLeast(*firstVersion)) {
+    if (auto firstVersion = feature->getLanguageMode()) {
+      if (Opts.isLanguageModeAtLeast(*firstVersion)) {
         Diags.diagnose(SourceLoc(),
                        diag::warning_upcoming_feature_on_by_default,
                        feature->getName(), *firstVersion);
@@ -1284,8 +1284,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // Add a future feature if it is not already implied by the language version.
   auto addFutureFeatureIfNotImplied = [&](Feature feature) {
     // Check if this feature was introduced already in this language version.
-    if (auto firstVersion = feature.getLanguageVersion()) {
-      if (Opts.isSwiftVersionAtLeast(*firstVersion))
+    if (auto firstVersion = feature.getLanguageMode()) {
+      if (Opts.isLanguageModeAtLeast(*firstVersion))
         return;
     }
 
@@ -1462,7 +1462,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasFlag(OPT_enable_nonfrozen_enum_exhaustivity_diagnostics,
                    OPT_disable_nonfrozen_enum_exhaustivity_diagnostics,
-                   Opts.isSwiftVersionAtLeast(5))) {
+                   Opts.isLanguageModeAtLeast(5))) {
     Opts.enableFeature(Feature::NonfrozenEnumExhaustivity);
   }
 
@@ -1878,7 +1878,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
       HadError = true;
     }
-  } else if (Opts.isSwiftVersionAtLeast(6)) {
+  } else if (Opts.isLanguageModeAtLeast(6)) {
     Opts.UseCheckedAsyncObjCBridging = true;
   }
 

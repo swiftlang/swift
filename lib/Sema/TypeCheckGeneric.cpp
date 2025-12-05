@@ -375,7 +375,7 @@ static bool checkProtocolSelfRequirementsImpl(
                        secondType.getString())
         // FIXME: This should become an unconditional error since violating
         // this invariant can introduce compiler and run time crashes.
-        .warnUntilFutureSwiftVersionIf(downgrade);
+        .warnUntilFutureLanguageModeIf(downgrade);
     return true;
   }
 
@@ -705,9 +705,9 @@ void TypeChecker::checkShadowedGenericParams(GenericContext *dc) {
       if (existingParamDecl->getDeclContext() == dc) {
         genericParamDecl->diagnose(diag::invalid_redecl, genericParamDecl);
       } else {
-        genericParamDecl->diagnose(
-            diag::shadowed_generic_param,
-            genericParamDecl).warnUntilSwiftVersion(6);
+        genericParamDecl
+            ->diagnose(diag::shadowed_generic_param, genericParamDecl)
+            .warnUntilLanguageMode(6);
       }
 
       if (existingParamDecl->getLoc()) {

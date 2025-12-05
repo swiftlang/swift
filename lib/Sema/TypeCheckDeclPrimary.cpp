@@ -148,9 +148,10 @@ public:
         diagnoseInvalid(repr, repr.getLoc(),
                         diag::conformance_repression_only_on_struct_class_enum,
                         ctx.getProtocol(*kp))
-            // Downgrade to a warning for `~BitwiseCopyable` because it was accepted
-            // in some incorrect positions before.
-            .warnUntilFutureSwiftVersionIf(kp == KnownProtocolKind::BitwiseCopyable);
+            // Downgrade to a warning for `~BitwiseCopyable` because it was
+            // accepted in some incorrect positions before.
+            .warnUntilFutureLanguageModeIf(kp ==
+                                           KnownProtocolKind::BitwiseCopyable);
         return Type();
       }
     }
@@ -287,7 +288,7 @@ static void checkInheritanceClause(
           isa<ProtocolDecl>(decl) &&
           Lexer::getTokenAtLocation(ctx.SourceMgr, sourceRange.Start)
               .is(tok::kw_class);
-      if (ctx.LangOpts.isSwiftVersionAtLeast(5) && isWrittenAsClass) {
+      if (ctx.isLanguageModeAtLeast(5) && isWrittenAsClass) {
         diags
             .diagnose(sourceRange.Start,
                       diag::anyobject_class_inheritance_deprecated)
@@ -301,7 +302,7 @@ static void checkInheritanceClause(
         auto knownIndex = inheritedAnyObject->first;
         auto knownRange = inheritedAnyObject->second;
         SourceRange removeRange = inheritedTypes.getRemovalRange(knownIndex);
-        if (!ctx.LangOpts.isSwiftVersionAtLeast(5) &&
+        if (!ctx.isLanguageModeAtLeast(5) &&
             isa<ProtocolDecl>(decl) &&
             Lexer::getTokenAtLocation(ctx.SourceMgr, knownRange.Start)
               .is(tok::kw_class)) {
@@ -1857,7 +1858,7 @@ static void diagnoseRetroactiveConformances(
             diags
                 .diagnose(loc, diag::retroactive_attr_does_not_apply, declForDiag,
                           isSameModule)
-                .warnUntilSwiftVersion(6)
+                .warnUntilLanguageMode(6)
                 .fixItRemove(SourceRange(loc, loc.getAdvancedLoc(1)));
             return TypeWalker::Action::Stop;
           }
@@ -4081,7 +4082,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
           // cannot have more than one isolated parameter (SE-0313)
           param->diagnose(diag::isolated_parameter_duplicate)
               .highlight(param->getSourceRange())
-              .warnUntilSwiftVersion(6);
+              .warnUntilLanguageMode(6);
           // I'd love to describe the context in which there is an isolated parameter,
           // we had a DescriptiveDeclContextKind, but that only
           // exists for Decls.

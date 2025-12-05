@@ -1070,7 +1070,7 @@ static bool diagnosePotentialUnavailability(
     } else if (behaviorLimit >= DiagnosticBehavior::Warning) {
       err.limitBehavior(behaviorLimit);
     } else {
-      err.warnUntilSwiftVersion(6);
+      err.warnUntilLanguageMode(6);
     }
 
     // Direct a fixit to the error if an existing guard is nearly-correct
@@ -1769,7 +1769,7 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
                 shouldHideDomainNameForConstraintDiagnostic(constraint),
                 domainAndRange.getDomain(), EncodedMessage.Message)
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
-      .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
+      .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6, 6);
 
   switch (constraint.getReason()) {
   case AvailabilityConstraint::Reason::UnavailableUnconditionally:
@@ -2951,9 +2951,9 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
     if (D->preconcurrency()) {
       diag.limitBehavior(DiagnosticBehavior::Warning);
     } else if (shouldWarnUntilFutureVersion()) {
-      diag.warnUntilFutureSwiftVersion();
+      diag.warnUntilFutureLanguageMode();
     } else {
-      diag.warnUntilSwiftVersion(6);
+      diag.warnUntilLanguageMode(6);
     }
 
     if (!attr->getRename().empty()) {
@@ -2975,9 +2975,9 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
     auto diag = ctx.Diags.diagnose(diagLoc, diag::async_unavailable_decl, D,
                                    attr->Message);
     if (shouldWarnUntilFutureVersion()) {
-      diag.warnUntilFutureSwiftVersion();
+      diag.warnUntilFutureLanguageMode();
     } else {
-      diag.warnUntilSwiftVersion(6);
+      diag.warnUntilLanguageMode(6);
     }
   }
   D->diagnose(diag::decl_declared_here, D);
