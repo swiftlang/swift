@@ -258,6 +258,15 @@ private struct MutatingUsesWalker : AddressDefUseWalker {
     }
   }
 
+  mutating func walkDown(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+    if let beginAccess = address.instruction as? BeginAccessInst, beginAccess.accessKind != .read {
+      // Don't verify that there are no stores in read-only access scopes if there is a conflicting scope.
+      // This is a programming error, but the compiler should not crash. The violation is caught at runtime.
+      return .continueWalk
+    }
+    return walkDownDefault(address: address, path: path)
+  }
+
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
     if address.isMutatedAddress {
       mutatingInstructions.insert(address.instruction)
@@ -288,7 +297,7 @@ private extension Operand {
       {
         switch convention {
         case .indirectIn, .indirectInGuaranteed:
-          // Such operands are consumed by the `partial_apply` and therefore cound as "written".
+          // Such operands are consumed by the `partial_apply` and therefore count as "written".
           return true
         default:
           return false
