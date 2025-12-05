@@ -82,7 +82,7 @@ private struct VTableSpecializer {
   }
 
   private func specializeEntries(of vTable: VTable, _ notifyNewFunction: (Function) -> ()) -> [VTable.Entry] {
-    return vTable.entries.map { entry in
+    return vTable.entries.compactMap { entry in
       if !entry.implementation.isGeneric {
         return entry
       }
@@ -95,6 +95,14 @@ private struct VTableSpecializer {
             let specializedMethod = context.specialize(function: entry.implementation, for: methodSubs,
                                                        convertIndirectToDirect: true, isMandatory: true)
       else {
+        if let constructor = entry.methodDecl.decl as? ConstructorDecl,
+           !constructor.isInheritable
+        {
+          // For some reason, SILGen is putting constructors in the vtable, though they are never
+          // called through the vtable.
+          // Dropping those vtable entries allows using constructors with generic arguments.
+          return nil
+        }
         return entry
       }
       notifyNewFunction(specializedMethod)
