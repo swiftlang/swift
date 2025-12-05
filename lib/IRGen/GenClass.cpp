@@ -1065,7 +1065,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
     if (!isEmbeddedWithExistentials && !D->isGenericContext()) {
       emitEmbeddedClassMetadata(*this, D);
     } else {
-      // We create all metadata lazyly in embedded with existentials mode.
+      // We create all metadata lazily in embedded with existentials mode.
       return;
     }
   }
