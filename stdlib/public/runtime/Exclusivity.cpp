@@ -156,155 +156,36 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
     .notes = nullptr,
   };
   _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
+  fatalError(0, "Fatal access conflict detected.\n");
 }
 
-bool AccessSet::insert(Access *access, void *pc, void *pointer,
-                       ExclusivityFlags flags) {
-#ifndef NDEBUG
-  if (isExclusivityLoggingEnabled()) {
-    withLoggingLock(
-        [&]() { fprintf(stderr, "Inserting new access: %p\n", access); });
-  }
-#endif
-  auto action = getAccessAction(flags);
-
-  for (Access *cur = Head; cur != nullptr; cur = cur->getNext()) {
-    // Ignore accesses to different values.
-    if (cur->Pointer != pointer)
-      continue;
-
-    // If both accesses are reads, it's not a conflict.
-    if (action == ExclusivityFlags::Read && action == cur->getAccessAction())
-      continue;
-
-    // Otherwise, it's a conflict.
-    reportExclusivityConflict(cur->getAccessAction(), cur->PC, flags, pc,
-                              pointer);
-
-    // 0 means no backtrace will be printed.
-    fatalError(0, "Fatal access conflict detected.\n");
-  }
-  if (!isTracking(flags)) {
-#ifndef NDEBUG
-    if (isExclusivityLoggingEnabled()) {
-      withLoggingLock([&]() { fprintf(stderr, "  Not tracking!\n"); });
-    }
-#endif
-    return false;
-  }
-
-  // Insert to the front of the array so that remove tends to find it faster.
-  access->initialize(pc, pointer, Head, action);
-  Head = access;
-#ifndef NDEBUG
-  if (isExclusivityLoggingEnabled()) {
-    withLoggingLock([&]() {
-      fprintf(stderr, "  Tracking!\n");
-      swift_dumpTrackedAccesses();
-    });
-  }
-#endif
-  return true;
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_reportExclusivityConflict(uintptr_t oldAction, void *oldPC,
+                                      uintptr_t newFlags, void *newPC,
+                                      void *pointer) {
+  reportExclusivityConflict((ExclusivityFlags)oldAction, oldPC,
+                            (ExclusivityFlags)newFlags, newPC, pointer);
 }
 
-void AccessSet::remove(Access *access) {
-  assert(Head && "removal from empty AccessSet");
-#ifndef NDEBUG
-  if (isExclusivityLoggingEnabled()) {
-    withLoggingLock(
-        [&]() { fprintf(stderr, "Removing access: %p\n", access); });
-  }
-#endif
-  auto cur = Head;
-  // Fast path: stack discipline.
-  if (cur == access) {
-    Head = cur->getNext();
-    return;
-  }
+static SWIFT_THREAD_LOCAL_TYPE(TLSPointer<void>, swift::tls_key::exclusivity)
+    AccessSetValue;
 
-  Access *last = cur;
-  for (cur = cur->getNext(); cur != nullptr; last = cur, cur = cur->getNext()) {
-    assert(last->getNext() == cur);
-    if (cur == access) {
-      last->setNext(cur->getNext());
-      return;
-    }
-  }
-
-  swift_unreachable("access not found in set");
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void * _Nullable _swift_getExclusivityTLSImpl() {
+  return AccessSetValue.get();
 }
 
-#ifndef NDEBUG
-/// Only available with asserts. Intended to be used with
-/// swift_dumpTrackedAccess().
-void AccessSet::forEach(std::function<void(Access *)> action) {
-  for (auto *iter = Head; iter != nullptr; iter = iter->getNext()) {
-    action(iter);
-  }
-}
-#endif
-
-// Each of these cases should define a function with this prototype:
-//   AccessSets &getAllSets();
-
-/// Begin tracking a dynamic access.
-///
-/// This may cause a runtime failure if an incompatible access is
-/// already underway.
-void swift::swift_beginAccess(void *pointer, ValueBuffer *buffer,
-                              ExclusivityFlags flags, void *pc) {
-  assert(pointer && "beginning an access on a null pointer?");
-
-  Access *access = reinterpret_cast<Access*>(buffer);
-
-  // If exclusivity checking is disabled, record in the access buffer that we
-  // didn't track anything. pc is currently undefined in this case.
-  if (_swift_disableExclusivityChecking) {
-    access->Pointer = nullptr;
-    return;
-  }
-
-  // If the provided `pc` is null, then the runtime may override it for
-  // diagnostics.
-  if (!pc)
-    pc = get_return_address();
-
-  if (!SwiftTLSContext::get().accessSet.insert(access, pc, pointer, flags))
-    access->Pointer = nullptr;
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_setExclusivityTLSImpl(void * _Nullable newValue) {
+  AccessSetValue.set(newValue);
 }
 
-/// End tracking a dynamic access.
-void swift::swift_endAccess(ValueBuffer *buffer) {
-  Access *access = reinterpret_cast<Access*>(buffer);
-  auto pointer = access->Pointer;
-
-  // If the pointer in the access is null, we must've declined
-  // to track it because exclusivity tracking was disabled.
-  if (!pointer) {
-    return;
-  }
-
-  SwiftTLSContext::get().accessSet.remove(access);
-}
-
-#ifndef NDEBUG
-
-// Dump the accesses that are currently being tracked by the runtime.
-//
-// This is only intended to be used in the debugger.
-void swift::swift_dumpTrackedAccesses() {
-  auto &accessSet = SwiftTLSContext::get().accessSet;
-  if (!accessSet) {
-    fprintf(stderr, "        No Accesses.\n");
-    return;
-  }
-  accessSet.forEach([](Access *a) {
-    fprintf(stderr, "        Access. Pointer: %p. PC: %p. AccessAction: %s\n",
-            a->Pointer, a->PC, getAccessName(a->getAccessAction()));
-  });
-}
-
-#endif
+// Declare two internal helpers from the Swift implementation that are used by
+// the concurrency-specific code.
+extern "C" void _swift_exclusivityAccessSetNext(void *access,
+                                                void *_Nullable next);
+extern "C" void *_swift_exclusivityAccessGetParent(void *access,
+                                                   void *_Nullable child);
 
 // Bring in the concurrency-specific exclusivity code.
 #include "ConcurrencyExclusivity.inc"
