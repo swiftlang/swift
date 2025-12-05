@@ -696,7 +696,15 @@ Generate a backtrace for the parent process.
           return
         }
 
-        outputJSONCrashLog(crashLog: crashLog, options: getJsonBacktraceFormatterOptions())
+        let writer = SwiftBacktraceWriter()
+        let options = getJsonBacktraceFormatterOptions()
+
+        var backtraceFormatter = BacktraceJSONFormatter(
+          crashLog: crashLog,
+          writer: writer,
+          options: options)
+
+        backtraceFormatter.writeCrashLog(now: formatISO8601(now))
     }
 
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)

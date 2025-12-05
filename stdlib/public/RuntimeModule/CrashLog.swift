@@ -85,6 +85,11 @@ public struct CrashLog<Address: FixedWidthInteger>: Codable {
                 "\"kind\": \"truncated\""
             }
         }
+
+        public init(kind: Kind, address: String?) {
+            self.kind = kind
+            self.address = address
+        }
     }
 
     public struct Thread: Codable {
@@ -110,6 +115,19 @@ public struct CrashLog<Address: FixedWidthInteger>: Codable {
         public var path: String?
         public var baseAddress: String
         public var endOfText: String
+
+        public init(
+            name: String?,
+            buildId: String?,
+            path: String?,
+            baseAddress: String,
+            endOfText: String) {
+                self.name = name
+                self.buildId = buildId
+                self.path = path
+                self.baseAddress = baseAddress
+                self.endOfText = endOfText
+            }
     }
 
     // all of these fields are present in all crash logs from swift-backtrace

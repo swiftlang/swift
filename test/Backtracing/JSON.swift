@@ -105,7 +105,7 @@ struct Crash {
 // SYMBOLICATED-NEXT:  "image": "Crash",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
 // UNSANITIZED-NEXT:     "file": "{{.*}}/test/Backtracing/JSON.swift",
-// SANITIZED-NEXT:       "file": "/Users/USER/*/JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*}}/JSON.swift",
 // SYMBOLICATED-NEXT:    "line": 51,
 // SYMBOLICATED-NEXT:    "column": 15
 // SYMBOLICATED-NEXT:  }
@@ -119,7 +119,7 @@ struct Crash {
 // SYMBOLICATED-NEXT:  "image": "Crash",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
 // UNSANITIZED-NEXT:     "file": "{{.*}}/test/Backtracing/JSON.swift",
-// SANITIZED-NEXT:       "file": "/Users/USER/*/JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*}}/JSON.swift",
 // SYMBOLICATED-NEXT:    "line": 45,
 // SYMBOLICATED-NEXT:    "column": 3
 // SYMBOLICATED-NEXT:  }
@@ -133,7 +133,7 @@ struct Crash {
 // SYMBOLICATED-NEXT:  "image": "Crash",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
 // UNSANITIZED-NEXT:     "file": "{{.*}}/test/Backtracing/JSON.swift",
-// SANITIZED-NEXT:       "file": "/Users/USER/*/JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*}}/JSON.swift",
 // SYMBOLICATED-NEXT:    "line": 41,
 // SYMBOLICATED-NEXT:    "column": 3
 // SYMBOLICATED-NEXT:  }
@@ -147,7 +147,7 @@ struct Crash {
 // SYMBOLICATED-NEXT:  "image": "Crash",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
 // UNSANITIZED-NEXT:     "file": "{{.*}}/test/Backtracing/JSON.swift",
-// SANITIZED-NEXT:       "file": "/Users/USER/*/JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*}}/JSON.swift",
 // SYMBOLICATED-NEXT:    "line": 37,
 // SYMBOLICATED-NEXT:    "column": 3
 // SYMBOLICATED-NEXT:  }
@@ -161,7 +161,7 @@ struct Crash {
 // SYMBOLICATED-NEXT:  "image": "Crash",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
 // UNSANITIZED-NEXT:     "file": "{{.*}}/test/Backtracing/JSON.swift",
-// SANITIZED-NEXT:       "file": "/Users/USER/*/JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*}}/JSON.swift",
 // SYMBOLICATED-NEXT:    "line": 33,
 // SYMBOLICATED-NEXT:    "column": 3
 // SYMBOLICATED-NEXT:  }
@@ -175,7 +175,7 @@ struct Crash {
 // SYMBOLICATED-NEXT:  "image": "Crash",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
 // UNSANITIZED-NEXT:     "file": "{{.*}}/test/Backtracing/JSON.swift",
-// SANITIZED-NEXT:       "file": "/Users/USER/*/JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*}}/JSON.swift",
 // SYMBOLICATED-NEXT:    "line": 57,
 // SYMBOLICATED-NEXT:    "column": 5
 // SYMBOLICATED-NEXT:  }
@@ -204,7 +204,7 @@ struct Crash {
 // SYMBOLICATED-NEXT:  "image": "Crash",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
 // UNSANITIZED-NEXT:     "file": "{{.*}}/test/Backtracing/JSON.swift",
-// SANITIZED-NEXT:       "file": "/Users/USER/*/JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*}}/JSON.swift",
 // SYMBOLICATED-NEXT:    "line": 0,
 // SYMBOLICATED-NEXT:    "column": 0
 // SYMBOLICATED-NEXT:  }

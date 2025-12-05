@@ -102,6 +102,17 @@ extension BacktraceJSONFormatter {
 
 @_spi(Formatting)
 public extension BacktraceJSONFormatter {
+  mutating func writeCrashLog(now: String) {
+    writePreamble(now: now)
+    writeThreads()
+    writeCapturedMemory()
+    writeImages()
+    writeFooter()
+  }
+}
+
+@_spi(Formatting)
+public extension BacktraceJSONFormatter {
   func writePreamble(now: String) {
     guard let description = getDescription(),
     let faultAddress = getFaultAddress(),
