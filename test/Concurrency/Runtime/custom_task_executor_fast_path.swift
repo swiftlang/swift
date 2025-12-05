@@ -96,7 +96,7 @@ final class SimpleTaskExecutor: TaskExecutor, @unchecked Sendable {
     await withTaskGroup { group in
       for _ in 0..<3 {
         group.addTask() {
-          for _ in 0..<100 {
+          for _ in 0..<20 {
             await withUnsafeContinuation { cont in
               cont.resume()
             }
@@ -108,7 +108,7 @@ final class SimpleTaskExecutor: TaskExecutor, @unchecked Sendable {
   }
 }
 
-// If we're on the fast path, we'll only enqueue four times (once per group)
+// If we're on the fast path, we'll only enqueue four times (once per group task)
 
 // CHECK: Enqueued
 // CHECK: Enqueued

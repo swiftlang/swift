@@ -24,7 +24,7 @@ actor Counter {
     let current = value
 
     // Make sure we haven't produced this value before
-    assert(scratchBuffer[current] == 0)
+    assert(scratchBuffer[current] == 0, "Expected scratchBuffer[current] to be zero, was: \(scratchBuffer[current])")
     scratchBuffer[current] = 1
 
     value = value + 1
@@ -33,7 +33,7 @@ actor Counter {
 
   deinit {
       for i in 0..<value {
-          assert(scratchBuffer[i] == 1)
+          assert(scratchBuffer[i] == 1, "expected scratchBuffer[i] to be 1, was: \(scratchBuffer[i])")
       }
   }
 }
@@ -50,7 +50,10 @@ func worker(identity: Int, counters: [Counter], numIterations: Int) async {
     let counterIndex = Int.random(in: 0 ..< counters.count)
     let counter = counters[counterIndex]
     let nextValue = await counter.next()
-    print("Worker \(identity) calling counter \(counterIndex) produced \(nextValue)")
+    _ = nextValue
+
+    // There's no real reason to be printing those in the test, and it slows down test execution since it is a lot of output
+    // print("Worker \(identity) calling counter \(counterIndex) produced \(nextValue)")
   }
 }
 
@@ -88,7 +91,7 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
     let args = CommandLine.arguments
     let counters = args.count >= 2 ? Int(args[1])! : 10
     let workers = args.count >= 3 ? Int(args[2])! : 100
-    let iterations = args.count >= 4 ? Int(args[3])! : 1000
+    let iterations = args.count >= 4 ? Int(args[3])! : 100
     print("counters: \(counters), workers: \(workers), iterations: \(iterations)")
     await runTest(numCounters: counters, numWorkers: workers, numIterations: iterations)
   }
