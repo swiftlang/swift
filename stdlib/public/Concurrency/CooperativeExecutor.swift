@@ -17,7 +17,7 @@ import Swift
 // Store the Timestamp in the executor private data, if it will fit; otherwise,
 // use the allocator to allocate space for it and stash a pointer in the private
 // data area.
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 extension ExecutorJob {
   fileprivate var cooperativeExecutorTimestampIsIndirect: Bool {
     return MemoryLayout<(Int, Int)>.size
@@ -99,7 +99,7 @@ extension ExecutorJob {
 
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 /// A wait queue is a specialised priority queue used to run a timer.
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 struct WaitQueue {
   var queue: PriorityQueue<UnownedJob>
   var clock: _ClockID
@@ -157,7 +157,7 @@ struct WaitQueue {
 
 /// A co-operative executor that can be used as the main executor or as a
 /// task executor.
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 final class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -282,7 +282,7 @@ extension CooperativeExecutor: SchedulingExecutor {
 }
 #endif
 
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 extension CooperativeExecutor: RunLoopExecutor {
   public func run() throws {
     try runUntil { false }
@@ -340,13 +340,13 @@ extension CooperativeExecutor: RunLoopExecutor {
   }
 }
 
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 extension CooperativeExecutor: SerialExecutor {}
 
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 extension CooperativeExecutor: TaskExecutor {}
 
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 extension CooperativeExecutor: MainExecutor {}
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
