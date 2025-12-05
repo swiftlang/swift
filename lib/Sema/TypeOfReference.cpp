@@ -1496,8 +1496,15 @@ void ConstraintSystem::openGenericRequirement(
   switch (kind) {
   case RequirementKind::Conformance: {
     auto protoDecl = req.getProtocolDecl();
-    // Determine whether this is the protocol 'Self' constraint we should
-    // skip.
+    // Determine whether this is the protocol 'Self' constraint we should skip.
+    //
+    // NOTE: At first glance it seems like this is just an optimization to avoid
+    // adding a redundant constraint, but it is in fact load bearing for
+    // DistributedActor since we can form a conformance to Actor in
+    // GetDistributedActorAsActorConformanceRequest despite the fact that
+    // DistributedActor does not require Actor conformance (although conforming
+    // types are guaranteed to have the witnesses). So a conformance check in
+    // that case would fail.
     if (skipProtocolSelfConstraint && protoDecl == outerDC &&
         protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
       return;
