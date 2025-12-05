@@ -137,6 +137,11 @@ namespace {
         CS->setDeclContext(ParentDC);
       if (auto *FS = dyn_cast<FallthroughStmt>(S))
         FS->setDeclContext(ParentDC);
+      if (auto *FES = dyn_cast<ForEachStmt>(S))
+      {
+        FES->setDeclContext(ParentDC);
+        FES->desugar();
+      }
 
       return Action::Continue(S);
     }
@@ -1517,6 +1522,10 @@ public:
     typeCheckStmt(Body);
     S->setBody(Body);
 
+    return S;
+  }
+
+  Stmt *visitOpaqueStmt(OpaqueStmt *S) {
     return S;
   }
 
@@ -3429,4 +3438,179 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
 
   // Fall back to AsyncIteratorProtocol.next().
   return ctx.getAsyncIteratorNext();
+}
+
+static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
+ auto *parsedSequence = stmt->getParsedSequence();
+ auto *dc = stmt->getDeclContext();
+ auto &ctx = dc->getASTContext();
+ bool isAsync = stmt->getAwaitLoc().isValid();
+
+  // If we have an unsafe expression for the sequence, lift it out of the
+  // sequence expression. We'll put it back after we've introduced the
+  // various calls.
+  UnsafeExpr *unsafeExpr = dyn_cast<UnsafeExpr>(parsedSequence);
+  if (unsafeExpr) {
+    parsedSequence = unsafeExpr->getSubExpr();
+  }
+
+  auto opaqueSeqExpr = new (ctx) OpaqueExpr(parsedSequence);
+
+  std::string name;
+  {
+    if (auto np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
+      name = "$"+np->getBoundName().str().str();
+    name += "$generator";
+  }
+
+  auto *makeIteratorVar = new (ctx)
+      VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
+          opaqueSeqExpr->getStartLoc(),
+          ctx.getIdentifier(name), dc);
+  makeIteratorVar->setImplicit();
+
+  // Async iterators are not `Sendable`; they're only meant to be used from
+  // the isolation domain that creates them. But the `next()` method runs on
+  // the generic executor, so calling it from an actor-isolated context passes
+  // non-`Sendable` state across the isolation boundary. `next()` should
+  // inherit the isolation of the caller, but for now, use the opt out.
+  if (isAsync) {
+    auto *nonisolated =
+        NonisolatedAttr::createImplicit(ctx, NonIsolatedModifier::Unsafe);
+    makeIteratorVar->addAttribute(nonisolated);
+  }
+
+  // First, let's form a call from sequence to `.makeIterator()` and save
+  // that in a special variable which is going to be used by SILGen.
+  FuncDecl *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
+                                     : ctx.getSequenceMakeIterator();
+
+  auto *makeIteratorRef = new (ctx) UnresolvedDotExpr(
+        opaqueSeqExpr, SourceLoc(), DeclNameRef(makeIterator->getName()),
+        DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
+  makeIteratorRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
+
+  Expr *makeIteratorCall =
+        CallExpr::createImplicitEmpty(ctx, makeIteratorRef);
+
+  // Swap in the 'unsafe' expression.
+  if (unsafeExpr) {
+    unsafeExpr = UnsafeExpr::createImplicit(ctx, unsafeExpr->getUnsafeLoc(), makeIteratorCall);
+    makeIteratorCall = unsafeExpr;
+  }
+
+  Pattern *pattern = NamedPattern::createImplicit(ctx, makeIteratorVar);
+  auto *PB = PatternBindingDecl::createImplicit(
+      ctx, StaticSpellingKind::None, pattern, makeIteratorCall, dc);
+
+  if (TypeChecker::typeCheckPatternBinding(PB, 0))
+    return nullptr;
+
+  // The result type of `.makeIterator()` is used to form a call to
+  // `.next()`. `next()` is called on each iteration of the loop.
+  FuncDecl *nextFn = 
+      TypeChecker::getForEachIteratorNextFunction(dc, stmt->getForLoc(), isAsync);
+  Identifier nextId = nextFn ? nextFn->getName().getBaseIdentifier()
+                             : ctx.Id_next;
+  TinyPtrVector<Identifier> labels;
+  if (nextFn && nextFn->getParameters()->size() == 1)
+    labels.push_back(ctx.Id_isolation);
+  auto *makeIteratorVarRef =
+      new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
+                            /*Implicit=*/true);
+  auto *nextRef = new (ctx)
+      UnresolvedDotExpr(makeIteratorVarRef, SourceLoc(),
+                        DeclNameRef(DeclName(ctx, nextId, labels)),
+                        DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
+  nextRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
+
+  ArgumentList *nextArgs;
+  if (nextFn && nextFn->getParameters()->size() == 1) {
+    auto isolationArg =
+      new (ctx) CurrentContextIsolationExpr(stmt->getForLoc(), Type());
+    nextArgs = ArgumentList::createImplicit(
+        ctx, {Argument(SourceLoc(), ctx.Id_isolation, isolationArg)});
+  } else {
+    nextArgs = ArgumentList::createImplicit(ctx, {});
+  }
+  Expr *nextCall = CallExpr::createImplicit(ctx, nextRef, nextArgs);
+
+  // `next` is always async but witness might not be throwing
+  if (isAsync) {
+    nextCall =
+        AwaitExpr::createImplicit(ctx, nextCall->getLoc(), nextCall);
+  }
+
+  if (stmt->getTryLoc().isValid()){
+    nextCall = TryExpr::createImplicit(ctx, nextCall->getLoc(), nextCall);
+  }
+
+  // Wrap the 'next' call in 'unsafe', if the for..in loop has that
+  // effect or if the loop is async (in which case the iterator variable
+  // is nonisolated(unsafe).
+  if (stmt->getUnsafeLoc().isValid() ||
+      (isAsync &&
+       ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete)) {
+    SourceLoc loc = stmt->getUnsafeLoc();
+    bool implicit = stmt->getUnsafeLoc().isInvalid();
+    if (loc.isInvalid())
+      loc = stmt->getForLoc();
+    nextCall = new (ctx) UnsafeExpr(loc, nextCall, Type(), implicit);
+  }
+
+  auto elementPattern = stmt->getPattern();
+  auto optPatternType = OptionalType::get(elementPattern->getType());
+  swift::constraints::SyntacticElementTarget nextTarget(nextCall, dc, CTP_ForEachElement,
+                                      /*contextualType=*/optPatternType,
+                                      /*isDiscarded=*/false);
+
+  auto nextCallTarget = TypeChecker::typeCheckExpression(nextTarget);
+  if (nextCallTarget == std::nullopt)
+    return nullptr;
+  nextCall = nextCallTarget->getAsExpr();
+
+  SmallVector<StmtConditionElement, 1> cond;
+
+  auto *somePattern = OptionalSomePattern::createImplicit(ctx, stmt->getPattern());
+  somePattern->setType(optPatternType);
+
+  auto PBI = ConditionalPatternBindingInfo::create(ctx, SourceLoc(), somePattern, nextCall);
+  auto conditionElement = StmtConditionElement(PBI);
+  cond.push_back(conditionElement);
+
+  /* for ... in ... where cond { body }
+   * becomes:
+   * while ... { if cond then body else continue }
+   */
+  auto* whereClause = stmt->getWhere();
+  auto* forBody = stmt->getBody();
+
+  Stmt* whileBody = new (ctx) OpaqueStmt(forBody, SourceLoc(), SourceLoc());
+
+  if (whereClause)
+  {
+    SmallVector<ASTNode, 1> thenClause{whileBody};
+
+    whereClause = new (ctx) OpaqueExpr(whereClause);
+
+    whileBody = new (ctx) IfStmt(SourceLoc(), whereClause,
+      BraceStmt::create(ctx, SourceLoc(), thenClause, SourceLoc()), SourceLoc(),
+      nullptr, /*implicit*/ true, ctx);
+  }
+
+  // FIXME: do we need to do anything extra here or elseswhere if the for each
+  // stmt is async?
+  auto* whileStmt = new (ctx) WhileStmt(stmt->getLabelInfo(), SourceLoc(), ctx.AllocateCopy(cond), whileBody, true);
+  stmt->setBreakTarget(whileStmt);
+  stmt->setContinueTarget(whileStmt);
+
+  SmallVector<ASTNode, 2> stmts;
+  stmts.push_back(PB);
+  stmts.push_back(whileStmt);
+
+  return BraceStmt::create(ctx, stmt->getStartLoc(), stmts, stmt->getEndLoc());
+}
+
+BraceStmt* DesugarForEachStmtRequest::evaluate(Evaluator &evaluator, ForEachStmt *stmt) const {
+  return desugarForEachStmt(stmt);
 }

@@ -466,6 +466,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(TypeJoin);
   SIMPLE_REFERENCE(MacroExpansion, getMacroRef);
   NO_REFERENCE(TypeValue);
+  NO_REFERENCE(Opaque);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -840,6 +841,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
 
   case ExprKind::MacroExpansion:
   case ExprKind::CurrentContextIsolation:
+  case ExprKind::Opaque: /* FIXME: unsure about this */
     return true;
   }
 
@@ -1044,6 +1046,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::ActorIsolationErasure:
   case ExprKind::ExtractFunctionIsolation:
   case ExprKind::UnsafeCast:
+  case ExprKind::Opaque:
     return false;
   }
 
