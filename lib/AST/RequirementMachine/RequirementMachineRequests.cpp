@@ -1045,14 +1045,16 @@ InferredGenericSignatureRequest::evaluate(
           continue;
 
         if (reduced->isTypeParameter()) {
-          ctx.Diags.diagnose(loc, diag::requires_generic_params_made_equal,
-                             genericParam, result->getSugaredType(reduced))
-            .warnUntilSwiftVersion(6);
+          ctx.Diags
+              .diagnose(loc, diag::requires_generic_params_made_equal,
+                        genericParam, result->getSugaredType(reduced))
+              .warnUntilLanguageMode(6);
         } else {
-          ctx.Diags.diagnose(loc,
-                             diag::requires_generic_param_made_equal_to_concrete,
-                             genericParam)
-            .warnUntilSwiftVersion(6);
+          ctx.Diags
+              .diagnose(loc,
+                        diag::requires_generic_param_made_equal_to_concrete,
+                        genericParam)
+              .warnUntilLanguageMode(6);
         }
       }
     }

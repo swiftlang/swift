@@ -3211,8 +3211,9 @@ public:
       }
     }
 
-    Diags.diagnose(loc, message).highlight(highlight)
-      .warnUntilSwiftVersionIf(classification.shouldDowngradeToWarning(), 6);
+    Diags.diagnose(loc, message)
+        .highlight(highlight)
+        .warnUntilLanguageModeIf(classification.shouldDowngradeToWarning(), 6);
     maybeAddRethrowsNote(Diags, loc, reason);
 
     // If this is a call without expected 'try[?|!]', like this:
@@ -4806,9 +4807,9 @@ private:
       return;
 
     Ctx.Diags.diagnose(anchor->getStartLoc(), diag::async_expr_without_await)
-      .warnUntilSwiftVersionIf(downgradeToWarning, 6)
-      .fixItInsert(loc, insertText)
-      .highlight(anchor->getSourceRange());
+        .warnUntilLanguageModeIf(downgradeToWarning, 6)
+        .fixItInsert(loc, insertText)
+        .highlight(anchor->getSourceRange());
 
     for (const DiagnosticInfo &diag: errors) {
       switch (diag.reason.getKind()) {
@@ -4909,7 +4910,7 @@ private:
       Ctx.Diags
           .diagnose(loc, diag::actor_isolated_access_outside_of_actor_context,
                     declIsolation, declRef.getDecl(), isCall)
-          .warnUntilSwiftVersionIf(errorInfo.downgradeToWarning, 6)
+          .warnUntilLanguageModeIf(errorInfo.downgradeToWarning, 6)
           .fixItInsert(fixItLoc, insertText)
           .highlight(anchor->getSourceRange());
       return true;

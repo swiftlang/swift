@@ -106,7 +106,7 @@ TEST(DiagnosticGroups, OverrideBehaviorLimitations) {
 
           diags.diagnose(SourceLoc(), diagnostic);
           diags.diagnose(SourceLoc(), diagnostic)
-              .limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning, 99);
+              .limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning, 99);
         },
         [](const DiagnosticInfo &info) {
           EXPECT_EQ(info.Kind, DiagnosticKind::Error);
@@ -138,7 +138,7 @@ TEST(DiagnosticGroups, OverrideBehaviorLimitations) {
           diags.setWarningsAsErrorsRules(rules);
 
           diags.diagnose(SourceLoc(), diagnostic)
-              .limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning, 99);
+              .limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning, 99);
         },
         [](const DiagnosticInfo &info) {
           EXPECT_EQ(info.Kind, DiagnosticKind::Error);
