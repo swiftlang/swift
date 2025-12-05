@@ -60,10 +60,6 @@ STATISTIC(ImportNameNumCacheMisses, "# of times the import name cache was missed
 using namespace swift;
 using namespace importer;
 
-// Commonly-used Clang classes.
-using clang::CompilerInstance;
-using clang::CompilerInvocation;
-
 Identifier importer::getOperatorName(ASTContext &ctx,
                                      clang::OverloadedOperatorKind op) {
   switch (op) {
