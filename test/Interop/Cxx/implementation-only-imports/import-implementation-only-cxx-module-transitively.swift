@@ -58,3 +58,9 @@ public struct OpaquePointer {
     self._rawValue = v
   }
 }
+
+@frozen
+public enum Optional<Wrapped> {
+  case none
+  case some(Wrapped)
+}

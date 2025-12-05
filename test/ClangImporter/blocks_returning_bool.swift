@@ -11,7 +11,7 @@ import BlocksReturningBool
 
 // rdar://43656704
 
-// CHECK-LABEL: sil {{.*}} @$sSo9Aggregatea13takePredicateABySbSicSgXCSg_tcfC
+// CHECK-LABEL: sil {{.*}} @$sSo9Aggregatea13takePredicateABySbSicSgXzC28_ZTSPFvU13block_pointerFbmEESg_tcfC
 // CHECK-SAME: Optional<@convention(c) (Optional<@convention(block) (Int) -> Bool>) -> ()>
 func foo() -> Aggregate {
   return Aggregate(takePredicate: nil)
