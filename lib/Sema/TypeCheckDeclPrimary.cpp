@@ -614,7 +614,8 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     checkInheritanceClause(gp);
   }
 
-  // Force resolution of interface types written in requirements here.
+  // Force resolution of interface types written in requirements here to check
+  // that generic types satisfy generic requirements, and so on.
   WhereClauseOwner(ownerCtx)
       .visitRequirements(TypeResolutionStage::Interface,
                          [](Requirement, RequirementRepr *) { return false; });

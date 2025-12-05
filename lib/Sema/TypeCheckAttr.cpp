@@ -3590,6 +3590,12 @@ void AttributeChecker::visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr)
   }
 
   (void)attr->getSpecializedSignature(FD);
+
+  // Force resolution of interface types written in requirements here to check
+  // that generic types satisfy generic requirements, and so on.
+  WhereClauseOwner(FD, attr)
+      .visitRequirements(TypeResolutionStage::Interface,
+                         [](Requirement, RequirementRepr *) { return false; });
 }
 
 GenericSignature
