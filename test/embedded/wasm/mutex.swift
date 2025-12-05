@@ -10,12 +10,12 @@ import Synchronization
     let m = Mutex(42)
 
     m.withLock {
-      puts("Hello \($0)")  // CHECK: Hello 42
+      print("Hello \($0)")  // CHECK: Hello 42
       $0 = 37
     }
     
     m.withLock {
-      puts("Hello \($0)")  // CHECK: Hello 37
+      print("Hello \($0)")  // CHECK: Hello 37
     }
   }
 }
