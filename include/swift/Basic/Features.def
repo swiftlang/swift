@@ -50,8 +50,8 @@
 // Swift compiler.
 //
 // OPTIONAL_LANGUAGE_FEATURE is the same as LANGUAGE_FEATURE, but describes
-// accepted features that can be enabled independently of language version and
-// are not scheduled to be enabled in some specific language version. Examples
+// accepted features that can be enabled independently of language mode and
+// are not scheduled to be enabled in some specific language mode. Examples
 // of optional language features include strict memory safety checking (SE-0458)
 // and Embedded Swift.
 //===----------------------------------------------------------------------===//
@@ -82,11 +82,11 @@
       defined(UPCOMING_FEATURE)
 #    error ambiguous defines when including Features.def
 #  elif defined(SUPPRESSIBLE_LANGUAGE_FEATURE)
-#    define SUPPRESSIBLE_UPCOMING_FEATURE(FeatureName, SENumber, Version) \
+#    define SUPPRESSIBLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode) \
        SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
 #  else
-#    define SUPPRESSIBLE_UPCOMING_FEATURE(FeatureName, SENumber, Version) \
-       UPCOMING_FEATURE(FeatureName, SENumber, Version)
+#    define SUPPRESSIBLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode) \
+       UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)
 #  endif
 #endif
 
@@ -136,10 +136,10 @@
 // feature is disabled.
 #ifndef MIGRATABLE_UPCOMING_FEATURE
   #if defined(UPCOMING_FEATURE)
-    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
-      UPCOMING_FEATURE(FeatureName, SENumber, Version)
+    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)   \
+      UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)
   #else
-    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
+    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)   \
       LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
   #endif
 #endif
@@ -161,7 +161,7 @@
 #endif
 
 #ifndef UPCOMING_FEATURE
-  #define UPCOMING_FEATURE(FeatureName, SENumber, Version)                     \
+  #define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)                \
     LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
 #endif
 

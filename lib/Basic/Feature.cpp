@@ -42,7 +42,7 @@ llvm::StringRef Feature::getName() const {
 std::optional<Feature> Feature::getUpcomingFeature(llvm::StringRef name) {
   return llvm::StringSwitch<std::optional<Feature>>(name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version)                       \
+#define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)                  \
   .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
       .Default(std::nullopt);
@@ -57,12 +57,12 @@ std::optional<Feature> Feature::getExperimentalFeature(llvm::StringRef name) {
       .Default(std::nullopt);
 }
 
-std::optional<unsigned> Feature::getLanguageVersion() const {
+std::optional<unsigned> Feature::getLanguageMode() const {
   switch (kind) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version)                       \
+#define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)                  \
   case Feature::FeatureName:                                                   \
-    return Version;
+    return LanguageMode;
 #include "swift/Basic/Features.def"
   default:
     return std::nullopt;
@@ -71,7 +71,7 @@ std::optional<unsigned> Feature::getLanguageVersion() const {
 
 bool Feature::isMigratable() const {
   switch (kind) {
-#define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)
+#define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)
 #define MIGRATABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
 #define MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
@@ -79,7 +79,7 @@ bool Feature::isMigratable() const {
 #include "swift/Basic/Features.def"
     return false;
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
-#define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)            \
+#define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)       \
   case Feature::FeatureName:
 #define MIGRATABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)          \
   case Feature::FeatureName:

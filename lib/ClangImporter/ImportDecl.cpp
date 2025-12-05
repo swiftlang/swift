@@ -5979,7 +5979,7 @@ namespace {
 
       auto access = AccessLevel::Open;
       if (decl->hasAttr<clang::ObjCSubclassingRestrictedAttr>() &&
-          Impl.SwiftContext.isSwiftVersionAtLeast(5)) {
+          Impl.SwiftContext.isLanguageModeAtLeast(5)) {
         access = AccessLevel::Public;
       }
 

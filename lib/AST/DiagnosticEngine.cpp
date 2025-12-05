@@ -459,8 +459,8 @@ InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
 }
 
 InFlightDiagnostic &
-InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
-    DiagnosticBehavior limit, unsigned majorVersion) {
+InFlightDiagnostic::limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
+                                                   unsigned majorVersion) {
   if (!Engine->languageVersion.isVersionAtLeast(majorVersion)) {
     // If the behavior limit is a warning or less, wrap the diagnostic
     // in a message that this will become an error in a later Swift
@@ -487,14 +487,14 @@ InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
   return *this;
 }
 
-InFlightDiagnostic &InFlightDiagnostic::warnUntilFutureSwiftVersion() {
+InFlightDiagnostic &InFlightDiagnostic::warnUntilFutureLanguageMode() {
   using namespace version;
-  return warnUntilSwiftVersion(Version::getFutureMajorLanguageVersion());
+  return warnUntilLanguageMode(Version::getFutureMajorLanguageVersion());
 }
 
 InFlightDiagnostic &
-InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
-  return limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning,
+InFlightDiagnostic::warnUntilLanguageMode(unsigned majorVersion) {
+  return limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning,
                                         majorVersion);
 }
 

@@ -1180,7 +1180,7 @@ namespace {
           return 6;
         };
 
-        diag.warnUntilSwiftVersion(shouldWarnUntilVersion());
+        diag.warnUntilLanguageMode(shouldWarnUntilVersion());
 
         mainDiagType = std::nullopt;
       }

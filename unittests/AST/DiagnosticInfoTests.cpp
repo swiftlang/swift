@@ -103,7 +103,7 @@ TEST(DiagnosticInfo, PrintDiagnosticNamesMode_Identifier_WrappedDiag) {
         diags.setPrintDiagnosticNamesMode(PrintDiagnosticNamesMode::Identifier);
 
         diags.diagnose(SourceLoc(), diag::error_immediate_mode_missing_stdlib)
-            .limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning, 99);
+            .limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning, 99);
       },
       [](DiagnosticEngine &diags, const DiagnosticInfo &info) {
         EXPECT_EQ(info.ID, diag::error_in_a_future_swift_lang_mode.ID);
@@ -159,7 +159,7 @@ TEST(DiagnosticInfo, PrintDiagnosticNamesMode_Group_WrappedDiag) {
         TestDiagnostic diagnostic(diag::error_immediate_mode_missing_stdlib.ID,
                                   DiagGroupID::DeprecatedDeclaration);
         diags.diagnose(SourceLoc(), diagnostic)
-            .limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning, 99);
+            .limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning, 99);
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
         EXPECT_EQ(info.ID, diag::error_in_a_future_swift_lang_mode.ID);
@@ -180,8 +180,8 @@ TEST(DiagnosticInfo, CategoryDeprecation) {
         EXPECT_TRUE(diags.isDeprecationDiagnostic(diag.ID));
 
         diags.diagnose(SourceLoc(), diag);
-        diags.diagnose(SourceLoc(), diag).warnUntilSwiftVersion(6);
-        diags.diagnose(SourceLoc(), diag).warnUntilSwiftVersion(99);
+        diags.diagnose(SourceLoc(), diag).warnUntilLanguageMode(6);
+        diags.diagnose(SourceLoc(), diag).warnUntilLanguageMode(99);
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
         EXPECT_EQ(info.Category, "deprecation");
@@ -197,8 +197,8 @@ TEST(DiagnosticInfo, CategoryNoUsage) {
         EXPECT_TRUE(diags.isNoUsageDiagnostic(diag.ID));
 
         diags.diagnose(SourceLoc(), diag);
-        diags.diagnose(SourceLoc(), diag).warnUntilSwiftVersion(6);
-        diags.diagnose(SourceLoc(), diag).warnUntilSwiftVersion(99);
+        diags.diagnose(SourceLoc(), diag).warnUntilLanguageMode(6);
+        diags.diagnose(SourceLoc(), diag).warnUntilLanguageMode(99);
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
         EXPECT_EQ(info.Category, "no-usage");
@@ -214,9 +214,9 @@ TEST(DiagnosticInfo, CategoryAPIDigesterBreakage) {
         EXPECT_TRUE(diags.isAPIDigesterBreakageDiagnostic(diag.ID));
 
         diags.diagnose(SourceLoc(), diag, StringRef());
-        diags.diagnose(SourceLoc(), diag, StringRef()).warnUntilSwiftVersion(6);
+        diags.diagnose(SourceLoc(), diag, StringRef()).warnUntilLanguageMode(6);
         diags.diagnose(SourceLoc(), diag, StringRef())
-            .warnUntilSwiftVersion(99);
+            .warnUntilLanguageMode(99);
       },
       [](DiagnosticEngine &, const DiagnosticInfo &info) {
         EXPECT_EQ(info.Category, "api-digester-breaking-change");

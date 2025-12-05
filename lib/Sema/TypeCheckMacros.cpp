@@ -699,9 +699,8 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
     if (isa<AccessorDecl>(decl) && role == MacroRole::Accessor) {
       auto *var = dyn_cast<VarDecl>(attachedTo);
       if (var && var->isLet()) {
-        ctx.Diags.diagnose(var->getLoc(),
-                           diag::let_accessor_expansion)
-          .warnUntilSwiftVersion(6);
+        ctx.Diags.diagnose(var->getLoc(), diag::let_accessor_expansion)
+            .warnUntilLanguageMode(6);
       }
 
       continue;

@@ -607,7 +607,7 @@ SourceLoc Parser::consumeAttributeLParen() {
   SourceLoc LastTokenEndLoc = getEndOfPreviousLoc();
   if (LastTokenEndLoc != Tok.getLoc() && !isInSILMode()) {
     diagnose(LastTokenEndLoc, diag::attr_extra_whitespace_before_lparen)
-        .warnUntilSwiftVersion(6);
+        .warnUntilLanguageMode(6);
   }
   return consumeToken(tok::l_paren);
 }
@@ -623,7 +623,7 @@ bool Parser::isAtAttributeLParen(bool isCustomAttr) {
   if (!Tok.isFollowingLParen())
     return false;
 
-  if (Context.isSwiftVersionAtLeast(6)) {
+  if (Context.isLanguageModeAtLeast(6)) {
     // No-space '(' are always arguments.
     if (getEndOfPreviousLoc() == Tok.getLoc())
       return true;

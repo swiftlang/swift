@@ -324,7 +324,7 @@ template <typename... T, typename... U>
 static InFlightDiagnostic diagnoseError(ASTContext &context, SourceLoc loc,
                                         Diag<T...> diag, U &&...args) {
   return std::move(context.Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                       .warnUntilSwiftVersion(6));
+                       .warnUntilLanguageMode(6));
 }
 
 template <typename... T, typename... U>
@@ -1087,7 +1087,7 @@ private:
     emittedErrorDiagnostic = true;
     return std::move(getASTContext()
                          .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilSwiftVersion(6));
+                         .warnUntilLanguageMode(6));
   }
 
   template <typename... T, typename... U>
@@ -1553,8 +1553,12 @@ public:
     // If the failure is due to an isolated conformance, downgrade the error
     // to a warning prior to Swift 7.
     if (isolationRegionInfo.getIsolationInfo().getIsolatedConformance() &&
-        !sendingOperand->get()->getType().getASTType()->getASTContext().LangOpts
-          .isSwiftVersionAtLeast(7))
+        !sendingOperand->get()
+             ->getType()
+             .getASTType()
+             ->getASTContext()
+             .isLanguageModeAtLeast(
+                 version::Version::getFutureMajorLanguageVersion()))
       return DiagnosticBehavior::Warning;
 
     return sendingOperand->get()->getType().getConcurrencyDiagnosticBehavior(
@@ -1866,7 +1870,7 @@ private:
     emittedErrorDiagnostic = true;
     return std::move(getASTContext()
                          .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilSwiftVersion(6));
+                         .warnUntilLanguageMode(6));
   }
 
   template <typename... T, typename... U>
@@ -2481,7 +2485,7 @@ public:
     emittedErrorDiagnostic = true;
     return std::move(getASTContext()
                          .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilSwiftVersion(6));
+                         .warnUntilLanguageMode(6));
   }
 
   template <typename... T, typename... U>
@@ -3004,7 +3008,7 @@ public:
     emittedErrorDiagnostic = true;
     return std::move(getASTContext()
                          .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilSwiftVersion(6));
+                         .warnUntilLanguageMode(6));
   }
 
   template <typename... T, typename... U>
@@ -3135,7 +3139,7 @@ public:
     emittedErrorDiagnostic = true;
     return std::move(getASTContext()
                          .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilSwiftVersion(6));
+                         .warnUntilLanguageMode(6));
   }
 
   template <typename... T, typename... U>
@@ -3345,7 +3349,7 @@ struct NonSendableIsolationCrossingResultDiagnosticEmitter {
     emittedErrorDiagnostic = true;
     return std::move(getASTContext()
                          .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilSwiftVersion(6));
+                         .warnUntilLanguageMode(6));
   }
 
   template <typename... T, typename... U>
@@ -3577,7 +3581,7 @@ public:
     emittedErrorDiagnostic = true;
     return std::move(getASTContext()
                          .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilSwiftVersion(6));
+                         .warnUntilLanguageMode(6));
   }
 
   template <typename... T, typename... U>
