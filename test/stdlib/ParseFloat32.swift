@@ -1,4 +1,7 @@
-// RUN: %target-run-simple-swift
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -g %s -o %t/a.out -enable-experimental-feature Extern
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -285,6 +288,33 @@ tests.test("Decimal Floats") {
   expectParse("999999999999999999999999999999999999999.999999999999999999999999999", Float32.infinity)
   expectParse("7674047411400702925974988342550565582448.117", Float32.infinity)
 }
+
+@_extern(c, "_swift_stdlib_strtof_clocale")
+func _swift_stdlib_strtof_clocale(
+  _: Optional<UnsafePointer<CChar>>,
+  _: Optional<UnsafeMutablePointer<Float32>>
+) -> Optional<UnsafePointer<CChar>>
+
+func viaLegacy(_ text: String) -> Float32? {
+  return text.withCString { strptr -> Float32? in
+    var result = Float32()
+    let succeeded = withUnsafeMutablePointer(to: &result) { dptr in
+      let endptr = _swift_stdlib_strtof_clocale(strptr, dptr)
+      return endptr == strptr + text.utf8.count
+    }
+    if succeeded {
+      return Float32?.some(result)
+    } else {
+      return Float32?.none
+    }
+  }
+}
+
+tests.test("Legacy ABI") {
+  expectEqual(viaLegacy("1.0"), 1.0 as Float32)
+  expectEqual(viaLegacy("3.4028235e+38"), Float32.greatestFiniteMagnitude)
+}
+
 
 /*
 // Verify round-trip correctness for every Float32 value.

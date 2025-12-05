@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -g %s -o %t/a.out
+// RUN: %target-build-swift -g %s -o %t/a.out -enable-experimental-feature Extern
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 
@@ -320,6 +320,32 @@ tests.test("Decimal Floats") {
   expectParse("1e309", Float64.infinity)
   expectParse("1e9999999999999999999999999999999999", Float64.infinity)
   expectParse("999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999.999999999999999999999999999", Float64.infinity)
+}
+
+@_extern(c, "_swift_stdlib_strtod_clocale")
+func _swift_stdlib_strtod_clocale(
+  _: Optional<UnsafePointer<CChar>>,
+  _: Optional<UnsafeMutablePointer<Double>>
+) -> Optional<UnsafePointer<CChar>>
+
+func viaLegacy(_ text: String) -> Double? {
+  return text.withCString { strptr -> Double? in
+    var result = Double()
+    let succeeded = withUnsafeMutablePointer(to: &result) { dptr in
+      let endptr = _swift_stdlib_strtod_clocale(strptr, dptr)
+      return endptr == strptr + text.utf8.count
+    }
+    if succeeded {
+      return Double?.some(result)
+    } else {
+      return Double?.none
+    }
+  }
+}
+
+tests.test("Legacy ABI") {
+  expectEqual(viaLegacy("1.0"), 1.0 as Double)
+  expectEqual(viaLegacy("1.7976931348623157e+308"), Double.greatestFiniteMagnitude)
 }
 
 /*
