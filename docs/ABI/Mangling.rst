@@ -113,9 +113,17 @@ The following symbolic reference kinds are currently implemented:
     objective-c-protocol-relative-reference  ::=  '\x0C'  .{4} // Reference points directly to a objective-c protcol reference
    #endif
 
-A mangled name may also include ``\xFF`` bytes, which are only used for
-alignment padding. They do not affect what the mangled name references and can
-be skipped over and ignored.
+Mangled names that contain relative symbolic references may include ``\xFF``
+bytes for alignment padding purposes. These bytes do not affect what the mangled
+name references and can be skipped over and ignored.
+
+DISCUSSION: A relative symbolic reference encodes a symbol by adding the offset
+integer value contained within the relative symbolic reference to the address in
+memory of the first byte of the relative symbolic reference. The addition of
+padding bytes is used to manipulate the location of that first byte so that the
+address of is already aligned in the same manner as the symbol that is
+ultimately referenced. Thus only an offset must be added to that address instead
+of also needing to consider alignment differences.
 
 Globals
 ~~~~~~~
