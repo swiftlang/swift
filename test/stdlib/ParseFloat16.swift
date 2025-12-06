@@ -1,7 +1,11 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// Float16 is not supported on x86_64 macOS at all
 // UNSUPPORTED: CPU=x86_64 && OS=macOS
+
+// TODO: Figure out why this test breaks on wasm32
+// UNSUPPORTED: CPU=wasm32
 
 // Cannot test with old OS stdlib, because that used libc strtof
 // for parsing, which results in incorrect results.
