@@ -3873,10 +3873,10 @@ extension DecodingError {
   /// The coding path for the returned error is constructed by appending the
   /// given key to the given container's coding path.
   ///
-  /// - param key: The key which caused the failure.
-  /// - param container: The container in which the corrupted data was
+  /// - Parameter key: The key which caused the failure.
+  /// - Parameter container: The container in which the corrupted data was
   ///   accessed.
-  /// - param debugDescription: A description of the error to aid in debugging.
+  /// - Parameter debugDescription: A description of the error to aid in debugging.
   ///
   /// - Returns: A new `.dataCorrupted` error with the given information.
   public static func dataCorruptedError<C: KeyedDecodingContainerProtocol>(
@@ -3896,9 +3896,9 @@ extension DecodingError {
   /// The coding path for the returned error is constructed by appending the
   /// given container's current index to its coding path.
   ///
-  /// - param container: The container in which the corrupted data was
+  /// - Parameter container: The container in which the corrupted data was
   ///   accessed.
-  /// - param debugDescription: A description of the error to aid in debugging.
+  /// - Parameter debugDescription: A description of the error to aid in debugging.
   ///
   /// - Returns: A new `.dataCorrupted` error with the given information.
   public static func dataCorruptedError(
@@ -3918,9 +3918,9 @@ extension DecodingError {
   /// The coding path for the returned error is the given container's coding
   /// path.
   ///
-  /// - param container: The container in which the corrupted data was
+  /// - Parameter container: The container in which the corrupted data was
   ///   accessed.
-  /// - param debugDescription: A description of the error to aid in debugging.
+  /// - Parameter debugDescription: A description of the error to aid in debugging.
   ///
   /// - Returns: A new `.dataCorrupted` error with the given information.
   public static func dataCorruptedError(
