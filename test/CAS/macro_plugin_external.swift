@@ -33,6 +33,15 @@
 
 // FS: MacroDefinition
 
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SAL > %t/SAL.cmd
+// RUN: %swift_frontend_plain @%t/SAL.cmd
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:vcruntime > %t/vcruntime.cmd
+// RUN: %swift_frontend_plain @%t/vcruntime.cmd
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_stdint > %t/_Builtin_stdint.cmd
+// RUN: %swift_frontend_plain @%t/_Builtin_stdint.cmd
+
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
 // RUN: %swift_frontend_plain @%t/SwiftShims.cmd
 
@@ -58,6 +67,15 @@
 
 /// CASFS is remapped.
 // FS-REMAP: /^test/plugins/[[LIB]]
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps2.json clang:SAL > %t/sal2.cmd
+// RUN: %swift_frontend_plain @%t/sal2.cmd
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps2.json clang:vcruntime > %t/vcruntime2.cmd
+// RUN: %swift_frontend_plain @%t/vcruntime2.cmd
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps2.json clang:_Builtin_stdint > %t/_Builtin_stdint2.cmd
+// RUN: %swift_frontend_plain @%t/_Builtin_stdint2.cmd
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps2.json clang:SwiftShims > %t/SwiftShims2.cmd
 // RUN: %swift_frontend_plain @%t/SwiftShims2.cmd

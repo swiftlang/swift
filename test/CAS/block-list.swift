@@ -7,8 +7,18 @@
 // RUN:   -scanner-prefix-map-paths %t /^tmp -I %t/include \
 // RUN:   %t/main.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas 
 
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SAL > %t/SAL.cmd
+// RUN: %swift_frontend_plain @%t/SAL.cmd
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:vcruntime > %t/vcruntime.cmd
+// RUN: %swift_frontend_plain @%t/vcruntime.cmd
+
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Builtin_stdint > %t/_Builtin_stdint.cmd
+// RUN: %swift_frontend_plain @%t/_Builtin_stdint.cmd
+
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
 // RUN: %swift_frontend_plain @%t/shim.cmd
+
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json A > %t/A.cmd
 // RUN: %swift_frontend_plain @%t/A.cmd
 
