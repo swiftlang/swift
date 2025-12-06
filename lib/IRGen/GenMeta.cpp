@@ -5398,6 +5398,7 @@ diagnoseUnsupportedObjCImplLayout(IRGenModule &IGM, ClassDecl *classDecl,
 void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                               const ClassLayout &fragileLayout,
                               const ClassLayout &resilientLayout) {
+
   assert(!classDecl->isForeign());
   PrettyStackTraceDecl stackTraceRAII("emitting metadata for", classDecl);
 
@@ -5565,8 +5566,7 @@ static void emitEmbeddedVTable(IRGenModule &IGM, CanType classTy,
   (void)var;
 }
 
-void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
-                                      const ClassLayout &fragileLayout) {
+void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl) {
   PrettyStackTraceDecl stackTraceRAII("emitting metadata for", classDecl);
   assert(!classDecl->isForeign());
   CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
@@ -5578,12 +5578,19 @@ void irgen::emitLazyClassMetadata(IRGenModule &IGM, CanType classTy) {
   // Might already be emitted, skip if that's the case.
   auto entity =
       LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::AddressPoint);
-  if (IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+
+  auto isEmbeddedWithExistentials = IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials);
+  if (isEmbeddedWithExistentials) {
     entity = LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::FullMetadata);
   }
   auto *existingVar = cast<llvm::GlobalVariable>(
       IGM.getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo()));
   if (!existingVar->isDeclaration()) {
+    return;
+  }
+
+  if (isEmbeddedWithExistentials) {
+    emitEmbeddedClassMetadata(IGM, classTy->getClassOrBoundGenericClass());
     return;
   }
 
