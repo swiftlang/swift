@@ -223,7 +223,7 @@ func composed2<U : None & A >(u : U) async {
   _ = u.someProp
   // FIXME: this ^ should raise "property access is 'async' but is not marked with 'await'""
 
-  _ = await u.someProp // expected-warning {{no 'async' operations occur within 'await' expression}}
+  _ = await u.someProp // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
 }
 
 func composed3<U : T & None >(u : U) throws {

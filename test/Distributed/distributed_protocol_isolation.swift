@@ -69,7 +69,7 @@ func outside_good_generic<DP: DistProtocol>(dp: DP) async throws {
   _ = dp.local() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   _ = await dp.local() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   // the below warning is expected because we don't apply the "implicitly async" to the not-callable func
-  // expected-warning@-2{{no 'async' operations occur within 'await' expression}}
+  // expected-warning@-2{{no 'async' operations occur within 'await' expression}}{{7-13=}}
 
   _ = try dp.local() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   // the below warning is expected because we don't apply the "implicitly throwing" to the not-callable func

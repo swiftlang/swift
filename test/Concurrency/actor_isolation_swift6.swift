@@ -53,15 +53,15 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
   _ = anno.counter
 
   // make sure it's just a warning if someone was awaiting on it previously
-  _ = await ext.point // expected-warning {{no 'async' operations occur within 'await' expression}}
-  _ = await formance.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}
-  _ = await anno.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}
+  _ = await ext.point // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
+  _ = await formance.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
+  _ = await anno.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
   
   // this does not need an await, since the property is 'Sendable' and of a
   // value type
   _ = anno.point
   _ = await anno.point
-  // expected-warning@-1 {{no 'async' operations occur within 'await' expression}}
+  // expected-warning@-1 {{no 'async' operations occur within 'await' expression}}{{7-13=}}
 
   // these do need await, regardless of reference or value type
   _ = await (formance as any MainCounter).counter

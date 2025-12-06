@@ -301,7 +301,7 @@ do {
   // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
 } // expected-error {{expected expression after operator}}
 
-_ = await /x/ // expected-warning {{no 'async' operations occur within 'await' expression}}
+_ = await /x/ // expected-warning {{no 'async' operations occur within 'await' expression}}{{5-11=}}
 
 /x/ = 0 // expected-error {{cannot assign to value: literals are not mutable}}
 /x/() // expected-error {{cannot call value of non-function type 'Regex<Substring>'}}

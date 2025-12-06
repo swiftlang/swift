@@ -50,7 +50,7 @@ actor BankAccount {
   }
 
   func testSelfBalance() async {
-    _ = await balance() // expected-warning {{no 'async' operations occur within 'await' expression}}
+    _ = await balance() // expected-warning {{no 'async' operations occur within 'await' expression}}{{9-15=}}
   }
 
   // returns the amount actually withdrawn
@@ -357,12 +357,12 @@ actor Calculator {
   // We will error on the next line when we get past type checking. But since we
   // error in the type checker, we do not make further progress.
   let _ = (await bananaAdd(1))(2)
-  let _ = await (await bananaAdd(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
+  let _ = await (await bananaAdd(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}{{11-17=}}
 
   let calc = Calculator()
   
   let _ = (await calc.addCurried(1))(2)
-  let _ = await (await calc.addCurried(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
+  let _ = await (await calc.addCurried(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}{{11-17=}}
 
   let plusOne = await calc.addCurried(await calc.add(0, 1))
   let _ = plusOne(2)

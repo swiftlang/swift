@@ -19,7 +19,7 @@ func isolatedSync() { // expected-note 2 {{calls to global function 'isolatedSyn
 }
 
 func nonIsolatedAsync() async {
-    await print(a) // expected-warning {{no 'async' operations occur within 'await' expression}}
+    await print(a) // expected-warning {{no 'async' operations occur within 'await' expression}}{{5-11=}}
     a = a + 10
 }
 

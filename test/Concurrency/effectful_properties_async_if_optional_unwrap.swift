@@ -48,7 +48,7 @@ struct Kappa {
     // though we could try to could give a better message
     if let await maybeData { // expected-error{{unwrap condition requires a valid identifier}}
       // expected-error@-1{{pattern variable binding cannot appear in an expression}}
-      // expected-warning@-2{{no 'async' operations occur within 'await' expression}}
+      // expected-warning@-2{{no 'async' operations occur within 'await' expression}}{{12-18=}}
       return maybeData // expected-error{{expression is 'async' but is not marked with 'await'}}
       // expected-note@-1{{property access is 'async'}}
     }
