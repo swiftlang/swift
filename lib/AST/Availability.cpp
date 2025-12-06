@@ -972,7 +972,7 @@ bool ASTContext::supportsVersionedAvailability() const {
   return minimumAvailableOSVersionForTriple(LangOpts.Target).has_value();
 }
 
-bool swift::isExported(const Decl *D) {
+ExportedLevel swift::isExported(const Decl *D) {
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     return isExported(VD);
   }
@@ -982,32 +982,35 @@ bool swift::isExported(const Decl *D) {
         return isExported(VD);
     }
 
-    return false;
+    return ExportedLevel::None;
   }
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     return isExported(ED);
   }
 
-  return true;
+  return ExportedLevel::Exported;
 }
 
-bool swift::isExported(const ValueDecl *VD) {
+ExportedLevel swift::isExported(const ValueDecl *VD) {
   if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
-    return false;
+    return ExportedLevel::None;
   if (VD->isObjCMemberImplementation())
-    return false;
+    return ExportedLevel::None;
 
   // Is this part of the module's API or ABI?
   AccessScope accessScope =
       VD->getFormalAccessScope(nullptr,
                                /*treatUsableFromInlineAsPublic*/ true);
   if (accessScope.isPublic())
-    return true;
+    return ExportedLevel::Exported;
 
   // Is this a stored property in a @frozen struct or class?
   if (auto *property = dyn_cast<VarDecl>(VD))
-    if (property->isLayoutExposedToClients(/*applyImplicit=*/true))
-      return true;
+    return property->isLayoutExposedToClients();
+
+  // Case of an enum not marked @_implementationOnly in a non-resilient module?
+  if (auto *EED = dyn_cast<EnumElementDecl>(VD))
+    return isExported(EED->getParentEnum());
 
   // Is this a type exposed by default in a non-resilient module?
   if (isa<NominalTypeDecl>(VD) &&
@@ -1016,13 +1019,9 @@ bool swift::isExported(const ValueDecl *VD) {
       VD->getDeclContext()->getParentModule()->getResilienceStrategy() !=
           ResilienceStrategy::Resilient &&
       !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
-    return true;
+    return ExportedLevel::ImplicitlyExported;
 
-  // Case of an enum not marked @_implementationOnly in a non-resilient module?
-  if (auto *EED = dyn_cast<EnumElementDecl>(VD))
-    return isExported(EED->getParentEnum());
-
-  return false;
+  return ExportedLevel::None;
 }
 
 bool swift::hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
@@ -1046,23 +1045,22 @@ bool swift::hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
   return false;
 }
 
-bool swift::isExported(const ExtensionDecl *ED) {
+ExportedLevel swift::isExported(const ExtensionDecl *ED) {
   // An extension can only be exported if it extends an exported type.
   if (auto *NTD = ED->getExtendedNominal()) {
-    if (!isExported(NTD))
-      return false;
-  }
-
-  // If there are any exported members then the extension is exported.
-  for (const Decl *D : ED->getMembers()) {
-    if (isExported(D))
-      return true;
+    if (isExported(NTD) == ExportedLevel::None)
+      return ExportedLevel::None;
   }
 
   // If the extension declares a conformance to a public protocol then the
   // extension is exported.
   if (hasConformancesToPublicProtocols(ED))
-    return true;
+    return ExportedLevel::Exported;
 
-  return false;
+  // If there are any exported members then the extension is exported.
+  ExportedLevel exported = ExportedLevel::None;
+  for (const Decl *D : ED->getMembers())
+    exported = std::max(exported, isExported(D));
+
+  return exported;
 }

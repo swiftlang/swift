@@ -2773,44 +2773,44 @@ bool VarDecl::isInitExposedToClients() const {
   if (getAttrs().hasAttribute<LazyAttr>())
     return false;
 
-  return hasInitialValue() && isLayoutExposedToClients();
+  return hasInitialValue() &&
+         isLayoutExposedToClients() == ExportedLevel::Exported;
 }
 
-bool VarDecl::isLayoutExposedToClients(bool applyImplicit) const {
+ExportedLevel VarDecl::isLayoutExposedToClients() const {
   auto parent = dyn_cast<NominalTypeDecl>(getDeclContext());
-  if (!parent) return false;
-  if (isStatic()) return false;
+  if (!parent) return ExportedLevel::None;
+  if (isStatic()) return ExportedLevel::None;
 
-  auto M = getDeclContext()->getParentModule();
-  auto nominalAccess =
-    parent->getFormalAccessScope(/*useDC=*/nullptr,
-                                 /*treatUsableFromInlineAsPublic=*/true);
-
-  // Resilient modules and classes hide layouts by default.
-  bool layoutIsHiddenByDefault = !applyImplicit ||
-    !getASTContext().LangOpts.hasFeature(Feature::CheckImplementationOnly) ||
-    M->getResilienceStrategy() == ResilienceStrategy::Resilient;
-  if (layoutIsHiddenByDefault) {
-    if (!nominalAccess.isPublic())
-      return false;
-
-    if (!parent->getAttrs().hasAttribute<FrozenAttr>() &&
-        !parent->getAttrs().hasAttribute<FixedLayoutAttr>())
-    return false;
-  } else {
-    // Non-resilient module: layouts are exposed by default unless marked
-    // otherwise.
-    if (parent->getAttrs().hasAttribute<ImplementationOnlyAttr>())
-      return false;
-  }
-
+  // Does it contribute to the layout?
   if (!hasStorage() &&
       !getAttrs().hasAttribute<LazyAttr>() &&
       !hasAttachedPropertyWrapper()) {
-    return false;
+    return ExportedLevel::None;
   }
 
-  return true;
+  // Is it a member of a frozen type?
+  auto nominalAccess =
+    parent->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*treatUsableFromInlineAsPublic=*/true);
+  if (nominalAccess.isPublic() &&
+      (parent->getAttrs().hasAttribute<FrozenAttr>() ||
+       parent->getAttrs().hasAttribute<FixedLayoutAttr>()))
+    return ExportedLevel::Exported;
+
+  // Is it a member of an `@_implementationOnly` type?
+  if (parent->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+    return ExportedLevel::None;
+
+  auto M = getDeclContext()->getParentModule();
+  if (getASTContext().LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
+      M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+    // Non-resilient module expose layouts by default.
+    return ExportedLevel::ImplicitlyExported;
+  } else {
+    // Resilient modules hide layouts by default.
+    return ExportedLevel::None;
+  }
 }
 
 /// Check whether the given type representation will be

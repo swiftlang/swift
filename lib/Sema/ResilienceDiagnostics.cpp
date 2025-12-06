@@ -261,6 +261,7 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
   case ExportabilityReason::ResultBuilder:
   case ExportabilityReason::PropertyWrapper:
   case ExportabilityReason::PublicVarDecl:
+  case ExportabilityReason::ImplicitlyPublicVarDecl:
     return false;
   }
 }
@@ -294,6 +295,9 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
         }
       });
 
+  if (where.canReferenceOrigin(originKind))
+    return false;
+
   auto fragileKind = where.getFragileFunctionKind();
   switch (originKind) {
   case DisallowedOriginKind::None:
@@ -326,14 +330,10 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
     if (reason && reason == ExportabilityReason::AvailableAttribute &&
         ctx.LangOpts.LibraryLevel == LibraryLevel::API)
       return false;
-    LLVM_FALLTHROUGH;
+    break;
 
   case DisallowedOriginKind::SPIImported:
   case DisallowedOriginKind::SPILocal:
-    if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient)
-      return false;
-    break;
-
   case DisallowedOriginKind::ImplementationOnly:
   case DisallowedOriginKind::FragileCxxAPI:
   case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
