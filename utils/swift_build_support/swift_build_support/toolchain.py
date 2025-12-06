@@ -166,7 +166,7 @@ class FreeBSD(GenericUnix):
             suffixes = ['']
         # See: https://github.com/apple/swift/pull/169
         # Building Swift from source requires a recent version of the Clang
-        # compiler with C++14 support.
+        # compiler with C++17 support.
         elif self._release_date and self._release_date >= 1100000:
             suffixes = ['']
         else:
