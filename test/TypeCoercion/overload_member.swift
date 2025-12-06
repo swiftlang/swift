@@ -8,14 +8,14 @@ class A {
   func f(x: X) -> X { }
   func f(y: Y) -> Y { }
 
-  func g(z: Z) -> X { } // expected-note 2{{found this candidate}}
-  func g(z: Z) -> Y { } // expected-note 2{{found this candidate}}
+  func g(z: Z) -> X { } // expected-note 2{{found candidate with type '(Z) -> X'}}
+  func g(z: Z) -> Y { } // expected-note 2{{found candidate with type '(Z) -> Y'}}
 
   class func sf(x: X) -> X { }
   class func sf(y: Y) -> Y { }
 
-  class func sg(z: Z) -> X { } // expected-note 2{{found this candidate}}
-  class func sg(z: Z) -> Y { } // expected-note 2{{found this candidate}}
+  class func sg(z: Z) -> X { } // expected-note 2{{found candidate with type '(Z) -> X'}}
+  class func sg(z: Z) -> Y { } // expected-note 2{{found candidate with type '(Z) -> Y'}}
 
   func mixed(x: X) -> X { }
   class func mixed(y: Y) -> Y { }

@@ -8,13 +8,13 @@ struct MyResultBuilder {
 }
 
 struct VariableDecl2 {
-  init( // expected-note {{found this candidate}}
+  init( // expected-note {{found candidate with type '(() -> Int?, Int, () -> Int?) -> VariableDecl2'}}
     paramClosure: () -> Int? = { nil },
     paramInt: Int,
     @MyResultBuilder paramResultBuilder: () -> Int? = { nil }
   ) { fatalError() }
 
-  init( // expected-note {{found this candidate}}
+  init( // expected-note {{found candidate with type '(() -> Int?, Int, () -> Int?) -> VariableDecl2'}}
     paramInt: Int,
     paramClosure: () -> Int? = { nil },
     @MyResultBuilder paramResultBuilder: () -> Int? = { nil }

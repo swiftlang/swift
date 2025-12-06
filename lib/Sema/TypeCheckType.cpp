@@ -1920,7 +1920,8 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
                     repr->getNameRef())
           .highlight(repr->getNameLoc().getSourceRange());
       for (auto entry : globals) {
-        entry.getValueDecl()->diagnose(diag::found_candidate);
+        auto *VD = entry.getValueDecl();
+        VD->diagnose(diag::found_candidate_decl, VD);
       }
     }
 

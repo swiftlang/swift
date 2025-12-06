@@ -23,7 +23,7 @@ var e = 3
 
 // Name lookup with imports.
 import imported_module
-func over1(_ x: UInt64) {} // expected-note{{found this candidate}}
+func over1(_ x: UInt64) {} // expected-note{{found candidate with type '(UInt64) -> ()}}
 func over2(_ x: UInt32) {}
 func over3(_ x: UInt32) {}
 typealias over4 = UInt32

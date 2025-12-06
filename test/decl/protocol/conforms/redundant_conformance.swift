@@ -12,7 +12,7 @@ extension ConformsToP
   typealias A = Double // expected-note{{type alias 'A' will not be used to satisfy the conformance to 'P1'}}
 
   func f() -> Double { return 0.0 } // expected-note{{instance method 'f()' will not be used to satisfy the conformance to 'P1'}}
-       // expected-note@-1{{found this candidate}}
+       // expected-note@-1{{found candidate with type '() -> Double'}}
 }
 
 extension ConformsToP

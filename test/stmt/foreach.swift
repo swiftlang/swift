@@ -107,9 +107,9 @@ struct Seq<T> : Sequence {
 
 func getIntSeq() -> Seq<Int> { return Seq() }
 
-func getOvlSeq() -> Seq<Int> { return Seq() } // expected-note{{found this candidate}}
-func getOvlSeq() -> Seq<Double> { return Seq() } // expected-note{{found this candidate}}
-func getOvlSeq() -> Seq<X<Int>> { return Seq() } // expected-note{{found this candidate}}
+func getOvlSeq() -> Seq<Int> { return Seq() } // expected-note{{found candidate with type '() -> Seq<Int>'}}
+func getOvlSeq() -> Seq<Double> { return Seq() } // expected-note{{found candidate with type '() -> Seq<Double>'}}
+func getOvlSeq() -> Seq<X<Int>> { return Seq() } // expected-note{{found candidate with type '() -> Seq<X<Int>>'}}
 
 func getGenericSeq<T>() -> Seq<T> { return Seq() }
 
