@@ -469,6 +469,7 @@ if(WINDOWS IN_LIST SWIFT_SDKS)
       vcruntime.modulemap
       winsdk_um.modulemap
       winsdk_shared.modulemap
+      WinRT.modulemap
     DESTINATION "share"
     COMPONENT sdk-overlay)
 endif()
