@@ -2706,6 +2706,15 @@ ERROR(spi_only_imports_not_enabled, none,
       "'@_spiOnly' requires setting the frontend flag '-experimental-spi-only-imports'",
       ())
 
+WARNING(warn_use_of_compat_memberwise_init,Deprecation,
+        "synthesized memberwise initializer no longer includes "
+        "%select{private properties with initial values|%1}0; uses of it "
+        "will be an error in a future Swift language mode", (bool, StringRef))
+NOTE(insert_compat_memberwise_init,none,
+     "insert an explicit implementation of the memberwise initializer",())
+NOTE(compat_memberwise_init_used_here,none,
+     "memberwise initializer used here",())
+
 // Access level on imports
 ERROR(access_level_on_import_unsupported, none,
       "The access level %0 is unsupported on imports: "

@@ -519,9 +519,9 @@ struct ASTContext::Implementation {
   /// Mapping from property declarations to the backing variable types.
   llvm::DenseMap<const VarDecl *, Type> PropertyWrapperBackingVarTypes;
 
-  /// A mapping from the backing storage of a property that has a wrapper
-  /// to the original property with the wrapper.
-  llvm::DenseMap<const VarDecl *, VarDecl *> OriginalWrappedProperties;
+  /// A mapping from the backing storage of a property that has a wrapper or
+  /// is `lazy` to the original property.
+  llvm::DenseMap<const VarDecl *, VarDecl *> OriginalVarsForBackingStorage;
 
   /// The builtin initializer witness for a literal. Used when building
   /// LiteralExprs in fully-checked AST.
@@ -917,7 +917,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   SIZE_AND_BYTES(DefaultAssociatedConformanceWitnesses);
   SIZE_AND_BYTES(DefaultTypeRequestCaches);
   SIZE_AND_BYTES(PropertyWrapperBackingVarTypes);
-  SIZE_AND_BYTES(OriginalWrappedProperties);
+  SIZE_AND_BYTES(OriginalVarsForBackingStorage);
   SIZE_AND_BYTES(BuiltinInitWitness);
   SIZE_AND_BYTES(OriginalBodySourceRanges);
   SIZE_AND_BYTES(NextMacroDiscriminator);
@@ -7066,9 +7066,8 @@ VarDecl *VarDecl::getOriginalWrappedProperty(
   if (!Bits.VarDecl.IsPropertyWrapperBackingProperty)
     return nullptr;
 
-  ASTContext &ctx = getASTContext();
-  assert(ctx.getImpl().OriginalWrappedProperties.count(this) > 0);
-  auto original = ctx.getImpl().OriginalWrappedProperties[this];
+  auto *original = getOriginalVarForBackingStorage();
+  ASSERT(original);
   if (!kind)
     return original;
 
@@ -7086,8 +7085,24 @@ VarDecl *VarDecl::getOriginalWrappedProperty(
 void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {
   Bits.VarDecl.IsPropertyWrapperBackingProperty = true;
   ASTContext &ctx = getASTContext();
-  assert(ctx.getImpl().OriginalWrappedProperties.count(this) == 0);
-  ctx.getImpl().OriginalWrappedProperties[this] = originalProperty;
+  assert(ctx.getImpl().OriginalVarsForBackingStorage.count(this) == 0);
+  ctx.getImpl().OriginalVarsForBackingStorage[this] = originalProperty;
+}
+
+void VarDecl::setLazyStorageFor(VarDecl *VD) {
+  Bits.VarDecl.IsLazyStorageProperty = true;
+  ASTContext &ctx = getASTContext();
+  ASSERT(ctx.getImpl().OriginalVarsForBackingStorage.count(this) == 0);
+  ctx.getImpl().OriginalVarsForBackingStorage[this] = VD;
+}
+
+VarDecl *VarDecl::getOriginalVarForBackingStorage() const {
+  const auto &map = getASTContext().getImpl().OriginalVarsForBackingStorage;
+  auto iter = map.find(this);
+  if (iter == map.end())
+    return nullptr;
+
+  return iter->second;
 }
 
 #ifndef NDEBUG

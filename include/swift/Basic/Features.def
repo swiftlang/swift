@@ -533,6 +533,10 @@ EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
 /// Enable @_lifetime attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 
+/// Excludes '(file)private' properties with initial values from the memberwise
+/// initializer if there is a more accessible initializable property.
+EXPERIMENTAL_FEATURE(ExcludePrivateFromMemberwiseInit, true)
+
 /// Allow macro based aliases to be imported into Swift
 EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 
