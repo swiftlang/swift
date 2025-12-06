@@ -20,6 +20,7 @@ set(swift_string_processing_compile_flags)
 # will be built with library evolution.
 list(APPEND swift_string_processing_compile_flags
   "-DRESILIENT_LIBRARIES")
+list(APPEND swift_string_processing_compile_flags "-Xfrontend" "-disable-availability-checking")
 
 if(SWIFT_BUILD_STATIC_STDLIB)
   # Explicitly autolink swift_RegexParser because it's imported with @_implementationOnly

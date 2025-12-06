@@ -1266,6 +1266,8 @@ final class ElfImage<SomeElfTraits: ElfTraits>
   }
 
   struct Notes: Sequence {
+    typealias Element = Note
+    
     var image: ElfImage<Traits>
 
     struct NoteIterator: IteratorProtocol {
