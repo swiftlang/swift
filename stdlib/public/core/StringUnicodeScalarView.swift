@@ -527,3 +527,14 @@ extension String.UnicodeScalarView {
     return r._knownUTF16
   }
 }
+
+extension String.UnicodeScalarView {
+  /// Returns a boolean value indicating whether this unicode scalar view
+  /// is trivially identical to `other`.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.3, *)
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._guts.isTriviallyIdentical(to: other._guts)
+  }
+}
