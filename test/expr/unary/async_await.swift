@@ -6,7 +6,7 @@ func test1(asyncfp : () async -> Int, fp : () -> Int) async {
   _ = await asyncfp()
   _ = await asyncfp() + asyncfp()
   _ = await asyncfp() + fp()
-  _ = await fp() + 42  // expected-warning {{no 'async' operations occur within 'await' expression}}
+  _ = await fp() + 42  // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
   _ = 32 + asyncfp() + asyncfp() // expected-error {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   // expected-note@-1:12{{call is 'async'}}
   // expected-note@-2:24{{call is 'async'}}
