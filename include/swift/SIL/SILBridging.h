@@ -1629,11 +1629,11 @@ struct BridgedVerifier {
 
   static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
   static void verifierError(BridgedStringRef message,
-                            OptionalBridgedInstruction atInstruction);
+                            BridgedInstruction atInstruction);
   static void verifierError(BridgedStringRef message,
-                            OptionalBridgedArgument atArgument);
+                            BridgedArgument atArgument);
   static void verifierError(BridgedStringRef message,
-                            OptionalBridgedValue atValue);
+                            BridgedValue atValue);
 };
 
 struct BridgedUtilities {
