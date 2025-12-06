@@ -5,7 +5,8 @@ set_target_properties(swift_math PROPERTIES
   Swift_MODULE_NAME _math)
 target_link_libraries(swift_math PRIVATE
   SwiftAndroid
-  swiftCore)
+  swiftCore
+  swift_Builtin_float)
 
 install(TARGETS swift_math
   EXPORT SwiftOverlayTargets
