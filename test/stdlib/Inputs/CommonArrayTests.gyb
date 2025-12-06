@@ -696,3 +696,27 @@ ${Suite}.test("${ArrayType}/AssociatedTypes") {
     indexType: Int.self,
     indicesType: CountableRange<Int>.self)
 }
+
+//===----------------------------------------------------------------------===//
+// Trivially Identical
+//===----------------------------------------------------------------------===//
+
+${Suite}.test("${ArrayType}/isTriviallyIdentical") {
+  let a1: ${ArrayType}<Int> = [ 10, 20, 30, 40 ]
+  expectTrue(a1.isTriviallyIdentical(to: a1))
+  
+  let a2: ${ArrayType}<Int> = a1
+  expectTrue(a1.isTriviallyIdentical(to: a2))
+  
+  var a3: ${ArrayType}<Int> = a2
+  a3.reserveCapacity(0)
+  expectFalse(a1.isTriviallyIdentical(to: a3))
+  
+  let a4: ${ArrayType}<Int> = [ 10, 20, 30, 40 ]
+  expectFalse(a1.isTriviallyIdentical(to: a4))
+
+  let a5: ArraySlice<Int> = a1[...]
+  let a6: ArraySlice<Int> = a1[1..<3]
+
+  expectFalse(a5.isTriviallyIdentical(to: a6))
+}
