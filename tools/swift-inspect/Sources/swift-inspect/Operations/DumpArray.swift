@@ -28,7 +28,7 @@ internal struct DumpArrays: ParsableCommand {
       process.iterateHeap { (allocation, size) in
         let metadata: UInt =
             swift_reflection_metadataForObject(process.context, UInt(allocation))
-        if metadata == 0 { return }
+        if metadata == 0 || metadata == .max { return }
 
         guard process.context.isContiguousArray(swift_reflection_ptr_t(metadata)) else {
           return
