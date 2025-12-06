@@ -329,30 +329,9 @@ const char *_swift_stdlib_strtold_clocale(const char *nptr, void *outResult) {
 #endif
 }
 
-const char *_swift_stdlib_strtod_clocale(const char *nptr, double *outResult) {
-#if SWIFT_STDLIB_HAS_LOCALE
-  return _swift_stdlib_strtoX_clocale_impl(nptr, outResult, HUGE_VAL, strtod_l);
-#else
-  return _swift_stdlib_strtoX_impl(nptr, outResult, strtod);
-#endif
-}
-
-const char *_swift_stdlib_strtof_clocale(const char *nptr, float *outResult) {
-#if SWIFT_STDLIB_HAS_LOCALE
-  return _swift_stdlib_strtoX_clocale_impl(nptr, outResult, HUGE_VALF,
-                                           strtof_l);
-#else
-  return _swift_stdlib_strtoX_impl(nptr, outResult, strtof);
-#endif
-}
-
-const char *_swift_stdlib_strtof16_clocale(const char *nptr,
-                                           __fp16 *outResult) {
-  float tmp;
-  const char *result = _swift_stdlib_strtof_clocale(nptr, &tmp);
-  *outResult = tmp;
-  return result;
-}
+// _swift_stdlib_strto{d,f,f16}_clocale were reimplemented in Swift
+// in December 2025.  See FloatingPointFromString.swift.
+// _swift_stdlib_strtold_clocale was not reimplemented in Swift at that time.
 
 void _swift_stdlib_flockfile_stdout() {
 #if defined(_WIN32)
