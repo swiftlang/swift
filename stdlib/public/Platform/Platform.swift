@@ -338,12 +338,12 @@ public var SIG_DFL: sig_t? { return nil }
 public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
 public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
 public var SIG_HOLD: sig_t { return unsafeBitCast(5, to: sig_t.self) }
-#elseif os(OpenBSD)
+#elseif os(OpenBSD) || os(FreeBSD)
 public var SIG_DFL: sig_t? { return nil }
 public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
 public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
 public var SIG_HOLD: sig_t { return unsafeBitCast(3, to: sig_t.self) }
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Haiku)
+#elseif os(Linux) || os(PS4) || os(Android) || os(Haiku)
 #if !canImport(SwiftMusl)
 public typealias sighandler_t = __sighandler_t
 #endif
@@ -495,3 +495,9 @@ public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
 }
 #endif
 #endif // SWIFT_STDLIB_HAS_ENVIRON
+
+#if os(FreeBSD)
+@inlineable public func inet_pton(_ af: CInt, _ src: UnsafePointer<CChar>!, _ dst: UnsafeMutablePointer!) -> CInt {
+  __inet_pton(af, src, dst)
+}
+#endif
