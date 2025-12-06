@@ -27,23 +27,10 @@
 // pool which might be scoped such that repeatedly placing objects into it
 // results in unbounded memory growth.
 
-// On i386 the remove from autorelease pool optimization is foiled by the
-// decomposedStringWithCanonicalMapping implementation. Instead, we use a local
-// autorelease pool to prevent leaking of the temporary object into the callers
-// autorelease pool.
-#if defined(__i386__)
-#define AUTORELEASEPOOL @autoreleasepool
-#else
-// On other platforms we rely on the remove from autorelease pool optimization.
-#define AUTORELEASEPOOL
-#endif
-
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 size_t swift_stdlib_NSStringHashValue(NSString *str,
                                       bool isASCII) {
-  AUTORELEASEPOOL {
     return isASCII ? str.hash : str.decomposedStringWithCanonicalMapping.hash;
-  }
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
@@ -51,9 +38,7 @@ size_t
 swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
   NSString __unsafe_unretained *str =
       (__bridge NSString __unsafe_unretained *)opaque;
-  AUTORELEASEPOOL {
     return isASCII ? str.hash : str.decomposedStringWithCanonicalMapping.hash;
-  }
 }
 
 #else
