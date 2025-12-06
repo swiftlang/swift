@@ -7929,6 +7929,65 @@ ClangImporter::getDefaultArgGenerator(const clang::ParmVarDecl *param) {
   return nullptr;
 }
 
+bool ClangImporter::needsClosureConstructor(
+    const clang::CXXRecordDecl *recordDecl) const {
+  return Impl.needsClosureConstructor(recordDecl);
+}
+
+bool ClangImporter::Implementation::needsClosureConstructor(
+    const clang::CXXRecordDecl *recordDecl) const {
+  // In the future, this should probably be configurable via a Clang attribute.
+  return recordDecl->isInStdNamespace() && recordDecl->getIdentifier() &&
+         recordDecl->getName() == "function";
+}
+
+bool ClangImporter::isSwiftFunctionWrapper(
+    const clang::RecordDecl *decl) const {
+  return Impl.isSwiftFunctionWrapper(decl);
+}
+
+bool ClangImporter::Implementation::isSwiftFunctionWrapper(
+    const clang::RecordDecl *decl) const {
+  return decl->getIdentifier() && decl->getName() == "__SwiftFunctionWrapper";
+}
+
+bool ClangImporter::isDeconstructedSwiftClosure(const clang::Type *type) const {
+  auto recordDecl = type->getAsCXXRecordDecl();
+  return recordDecl && recordDecl->getIdentifier() &&
+         recordDecl->getName() == "__swift_interop_closure";
+}
+
+const clang::FunctionType *ClangImporter::extractCXXFunctionType(
+    const clang::CXXRecordDecl *functionalTypeDecl) const {
+  auto &clangCtx = functionalTypeDecl->getASTContext();
+  auto operatorCallName = clangCtx.DeclarationNames.getCXXOperatorName(
+      clang::OverloadedOperatorKind::OO_Call);
+  auto lookupResult = functionalTypeDecl->lookup(operatorCallName);
+  const clang::CXXMethodDecl *operatorCall = nullptr;
+  // If an overload of operator() was found, assert that it's a single one.
+  if (!lookupResult.empty()) {
+    ASSERT(lookupResult.isSingleResult() &&
+           "expected single operator() in a functional type");
+    operatorCall = cast<clang::CXXMethodDecl>(lookupResult.front());
+  } else {
+    // If no overload if operator() was found, there could be a viable overload
+    // in one of the base types. For instance, std::function in Microsoft STL
+    // exposes an operator() from a base type.
+    functionalTypeDecl->forallBases([&](const clang::CXXRecordDecl *base) {
+      auto baseResult = base->lookup(operatorCallName);
+      if (!baseResult.empty()) {
+        ASSERT(!operatorCall && "expected single operator() across base types");
+        ASSERT(baseResult.isSingleResult() &&
+               "expected single operator() in a base type");
+        operatorCall = cast<clang::CXXMethodDecl>(baseResult.front());
+      }
+      return true;
+    });
+    ASSERT(operatorCall && "expected operator() in one of the bases");
+  }
+  return operatorCall->getType()->getAs<clang::FunctionType>();
+}
+
 FuncDecl *
 ClangImporter::getAvailabilityDomainPredicate(const clang::VarDecl *var) {
   auto it = Impl.availabilityDomainPredicates.find(var);

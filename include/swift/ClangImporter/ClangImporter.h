@@ -620,6 +620,15 @@ public:
 
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
 
+  bool needsClosureConstructor(
+      const clang::CXXRecordDecl *recordDecl) const override;
+
+  bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const override;
+  bool isDeconstructedSwiftClosure(const clang::Type *type) const override;
+
+  const clang::FunctionType *extractCXXFunctionType(
+      const clang::CXXRecordDecl *functionalTypeDecl) const override;
+
   FuncDecl *getAvailabilityDomainPredicate(const clang::VarDecl *var) override;
 
   bool isAnnotatedWith(const clang::CXXMethodDecl *method, StringRef attr);
