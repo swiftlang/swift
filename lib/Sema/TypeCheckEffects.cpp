@@ -4666,10 +4666,11 @@ private:
   void diagnoseRedundantAwait(AwaitExpr *E) const {
     if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E)) {
       // For an if/switch expression, produce a tailored warning.
-      Ctx.Diags.diagnose(E->getAwaitLoc(),
-                         diag::effect_marker_on_single_value_stmt,
-                         "await", SVE->getStmt()->getKind())
-        .highlight(E->getAwaitLoc());
+      Ctx.Diags
+          .diagnose(E->getAwaitLoc(), diag::effect_marker_on_single_value_stmt,
+                    "await", SVE->getStmt()->getKind())
+          .highlight(E->getAwaitLoc())
+          .fixItRemove(E->getAwaitLoc());
       return;
     }
     Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await)
