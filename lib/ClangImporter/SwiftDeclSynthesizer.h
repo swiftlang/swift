@@ -14,6 +14,7 @@
 #define SWIFT_SWIFT_DECL_SYNTHESIZER_H
 
 #include "ImporterImpl.h"
+#include "swift/AST/Decl.h"
 #include "swift/ClangImporter/ClangImporter.h"
 
 namespace swift {
@@ -133,6 +134,9 @@ public:
                                                      VarDecl *storedRawValue,
                                                      bool wantLabel,
                                                      bool wantBody);
+
+  /// Create a constructor that initializes a class from a smart pointer.
+  VarDecl *createSmartPtrBridgingProperty(FuncDecl *bridgingFunction);
 
   /// Make a struct declaration into a raw-value-backed struct, with
   /// bridged computed rawValue property which differs from stored backing

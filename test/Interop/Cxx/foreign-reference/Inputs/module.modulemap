@@ -97,3 +97,8 @@ module FRTReferenceReturns {
   header "frt-reference-returns.h"
   requires cplusplus
 }
+
+module RefCountedSmartPtrs {
+  header "refcounted-smartptrs.h"
+  requires cplusplus
+}
