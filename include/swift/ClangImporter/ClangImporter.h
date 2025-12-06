@@ -872,6 +872,14 @@ std::optional<T> matchSwiftAttrOnRecordPtr(
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
 getCxxRefConventionWithAttrs(const clang::Decl *decl);
+
+
+/// Determines whether the given Clang declaration has conflicting 
+/// Swift attributes and emits diagnostics for any violations found.
+///
+/// \param decl The Clang record or function declaration to validate.
+void validateSwiftAttributes(const clang::NamedDecl *decl,
+                             ClangImporter::Implementation &impl);
 } // namespace importer
 
 struct ClangInvocationFileMapping {

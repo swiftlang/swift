@@ -120,10 +120,6 @@ GROUPED_WARNING(import_multiple_mainactor_attr, ClangDeclarationImport, none,
       "this attribute for global actor '%0' is invalid; the declaration already has attribute for global actor '%1'",
       (StringRef, StringRef))
 
-GROUPED_WARNING(contradicting_mutation_attrs, ClangDeclarationImport, none,
-        "attribute '%0' is ignored when combined with attribute '%1'",
-        (StringRef, StringRef))
-
 GROUPED_WARNING(nonmutating_without_const, ClangDeclarationImport, none,
         "attribute 'nonmutating' has no effect on non-const method", ())
 
@@ -386,6 +382,16 @@ NOTE(ptr_to_nonescapable,none,
 
 NOTE(nonescapable_field_of_escapable, none,
      "escapable record %0 cannot have non-escapable field '%1'",
+     (const clang::NamedDecl *, StringRef))
+
+GROUPED_WARNING(
+    invalid_conditional_attr, ClangDeclarationImport, none,
+    "swift attribute '%0' ignored because it is only supported in templates",
+    (StringRef))
+
+GROUPED_WARNING(too_many_swift_attrs, ClangDeclarationImport, none,
+     "multiple Swift attributes of the same kind found on %0; there "
+     "must be at most one %1 attribute",
      (const clang::NamedDecl *, StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
