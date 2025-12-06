@@ -1762,11 +1762,14 @@ static bool checkWitnessAccess(DeclContext *dc,
 
   auto actualScopeToCheck = requiredAccessScope.first;
 
+  // without StrictTextualInterfaceChecking feature forConformance is set true
+  bool forConformance = not dc->getASTContext().LangOpts.hasFeature
+                            (Feature::StrictSemaForTextualInterface);
   // Setting the 'forConformance' flag means that we admit witnesses in
   // protocol extensions that we can see, but are not necessarily as
   // visible as the conforming type and protocol.
   if (!witness->isAccessibleFrom(actualScopeToCheck.getDeclContext(),
-                                 /*forConformance=*/true)) {
+                                 forConformance)) {
     // Special case: if we have `@testable import` of the witness's module,
     // allow the witness to match if it would have matched for just this file.
     // That is, if '@testable' allows us to see the witness here, it should
@@ -4453,7 +4456,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                        diagKind, getProtocolRequirementKind(requirement),
                        witness, isSetter, requiredAccess,
                        protoAccessScope.accessLevelForDiagnostics(),
-                       proto);
+                       proto).warnUntilFutureSwiftVersionIf(DC->getASTContext().LangOpts.hasFeature(Feature::StrictSemaForTextualInterface));
 
         auto *decl = dyn_cast<AbstractFunctionDecl>(witness);
         if (decl && decl->isSynthesized())
