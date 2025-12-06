@@ -4626,22 +4626,8 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().EnableObjCInterop =
         llvm::Triple(options::Triple).isOSDarwin();
   }
-  if (options::EnableCxxInterop) {
+  if (options::EnableCxxInterop || !options::CxxInteropVersion.empty()) {
     InitInvok.getLangOptions().EnableCXXInterop = true;
-  }
-  if (!options::CxxInteropVersion.empty()) {
-    InitInvok.getLangOptions().EnableCXXInterop = true;
-    if (options::CxxInteropVersion == "upcoming-swift")
-      InitInvok.getLangOptions().cxxInteropCompatVersion =
-          version::Version({version::getUpcomingCxxInteropCompatVersion()});
-    else if (options::CxxInteropVersion == "swift-6")
-      InitInvok.getLangOptions().cxxInteropCompatVersion =
-          version::Version({6});
-    else if (options::CxxInteropVersion == "swift-5.9")
-      InitInvok.getLangOptions().cxxInteropCompatVersion =
-          version::Version({5, 9});
-    else
-      llvm::errs() << "invalid CxxInteropVersion\n";
   }
   if (options::CxxInteropGettersSettersAsProperties) {
     InitInvok.getLangOptions().CxxInteropGettersSettersAsProperties = true;

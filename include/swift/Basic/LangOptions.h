@@ -333,10 +333,6 @@ namespace swift {
     /// disabled because it is not complete.
     bool EnableCXXInterop = false;
 
-    /// The C++ interoperability source compatibility version. Defaults
-    /// to the Swift language version.
-    version::Version cxxInteropCompatVersion;
-
     /// What version of C++ interoperability a textual interface was originally
     /// generated with (if at all).
     std::optional<version::Version> FormalCxxInteropMode;
@@ -751,13 +747,6 @@ namespace swift {
     /// check for isLanguageModeAtLeast(5).
     bool isLanguageModeAtLeast(unsigned major, unsigned minor = 0) const {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
-    }
-
-    /// Whether the C++ interoperability compatibility version is at least
-    /// 'major'.
-    bool isCxxInteropCompatVersionAtLeast(unsigned major,
-                                          unsigned minor = 0) const {
-      return cxxInteropCompatVersion.isVersionAtLeast(major, minor);
     }
 
     /// Sets the "_hasAtomicBitWidth" conditional.

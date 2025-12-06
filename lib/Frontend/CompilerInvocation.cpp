@@ -668,17 +668,9 @@ static std::pair<CxxCompatMode, version::Version>
 validateCxxInteropCompatibilityMode(StringRef mode) {
   if (mode == "off")
     return {CxxCompatMode::off, {}};
-  if (mode == "default")
+  if (mode == "default" || mode == "upcoming-swift" || mode == "swift-6" ||
+      mode == "swift-5.9")
     return {CxxCompatMode::enabled, {}};
-  if (mode == "upcoming-swift")
-    return {CxxCompatMode::enabled,
-            version::Version({version::getUpcomingCxxInteropCompatVersion()})};
-  if (mode == "swift-6")
-    return {CxxCompatMode::enabled, version::Version({6})};
-  // Swift-5.9 corresponds to the Swift 5 language mode when
-  // Swift 5 is the default language version.
-  if (mode == "swift-5.9")
-    return {CxxCompatMode::enabled, version::Version({5})};
   // Note: If this is updated, corresponding code in
   // InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl needs
   // to be updated also.
@@ -710,13 +702,6 @@ void LangOptions::setCxxInteropFromArgs(ArgList &Args,
     auto interopCompatMode = validateCxxInteropCompatibilityMode(A->getValue());
     EnableCXXInterop |=
         (interopCompatMode.first == CxxCompatMode::enabled);
-    if (EnableCXXInterop) {
-      cxxInteropCompatVersion = interopCompatMode.second;
-      // The default is tied to the current language version.
-      if (cxxInteropCompatVersion.empty())
-        cxxInteropCompatVersion =
-            EffectiveLanguageVersion.asMajorVersion();
-    }
 
     if (interopCompatMode.first == CxxCompatMode::invalid)
       diagnoseCxxInteropCompatMode(A, Args, Diags);
@@ -726,11 +711,6 @@ void LangOptions::setCxxInteropFromArgs(ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::enable_interop_flag_deprecated);
     Diags.diagnose(SourceLoc(), diag::swift_will_maintain_compat);
     EnableCXXInterop |= true;
-    // Using the deprecated option only forces the 'swift-5.9' compat
-    // mode.
-    if (cxxInteropCompatVersion.empty())
-      cxxInteropCompatVersion =
-          validateCxxInteropCompatibilityMode("swift-5.9").second;
   }
 
   if (Arg *A = Args.getLastArg(options::OPT_formal_cxx_interoperability_mode)) {

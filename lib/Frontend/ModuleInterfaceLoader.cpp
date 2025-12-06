@@ -2026,23 +2026,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   if (langOpts.EnableCXXInterop) {
     // Modelled after a reverse of validateCxxInteropCompatibilityMode
     genericSubInvocation.getLangOptions().EnableCXXInterop = true;
-    genericSubInvocation.getLangOptions().cxxInteropCompatVersion =
-        langOpts.cxxInteropCompatVersion;
-    std::string compatVersion;
-    if (langOpts.cxxInteropCompatVersion.empty())
-      compatVersion = "default";
-    else if (langOpts.cxxInteropCompatVersion[0] == 5)
-      compatVersion = "swift-5.9";
-    else if (langOpts.cxxInteropCompatVersion[0] == 6)
-      compatVersion = "swift-6";
-    else if (langOpts.cxxInteropCompatVersion[0] ==
-             version::getUpcomingCxxInteropCompatVersion())
-      compatVersion = "upcoming-swift";
-    else // TODO: This may need to be updated once more versions are added
-      compatVersion = "default";
-
-    GenericArgs.push_back(
-        ArgSaver.save("-cxx-interoperability-mode=" + compatVersion));
+    GenericArgs.push_back(ArgSaver.save("-cxx-interoperability-mode=default"));
 
     if (!langOpts.isUsingPlatformDefaultCXXStdlib() &&
         langOpts.CXXStdlib == CXXStdlibKind::Libcxx) {
