@@ -664,6 +664,19 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   return false;
 }
 
+std::vector<clang::tooling::dependencies::
+                DependencyScanningFilesystemSharedCache::OutOfDateEntry>
+SwiftDependencyScanningService::getFileSystemCacheOutOfDateEntries() {
+  const auto &sharedCache = ClangScanningService->getSharedCache();
+
+  // Note to reviewers: is it sufficient to check the underlying physical
+  // file system against the file system cache?
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFileSystem =
+      llvm::vfs::createPhysicalFileSystem();
+
+  return sharedCache.getOutOfDateEntries(*baseFileSystem);
+}
+
 ModuleDependenciesCache::ModuleDependenciesCache(
     const std::string &mainScanModuleName, const std::string &scannerContextHash)
     : mainScanModuleName(mainScanModuleName),
