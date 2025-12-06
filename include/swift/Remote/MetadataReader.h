@@ -2907,7 +2907,7 @@ private:
       RemoteAddress address(descriptor.getRemoteAddress());
       address = Reader->resolveRemoteAddress(address).value_or(address);
       snprintf(addressBuf, sizeof(addressBuf), "$%" PRIx64,
-               (uint64_t)descriptor.getRemoteAddress().getRawAddress());
+               (uint64_t)address.getRawAddress());
       auto anonNode = dem.createNode(Node::Kind::AnonymousContext);
       CharVector addressStr;
       addressStr.append(addressBuf, dem);
