@@ -925,9 +925,24 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
 
-  if (storage->getInnermostDeclContext()->mapTypeIntoEnvironment(
-        storage->getValueInterfaceType())->isNoncopyable())
+  auto context = storage->getInnermostDeclContext();
+  auto storageType =
+      context->mapTypeIntoEnvironment(storage->getValueInterfaceType());
+  if (storageType->isNoncopyable()) {
+    // If we are in the context of a non-escapable + non-copyable storage on an
+    // escapable type, then it is a projection of self and must be accessed as
+    // an owned value.
+    if (context->isTypeContext()) {
+      if (Type selfType = context->getSelfTypeInContext()) {
+        if (selfType->isEscapable() && !storageType->isEscapable() &&
+            storage->getAccessor(AccessorKind::Get)) {
+          return OpaqueReadOwnership::Owned;
+        }
+      }
+    }
+
     return usesBorrowed(DiagKind::NoncopyableType);
+  }
 
   return OpaqueReadOwnership::Owned;
 }
