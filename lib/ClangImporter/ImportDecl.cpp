@@ -3218,6 +3218,7 @@ namespace {
           conformToCxxVectorIfNeeded(Impl, nominalDecl, decl);
           conformToCxxFunctionIfNeeded(Impl, nominalDecl, decl);
           conformToCxxSpanIfNeeded(Impl, nominalDecl, decl);
+          conformToHashableIfNeeded(Impl, synthesizer, nominalDecl, decl);
         }
       }
 

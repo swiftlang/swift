@@ -305,6 +305,8 @@ public:
   /// function `successor() -> Self`.
   FuncDecl *makeSuccessorFunc(FuncDecl *incrementFunc);
 
+  FuncDecl *makeHashFunc(NominalTypeDecl *decl, StructDecl *hasherVar);
+
   FuncDecl *makeOperator(FuncDecl *operatorMethod,
                          clang::OverloadedOperatorKind opKind);
   
