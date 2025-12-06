@@ -3231,8 +3231,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_passes))
     Opts.OptRecordPasses = A->getValue();
 
-  if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
-    Opts.OptRecordFile = A->getValue();
+  // Only use getLastArg for single -save-optimization-record-path.
+  // With multiple paths (multi-threaded WMO), FrontendTool will populate
+  // OptRecordFile and AuxOptRecordFiles from command-line arguments.
+  auto allOptRecordPaths = Args.getAllArgValues(OPT_save_optimization_record_path);
+  if (allOptRecordPaths.size() == 1)
+    Opts.OptRecordFile = allOptRecordPaths[0];
 
   // If any of the '-g<kind>', except '-gnone', is given,
   // tell the SILPrinter to print debug info as well
