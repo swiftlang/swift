@@ -54,44 +54,82 @@ using namespace inference;
 
 #define DEBUG_TYPE "ConstraintSystem"
 
-ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
-                                 unsigned thresholdInSecs)
-    : Anchor(Anchor), Context(CS.getASTContext()),
-      StartTime(llvm::TimeRecord::getCurrentTime()),
-      ThresholdInSecs(thresholdInSecs),
-      PrintDebugTiming(CS.getASTContext().TypeCheckerOpts.DebugTimeExpressions),
-      PrintWarning(true) {}
+void ConstraintSystem::startExpression(ASTNode node) {
+  CurrentRange = node.getSourceRange();
 
-SourceRange ExpressionTimer::getAffectedRange() const {
-  ASTNode anchor;
+  startExpressionTimer();
+}
 
-  if (auto *locator = Anchor.dyn_cast<ConstraintLocator *>()) {
-    anchor = simplifyLocatorToAnchor(locator);
-    // If locator couldn't be simplified down to a single AST
-    // element, let's use its root.
-    if (!anchor)
-      anchor = locator->getAnchor();
-  } else {
-    anchor = cast<Expr *>(Anchor);
+bool ConstraintSystem::isTooComplex(size_t solutionMemory) {
+  if (isAlreadyTooComplex.first)
+    return true;
+
+  auto CancellationFlag = getASTContext().CancellationFlag;
+  if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed))
+    return true;
+
+  auto markTooComplex = [&](SourceRange range, StringRef reason) {
+    if (isDebugMode()) {
+      if (solverState)
+        llvm::errs().indent(solverState->getCurrentIndent());
+      llvm::errs() << "(too complex: " << reason << ")\n";
+    }
+    isAlreadyTooComplex = {true, range};
+    return true;
+  };
+
+  auto used = getASTContext().getSolverMemory() + solutionMemory;
+  MaxMemory = std::max(used, MaxMemory);
+  auto threshold = getASTContext().TypeCheckerOpts.SolverMemoryThreshold;
+  if (MaxMemory > threshold) {
+    // Bail once we've used too much constraint solver arena memory.
+    return markTooComplex(getCurrentSourceRange(), "exceeded memory limit");
   }
 
-  return anchor.getSourceRange();
+  if (Timer && Timer->isExpired()) {
+    // Disable warnings about expressions that go over the warning
+    // threshold since we're arbitrarily ending evaluation and
+    // emitting an error.
+    Timer->disableWarning();
+
+    return markTooComplex(getCurrentSourceRange(), "exceeded time limit");
+  }
+
+  auto &opts = getASTContext().TypeCheckerOpts;
+
+  // Bail out once we've looked at a really large number of choices.
+  if (opts.SolverScopeThreshold && NumSolverScopes > opts.SolverScopeThreshold)
+    return markTooComplex(getCurrentSourceRange(), "exceeded scope limit");
+
+  // Bail out once we've taken a really large number of steps.
+  if (opts.SolverTrailThreshold && NumTrailSteps > opts.SolverTrailThreshold)
+    return markTooComplex(getCurrentSourceRange(), "exceeded trail limit");
+
+  return false;
+}
+
+ExpressionTimer::ExpressionTimer(ConstraintSystem &CS, unsigned thresholdInSecs)
+    : CS(CS),
+      StartTime(llvm::TimeRecord::getCurrentTime()),
+      ThresholdInSecs(thresholdInSecs),
+      PrintWarning(true) {}
+
+unsigned ExpressionTimer::getWarnLimit() const {
+  return CS.getASTContext().TypeCheckerOpts.WarnLongExpressionTypeChecking;
 }
 
 ExpressionTimer::~ExpressionTimer() {
   auto elapsed = getElapsedProcessTimeInFractionalSeconds();
   unsigned elapsedMS = static_cast<unsigned>(elapsed * 1000);
+  auto &ctx = CS.getASTContext();
 
-  if (PrintDebugTiming) {
+  auto range = CS.getCurrentSourceRange();
+
+  if (ctx.TypeCheckerOpts.DebugTimeExpressions) {
     // Round up to the nearest 100th of a millisecond.
     llvm::errs() << llvm::format("%0.2f", std::ceil(elapsed * 100000) / 100)
                  << "ms\t";
-    if (auto *E = Anchor.dyn_cast<Expr *>()) {
-      E->getLoc().print(llvm::errs(), Context.SourceMgr);
-    } else {
-      auto *locator = cast<ConstraintLocator *>(Anchor);
-      locator->dump(&Context.SourceMgr, llvm::errs());
-    }
+    range.Start.print(llvm::errs(), ctx.SourceMgr);
     llvm::errs() << "\n";
   }
 
@@ -103,13 +141,11 @@ ExpressionTimer::~ExpressionTimer() {
   if (WarnLimit == 0 || elapsedMS < WarnLimit)
     return;
 
-  auto sourceRange = getAffectedRange();
-
-  if (sourceRange.Start.isValid()) {
-    Context.Diags
-        .diagnose(sourceRange.Start, diag::debug_long_expression, elapsedMS,
+  if (range.Start.isValid()) {
+    ctx.Diags
+        .diagnose(range.Start, diag::debug_long_expression, elapsedMS,
                   WarnLimit)
-        .highlight(sourceRange);
+        .highlight(range);
   }
 }
 
@@ -140,7 +176,7 @@ ConstraintSystem::~ConstraintSystem() {
   }
 }
 
-void ConstraintSystem::startExpressionTimer(ExpressionTimer::AnchorType anchor) {
+void ConstraintSystem::startExpressionTimer() {
   ASSERT(!Timer);
 
   const auto &opts = getASTContext().TypeCheckerOpts;
@@ -156,7 +192,7 @@ void ConstraintSystem::startExpressionTimer(ExpressionTimer::AnchorType anchor) 
     timeout = ExpressionTimer::NoLimit;
   }
 
-  Timer.emplace(anchor, *this, timeout);
+  Timer.emplace(*this, timeout);
 }
 
 void ConstraintSystem::incrementScopeCounter() {
@@ -3692,6 +3728,10 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::Condition: {
       if (auto *condStmt = getAsStmt<LabeledConditionalStmt>(anchor)) {
         anchor = &condStmt->getCond().front();
+      } else if (auto *whileStmt = getAsStmt<RepeatWhileStmt>(anchor)) {
+        anchor = whileStmt->getCond();
+      } else if (auto *assertStmt = getAsStmt<PoundAssertStmt>(anchor)) {
+        anchor = assertStmt->getCondition();
       } else {
         anchor = castToExpr<TernaryExpr>(anchor)->getCondExpr();
       }

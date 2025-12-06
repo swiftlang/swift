@@ -236,36 +236,23 @@ public:
 
 
 class ExpressionTimer {
-public:
-  using AnchorType = llvm::PointerUnion<Expr *, ConstraintLocator *>;
-
-private:
-  AnchorType Anchor;
-  ASTContext &Context;
+  ConstraintSystem &CS;
   llvm::TimeRecord StartTime;
 
   /// The number of seconds from creation until
   /// this timer is considered expired.
   unsigned ThresholdInSecs;
 
-  bool PrintDebugTiming;
   bool PrintWarning;
 
 public:
   const static unsigned NoLimit = (unsigned) -1;
 
-  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
-                  unsigned thresholdInSecs);
+  ExpressionTimer(ConstraintSystem &CS, unsigned thresholdInSecs);
 
   ~ExpressionTimer();
 
-  AnchorType getAnchor() const { return Anchor; }
-
-  SourceRange getAffectedRange() const;
-
-  unsigned getWarnLimit() const {
-    return Context.TypeCheckerOpts.WarnLongExpressionTypeChecking;
-  }
+  unsigned getWarnLimit() const;
   llvm::TimeRecord startedAt() const { return StartTime; }
 
   /// Return the elapsed process time (including fractional seconds)
@@ -2159,7 +2146,9 @@ struct ClosureIsolatedByPreconcurrency {
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
 class ConstraintSystem {
+private:
   ASTContext &Context;
+  SourceRange CurrentRange;
 
 public:
   DeclContext *DC;
@@ -5384,6 +5373,9 @@ private:
   /// \returns The selected conjunction.
   Constraint *selectConjunction();
 
+  void diagnoseTooComplex(SourceLoc fallbackLoc,
+                          SolutionResult &result);
+
   /// Solve the system of constraints generated from provided expression.
   ///
   /// \param target The target to generate constraints from.
@@ -5481,6 +5473,8 @@ private:
   compareSolutions(ConstraintSystem &cs, ArrayRef<Solution> solutions,
                    const SolutionDiff &diff, unsigned idx1, unsigned idx2);
 
+  void startExpressionTimer();
+
 public:
   /// Increase the score of the given kind for the current (partial) solution
   /// along the current solver path.
@@ -5518,7 +5512,6 @@ public:
   std::optional<unsigned> findBestSolution(SmallVectorImpl<Solution> &solutions,
                                            bool minimize);
 
-public:
   /// Apply a given solution to the target, producing a fully
   /// type-checked target or \c None if an error occurred.
   ///
@@ -5571,7 +5564,14 @@ public:
   /// resolved before any others.
   void optimizeConstraints(Expr *e);
 
-  void startExpressionTimer(ExpressionTimer::AnchorType anchor);
+  /// Set the current sub-expression (of a multi-statement closure, etc) for
+  /// the purposes of diagnosing "reasonable time" errors.
+  void startExpression(ASTNode node);
+
+  /// The source range of the target being type checked.
+  SourceRange getCurrentSourceRange() const {
+    return CurrentRange;
+  }
 
   /// Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
@@ -5584,53 +5584,7 @@ public:
     return range.isValid() ? range : std::optional<SourceRange>();
   }
 
-  bool isTooComplex(size_t solutionMemory) {
-    if (isAlreadyTooComplex.first)
-      return true;
-
-    auto CancellationFlag = getASTContext().CancellationFlag;
-    if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed))
-      return true;
-
-    auto markTooComplex = [&](SourceRange range, StringRef reason) {
-      if (isDebugMode()) {
-        if (solverState)
-          llvm::errs().indent(solverState->getCurrentIndent());
-        llvm::errs() << "(too complex: " << reason << ")\n";
-      }
-      isAlreadyTooComplex = {true, range};
-      return true;
-    };
-
-    auto used = getASTContext().getSolverMemory() + solutionMemory;
-    MaxMemory = std::max(used, MaxMemory);
-    auto threshold = getASTContext().TypeCheckerOpts.SolverMemoryThreshold;
-    if (MaxMemory > threshold) {
-      // No particular location for OoM problems.
-      return markTooComplex(SourceRange(), "exceeded memory limit");
-    }
-
-    if (Timer && Timer->isExpired()) {
-      // Disable warnings about expressions that go over the warning
-      // threshold since we're arbitrarily ending evaluation and
-      // emitting an error.
-      Timer->disableWarning();
-
-      return markTooComplex(Timer->getAffectedRange(), "exceeded time limit");
-    }
-
-    auto &opts = getASTContext().TypeCheckerOpts;
-
-    // Bail out once we've looked at a really large number of choices.
-    if (opts.SolverScopeThreshold && NumSolverScopes > opts.SolverScopeThreshold)
-      return markTooComplex(SourceRange(), "exceeded scope limit");
-
-    // Bail out once we've taken a really large number of steps.
-    if (opts.SolverTrailThreshold && NumTrailSteps > opts.SolverTrailThreshold)
-      return markTooComplex(SourceRange(), "exceeded trail limit");
-
-    return false;
-  }
+  bool isTooComplex(size_t solutionMemory);
 
   bool isTooComplex(ArrayRef<Solution> solutions) {
     if (isAlreadyTooComplex.first)

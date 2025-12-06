@@ -829,9 +829,7 @@ bool ConstraintSystem::Candidate::solve(
 
   // Allocate new constraint system for sub-expression.
   ConstraintSystem cs(DC, std::nullopt);
-
-  // Set up expression type checker timer for the candidate.
-  cs.startExpressionTimer(E);
+  cs.startExpression(E);
 
   // Generate constraints for the new system.
   if (auto generatedExpr = cs.generateConstraints(E, DC)) {
@@ -1455,18 +1453,7 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
       return std::nullopt;
 
     case SolutionResult::TooComplex: {
-      auto affectedRange = solution.getTooComplexAt();
-
-      // If affected range is unknown, let's use whole
-      // target.
-      if (!affectedRange)
-        affectedRange = target.getSourceRange();
-
-      getASTContext()
-          .Diags.diagnose(affectedRange->Start, diag::expression_too_complex)
-          .highlight(*affectedRange);
-
-      solution.markAsDiagnosed();
+      diagnoseTooComplex(target.getLoc(), solution);
       return std::nullopt;
     }
 
@@ -1501,6 +1488,19 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
   llvm_unreachable("Loop always returns");
 }
 
+void ConstraintSystem::diagnoseTooComplex(SourceLoc fallbackLoc,
+                                          SolutionResult &result) {
+  auto affectedRange = result.getTooComplexAt();
+
+  SourceLoc loc = (affectedRange ? affectedRange->Start : fallbackLoc);
+  auto diag = getASTContext().Diags.diagnose(loc, diag::expression_too_complex);
+
+  if (affectedRange)
+    diag.highlight(*affectedRange);
+
+  result.markAsDiagnosed();
+}
+
 SolutionResult
 ConstraintSystem::solveImpl(SyntacticElementTarget &target,
                             FreeTypeVariableBinding allowFreeTypeVariables) {
@@ -1518,9 +1518,8 @@ ConstraintSystem::solveImpl(SyntacticElementTarget &target,
 
   assert(!solverState && "cannot be used directly");
 
-  // Set up the expression type checker timer.
   if (Expr *expr = target.getAsExpr())
-    startExpressionTimer(expr);
+    startExpression(expr);
 
   if (generateConstraints(target, allowFreeTypeVariables))
     return SolutionResult::forError();
@@ -1701,8 +1700,7 @@ bool ConstraintSystem::solveForCodeCompletion(
     // Tell the constraint system what the contextual type is.
     setContextualInfo(expr, target.getExprContextualTypeInfo());
 
-    // Set up the expression type checker timer.
-    startExpressionTimer(expr);
+    startExpression(expr);
 
     shrink(expr);
   }
