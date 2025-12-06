@@ -63,6 +63,8 @@ NO_TEST=",no_test"
 USE_OS_RUNTIME=
 MACOS_ONLY=
 NO_ASSERTIONS=
+PRESET_FILE=utils/build-presets.ini
+SINGLE_ARCH_PRESET_FILE=utils/build-toolchain-presets.ini
 
 case $(uname -s) in
   Darwin)
@@ -98,6 +100,7 @@ while [ $# -ne 0 ]; do
     --preset-file)
       shift
       PRESET_FILE_FLAGS="${PRESET_FILE_FLAGS} --preset-file=$1"
+      PRESET_FILE=$1
   ;;
     --preset-prefix)
       shift
@@ -112,7 +115,12 @@ while [ $# -ne 0 ]; do
     -a|--no-assert)
       NO_ASSERTIONS=",no_assertions"
   ;;
-  -h|--help)
+    --single-arch)
+      grep -v infer-cross-compile-hosts-on-darwin $PRESET_FILE >$SINGLE_ARCH_PRESET_FILE
+      PRESET_FILE_FLAGS="--preset-file=$SINGLE_ARCH_PRESET_FILE"
+      PRESET_FILE=$SINGLE_ARCH_PRESET_FILE
+  ;;
+    -h|--help)
     usage
     exit 0
   ;;
@@ -175,3 +183,7 @@ SCCACHE_FLAG="${SCCACHE_FLAG}"
         darwin_toolchain_version="${TOOLCHAIN_VERSION}" \
         darwin_toolchain_alias="Local" \
         darwin_toolchain_require_use_os_runtime="${REQUIRE_USE_OS_RUNTIME}"
+
+if [ "$PRESET_FILE" = "$SINGLE_ARCH_PRESET_FILE" ]; then
+  rm -r "$SINGLE_ARCH_PRESET_FILE" ../swift-nightly-{install,symroot}
+fi
