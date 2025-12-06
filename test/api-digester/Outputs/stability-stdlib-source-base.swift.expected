@@ -53,6 +53,7 @@ Constructor ContiguousArray.init(unsafeUninitializedCapacity:initializingWith:) 
 Constructor ContiguousArray.init(unsafeUninitializedCapacity:initializingWith:) has parameter 1 type change from (inout Swift.UnsafeMutableBufferPointer<Element>, inout Swift.Int) throws -> Swift.Void to (inout Swift.UnsafeMutableBufferPointer<Element>, inout Swift.Int) throws(E) -> Swift.Void
 Constructor ContiguousArray.init(unsafeUninitializedCapacity:initializingWith:) is now without rethrows
 
+Protocol LosslessStringConvertible has generic signature change from <Self : Swift.CustomStringConvertible> to <Self : Swift.CustomStringConvertible, Self : ~Copyable>
 Protocol SIMDScalar has generic signature change from <Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar> to <Self : Swift.BitwiseCopyable, Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMDMaskScalar == Self.SIMDMaskScalar.SIMDMaskScalar, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar>
 
 Protocol AdditiveArithmetic has added inherited protocol Copyable
@@ -72,7 +73,6 @@ Protocol CodingKey has added inherited protocol Escapable
 Protocol Collection has added inherited protocol Copyable
 Protocol Collection has added inherited protocol Escapable
 Protocol Comparable has added inherited protocol Escapable
-Protocol CustomDebugStringConvertible has added inherited protocol Copyable
 Protocol CustomDebugStringConvertible has added inherited protocol Escapable
 Protocol CustomLeafReflectable has added inherited protocol Copyable
 Protocol CustomLeafReflectable has added inherited protocol Escapable
@@ -80,7 +80,6 @@ Protocol CustomPlaygroundDisplayConvertible has added inherited protocol Copyabl
 Protocol CustomPlaygroundDisplayConvertible has added inherited protocol Escapable
 Protocol CustomReflectable has added inherited protocol Copyable
 Protocol CustomReflectable has added inherited protocol Escapable
-Protocol CustomStringConvertible has added inherited protocol Copyable
 Protocol CustomStringConvertible has added inherited protocol Escapable
 Protocol Decodable has added inherited protocol Copyable
 Protocol Decodable has added inherited protocol Escapable
@@ -129,7 +128,6 @@ Protocol LazyCollectionProtocol has added inherited protocol Copyable
 Protocol LazyCollectionProtocol has added inherited protocol Escapable
 Protocol LazySequenceProtocol has added inherited protocol Copyable
 Protocol LazySequenceProtocol has added inherited protocol Escapable
-Protocol LosslessStringConvertible has added inherited protocol Copyable
 Protocol LosslessStringConvertible has added inherited protocol Escapable
 Protocol MirrorPath has added inherited protocol Copyable
 Protocol MirrorPath has added inherited protocol Escapable
@@ -176,7 +174,6 @@ Protocol StringProtocol has added inherited protocol Copyable
 Protocol StringProtocol has added inherited protocol Escapable
 Protocol TextOutputStream has added inherited protocol Copyable
 Protocol TextOutputStream has added inherited protocol Escapable
-Protocol TextOutputStreamable has added inherited protocol Copyable
 Protocol TextOutputStreamable has added inherited protocol Escapable
 Protocol UnicodeCodec has added inherited protocol Copyable
 Protocol UnicodeCodec has added inherited protocol Escapable
@@ -401,3 +398,12 @@ Func Comparable.>=(_:_:) has generic signature change from <Self where Self : Sw
 Func Comparable.>=(_:_:) has parameter 0 changing from Default to Shared
 Func Comparable.>=(_:_:) has parameter 1 changing from Default to Shared
 
+// CustomStringConvertible etc: ~Copyable
+Accessor CustomDebugStringConvertible.debugDescription.Get() has generic signature change from <Self where Self : Swift.CustomDebugStringConvertible> to <Self where Self : Swift.CustomDebugStringConvertible, Self : ~Copyable>
+Accessor CustomStringConvertible.description.Get() has generic signature change from <Self where Self : Swift.CustomStringConvertible> to <Self where Self : Swift.CustomStringConvertible, Self : ~Copyable>
+Constructor LosslessStringConvertible.init(_:) has generic signature change from <Self where Self : Swift.LosslessStringConvertible> to <Self where Self : Swift.LosslessStringConvertible, Self : ~Copyable>
+Func DefaultStringInterpolation.appendInterpolation(_:) has generic signature change from <T where T : Swift.CustomStringConvertible, T : Swift.TextOutputStreamable> to <T where T : Swift.CustomStringConvertible, T : Swift.TextOutputStreamable, T : ~Copyable>
+Func DefaultStringInterpolation.appendInterpolation(_:) has generic signature change from <T where T : Swift.CustomStringConvertible> to <T where T : Swift.CustomStringConvertible, T : ~Copyable>
+Func DefaultStringInterpolation.appendInterpolation(_:) has generic signature change from <T where T : Swift.TextOutputStreamable> to <T where T : Swift.TextOutputStreamable, T : ~Copyable>
+Func DefaultStringInterpolation.appendInterpolation(_:) has parameter 0 changing from Default to Shared
+Func TextOutputStreamable.write(to:) has generic signature change from <Self, Target where Self : Swift.TextOutputStreamable, Target : Swift.TextOutputStream> to <Self, Target where Self : Swift.TextOutputStreamable, Target : Swift.TextOutputStream, Self : ~Copyable>
