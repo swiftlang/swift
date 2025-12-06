@@ -2645,7 +2645,8 @@ namespace {
           structResult->setIsCxxNonTrivial(isAddressOnly);
         }
 
-        for (auto &getterAndSetter : Impl.GetterSetterMap[result]) {
+        auto gettersAndSetters = Impl.GetterSetterMap[result];
+        for (auto &getterAndSetter : gettersAndSetters) {
           auto getter = getterAndSetter.second.first;
           auto setter = getterAndSetter.second.second;
           // We cannot make a computed property without a getter.
