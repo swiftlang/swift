@@ -358,6 +358,8 @@ extension InlineArray where Element: ~Copyable {
       let buffer = unsafe Self._initializationBuffer(start: rawPtr)
       _internalInvariant(Self.count == buffer.count)
       var output = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
+      // no need to finalize in a `defer` block, since throwing will cause
+      // changes to be deinitialized when the output span is deinited.
       try initializer(&output)
       let initialized = unsafe output.finalize(for: buffer)
       _precondition(count == initialized, "InlineArray initialization underflow")
