@@ -65,7 +65,7 @@
 // REQUIRES: embedded_stdlib_cross_compiling
 
 @_implementationOnly import directs
-// expected-warning @-1 {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}
+// expected-not-opt-in-warning @-1 {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
 import indirects
 
 /// Referenced types

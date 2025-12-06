@@ -18,7 +18,7 @@
 // REQUIRES: embedded_stdlib_cross_compiling
 
 @_implementationOnly internal import directs
-// expected-warning @-1 {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}
+// expected-warning @-1 {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
 // expected-note @-2 11 {{struct 'StructFromDirect' imported as 'internal' from 'directs' here}}
 // expected-note @-3 6 {{initializer 'init()' imported as 'internal' from 'directs' here}}
 import indirects
