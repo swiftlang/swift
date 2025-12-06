@@ -59,6 +59,7 @@ func pad<T>(_ value: T, _ width: Int, align: PadAlignment = .left) -> String {
   }
 }
 
+#if os(Linux)
 @_spi(Utils)
 public func readString(from file: String) -> String? {
   let fd = open(file, O_RDONLY, 0)
@@ -84,6 +85,7 @@ public func readString(from file: String) -> String? {
 
   return String(decoding: bytes, as: UTF8.self)
 }
+#endif
 
 @_spi(Utils)
 public func stripWhitespace<S: StringProtocol>(_ s: S)
