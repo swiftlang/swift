@@ -1,6 +1,5 @@
 include(macCatalystUtils)
 
-# Workaround a cmake bug, see the corresponding function in swift-syntax
 function(force_add_dependencies TARGET)
   foreach(DEPENDENCY ${ARGN})
     string(REGEX REPLACE [<>:\"/\\|?*] _ sanitized ${DEPENDENCY})
@@ -16,12 +15,18 @@ endfunction()
 function(force_target_link_libraries TARGET)
   target_link_libraries(${TARGET} ${ARGN})
 
-  cmake_parse_arguments(ARGS "PUBLIC;PRIVATE;INTERFACE" "" "" ${ARGN})
-  force_add_dependencies(${TARGET} ${ARGS_UNPARSED_ARGUMENTS})
+  if(NOT CMP0157_IS_NEW)
+    # Workaround a cmake bug, see the corresponding function in swift-syntax
+    cmake_parse_arguments(ARGS "PUBLIC;PRIVATE;INTERFACE" "" "" ${ARGN})
+    force_add_dependencies(${TARGET} ${ARGS_UNPARSED_ARGUMENTS})
+  endif()
 endfunction()
 
 # Add compile options shared between libraries and executables.
 function(_add_host_swift_compile_options name)
+  set_property(TARGET ${name} PROPERTY
+    Swift_COMPILATION_MODE "$<IF:$<CONFIG:Release,RelWithDebInfo>,wholemodule,incremental>")
+
   # Avoid introducing an implicit dependency on the string-processing library.
   if(SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
     target_compile_options(${name} PRIVATE
@@ -336,14 +341,16 @@ function(add_pure_swift_host_library name)
     # NOTE: workaround for CMake not setting up include flags.
     INTERFACE_INCLUDE_DIRECTORIES ${module_dir})
 
-  # Workaround to touch the library and its objects so that we don't
-  # continually rebuild (again, see corresponding change in swift-syntax).
-  add_custom_command(
-      TARGET ${name}
-      POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E touch_nocreate $<TARGET_FILE:${name}> $<TARGET_OBJECTS:${name}> "${module_file}"
-      COMMAND_EXPAND_LISTS
-      COMMENT "Update mtime of library outputs workaround")
+  if(NOT CMP0157_IS_NEW)
+    # Workaround to touch the library and its objects so that we don't
+    # continually rebuild (again, see corresponding change in swift-syntax).
+    add_custom_command(
+        TARGET ${name}
+        POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E touch_nocreate $<TARGET_FILE:${name}> $<TARGET_OBJECTS:${name}> "${module_file}"
+        COMMAND_EXPAND_LISTS
+        COMMENT "Update mtime of library outputs workaround")
+  endif()
 
   # Downstream linking should include the swiftmodule in debug builds to allow lldb to
   # work correctly. Only do this on Darwin since neither gold (currently used by default
@@ -482,24 +489,26 @@ function(add_pure_swift_host_tool name)
       "SHELL:-Xlinker --build-id=sha1")
   endif()
 
-  # Workaround to touch the library and its objects so that we don't
-  # continually rebuild (again, see corresponding change in swift-syntax).
-  add_custom_command(
-      TARGET ${name}
-      POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E touch_nocreate $<TARGET_FILE:${name}> $<TARGET_OBJECTS:${name}>
-      COMMAND_EXPAND_LISTS
-      COMMENT "Update mtime of executable outputs workaround")
+  if(NOT CMP0157_IS_NEW)
+    # Workaround to touch the library and its objects so that we don't
+    # continually rebuild (again, see corresponding change in swift-syntax).
+    add_custom_command(
+        TARGET ${name}
+        POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E touch_nocreate $<TARGET_FILE:${name}> $<TARGET_OBJECTS:${name}>
+        COMMAND_EXPAND_LISTS
+        COMMENT "Update mtime of executable outputs workaround")
 
-  # Even worse hack - ${name}.swiftmodule is added as an output, even though
-  # this is an executable target. Just touch it all the time to avoid having
-  # to rebuild it every time.
-  add_custom_command(
-      TARGET ${name}
-      POST_BUILD
-      COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/${name}.swiftmodule"
-      COMMAND_EXPAND_LISTS
-      COMMENT "Update mtime of executable outputs workaround")
+    # Even worse hack - ${name}.swiftmodule is added as an output, even though
+    # this is an executable target. Just touch it all the time to avoid having
+    # to rebuild it every time.
+    add_custom_command(
+        TARGET ${name}
+        POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/${name}.swiftmodule"
+        COMMAND_EXPAND_LISTS
+        COMMENT "Update mtime of executable outputs workaround")
+  endif()
 
   if(NOT APSHT_SWIFT_COMPONENT STREQUAL no_component)
     add_dependencies(${APSHT_SWIFT_COMPONENT} ${name})
