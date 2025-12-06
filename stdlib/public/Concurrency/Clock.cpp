@@ -240,7 +240,7 @@ void swift_sleep(
     delay = deadline - now;
   }
 #elif defined(__linux__) || defined(__APPLE__) || defined(__wasi__) \
-  || defined(__OpenBSD) || defined(__FreeBSD__)
+  || defined(__OpenBSD__) || defined(__FreeBSD__)
   struct timespec ts;
   ts.tv_sec = seconds;
   ts.tv_nsec = nanoseconds;
