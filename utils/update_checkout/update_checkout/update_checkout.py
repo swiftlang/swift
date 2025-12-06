@@ -376,6 +376,46 @@ def _is_any_repository_locked(pool_args: List[UpdateArguments]) -> Set[str]:
     return locked_repositories
 
 
+def _check_missing_clones(
+    args: CliArguments, config: Dict[str, Any], scheme_map: Dict[str, Any]
+):
+    """
+    Verify that all repositories defined in the scheme map are present in the
+    source root directory. If a repository is missing—and not explicitly skipped—
+    the user is prompted to re-run the script with the `--clone` option.
+
+    This function also respects per-repository platform restrictions: if the
+    current platform is not listed for a repo, that repo is ignored.
+
+    Args:
+        args (CliArguments): Parsed CLI arguments.
+        config (Dict[str, Any]): deserialized `update-checkout-config.json`.
+        scheme_map (Dict[str, str] | None): map of repo names to branches to check out.
+
+    Returns:
+        Prints a warning if any required repository is missing.
+    """
+
+    directory_contents = {path.name for path in args.source_root.iterdir()}
+    current_platform = platform.system()
+
+    for repo in scheme_map:
+        repo_config = config["repos"].get(repo, {})
+
+        if (
+            "platforms" in repo_config
+            and current_platform not in repo_config["platforms"]
+        ):
+            continue
+
+        if repo not in directory_contents and repo not in args.skip_repository_list:
+            print(
+                "You don't have all swift sources. "
+                "Call this script with --clone to get them."
+            )
+            return
+
+
 def _move_llvm_project_to_first_index(
     pool_args: Union[List[UpdateArguments], List[AdditionalSwiftSourcesArguments]],
 ):
@@ -855,17 +895,7 @@ def main() -> int:
         dump_repo_hashes(args, config, args.dump_hashes_config)
         return 0
 
-    # Quick check whether somebody is calling update in an empty directory
-    directory_contents = args.source_root.iterdir()
-    if not (
-        "cmark" in directory_contents
-        or "llvm" in directory_contents
-        or "clang" in directory_contents
-    ):
-        print(
-            "You don't have all swift sources. "
-            "Call this script with --clone to get them."
-        )
+    _check_missing_clones(args=args, config=config, scheme_map=scheme_map)
 
     skipped_repositories, update_results = update_all_repositories(
         args, config, scheme_name, scheme_map, cross_repos_pr
