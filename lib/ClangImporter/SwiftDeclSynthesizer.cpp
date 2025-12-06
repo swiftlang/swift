@@ -3076,8 +3076,7 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
       ctx.evaluator, 
       CxxValueSemantics({clangType->getTypeForDecl(), &ImporterImpl}), {});
 
-  if (valueSemanticsKind != CxxValueSemanticsKind::Copyable &&
-      valueSemanticsKind != CxxValueSemanticsKind::MoveOnly)
+  if (valueSemanticsKind == CxxValueSemanticsKind::Unknown)
     return nullptr;
 
   auto cxxRecordSemanticsKind = evaluateOrDefault(
