@@ -16,13 +16,27 @@ available yet, specifically:
 * Binary size is a high priority requirement. Since WebAssembly payloads are usually served in browsers,
 one wouldn't want end users to download multi-megabyte binaries.
 
+## Running Wasm stdlib tests
+
+If you're a compiler/stdlib engineer, this invocation builds LLVM, Swift, installs those together with necessary
+tools, and also builds WasmKit to execute stdlib tests:
+
+```
+./utils/build-script --build-wasm-stdlib --wasmkit --build-embedded-stdlib --build-embedded-stdlib-cross-compiling \
+  --install-swift --install-llvm \
+  '--llvm-install-components=llvm-ar;llvm-nm;llvm-ranlib;llvm-cov;llvm-profdata;llvm-objdump;llvm-objcopy;llvm-symbolizer;IndexStore;clang;clang-resource-headers;builtins;runtimes;clangd;libclang;dsymutil;LTO;clang-features-file;lld' \
+  --sccache
+```
+
+On macOS it's also best to avoid cross-compiling host tools from arm64 to x86 and vice versa, add this option to avoid that: `--infer-cross-compile-hosts-on-darwin=false`.
+
 ## Building Swift SDK for WebAssembly
 
 The [Swift SDK](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0387-cross-compilation-destinations.md)
 for WebAssembly is built and tested using the following command:
 
 ```bash
-./utils/build-script --build-wasm-stdlib --wasmkit --install-llvm --install-swift --swiftpm --install-swiftpm \
+./utils/build-script --sccache --build-wasm-stdlib --wasmkit --install-llvm --install-swift --swiftpm --install-swiftpm \
   --libcxx --install-libcxx --llbuild --install-llbuild --swift-testing --install-swift-testing \
   --swift-testing-macros --install-swift-testing-macros --build-embedded-stdlib --build-embedded-stdlib-cross-compiling \
   '--llvm-install-components=llvm-ar;llvm-nm;llvm-ranlib;llvm-cov;llvm-profdata;llvm-objdump;llvm-objcopy;llvm-symbolizer;IndexStore;clang;clang-resource-headers;builtins;runtimes;clangd;libclang;dsymutil;LTO;clang-features-file;lld'
