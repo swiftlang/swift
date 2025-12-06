@@ -174,7 +174,8 @@ bool ConstraintSystem::worseThanBestSolution() const {
 
   if (isDebugMode()) {
     llvm::errs().indent(solverState->getCurrentIndent())
-        << "(solution is worse than the best solution)\n";
+        << "(solution " << CurrentScore << " is worse than the best solution "
+        << solverState->BestScore <<")\n";
   }
 
   return true;

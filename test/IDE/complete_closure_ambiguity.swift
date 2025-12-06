@@ -26,6 +26,6 @@ foo {
 
 // CONSTRAINTS: attempting disjunction choice {{.*}}:12:6
 // CONSTRAINTS: increasing 'disfavored overload' score
-// CONSTRAINTS: solution is worse than the best solution
+// CONSTRAINTS: solution {{.*}} is worse than the best solution {{.*}}
 
 // CONSTRAINTS-NOT-NOT: increasing 'hole'
