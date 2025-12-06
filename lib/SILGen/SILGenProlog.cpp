@@ -498,9 +498,7 @@ public:
       } else {
         // Otherwise, we need to move or copy values into a +1 tuple.
         for (auto element : elements) {
-          SILValue value = element.hasCleanup()
-            ? element.forward(SGF)
-            : element.copyUnmanaged(SGF, loc).forward(SGF);
+          SILValue value = element.ensurePlusOne(SGF, loc).forward(SGF);
           elementValues.push_back(value);
         }
       }
