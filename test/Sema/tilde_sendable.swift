@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -swift-version 5 -enable-experimental-feature TildeSendable
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -swift-version 5 -enable-experimental-feature TildeSendable -Wwarning ExplicitSendable
 
 // REQUIRES: swift_feature_TildeSendable
 
@@ -134,5 +134,21 @@ do {
 
   actor A: ~Sendable {
     // expected-error@-1 {{conformance to 'Sendable' can only be suppressed on structs, classes, and enums}}
+  }
+}
+
+// ExplicitSendable + ~Sendable tests
+
+public struct TestExplicitSendable1 { // expected-warning {{public struct 'TestExplicitSendable1' does not specify whether it is 'Sendable' or not}}
+  // expected-note@-1 {{consider making struct 'TestExplicitSendable1' conform to the 'Sendable' protocol}}
+  // expected-note@-2 {{consider suppressing conformance to 'Sendable' protocol}} {{36-36=: ~Sendable}}
+  // expected-note@-3 {{make struct 'TestExplicitSendable1' explicitly non-Sendable to suppress this warning}}
+}
+
+public class TestExplicitSendableWithParent: ExpressibleByIntegerLiteral { // expected-warning {{public class 'TestExplicitSendableWithParent' does not specify whether it is 'Sendable' or not}}
+  // expected-note@-1 {{consider suppressing conformance to 'Sendable' protocol}} {{73-73=, ~Sendable}}
+  // expected-note@-2 {{make class 'TestExplicitSendableWithParent' explicitly non-Sendable to suppress this warning}}
+
+  public required init(integerLiteral: Int) {
   }
 }

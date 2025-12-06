@@ -8987,6 +8987,9 @@ NOTE(sendable_conformance_is_suppressed, none,
      "%kind0 explicitly suppresses conformance to 'Sendable' protocol",
      (const NominalTypeDecl *))
 
+NOTE(suppress_sendable_conformance,none,
+     "consider suppressing conformance to 'Sendable' protocol", ())
+
 ERROR(non_sendable_type_suppressed,none,
       "cannot both conform to and suppress conformance to 'Sendable'", ())
 
