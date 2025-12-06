@@ -49,6 +49,14 @@ public var benchmarks: [BenchmarkInfo] {
         runFunction: run_iterateWords,
         tags: [.validation, .String]))
   }
+  
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *) {
+    result.append(
+      BenchmarkInfo(
+        name: "StringIdentical",
+        runFunction: run_StringIdentical,
+        tags: [.validation, .api, .String]))
+  }
   return result
 }
 
@@ -1674,5 +1682,16 @@ extension String {
 public func run_iterateWords(_ n: Int) {
   for _ in 0 ..< n {
     blackHole(swiftOrgHTML._words)
+  }
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
+public func run_StringIdentical(_ n: Int) {
+  let str1 = "The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. "
+  let str2 = str1
+  for _ in 0 ..< n {
+    for _ in 0 ..< 100_000 {
+      check(str1.isTriviallyIdentical(to: str2))
+    }
   }
 }
