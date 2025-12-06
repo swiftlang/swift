@@ -1326,6 +1326,32 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@section");
     Printer << "(\"" << cast<SectionAttr>(this)->Name << "\")";
     break;
+      
+  case DeclAttrKind::Warn: {
+    auto warnAttr = cast<WarnAttr>(this);
+    Printer.printAttrName("@warn(");
+    
+    auto &diagGroupInfo = getDiagGroupInfoByID(warnAttr->DiagnosticGroupID);
+    Printer.printText(diagGroupInfo.name);
+    Printer << ", ";
+    switch (cast<WarnAttr>(this)->DiagnosticBehavior) {
+      case WarningGroupBehavior::None:
+      case WarningGroupBehavior::AsWarning:
+        Printer << "as: warning";
+        break;
+      case WarningGroupBehavior::AsError:
+        Printer << "as: error";
+        break;
+      case WarningGroupBehavior::Ignored:
+        Printer << "as: ignored";
+        break;
+    }
+    if (cast<WarnAttr>(this)->Reason) {
+      Printer << ", \"" << *(cast<WarnAttr>(this)->Reason) << "\"";
+    }
+    Printer <<")";
+  }
+  break;
 
   case DeclAttrKind::ObjC: {
     Printer.printAttrName("@objc");
@@ -2017,6 +2043,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_rawLayout";
   case DeclAttrKind::Extern:
     return "_extern";
+  case DeclAttrKind::Warn:
+    return "warn";
   case DeclAttrKind::AllowFeatureSuppression:
     if (cast<AllowFeatureSuppressionAttr>(this)->getInverted()) {
       return "_disallowFeatureSuppression";

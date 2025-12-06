@@ -27,11 +27,14 @@
 #include "swift/AST/LayoutConstraintKind.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/BasicBridging.h"
+#include "swift/Basic/WarningGroupBehavior.h"
 
 #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #endif
+
+#include <utility>
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -1151,10 +1154,35 @@ BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
                                                    swift::SourceRange range,
                                                    swift::Identifier name);
 
+SWIFT_NAME("BridgedWarnAttr.createParsed(_:atLoc:range:diagGroupName:behavior:reason:)")
+BridgedWarnAttr
+BridgedWarnAttr_createParsed(BridgedASTContext cContext,
+                             swift::SourceLoc atLoc,
+                             swift::SourceRange range,
+                             swift::Identifier diagGroupName,
+                             swift::WarningGroupBehavior behavior,
+                             BridgedStringRef reason);
+
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedNonSendableKind {
   BridgedNonSendableKindSpecific,
   BridgedNonSendableKindAssumed,
 };
+
+SWIFT_NAME("BridgedWarningGroupBehaviorRule.getGroupName(self:)")
+BridgedStringRef BridgedWarningGroupBehaviorRule_getGroupName(BridgedWarningGroupBehaviorRule rule);
+
+SWIFT_NAME("BridgedWarningGroupBehaviorRule.getBehavior(self:)")
+swift::WarningGroupBehavior
+BridgedWarningGroupBehaviorRule_getBehavior(BridgedWarningGroupBehaviorRule rule);
+
+
+SWIFT_NAME("getDiagnosticGroupLinksCount()")
+SwiftInt
+BridgedDiagnosticGroupLinks_getCount();
+
+SWIFT_NAME("getDiagnosticGroupLink(at:)")
+std::pair<BridgedStringRef, BridgedStringRef>
+BridgedDiagnosticGroupLinks_getLink(SwiftInt index);
 
 SWIFT_NAME("BridgedNonSendableAttr.createParsed(_:atLoc:range:kind:)")
 BridgedNonSendableAttr BridgedNonSendableAttr_createParsed(
