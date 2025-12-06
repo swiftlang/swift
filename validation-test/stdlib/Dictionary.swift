@@ -5789,6 +5789,21 @@ DictionaryTestSuite.test("BulkLoadingInitializer.Nonunique") {
   }
 }
 
+DictionaryTestSuite.test("Identical") {
+  let d1: Dictionary = ["a": 1, "b": 2, "c": 3]
+  expectTrue(d1.isTriviallyIdentical(to: d1))
+
+  let d2: Dictionary = d1
+  expectTrue(d1.isTriviallyIdentical(to: d2))
+
+  var d3: Dictionary = d2
+  d3.reserveCapacity(0)
+  expectFalse(d1.isTriviallyIdentical(to: d3))
+
+  let d4: Dictionary = ["a": 1, "b": 2, "c": 3]
+  expectFalse(d1.isTriviallyIdentical(to: d4))
+}
+
 DictionaryTestSuite.setUp {
 #if _runtime(_ObjC)
   // Exercise ARC's autoreleased return value optimization in Foundation.
