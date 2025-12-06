@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -parse-as-library %import-static-libdispatch -Onone -static-stdlib -g -o %t/CrashStatic
+// RUN: %target-build-swift %s -parse-as-library -Onone -static-stdlib -g -o %t/CrashStatic
 // RUN: %target-codesign %t/CrashStatic
 // RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no,swift-backtrace=%backtracer %target-run %t/CrashStatic 2>&1 || true) | %FileCheck %s
 
