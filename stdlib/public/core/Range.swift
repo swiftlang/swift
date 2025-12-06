@@ -217,6 +217,43 @@ extension Range: Sequence
 where Bound: Strideable, Bound.Stride: SignedInteger {
   public typealias Element = Bound
   public typealias Iterator = IndexingIterator<Range<Bound>>
+
+  @inlinable
+  public func makeBorrowingIterator() -> BorrowingIterator {
+      .init(lower: lowerBound, upper: upperBound)
+  }
+
+  @frozen
+  public struct BorrowingIterator: BorrowingIteratorProtocol {
+    @usableFromInline
+    var lowerBound: [1 of Bound]
+    @usableFromInline
+    let upperBound: Bound
+    @usableFromInline
+    var first: Bool = true
+
+
+    @inlinable
+    @usableFromInline
+    init(lower: Bound, upper: Bound) {
+        self.lowerBound = [lower.advanced(by: -1)]
+        self.upperBound = upper
+    }
+
+    @_lifetime(&self)
+    @inlinable
+    public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
+      if lowerBound[0] >= upperBound {
+          return .init()
+      }
+      if first {
+          first = false
+          return lowerBound.span
+      }
+      lowerBound[0] = lowerBound[0].advanced(by: 1)
+      return lowerBound.span
+    }
+  }
 }
 
 extension Range: Collection, BidirectionalCollection, RandomAccessCollection
