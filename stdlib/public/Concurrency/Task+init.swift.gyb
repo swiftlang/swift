@@ -253,11 +253,14 @@ extension Task where Failure == ${FAILURE_TYPE} {
 % end
   ///
 % if IS_DETACHED:
-  /// Don't use a detached unstructured task if it's possible
-  /// to model the operation using structured concurrency features like child tasks.
-  /// Child tasks inherit the parent task's priority and task-local storage,
-  /// and canceling a parent task automatically cancels all of its child tasks.
-  /// You need to handle these considerations manually with a detached task.
+  /// In most cases, an "attached" unstructured task (created via `Task.init`)
+  /// is a more appropriate choice than a detached unstructured task. Attached
+  /// tasks inherit the priority and task-local storage from the enclosing task
+  /// during which they are created. You need to handle these considerations
+  /// manually with a detached task.
+  ///
+  /// A detached `Task` has the same cancellation mechanism as any other `Task`;
+  /// it can only become cancelled via an explicit `cancel()` method call.
 % end
   ///
   /// You need to keep a reference to the task
