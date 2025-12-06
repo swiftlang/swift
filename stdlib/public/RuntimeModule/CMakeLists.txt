@@ -66,6 +66,22 @@ set(RUNTIME_SOURCES
   Win32Extras.cpp
 
   get-cpu-context.${SWIFT_ASM_EXT}
+  )
+
+set(MODULE_SOURCES
+  modules/Runtime/Runtime.h
+  modules/FixedLayout.h
+  modules/module.modulemap
+  modules/Compression.h
+  modules/ImageFormats/Dwarf/eh_frame_hdr.h
+  modules/ImageFormats/Dwarf/dwarf.h
+  modules/ImageFormats/ImageFormats.modulemap
+  modules/ImageFormats/Elf/elf.h
+  modules/OS/Libc.h
+  modules/OS/Linux.h
+  modules/OS/Windows.h
+  modules/OS/Darwin.h
+  modules/OS/OS.modulemap
 )
 
 set(RUNTIME_COMPILE_FLAGS
@@ -107,6 +123,7 @@ endif()
 
 add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${RUNTIME_SOURCES}
+  FILE_DEPENDS ${MODULE_SOURCES}
 
   SWIFT_MODULE_DEPENDS ${concurrency} ${cxxstdlib_overlay}
 
