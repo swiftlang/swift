@@ -199,11 +199,11 @@ printModuleInterfaceIfNeeded(llvm::vfs::OutputBackend &outputBackend,
     return false;
 
   DiagnosticEngine &diags = M->getDiags();
-  if (!LangOpts.isSwiftVersionAtLeast(5)) {
-    assert(LangOpts.isSwiftVersionAtLeast(4));
+  if (!LangOpts.isLanguageModeAtLeast(5)) {
+    assert(LangOpts.isLanguageModeAtLeast(4));
     diags.diagnose(SourceLoc(),
                    diag::warn_unsupported_module_interface_swift_version,
-                   LangOpts.isSwiftVersionAtLeast(4, 2) ? "4.2" : "4");
+                   LangOpts.isLanguageModeAtLeast(4, 2) ? "4.2" : "4");
   }
   if (M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
     diags.diagnose(SourceLoc(),
