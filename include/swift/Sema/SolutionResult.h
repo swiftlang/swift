@@ -76,8 +76,10 @@ public:
   SolutionResult(const SolutionResult &other) = delete;
 
   SolutionResult(SolutionResult &&other)
-      : kind(other.kind), numSolutions(other.numSolutions),
-        solutions(other.solutions) {
+      : kind(other.kind),
+        numSolutions(other.numSolutions),
+        solutions(other.solutions),
+        TooComplexAt(other.TooComplexAt) {
     emittedDiagnostic = false;
     other.kind = Error;
     other.numSolutions = 0;
