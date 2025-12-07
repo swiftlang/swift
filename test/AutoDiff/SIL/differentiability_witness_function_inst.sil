@@ -80,13 +80,13 @@ bb0:
 // CHECK:   {{%.*}} = differentiability_witness_function [vjp] [reverse] [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable, τ_0_0 == τ_0_0.TangentVector> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
 // CHECK: }
 
-// IRGEN: @fooWJrSUUpSr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT:[0-9]+]]
-// IRGEN: @fooWJrSSUpSr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
-// IRGEN: @barWJrSUUpSUr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
-// IRGEN: @barWJrSSUpSSr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
-// IRGEN: @generic16_Differentiation14DifferentiableRzlWJrSUpSr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
-// IRGEN: @generics18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlWJrSSpSr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
-// IRGEN: @generic16_Differentiation14DifferentiableRz13TangentVector{{.*}}WJrSSpSr = external global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @fooWJrSUUpSr = external{{( dllimport)?}} global %swift.differentiability_witness, align [[PTR_ALIGNMENT:[0-9]+]]
+// IRGEN: @fooWJrSSUpSr = external{{( dllimport)?}} global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @barWJrSUUpSUr = external{{( dllimport)?}} global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @barWJrSSUpSSr = external{{( dllimport)?}} global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @generic16_Differentiation14DifferentiableRzlWJrSUpSr = external{{( dllimport)?}} global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @generics18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlWJrSSpSr = external{{( dllimport)?}} global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
+// IRGEN: @generic16_Differentiation14DifferentiableRz13TangentVector{{.*}}WJrSSpSr = external{{( dllimport)?}} global %swift.differentiability_witness, align [[PTR_ALIGNMENT]]
 
 // IRGEN-LABEL: define {{.*}} @test_derivative_witnesses()
 
