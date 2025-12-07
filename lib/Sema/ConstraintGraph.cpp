@@ -352,6 +352,10 @@ void ConstraintGraphNode::retractFromInference() {
       });
 }
 
+void ConstraintGraphNode::introduceToInference(Constraint *constraint) {
+  getPotentialBindings().infer(constraint);
+}
+
 void ConstraintGraphNode::introduceToInference(Type fixedType) {
   // Notify all of the type variables that reference this one.
   //
@@ -360,7 +364,7 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
   // which means that all of the not-yet-attempted bindings should
   // change as well.
   notifyReferencingVars([](ConstraintGraphNode &node, Constraint *constraint) {
-    node.getPotentialBindings().infer(constraint);
+    node.introduceToInference(constraint);
   });
 
   if (!fixedType->hasTypeVariable())
@@ -381,7 +385,7 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
     // all of the constraints that reference bound type variable.
     for (auto *constraint : getConstraints()) {
       if (isUsefulForReferencedVars(constraint))
-        node.getPotentialBindings().infer(constraint);
+        node.introduceToInference(constraint);
     }
   }
 }
@@ -409,12 +413,13 @@ void ConstraintGraph::addConstraint(Constraint *constraint) {
 
     auto *repr = typeVar->getImpl().getRepresentative(/*record=*/nullptr);
     if (!repr->getImpl().getFixedType(/*record=*/nullptr))
-      (*this)[repr].getPotentialBindings().infer(constraint);
+      (*this)[repr].introduceToInference(constraint);
 
     if (isUsefulForReferencedVars(constraint)) {
-      (*this)[typeVar].notifyReferencedVars([&](ConstraintGraphNode &node) {
-        node.getPotentialBindings().infer(constraint);
-      });
+      (*this)[typeVar].notifyReferencedVars(
+          [&constraint](ConstraintGraphNode &node) {
+            node.introduceToInference(constraint);
+          });
     }
   }
 
@@ -528,19 +533,19 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
 
     for (auto *constraint : node.getConstraints()) {
       if (!typeVar1->getImpl().getFixedType(/*record=*/nullptr))
-        repNode.getPotentialBindings().infer(constraint);
+        repNode.introduceToInference(constraint);
 
       if (!isUsefulForReferencedVars(constraint))
         continue;
 
-      repNode.notifyReferencedVars([&](ConstraintGraphNode &node) {
-        node.getPotentialBindings().infer(constraint);
+      repNode.notifyReferencedVars([&constraint](ConstraintGraphNode &node) {
+        node.introduceToInference(constraint);
       });
     }
 
     node.notifyReferencingVars(
-        [&](ConstraintGraphNode &node, Constraint *constraint) {
-          node.getPotentialBindings().infer(constraint);
+        [](ConstraintGraphNode &node, Constraint *constraint) {
+          node.introduceToInference(constraint);
         });
   }
 }
