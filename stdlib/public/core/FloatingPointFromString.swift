@@ -11,9 +11,12 @@
 //
 //===---------------------------------------------------------------------===//
 //
-// Converts ASCII text sequences to binary floating-point.
+// Converts ASCII text sequences to binary floating-point.  This is the internal
+// implementation backing APIs such as `Double(_:String)`.  The public APIs
+// themselves (and the public-facing documentation for said APIs) are defined in
+// `FloatingPointParsing.swift.gyb`.
 //
-// Based on the strtofp.c implementation from Apple's libc,
+// This is derived from the strtofp.c implementation from Apple's libc,
 // with a number of changes to support Swift semantics:
 // However, unlike that implementation:
 // * It accepts a `Span` covering the bytes of the
@@ -45,7 +48,7 @@
 // First Step: Initial Parsing
 //
 // The initial parsing of the textual input is handled by
-// `fastParse64`.  As the name suggests, this uses a fixed-size 64-bit
+// `fastParse64`.  Following Lemire, this uses a fixed-size 64-bit
 // accumulator for speed and is heavily optimized assuming that the
 // input significand has at most 19 digits. Longer input will overflow
 // the accumulator, triggering an additional scan of the input.  This
