@@ -150,6 +150,11 @@ private:
   /// to a type variable.
   void retractFromInference();
 
+  /// Attempt to infer bindings from the constraint. The inferred bindings
+  /// would have to be removed once the constraint gets retracted from the
+  /// graph.
+  void introduceToInference(Constraint *constraint);
+
   /// Perform graph updates that must be undone before we bind a fixed type
   /// to a type variable.
   ///
