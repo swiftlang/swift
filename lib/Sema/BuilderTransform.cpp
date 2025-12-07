@@ -1053,9 +1053,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
 
     case SolutionResult::Kind::TooComplex:
       reportSolutionsToSolutionCallback(salvagedResult);
-      func->diagnose(diag::expression_too_complex)
-        .highlight(func->getBodySourceRange());
-      salvagedResult.markAsDiagnosed();
+      cs.diagnoseTooComplex(func->getLoc(), salvagedResult);
       return nullptr;
     }
 
