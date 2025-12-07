@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 
 // https://forums.swift.org/t/roadmap-for-improving-the-type-checker/82952/9
 //
