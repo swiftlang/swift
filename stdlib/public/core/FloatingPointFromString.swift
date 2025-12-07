@@ -1922,119 +1922,117 @@ internal func _swift_stdlib_strtof16_clocale(
 }
 
 @available(SwiftStdlib 5.3, *)
-internal extension Float16 {
-  init?(_ span: Span<UInt8>) {
-    let targetFormat = TargetFormat(
-      significandBits: 11,
-      minBinaryExponent: -14,
-      maxBinaryExponent: 15,
-      minDecimalExponent: -7,
-      maxDecimalExponent: 5,
-      maxDecimalMidpointDigits: 22
-    )
+internal func parse_float16(_ span: Span<UInt8>) -> Optional<Float16> {
+  let targetFormat = TargetFormat(
+    significandBits: 11,
+    minBinaryExponent: -14,
+    maxBinaryExponent: 15,
+    minDecimalExponent: -7,
+    maxDecimalExponent: 5,
+    maxDecimalMidpointDigits: 22
+  )
 
-    // Verify the text format and parse the key pieces
-    var parsed = fastParse64(targetFormat: targetFormat, input: span)
+  // Verify the text format and parse the key pieces
+  var parsed = fastParse64(targetFormat: targetFormat, input: span)
 
-    // If we parsed a decimal, use `slowDecimalToBinary` to convert to binary
-    if case .decimal(digits: let digits,
-                     base10Exponent: let base10Exponent,
-                     unparsedDigitCount: let unparsedDigitCount,
-                     firstUnparsedDigitOffset: let firstUnparsedDigitOffset,
-                     leadingDigitCount: let leadingDigitCount,
-                     sign: let sign) = parsed {
+  // If we parsed a decimal, use `slowDecimalToBinary` to convert to binary
+  if case .decimal(digits: let digits,
+                   base10Exponent: let base10Exponent,
+                   unparsedDigitCount: let unparsedDigitCount,
+                   firstUnparsedDigitOffset: let firstUnparsedDigitOffset,
+                   leadingDigitCount: let leadingDigitCount,
+                   sign: let sign) = parsed {
+    // ================================================================
+    // Fixed-precision interval arithmetic
+    // ================================================================
+    // Except for the rounding of lower/upper significand below, this
+    // is exactly identical to the float32 code.  With 53 extra bits
+    // in the significand estimate here, we almost never fall through,
+    // even with a larger-than-necessary interval width.  The only fall-through
+    // cases in practice should be subnormals (which are simply not implemented
+    // in the fast path yet).
+    let intervalWidth: UInt64 = 40
+    let powerOfTenRoundedDown = powersOf10_Float[Int(base10Exponent) + 70]
+    let powerOfTenExponent = binaryExponentFor10ToThe(Int(base10Exponent))
+    let normalizeDigits = digits.leadingZeroBitCount
+    let d = digits << normalizeDigits
+    let dExponent = 64 - normalizeDigits
+    let l = multiply64x64RoundingDown(powerOfTenRoundedDown, d)
+    let lExponent = powerOfTenExponent + dExponent
+    let normalizeProduct = l.leadingZeroBitCount
+    let normalizedL = l << normalizeProduct
+    let normalizedLExponent = lExponent - normalizeProduct
+    // Note: Wrapping is essential in the next two lines
+    let lowerSignificand = (normalizedL &+ 0x0fffffffffffff) >> 53
+    let upperSignificand = (normalizedL &+ 0x10000000000000 &+ intervalWidth) >> 53
+    let binaryExponent = lowerSignificand == 0 ? normalizedLExponent : normalizedLExponent - 1
+
+    // Now we have a binary exponent and upper/lower bounds on the
+    // significand
+    if binaryExponent > targetFormat.maxBinaryExponent {
+      parsed = .infinity(sign: sign) // Overflow
+    } else if binaryExponent < targetFormat.minBinaryExponent - targetFormat.significandBits {
+      parsed = .zero(sign: sign) // Underflow
+    } else if (binaryExponent > targetFormat.minBinaryExponent
+                 && upperSignificand == lowerSignificand) {
+      // Normal with converged bounds
+      parsed = .binary(significand: lowerSignificand,
+                       exponent: Int16(truncatingIfNeeded: binaryExponent),
+                       sign: sign)
+    } else {
       // ================================================================
-      // Fixed-precision interval arithmetic
+      // Slow arbitrary-precision fallback
       // ================================================================
-      // Except for the rounding of lower/upper significand below, this
-      // is exactly identical to the float32 code.  With 53 extra bits
-      // in the significand estimate here, we almost never fall through,
-      // even with a larger-than-necessary interval width.  The only fall-through
-      // cases in practice should be subnormals (which are simply not implemented
-      // in the fast path yet).
-      let intervalWidth: UInt64 = 40
-      let powerOfTenRoundedDown = powersOf10_Float[Int(base10Exponent) + 70]
-      let powerOfTenExponent = binaryExponentFor10ToThe(Int(base10Exponent))
-      let normalizeDigits = digits.leadingZeroBitCount
-      let d = digits << normalizeDigits
-      let dExponent = 64 - normalizeDigits
-      let l = multiply64x64RoundingDown(powerOfTenRoundedDown, d)
-      let lExponent = powerOfTenExponent + dExponent
-      let normalizeProduct = l.leadingZeroBitCount
-      let normalizedL = l << normalizeProduct
-      let normalizedLExponent = lExponent - normalizeProduct
-      // Note: Wrapping is essential in the next two lines
-      let lowerSignificand = (normalizedL &+ 0x0fffffffffffff) >> 53
-      let upperSignificand = (normalizedL &+ 0x10000000000000 &+ intervalWidth) >> 53
-      let binaryExponent = lowerSignificand == 0 ? normalizedLExponent : normalizedLExponent - 1
-      
-      // Now we have a binary exponent and upper/lower bounds on the
-      // significand
-      if binaryExponent > targetFormat.maxBinaryExponent {
-        parsed = .infinity(sign: sign) // Overflow
-      } else if binaryExponent < targetFormat.minBinaryExponent - targetFormat.significandBits {
-        parsed = .zero(sign: sign) // Underflow
-      } else if (binaryExponent > targetFormat.minBinaryExponent
-                   && upperSignificand == lowerSignificand) {
-        // Normal with converged bounds
-        parsed = .binary(significand: lowerSignificand,
-                         exponent: Int16(truncatingIfNeeded: binaryExponent),
-                         sign: sign)
-      } else {
-        // ================================================================
-        // Slow arbitrary-precision fallback
-        // ================================================================
-        // Work area big enough to correctly convert
-        // any decimal input regardless of length to binary16:
-        var workStorage = _InlineArray<16, MPWord>(repeating: MPWord(0))
-        var work = workStorage.mutableSpan
-        parsed = slowDecimalToBinary(targetFormat: targetFormat,
-                                     input: span,
-                                     work: &work,
-                                     digits: digits,
-                                     base10Exponent: base10Exponent,
-                                     unparsedDigitCount: unparsedDigitCount,
-                                     firstUnparsedDigitOffset: firstUnparsedDigitOffset,
-                                     leadingDigitCount: leadingDigitCount,
-                                     sign: sign)
-      }
+      // Work area big enough to correctly convert
+      // any decimal input regardless of length to binary16:
+      var workStorage = _InlineArray<16, MPWord>(repeating: MPWord(0))
+      var work = workStorage.mutableSpan
+      parsed = slowDecimalToBinary(targetFormat: targetFormat,
+                                   input: span,
+                                   work: &work,
+                                   digits: digits,
+                                   base10Exponent: base10Exponent,
+                                   unparsedDigitCount: unparsedDigitCount,
+                                   firstUnparsedDigitOffset: firstUnparsedDigitOffset,
+                                   leadingDigitCount: leadingDigitCount,
+                                   sign: sign)
     }
+  }
 
-    // Now we have either binary or a special form...
-    switch parsed {
-    case .binary(significand: let sig, exponent: let binaryExponent, sign: let sign):
-      // Hex float or converted decimal
-      // Parsers above give us the significand/exponent
-      // already adjusted for subnormal, etc.
-      // So the conversion here is simple:
-      let exponentBits = UInt(binaryExponent + 15)
-      self.init(sign: sign,
-                exponentBitPattern: exponentBits,
-                significandBitPattern: UInt16(sig))
-    case .zero(sign: let sign):
-      // Literal zero or underflow
-      if sign == .minus {
-        self = -0.0
-      } else {
-        self = 0.0
-      }
-    case .infinity(sign: let sign):
-      // Literal infinity or overflow
-      if sign == .minus {
-        self = -Float16.infinity
-      } else {
-        self = Float16.infinity
-      }
-    case .nan(payload: let payload, signaling: let signaling, sign: let sign):
-      let p = 255 & Float16.RawSignificand(truncatingIfNeeded: payload)
-      if sign == .minus {
-        self = -Float16(nan: p, signaling: signaling)
-      } else {
-        self = Float16(nan: p, signaling: signaling)
-      }
-    default:
-      return nil
+  // Now we have either binary or a special form...
+  switch parsed {
+  case .binary(significand: let sig, exponent: let binaryExponent, sign: let sign):
+    // Hex float or converted decimal
+    // Parsers above give us the significand/exponent
+    // already adjusted for subnormal, etc.
+    // So the conversion here is simple:
+    let exponentBits = UInt(binaryExponent + 15)
+    return Float16(sign: sign,
+                   exponentBitPattern: exponentBits,
+                   significandBitPattern: UInt16(sig))
+  case .zero(sign: let sign):
+    // Literal zero or underflow
+    if sign == .minus {
+      return -0.0
+    } else {
+      return 0.0
     }
+  case .infinity(sign: let sign):
+    // Literal infinity or overflow
+    if sign == .minus {
+      return -Float16.infinity
+    } else {
+      return Float16.infinity
+    }
+  case .nan(payload: let payload, signaling: let signaling, sign: let sign):
+    let p = 255 & Float16.RawSignificand(truncatingIfNeeded: payload)
+    if sign == .minus {
+      return -Float16(nan: p, signaling: signaling)
+    } else {
+      return Float16(nan: p, signaling: signaling)
+    }
+  default:
+    return nil
   }
 }
 #endif
@@ -2069,7 +2067,8 @@ internal func _swift_stdlib_strtof_clocale(
   }
 
   let charSpan = unsafe Span<UInt8>(_unchecked: cText, count: i)
-  if let result = Float32(charSpan) {
+  let result = parse_float32(charSpan)
+  if let result {
     unsafe output.pointee = result
     return unsafe cText + i
   } else {
@@ -2082,141 +2081,136 @@ fileprivate let floatPowersOf10_exact: _InlineArray<11, Float32> = [
   1.0, 10.0, 100.0, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10
 ]
 
-// TODO: Propose this via Swift Evolution and make it public
-internal extension Float32 {
-  init?(_ span: Span<UInt8>) {
-    let targetFormat = TargetFormat(
-      significandBits: 24,
-      minBinaryExponent: -126,
-      maxBinaryExponent: 127,
-      minDecimalExponent: -46,
-      maxDecimalExponent: 40,
-      maxDecimalMidpointDigits: 113
-    )
+internal func parse_float32(_ span: Span<UInt8>) -> Optional<Float32> {
+  let targetFormat = TargetFormat(
+    significandBits: 24,
+    minBinaryExponent: -126,
+    maxBinaryExponent: 127,
+    minDecimalExponent: -46,
+    maxDecimalExponent: 40,
+    maxDecimalMidpointDigits: 113
+  )
 
-    // Verify the text format and parse the key pieces
-    var parsed = fastParse64(targetFormat: targetFormat, input: span)
+  // Verify the text format and parse the key pieces
+  var parsed = fastParse64(targetFormat: targetFormat, input: span)
 
-    // If we parsed a decimal, we need to convert to binary
-    if case .decimal(digits: let digits,
-                     base10Exponent: let base10Exponent,
-                     unparsedDigitCount: let unparsedDigitCount,
-                     firstUnparsedDigitOffset: let firstUnparsedDigitOffset,
-                     leadingDigitCount: let leadingDigitCount,
-                     sign: let sign) = parsed {
+  // If we parsed a decimal, we need to convert to binary
+  if case .decimal(digits: let digits,
+                   base10Exponent: let base10Exponent,
+                   unparsedDigitCount: let unparsedDigitCount,
+                   firstUnparsedDigitOffset: let firstUnparsedDigitOffset,
+                   leadingDigitCount: let leadingDigitCount,
+                   sign: let sign) = parsed {
 
-      // ================================================================
-      // Use a single FP operation if the power-of-10 and digits both fit
-      // ================================================================
-      if base10Exponent > -11 && base10Exponent < 11 && leadingDigitCount < 8 {
-        let sdigits = sign == .minus ? -Float(digits) : Float(digits)
-        if base10Exponent < 0 {
-          self = sdigits / floatPowersOf10_exact[Int(-base10Exponent)]
-          return
-        } else {
-          self = sdigits * floatPowersOf10_exact[Int(base10Exponent)]
-          return
-        }
-      }
-
-      // ================================================================
-      // Fixed-precision interval arithmetic
-      // ================================================================
-      // This uses fast 64-bit fixed-precision arithmetic to compute
-      // upper and lower bounds for the significand.  If those bounds
-      // agree, we can return the result.  With 40 fractional bits, this
-      // should very rarely fall through, even with the pessimized
-      // interval width here.  (The interval for <= 19 digits could be
-      // reduced to 4, but the saved branch is more valuable here.)
-      // The Float64 version of this code is extensively commented...
-      let intervalWidth: UInt64 = 36
-      let powerOfTenRoundedDown = powersOf10_Float[Int(base10Exponent) + 70]
-      let powerOfTenExponent = binaryExponentFor10ToThe(Int(base10Exponent))
-      let normalizeDigits = digits.leadingZeroBitCount
-      let d = digits << normalizeDigits
-      let dExponent = 64 - normalizeDigits
-      let l = multiply64x64RoundingDown(powerOfTenRoundedDown, d)
-      let lExponent = powerOfTenExponent + dExponent
-      let normalizeProduct = l.leadingZeroBitCount
-      let normalizedL = l << normalizeProduct
-      let normalizedLExponent = lExponent - normalizeProduct
-      // Note: Wrapping in the next two lines is possible, but that
-      // just leads to losing the upper bit, which isn't stored
-      // explicitly in IEEE754 formats anyway.  In effect, we're
-      // using 65-bit arithmetic here.
-      let lowerSignificand = (normalizedL &+ 0x7fffffffff) >> 40
-      let upperSignificand = (normalizedL &+ 0x8000000000 &+ intervalWidth) >> 40
-      let binaryExponent = lowerSignificand == 0 ? normalizedLExponent : normalizedLExponent - 1
-
-      // Now we have a binary exponent and upper/lower bounds on the
-      // significand
-      if binaryExponent > targetFormat.maxBinaryExponent {
-        // Overflow
-        parsed = .infinity(sign: sign)
-      } else if binaryExponent < targetFormat.minBinaryExponent - targetFormat.significandBits {
-        // Underflow
-        parsed = .zero(sign: sign)
-      } else if (binaryExponent > targetFormat.minBinaryExponent
-                   && upperSignificand == lowerSignificand) {
-        // Normal with converged bounds
-        parsed = .binary(significand: lowerSignificand,
-                         exponent: Int16(truncatingIfNeeded: binaryExponent),
-                         sign: sign)
+    // ================================================================
+    // Use a single FP operation if the power-of-10 and digits both fit
+    // ================================================================
+    if base10Exponent > -11 && base10Exponent < 11 && leadingDigitCount < 8 {
+      let sdigits = sign == .minus ? -Float(digits) : Float(digits)
+      if base10Exponent < 0 {
+        return sdigits / floatPowersOf10_exact[Int(-base10Exponent)]
       } else {
-        // ================================================================
-        // Slow arbitrary-precision fallback
-        // ================================================================
-        // Work area big enough to correctly convert
-        // any decimal input regardless of length to binary32:
-        var workStorage = _InlineArray<32, MPWord>(repeating: MPWord(0))
-        var work = workStorage.mutableSpan
-        parsed = slowDecimalToBinary(targetFormat: targetFormat,
-                                     input: span,
-                                     work: &work,
-                                     digits: digits,
-                                     base10Exponent: base10Exponent,
-                                     unparsedDigitCount: unparsedDigitCount,
-                                     firstUnparsedDigitOffset: firstUnparsedDigitOffset,
-                                     leadingDigitCount: leadingDigitCount,
-                                     sign: sign)
+        return sdigits * floatPowersOf10_exact[Int(base10Exponent)]
       }
     }
 
-    // Now we have either binary or a special form...
-    switch parsed {
-    case .binary(significand: let sig, exponent: let binaryExponent, sign: let sign):
-      // Hex float or converted decimal
-      // Parsers above give us the significand/exponent
-      // already adjusted for subnormal, etc.
-      // So the conversion here is simple:
-      let exponentBits = UInt(binaryExponent + 127)
-      self.init(sign: sign,
-                exponentBitPattern: exponentBits,
-                significandBitPattern: UInt32(sig))
-    case .zero(sign: let sign):
-      // Literal zero or underflow
-      if sign == .minus {
-        self = -0.0
-      } else {
-        self = 0.0
-      }
-    case .infinity(sign: let sign):
-      // Literal infinity or overflow
-      if sign == .minus {
-        self = -Float32.infinity
-      } else {
-        self = Float32.infinity
-      }
-    case .nan(payload: let payload, signaling: let signaling, sign: let sign):
-      let p = 0x1fffff & Float32.RawSignificand(truncatingIfNeeded: payload)
-      if sign == .minus {
-        self = -Float32(nan: p, signaling: signaling)
-      } else {
-        self = Float32(nan: p, signaling: signaling)
-      }
-    default:
-      return nil
+    // ================================================================
+    // Fixed-precision interval arithmetic
+    // ================================================================
+    // This uses fast 64-bit fixed-precision arithmetic to compute
+    // upper and lower bounds for the significand.  If those bounds
+    // agree, we can return the result.  With 40 fractional bits, this
+    // should very rarely fall through, even with the pessimized
+    // interval width here.  (The interval for <= 19 digits could be
+    // reduced to 4, but the saved branch is more valuable here.)
+    // The Float64 version of this code is extensively commented...
+    let intervalWidth: UInt64 = 36
+    let powerOfTenRoundedDown = powersOf10_Float[Int(base10Exponent) + 70]
+    let powerOfTenExponent = binaryExponentFor10ToThe(Int(base10Exponent))
+    let normalizeDigits = digits.leadingZeroBitCount
+    let d = digits << normalizeDigits
+    let dExponent = 64 - normalizeDigits
+    let l = multiply64x64RoundingDown(powerOfTenRoundedDown, d)
+    let lExponent = powerOfTenExponent + dExponent
+    let normalizeProduct = l.leadingZeroBitCount
+    let normalizedL = l << normalizeProduct
+    let normalizedLExponent = lExponent - normalizeProduct
+    // Note: Wrapping in the next two lines is possible, but that
+    // just leads to losing the upper bit, which isn't stored
+    // explicitly in IEEE754 formats anyway.  In effect, we're
+    // using 65-bit arithmetic here.
+    let lowerSignificand = (normalizedL &+ 0x7fffffffff) >> 40
+    let upperSignificand = (normalizedL &+ 0x8000000000 &+ intervalWidth) >> 40
+    let binaryExponent = lowerSignificand == 0 ? normalizedLExponent : normalizedLExponent - 1
+
+    // Now we have a binary exponent and upper/lower bounds on the
+    // significand
+    if binaryExponent > targetFormat.maxBinaryExponent {
+      // Overflow
+      parsed = .infinity(sign: sign)
+    } else if binaryExponent < targetFormat.minBinaryExponent - targetFormat.significandBits {
+      // Underflow
+      parsed = .zero(sign: sign)
+    } else if (binaryExponent > targetFormat.minBinaryExponent
+                 && upperSignificand == lowerSignificand) {
+      // Normal with converged bounds
+      parsed = .binary(significand: lowerSignificand,
+                       exponent: Int16(truncatingIfNeeded: binaryExponent),
+                       sign: sign)
+    } else {
+      // ================================================================
+      // Slow arbitrary-precision fallback
+      // ================================================================
+      // Work area big enough to correctly convert
+      // any decimal input regardless of length to binary32:
+      var workStorage = _InlineArray<32, MPWord>(repeating: MPWord(0))
+      var work = workStorage.mutableSpan
+      parsed = slowDecimalToBinary(targetFormat: targetFormat,
+                                   input: span,
+                                   work: &work,
+                                   digits: digits,
+                                   base10Exponent: base10Exponent,
+                                   unparsedDigitCount: unparsedDigitCount,
+                                   firstUnparsedDigitOffset: firstUnparsedDigitOffset,
+                                   leadingDigitCount: leadingDigitCount,
+                                   sign: sign)
     }
+  }
+
+  // Now we have either binary or a special form...
+  switch parsed {
+  case .binary(significand: let sig, exponent: let binaryExponent, sign: let sign):
+    // Hex float or converted decimal
+    // Parsers above give us the significand/exponent
+    // already adjusted for subnormal, etc.
+    // So the conversion here is simple:
+    let exponentBits = UInt(binaryExponent + 127)
+    return Float32(sign: sign,
+                   exponentBitPattern: exponentBits,
+                   significandBitPattern: UInt32(sig))
+  case .zero(sign: let sign):
+    // Literal zero or underflow
+    if sign == .minus {
+      return -0.0
+    } else {
+      return 0.0
+    }
+  case .infinity(sign: let sign):
+    // Literal infinity or overflow
+    if sign == .minus {
+      return -Float32.infinity
+    } else {
+      return Float32.infinity
+    }
+  case .nan(payload: let payload, signaling: let signaling, sign: let sign):
+    let p = 0x1fffff & Float32.RawSignificand(truncatingIfNeeded: payload)
+    if sign == .minus {
+      return -Float32(nan: p, signaling: signaling)
+    } else {
+      return Float32(nan: p, signaling: signaling)
+    }
+  default:
+    return nil
   }
 }
 
@@ -2244,19 +2238,18 @@ internal func _swift_stdlib_strtod_clocale(
     return unsafe cText
   }
 
-  // Construct a Span<UInt8>
+  // i = strlen(cText)
   var i = 0
   while unsafe cText[i] != 0 {
     i &+= 1
   }
-  let charSpan = unsafe Span<UInt8>(_unchecked: cText, count: i)
 
-  if let result = Float64(charSpan) {
-    // If we can parse it, return the end pointer
+  let charSpan = unsafe Span<UInt8>(_unchecked: cText, count: i)
+  let result = parse_float64(charSpan)
+  if let result {
     unsafe output.pointee = result
     return unsafe cText + i
   } else {
-    // We can't parse it, return a null pointer
     return nil
   }
 }
@@ -2267,258 +2260,253 @@ fileprivate let doublePowersOf10_exact: _InlineArray<23, Float64> = [
   1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22,
 ]
 
-// TODO: Someday, expose this publicly (after Swift Evolution review, of course)
-internal extension Float64 {
-  init?(_ span: Span<UInt8>) {
-    let targetFormat = TargetFormat(
-      significandBits: 53,
-      minBinaryExponent: -1022,
-      maxBinaryExponent: 1023,
-      minDecimalExponent: -325,
-      maxDecimalExponent: 310,
-      maxDecimalMidpointDigits: 768
-    )
+// TODO: Someday, this should be exposed as a public API with the
+// signature: Double.init(_:UTF8Span)
+internal func parse_float64(_ span: Span<UInt8>) -> Optional<Float64> {
+  let targetFormat = TargetFormat(
+    significandBits: 53,
+    minBinaryExponent: -1022,
+    maxBinaryExponent: 1023,
+    minDecimalExponent: -325,
+    maxDecimalExponent: 310,
+    maxDecimalMidpointDigits: 768
+  )
 
-    // Verify the text format and parse the key pieces
-    var parsed = fastParse64(targetFormat: targetFormat, input: span)
+  // Verify the text format and parse the key pieces
+  var parsed = fastParse64(targetFormat: targetFormat, input: span)
 
-    // If we parsed a decimal, we need to convert it to binary
-    if case .decimal(digits: let digits,
-                     base10Exponent: let base10Exponent,
-                     unparsedDigitCount: let unparsedDigitCount,
-                     firstUnparsedDigitOffset: let firstUnparsedDigitOffset,
-                     leadingDigitCount: let leadingDigitCount,
-                     sign: let sign) = parsed {
+  // If we parsed a decimal, we need to convert it to binary
+  if case .decimal(digits: let digits,
+                   base10Exponent: let base10Exponent,
+                   unparsedDigitCount: let unparsedDigitCount,
+                   firstUnparsedDigitOffset: let firstUnparsedDigitOffset,
+                   leadingDigitCount: let leadingDigitCount,
+                   sign: let sign) = parsed {
 
-      // ================================================================
-      // A single FP operation provides correctly-rounded results if
-      // all of the inputs are exact.  We go to some lengths here to
-      // use this path for inputs with up to 17 digits.
-      // ================================================================
-      if base10Exponent >= -22 && base10Exponent < 19 {
-        if base10Exponent < 0 {
-          if leadingDigitCount <= 15 {
-            // At most 15 digits with a negative exponent, we can
-            // use a single correctly-rounded FP division
-            let sdigits = sign == .minus ? -Double(digits) : Double(digits)
-            self = sdigits / doublePowersOf10_exact[Int(-base10Exponent)]
-            return
-          }
-        } else if base10Exponent == 0 {
-          // At most 19 digits with a zero exponent, we can use
-          // a single correctly-rounded int64-to-double conversion.
-          if unparsedDigitCount == 0 {
-            switch sign {
-            case .plus:
-              self = Double(digits)
-              return
-            case .minus:
-              self = Double(-Int64(truncatingIfNeeded: digits))
-              return
-            }
-          }
-        } else if unparsedDigitCount == 0 {
-          // At most 19 digits with a positive exponent; a little
-          // prep work lets us use a single correctly-rounded FMA:
-          let lowMask = UInt64(0x7ff)
-          let highMask = ~lowMask
-          let highDigits = Double(digits & highMask) // <= 53 bits
-          let lowDigits = Double(digits & lowMask) // 11 bits
-          // p10 is exact (10^18 has 42 bits)
-          var p10 = doublePowersOf10_exact[Int(base10Exponent)]
-          if sign == .minus { p10 = -p10 }
-          let u = lowDigits * p10 // Exact (11 bits + 42 bits)
-          // Inputs to FMA here are all exact, so result is correctly rounded
-          self = u.addingProduct(highDigits, p10)
-          return
+    // ================================================================
+    // A single FP operation provides correctly-rounded results if
+    // all of the inputs are exact.  We go to some lengths here to
+    // use this path for inputs with up to 17 digits.
+    // ================================================================
+    if base10Exponent >= -22 && base10Exponent < 19 {
+      if base10Exponent < 0 {
+        if leadingDigitCount <= 15 {
+          // At most 15 digits with a negative exponent, we can
+          // use a single correctly-rounded FP division
+          let sdigits = sign == .minus ? -Double(digits) : Double(digits)
+          return sdigits / doublePowersOf10_exact[Int(-base10Exponent)]
         }
-      }
-
-      // ================================================================
-      // Fixed-width interval arithmetic
-      //
-      // This copy is commented pretty extensively.  Everything here
-      // also applies to the other formats that use similar logic.
-      // Basic idea: We're going to compute upper and lower bounds for
-      // the significand using fixed-precision arithmetic.  If they
-      // agree, we're done.  Otherwise, we fall back to slow but fully
-      // accurate arbitrary-precision calculations.
-      // ================================================================
-
-      // For performance reasons, we directly compute the lower bound and
-      // then add a fixed interval to get the upper bound.  This sacrifices
-      // some accuracy, of course, which means we'll fall through to the
-      // slow path a little more often.  But testing shows that it pays off
-      // on average.
-
-      // 64-bit arithmetic gives us only 11 fractional bits in our significand
-      // calculation, so it's worthwhile setting the interval width smaller
-      // when we can.  If unparsedDigitCount > 0, then we have 19 decimal digits
-      // in `digits` and can consider the input as if it were:
-      //    (first 19 digits).(remaining digits) * 10^p
-      // In this form, (first 19 digits) is a lower bound for the decimal
-      // significand and (first 19 digits) + 1 is an upper bound.
-      let intervalWidth: UInt64 = unparsedDigitCount == 0 ? 12 : 80
-
-      // For code size, we compute an approximation to the power of 10
-      // by multiplying two values together.  The coarse table stores
-      // every 28th power of 10, the fine table stores powers from 0..<28
-      let coarseIndex = (Int(base10Exponent) * 585 + 256) >> 14 // divide by 28
-      let coarsePower = coarseIndex * 28
-      let exactPower = Int(base10Exponent) - coarsePower // base10Exponent % 28
-      let exact = powersOf10_Float[exactPower + 70]
-      let coarse = powersOf10_CoarseBinary64[coarseIndex + 15]
-
-      // The exact values are exact.  The coarse values are rounded,
-      // but they're never rounded up, so:
-      //    coarse <= true value <= coarse + 1
-      let powerOfTenRoundedDown = multiply64x64RoundingDown(coarse, exact)
-      // So the corresponding upper bound for the power of 10 is:
-      //    <= ((coarse + 1) * exact + UINT64_MAX) >> 64
-      //    <= (coarse * exact + exact + UINT64_MAX) >> 64
-      //    <= powerOfTenRoundedDown + 2
-
-      // Note: Constants in the power-of-10 table have the binary point
-      // at the far left.  That is, they all have the form
-      //     0.10101010... * 2^e
-      // So the `powerOfTenRoundedDown` is the product of two numbers
-      // in [1/2,1.0) and this is the corresponding power.
-      let powerOfTenExponent = (binaryExponentFor10ToThe(coarsePower)
-                                  + binaryExponentFor10ToThe(exactPower))
-
-      // Normalize the base-10 significand.  `digits` has the binary
-      // point at the far right; when we multiply here, we'll switch
-      // to the convention with the binary point at the far left by
-      // adding 64 to our binary exponent.
-      let normalizeDigits = digits.leadingZeroBitCount
-      _internalInvariant(normalizeDigits <= 4 || unparsedDigitCount == 0)
-      let d = digits << normalizeDigits
-      let dExponent = 64 - normalizeDigits
-      // The upper bound for d is:
-      //   exactly d (for <= 19 digit case)
-      //   d + 16 (for > 19 digit case)
-
-      // A 64-bit lower bound on the binary significand
-      let l = multiply64x64RoundingDown(powerOfTenRoundedDown, d)
-      let lExponent = powerOfTenExponent + dExponent
-      // In terms of `l128` = the full 128-bit product corresponding to `l`,
-      // we see that the corresponding upper bound is:
-      // <= 19 digits:  (powerOfTenRoundedDown + 2) * d == l128 + d + d
-      //  > 19 digits:  (powerOfTenRoundedDown + 2) * (d + 16)
-
-      // Rounding to 64 bits, the upper bound for <= 19 digits:
-      //    (l128 + d + d + UINT64_MAX) >> 64   <=   l + 3
-      // For >19 digits, we similarly get l + 20 as an upper bound.
-
-      // Normalize again
-      let normalizeProduct = l.leadingZeroBitCount
-      _internalInvariant(normalizeProduct <= 2)
-      // Upper bound is (l + 3) or (l + 20)
-      let normalizedL = l << normalizeProduct
-      // After normalizing, upper bound is (l + 12) or (l + 80)
-      let normalizedLExponent = lExponent - normalizeProduct
-
-      // We have 64-bit lower bound (53-bit significand + 11
-      // fraction bits).  Add the interval width to get the upper
-      // bound and round each one separately.  Using a rounding
-      // offset slightly less than 0x400 == exact 1/2 for the lower
-      // bound means that we never handle exact 1/2 ties in the fast
-      // path.
-      let lowerSignificand = (normalizedL &+ 0x3ff) >> 11
-      let upperSignificand = (normalizedL &+ 0x400 &+ intervalWidth) >> 11
-
-      // If the lower significand wrapped, we effectively overflowed
-      // to a 65-bit result, which will show up as a zero value
-      // here.  Because IEEE754 doesn't store the high bit, we don't
-      // need to recover the high bit here, just account for it by
-      // adding one to the exponent if lowerSignificand==0.
-
-      // BUT: We also need at some point to switch conventions from
-      // having a binary point at the far left to the IEEE754
-      // convention with one significant bit to the left of the
-      // binary point. So cumulatively, we add one if
-      // lowerSignificand is zero and always subtract one, which
-      // gives us:
-      let binaryExponent = lowerSignificand == 0 ? normalizedLExponent : normalizedLExponent - 1
-
-      // We have an accurate binary exponent for the converted value, so
-      // can identify overflow/underflow pretty accurately here.
-      if binaryExponent > targetFormat.maxBinaryExponent {
-        parsed = .infinity(sign: sign) // Overflow
-      } else if binaryExponent < targetFormat.minBinaryExponent - targetFormat.significandBits {
-        parsed = .zero(sign: sign) // Underflow
-      /*
-      } else if binaryExponent <= targetFormat.minBinaryExponent {
-        // TODO: Process subnormal here
-      */
-      } else if (binaryExponent > targetFormat.minBinaryExponent
-                   && upperSignificand == lowerSignificand) {
-        parsed = .binary(significand: lowerSignificand,
-                         exponent: Int16(binaryExponent),
-                         sign: sign)
-      } else {
-        // TODO: Can we exploit the known binaryExponent and/or
-        // near-miss significand bounds to speed up
-        // slowDecimalToBinary??  Note that the significand bounds
-        // differ by only 1, so we know one of them is correct.
-        // (In fact, if +/- one ULP is sufficient for you, you
-        // could always choose the lowerSignificand above and not
-        // have this slow path fallback at all.)
-
-        // ================================================================
-        // Slow arbitrary-precision fallback
-        // ================================================================
-        // Work area big enough to correctly convert
-        // any decimal input regardless of length to binary64:
-        var workStorage = _InlineArray<164, MPWord>(repeating: MPWord(0))
-        var work = workStorage.mutableSpan
-        parsed = slowDecimalToBinary(targetFormat: targetFormat,
-                                     input: span,
-                                     work: &work,
-                                     digits: digits,
-                                     base10Exponent: base10Exponent,
-                                     unparsedDigitCount: unparsedDigitCount,
-                                     firstUnparsedDigitOffset: firstUnparsedDigitOffset,
-                                     leadingDigitCount: leadingDigitCount,
-                                     sign: sign)
+      } else if base10Exponent == 0 {
+        // At most 19 digits with a zero exponent, we can use
+        // a single correctly-rounded int64-to-double conversion.
+        if unparsedDigitCount == 0 {
+          switch sign {
+          case .plus:
+            return Double(digits)
+          case .minus:
+            return Double(-Int64(truncatingIfNeeded: digits))
+          }
+        }
+      } else if unparsedDigitCount == 0 {
+        // At most 19 digits with a positive exponent; a little
+        // prep work lets us use a single correctly-rounded FMA:
+        let lowMask = UInt64(0x7ff)
+        let highMask = ~lowMask
+        let highDigits = Double(digits & highMask) // <= 53 bits
+        let lowDigits = Double(digits & lowMask) // 11 bits
+        // p10 is exact (10^18 has 42 bits)
+        var p10 = doublePowersOf10_exact[Int(base10Exponent)]
+        if sign == .minus { p10 = -p10 }
+        let u = lowDigits * p10 // Exact (11 bits + 42 bits)
+        // Inputs to FMA here are all exact, so result is correctly rounded
+        return u.addingProduct(highDigits, p10)
       }
     }
 
-    // Now we have either binary or a special form...
-    switch parsed {
-    case .binary(significand: let sig, exponent: let binaryExponent, sign: let sign):
-      // Hex float or converted decimal
-      // Parsers above give us the significand/exponent
-      // already adjusted for subnormal, etc.
-      // So the conversion here is simple:
-      let exponentBits = UInt(binaryExponent + 1023)
-      self.init(sign: sign,
-                exponentBitPattern: exponentBits,
-                significandBitPattern: UInt64(sig))
-    case .zero(sign: let sign):
-      // Literal zero or underflow
-      if sign == .minus {
-        self = -0.0
-      } else {
-        self = 0.0
-      }
-    case .infinity(sign: let sign):
-      // Literal infinity or overflow
-      if sign == .minus {
-        self = -Float64.infinity
-      } else {
-        self = Float64.infinity
-      }
-    case .nan(payload: let payload, signaling: let signaling, sign: let sign):
-      let p = 0x3ffffffffffff & Float64.RawSignificand(truncatingIfNeeded: payload)
-      if sign == .minus {
-        self = -Float64(nan: p, signaling: signaling)
-      } else {
-        self = Float64(nan: p, signaling: signaling)
-      }
-    default:
-      return nil
+    // ================================================================
+    // Fixed-width interval arithmetic
+    //
+    // This copy is commented pretty extensively.  Everything here
+    // also applies to the other formats that use similar logic.
+    // Basic idea: We're going to compute upper and lower bounds for
+    // the significand using fixed-precision arithmetic.  If they
+    // agree, we're done.  Otherwise, we fall back to slow but fully
+    // accurate arbitrary-precision calculations.
+    // ================================================================
+
+    // For performance reasons, we directly compute the lower bound and
+    // then add a fixed interval to get the upper bound.  This sacrifices
+    // some accuracy, of course, which means we'll fall through to the
+    // slow path a little more often.  But testing shows that it pays off
+    // on average.
+
+    // 64-bit arithmetic gives us only 11 fractional bits in our significand
+    // calculation, so it's worthwhile setting the interval width smaller
+    // when we can.  If unparsedDigitCount > 0, then we have 19 decimal digits
+    // in `digits` and can consider the input as if it were:
+    //    (first 19 digits).(remaining digits) * 10^p
+    // In this form, (first 19 digits) is a lower bound for the decimal
+    // significand and (first 19 digits) + 1 is an upper bound.
+    let intervalWidth: UInt64 = unparsedDigitCount == 0 ? 12 : 80
+
+    // For code size, we compute an approximation to the power of 10
+    // by multiplying two values together.  The coarse table stores
+    // every 28th power of 10, the fine table stores powers from 0..<28
+    let coarseIndex = (Int(base10Exponent) * 585 + 256) >> 14 // divide by 28
+    let coarsePower = coarseIndex * 28
+    let exactPower = Int(base10Exponent) - coarsePower // base10Exponent % 28
+    let exact = powersOf10_Float[exactPower + 70]
+    let coarse = powersOf10_CoarseBinary64[coarseIndex + 15]
+
+    // The exact values are exact.  The coarse values are rounded,
+    // but they're never rounded up, so:
+    //    coarse <= true value <= coarse + 1
+    let powerOfTenRoundedDown = multiply64x64RoundingDown(coarse, exact)
+    // So the corresponding upper bound for the power of 10 is:
+    //    <= ((coarse + 1) * exact + UINT64_MAX) >> 64
+    //    <= (coarse * exact + exact + UINT64_MAX) >> 64
+    //    <= powerOfTenRoundedDown + 2
+
+    // Note: Constants in the power-of-10 table have the binary point
+    // at the far left.  That is, they all have the form
+    //     0.10101010... * 2^e
+    // So the `powerOfTenRoundedDown` is the product of two numbers
+    // in [1/2,1.0) and this is the corresponding power.
+    let powerOfTenExponent = (binaryExponentFor10ToThe(coarsePower)
+                                + binaryExponentFor10ToThe(exactPower))
+
+    // Normalize the base-10 significand.  `digits` has the binary
+    // point at the far right; when we multiply here, we'll switch
+    // to the convention with the binary point at the far left by
+    // adding 64 to our binary exponent.
+    let normalizeDigits = digits.leadingZeroBitCount
+    _internalInvariant(normalizeDigits <= 4 || unparsedDigitCount == 0)
+    let d = digits << normalizeDigits
+    let dExponent = 64 - normalizeDigits
+    // The upper bound for d is:
+    //   exactly d (for <= 19 digit case)
+    //   d + 16 (for > 19 digit case)
+
+    // A 64-bit lower bound on the binary significand
+    let l = multiply64x64RoundingDown(powerOfTenRoundedDown, d)
+    let lExponent = powerOfTenExponent + dExponent
+    // In terms of `l128` = the full 128-bit product corresponding to `l`,
+    // we see that the corresponding upper bound is:
+    // <= 19 digits:  (powerOfTenRoundedDown + 2) * d == l128 + d + d
+    //  > 19 digits:  (powerOfTenRoundedDown + 2) * (d + 16)
+
+    // Rounding to 64 bits, the upper bound for <= 19 digits:
+    //    (l128 + d + d + UINT64_MAX) >> 64   <=   l + 3
+    // For >19 digits, we similarly get l + 20 as an upper bound.
+
+    // Normalize again
+    let normalizeProduct = l.leadingZeroBitCount
+    _internalInvariant(normalizeProduct <= 2)
+    // Upper bound is (l + 3) or (l + 20)
+    let normalizedL = l << normalizeProduct
+    // After normalizing, upper bound is (l + 12) or (l + 80)
+    let normalizedLExponent = lExponent - normalizeProduct
+
+    // We have 64-bit lower bound (53-bit significand + 11
+    // fraction bits).  Add the interval width to get the upper
+    // bound and round each one separately.  Using a rounding
+    // offset slightly less than 0x400 == exact 1/2 for the lower
+    // bound means that we never handle exact 1/2 ties in the fast
+    // path.
+    let lowerSignificand = (normalizedL &+ 0x3ff) >> 11
+    let upperSignificand = (normalizedL &+ 0x400 &+ intervalWidth) >> 11
+
+    // If the lower significand wrapped, we effectively overflowed
+    // to a 65-bit result, which will show up as a zero value
+    // here.  Because IEEE754 doesn't store the high bit, we don't
+    // need to recover the high bit here, just account for it by
+    // adding one to the exponent if lowerSignificand==0.
+
+    // BUT: We also need at some point to switch conventions from
+    // having a binary point at the far left to the IEEE754
+    // convention with one significant bit to the left of the
+    // binary point. So cumulatively, we add one if
+    // lowerSignificand is zero and always subtract one, which
+    // gives us:
+    let binaryExponent = lowerSignificand == 0 ? normalizedLExponent : normalizedLExponent - 1
+
+    // We have an accurate binary exponent for the converted value, so
+    // can identify overflow/underflow pretty accurately here.
+    if binaryExponent > targetFormat.maxBinaryExponent {
+      parsed = .infinity(sign: sign) // Overflow
+    } else if binaryExponent < targetFormat.minBinaryExponent - targetFormat.significandBits {
+      parsed = .zero(sign: sign) // Underflow
+    /*
+    } else if binaryExponent <= targetFormat.minBinaryExponent {
+      // TODO: Process subnormal here
+    */
+    } else if (binaryExponent > targetFormat.minBinaryExponent
+                 && upperSignificand == lowerSignificand) {
+      parsed = .binary(significand: lowerSignificand,
+                       exponent: Int16(binaryExponent),
+                       sign: sign)
+    } else {
+      // TODO: Can we exploit the known binaryExponent and/or
+      // near-miss significand bounds to speed up
+      // slowDecimalToBinary??  Note that the significand bounds
+      // differ by only 1, so we know one of them is correct.
+      // (In fact, if +/- one ULP is sufficient for you, you
+      // could always choose the lowerSignificand above and not
+      // have this slow path fallback at all.)
+
+      // ================================================================
+      // Slow arbitrary-precision fallback
+      // ================================================================
+      // Work area big enough to correctly convert
+      // any decimal input regardless of length to binary64:
+      var workStorage = _InlineArray<164, MPWord>(repeating: MPWord(0))
+      var work = workStorage.mutableSpan
+      parsed = slowDecimalToBinary(targetFormat: targetFormat,
+                                   input: span,
+                                   work: &work,
+                                   digits: digits,
+                                   base10Exponent: base10Exponent,
+                                   unparsedDigitCount: unparsedDigitCount,
+                                   firstUnparsedDigitOffset: firstUnparsedDigitOffset,
+                                   leadingDigitCount: leadingDigitCount,
+                                   sign: sign)
     }
+  }
+
+  // Now we have either binary or a special form...
+  switch parsed {
+  case .binary(significand: let sig, exponent: let binaryExponent, sign: let sign):
+    // Hex float or converted decimal
+    // Parsers above give us the significand/exponent
+    // already adjusted for subnormal, etc.
+    // So the conversion here is simple:
+    let exponentBits = UInt(binaryExponent + 1023)
+    return Float64(sign: sign,
+                   exponentBitPattern: exponentBits,
+                   significandBitPattern: UInt64(sig))
+  case .zero(sign: let sign):
+    // Literal zero or underflow
+    if sign == .minus {
+      return -0.0
+    } else {
+      return 0.0
+    }
+  case .infinity(sign: let sign):
+    // Literal infinity or overflow
+    if sign == .minus {
+      return -Float64.infinity
+    } else {
+      return Float64.infinity
+    }
+  case .nan(payload: let payload, signaling: let signaling, sign: let sign):
+    let p = 0x3ffffffffffff & Float64.RawSignificand(truncatingIfNeeded: payload)
+    if sign == .minus {
+      return -Float64(nan: p, signaling: signaling)
+    } else {
+      return Float64(nan: p, signaling: signaling)
+    }
+  default:
+    return nil
   }
 }
 

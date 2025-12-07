@@ -218,7 +218,7 @@ extension ${Self}: LosslessStringConvertible {
   #else
     // Work around span availability limits
     let parsed = unsafe text.base._guts.withFastUTF8 { chars -> ${Self}? in
-      unsafe ${Self}(chars.span)
+      unsafe parse_float${bits}(chars.span)
     }
 
     if let parsed {
