@@ -4,7 +4,7 @@
 
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | sort | tee %t/actual-dependencies.txt
 
-// RUN: %if target-os-linux-gnu %{ sort %t/allowed-dependencies_linux.txt -o %t/allowed-dependencies_linux.txt && comm -13 %t/allowed-dependencies_linux.txt %t/actual-dependencies.txt > %t/extra.txt && test ! -s %t/extra.txt %} %else %{ sort %t/allowed-dependencies_macos.txt -o %t/allowed-dependencies_macos.txt && comm -13 %t/allowed-dependencies_macos.txt %t/actual-dependencies.txt > %t/extra.txt && test ! -s %t/extra.txt %}
+// RUN: %if OS=linux-gnu %{ sort %t/allowed-dependencies_linux.txt -o %t/allowed-dependencies_linux.txt && comm -13 %t/allowed-dependencies_linux.txt %t/actual-dependencies.txt > %t/extra.txt && test ! -s %t/extra.txt %} %else %{ sort %t/allowed-dependencies_macos.txt -o %t/allowed-dependencies_macos.txt && comm -13 %t/allowed-dependencies_macos.txt %t/actual-dependencies.txt > %t/extra.txt && test ! -s %t/extra.txt %}
 
 //--- allowed-dependencies_macos.txt
 ___stack_chk_fail
