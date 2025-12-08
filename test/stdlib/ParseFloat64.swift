@@ -8,6 +8,9 @@
 // TODO: Figure out why this test breaks on wasm32
 // UNSUPPORTED: CPU=wasm32
 
+// Needed to declare the ABI entry point
+// REQUIRES: swift_feature_Extern
+
 import StdlibUnittest
 
 let tests = TestSuite("FloatingPointParsing")

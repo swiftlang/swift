@@ -4,6 +4,9 @@
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
+// Needed to verify the legacy ABI
+// REQUIRES: swift_feature_Extern
+
 import StdlibUnittest
 
 let tests = TestSuite("FloatingPointParsing")
