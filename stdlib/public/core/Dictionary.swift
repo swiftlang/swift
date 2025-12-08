@@ -2171,8 +2171,7 @@ extension Dictionary {
   /// are both `true`, then `a.isTriviallyIdentical(to: c)` is also `true`.
   /// (Transitivity)
   /// - If `a` and `b` are `Equatable`, then `a.isTriviallyIdentical(b)` implies
-  /// `a == b`
-  ///   - `a == b` does not imply `a.isTriviallyIdentical(b)`
+  /// `a == b`. `a == b` does not imply `a.isTriviallyIdentical(b)`
   ///
   /// Values produced by copying the same value, with no intervening mutations,
   /// will compare identical:
