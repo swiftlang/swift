@@ -5308,7 +5308,8 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
 
     return cast<llvm::GlobalValue>(addr);
   }
-
+  bool hasEmbeddedExistentials =
+    Context.LangOpts.hasFeature(Feature::EmbeddedExistentials);
   auto entity =
       (isPrespecialized &&
        !irgen::isCanonicalInitializableTypeMetadataStaticallyAddressable(
@@ -5324,7 +5325,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
     entity = LinkEntity::forTypeMetadata(concreteType,
                                          TypeMetadataAddress::AddressPoint);
-    if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials))
+    if (hasEmbeddedExistentials)
       entity = LinkEntity::forTypeMetadata(concreteType,
                                            TypeMetadataAddress::FullMetadata);
   }
@@ -5350,7 +5351,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   markGlobalAsUsedBasedOnLinkage(*this, link, var);
   
   if (Context.LangOpts.hasFeature(Feature::Embedded) &&
-      !Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+      !hasEmbeddedExistentials) {
     return var;
   }
 
@@ -5361,14 +5362,13 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   if (auto nominal = concreteType->getAnyNominal()) {
     // Keep type metadata around for all types (except @_objcImplementation,
     // since we're using ObjC metadata for that).
-    if (!isObjCImpl &&
-        !Context.LangOpts.hasFeature(Feature::EmbeddedExistentials))
+    if (!isObjCImpl && !hasEmbeddedExistentials)
       addRuntimeResolvableType(nominal);
 
     // Don't define the alias for foreign type metadata, prespecialized
     // generic metadata, or @_objcImplementation classes, since they're not ABI.
-    if (requiresForeignTypeMetadata(nominal) ||
-        (isPrespecialized && !Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) ||
+    if ((requiresForeignTypeMetadata(nominal) && !hasEmbeddedExistentials) ||
+        (isPrespecialized && !hasEmbeddedExistentials) ||
         isObjCImpl)
       return var;
 
@@ -5382,7 +5382,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
     }
   }
 
-  if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+  if (hasEmbeddedExistentials) {
     adjustmentIndex = MetadataAdjustmentIndex::EmbeddedWithExistentials;
   }
 
