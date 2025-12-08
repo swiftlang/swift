@@ -3840,14 +3840,18 @@ NOTE(enum_raw_value_incrementing_from_zero,none,
 NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
+#define EXPORTABILITY_REASON_SELECT "select{" \
+      "here|as property wrapper here|" \
+      "as result builder here|" \
+      "in an extension with public or '@usableFromInline' members|" \
+      "in an extension with conditional conformances|" \
+      "in a public or '@usableFromInline' conformance|" \
+      "in an '@available' attribute here|" \
+      "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context|" \
+      "in a property declaration member of a type not marked '@_implementationOnly'}"
+
 ERROR(decl_from_hidden_module,none,
-      "cannot use %kind0 %select{here|as property wrapper here|"
-      "as result builder here|"
-      "in an extension with public or '@usableFromInline' members|"
-      "in an extension with conditional conformances|"
-      "in a public or '@usableFromInline' conformance|"
-      "in an '@available' attribute here|"
-      "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context}1; "
+      "cannot use %kind0 %" EXPORTABILITY_REASON_SELECT "1; "
       "%select{%2 has been imported as implementation-only|"
       "it is an SPI imported from %2|"
       "it is SPI|"
@@ -3859,14 +3863,7 @@ ERROR(decl_from_hidden_module,none,
       "%0 is marked '@_implementationOnly'}3",
       (const Decl *, unsigned, Identifier, unsigned))
 ERROR(typealias_desugars_to_type_from_hidden_module,none,
-      "%0 aliases '%1.%2' and cannot be used %select{here|"
-      "as property wrapper here|"
-      "as result builder here|"
-      "in an extension with public or '@usableFromInline' members|"
-      "in an extension with conditional conformance|"
-      "in a public or '@usableFromInline' conformance|"
-      "<<ERROR>>|"
-      "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context}3 "
+      "%0 aliases '%1.%2' and cannot be used %" EXPORTABILITY_REASON_SELECT "3 "
       "because %select{%4 has been imported as implementation-only|"
       "it is an SPI imported from %4|"
       "<<ERROR>>|"
@@ -3878,12 +3875,7 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "%0 is marked '@_implementationOnly'}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
-      "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
-      "as result builder here|"
-      "in an extension with public or '@usableFromInline' members|"
-      "in an extension with conditional conformances|"
-      "<<ERROR>>|<<ERROR>>|"
-      "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context}2; "
+      "cannot use conformance of %0 to %1 %" EXPORTABILITY_REASON_SELECT "2; "
       "%select{%3 has been imported as implementation-only|"
       "the conformance is declared as SPI in %3|"
       "the conformance is declared as SPI|"
@@ -8986,6 +8978,9 @@ ERROR(tilde_sendable_requires_feature_flag,none,
 NOTE(sendable_conformance_is_suppressed, none,
      "%kind0 explicitly suppresses conformance to 'Sendable' protocol",
      (const NominalTypeDecl *))
+
+NOTE(suppress_sendable_conformance,none,
+     "consider suppressing conformance to 'Sendable' protocol", ())
 
 ERROR(non_sendable_type_suppressed,none,
       "cannot both conform to and suppress conformance to 'Sendable'", ())
