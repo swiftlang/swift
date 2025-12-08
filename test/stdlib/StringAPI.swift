@@ -524,10 +524,10 @@ StringTests.test("_isIdentical(to:)") {
 
 StringTests.test("String.UnicodeScalarView.isTriviallyIdentical(to:)")
   .skip(.custom({
-    if #available(SwiftStdlib 6.3, *) { false } else { true }
-  }, reason: "Requires Swift stdlib 6.3"))
+    if #available(StdlibDeploymentTarget 6.4, *) { false } else { true }
+  }, reason: "Requires Swift stdlib 6.4"))
   .code {
-    guard #available(SwiftStdlib 6.3, *) else { return }
+    guard #available(StdlibDeploymentTarget 6.4, *) else { return }
     
     let a = "Hello".unicodeScalars
     let b = "Hello".unicodeScalars
@@ -542,10 +542,10 @@ StringTests.test("String.UnicodeScalarView.isTriviallyIdentical(to:)")
   }
 StringTests.test("String.UTF8View.isTriviallyIdentical(to:)")
   .skip(.custom({
-    if #available(SwiftStdlib 6.3, *) { false } else { true }
-  }, reason: "Requires Swift stdlib 6.3"))
+    if #available(StdlibDeploymentTarget 6.4, *) { false } else { true }
+  }, reason: "Requires Swift stdlib 6.4"))
   .code {
-    guard #available(SwiftStdlib 6.3, *) else { return }
+    guard #available(StdlibDeploymentTarget 6.4, *) else { return }
     
     let a = "Hello".utf8
     let b = "Hello".utf8
@@ -561,10 +561,10 @@ StringTests.test("String.UTF8View.isTriviallyIdentical(to:)")
   }
 StringTests.test("String.UTF16View.isTriviallyIdentical(to:)")
   .skip(.custom({
-    if #available(SwiftStdlib 6.3, *) { false } else { true }
-  }, reason: "Requires Swift stdlib 6.3"))
+    if #available(StdlibDeploymentTarget 6.4, *) { false } else { true }
+  }, reason: "Requires Swift stdlib 6.4"))
   .code {
-    guard #available(SwiftStdlib 6.3, *) else { return }
+    guard #available(StdlibDeploymentTarget 6.4, *) else { return }
     
     let a = "Hello".utf16
     let b = "Hello".utf16
@@ -581,10 +581,10 @@ StringTests.test("String.UTF16View.isTriviallyIdentical(to:)")
 
 StringTests.test("Substring.UnicodeScalarView.isTriviallyIdentical(to:)")
   .skip(.custom({
-    if #available(SwiftStdlib 6.3, *) { false } else { true }
-  }, reason: "Requires Swift stdlib 6.3"))
+    if #available(StdlibDeploymentTarget 6.4, *) { false } else { true }
+  }, reason: "Requires Swift stdlib 6.4"))
   .code {
-    guard #available(SwiftStdlib 6.3, *) else { return }
+    guard #available(StdlibDeploymentTarget 6.4, *) else { return }
     
     let base1 = "Test String"
     let a = base1[base1.index(base1.startIndex, offsetBy: 5)..<base1.endIndex]
@@ -603,10 +603,10 @@ StringTests.test("Substring.UnicodeScalarView.isTriviallyIdentical(to:)")
   }
 StringTests.test("Substring.UTF8View.isTriviallyIdentical(to:)")
   .skip(.custom({
-    if #available(SwiftStdlib 6.3, *) { false } else { true }
-  }, reason: "Requires Swift stdlib 6.3"))
+    if #available(StdlibDeploymentTarget 6.4, *) { false } else { true }
+  }, reason: "Requires Swift stdlib 6.4"))
   .code {
-    guard #available(SwiftStdlib 6.3, *) else { return }
+    guard #available(StdlibDeploymentTarget 6.4, *) else { return }
     
     let base1 = "Test String"
     let a = base1[base1.index(base1.startIndex, offsetBy: 5)..<base1.endIndex]
@@ -625,10 +625,10 @@ StringTests.test("Substring.UTF8View.isTriviallyIdentical(to:)")
   }
 StringTests.test("Substring.UTF16View.isTriviallyIdentical(to:)")
   .skip(.custom({
-    if #available(SwiftStdlib 6.3, *) { false } else { true }
-  }, reason: "Requires Swift stdlib 6.3"))
+    if #available(StdlibDeploymentTarget 6.4, *) { false } else { true }
+  }, reason: "Requires Swift stdlib 6.4"))
   .code {
-    guard #available(SwiftStdlib 6.3, *) else { return }
+    guard #available(StdlibDeploymentTarget 6.4, *) else { return }
     
     let base1 = "Test String"
     let a = base1[base1.index(base1.startIndex, offsetBy: 5)..<base1.endIndex]

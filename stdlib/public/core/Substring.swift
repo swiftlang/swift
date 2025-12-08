@@ -887,7 +887,7 @@ extension Substring.UTF8View {
   /// is trivially identical to `other`.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.3, *)
+  @available(StdlibDeploymentTarget 6.4, *)
   public func isTriviallyIdentical(to other: Self) -> Bool {
     self._base.isTriviallyIdentical(to: other._base)
     && self._bounds == other._bounds
@@ -1054,7 +1054,7 @@ extension Substring.UTF16View {
   /// is trivially identical to `other`.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.3, *)
+  @available(StdlibDeploymentTarget 6.4, *)
   public func isTriviallyIdentical(to other: Self) -> Bool {
     self._base.isTriviallyIdentical(to: other._base)
     && self._bounds == other._bounds
@@ -1310,7 +1310,7 @@ extension Substring.UnicodeScalarView {
   /// is trivially identical to `other`.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.3, *)
+  @available(StdlibDeploymentTarget 6.4, *)
   public func isTriviallyIdentical(to other: Self) -> Bool {
     self._slice._base.isTriviallyIdentical(to: other._slice._base)
     && self._bounds == other._bounds
