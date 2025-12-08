@@ -90,7 +90,7 @@ public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
 }
 
 @available(SwiftStdlib 6.3, *)
-extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable {
+extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_lifetime(&self)
   @_lifetime(self: copy self)
@@ -101,7 +101,7 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable {
 }
 
 @available(SwiftStdlib 6.3, *)
-extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable {
+extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_lifetime(self: copy self)
   public mutating func skip(by offset: Int) -> Int {

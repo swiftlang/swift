@@ -332,7 +332,7 @@ public protocol Sequence<Element>: ~Copyable, ~Escapable {
     where Iterator.Element == Element
 
   @available(SwiftStdlib 6.3, *)
-  associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = BorrowingIteratorAdapter<Iterator>
+  associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = BorrowingIteratorAdapter<Iterator, Element>
     where BorrowingIterator.Element == Element
 
   // FIXME: <rdar://problem/34142121>
@@ -460,10 +460,14 @@ public protocol Sequence<Element>: ~Copyable, ~Escapable {
   ) rethrows -> R?
 }
 
+// It would be nicer to just have a single generic parameter, but when I
+// try to generalize `Iterator.Element: ~Copyable` (or `Seq.Element: ~Copyable`
+// when I try that approach), I get the error:
+//
+// Cannot suppress '~Copyable' on generic parameter 'Iterator.Element' defined in outer scope
 @available(SwiftStdlib 6.3, *)
 @frozen
-public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: ~Copyable & ~Escapable &
-  BorrowingIteratorProtocol
+public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol, Element: ~Copyable>: BorrowingIteratorProtocol & ~Copyable where Iterator.Element == Element
 {
   @usableFromInline
   var iterator: Iterator
@@ -487,6 +491,9 @@ public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: ~Copyable & 
 }
 
 @available(SwiftStdlib 6.3, *)
+extension BorrowingIteratorAdapter: Copyable where Iterator.Element: Copyable {}
+
+@available(SwiftStdlib 6.3, *)
 public enum NeverIterator<Element: ~Copyable> {}
 
 @available(SwiftStdlib 6.3, *)
@@ -498,7 +505,7 @@ extension NeverIterator: IteratorProtocol { /* where Element: ~Copyable */
 }
 
 @available(SwiftStdlib 6.3, *)
-extension Sequence where BorrowingIterator == BorrowingIteratorAdapter<Iterator> {
+extension Sequence where BorrowingIterator == BorrowingIteratorAdapter<Iterator, Self.Element> {
   @_transparent
   public func makeBorrowingIterator() -> BorrowingIterator {
     BorrowingIteratorAdapter(iterator: makeIterator())
@@ -758,7 +765,7 @@ extension Sequence where Self: ~Copyable & ~Escapable {
   }
 }
 
-extension Sequence {
+extension Sequence where Element: Copyable {
   /// Returns an array containing the results of mapping the given closure
   /// over the sequence's elements.
   ///
