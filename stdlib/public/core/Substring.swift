@@ -1401,8 +1401,7 @@ extension Substring {
   /// - If `a.isTriviallyIdentical(to: b)` and `b.isTriviallyIdentical(to: c)`
   /// are both `true`, then `a.isTriviallyIdentical(to: c)` is also `true`.
   /// (Transitivity)
-  /// - `a.isTriviallyIdentical(b)` implies `a == b`
-  ///   - `a == b` does not imply `a.isTriviallyIdentical(b)`
+  /// - `a.isTriviallyIdentical(b)` implies `a == b`. `a == b` does not imply `a.isTriviallyIdentical(b)`
   ///
   /// Values produced by copying the same value, with no intervening mutations,
   /// will compare identical:
