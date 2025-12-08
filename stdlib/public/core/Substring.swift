@@ -1457,7 +1457,7 @@ extension Substring {
   /// - Complexity: O(1)
   @available(StdlibDeploymentTarget 6.4, *)
   public func isTriviallyIdentical(to other: Self) -> Bool {
-    self._wholeGuts.rawBits == other._wholeGuts.rawBits &&
+    self._wholeGuts.isTriviallyIdentical(to: other._wholeGuts) &&
     self._offsetRange == other._offsetRange
   }
 }
