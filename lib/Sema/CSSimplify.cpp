@@ -14348,6 +14348,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
   if (shape1->isEqual(shape2))
     return SolutionKind::Solved;
 
+  // Handle the case where one shape is a pack parameter and the other is
+  // a singleton pack containing a pack expansion of that same parameter.
+  // This can happen when comparing opened opaque archetypes with extension
+  // requirements that have pack expansion same-type constraints.
+  auto unwrapSingletonPackExpansion = [](CanType shape) -> CanType {
+    if (auto *packType = shape->getAs<PackType>()) {
+      if (packType->getNumElements() == 1) {
+        if (auto *expansion = packType->getElementType(0)
+                                  ->getAs<PackExpansionType>()) {
+          // For a singleton pack expansion like Pack{repeat each T},
+          // the shape class is determined by the expansion's count type.
+          return expansion->getCountType()->getCanonicalType();
+        }
+      }
+    }
+    return shape;
+  };
+
+  auto unwrappedShape1 = unwrapSingletonPackExpansion(shape1);
+  auto unwrappedShape2 = unwrapSingletonPackExpansion(shape2);
+
+  if (unwrappedShape1->isEqual(unwrappedShape2))
+    return SolutionKind::Solved;
+
   if (shouldAttemptFixes()) {
     // If there are placeholders involved shape mismatches are most
     // likely just a symptom of some other issue i.e. type mismatch.
