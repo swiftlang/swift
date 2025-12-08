@@ -731,7 +731,8 @@ static bool writeAPIDescriptorIfNeeded(CompilerInstance &Instance) {
 static bool performCompileStepsPostSILGen(
     CompilerInstance &Instance, std::unique_ptr<SILModule> SM,
     ModuleOrSourceFile MSF, const PrimarySpecificPaths &PSPs, int &ReturnValue,
-    FrontendObserver *observer, ArrayRef<const char *> CommandLineArgs);
+    FrontendObserver *observer, ArrayRef<const char *> CommandLineArgs,
+    ArrayRef<PrimarySpecificPaths> auxPSPs = {});
 
 bool swift::performCompileStepsPostSema(
     CompilerInstance &Instance, int &ReturnValue, FrontendObserver *observer,
@@ -749,14 +750,48 @@ bool swift::performCompileStepsPostSema(
           PSPs.SupplementaryOutputs.YAMLOptRecordPath :
           PSPs.SupplementaryOutputs.BitstreamOptRecordPath;
     }
+
+    auto populateOptRecordPathsFromCmdLine = [&]() {
+      auto optRecordPaths = collectSupplementaryOutputPaths(
+          CommandLineArgs, options::OPT_save_optimization_record_path);
+      if (!optRecordPaths.empty()) {
+        // Set the first path. With multiple paths, CompilerInvocation leaves
+        // OptRecordFile empty, so we populate it here along with aux paths.
+        SILOpts.OptRecordFile = optRecordPaths[0];
+        if (optRecordPaths.size() > 1) {
+          SILOpts.AuxOptRecordFiles.assign(optRecordPaths.begin() + 1,
+                                           optRecordPaths.end());
+        }
+      }
+    };
+
     if (!auxPSPs.empty()) {
       assert(SILOpts.AuxOptRecordFiles.empty());
+      // Check if ALL auxPSPs have optimization record paths populated
+      bool allHaveOptRecordPaths = true;
       for (const auto &auxFile: auxPSPs) {
-        SILOpts.AuxOptRecordFiles.push_back(
-          SILOpts.OptRecordFormat == llvm::remarks::Format::YAML ?
-          auxFile.SupplementaryOutputs.YAMLOptRecordPath :
-          auxFile.SupplementaryOutputs.BitstreamOptRecordPath);
+        bool hasPath = SILOpts.OptRecordFormat == llvm::remarks::Format::YAML ?
+          !auxFile.SupplementaryOutputs.YAMLOptRecordPath.empty() :
+          !auxFile.SupplementaryOutputs.BitstreamOptRecordPath.empty();
+        if (!hasPath) {
+          allHaveOptRecordPaths = false;
+          break;
+        }
       }
+
+      if (allHaveOptRecordPaths) {
+        for (const auto &auxFile: auxPSPs) {
+          SILOpts.AuxOptRecordFiles.push_back(
+            SILOpts.OptRecordFormat == llvm::remarks::Format::YAML ?
+            auxFile.SupplementaryOutputs.YAMLOptRecordPath :
+            auxFile.SupplementaryOutputs.BitstreamOptRecordPath);
+        }
+      } else {
+        populateOptRecordPathsFromCmdLine();
+      }
+    } else {
+      assert(SILOpts.AuxOptRecordFiles.empty());
+      populateOptRecordPathsFromCmdLine();
     }
     return SILOpts;
   };
@@ -781,7 +816,7 @@ bool swift::performCompileStepsPostSema(
                                  &irgenOpts);
     return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
                                          ReturnValue, observer,
-                                         CommandLineArgs);
+                                         CommandLineArgs, auxPSPs);
   }
 
 
@@ -1983,7 +2018,8 @@ static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
 static bool performCompileStepsPostSILGen(
     CompilerInstance &Instance, std::unique_ptr<SILModule> SM,
     ModuleOrSourceFile MSF, const PrimarySpecificPaths &PSPs, int &ReturnValue,
-    FrontendObserver *observer, ArrayRef<const char *> CommandLineArgs) {
+    FrontendObserver *observer, ArrayRef<const char *> CommandLineArgs,
+    ArrayRef<PrimarySpecificPaths> auxPSPs) {
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
@@ -2156,10 +2192,38 @@ static bool performCompileStepsPostSILGen(
   std::vector<std::string> ParallelOutputFilenames =
       opts.InputsAndOutputs.copyOutputFilenames();
 
-  // Collect IR output paths from command line arguments
-  std::vector<std::string> ParallelIROutputFilenames =
-      collectSupplementaryOutputPaths(CommandLineArgs,
-                                      options::OPT_ir_output_path);
+  // Collect IR output paths - check if supplementary output file map has paths,
+  // otherwise fall back to command line arguments
+  std::vector<std::string> ParallelIROutputFilenames;
+  if (!auxPSPs.empty()) {
+    // Check if the first file (PSPs) and ALL auxPSPs have IR output paths populated
+    bool allHaveIRPaths = !PSPs.SupplementaryOutputs.LLVMIROutputPath.empty();
+    if (allHaveIRPaths) {
+      for (const auto &auxFile : auxPSPs) {
+        if (auxFile.SupplementaryOutputs.LLVMIROutputPath.empty()) {
+          allHaveIRPaths = false;
+          break;
+        }
+      }
+    }
+
+    if (allHaveIRPaths) {
+      // Paths are in supplementary output file map - include first file + aux files
+      ParallelIROutputFilenames.push_back(PSPs.SupplementaryOutputs.LLVMIROutputPath);
+      for (const auto &auxFile : auxPSPs) {
+        ParallelIROutputFilenames.push_back(
+            auxFile.SupplementaryOutputs.LLVMIROutputPath);
+      }
+    } else {
+      // Fall back to command line arguments
+      ParallelIROutputFilenames = collectSupplementaryOutputPaths(
+          CommandLineArgs, options::OPT_ir_output_path);
+    }
+  } else {
+    // No auxPSPs, use command line arguments
+    ParallelIROutputFilenames = collectSupplementaryOutputPaths(
+        CommandLineArgs, options::OPT_ir_output_path);
+  }
 
   llvm::GlobalVariable *HashGlobal;
   cas::SwiftCASOutputBackend *casBackend =
@@ -2310,10 +2374,13 @@ collectSupplementaryOutputPaths(ArrayRef<const char *> Args,
     StringRef arg = Args[i];
     StringRef optionName;
 
-    if (OptionID == options::OPT_sil_output_path) {
-      optionName = "-sil-output-path";
-    } else if (OptionID == options::OPT_ir_output_path) {
+    // Note: SIL is NOT included here because in WMO mode, SIL is generated once
+    // per module, not per source file. Only IR and optimization records can have
+    // per-file outputs in multi-threaded WMO.
+    if (OptionID == options::OPT_ir_output_path) {
       optionName = "-ir-output-path";
+    } else if (OptionID == options::OPT_save_optimization_record_path) {
+      optionName = "-save-optimization-record-path";
     } else {
       continue;
     }
