@@ -1550,6 +1550,17 @@ ASTBuilder::findDeclContext(NodePointer node) {
       }
     }
 
+    // FIXME: We shouldn't be attempting to find an exact extension match,
+    // clients only need the nominal for qualified lookup. Additionally, the
+    // module in which the extension resides is currently used to filter the
+    // lookup results. This means when we have multiple matches, the particular
+    // extension we choose matters.
+    //
+    // We ought to refactor things such that we return a module ABI name +
+    // nominal decl which downstream logic can use to lookup and limit results
+    // to only those that appear in the ABI module. Then we can delete all this
+    // logic.
+    SmallVector<ExtensionDecl *, 4> genericExts;
     for (auto *ext : nominalDecl->getExtensions()) {
       bool found = false;
       for (ModuleDecl *module : moduleDecls) {
@@ -1588,6 +1599,39 @@ ASTBuilder::findDeclContext(NodePointer node) {
         if (requirements.empty())
           return ext;
       }
+      genericExts.push_back(ext);
+    }
+    if (!genericSig)
+      return nullptr;
+
+    SmallVector<Requirement, 2> requirements;
+    SmallVector<InverseRequirement, 2> inverses;
+    genericSig->getRequirementsWithInverses(requirements, inverses);
+
+    // If we didn't find a result yet, try again without invertible requirements
+    // since `demangleGenericSignature` won't include them, e.g won't include
+    // Copyable for:
+    //
+    // struct S<T: ~Copyable> {}
+    // protocol P: ~Copyable {}
+    // extension S where T: P/*, T: Copyable*/ {}
+    //
+    // We do this as a separate loop to avoid disturbing existing lookup
+    // behavior for cases where there's an extension with matching inverses,
+    // since the choice of extension matters (see above FIXME).
+    //
+    // FIXME: This is a complete hack, we ought to delete all this logic and
+    // just return the nominal + module ABI name.
+    for (auto *ext : genericExts) {
+      auto extSig = ext->getGenericSignature().getCanonicalSignature();
+      if (extSig.getGenericParams() != genericSig.getGenericParams())
+        continue;
+
+      SmallVector<Requirement, 2> extReqs;
+      SmallVector<InverseRequirement, 2> extInvs;
+      extSig->getRequirementsWithInverses(extReqs, extInvs);
+      if (extReqs == requirements)
+        return ext;
     }
 
     return nullptr;
