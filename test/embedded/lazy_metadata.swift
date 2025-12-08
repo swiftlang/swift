@@ -80,9 +80,9 @@ public func useMetadata3() -> Any {
 // A2: @"$e1A10SomeStructVMf" = linkonce_odr hidden constant
 // A2: @"$e1A9SomeClassCMf" = linkonce_odr hidden global
 
-// A2: @"$e1A8SomeEnumON" = alias{{.*}}e1A8SomeEnumOMf
-// A2: @"$e1A10SomeStructVN" = alias{{.*}}e1A10SomeStructVMf
-// A2: @"$e1A9SomeClassCN" = alias{{.*}}e1A9SomeClassCMf
+// A2: @"$e1A8SomeEnumON" = {{.*}}alias{{.*}}e1A8SomeEnumOMf
+// A2: @"$e1A10SomeStructVN" = {{.*}}alias{{.*}}e1A10SomeStructVMf
+// A2: @"$e1A9SomeClassCN" = {{.*}}alias{{.*}}e1A9SomeClassCMf
 
 // B2: @"$e1A9SomeClassCN" = {{.*}}external{{.*}} global
 // B2: @"$e1A10SomeStructVN" = {{.*}}external{{.*}} global
@@ -95,10 +95,10 @@ public func useMetadata3() -> Any {
 // visible outside of the image per current policy.
 // In single llvm module per SIL module "Private" SIL linkage makes more
 // intuitive sense.
-// A3: @"$e1A8SomeEnumOMf" = internal constant
-// A3: @"$e1A10SomeStructVMf" = internal constant
-// A3: @"$e1A9SomeClassCMf" = internal global
-// A3: @"$e1A9SomeClassCN" = alias{{.*}}e1A9SomeClassCMf
+// A3: @"$e1A8SomeEnumOMf" = {{.*}}internal constant
+// A3: @"$e1A10SomeStructVMf" = {{.*}}internal constant
+// A3: @"$e1A9SomeClassCMf" = {{.*}}internal global
+// A3: @"$e1A9SomeClassCN" = {{.*}}alias{{.*}}e1A9SomeClassCMf
 // A3: call {{.*}} @"$e1A9SomeClassCACycfC"({{.*}}getelementptr{{.*}}@"$e1A9SomeClassCMf"
 
 
