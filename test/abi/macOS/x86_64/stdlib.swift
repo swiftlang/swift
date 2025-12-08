@@ -1156,3 +1156,7 @@ Added: _$ss13EncodingErrorO16debugDescriptionSSvg
 Added: _$ss13EncodingErrorO16debugDescriptionSSvpMV
 Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesMc
 Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesWP
+
+// SE-0494 Add isTriviallyIdentical(to:) Methods to String and Substring
+Added: _$sSS20isTriviallyIdentical2toSbSS_tF
+Added: _$sSs20isTriviallyIdentical2toSbSs_tF
