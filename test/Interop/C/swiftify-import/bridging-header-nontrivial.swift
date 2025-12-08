@@ -6,28 +6,27 @@
 // RUN: %target-swiftc_driver -typecheck -disable-bridging-pch -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-objc-header %t/bridging.h -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast %t/test.swift -Xfrontend -dump-macro-expansions 2>&1 | %FileCheck --dry-run > %t/macro-expansions.out
 // RUN: %diff %t/macro-expansions.out %t/macro-expansions.expected
 // RUN: %target-swiftc_driver -typecheck -disable-bridging-pch -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-objc-header %t/bridging.h -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast %t/test.swift -Xfrontend -dump-source-file-imports 2>&1 | %FileCheck --dry-run > %t/imports.out
-// RUN: %diff %t/imports.out %t/imports.expected
+// RUN: %FileCheck %s < %t/imports.out
 
-//--- imports.expected
-imports for TMP_DIR/test.swift:
-	Swift
-	__ObjC
-	_StringProcessing
-	_SwiftConcurrencyShims
-	_Concurrency
-	TestClang
-imports for __ObjC.foo:
-imports for @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:
-	__ObjC
-	Swift
-imports for TestClang.bar:
-imports for @__swiftmacro_So3bar15_SwiftifyImportfMp_.swift:
-	Swift
-	lifetimebound
-	ptrcheck
-	_StringProcessing
-	_SwiftConcurrencyShims
-	_Concurrency
+// CHECK:      imports for TMP_DIR{{/|\\}}test.swift:
+// CHECK-NEXT: 	Swift
+// CHECK-NEXT: 	__ObjC
+// CHECK-NEXT: 	_StringProcessing
+// CHECK-NEXT: 	_SwiftConcurrencyShims
+// CHECK-NEXT: 	_Concurrency
+// CHECK-NEXT: 	TestClang
+// CHECK-NEXT: imports for __ObjC.foo:
+// CHECK-NEXT: imports for @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:
+// CHECK-NEXT: 	__ObjC
+// CHECK-NEXT: 	Swift
+// CHECK-NEXT: imports for TestClang.bar:
+// CHECK-NEXT: imports for @__swiftmacro_So3bar15_SwiftifyImportfMp_.swift:
+// CHECK-NEXT: 	Swift
+// CHECK-NEXT: 	lifetimebound
+// CHECK-NEXT: 	ptrcheck
+// CHECK-NEXT: 	_StringProcessing
+// CHECK-NEXT: 	_SwiftConcurrencyShims
+// CHECK-NEXT: 	_Concurrency
 
 //--- macro-expansions.expected
 @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift

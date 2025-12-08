@@ -5,7 +5,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Lib)) %t/Lib.swift \
 // RUN:   -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -emit-clang-header-path %t/cdecl.h \
-// RUN:   -import-objc-header %t/BridgingHeader.h
+// RUN:   -import-objc-header %t/BridgingHeader.h -v
 // RUN: %target-codesign %t/%target-library-name(Lib)
 
 /// Build a C client against cdecl.h.

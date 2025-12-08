@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -import-objc-header %S/Inputs/tail_allocated_c_array.h -swift-version 5 -g %s -o %t/a.out
+// RUN: %target-build-swift -import-objc-header %S/Inputs/tail_allocated_c_array.h -swift-version 5 -g %s -o %t/a.out -explicit-module-build -v
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
