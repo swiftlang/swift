@@ -26,5 +26,5 @@ func test(arr: [any P]) {
 // CHECK: sil private [ossa] @$s34anyhashable_and_operator_filtering4test3arrySayAA1P_pG_tFyAaD_pXEfU_
 // CHECK: [[LHS_ARG:%.*]] = alloc_stack $E
 // CHECK: [[RHS_ARG:%.*]] = alloc_stack $E
-// CHECK: [[GENERIC_OP:%.*]] = witness_method $E, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool
+// CHECK: [[GENERIC_OP:%.*]] = witness_method $E, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool
 // CHECK-NEXT: apply [[GENERIC_OP]]<E>([[LHS_ARG]], [[RHS_ARG]], {{.*}})
