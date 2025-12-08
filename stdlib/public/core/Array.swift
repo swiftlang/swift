@@ -2181,19 +2181,20 @@ extension Array {
   ///   - `a == b` does not imply `a.isTriviallyIdentical(b)`
   ///
   /// Values produced by copying the same value, with no intervening mutations,
-  /// will compare identical:
+  /// compare as identical:
   ///
   /// ```swift
   /// let d = c
   /// print(c.isTriviallyIdentical(to: d))
-  /// // Prints true
+  /// // Prints true.
   /// ```
   ///
-  /// Comparing arrays this way includes comparing (normally) hidden
-  /// implementation details such as the memory location of any underlying
-  /// array storage object. Therefore, identical arrays are guaranteed to
-  /// compare equal with `==`, but not all equal arrays are considered
-  /// identical.
+  /// Comparing arrays this way
+  /// includes comparing implementation details that are normally hidden,
+  /// such as the memory location of any underlying array storage,
+  /// These details aren't considered when comparing for equality with the `==` operator.
+  /// Therefore, identical arrays are guaranteed to compare equal,
+  /// but not all equal arrays are identical.
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
