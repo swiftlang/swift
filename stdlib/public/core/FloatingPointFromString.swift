@@ -929,7 +929,7 @@ fileprivate func fastParse64(
   }
 
   // Parse an exponent phrase "e+123"
-  if i < input.count && (input[i] | 0x20) == 0x65 { // 'e' or 'E'
+  if unsafe i < input.count && (input[unchecked: i] | 0x20) == 0x65 { // 'e' or 'E'
     i &+= 1
     var exponentSign = Int32(1)
     if i >= input.count {
