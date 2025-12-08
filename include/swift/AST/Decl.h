@@ -81,6 +81,7 @@ namespace swift {
   class DiagnosticEngine;
   class DynamicSelfType;
   class Type;
+  enum class ExportedLevel;
   class Expr;
   struct ExternalSourceLocs;
   class CaptureListExpr;
@@ -6755,10 +6756,7 @@ public:
   ///
   /// From the standpoint of access control and exportability checking, this
   /// var will behave as if it was public, even if it is internal or private.
-  ///
-  /// If \p applyImplicit, consider implicitly exposed layouts as well.
-  /// This applies to non-resilient modules.
-  bool isLayoutExposedToClients(bool applyImplicit = false) const;
+  ExportedLevel isLayoutExposedToClients() const;
 
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
