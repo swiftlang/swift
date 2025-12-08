@@ -81,7 +81,7 @@ import Swift
 /// method is explicitly invoked. No other mechanism can cancel a `Task`, 
 /// including any instance of `Task` created within the scope of another 
 /// cancelled task. To propagate cancellation from an enclosing task, provide a 
-/// cancellation handler via ``Task/withTaskCancellationHandler(operation:onCancel:isolation:)``.
+/// cancellation handler via ``withTaskCancellationHandler(operation:onCancel:isolation:)``.
 ///
 /// Any instance of `Task` that you initialize for yourself is a top-level,
 /// _unstructured_ task. For more information about the implications of
