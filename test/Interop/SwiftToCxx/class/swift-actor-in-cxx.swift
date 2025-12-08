@@ -16,7 +16,7 @@
 // REQUIRES: concurrency
 
 @_expose(Cxx)
-public final actor ActorWithField {
+public final actor ActorWithField { // expected-warning{{'final' on actor 'ActorWithField' has no effect}}
   var field: Int64
 
   public init() {

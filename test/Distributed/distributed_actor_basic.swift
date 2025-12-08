@@ -23,3 +23,5 @@ distributed actor Second {
     try! await first.one(second: self)
   }
 }
+
+final distributed actor WarnAboutMe { } // expected-warning{{'final' on distributed actor 'WarnAboutMe' has no effect}}

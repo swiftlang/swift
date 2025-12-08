@@ -3284,8 +3284,14 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
 
-    if (CD->isActor())
+    if (CD->isActor()) {
       TypeChecker::checkConcurrencyAvailability(CD->getLoc(), CD);
+
+      if (CD->isFinal()) {
+        CD->diagnose(diag::actor_final_no_effect, CD)
+            .fixItRemove(CD->getAttrs().getAttribute<FinalAttr>()->getLocation());
+      }
+    }
 
     for (Decl *Member : CD->getABIMembers())
       visit(Member);

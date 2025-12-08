@@ -5699,6 +5699,9 @@ ERROR(async_objc_dynamic_self,none,
 ERROR(actor_inheritance,none,
       "%select{actor|distributed actor}0 types do not support inheritance",
       (bool))
+WARNING(actor_final_no_effect,none,
+        "'final' on %kind0 has no effect",
+        (const ValueDecl*))
 
 ERROR(actor_protocol_illegal_inheritance,none,
       "non-actor type %0 cannot conform to the %1 protocol",
