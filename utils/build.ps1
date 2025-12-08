@@ -273,13 +273,13 @@ if ($UseHostToolchain -is [string]) {
 
 $DefaultPinned = @{
   AMD64 = @{
-    PinnedBuild = "https://download.swift.org/development/windows10/swift-DEVELOPMENT-SNAPSHOT-2025-11-03-a/swift-DEVELOPMENT-SNAPSHOT-2025-11-03-a-windows10.exe";
-    PinnedSHA256 = "1B93C9B419070925E5ABCD1A273C510121E9928554876EC0DCA530121D8C93D3";
+    PinnedBuild = "https://download.swift.org/development/windows10/swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a/swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a-windows10.exe";
+    PinnedSHA256 = "E16E5289691D9FBD01075054A066D5BB9BF6DE061970758DD9E8863606763C09";
     PinnedVersion = "0.0.0";
   };
   ARM64 = @{
-    PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2025-11-03-a/swift-DEVELOPMENT-SNAPSHOT-2025-11-03-a-windows10-arm64.exe"
-    PinnedSHA256 = "A4394A53082BC0346A0D85C6B4A52F540A29517D594288707B8C1D6BAA0B9E55";
+    PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a/swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a-windows10-arm64.exe"
+    PinnedSHA256 = "39C9013F2CC3FE5186D3F10E30023BED4456F971CFAA0E900779A5F55A9651F1";
     PinnedVersion = "0.0.0";
   };
 }
