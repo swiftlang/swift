@@ -317,7 +317,7 @@ struct PotentialBindings {
   /// relational constraint.
   std::optional<PotentialBinding> inferFromRelational(Constraint *constraint);
 
-  void infer(Constraint *constraint);
+  std::optional<PotentialBinding> infer(Constraint *constraint);
 
   /// Retract all bindings and other information related to a given
   /// constraint from this binding set.
