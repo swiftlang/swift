@@ -72,14 +72,14 @@ func testActorCrossingBoundary() async {
   let _ = await (await mainActorResult(1))(2)
   // expected-error @-1 {{non-Sendable '(Int) -> Int'-typed result can not be returned from main actor-isolated global function 'mainActorResult' to global actor 'CustomActor'-isolated context}}
   // expected-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-  // expected-warning @-3 {{no 'async' operations occur within 'await' expression}}
+  // expected-warning @-3 {{no 'async' operations occur within 'await' expression}}{{11-17=}}
 
   let calc = Calculator()
   
   let _ = (await calc.addCurried(1))(2)
   // expected-error @-1 {{non-Sendable '(Int) -> Int'-typed result can not be returned from actor-isolated instance method 'addCurried' to global actor 'CustomActor'-isolated context}}
   // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-  let _ = await (await calc.addCurried(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
+  let _ = await (await calc.addCurried(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}{{11-17=}}
   // expected-error @-1 {{non-Sendable '(Int) -> Int'-typed result can not be returned from actor-isolated instance method 'addCurried' to global actor 'CustomActor'-isolated context}}
   // expected-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
