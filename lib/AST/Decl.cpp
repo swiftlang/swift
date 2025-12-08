@@ -2803,6 +2803,11 @@ ExportedLevel VarDecl::isLayoutExposedToClients() const {
   if (parent->getAttrs().hasAttribute<ImplementationOnlyAttr>())
     return ExportedLevel::None;
 
+  // Class layouts are not exposed to clients, except for subclassing.
+  if (isa<ClassDecl>(parent) &&
+      !parent->hasOpenAccess(getDeclContext()))
+    return ExportedLevel::None;
+
   auto M = getDeclContext()->getParentModule();
   if (getASTContext().LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
       M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
