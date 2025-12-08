@@ -73,6 +73,33 @@ import Swift
 /// as resuming a continuation, may acquire these same internal locks.
 /// Therefore, if a cancellation handler must acquire a lock, other code should
 /// not cancel tasks or resume continuations while holding that lock.
+///
+/// ### Propagating cancellation to unstructured tasks
+///
+/// If an unstructured task (an instance of ``Task``) is created during the 
+/// operation of another task, cancellation of the enclosing task will not
+/// propagate to the unstructured task without an explicit cancellation handler:
+///
+/// ```swift
+/// let outer = Task {
+///     let inner = Task {
+///         // The next statement will not throw an error unless cancellation of
+///         // the `outer` task is manually propagated to the `inner` task via a
+///         // cancellation handler:
+///         try Task.checkCancellation()
+///         return try await work()
+///     }
+///     return try await withTaskCancellationHandler {
+///         try await inner.value
+///     } onCancel: {
+///         inner.cancel()
+///     }
+/// }
+///
+/// // When `outer` becomes cancelled, the `onCancel` handler above will run,
+/// // causing `inner` to become cancelled, too.
+/// outer.cancel()
+/// ```
 @available(SwiftStdlib 5.1, *)
 #if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)

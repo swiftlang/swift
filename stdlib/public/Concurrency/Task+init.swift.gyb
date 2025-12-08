@@ -253,15 +253,13 @@ extension Task where Failure == ${FAILURE_TYPE} {
 % end
   ///
 % if IS_DETACHED:
-  /// In most cases, an "attached" unstructured task (created via `Task.init`)
-  /// is a more appropriate choice than a detached unstructured task. Attached
-  /// tasks inherit the priority and task-local storage from the enclosing task
-  /// during which they are created. You need to handle these considerations
-  /// manually with a detached task.
-  ///
-  /// A detached `Task` has the same cancellation mechanism as any other `Task`;
-  /// it can only become cancelled via an explicit `cancel()` method call.
+  /// A detached `Task` will not inherit task priority or task-local storage
+  /// from a parent task. You will need to handle these considerations manually.
 % end
+  ///
+  /// Asynchronous operations modeled with `Task` are ["unstructured concurrency"](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/#Unstructured-Concurrency).
+  /// Among other concerns, an unstructured task will not inherit cancellation
+  /// from a parent task.
   ///
   /// You need to keep a reference to the task
   /// if you want to cancel it by calling the `Task.cancel()` method.
