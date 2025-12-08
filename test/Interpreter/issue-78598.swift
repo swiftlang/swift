@@ -1,8 +1,11 @@
-// RUN: %target-run-simple-swift(-target %target-swift-5.9-abi-triple %no-fixup-chains) | %FileCheck %s
+// RUN: %target-run-simple-swift(-target %target-swift-5.9-abi-triple) | %FileCheck %s
 
 // https://github.com/swiftlang/swift/issues/78598
 
 // REQUIRES: executable_test
+
+// This test needs a Swift 5.9 runtime or newer.
+// UNSUPPORTED: back_deployment_runtime
 
 var counter = 0
 
