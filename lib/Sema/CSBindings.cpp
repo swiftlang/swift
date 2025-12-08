@@ -2075,11 +2075,12 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 /// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
-void PotentialBindings::infer(Constraint *constraint) {
+std::optional<PotentialBinding>
+PotentialBindings::infer(Constraint *constraint) {
   ASSERT(TypeVar);
 
   if (!Constraints.insert(constraint))
-    return;
+    return std::nullopt;
 
   // Record the change, if there are active scopes.
   if (CS.solverState)
@@ -2104,7 +2105,7 @@ void PotentialBindings::infer(Constraint *constraint) {
       break;
 
     addPotentialBinding(*binding);
-    break;
+    return binding;
   }
   case ConstraintKind::KeyPathApplication: {
     // If this variable is in the application projected result type, delay
@@ -2260,6 +2261,8 @@ void PotentialBindings::infer(Constraint *constraint) {
     break;
   }
   }
+
+  return std::nullopt;
 }
 
 void PotentialBindings::retract(Constraint *constraint) {
