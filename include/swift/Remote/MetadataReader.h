@@ -2674,6 +2674,18 @@ private:
       return nullptr;
     }
 
+    // Check if the Reader can provide a symbol for this descriptor, and if it 
+    // can, use that instead.
+    if (auto remoteAbsolutePointer =
+            Reader->resolvePointerAsSymbol(descriptor.getRemoteAddress())) {
+      auto symbol = remoteAbsolutePointer->getSymbol();
+      if (!symbol.empty()) {
+        if (auto demangledSymbol = buildContextManglingForSymbol(symbol, dem)) {
+          return demangledSymbol;
+        }
+      }
+    }
+
     // Read the parent descriptor.
     auto parentDescriptorResult = readParentContextDescriptor(descriptor);
 
