@@ -919,7 +919,7 @@ fileprivate func fastParse64(
       }
     }
     nonZeroDigitCount &+= i &- firstSignificantDigitAfterDecimalPointOffset
-    base10Exponent &-= Int32(i &- firstDigitAfterDecimalPointOffset)
+    base10Exponent &-= Int32(truncatingIfNeeded: i &- firstDigitAfterDecimalPointOffset)
 
     if i == firstDigitOffset &+ 1 {
       return .failure // No digits, only a '.'
