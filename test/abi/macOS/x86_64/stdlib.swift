@@ -1160,3 +1160,9 @@ Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesWP
 // SE-0494 Add isTriviallyIdentical(to:) Methods to String and Substring
 Added: _$sSS20isTriviallyIdentical2toSbSS_tF
 Added: _$sSs20isTriviallyIdentical2toSbSs_tF
+Added: _$sSS17UnicodeScalarViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSS8UTF8ViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSS9UTF16ViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSs17UnicodeScalarViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSs8UTF8ViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSs9UTF16ViewV20isTriviallyIdentical2toSbAB_tF
