@@ -550,11 +550,12 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   if (minAccessScope.isPublic())
     return;
 
-  // FIXME: Promote these to an error in the next -swift-version break.
-  if (isa<SubscriptDecl>(ownerDecl) || isa<TypeAliasDecl>(ownerDecl))
+  auto &Context = ownerDecl->getASTContext();
+
+  if (!Context.LangOpts.hasFeature(Feature::StrictAccessControl) &&
+      (isa<SubscriptDecl>(ownerDecl) || isa<TypeAliasDecl>(ownerDecl)))
     downgradeToWarning = DowngradeToWarning::Yes;
 
-  auto &Context = ownerDecl->getASTContext();
   if (checkUsableFromInline) {
     if (!Context.isLanguageModeAtLeast(5))
       downgradeToWarning = DowngradeToWarning::Yes;
@@ -2042,14 +2043,16 @@ swift::getDisallowedOriginKind(const Decl *decl,
   downgradeToWarning = DowngradeToWarning::No;
   ModuleDecl *M = decl->getModuleContext();
   auto *SF = where.getDeclContext()->getParentSourceFile();
+  auto &Context = M->getASTContext();
 
   RestrictedImportKind howImported = SF->getRestrictedImportKind(M);
   if (howImported != RestrictedImportKind::None) {
     // Temporarily downgrade implementation-only exportability in SPI to
     // a warning.
-    if (where.isSPI() &&
+    if (!Context.LangOpts.hasFeature(Feature::StrictAccessControl) &&
+        where.isSPI() &&
         where.getFragileFunctionKind().kind == FragileFunctionKind::None &&
-        !SF->getASTContext().LangOpts.EnableSPIOnlyImports)
+        !Context.LangOpts.EnableSPIOnlyImports)
       downgradeToWarning = DowngradeToWarning::Yes;
 
     if (where.isSPI() && howImported == RestrictedImportKind::SPIOnly)
@@ -2058,8 +2061,9 @@ swift::getDisallowedOriginKind(const Decl *decl,
     // Before Swift 6, implicit imports were not reported unless an
     // implementation-only import was also present. Downgrade to a warning
     // just in this case.
-    if (howImported == RestrictedImportKind::MissingImport &&
-        !SF->getASTContext().isLanguageModeAtLeast(6) &&
+    if (!Context.LangOpts.hasFeature(Feature::StrictAccessControl) &&
+        howImported == RestrictedImportKind::MissingImport &&
+        !Context.isLanguageModeAtLeast(6) &&
         !SF->hasImportsWithFlag(ImportFlags::ImplementationOnly)) {
       downgradeToWarning = DowngradeToWarning::Yes;
     }
@@ -2087,7 +2091,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
         if (!owningModule)
           continue;
         auto moduleWrapper =
-            decl->getASTContext().getClangModuleLoader()->getWrapperForModule(
+            Context.getClangModuleLoader()->getWrapperForModule(
                 owningModule);
         auto visibleAccessPath =
             find_if(sfImportedModules, [&moduleWrapper](auto importedModule) {
@@ -2150,7 +2154,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
   }
 
   // C++ APIs do not support library evolution.
-  if (SF->getASTContext().LangOpts.EnableCXXInterop && where.getDeclContext() &&
+  if (Context.LangOpts.EnableCXXInterop && where.getDeclContext() &&
       where.getDeclContext()->getAsDecl() &&
       where.getDeclContext()->getAsDecl()->getModuleContext()->isResilient() &&
       !where.getDeclContext()
@@ -2159,13 +2163,13 @@ swift::getDisallowedOriginKind(const Decl *decl,
            ->getUnderlyingModuleIfOverlay() &&
       decl->hasClangNode() && !decl->getModuleContext()->isSwiftShimsModule() &&
       isFragileClangNode(decl->getClangNode()) &&
-      !SF->getASTContext().LangOpts.hasFeature(
+      !Context.LangOpts.hasFeature(
           Feature::AssumeResilientCxxTypes))
     return DisallowedOriginKind::FragileCxxAPI;
 
   // Implementation-only memory layouts for non-library-evolution mode.
   if (isa<NominalTypeDecl>(decl) &&
-      decl->getASTContext().LangOpts.hasFeature(
+      Context.LangOpts.hasFeature(
           Feature::CheckImplementationOnly) &&
       decl->getAttrs().hasAttribute<ImplementationOnlyAttr>())
     return DisallowedOriginKind::ImplementationOnlyMemoryLayout;
