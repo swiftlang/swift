@@ -319,11 +319,11 @@ SubstringTests.test("Substring.base") {
 
 SubstringTests.test("isTriviallyIdentical(to:) small ascii")
 .skip(.custom(
-  { if #available(SwiftStdlib 9999, *) { false } else { true } },
-  reason: "Requires Swift 6.3's standard library"
+  { if #available(StdlibDeploymentTarget 6.4, *) { false } else { true } },
+  reason: "Requires Swift 6.4's standard library"
 ))
 .code {
-  guard #available(SwiftStdlib 9999, *) else { return }
+  guard #available(StdlibDeploymentTarget 6.4, *) else { return }
 
   let a = "Hello"
   let b = "Hello"
@@ -378,11 +378,11 @@ SubstringTests.test("isTriviallyIdentical(to:) small ascii")
 
 SubstringTests.test("isTriviallyIdentical(to:) small unicode")
 .skip(.custom(
-  { if #available(SwiftStdlib 9999, *) { false } else { true } },
-  reason: "Requires Swift 6.3's standard library"
+  { if #available(StdlibDeploymentTarget 6.4, *) { false } else { true } },
+  reason: "Requires Swift 6.4's standard library"
 ))
 .code {
-  guard #available(SwiftStdlib 9999, *) else { return }
+  guard #available(StdlibDeploymentTarget 6.4, *) else { return }
 
   let a = "Cafe\u{301}"
   let b = "Cafe\u{301}"
@@ -431,11 +431,11 @@ SubstringTests.test("isTriviallyIdentical(to:) small unicode")
 
 SubstringTests.test("isTriviallyIdentical(to:) large ascii")
 .skip(.custom(
-  { if #available(SwiftStdlib 9999, *) { false } else { true } },
-  reason: "Requires Swift 6.3's standard library"
+  { if #available(StdlibDeploymentTarget 6.4, *) { false } else { true } },
+  reason: "Requires Swift 6.4's standard library"
 ))
 .code {
-  guard #available(SwiftStdlib 9999, *) else { return }
+  guard #available(StdlibDeploymentTarget 6.4, *) else { return }
 
   let a = String(repeating: "foo", count: 1000)
   let b = String(repeating: "foo", count: 1000)
