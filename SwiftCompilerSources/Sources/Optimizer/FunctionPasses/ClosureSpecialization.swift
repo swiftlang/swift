@@ -1274,7 +1274,7 @@ func findOptionalNoneMatchingOptionalSome(in vjp: Function, closuresInBTE: [Clos
       subsetThunk: closureInBTE.subsetThunk,
       optionalWrapper: optionalNone,
       useInPayload: payloadTuple.operands.last!,
-      enumCase: bteWithNone.type.getEnumCases(in: vjp)![bteWithNone.caseIndex]!,
+      enumCase: bteWithNone.type.getEnumCases(in: vjp)![bteWithNone.caseIndex]!
     ))
   }
 
@@ -1502,7 +1502,7 @@ private func findBTEUses(for rootClosure: SingleValueInstruction) -> [ClosureInB
         subsetThunk: subsetThunk,
         optionalWrapper: optionalWrapper,
         useInPayload: use,
-        enumCase: enumCase,
+        enumCase: enumCase
       )
       // Avoid duplicates in case when multiple identical enum instructions accept `ti` as payload
       if !closureInBTEForPayloadArr.contains(closureInBTE) {
