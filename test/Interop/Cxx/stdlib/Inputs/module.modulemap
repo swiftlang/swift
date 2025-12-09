@@ -105,3 +105,9 @@ module StdExpected {
   requires cplusplus
   export *
 }
+
+module StdHash {
+  header "std-hash.h"
+  requires cplusplus
+  export *
+}
