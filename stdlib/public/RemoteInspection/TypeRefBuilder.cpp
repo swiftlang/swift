@@ -335,6 +335,13 @@ void TypeRefBuilder::ReflectionTypeDescriptorFinder::
   ProcessedReflectionInfoIndexes.insert(Index);
 }
 
+void TypeRefBuilder::ReflectionTypeDescriptorFinder::
+    ensureAllFieldDescriptorsCached() {
+  for (size_t i = 0; i < ReflectionInfos.size(); ++i) {
+    populateFieldTypeInfoCacheWithReflectionAtIndex(i);
+  }
+}
+
 std::optional<RemoteRef<FieldDescriptor>>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::findFieldDescriptorAtIndex(
     size_t Index, const std::string &MangledName) {

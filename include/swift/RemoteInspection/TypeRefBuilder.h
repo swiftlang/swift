@@ -597,6 +597,9 @@ public:
     /// an external file.
     remote::ExternalTypeRefCache *ExternalTypeRefCache = nullptr;
 
+    /// Ensure all field descriptors are in the FieldTypeInfoCache.
+    void ensureAllFieldDescriptorsCached();
+
   public:
     ///
     /// Dumping typerefs, field declarations, builtin types, captures,
@@ -746,20 +749,18 @@ public:
     ConformanceCollectionResult collectAllConformances() {
       ConformanceCollectionResult result;
 
-      // The Fields section has gathered info on types that includes their
-      // mangled names. Use that to build a dictionary from a type's demangled
-      // name to its mangled name
+      ensureAllFieldDescriptorsCached();
+
+      Demangler dem;
+      // Build the demangled to mangled name map from the FieldTypeInfoCache.
       std::unordered_map<std::string, std::string> typeNameToManglingMap;
-      for (const auto &section : ReflectionInfos) {
-        for (auto descriptor : section.Field) {
-          TypeRefBuilder::ScopedNodeFactoryCheckpoint checkpoint(&Builder);
-          auto TypeRef = readTypeRef(descriptor, descriptor->MangledTypeName);
-          auto OptionalMangledTypeName = normalizeReflectionName(TypeRef);
-          auto TypeName = nodeToString(Builder.demangleTypeRef(TypeRef));
-          if (OptionalMangledTypeName.has_value()) {
-            typeNameToManglingMap[TypeName] = OptionalMangledTypeName.value();
-          }
-        }
+      for (const auto &entry : FieldTypeInfoCache) {
+        const std::string &mangledName = entry.first;
+        RemoteRef<FieldDescriptor> descriptor = entry.second;
+
+        auto node = dem.demangleType(mangledName);
+        auto demangledName = nodeToString(node);
+        typeNameToManglingMap[demangledName] = mangledName;
       }
 
       // Collect all conformances and aggregate them per-conforming-type.
