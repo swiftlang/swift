@@ -36,14 +36,12 @@ func id<T>(_: T) -> T {}
 
 func bar3(x: @escaping () -> ()) {
   func f(_: @escaping @convention(block) () -> ()) {}
-  // FIXME
-  f(id(x))  // expected-error {{conflicting arguments to generic parameter 'T' ('@convention(block) () -> ()' vs. '() -> ()')}}
+  f(id(x))
 }
 
 func bar4(x: @escaping @convention(block) () -> ()) {
   func f(_: @escaping () -> ()) {}
-  // FIXME
-  f(id(x))  // expected-error {{conflicting arguments to generic parameter 'T' ('() -> ()' vs. '@convention(block) () -> ()')}}
+  f(id(x))
 }
 
 func bar5(x: Double) {

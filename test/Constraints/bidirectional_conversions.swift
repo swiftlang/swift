@@ -43,3 +43,37 @@ func baz2(x: (Int, Int)?) {
   func f(_: (x: Int, y: Int)) {}
   f(unwrap(x))
 }
+
+/////////////
+
+func borrowingFn(fn: @escaping (borrowing AnyObject) -> ()) -> (AnyObject) -> () {
+  return id(id(fn))
+}
+
+/////////////
+
+infix operator <+
+infix operator >+
+
+protocol P {
+  static func <+ (lhs: borrowing Self, rhs: borrowing Self)
+  static func >+ (lhs: borrowing Self, rhs: borrowing Self)
+}
+
+extension P {
+  static func >+ (lhs: borrowing Self, rhs: borrowing Self) {}
+}
+
+struct S: P {
+  static func <+ (lhs: Self, rhs: Self) {}
+}
+
+let _: (S, S) -> () = false ? (<+) : (>+)
+
+/////////////
+
+struct MyString: Comparable {
+  static func < (lhs: Self, rhs: Self) -> Bool { fatalError() }
+}
+
+let _: (MyString, MyString) -> Bool = false ? (<) : (>)
