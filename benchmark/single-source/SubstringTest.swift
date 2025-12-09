@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let benchmarks: [BenchmarkInfo] = [
+public let benchmarks = [
   BenchmarkInfo(name: "EqualStringSubstring", runFunction: run_EqualStringSubstring, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "EqualSubstringString", runFunction: run_EqualSubstringString, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "EqualSubstringSubstring", runFunction: run_EqualSubstringSubstring, tags: [.validation, .api, .String]),
@@ -24,7 +24,7 @@ public let benchmarks: [BenchmarkInfo] = [
   BenchmarkInfo(name: "StringFromLongWholeSubstring", runFunction: run_StringFromLongWholeSubstring, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "StringFromLongWholeSubstringGeneric", runFunction: run_StringFromLongWholeSubstringGeneric, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringComparable", runFunction: run_SubstringComparable, tags: [.validation, .api, .String],
-                setUpFunction: { blackHole(_comparison) }),
+    setUpFunction: { blackHole(_comparison) }),
   BenchmarkInfo(name: "SubstringEqualString", runFunction: run_SubstringEqualString, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringEquatable", runFunction: run_SubstringEquatable, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringFromLongString2", runFunction: run_SubstringFromLongString, tags: [.validation, .api, .String]),
