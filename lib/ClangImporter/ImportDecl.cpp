@@ -1613,6 +1613,14 @@ namespace {
       if (!dc)
         return nullptr;
 
+      // It's possible that we already encountered and imported decl while
+      // importing its decl context. If we are able to find a cached result,
+      // use it to avoid making a duplicate imported decl.
+      auto alreadyImported =
+          Impl.ImportedDecls.find({decl->getCanonicalDecl(), getVersion()});
+      if (alreadyImported != Impl.ImportedDecls.end())
+        return alreadyImported->second;
+
       auto name = importedName.getBaseIdentifier(Impl.SwiftContext);
 
       // Create the enum declaration and record it.
