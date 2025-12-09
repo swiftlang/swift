@@ -6204,7 +6204,7 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
 
   // Parse attributes.
   DeclAttributes Attributes;
-  if (Tok.hasComment())
+  if (Tok.hasComment() && shouldAttachCommentToDecl())
     Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
   ParserStatus AttrStatus = parseDeclAttributeList(
       Attributes, IfConfigsAreDeclAttrs);

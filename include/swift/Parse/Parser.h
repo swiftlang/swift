@@ -693,6 +693,10 @@ public:
     return Context.LangOpts.EnableExperimentalConcurrency;
   }
 
+  bool shouldAttachCommentToDecl() {
+    return Context.LangOpts.AttachCommentsToDecls;
+  }
+
   /// Returns true if a Swift declaration starts after the current token,
   /// otherwise returns false.
   bool isNextStartOfSwiftDecl() {
