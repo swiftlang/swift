@@ -147,6 +147,8 @@ struct PotentialBinding {
     return {placeholderTy, AllowedBindingKind::Exact,
             PointerUnion<Constraint *, ConstraintLocator *>()};
   }
+
+  void print(llvm::raw_ostream &out, const PrintOptions &PO) const;
 };
 
 struct LiteralRequirement {
