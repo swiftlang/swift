@@ -771,6 +771,7 @@ Added: _$ss7UnicodeO5UTF32O27encodedReplacementCharacters15CollectionOfOneVys6UI
 Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_2_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_3_0ABvpZMV
+Added: _$sSo19_SwiftStdlibVersionasE6v6_4_0ABvpZMV
 Added: _$sSBsE5radixSivpZMV
 Added: _$sSFsE8ulpOfOnexvpZMV
 Added: _$sSUsE8isSignedSbvpZMV
