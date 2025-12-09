@@ -1085,8 +1085,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // In this case solver would produce 2 solutions: one where `count`
     // is a property reference on `[Int]` and another one is tuple access
     // for a `count:` element.
-    if (choice1.isDecl() != choice2.isDecl())
+    if (choice1.isDecl() != choice2.isDecl()) {
+      if (cs.isDebugMode()) {
+        llvm::errs().indent(cs.solverState->getCurrentIndent())
+            << "- incomparable\n";
+      }
+
       return SolutionCompareResult::Incomparable;
+    }
 
     auto decl1 = choice1.getDecl();
     auto dc1 = decl1->getDeclContext();
@@ -1553,13 +1559,39 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
   // If the scores are different, we have a winner.
   if (score1 != score2) {
-    return score1 > score2? SolutionCompareResult::Better
-                          : SolutionCompareResult::Worse;
+    if (score1 > score2) {
+      if (cs.isDebugMode()) {
+        llvm::errs().indent(cs.solverState->getCurrentIndent())
+            << "- better\n";
+      }
+
+      return SolutionCompareResult::Better;
+    } else {
+      if (cs.isDebugMode()) {
+        llvm::errs().indent(cs.solverState->getCurrentIndent())
+            << "- worse\n";
+      }
+
+      return SolutionCompareResult::Worse;
+    }
   }
 
   // Neither system wins; report whether they were identical or not.
-  return identical? SolutionCompareResult::Identical
-                  : SolutionCompareResult::Incomparable;
+  if (identical) {
+    if (cs.isDebugMode()) {
+      llvm::errs().indent(cs.solverState->getCurrentIndent())
+          << "- identical\n";
+    }
+
+    return SolutionCompareResult::Identical;
+  } else {
+    if (cs.isDebugMode()) {
+      llvm::errs().indent(cs.solverState->getCurrentIndent())
+          << "- incomparable\n";
+    }
+
+    return SolutionCompareResult::Incomparable;
+  }
 }
 
 std::optional<unsigned>
