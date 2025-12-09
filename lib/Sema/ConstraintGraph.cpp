@@ -910,6 +910,9 @@ bool ConstraintGraph::contractEdges() {
     if (!(tyvar1 && tyvar2))
       continue;
 
+    auto rep1 = CS.getRepresentative(tyvar1);
+    auto rep2 = CS.getRepresentative(tyvar2);
+
     // If the argument is allowed to bind to `inout`, in general,
     // it's invalid to contract the edge between argument and parameter,
     // but if we can prove that there are no possible bindings
@@ -919,9 +922,9 @@ bool ConstraintGraph::contractEdges() {
     // Such action is valid because argument type variable can
     // only get its bindings from related overload, which gives
     // us enough information to decided on l-valueness.
-    if (tyvar1->getImpl().canBindToInOut()) {
+    if (rep1->getImpl().canBindToInOut()) {
       bool isNotContractable = true;
-      auto bindings = CS.getBindingsFor(tyvar1);
+      auto bindings = CS.getBindingsFor(rep1);
       if (bindings.isViable()) {
         // Holes can't be contracted.
         if (bindings.isHole())
@@ -948,9 +951,6 @@ bool ConstraintGraph::contractEdges() {
       if (isNotContractable)
         continue;
     }
-
-    auto rep1 = CS.getRepresentative(tyvar1);
-    auto rep2 = CS.getRepresentative(tyvar2);
 
     if (CS.isDebugMode()) {
       auto indent = CS.solverState ? CS.solverState->getCurrentIndent() : 0;
