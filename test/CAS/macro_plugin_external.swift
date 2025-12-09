@@ -33,19 +33,12 @@
 
 // FS: MacroDefinition
 
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
-// RUN: %swift_frontend_plain @%t/SwiftShims.cmd
-
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json MyApp > %t/MyApp.cmd
-
-// RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
+// RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd
 
 // RUN: %target-swift-frontend \
 // RUN:   -typecheck -verify -cache-compile-job -cas-path %t/cas \
-// RUN:   -swift-version 5 -disable-implicit-swift-modules \
+// RUN:   -swift-version 5 -module-name MyApp \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   %t/macro.swift @%t/MyApp.cmd
 
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-name MyApp -module-cache-path %t/clang-module-cache -O \
@@ -59,13 +52,7 @@
 /// CASFS is remapped.
 // FS-REMAP: /^test/plugins/[[LIB]]
 
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps2.json clang:SwiftShims > %t/SwiftShims2.cmd
-// RUN: %swift_frontend_plain @%t/SwiftShims2.cmd
-
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps2.json MyApp > %t/MyApp2.cmd
-
-// RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps2.json > %t/map2.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map2.json > %t/map2.casid
+// RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps2.json -o %t/MyApp2.cmd
 
 /// Command-line is remapped.
 // RUN: %FileCheck %s --check-prefix=CMD-REMAP --input-file=%t/MyApp2.cmd -DLIB=%target-library-name(MacroDefinition)
@@ -77,9 +64,9 @@
 // RUN: %target-swift-frontend \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
-// RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
+// RUN:   -swift-version 5 -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job \
+// RUN:   -module-name MyApp -Rmacro-loading -Rcache-compile-job \
 // RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir 2>&1 | %FileCheck %s --check-prefix=REMARK
 // REMAKR: remark: cache miss
 // REMARK: remark: loaded macro implementation module 'MacroDefinition' from compiler plugin server
@@ -93,9 +80,9 @@
 // RUN: %target-swift-frontend \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
-// RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
+// RUN:   -swift-version 5 -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job \
+// RUN:   -module-name MyApp -Rmacro-loading -Rcache-compile-job \
 // RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir 2>&1 | %FileCheck %s --check-prefix=NO-REMARK
 // NO-REMARK: remark: replay output file
 // NO-REMARK-NOT: remark: loaded macro implementation module 'MacroDefinition' from compiler plugin server
@@ -105,9 +92,9 @@
 // RUN: %target-swift-frontend \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
-// RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
+// RUN:   -swift-version 5 -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job -cache-disable-replay \
+// RUN:   -module-name MyApp -Rmacro-loading -Rcache-compile-job -cache-disable-replay \
 // RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir
 
 /// Typecheck swift interface with macro plugin.
@@ -115,18 +102,18 @@
 // RUN:   %target-swift-frontend \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
-// RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
+// RUN:   -swift-version 5 -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job -cache-disable-replay \
+// RUN:   -module-name MyApp -Rmacro-loading -Rcache-compile-job -cache-disable-replay \
 // RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir > %t/keys.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json /^test/macro.swift > %t/key
 
 // RUN: %target-swift-frontend \
 // RUN:   -typecheck-module-from-interface %t/Macro.swiftinterface \
 // RUN:   -cache-compile-job -cas-path %t/cas \
-// RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
+// RUN:   -swift-version 5 -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job -cache-disable-replay \
+// RUN:   -module-name MyApp -Rmacro-loading -Rcache-compile-job -cache-disable-replay \
 // RUN:   @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir \
 // RUN:   -input-file-key @%t/key
 
@@ -135,9 +122,9 @@
 // RUN: not %target-swift-frontend \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
-// RUN:   -swift-version 5 -disable-implicit-swift-modules -O \
+// RUN:   -swift-version 5 -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map2.casid -Rmacro-loading -Rcache-compile-job -cache-disable-replay \
+// RUN:   -module-name MyApp -Rmacro-loading -Rcache-compile-job -cache-disable-replay \
 // RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir 2>&1 | %FileCheck %s --check-prefix=FAILED
 // FAILED: plugin has changed since dependency scanning
 
