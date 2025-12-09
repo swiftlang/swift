@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 // Float16 is not supported on x86_64 macOS at all
-// UNSUPPORTED: CPU=x86_64 && OS=macOS
+// UNSUPPORTED: CPU=x86_64 && OS=macosx
 
 // TODO: Figure out why this test breaks on wasm32
 // UNSUPPORTED: CPU=wasm32
