@@ -47,6 +47,11 @@ import Swift
 /// Unless you're implementing a custom executor,
 /// you don't directly interact with partial tasks.
 ///
+/// Asynchronous work modeled with `Task` is unstructured concurrency.
+/// Don't use an unstructured task if it's possible to model the operation
+/// using structured concurrency features like child tasks (such as `async let`
+/// or task groups).
+///
 /// For information about the language-level concurrency model that `Task` is part of,
 /// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
 ///
@@ -82,11 +87,6 @@ import Swift
 /// including any instance of `Task` created within the scope of another 
 /// cancelled task. To propagate cancellation from an enclosing task, provide a 
 /// cancellation handler via ``withTaskCancellationHandler(operation:onCancel:isolation:)``.
-///
-/// Any instance of `Task` that you initialize for yourself is a top-level,
-/// _unstructured_ task. For more information about the implications of
-/// unstructured tasks, read the ["Unstructured Concurrency"](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/#Unstructured-Concurrency)
-/// portion of the Swift Programming Language book.
 ///
 /// ### Task closure lifetime
 /// Tasks are initialized by passing a closure containing the code that will be executed by a given task.
