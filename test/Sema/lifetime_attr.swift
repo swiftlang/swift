@@ -225,6 +225,7 @@ func getGeneric<T : ~Escapable>(_ inValue: T) -> T {
   return inValue
 }
 
+// TODO: rdar://160894371?
 func takeGetGenericImplicit<T : ~Escapable>(f: @_lifetime(borrow inValue) (_ inValue: T) -> T) {} // expected-error{{invalid use of borrow dependence with context-dependent ownership}}
 
 func takeGetGeneric<T : ~Escapable>(f: @_lifetime(borrow inValue) (_ inValue: borrowing T) -> T) {}
@@ -235,16 +236,18 @@ func getGeneric<T : ~Escapable>(_ outValue: inout T, _ inValue: T)  {
 }
 
 @_lifetime(o: borrow i)
-func takeGetGeneric<T: ~Escapable>(f: @_lifetime(outValue: borrow inValue)
-                                     (_ outValue: inout T, _ inValue: borrowing T) -> (), o: inout T, i: T) {
+func takeGetGenericAndArgs<T: ~Escapable>(f: @_lifetime(outValue: borrow inValue)
+                                            (_ outValue: inout T, _ inValue: borrowing T) -> (), o: inout T, i: T) {
   f(&o, i)
 }
+
+func takeGetGenericCorrect<T : ~Escapable>(f: @_lifetime(outValue: borrow inValue) (_ outValue: inout T, _ inValue: borrowing T) -> ()) {}
 
 do {
   let x = NE()
   var y = NE()
 
-  takeGetGeneric(f: getGeneric, o: &y, i: x)
+  takeGetGenericAndArgs(f: getGeneric, o: &y, i: x)
 
   let inferredTypeFn = inoutLifetimeDependence
   let unannotatedFn: (inout NE) -> NE = inoutLifetimeDependence // expected-error{{value of type 'NE' does not conform to specified type 'Escapable'}}
@@ -252,8 +255,8 @@ do {
   let annotatedFn: @_lifetime(&ne) (_ ne: inout NE) -> NE = inoutLifetimeDependence // expected-error{{value of type 'NE' does not conform to specified type 'Escapable'}}
 
   // TODO: Closure sema tests
-  //   let copyIt = { @_lifetime(outV: borrow inV) (outV: inout NE, inV: borrowing NE) -> () in
-  //   outV = inV
+  // takeGetGenericCorrect { @_lifetime(outV: borrow inV) (outV: inout NE, inV: NE) in
+    // outV = inV
   // }
 }
 

@@ -13,6 +13,7 @@
 #include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -660,12 +661,16 @@ addTargetDepsForSource(LifetimeDependenceBuilder::TargetDeps *deps,
 class LifetimeDependenceChecker {
   using TargetDeps = LifetimeDependenceBuilder::TargetDeps;
 
-  DeclAttributes const &attrs;
+  SmallVector<LifetimeEntry *, 2> lifetimeEntries;
   ParameterList const *parameters;
+  SmallVector<SourceLoc, 4> parameterLocs;
 
   DeclContext *functionDC;
   DeclContext *parentDC;
   ASTContext &ctx;
+
+  // The result or yield type of the function being checked.
+  Type resultTy;
 
   SourceLoc returnLoc;
 
@@ -683,8 +688,7 @@ class LifetimeDependenceChecker {
   // The implicit self declaration of the function, if it has one. Otherwise, nullptr.
   ParamDecl const *const implicitSelfDecl;
 
-  // The result or yield type of the function being checked.
-  Type resultTy;
+  bool const hasUnsafeNonEscapableResult;
 
   // True if lifetime diganostics have already been performed. Avoids redundant
   // diagnostics, and allows bypassing diagnostics for special cases.
@@ -705,14 +709,26 @@ public:
     return paramList ? paramList->size() + 1 : 1;
   }
 
+private:
+  void collectLifetimeEntries(DeclAttributes const &attrs) {
+    for (auto attr : attrs.getAttributes<LifetimeAttr>()) {
+      lifetimeEntries.push_back(attr->getLifetimeEntry());
+    }
+  }
+
+  // LifetimeDependenceChecker(DeclAttributes const& attrs, ParameterList const* parameters, DeclContext *functionDC, DeclContext *parentDC, )
+
 public:
   LifetimeDependenceChecker(AbstractFunctionDecl *afd)
-      : attrs(afd->getAttrs()), parameters(afd->getParameters()),
-        functionDC(afd), parentDC(functionDC->getParent()),
-        ctx(parentDC->getASTContext()), resultIndex(getResultIndex(afd)),
+      : parameters(afd->getParameters()), functionDC(afd),
+        parentDC(functionDC->getParent()), ctx(parentDC->getASTContext()),
+        resultIndex(getResultIndex(afd)),
         depBuilder(/*sourceIndexCap*/ resultIndex),
         isImplicit(afd->isImplicit()), isInit(isa<ConstructorDecl>(afd)),
-        implicitSelfDecl(afd->getImplicitSelfDecl()) {
+        implicitSelfDecl(afd->getImplicitSelfDecl()),
+        hasUnsafeNonEscapableResult(
+            afd->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
+    collectLifetimeEntries(afd->getAttrs());
 
     if (auto *accessor = dyn_cast<AccessorDecl>(functionDC);
         accessor && accessor->isCoroutine()) {
@@ -741,12 +757,12 @@ public:
   }
 
   LifetimeDependenceChecker(ClosureExpr *ce, Type resultTy)
-      : attrs(ce->getAttrs()), parameters(ce->getParameters()), functionDC(ce),
+      : parameters(ce->getParameters()), functionDC(ce),
         parentDC(functionDC->getParent()), ctx(parentDC->getASTContext()),
-        resultIndex(getResultIndex(ce)),
-        depBuilder(/*sourceIndexCap*/ resultIndex), isImplicit(false),
-        isInit(false), implicitSelfDecl(nullptr), resultTy(resultTy) {
-
+        resultTy(resultTy),
+        resultIndex(getResultIndex(ce)), depBuilder(/*sourceIndexCap*/ resultIndex),
+        isImplicit(false), isInit(false), implicitSelfDecl(nullptr), hasUnsafeNonEscapableResult(ce->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
+    collectLifetimeEntries(ce->getAttrs());
     if (ce->hasExplicitResultType()) {
       returnLoc = ce->getExplicitResultTypeRepr()->getLoc();
     } else {
@@ -794,14 +810,14 @@ public:
       return currentDependencies();
     }
 
-    if (attrs.hasAttribute<LifetimeAttr>()) {
+    if (!lifetimeEntries.empty()) {
       initializeAttributeDeps();
       if (performedDiagnostics)
         return std::nullopt;
     }
     // Methods or functions with @_unsafeNonescapableResult do not require
     // lifetime annotation and do not infer any lifetime dependency.
-    if (attrs.hasAttribute<UnsafeNonEscapableResultAttr>()) {
+    if (hasUnsafeNonEscapableResult) {
       return currentDependencies();
     }
 
@@ -1079,7 +1095,7 @@ protected:
                diag::lifetime_dependence_invalid_self_in_static);
       return std::nullopt;
     }
-    if (isa<ConstructorDecl>(functionDC)) {
+    if (isInit) {
       diagnose(descriptor.getLoc(),
                diag::lifetime_dependence_invalid_self_in_init);
       return std::nullopt;
@@ -1102,9 +1118,7 @@ protected:
 
   // Initialize 'depBuilder' based on the function's @_lifetime attributes.
   void initializeAttributeDeps() {
-    auto lifetimeAttrs = attrs.getAttributes<LifetimeAttr>();
-    for (auto attr : lifetimeAttrs) {
-      LifetimeEntry *entry = attr->getLifetimeEntry();
+    for (LifetimeEntry *entry : lifetimeEntries) {
       auto targetDescriptor = entry->getTargetDescriptor();
       unsigned targetIndex;
       if (targetDescriptor.has_value()) {
@@ -1133,7 +1147,9 @@ protected:
       }
       TargetDeps *deps = depBuilder.createAnnotatedTargetDeps(targetIndex);
       if (deps == nullptr) {
-        diagnose(attr->getLocation(),
+        // TODO: This diagnostic previously pointed to the @_lifetime attribute, while now it will point to the entry.
+        // This could be misleading.
+        diagnose(entry->getLoc(),
                  diag::lifetime_dependence_duplicate_target);
         return;
       }
