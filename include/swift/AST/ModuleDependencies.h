@@ -1073,6 +1073,9 @@ class ModuleDependenciesCache {
 private:
   /// Discovered dependencies
   ModuleDependenciesKindMap ModuleDependenciesMap;
+  /// A set of module identifiers for which a scanning action failed
+  /// to discover a Swift module dependency
+  llvm::StringSet<> negativeSwiftDependencyCache;
   /// Set containing all of the Clang modules that have already been seen.
   llvm::DenseSet<clang::tooling::dependencies::ModuleID> alreadySeenClangModules;
   /// Name of the module under scan
@@ -1111,6 +1114,8 @@ public:
   bool hasDependency(StringRef moduleName) const;
   /// Whether we have cached dependency information for the given Swift module.
   bool hasSwiftDependency(StringRef moduleName) const;
+  /// Whether we have cached a failed lookup of a Swift dependency for the given identifier.
+  bool hasNegativeSwiftDependency(StringRef moduleName) const;
 
   const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &
   getAlreadySeenClangModules() const {
@@ -1227,6 +1232,8 @@ public:
   void
   addVisibleClangModules(ModuleDependencyID moduleID,
                          const std::vector<std::string> &moduleNames);
+  /// Add an identifier to the set of failed Swift module queries
+  void cacheNegativeSwiftDependency(StringRef moduleIdentifier);
 
   StringRef getMainModuleName() const { return mainScanModuleName; }
 
