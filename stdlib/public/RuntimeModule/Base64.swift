@@ -217,6 +217,8 @@ public struct Base64Encoder<S: Sequence>: Sequence
 public struct Base64Decoder<S: Sequence>: Sequence
   where S.Element == UTF8.CodeUnit
 {
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  public typealias BorrowingIterator = BorrowingIteratorAdapter<Iterator>
   public typealias Element = UInt8
 
   var source: S

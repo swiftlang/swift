@@ -327,6 +327,9 @@ let large = sampleData(.large)
 let array809 = byteArray(size: 809)
 
 struct Count0<S: Sequence> : Sequence {
+  @available(macOS 9999, *)
+  public typealias BorrowingIterator = BorrowingIteratorAdapter<S.Iterator>
+
   let base: S
   init (_ base:S) { self.base = base }
   func makeIterator() -> S.Iterator { return base.makeIterator() }
@@ -334,7 +337,10 @@ struct Count0<S: Sequence> : Sequence {
 }
 
 struct Bytes: Sequence, IteratorProtocol {
-    let count: Int
+  @available(macOS 9999, *)
+  public typealias BorrowingIterator = BorrowingIteratorAdapter<Self>
+
+  let count: Int
     let exact: Bool
     var  i: Int = 0
     init(count: Int, exact: Bool) {

@@ -19,6 +19,8 @@ extension _Deque: Sequence {
   // This custom implementation performs direct storage access to eliminate any
   // and all index validation overhead. It also optimizes away repeated
   // conversions from indices to storage slots.
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  internal typealias BorrowingIterator = BorrowingIteratorAdapter<Iterator>
 
   /// An iterator over the members of a deque.
   struct Iterator: IteratorProtocol {

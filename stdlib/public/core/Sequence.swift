@@ -322,14 +322,17 @@ public protocol IteratorProtocol<Element> {
 /// makes no other requirements about element access, so routines that
 /// traverse a sequence should be considered O(*n*) unless documented
 /// otherwise.
-public protocol Sequence<Element> {
+public protocol Sequence<Element>: ~Copyable, ~Escapable {
   /// A type representing the sequence's elements.
   associatedtype Element
 
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
-  associatedtype Iterator: IteratorProtocol where Iterator.Element == Element
+  associatedtype Iterator: IteratorProtocol<Element>
 
+  @available(SwiftStdlib 6.3, *)
+  associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = BorrowingIteratorAdapter<Iterator>
+  
   // FIXME: <rdar://problem/34142121>
   // This typealias should be removed as it predates the source compatibility
   // guarantees of Swift 3, but it cannot due to a bug.
@@ -345,6 +348,10 @@ public protocol Sequence<Element> {
   /// Returns an iterator over the elements of this sequence.
   __consuming func makeIterator() -> Iterator
 
+  @available(SwiftStdlib 6.3, *)
+  @lifetime(borrow self)
+  func makeBorrowingIterator() -> BorrowingIterator
+  
   /// A value less than or equal to the number of elements in the sequence,
   /// calculated nondestructively.
   ///
@@ -449,6 +456,58 @@ public protocol Sequence<Element> {
   func withContiguousStorageIfAvailable<R>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?
+}
+
+@available(SwiftStdlib 6.3, *)
+@frozen
+public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: /* & ~Copyable & ~Escapable */
+  BorrowingIteratorProtocol where Iterator.Element: Copyable
+{
+  @usableFromInline
+  var iterator: Iterator
+  @usableFromInline
+  var curValue: Iterator.Element?
+
+  public typealias Element = Iterator.Element
+
+  @_transparent
+  public init(iterator: Iterator) {
+    self.iterator = iterator
+    curValue = nil
+  }
+
+  @_transparent
+  @lifetime(&self)
+  public mutating func nextSpan(maximumCount: Int) -> Span<Iterator.Element> {
+    curValue = iterator.next()
+    return curValue._span
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+public enum NeverIterator<Element: ~Copyable> {}
+
+@available(SwiftStdlib 6.3, *)
+extension NeverIterator: IteratorProtocol { /* where Element: ~Copyable */
+  public typealias Element = Element
+  public func next() -> Element? {
+    Builtin.unreachable()
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension Sequence where BorrowingIterator == BorrowingIteratorAdapter<Iterator> {
+  @_transparent
+  public func makeBorrowingIterator() -> BorrowingIterator {
+    BorrowingIteratorAdapter(iterator: makeIterator())
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension Sequence where Iterator == NeverIterator<Element>, Self: ~Copyable & ~Escapable {
+  public func makeIterator() -> Iterator {
+    fatalError("Attempt to iterate using a NeverIterator")
+  }
 }
 
 // Provides a default associated type witness for Iterator when the
@@ -662,6 +721,40 @@ extension DropWhileSequence: Sequence {
 //===----------------------------------------------------------------------===//
 // Default implementations for Sequence
 //===----------------------------------------------------------------------===//
+
+extension Sequence where Self: ~Copyable & ~Escapable {
+  @inlinable
+  public var underestimatedCount: Int {
+    return 0
+  }
+  
+  @inlinable
+  @inline(__always)
+  public func _customContainsEquatableElement(
+    _ element: Iterator.Element
+  ) -> Bool? {
+    return nil
+  }
+  
+  @inlinable
+  @safe
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return nil
+  }
+
+  public __consuming func _copyContents(
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    fatalError("_copyContents on a ~Copyable/~Copyable sequence")
+  }
+  
+  @inlinable
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
+    fatalError("_copyToContiguousArray on a ~Copyable/~Escapable sequence")
+  }
+}
 
 extension Sequence {
   /// Returns an array containing the results of mapping the given closure

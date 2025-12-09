@@ -45,6 +45,7 @@ split_embedded_sources(
   EMBEDDED BidirectionalCollection.swift
   EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
+  EMBEDDED BorrowingIteratorProtocol.swift
     NORMAL BridgeObjectiveC.swift
   EMBEDDED BridgeStorage.swift
     NORMAL BridgingBuffer.swift
@@ -98,6 +99,7 @@ split_embedded_sources(
   EMBEDDED InputStream.swift
   EMBEDDED IntegerParsing.swift
   EMBEDDED Integers.swift
+  EMBEDDED Iterable.swift
   EMBEDDED Join.swift
   EMBEDDED KeyPath.swift
   EMBEDDED KeyValuePairs.swift
@@ -275,7 +277,7 @@ if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
   split_embedded_sources(
     OUT_LIST_EMBEDDED SWIFTLIB_EMBEDDED_VECTOR_GYB_SOURCES
     OUT_LIST_NORMAL SWIFTLIB_VECTOR_GYB_SOURCES
-    
+
     EMBEDDED SIMDIntegerConcreteOperations.swift.gyb
     EMBEDDED SIMDFloatConcreteOperations.swift.gyb
     EMBEDDED SIMDMaskConcreteOperations.swift.gyb
@@ -338,6 +340,7 @@ endif()
 
 # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concise-pound-file")
+list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-disable-availability-checking")
 
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
@@ -530,7 +533,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     list(GET list 0 arch)
     list(GET list 1 mod)
     list(GET list 2 triple)
-    
+
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
