@@ -388,5 +388,32 @@ NOTE(nonescapable_field_of_escapable, none,
      "escapable record %0 cannot have non-escapable field '%1'",
      (const clang::NamedDecl *, StringRef))
 
+NOTE(refcounted_ptr_missing_torawpointer, none,
+     "SWIFT_REFCOUNTED_PTR on %0 is missing required "
+     "'_toRawPointer' parameter",
+     (const clang::NamedDecl *))
+
+NOTE(refcounted_ptr_torawpointer_lookup_failure, none,
+     "cannot find function '%0' specified in '_toRawPointer' "
+     "parameter of SWIFT_REFCOUNTED_PTR %1",
+     (StringRef, const clang::NamedDecl *))
+
+NOTE(refcounted_ptr_torawpointer_lookup_ambiguity, none,
+     "there are multiple candidates of function '%0' specified in "
+     "'_toRawPointer' parameter of SWIFT_REFCOUNTED_PTR %1",
+     (StringRef, const clang::NamedDecl *))
+
+NOTE(refcounted_ptr_torawpointer_not_function, none,
+     "%0 specified in '_toRawPointer' parameter of "
+     "SWIFT_REFCOUNTED_PTR on %1 is not a function",
+     (const Decl *, const clang::NamedDecl *))
+
+NOTE(
+    refcounted_ptr_torawpointer_wrong_signature, none,
+    "function %0 specified in '_toRawPointer' parameter of "
+    "SWIFT_REFCOUNTED_PTR on %1 has incorrect signature; expected a function "
+    "that takes no arguments and returns a pointer to a foreign reference type",
+    (const Decl *, const clang::NamedDecl *))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -111,6 +111,33 @@
   __attribute__((swift_attr("release:immortal")))    \
   __attribute__((swift_attr("unsafe")))
 
+/// The annotated `class` or `struct` is a smart pointer to an intrusively
+/// reference counted object. The pointee type is expected to be a Swift shared
+/// reference. The presence of this annotation will introduce conversion
+/// functions between the smart pointer type and Swift's native reference type.
+/// The conversion function is expected to return a +0 raw pointer to a Swift
+/// shared reference type.
+///
+///  ```c++
+///   template <class T>
+///   struct SWIFT_REFCOUNTED_PTR(.getPtr) Ptr {
+///     T *_Nullable getPtr() const { return ptr; }
+///   };
+///
+///   using PtrOfSharedRef = Ptr<SharedRef>;
+///  ```
+///
+/// In Swift, we can convert the smart pointer type to the corresponding native
+/// Swift reference:
+///  ```swift
+///  func f(_ x: PtrOfSharedRef) {
+///    let y = x.asReference
+///  }
+///  ```
+#define SWIFT_REFCOUNTED_PTR(_toRawPointer)                                            \
+  __attribute__((swift_attr(                                                           \
+      "@_refCountedPtr(ToRawPointer: \"" _CXX_INTEROP_STRINGIFY(_toRawPointer) "\")")))
+
 /// Specifies a name that will be used in Swift for this declaration instead of its original name.
 #define SWIFT_NAME(_name) __attribute__((swift_name(#_name)))
 
@@ -280,6 +307,7 @@
 #define SWIFT_SHARED_REFERENCE(_retain, _release)
 #define SWIFT_IMMORTAL_REFERENCE
 #define SWIFT_UNSAFE_REFERENCE
+#define SWIFT_REFCOUNTED_PTR(_toRawPointer)
 #define SWIFT_NAME(_name)
 #define SWIFT_CONFORMS_TO_PROTOCOL(_moduleName_protocolName)
 #define SWIFT_COMPUTED_PROPERTY

@@ -2127,6 +2127,86 @@ namespace {
       return;
     }
 
+    bool
+    injectBridgingConversionsForRefCountedSmartPtrs(NominalTypeDecl *smartPtr) {
+      for (const auto *attr : smartPtr->getAttrs()) {
+        if (const auto *customAttr = dyn_cast<CustomAttr>(attr)) {
+          if (!customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
+                  "_refCountedPtr"))
+            continue;
+          auto clangDecl = cast<clang::TagDecl>(smartPtr->getClangDecl());
+          StringRef ToRawPtrFuncName;
+          for (auto arg : *customAttr->getArgs()) {
+            if (arg.getLabel().str() == "ToRawPointer") {
+              if (const auto *literal =
+                      dyn_cast<StringLiteralExpr>(arg.getExpr()))
+                ToRawPtrFuncName = literal->getValue();
+            }
+          }
+          if (ToRawPtrFuncName.empty()) {
+            Impl.addImportDiagnostic(
+                clangDecl,
+                Diagnostic(diag::refcounted_ptr_missing_torawpointer,
+                           clangDecl),
+                clangDecl->getLocation());
+            return false;
+          }
+
+          auto results = getValueDeclsForName(smartPtr, ToRawPtrFuncName);
+          if (results.empty()) {
+            Impl.addImportDiagnostic(
+                clangDecl,
+                Diagnostic(
+                    diag::refcounted_ptr_torawpointer_lookup_failure,
+                    Impl.SwiftContext.AllocateCopy(ToRawPtrFuncName.str()),
+                    clangDecl),
+                clangDecl->getLocation());
+            return false;
+          }
+          if (results.size() > 1) {
+            Impl.addImportDiagnostic(
+                clangDecl,
+                Diagnostic(
+                    diag::refcounted_ptr_torawpointer_lookup_ambiguity,
+                    Impl.SwiftContext.AllocateCopy(ToRawPtrFuncName.str()),
+                    clangDecl),
+                clangDecl->getLocation());
+            return false;
+          }
+
+          auto toRawPtrFunc = dyn_cast<FuncDecl>(results.front());
+          if (!toRawPtrFunc) {
+            Impl.addImportDiagnostic(
+                clangDecl,
+                Diagnostic(diag::refcounted_ptr_torawpointer_not_function,
+                           toRawPtrFunc, clangDecl),
+                clangDecl->getLocation());
+            return false;
+          }
+
+          auto pointeeType = toRawPtrFunc->getResultInterfaceType()
+                                 ->lookThroughSingleOptionalType();
+          ClassDecl *referenceDecl = pointeeType->getClassOrBoundGenericClass();
+
+          if (toRawPtrFunc->getParameters()->size() != 0 || !referenceDecl) {
+            Impl.addImportDiagnostic(
+                clangDecl,
+                Diagnostic(diag::refcounted_ptr_torawpointer_wrong_signature,
+                           toRawPtrFunc, clangDecl),
+                clangDecl->getLocation());
+            return false;
+          }
+
+          auto asReferenceDecl =
+              synthesizer.createSmartPtrBridgingProperty(toRawPtrFunc);
+          smartPtr->addMember(asReferenceDecl);
+          smartPtr->addMemberToLookupTable(asReferenceDecl);
+          break;
+        }
+      }
+      return true;
+    }
+
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
       // Track whether this record contains fields we can't reference in Swift
       // as stored properties.
@@ -2736,6 +2816,9 @@ namespace {
 
       // If we need it, add an explicit "deinit" to this type.
       synthesizer.addExplicitDeinitIfRequired(result, decl);
+
+      if (!injectBridgingConversionsForRefCountedSmartPtrs(result))
+        return nullptr;
 
       result->setMemberLoader(&Impl, 0);
       return result;
