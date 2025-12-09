@@ -680,7 +680,7 @@ private enum ImmutableScope {
         }
 
         switch singleBorrowIntroducer {
-        case .beginBorrow, .loadBorrow, .reborrow:
+        case .beginBorrow, .loadBorrow, .dereferenceBorrow, .reborrow:
           self = .borrow(singleBorrowIntroducer)
         case .functionArgument:
           self = .wholeFunction

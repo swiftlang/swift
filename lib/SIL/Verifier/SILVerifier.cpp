@@ -5580,14 +5580,17 @@ public:
     requireSameType(functionResultType, instResultType,
                     "return value type does not match return type of function");
 
-    // If the result type is an address, ensure it's base address is from a
-    // function argument.
+    // If the result type is an address, ensure its base address is from a
+    // function argument or Builtin.Borrow.
     if (F.getModule().getStage() >= SILStage::Canonical &&
         functionResultType.isAddress()) {
       auto base = getAccessBase(RI->getOperand());
-      require(!base->getType().isAddress() || isa<SILFunctionArgument>(base) ||
-                  isa<ApplyInst>(base) &&
-                      cast<ApplyInst>(base)->hasAddressResult(),
+      require(!base->getType().isAddress()
+               || isa<SILFunctionArgument>(base)
+               || isa<DereferenceAddrBorrowInst>(base)
+               || isa<DereferenceBorrowAddrInst>(base)
+               || (isa<ApplyInst>(base)
+                   && cast<ApplyInst>(base)->hasAddressResult()),
               "unidentified address return");
     }
   }

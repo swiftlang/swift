@@ -3403,8 +3403,10 @@ LValue SILGenLValue::visitApplyExpr(ApplyExpr *e, SGFAccessKind accessKind,
       } else {
         SILValue derefValue
           = SGF.B.createDereferenceBorrow(e, borrowValue.getValue());
-        // TODO: The ownership of the borrow ought to be verifiable, but in the
-        // meantime mark it as unchecked.
+        SGF.emitManagedBorrowedRValueWithCleanup(derefValue);
+        // TODO: For borrow accessors, we form the proper borrow scope during
+        // SILGenCleanup. Leave the returned result unchecked until that
+        // cleanup occurs.
         deref = ManagedValue::forBorrowedObjectRValue(
                  SGF.B.createUncheckedOwnership(e, derefValue));
       }

@@ -157,7 +157,7 @@ bool SILGenCleanup::fixupBorrowAccessors(SILFunction *function) {
   SmallVector<SILInstruction *> toDelete;
 
   // For all the local borrow scopes that enclose the return value, delete
-  // their end_borrow instructions and use them as an encolsing value in
+  // their end_borrow instructions and use them as an enclosing value in
   // return_borrow instruction.
   for (auto enclosingValue : enclosingValues) {
     BorrowedValue borrow(enclosingValue);
