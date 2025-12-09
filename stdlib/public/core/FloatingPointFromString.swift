@@ -901,6 +901,10 @@ fileprivate func fastParse64(
       firstSignificantDigitAfterDecimalPointOffset = i
     }
     if i < input.count {
+      // Note: While testing `.description` + `Double(_:String)` against
+      // random Double values to validate round-trip correctness, almost
+      // 1/3 of `float_parse64()` is spent in the following loop.
+
       // TODO: Evaluate SIMD or SWAR techniques here...
       // In the common case of input such as "1.794373235e+12",
       // we should be able to use `input.count - i` to estimate
@@ -959,7 +963,7 @@ fileprivate func fastParse64(
       byte = unsafe input[unchecked: i]
     }
     // Did we scan more than 8 digits in the exponent?
-    if i - firstExponentDigitOffset > 8 {
+    if i &- firstExponentDigitOffset > 8 {
       // If so, explicitExponent might have overflowed.  Scan
       // again more carefully to correctly handle both
       // "1e0000000000000001" (== 10.0) and "1e99999999999999" (== inf)
