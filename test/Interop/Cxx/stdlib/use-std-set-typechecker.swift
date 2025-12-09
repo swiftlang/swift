@@ -3,9 +3,9 @@
 import StdSet
 import CxxStdlib
 
-func takeCopyable<T: Copyable>(_ x: T) {} 
+func takeCopyable<T: Copyable>(_ x: T) {}
 
-let setNonCopyable = SetOfNonCopyable() 
-takeCopyable(setNonCopyable) 
+let setNonCopyable = SetOfNonCopyable()
+takeCopyable(setNonCopyable)
 // CHECK: error: global function 'takeCopyable' requires that 'SetOfNonCopyable' {{.*}} conform to 'Copyable'
 // CHECK: note: 'where T: Copyable' is implicit here
