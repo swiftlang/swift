@@ -1588,8 +1588,10 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   auto found = HasLazyMetadata.find(type);
   if (found != HasLazyMetadata.end())
     return found->second;
-
-  if (SIL.getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials) &&
+  auto &langOpts = SIL.getASTContext().LangOpts;
+  auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
+    langOpts.hasFeature(Feature::EmbeddedExistentials);
+  if (isEmbeddedWithExistentials &&
       (isa<StructDecl>(type) || isa<EnumDecl>(type))) {
     bool isGeneric = cast<NominalTypeDecl>(type)->isGenericContext();
     HasLazyMetadata[type] = !isGeneric;
@@ -5308,8 +5310,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
 
     return cast<llvm::GlobalValue>(addr);
   }
-  bool hasEmbeddedExistentials =
-    Context.LangOpts.hasFeature(Feature::EmbeddedExistentials);
+  bool hasEmbeddedExistentials = isEmbeddedWithExistentials();
   auto entity =
       (isPrespecialized &&
        !irgen::isCanonicalInitializableTypeMetadataStaticallyAddressable(
@@ -5427,7 +5428,8 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
-  if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+  auto hasEmbeddedExistentials = isEmbeddedWithExistentials();
+  if (hasEmbeddedExistentials) {
     adjustmentIndex = 0;
     defaultVarTy = EmbeddedExistentialsMetadataStructTy;
   } else if (concreteType->isAny() || concreteType->isAnyObject() || concreteType->isVoid() || concreteType->is<TupleType>() || concreteType->is<BuiltinType>()) {
@@ -5474,7 +5476,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
       }
     }
 
-    if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+    if (hasEmbeddedExistentials) {
       if ((isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) &&
           nominal->isGenericContext()) {
         IRGen.noteUseOfSpecializedValueMetadata(concreteType);
@@ -5482,7 +5484,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     }
   }
 
-  if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials) &&
+  if (hasEmbeddedExistentials &&
       (isa<TupleType>(concreteType) ||
        isa<FunctionType>(concreteType))) {
     IRGen.noteUseOfSpecializedValueMetadata(concreteType);

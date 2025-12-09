@@ -2455,3 +2455,9 @@ bool swift::writeEmptyOutputFilesFor(
   }
   return false;
 }
+
+bool IRGenModule::isEmbeddedWithExistentials() const {
+  auto &langOpts = Context.LangOpts;
+  return langOpts.hasFeature(Feature::Embedded) &&
+    langOpts.hasFeature(Feature::EmbeddedExistentials);
+}

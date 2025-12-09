@@ -1051,18 +1051,17 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   auto &resilientLayout =
     classTI.getClassLayout(*this, selfType, /*forBackwardDeployment=*/false);
 
-  auto isEmbeddedWithExistentials =
-    Context.LangOpts.hasFeature(Feature::EmbeddedExistentials);
+  auto hasEmbeddedWithExistentials = isEmbeddedWithExistentials();
 
   // As a matter of policy, class metadata is never emitted lazily for now.
-  assert(isEmbeddedWithExistentials || !IRGen.hasLazyMetadata(D));
+  assert(hasEmbeddedWithExistentials || !IRGen.hasLazyMetadata(D));
 
   // Emit the class metadata.
   if (!D->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     emitClassMetadata(*this, D, fragileLayout, resilientLayout);
     emitFieldDescriptor(D);
   } else {
-    if (!isEmbeddedWithExistentials && !D->isGenericContext()) {
+    if (!hasEmbeddedWithExistentials && !D->isGenericContext()) {
       emitEmbeddedClassMetadata(*this, D);
     } else {
       // We create all metadata lazily in embedded with existentials mode.
