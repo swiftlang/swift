@@ -2116,6 +2116,10 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_solver_disable_prepared_overloads))
     Opts.SolverEnablePreparedOverloads = Args.hasArg(OPT_solver_enable_prepared_overloads);
 
+  if (Args.hasArg(OPT_solver_enable_prune_disjunctions) ||
+      Args.hasArg(OPT_solver_disable_prune_disjunctions))
+    Opts.SolverPruneDisjunctions = Args.hasArg(OPT_solver_enable_prune_disjunctions);
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
 
