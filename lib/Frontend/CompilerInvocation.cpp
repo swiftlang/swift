@@ -1818,6 +1818,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
 
+  if (Opts.hasFeature(Feature::EmbeddedExistentials) &&
+      !Opts.hasFeature(Feature::Embedded)) {
+      Diags.diagnose(SourceLoc(), diag::embedded_existentials_without_embedded);
+      HadError = true;
+  }
   if (Opts.hasFeature(Feature::Embedded)) {
     Opts.UnavailableDeclOptimizationMode = UnavailableDeclOptimization::Complete;
     Opts.DisableImplicitStringProcessingModuleImport = true;

@@ -98,8 +98,10 @@ inline bool isEmbeddedWithoutEmbeddedExitentials(CanType t) {
 // expect for classes (both generic and non-generic), dynamic self, and
 // class-bound existentials.
 inline bool isMetadataAllowedInEmbedded(CanType t) {
+  auto &langOpts = t->getASTContext().LangOpts;
   bool embeddedExistentials =
-    t->getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials);
+    langOpts.hasFeature(Feature::EmbeddedExistentials) &&
+    langOpts.hasFeature(Feature::Embedded);
 
   if (isa<ClassType>(t) || isa<BoundGenericClassType>(t) ||
       isa<DynamicSelfType>(t)) {
