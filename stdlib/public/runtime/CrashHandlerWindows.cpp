@@ -31,8 +31,8 @@ SRWLOCK crashLock = SRWLOCK_INIT;
 CrashInfo crashInfo;
 
 void *pcFromContext(PCONTEXT Context);
-LONG handleException(EXCEPTION_POINTERS *ExceptionInfo);
-LONG reinstallUnhandledExceptionFilter(EXCEPTION_POINTERS *ExceptionInfo);
+LONG NTAPI handleException(EXCEPTION_POINTERS *ExceptionInfo);
+LONG NTAPI reinstallUnhandledExceptionFilter(EXCEPTION_POINTERS *ExceptionInfo);
 
 }
 

@@ -76,25 +76,26 @@ FN(_swift_get_cpu_context):
         movl %ebp,    24(%eax)
         leal 8(%esp), %edx
         movl %edx,    28(%eax)
+        pop  %edx
+        movl %edx,    (%eax)
         pushf
         pop  %edx
         movl %edx,    32(%eax)
-        movw %ss,     %dx
+        movw %es,     %dx
         movw %dx,     36(%eax)
         movw %cs,     %dx
         movw %dx,     38(%eax)
-        movw %ds,     %dx
+        movw %ss,     %dx
         movw %dx,     40(%eax)
-        movw %es,     %dx
+        movw %ds,     %dx
         movw %dx,     42(%eax)
         movw %fs,     %dx
         movw %dx,     44(%eax)
         movw %gs,     %dx
         movw %dx,     46(%eax)
         movl (%esp),  %edx
-        movl %edx,    (%eax)
-        movl $0xffff, 48(%eax)
-        popl %eax
+        movl %edx,    48(%eax)
+        movl $0xffff, 52(%eax)
         ret
 #endif
 
