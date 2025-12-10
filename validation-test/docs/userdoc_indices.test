@@ -1,6 +1,7 @@
 # REQUIRES: swift_swift_parser
 # REQUIRES: target-same-as-host
 # REQUIRES: swift_feature_BareSlashRegexLiterals
+# UNSUPPORTED: OS=freebsd
 
 # RUN: %empty-directory(%t)
 
