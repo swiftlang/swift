@@ -852,7 +852,7 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
   return decl1Better ? Comparison::Better : Comparison::Worse;
 }
 
-static Type getUnlabeledType(Type type, ASTContext &ctx) {
+static Type getStrippedType(Type type, ASTContext &ctx) {
   return type.transformRec([&](TypeBase *type) -> std::optional<Type> {
     if (auto *tupleType = dyn_cast<TupleType>(type)) {
       if (tupleType->getNumElements() == 1)
@@ -864,6 +864,31 @@ static Type getUnlabeledType(Type type, ASTContext &ctx) {
       }
 
       return TupleType::get(elts, ctx);
+    }
+
+    if (auto *funcType = dyn_cast<FunctionType>(type)) {
+      auto params = funcType->getParams();
+      SmallVector<AnyFunctionType::Param, 4> newParams;
+      for (auto param : params) {
+        auto newParam = param;
+        switch (param.getParameterFlags().getOwnershipSpecifier()) {
+        case ParamSpecifier::Borrowing:
+        case ParamSpecifier::Consuming: {
+          auto flags = param.getParameterFlags()
+                            .withOwnershipSpecifier(ParamSpecifier::Default);
+          newParams.push_back(param.withFlags(flags));
+          break;
+        }
+        default:
+          newParams.push_back(newParam);
+          break;
+        }
+      }
+      auto newExtInfo = funcType->getExtInfo().withRepresentation(
+          AnyFunctionType::Representation::Swift);
+      return FunctionType::get(newParams,
+                               funcType->getResult(),
+                               newExtInfo);
     }
 
     return std::nullopt;
@@ -1060,8 +1085,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // In this case solver would produce 2 solutions: one where `count`
     // is a property reference on `[Int]` and another one is tuple access
     // for a `count:` element.
-    if (choice1.isDecl() != choice2.isDecl())
+    if (choice1.isDecl() != choice2.isDecl()) {
+      if (cs.isDebugMode()) {
+        llvm::errs().indent(cs.solverState->getCurrentIndent())
+            << "- incomparable\n";
+      }
+
       return SolutionCompareResult::Incomparable;
+    }
 
     auto decl1 = choice1.getDecl();
     auto dc1 = decl1->getDeclContext();
@@ -1438,15 +1469,16 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       if (type2Better)
         ++score2;
 
-      // Prefer the unlabeled form of a type.
-      auto unlabeled1 = getUnlabeledType(type1, cs.getASTContext());
-      auto unlabeled2 = getUnlabeledType(type2, cs.getASTContext());
-      if (unlabeled1->isEqual(unlabeled2)) {
-        if (type1->isEqual(unlabeled1) && !types.Type1WasLabeled) {
+      // Prefer the "stripped" form of a type. See getStrippedType()
+      // for the definition.
+      auto stripped1 = getStrippedType(type1, cs.getASTContext());
+      auto stripped2 = getStrippedType(type2, cs.getASTContext());
+      if (stripped1->isEqual(stripped2)) {
+        if (type1->isEqual(stripped1) && !types.Type1WasLabeled) {
           ++score1;
           continue;
         }
-        if (type2->isEqual(unlabeled2) && !types.Type2WasLabeled) {
+        if (type2->isEqual(stripped2) && !types.Type2WasLabeled) {
           ++score2;
           continue;
         }
@@ -1527,13 +1559,39 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
   // If the scores are different, we have a winner.
   if (score1 != score2) {
-    return score1 > score2? SolutionCompareResult::Better
-                          : SolutionCompareResult::Worse;
+    if (score1 > score2) {
+      if (cs.isDebugMode()) {
+        llvm::errs().indent(cs.solverState->getCurrentIndent())
+            << "- better\n";
+      }
+
+      return SolutionCompareResult::Better;
+    } else {
+      if (cs.isDebugMode()) {
+        llvm::errs().indent(cs.solverState->getCurrentIndent())
+            << "- worse\n";
+      }
+
+      return SolutionCompareResult::Worse;
+    }
   }
 
   // Neither system wins; report whether they were identical or not.
-  return identical? SolutionCompareResult::Identical
-                  : SolutionCompareResult::Incomparable;
+  if (identical) {
+    if (cs.isDebugMode()) {
+      llvm::errs().indent(cs.solverState->getCurrentIndent())
+          << "- identical\n";
+    }
+
+    return SolutionCompareResult::Identical;
+  } else {
+    if (cs.isDebugMode()) {
+      llvm::errs().indent(cs.solverState->getCurrentIndent())
+          << "- incomparable\n";
+    }
+
+    return SolutionCompareResult::Incomparable;
+  }
 }
 
 std::optional<unsigned>
