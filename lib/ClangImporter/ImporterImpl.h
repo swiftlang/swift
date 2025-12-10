@@ -706,6 +706,10 @@ public:
 
   bool isDefaultArgSafeToImport(const clang::ParmVarDecl *param);
 
+  bool needsClosureConstructor(const clang::CXXRecordDecl *recordDecl) const;
+
+  bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const;
+
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance);
 

@@ -1081,6 +1081,10 @@ void SILModule::moveAfter(SILModule::iterator moveAfter, SILFunction *fn) {
   getFunctionList().insertAfter(moveAfter, fn);
 }
 
+TypeExpansionContext SILModule::getMaximalTypeExpansionContext() const {
+  return TypeExpansionContext::maximal(getAssociatedContext(), isWholeModule());
+}
+
 SILProperty *
 SILProperty::create(SILModule &M, unsigned Serialized, AbstractStorageDecl *Decl,
                     std::optional<KeyPathPatternComponent> Component) {
