@@ -893,7 +893,7 @@ public:
       llvm_unreachable("Unexpected module dependency kind");
   }
 
-  llvm::StringSet<> &getVisibleClangModules() const {
+  llvm::StringSet<> getVisibleClangModules() const {
     return storage->visibleClangModules;
   }
 
@@ -1076,6 +1076,11 @@ private:
   /// A set of module identifiers for which a scanning action failed
   /// to discover a Swift module dependency
   llvm::StringSet<> negativeSwiftDependencyCache;
+
+  /// A map from Clang module name to all visible modules to a client
+  /// of a by-name import of this Clang module
+  llvm::StringMap<std::vector<std::string>> clangModulesVisibleFrom;
+
   /// Set containing all of the Clang modules that have already been seen.
   llvm::DenseSet<clang::tooling::dependencies::ModuleID> alreadySeenClangModules;
   /// Name of the module under scan
@@ -1153,8 +1158,12 @@ public:
   llvm::ArrayRef<ModuleDependencyID>
   getCrossImportOverlayDependencies(const ModuleDependencyID &moduleID) const;
   /// Query all visible Clang modules for a given Swift dependency
-  llvm::StringSet<>&
+  llvm::StringSet<>
   getVisibleClangModules(ModuleDependencyID moduleID) const;
+  /// Query all Clang modules visible via a by-name lookup of given
+  /// Clang dependency
+  std::vector<std::string>
+  getVisibleClangModulesFrom(ModuleDependencyID moduleID) const;
 
   /// Look for module dependencies for a module with the given ID
   ///
@@ -1231,7 +1240,11 @@ public:
   /// Add to this module's set of visible Clang modules
   void
   addVisibleClangModules(ModuleDependencyID moduleID,
+                         ModuleDependencyID clangDependencyID,
                          const std::vector<std::string> &moduleNames);
+  void
+  addHeaderVisibleClangModules(ModuleDependencyID moduleID,
+                               const std::vector<std::string> &moduleNames);
   /// Add an identifier to the set of failed Swift module queries
   void cacheNegativeSwiftDependency(StringRef moduleIdentifier);
 

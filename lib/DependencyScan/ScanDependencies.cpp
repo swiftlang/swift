@@ -1599,7 +1599,7 @@ void swift::dependencies::incremental::validateInterModuleDependenciesCache(
                       emitRemarks, visited, modulesRequiringRescan);
   for (const auto &outOfDateModID : modulesRequiringRescan)
     cache.removeDependency(outOfDateModID);
-
+  // ACTODO: Invalidate visible modules
   // Regardless of invalidation, always re-scan main module.
   cache.removeDependency(rootModuleID);
 }
