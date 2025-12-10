@@ -42,7 +42,7 @@ func parseWordBreakTests(
 
         // If this is a break, record the +1 count. Otherwise it is × which is
         // not a break.
-        if components[i] == "÷" {
+        if components[i].hasPrefix("÷") {
           words.append("")
         }
       }
