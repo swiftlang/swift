@@ -40,7 +40,7 @@ struct Wrapper {
     }
   }
   var k5: Klass {
-    mutate { // expected-error{{variable with a 'mutate' accessor must also have a 'borrow' accessor, getter, addressor or 'yielding borrow' accessor}}
+    mutate { // expected-error{{variable with a 'mutate' accessor must also have a 'borrow' accessor}}
       return &_otherK
     }
   }

@@ -4169,6 +4169,14 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     if (storage->getParsedAccessor(AccessorKind::YieldingBorrow)) {
       readImpl = ReadImplKind::YieldingBorrow;
     }
+    if (storage->getParsedAccessor(AccessorKind::Mutate)) {
+      readImpl = ReadImplKind::Borrow;
+      writeImpl = WriteImplKind::Mutate;
+      readWriteImpl = ReadWriteImplKind::Mutate;
+    }
+    if (storage->getParsedAccessor(AccessorKind::Borrow)) {
+      readImpl = ReadImplKind::Borrow;
+    }
 
     StorageImplInfo info(readImpl, writeImpl, readWriteImpl);
     finishStorageImplInfo(storage, info);
