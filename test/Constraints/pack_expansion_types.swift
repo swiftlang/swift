@@ -301,16 +301,16 @@ func test_one_element_tuple_vs_non_tuple_matching() {
   }
 }
 
-// MARK: lValue'd packing (Issue 85924)
+// Ensure correct behavior of lvalue tuple parameters
 
 /**
- Before a fix in #85924, `var`-backed parameters would end up wrapped
- in an extraneous tuple wrapping (from #65125) for the `var` parameter,
- leading to less-than-efficient parameter packing.
+ Previously `var`-backed parameters would end up wrapped
+ in an extraneous tuple level, leading to leading to incorrect
+ nesting in the output type due to the `LValueType` not being unwrapped.
 
  https://github.com/swiftlang/swift/issues/85924
  */
-func test_var_let_tuple_append_equivalence() {
+func test_var_let_tuple_merge_equivalence() {
   func merge<each A, each B>(_ a: (repeat each A), _ b: (repeat each B)) -> (repeat each A, repeat each B) {
     return (repeat each a, repeat each b)
   }

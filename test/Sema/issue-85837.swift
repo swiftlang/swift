@@ -25,12 +25,3 @@ let built: (String, Int, String) = builder {
         2
         "c"
     }
-
-/*
-// Ideally we should be able to fall back to this legacy type?
-let legacy: ((String, Int), String) = builder {
-    "a"
-    2
-    "c"
-}
-*/
