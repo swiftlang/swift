@@ -3314,10 +3314,6 @@ static AccessStrategy getOpaqueReadAccessStrategy(
     return AccessStrategy::getAccessor(AccessorKind::YieldingBorrow, dispatch);
   if (storage->requiresOpaqueReadCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
-
-  if (storage->getParsedAccessor(AccessorKind::Borrow)) {
-    return AccessStrategy::getAccessor(AccessorKind::Borrow, dispatch);
-  }
   return AccessStrategy::getAccessor(AccessorKind::Get, dispatch);
 }
 
@@ -3498,10 +3494,6 @@ bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
     return requiresCorrespondingUnderscoredCoroutineAccessor(
         AccessorKind::YieldingBorrow);
 
-  // If a borrow accessor is present, we don't need a read coroutine.
-  if (getParsedAccessor(AccessorKind::Borrow)) {
-    return false;
-  }
   return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
 }
 
@@ -3509,11 +3501,6 @@ bool AbstractStorageDecl::requiresOpaqueYieldingBorrowCoroutine() const {
   ASTContext &ctx = getASTContext();
   if (!ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
     return false;
-
-  // If a borrow accessor is present, we don't need a read coroutine.
-  if (getParsedAccessor(AccessorKind::Borrow)) {
-    return false;
-  }
 
   // If a `_read` accessor is explicitly present and the CoroutineAccessors
   // feature is enabled, we need to synthesize a `yielding borrow`.
@@ -3525,6 +3512,11 @@ bool AbstractStorageDecl::requiresOpaqueYieldingBorrowCoroutine() const {
         ResilienceStrategy::Resilient &&
       isExported(this) != ExportedLevel::None) {
     return true;
+  }
+  
+  // If a borrow accessor is present, we don't need a read coroutine.
+  if (getParsedAccessor(AccessorKind::Borrow)) {
+    return false;
   }
 
   return getOpaqueReadOwnership() !=  OpaqueReadOwnership::Owned;
