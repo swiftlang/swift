@@ -385,6 +385,10 @@ public:
   BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
              const PotentialBindings &info);
 
+  BindingSet(BindingSet &&other) = default;
+
+  BindingSet(const BindingSet &other) = delete;
+
   ConstraintSystem &getConstraintSystem() const { return CS; }
 
   TypeVariableType *getTypeVariable() const { return TypeVar; }

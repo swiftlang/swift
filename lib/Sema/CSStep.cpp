@@ -263,7 +263,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   SmallString<64> potentialBindings;
   llvm::raw_svector_ostream bos(potentialBindings);
 
-  auto bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
+  const auto *bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
     if (CS.isDebugMode() && bindings.hasViableBindings()) {
       bos.indent(CS.solverState->getCurrentIndent() + 2);
       bos << "(";
