@@ -43,10 +43,12 @@ struct S4: (P & Q<String>) & R {
 }
 
 struct Bad: P<Int, Float> { // expected-error {{type 'Bad' does not conform to protocol 'P'}}
-  typealias A = String  // expected-note {{possibly intended match}}
+  typealias A = String
+  // expected-note@-1 {{possibly intended match}}
+  // expected-note@-2 {{found this candidate}}
 }
 
-let x = Bad.A.self
+let x = Bad.A.self // expected-error {{ambiguous use of 'A'}}
 g(x)
 
 struct Circle: Q<Circle.A> {}
