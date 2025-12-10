@@ -2625,6 +2625,12 @@ namespace {
           cxxRecordDecl->getName() == "pair") {
         forceMemberwiseInitializer = true;
       }
+      // If this is the type that wraps around a Swift closure for the purpose
+      // of std::function support, force a memberwise initializer. It will be
+      // called by the synthesized std::function initializer.
+      if (cxxRecordDecl && Impl.isSwiftFunctionWrapper(cxxRecordDecl))
+        forceMemberwiseInitializer = true;
+
       // We can assume that it is possible to correctly construct the object by
       // simply initializing its member variables to arbitrary supplied values
       // only when the same is possible in C++. While we could check for that
@@ -3300,8 +3306,13 @@ namespace {
           conformToCxxPairIfNeeded(Impl, nominalDecl, decl);
           conformToCxxOptionalIfNeeded(Impl, nominalDecl, decl);
           conformToCxxVectorIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxFunctionIfNeeded(Impl, nominalDecl, decl);
           conformToCxxSpanIfNeeded(Impl, nominalDecl, decl);
+
+          if (Impl.needsClosureConstructor(decl)) {
+            if (auto closureCtor =
+                    synthesizer.makeClosureConstructor(nominalDecl))
+              nominalDecl->addMember(closureCtor);
+          }
         }
       }
 
@@ -4611,6 +4622,29 @@ namespace {
 
       auto fieldType = desugarIfElaborated(decl->getType());
       ImportedType importedType = importer::findOptionSetEnum(fieldType, Impl);
+
+      // If this is a closure field of the __SwiftFunctionWrapper type, pretend
+      // that the type of the field is a Swift closure. The actual Clang type is
+      // a pair of two pointers: code and context.
+      if (!importedType && decl->getParent() &&
+          decl->getParent()->getIdentifier() &&
+          Impl.isSwiftFunctionWrapper(decl->getParent()) &&
+          name.is("closure")) {
+        auto &ctx = dc->getASTContext();
+        auto functionWrapperDecl = dc->getSelfStructDecl();
+        auto callAsFunctionOverloads =
+            functionWrapperDecl->lookupDirect(ctx.Id_callAsFunction);
+        ASSERT(callAsFunctionOverloads.size() == 1 &&
+               "__SwiftFunctionWrapper should only have one operator()");
+        auto callAsFunctionDecl =
+            cast<FuncDecl>(callAsFunctionOverloads.front());
+
+        auto closureType = callAsFunctionDecl->getInterfaceType()
+                               ->getAs<FunctionType>()
+                               ->getResult();
+
+        importedType = ImportedType(closureType, false);
+      }
 
       if (!importedType)
         importedType =

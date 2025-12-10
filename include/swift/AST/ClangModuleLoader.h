@@ -298,6 +298,24 @@ public:
 
   virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
 
+  /// Determine whether this is a functional C++ type, e.g. std::function, for
+  /// which Swift provides a synthesized constructor that takes a Swift closure
+  /// as the single parameter.
+  virtual bool
+  needsClosureConstructor(const clang::CXXRecordDecl *recordDecl) const = 0;
+
+  /// Determine whether this is an instantiation of the __SwiftFunctionWrapper
+  /// type, which wraps around a Swift closure along with its context.
+  virtual bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const = 0;
+  virtual bool isDeconstructedSwiftClosure(const clang::Type* type) const = 0;
+
+  /// Given a functional C++ type, e.g. std::function, determine the
+  /// corresponding C++ closure type.
+  ///
+  /// \see needsClosureConstructor
+  virtual const clang::FunctionType *extractCXXFunctionType(
+      const clang::CXXRecordDecl *functionalTypeDecl) const = 0;
+
   virtual FuncDecl *
   getAvailabilityDomainPredicate(const clang::VarDecl *var) = 0;
 

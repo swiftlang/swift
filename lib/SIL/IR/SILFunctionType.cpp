@@ -27,6 +27,7 @@
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -46,6 +47,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/SipHash.h"
 
 using namespace swift;
 using namespace swift::Lowering;
@@ -1040,6 +1042,162 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
       constrainedOriginalFnTy->getASTContext(),
       constrainedOriginalFnTy->getWitnessMethodConformanceOrInvalid());
   return cachedResult;
+}
+
+static void hashStringForFunctionType(SILModule *M, CanSILFunctionType type,
+                                      raw_ostream &Out,
+                                      GenericEnvironment *genericEnv);
+
+static void hashStringForType(SILModule *M, CanType Ty, raw_ostream &Out,
+                              GenericEnvironment *genericEnv) {
+  if (Ty->isAnyClassReferenceType()) {
+    // Any class type has to be hashed opaquely.
+    Out << "-class";
+  } else if (isa<AnyMetatypeType>(Ty)) {
+    // Any metatype has to be hashed opaquely.
+    Out << "-metatype";
+  } else if (auto UnwrappedTy = Ty->getOptionalObjectType()) {
+    if (UnwrappedTy->isBridgeableObjectType()) {
+      // Optional<T> is compatible with T when T is class-based.
+      hashStringForType(M, UnwrappedTy->getCanonicalType(), Out, genericEnv);
+    } else if (UnwrappedTy->is<MetatypeType>()) {
+      // Optional<T> is compatible with T when T is a metatype.
+      hashStringForType(M, UnwrappedTy->getCanonicalType(), Out, genericEnv);
+    } else {
+      // Optional<T> is direct if and only if T is.
+      Out << "Optional<";
+      hashStringForType(M, UnwrappedTy->getCanonicalType(), Out, genericEnv);
+      Out << ">";
+    }
+  } else if (auto ETy = dyn_cast<ExistentialType>(Ty)) {
+    // Look through existential types
+    hashStringForType(M, ETy->getConstraintType()->getCanonicalType(),
+                      Out, genericEnv);
+  } else if (auto GTy = dyn_cast<AnyGenericType>(Ty)) {
+    // For generic and non-generic value types, use the mangled declaration
+    // name, and ignore all generic arguments.
+    NominalTypeDecl *nominal = cast<NominalTypeDecl>(GTy->getDecl());
+    Out << Mangle::ASTMangler(Ty->getASTContext()).mangleNominalType(nominal);
+  } else if (auto FTy = dyn_cast<SILFunctionType>(Ty)) {
+    Out << "(";
+    hashStringForFunctionType(M, FTy, Out, genericEnv);
+    Out << ")";
+  } else {
+    Out << "-";
+  }
+}
+
+template <class T>
+static void hashStringForList(SILModule *M, const ArrayRef<T> &list,
+                              raw_ostream &Out, GenericEnvironment *genericEnv,
+                              const SILFunctionType *fnType) {
+  for (auto paramOrRetVal : list) {
+    if (paramOrRetVal.isFormalIndirect()) {
+      // Indirect params and return values have to be opaque.
+      Out << "-indirect";
+    } else {
+      CanType Ty = M ? paramOrRetVal.getArgumentType(
+                           *M, fnType, M->getMaximalTypeExpansionContext())
+                     : paramOrRetVal.getInterfaceType();
+      if (Ty->hasTypeParameter())
+        Ty = genericEnv->mapTypeIntoEnvironment(Ty)->getCanonicalType();
+      hashStringForType(M, Ty, Out, genericEnv);
+    }
+    Out << ":";
+  }
+}
+
+static void hashStringForList(SILModule *M, const ArrayRef<SILResultInfo> &list,
+                              raw_ostream &Out, GenericEnvironment *genericEnv,
+                              const SILFunctionType *fnType) {
+  for (auto paramOrRetVal : list) {
+    if (paramOrRetVal.isFormalIndirect()) {
+      // Indirect params and return values have to be opaque.
+      Out << "-indirect";
+    } else {
+      CanType Ty = M ? paramOrRetVal.getReturnValueType(
+                           *M, fnType, M->getMaximalTypeExpansionContext())
+                     : paramOrRetVal.getInterfaceType();
+      if (Ty->hasTypeParameter())
+        Ty = genericEnv->mapTypeIntoEnvironment(Ty)->getCanonicalType();
+      hashStringForType(M, Ty, Out, genericEnv);
+    }
+    Out << ":";
+  }
+}
+
+static void hashStringForFunctionType(SILModule *M, CanSILFunctionType type,
+                                      raw_ostream &Out,
+                                      GenericEnvironment *genericEnv) {
+  Out << (type->isCoroutine() ? "coroutine" : "function") << ":";
+  Out << type->getNumParameters() << ":";
+  hashStringForList(M, type->getParameters(), Out, genericEnv, type);
+  Out << type->getNumResults() << ":";
+  hashStringForList(M, type->getResults(), Out, genericEnv, type);
+  if (type->isCoroutine()) {
+    Out << type->getNumYields() << ":";
+    hashStringForList(M, type->getYields(), Out, genericEnv, type);
+  }
+}
+
+uint16_t SILFunctionType::getPointerAuthDiscriminator(SILModule *M) {
+  // The hash we need to do here ignores:
+  //   - thickness, so that we can promote thin-to-thick without rehashing;
+  //   - error results, so that we can promote nonthrowing-to-throwing
+  //     without rehashing;
+  //   - isolation, so that global actor annotations can change in the SDK
+  //     without breaking compatibility and so that we can erase it to
+  //     nonisolated without rehashing;
+  //   - types of indirect arguments/retvals, so they can be substituted freely;
+  //   - types of class arguments/retvals
+  //   - types of metatype arguments/retvals
+  // See isABICompatibleWith and areABICompatibleParamsOrReturns in
+  // SILFunctionType.cpp.
+
+  SmallString<32> Buffer;
+  llvm::raw_svector_ostream Out(Buffer);
+  auto genericSig = getInvocationGenericSignature();
+  hashStringForFunctionType(
+      M, CanSILFunctionType(this), Out,
+      genericSig.getCanonicalSignature().getGenericEnvironment());
+  return llvm::getPointerAuthStableSipHash(Out.str());
+}
+
+uint16_t SILFunctionType::getCoroutineYieldTypesDiscriminator(SILModule &M) {
+  SmallString<32> buffer;
+  llvm::raw_svector_ostream out(buffer);
+  auto genericSig = getInvocationGenericSignature();
+  auto *genericEnv =  genericSig.getCanonicalSignature().getGenericEnvironment();
+  
+  out << [&]() -> StringRef {
+    switch (getCoroutineKind()) {
+    case SILCoroutineKind::YieldMany: return "yield_many:";
+    case SILCoroutineKind::YieldOnce: return "yield_once:";
+    case SILCoroutineKind::YieldOnce2: return "yield_once_2:";
+    case SILCoroutineKind::None: llvm_unreachable("not a coroutine");
+    }
+    llvm_unreachable("bad coroutine kind");
+  }();
+
+  out << getNumYields() << ":";
+
+  for (auto yield: getYields()) {
+    // We can't mangle types on inout and indirect yields because they're
+    // abstractable.
+    if (yield.isIndirectInOut()) {
+      out << "inout";
+    } else if (yield.isFormalIndirect()) {
+      out << "indirect";
+    } else {
+      CanType Ty = yield.getArgumentType(M, this,
+                                         M.getMaximalTypeExpansionContext());
+      if (Ty->hasTypeParameter())
+        Ty = genericEnv->mapTypeIntoEnvironment(Ty)->getCanonicalType();
+      hashStringForType(&M, Ty, out, genericEnv);
+    }
+    out << ":";
+  }
+  return llvm::getPointerAuthStableSipHash(out.str());
 }
 
 CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
@@ -4348,7 +4506,26 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
     }
 
     // Does this constant have a preferred abstraction pattern set?
-    AbstractionPattern origType = [&]{
+    AbstractionPattern origType = [&] {
+      // If this is a constructor of std::function which was synthesized by
+      // ClangImporter, the SIL type of the closure parameter needs to match the
+      // Clang convention. For instance, directness of parameters needs to
+      // match. This needs special handling, because the constructor is
+      // synthesized as Swift AST, and therefore isn't considered foreign, but
+      // at the same time requires a Clang abstraction pattern.
+      if (auto ctor = dyn_cast_or_null<ConstructorDecl>(constant.getDecl())) {
+        if (auto parentStruct = ctor->getParent()->getSelfStructDecl()) {
+          if (auto functionTypeDecl = dyn_cast_or_null<clang::CXXRecordDecl>(
+                  parentStruct->getClangDecl())) {
+            auto clangImporter = TC.Context.getClangModuleLoader();
+            if (clangImporter->needsClosureConstructor(functionTypeDecl) ||
+                clangImporter->isSwiftFunctionWrapper(functionTypeDecl)) {
+              return AbstractionPattern::getCXXFunctionalConstructor(
+                  origLoweredInterfaceType, functionTypeDecl);
+            }
+          }
+        }
+      }
       if (auto closureInfo = TC.getClosureTypeInfo(constant)) {
         return closureInfo->OrigType;
       } else {
