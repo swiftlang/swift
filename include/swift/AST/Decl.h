@@ -8065,6 +8065,11 @@ public:
   /// type-checked.
   BraceStmt *getMacroExpandedBody() const;
 
+  /// Whether the body of the function has been expanded from a body macro.
+  bool isBodyMacroExpanded() const {
+    return getBodyExpandedStatus() == BodyExpandedStatus::Expanded;
+  }
+
   /// Retrieve the type-checked body of the given function, or \c nullptr if
   /// there's no body available.
   BraceStmt *getTypecheckedBody() const;
