@@ -5,7 +5,7 @@
 // UNSUPPORTED: CPU=x86_64 && OS=macosx
 
 // Float16 is only available in watchOS 7.0 or newer
-// UNSUPPORTED: CPU=arm64_32 && OS=watchos
+// UNSUPPORTED: OS=watchos
 
 // TODO: Figure out why this test breaks on wasm32
 // UNSUPPORTED: CPU=wasm32
