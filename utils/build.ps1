@@ -3627,7 +3627,8 @@ function Build-ArgumentParser([Hashtable] $Platform) {
     -Bin (Get-ProjectBinaryCache $Platform ArgumentParser) `
     -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
     -Platform $Platform `
-    -UseBuiltCompilers Swift C`
+    -UseBuiltCompilers Swift `
+    -UseMSVCCompilers C `
     -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
