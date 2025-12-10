@@ -362,12 +362,16 @@ private:
 
   /// The queue of IRGenModules for multi-threaded compilation.
   SmallVector<IRGenModule *, 8> Queue;
+
+  /// ObjectStore for MCCAS backend if used.
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
   
   std::atomic<int> QueueIndex;
   
   friend class CurrentIGMPtr;
 public:
-  explicit IRGenerator(const IRGenOptions &opts, SILModule &module);
+  explicit IRGenerator(const IRGenOptions &opts, SILModule &module,
+                       std::shared_ptr<llvm::cas::ObjectStore> CAS = nullptr);
 
   /// Attempt to create an llvm::TargetMachine for the current target.
   std::unique_ptr<llvm::TargetMachine> createTargetMachine();
