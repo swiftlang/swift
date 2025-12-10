@@ -495,6 +495,10 @@ public:
   /// operator.
   bool isTernary() const;
 
+  /// Determine whether this type variable represents a solver synthesized
+  /// base type of a leading-dot member chain.
+  bool isUnresolvedMemberBase() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -2468,6 +2472,17 @@ public:
   llvm::DenseMap<ConstraintLocator *, ProtocolDecl *>
       SynthesizedConformances;
 
+  /// A cache of base types created of leading-dot expressions.
+  llvm::DenseMap<ConstraintLocator *, Type> UnresolvedMemberBaseTypes;
+
+  /// Find previously recorded base type for the given leading-dot
+  /// member reference expression.
+  Type findUnresolvedMemberBase(UnresolvedMemberExpr *E);
+
+  /// Record a base type created by the solver for the given leading-dot
+  /// member reference expression.
+  void recordUnresolvedMemberBase(UnresolvedMemberExpr *E, Type baseTy);
+
 private:
   /// Describe the candidate expression for partial solving.
   /// This class used by shrink & solve methods which apply
@@ -3825,6 +3840,9 @@ public:
 
     addUnsolvedConstraint(constraint);
   }
+
+  void addTransitiveConformanceConstraint(Type type, Type protocolTy,
+                                          ConstraintLocatorBuilder locator);
 
   /// Whether we should record the failure of a constraint.
   bool shouldRecordFailedConstraint() const {

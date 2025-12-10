@@ -26,6 +26,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/MacroDefinition.h"
@@ -1587,6 +1588,36 @@ void ConstraintSystem::buildDisjunctionForOptionalVsUnderlying(
 
   // Create the disjunction
   addDisjunctionConstraint(choices, locator, RememberChoice);
+}
+
+void ConstraintSystem::addTransitiveConformanceConstraint(
+    Type type, Type protocolTy, ConstraintLocatorBuilder locator) {
+  if (!protocolTy->is<ProtocolType>())
+    return;
+
+  auto *loc = getConstraintLocator(locator);
+
+  TinyPtrVector<TypeVariableType *> referencedVars;
+  // Note that implicit base type of a leading-dot reference is recorded
+  // as a "referenced" in the constraint. This is important to make sure
+  // that new conformance constraint gets introduced to its inference
+  // without actual conformance check which cannot succeed for the base.
+  //
+  // This supports syntax like `let _: some P = .test`, `<T: P>(_: T = .test)`
+  // and passing leading-dot chain as an argument to a parameter that has a
+  // generic parameter type with conformance constraints.
+  if (auto *M = getAsExpr<UnresolvedMemberChainResultExpr>(
+          simplifyLocatorToAnchor(loc))) {
+    auto *base = M->getChainBase();
+    referencedVars.push_back(
+        findUnresolvedMemberBase(base)->castTo<TypeVariableType>());
+  }
+
+  auto *transitiveConformance =
+      Constraint::create(*this, ConstraintKind::TransitivelyConformsTo, type,
+                         protocolTy, loc, referencedVars);
+  addUnsolvedConstraint(transitiveConformance);
+  activateConstraint(transitiveConformance);
 }
 
 namespace {
@@ -4115,6 +4146,24 @@ ArgumentList *Solution::getArgumentList(ConstraintLocator *locator) const {
       return known->second;
   }
   return nullptr;
+}
+
+Type ConstraintSystem::findUnresolvedMemberBase(UnresolvedMemberExpr *E) {
+  auto *locator = getConstraintLocator(E);
+  auto known = UnresolvedMemberBaseTypes.find(locator);
+  if (known != UnresolvedMemberBaseTypes.end())
+    return known->second;
+  return Type();
+}
+
+void ConstraintSystem::recordUnresolvedMemberBase(UnresolvedMemberExpr *E,
+                                                  Type baseTy) {
+  auto *locator = getConstraintLocator(E);
+  bool inserted = UnresolvedMemberBaseTypes.insert({locator, baseTy}).second;
+  ASSERT(inserted);
+
+  if (solverState)
+    recordChange(SolverTrail::Change::RecordedUnresolvedMemberBase(locator));
 }
 
 std::optional<ConversionRestrictionKind>

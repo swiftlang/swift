@@ -393,165 +393,6 @@ bool BindingSet::isPotentiallyIncomplete() const {
   return false;
 }
 
-void BindingSet::inferTransitiveProtocolRequirements() {
-  if (TransitiveProtocols)
-    return;
-
-  llvm::SmallVector<std::pair<TypeVariableType *, TypeVariableType *>, 4>
-      workList;
-  llvm::SmallPtrSet<TypeVariableType *, 4> visitedRelations;
-
-  llvm::SmallDenseMap<TypeVariableType *, SmallPtrSet<Constraint *, 4>, 4>
-      protocols;
-
-  auto addToWorkList = [&](TypeVariableType *parent,
-                           TypeVariableType *typeVar) {
-    if (visitedRelations.insert(typeVar).second)
-      workList.push_back({parent, typeVar});
-  };
-
-  auto propagateProtocolsTo =
-      [&protocols](TypeVariableType *dstVar,
-                   const ArrayRef<Constraint *> &direct,
-                   const SmallPtrSetImpl<Constraint *> &transitive) {
-        auto &destination = protocols[dstVar];
-
-        if (direct.size() > 0)
-          destination.insert(direct.begin(), direct.end());
-
-        if (transitive.size() > 0)
-          destination.insert(transitive.begin(), transitive.end());
-      };
-
-  addToWorkList(nullptr, TypeVar);
-
-  do {
-    auto *currentVar = workList.back().second;
-
-    auto &node = CS.getConstraintGraph()[currentVar];
-    if (!node.hasBindingSet()) {
-      workList.pop_back();
-      continue;
-    }
-
-    auto &bindings = node.getBindingSet();
-
-    // If current variable already has transitive protocol
-    // conformances inferred, there is no need to look deeper
-    // into subtype/equivalence chain.
-    if (bindings.TransitiveProtocols) {
-      TypeVariableType *parent = nullptr;
-      std::tie(parent, currentVar) = workList.pop_back_val();
-      assert(parent);
-      propagateProtocolsTo(parent, bindings.getConformanceRequirements(),
-                           *bindings.TransitiveProtocols);
-      continue;
-    }
-
-    for (const auto &entry : bindings.Info.SubtypeOf)
-      addToWorkList(currentVar, entry.first);
-
-    // If current type variable is part of an equivalence
-    // class, make it a "representative" and let it infer
-    // supertypes and direct protocol requirements from
-    // other members and their equivalence classes.
-    llvm::SmallSetVector<TypeVariableType *, 4> equivalenceClass;
-    {
-      SmallVector<TypeVariableType *, 4> workList;
-      workList.push_back(currentVar);
-
-      do {
-        auto *typeVar = workList.pop_back_val();
-
-        if (!equivalenceClass.insert(typeVar))
-          continue;
-
-        auto &node = CS.getConstraintGraph()[typeVar];
-        if (!node.hasBindingSet())
-          continue;
-
-        auto &equivalences = node.getBindingSet().Info.EquivalentTo;
-        for (const auto &eqVar : equivalences) {
-          workList.push_back(eqVar.first);
-        }
-      } while (!workList.empty());
-    }
-
-    for (const auto &memberVar : equivalenceClass) {
-      if (memberVar == currentVar)
-        continue;
-
-      auto &node = CS.getConstraintGraph()[memberVar];
-      if (!node.hasBindingSet())
-        continue;
-
-      const auto &bindings = node.getBindingSet();
-
-      llvm::SmallPtrSet<Constraint *, 2> placeholder;
-      // Add any direct protocols from members of the
-      // equivalence class, so they could be propagated
-      // to all of the members.
-      propagateProtocolsTo(currentVar, bindings.getConformanceRequirements(),
-                           placeholder);
-
-      // Since type variables are equal, current type variable
-      // becomes a subtype to any supertype found in the current
-      // equivalence  class.
-      for (const auto &eqEntry : bindings.Info.SubtypeOf)
-        addToWorkList(currentVar, eqEntry.first);
-    }
-
-    // More subtype/equivalences relations have been added.
-    if (workList.back().second != currentVar)
-      continue;
-
-    TypeVariableType *parent = nullptr;
-    std::tie(parent, currentVar) = workList.pop_back_val();
-
-    // At all of the protocols associated with current type variable
-    // are transitive to its parent, propagate them down the subtype/equivalence
-    // chain.
-    if (parent) {
-      propagateProtocolsTo(parent, bindings.getConformanceRequirements(),
-                           protocols[currentVar]);
-    }
-
-    auto &inferredProtocols = protocols[currentVar];
-
-    llvm::SmallPtrSet<Constraint *, 4> protocolsForEquivalence;
-
-    // Equivalence class should contain both:
-    // - direct protocol requirements of the current type
-    //   variable;
-    // - all of the transitive protocols inferred through
-    //   the members of the equivalence class.
-    {
-      auto directRequirements = bindings.getConformanceRequirements();
-      protocolsForEquivalence.insert(directRequirements.begin(),
-                                     directRequirements.end());
-
-      protocolsForEquivalence.insert(inferredProtocols.begin(),
-                                     inferredProtocols.end());
-    }
-
-    // Propagate inferred protocols to all of the members of the
-    // equivalence class.
-    for (const auto &equivalence : bindings.Info.EquivalentTo) {
-      auto &node = CS.getConstraintGraph()[equivalence.first];
-      if (node.hasBindingSet()) {
-        auto &bindings = node.getBindingSet();
-        bindings.TransitiveProtocols.emplace(protocolsForEquivalence.begin(),
-                                             protocolsForEquivalence.end());
-      }
-    }
-
-    // Update the bindings associated with current type variable,
-    // to avoid repeating this inference process.
-    bindings.TransitiveProtocols.emplace(inferredProtocols.begin(),
-                                         inferredProtocols.end());
-  } while (!workList.empty());
-}
-
 void BindingSet::inferTransitiveKeyPathBindings() {
   // If the current type variable represents a key path root type
   // let's try to transitively infer its type through bindings of
@@ -681,43 +522,6 @@ void BindingSet::inferTransitiveSupertypeBindings() {
 
       addBinding(binding.withSameSource(type, AllowedBindingKind::Supertypes),
                  /*isTransitive=*/true);
-    }
-  }
-}
-
-void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
-  if (!hasViableBindings()) {
-    if (auto *locator = TypeVar->getImpl().getLocator()) {
-      if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
-        // If this is a base of an unresolved member chain, as a last
-        // resort effort let's infer base to be a protocol type based
-        // on contextual conformance requirements.
-        //
-        // This allows us to find solutions in cases like this:
-        //
-        // \code
-        // func foo<T: P>(_: T) {}
-        // foo(.bar) <- `.bar` should be a static member of `P`.
-        // \endcode
-        inferTransitiveProtocolRequirements();
-
-        if (TransitiveProtocols.has_value()) {
-          for (auto *constraint : *TransitiveProtocols) {
-            Type protocolTy = constraint->getSecondType();
-
-            // Compiler-known marker protocols cannot be extended with members,
-            // so do not consider them.
-            if (auto p = protocolTy->getAs<ProtocolType>()) {
-              if (ProtocolDecl *decl = p->getDecl())
-                if (decl->getKnownProtocolKind() && decl->isMarkerProtocol())
-                  continue;
-            }
-
-            addBinding({protocolTy, AllowedBindingKind::Exact, constraint},
-                       /*isTransitive=*/false);
-          }
-        }
-      }
     }
   }
 }
@@ -1117,9 +921,6 @@ bool BindingSet::operator==(const BindingSet &other) {
       return false;
   }
 
-  if (TransitiveProtocols != other.TransitiveProtocols)
-    return false;
-
   return true;
 }
 
@@ -1209,7 +1010,6 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
 
     // Special handling for "leading-dot" unresolved member references,
     // like .foo.
-    bindings.inferTransitiveUnresolvedMemberRefBindings();
     bindings.finalizeUnresolvedMemberChainResult();
 
     // Before attempting to infer transitive bindings let's check
@@ -2087,11 +1887,33 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     // Constraints from which we can't do anything.
     break;
 
-  // For now let's avoid inferring protocol requirements from
-  // this constraint, but in the future we could do that to
-  // to filter bindings.
-  case ConstraintKind::TransitivelyConformsTo:
+  case ConstraintKind::TransitivelyConformsTo: {
+    // If this is a base of an unresolved member chain, as a last
+    // resort effort let's infer base to be a protocol type based
+    // on contextual conformance requirements.
+    //
+    // This allows us to find solutions in cases like this:
+    //
+    // \code
+    // func foo<T: P>(_: T) {}
+    // foo(.bar) <- `.bar` should be a static member of `P`.
+    // \endcode
+    if (TypeVar->getImpl().isUnresolvedMemberBase()) {
+      auto protocolTy = constraint->getSecondType();
+      // Compiler-known marker protocols cannot be extended with members,
+      // so do not consider them.
+      if (auto p = protocolTy->getAs<ProtocolType>()) {
+        if (ProtocolDecl *decl = p->getDecl())
+          if (decl->getKnownProtocolKind() && decl->isMarkerProtocol())
+            break;
+      }
+
+      addPotentialBinding(
+          TypeVar,
+          PotentialBinding(protocolTy, AllowedBindingKind::Exact, constraint));
+    }
     break;
+  }
 
   case ConstraintKind::DynamicTypeOf: {
     // Direct binding of the left-hand side could result
