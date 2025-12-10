@@ -291,7 +291,7 @@ extension arm_gprs {
     return X86_64Context(with: mcontext as! darwin_x86_64_mcontext)
   }
   #elseif os(Linux) && arch(x86_64)
-  init(with mctx: mcontext_t) {
+  init(with mctx: mcontext_t) { 
     gprs.setR(X86_64Register.rax.rawValue, to: UInt64(bitPattern: mctx.gregs.13))
     gprs.setR(X86_64Register.rbx.rawValue, to: UInt64(bitPattern: mctx.gregs.12))
     gprs.setR(X86_64Register.rcx.rawValue, to: UInt64(bitPattern: mctx.gregs.14))
@@ -488,17 +488,17 @@ extension arm_gprs {
     gprs.setR(I386Register.ebx.rawValue, to: UInt32(bitPattern: mctx.gregs.8))
     gprs.setR(I386Register.esp.rawValue, to: UInt32(bitPattern: mctx.gregs.7))
     gprs.setR(I386Register.ebp.rawValue, to: UInt32(bitPattern: mctx.gregs.6))
-    gprs.setR(I386Register.ebp.rawValue, to: UInt32(bitPattern: mctx.gregs.5))
-    gprs.setR(I386Register.ebp.rawValue, to: UInt32(bitPattern: mctx.gregs.4))
-    gprs.eip = UInt32(bitPattern: mctx.gregs.14)
-    gprs.eflags = UInt32(bitPattern: mctx.gregs.16)
+    gprs.setR(I386Register.esi.rawValue, to: UInt32(bitPattern: mctx.gregs.5))
+    gprs.setR(I386Register.edi.rawValue, to: UInt32(bitPattern: mctx.gregs.4))
     gprs.segreg.0 = UInt16(bitPattern: mctx.gregs.2 & 0xffff)  // es
     gprs.segreg.1 = UInt16(bitPattern: mctx.gregs.15 & 0xffff) // cs
     gprs.segreg.2 = UInt16(bitPattern: mctx.gregs.18 & 0xffff) // ss
     gprs.segreg.3 = UInt16(bitPattern: mctx.gregs.3 & 0xffff)  // ds
     gprs.segreg.4 = UInt16(bitPattern: mctx.gregs.1 & 0xffff)  // fs
     gprs.segreg.5 = UInt16(bitPattern: mctx.gregs.0 & 0xffff)  // gs
-    gprs.valid = 0x7fff
+    gprs.eip = UInt32(bitPattern: mctx.gregs.14)
+    gprs.eflags = UInt32(bitPattern: mctx.gregs.16)
+    gprs.valid = 0xffff
   }
 
   public static func fromHostMContext(_ mcontext: Any) -> HostContext {
@@ -881,9 +881,9 @@ extension arm_gprs {
   #if os(Linux) && arch(arm)
   init(with mctx: mcontext_t) {
     withUnsafeMutablePointer(to: &gprs._r) {
-      $0.withMemoryRebound(to: UInt32.self, capacity: 16) {
-        withUnsafePointer(to: &mctx.arm_r0) {
-          $0.withMemoryRebound(to: UInt32.self, capacity: 16) {
+      $0.withMemoryRebound(to: UInt32.self, capacity: 16) { to in
+        withUnsafePointer(to: mctx.arm_r0) {
+          $0.withMemoryRebound(to: UInt32.self, capacity: 16) { from in
             for n in 0..<16 {
               to[n] = from[n]
             }
@@ -1049,16 +1049,44 @@ private func thread_get_state<T>(_ thread: thread_t,
 
 #if os(Windows)
 @_spi(Contexts) public protocol Win32Context: Context {
-
   var win32MachineType: UInt32 { get }
 
   /// A function to construct the CONTEXT structure from this Context
   func withNTContext<R>(_ body: (UnsafeMutableRawPointer) -> R) -> R
 
+  init(ntContext: UnsafeRawPointer)
 }
 
 extension X86_64Context: Win32Context {
   public var win32MachineType: UInt32 { UInt32(IMAGE_FILE_MACHINE_AMD64) }
+
+  public init(ntContext: UnsafeRawPointer) {
+    let pctx = ntContext.assumingMemoryBound(to: WIN32_AMD64_CONTEXT.self)
+    let ctx = pctx.pointee
+
+    gprs.setR(X86_64Register.rax.rawValue, to: ctx.Rax)
+    gprs.setR(X86_64Register.rcx.rawValue, to: ctx.Rcx)
+    gprs.setR(X86_64Register.rdx.rawValue, to: ctx.Rdx)
+    gprs.setR(X86_64Register.rbx.rawValue, to: ctx.Rbx)
+    gprs.setR(X86_64Register.rsp.rawValue, to: ctx.Rsp)
+    gprs.setR(X86_64Register.rbp.rawValue, to: ctx.Rbp)
+    gprs.setR(X86_64Register.rsi.rawValue, to: ctx.Rsi)
+    gprs.setR(X86_64Register.rdi.rawValue, to: ctx.Rdi)
+    gprs.setR(X86_64Register.r8.rawValue, to: ctx.R8)
+    gprs.setR(X86_64Register.r9.rawValue, to: ctx.R9)
+    gprs.setR(X86_64Register.r10.rawValue, to: ctx.R10)
+    gprs.setR(X86_64Register.r11.rawValue, to: ctx.R11)
+    gprs.setR(X86_64Register.r12.rawValue, to: ctx.R12)
+    gprs.setR(X86_64Register.r13.rawValue, to: ctx.R13)
+    gprs.setR(X86_64Register.r14.rawValue, to: ctx.R14)
+    gprs.setR(X86_64Register.r15.rawValue, to: ctx.R15)
+    gprs.rip = ctx.Rip
+    gprs.rflags = UInt64(ctx.EFlags)
+    gprs.cs = ctx.SegCs
+    gprs.fs = ctx.SegFs
+    gprs.gs = ctx.SegGs
+    gprs.valid = 0x1fffff
+  }
 
   public func withNTContext<R>(_ body: (UnsafeMutableRawPointer) -> R) -> R {
     var ctx = WIN32_AMD64_CONTEXT()
@@ -1083,10 +1111,10 @@ extension X86_64Context: Win32Context {
     ctx.R14 = getRegister(.r14)!
     ctx.R15 = getRegister(.r15)!
     ctx.Rip = programCounter
-    ctx.EFlags = DWORD(truncatingIfNeeded: getRegister(.rflags)!)
-    ctx.SegCs = WORD(truncatingIfNeeded: getRegister(.cs)!)
-    ctx.SegFs = WORD(truncatingIfNeeded: getRegister(.fs)!)
-    ctx.SegGs = WORD(truncatingIfNeeded: getRegister(.gs)!)
+    ctx.EFlags = UInt32(truncatingIfNeeded: getRegister(.rflags)!)
+    ctx.SegCs = UInt16(truncatingIfNeeded: getRegister(.cs)!)
+    ctx.SegFs = UInt16(truncatingIfNeeded: getRegister(.fs)!)
+    ctx.SegGs = UInt16(truncatingIfNeeded: getRegister(.gs)!)
 
     return withUnsafeMutablePointer(to: &ctx) { ptr in
       return body(ptr)
@@ -1096,6 +1124,29 @@ extension X86_64Context: Win32Context {
 
 extension I386Context: Win32Context {
   public var win32MachineType: UInt32 { UInt32(IMAGE_FILE_MACHINE_I386) }
+
+  public init(ntContext: UnsafeRawPointer) {
+    let pctx = ntContext.assumingMemoryBound(to: WIN32_I386_CONTEXT.self)
+    let ctx = pctx.pointee
+
+    gprs.setR(I386Register.eax.rawValue, to: ctx.Eax)
+    gprs.setR(I386Register.ecx.rawValue, to: ctx.Ecx)
+    gprs.setR(I386Register.edx.rawValue, to: ctx.Edx)
+    gprs.setR(I386Register.ebx.rawValue, to: ctx.Ebx)
+    gprs.setR(I386Register.esp.rawValue, to: ctx.Esp)
+    gprs.setR(I386Register.ebp.rawValue, to: ctx.Ebp)
+    gprs.setR(I386Register.esi.rawValue, to: ctx.Esi)
+    gprs.setR(I386Register.edi.rawValue, to: ctx.Edi)
+    gprs.segreg.0 = UInt16(truncatingIfNeeded: ctx.SegEs)
+    gprs.segreg.1 = UInt16(truncatingIfNeeded: ctx.SegCs)
+    gprs.segreg.2 = UInt16(truncatingIfNeeded: ctx.SegSs)
+    gprs.segreg.3 = UInt16(truncatingIfNeeded: ctx.SegDs)
+    gprs.segreg.4 = UInt16(truncatingIfNeeded: ctx.SegFs)
+    gprs.segreg.5 = UInt16(truncatingIfNeeded: ctx.SegGs)
+    gprs.eip = ctx.Eip
+    gprs.eflags = ctx.EFlags
+    gprs.valid = 0xffff
+  }
 
   public func withNTContext<R>(_ body: (UnsafeMutableRawPointer) -> R) -> R {
     var ctx = WIN32_I386_CONTEXT()
@@ -1131,6 +1182,24 @@ extension I386Context: Win32Context {
 extension ARMContext: Win32Context {
   public var win32MachineType: UInt32 { UInt32(IMAGE_FILE_MACHINE_ARM) }
 
+  public init(ntContext: UnsafeRawPointer) {
+    let pctx = ntContext.assumingMemoryBound(to: WIN32_ARM_CONTEXT.self)
+    let ctx = pctx.pointee
+
+    withUnsafeMutablePointer(to: &gprs._r) {
+      $0.withMemoryRebound(to: UInt32.self, capacity: 16) { to in
+        withUnsafePointer(to: ctx.R0) {
+          $0.withMemoryRebound(to: UInt32.self, capacity: 16) { from in
+            for n in 0..<16 {
+              to[n] = from[n]
+            }
+          }
+        }
+      }
+    }
+    gprs.valid = 0xffff
+  }
+
   public func withNTContext<R>(_ body: (UnsafeMutableRawPointer) -> R) -> R {
     var ctx = WIN32_ARM_CONTEXT()
 
@@ -1157,6 +1226,27 @@ extension ARMContext: Win32Context {
 
 extension ARM64Context: Win32Context {
   public var win32MachineType: UInt32 { UInt32(IMAGE_FILE_MACHINE_ARM64) }
+
+  public init(ntContext: UnsafeRawPointer) {
+    let pctx = ntContext.assumingMemoryBound(to: WIN32_ARM64_CONTEXT.self)
+    let ctx = pctx.pointee
+
+    withUnsafeMutablePointer(to: &gprs._x) {
+      $0.withMemoryRebound(to: UInt64.self, capacity: 32){ to in
+        withUnsafePointer(to: ctx.X) {
+          $0.withMemoryRebound(to: UInt64.self, capacity: 31) { from in
+            for n in 0..<31 {
+              to[n] = from[n]
+            }
+          }
+        }
+
+	to[31] = ctx.Sp
+      }
+    }
+    gprs.pc = ctx.Pc
+    gprs.valid = 0x1ffffffff
+  }
 
   public func withNTContext<R>(_ body: (UnsafeMutableRawPointer) -> R) -> R {
     var ctx = WIN32_ARM64_CONTEXT()

@@ -158,7 +158,7 @@ public struct Win32Unwinder<C: Win32Context, M: MemoryReader>
 
     let unwinder: any Win32UnwinderSupport = self
     if !(withUnsafePointer(to: unwinder) { ptr in
-           StackWalk64(machineType,
+           StackWalk64(DWORD(truncatingIfNeeded: machineType),
                        HANDLE(mutating: ptr),
                        HANDLE(mutating: ptr),
                        &stackFrame,

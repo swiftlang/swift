@@ -97,7 +97,7 @@ extension CachingMemoryReader where Reader == UncachedMemserverMemoryReader {
 }
 #endif
 
-#if os(Linux) || os(macOS)
+#if os(Linux) || os(macOS) || os(Windows)
 @_spi(MemoryReaders)
 @available(Backtracing 6.2, *)
 public typealias RemoteMemoryReader = CachingMemoryReader<UncachedRemoteMemoryReader>
@@ -111,6 +111,10 @@ extension CachingMemoryReader where Reader == UncachedRemoteMemoryReader {
   #elseif os(Linux)
   convenience public init(pid: Any) {
     self.init(for: UncachedRemoteMemoryReader(pid: pid))
+  }
+  #elseif os(Windows)
+  convenience public init(hProcess: UInt) {
+    self.init(for: UncachedRemoteMemoryReader(hProcess: hProcess))
   }
   #endif
 }

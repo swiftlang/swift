@@ -14,7 +14,8 @@
 ;
 ; ===----------------------------------------------------------------------=== ;
 
-        AREA |.text|, CODE, ARM64
+        AREA |.text|, CODE, READONLY, ARM64
+        EXPORT _swift_get_cpu_context
 
 ;; On entry, rax contains the pointer to the arm64_gprs
 _swift_get_cpu_context PROC PUBLIC

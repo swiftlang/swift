@@ -247,8 +247,13 @@ PE_ENUM(uint32_t, pe_debug_directory_type) {
   PE_DEBUG_TYPE_EX_DLLCHARACTERISTICS = 20
 };
 
-PE_OPTIONS(uint32_t, pe_debug_characteristics) {
-};
+// We would do this, but it causes a warning because there are no flags
+// defined:
+//
+//  PE_OPTIONS(uint32_t, pe_debug_characteristics) {
+//  };
+//
+typedef uint32_t pe_debug_characteristics;
 
 /* .. PE Header ............................................................. */
 
