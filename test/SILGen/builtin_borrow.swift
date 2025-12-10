@@ -241,23 +241,17 @@ struct BorrowAFDTrivial: ~Escapable {
 	}
 }
 
-/* TODO: Raises a spurious escape diagnostic.
-
 struct BorrowDep<T>: ~Escapable {
-	var borrowed: Builtin.Borrow<T>
-
 	var value: T {
-		// C.HECK-LABEL: sil{{.*}} @$s{{.*}}9BorrowDepV5value{{.*}}vb :
-		// C.HECK:       bb0([[STRUCT:%.*]] :
-		// C.HECK:         [[BORROW:%.*]] = struct_element_addr [[STRUCT]]
-		// T.ODO: This copy is unnecessary. Can we make SILGen avoid it?
-		// C.HECK:         [[BORROW_COPY:%.*]] = alloc_stack
-		// C.HECK:         copy_addr [[BORROW]] to [init] [[BORROW_COPY]]
-		// C.HECK:         [[REFERENT:%.*]] = dereference_borrow_addr [[BORROW_COPY]]
-		// C.HECK:         return [[REFERENT]]
+		// CHECK-LABEL: sil{{.*}} @$s{{.*}}9BorrowDepV5value{{.*}}vb :
+		// CHECK:       bb0([[STRUCT:%.*]] :
+		// CHECK:         [[BORROW:%.*]] = struct_element_addr [[STRUCT]]
+		// CHECK:         [[REFERENT:%.*]] = dereference_borrow_addr [[BORROW]]
+		// CHECK:         return [[REFERENT]]
 		borrow {
 			return Builtin.dereferenceBorrow(borrowed)
 		}
 	}
+
+	private var borrowed: Builtin.Borrow<T>
 }
-*/

@@ -3374,10 +3374,24 @@ LValue SILGenLValue::visitApplyExpr(ApplyExpr *e, SGFAccessKind accessKind,
 
   switch (builtinInfo.ID) {
   case BuiltinValueKind::DereferenceBorrow: {
-    // The `Builtin.Borrow` argument is evaluated as a normal rvalue.
-    auto borrowValue = visitRecNonInOutBase(*this, e->getArgs()->getExpr(0),
-                      SGFAccessKind::OwnedObjectRead, options,
-                      AbstractionPattern(e->getArgs()->getExpr(0)->getType()));
+    // The `Builtin.Borrow` argument is evaluated as a +0 rvalue.
+    auto borrowExpr = e->getArgs()->getExpr(0);
+
+    // If the `Builtin.Borrow` is address-only in its current form, then try to
+    // get its addressable representation. The projected address of the
+    // borrowed value may be the same as the `Builtin.Borrow` in cases where
+    // `Builtin.Borrow` uses the inline representation, so a temporary copy may
+    // unnecessarily limit its lifetime.
+    auto borrowValue = ManagedValue();
+    if (SGF.getLoweredType(borrowExpr->getType()).isAddressOnly(SGF.F)) {
+      borrowValue = SGF.tryEmitAddressableParameterAsAddress(borrowExpr,
+                                                       ValueOwnership::Shared);
+    }
+    if (!borrowValue) {
+      borrowValue = SGF.emitRValue(e->getArgs()->getExpr(0),
+                                   SGFContext::AllowGuaranteedPlusZero)
+        .getAsSingleValue(SGF, e);
+    }
     
     ManagedValue deref;
     // Project the borrow of the value from there.
