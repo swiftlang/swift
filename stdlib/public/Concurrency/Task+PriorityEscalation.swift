@@ -125,11 +125,30 @@ func __withTaskPriorityEscalationHandler0<T, E>(
   onPriorityEscalated handler0: @Sendable (UInt8, UInt8) -> Void,
   isolation: isolated (any Actor)? = #isolation
 ) async throws(E) -> T {
+#if $BuiltinConcurrencyStackNesting
   let record =
     unsafe Builtin.taskAddPriorityEscalationHandler(handler: handler0)
   defer {
     unsafe Builtin.taskRemovePriorityEscalationHandler(record: record)
   }
+#else
+  let record = unsafe _taskAddPriorityEscalationHandler(handler: handler0)
+  defer { unsafe _taskRemovePriorityEscalationHandler(record: record) }
+#endif
 
   return try await operation()
 }
+
+@usableFromInline
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_task_addPriorityEscalationHandler")
+func _taskAddPriorityEscalationHandler(
+  handler: (UInt8, UInt8) -> Void
+) -> UnsafeRawPointer /*EscalationNotificationStatusRecord*/
+
+@usableFromInline
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_task_removePriorityEscalationHandler")
+func _taskRemovePriorityEscalationHandler(
+  record: UnsafeRawPointer /*EscalationNotificationStatusRecord*/
+)
