@@ -300,3 +300,169 @@ func test_one_element_tuple_vs_non_tuple_matching() {
     test(V<Int>.self) // Ok
   }
 }
+
+// MARK: lValue'd packing (Issue 85924)
+
+/**
+ Before a fix in #85924, `var`-backed parameters would end up wrapped
+ in an extraneous tuple wrapping (from #65125) for the `var` parameter,
+ leading to less-than-efficient parameter packing.
+
+ https://github.com/swiftlang/swift/issues/85924
+ */
+func test_var_let_tuple_append_equivalence() {
+  func merge<each A, each B>(_ a: (repeat each A), _ b: (repeat each B)) -> (repeat each A, repeat each B) {
+    return (repeat each a, repeat each b)
+  }
+
+  let allLetsTupleFirst: (String, Int, String) = {
+    let a = ("a", 2) // (String, Int)
+    let b = "c" // String
+    return merge(a, b)
+  }()
+
+  // Before #85924 was fixed, this would type as ((String, Int), String)
+  let varFirstTupleFirst: (String, Int, String) = {
+    var a = ("a", 2) // @lvalue (String, Int)
+    let b = "c" // String
+    return merge(a, b)
+  }()
+
+  let varSecondTupleFirst: (String, Int, String) = {
+    let a = ("a", 2) // (String, Int)
+    var b = "c" // @lvalue String
+    return merge(a, b)
+  }()
+
+  let allVarsTupleFirst: (String, Int, String) = {
+    var a = ("a", 2) // @lvalue (String, Int)
+    var b = "c" // @lvalue String
+    return merge(a, b)
+  }()
+
+  let allLetsTupleSecond: (String, Int, String) = {
+    let a = "a"
+    let b = (2, "c")
+    return merge(a, b)
+  }()
+
+  let varFirstTupleSecond: (String, Int, String) = {
+    var a = "a"
+    let b = (2, "c")
+    return merge(a, b)
+  }()
+
+  let varSecondTupleSecond: (String, Int, String) = {
+    let a = "a"
+    var b = (2, "c")
+    return merge(a, b)
+  }()
+
+  let allVarsTupleSecond: (String, Int, String) = {
+    var a = "a"
+    var b = (2, "c")
+    return merge(a, b)
+  }()
+
+  let allLetsMultiTuple: (String, Int, String) = {
+    let a = ("a")
+    let b = (2, "c")
+    return merge(a, b)
+  }()
+
+  let varFirstMultiTuple: (String, Int, String) = {
+    var a = ("a")
+    let b = (2, "c")
+    return merge(a, b)
+  }()
+
+  let varSecondMultiTuple: (String, Int, String) = {
+    let a = ("a")
+    var b = (2, "c")
+    return merge(a, b)
+  }()
+
+  let allVarsMultiTuple: (String, Int, String) = {
+    var a = ("a")
+    var b = (2, "c")
+    return merge(a, b)
+  }()
+}
+
+func test_var_let_tuple_append_equivalence() {
+  func append<each A, B>(_ a: (repeat each A), _ b: B) -> (repeat each A, B) {
+      return (repeat each a, b)
+  }
+
+  let allLetsTupleFirst: (String, Int, String) = {
+    let a = ("a", 2) // (String, Int)
+    let b = "c" // String
+    return append(a, b)
+  }()
+
+  let varFirstTupleFirst: (String, Int, String) = {
+    var a = ("a", 2) // @lvalue (String, Int)
+    let b = "c" // String
+    return append(a, b)
+  }()
+
+  let varSecondTupleFirst: (String, Int, String) = {
+    let a = ("a", 2) // (String, Int)
+    var b = "c" // @lvalue String
+    return append(a, b)
+  }()
+
+  let allVarsTupleFirst: (String, Int, String) = {
+    var a = ("a", 2) // @lvalue (String, Int)
+    var b = "c" // @lvalue String
+    return append(a, b)
+  }()
+
+  let allLetsTupleSecond: (String, (Int, String)) = {
+    let a = "a"
+    let b = (2, "c")
+    return append(a, b)
+  }()
+
+  let varFirstTupleSecond: (String, (Int, String)) = {
+    var a = "a"
+    let b = (2, "c")
+    return append(a, b)
+  }()
+
+  let varSecondTupleSecond: (String, (Int, String)) = {
+    let a = "a"
+    var b = (2, "c")
+    return append(a, b)
+  }()
+
+  let allVarsTupleSecond: (String, (Int, String)) = {
+    var a = "a"
+    var b = (2, "c")
+    return append(a, b)
+  }()
+
+  let allLetsMultiTuple: (String, (Int, String)) = {
+    let a = ("a")
+    let b = (2, "c")
+    return append(a, b)
+  }()
+
+  let varFirstMultiTuple: (String, (Int, String)) = {
+    var a = ("a")
+    let b = (2, "c")
+    return append(a, b)
+  }()
+
+  let varSecondMultiTuple: (String, (Int, String)) = {
+    let a = ("a")
+    var b = (2, "c")
+    return append(a, b)
+  }()
+
+  let allVarsMultiTuple: (String, (Int, String)) = {
+    var a = ("a")
+    var b = (2, "c")
+    return append(a, b)
+  }()
+}
