@@ -293,10 +293,24 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 
       // If the protocol has a default type, check it.
       if (auto defaultType = TypeChecker::getDefaultType(literalProtocol, DC)) {
-        // Check whether the nominal types match. This makes sure that we
-        // properly handle Array vs. Array<T>.
-        if (defaultType->getAnyNominal() != type->getAnyNominal()) {
-          increaseScore(SK_NonDefaultLiteral, locator);
+        auto isDefaultType = [&defaultType](Type type) {
+          // Check whether the nominal types match. This makes sure that we
+          // properly handle Array vs. Array<T>.
+          return defaultType->getAnyNominal() == type->getAnyNominal();
+        };
+
+        if (!isDefaultType(type)) {
+          // Treat `std.string` as a default type just like we do
+          // Swift standard library `String`. This helps to disambiguate
+          // operator overloads that use `std.string` vs. a custom C++
+          // type that conforms to `ExpressibleByStringLiteral` as well.
+          bool isCxxDefaultType =
+              literalProtocol->isSpecificProtocol(
+                  KnownProtocolKind::ExpressibleByStringLiteral) &&
+              type->isCxxString();
+
+          increaseScore(SK_NonDefaultLiteral, locator,
+                        isCxxDefaultType ? 1 : 2);
         }
       }
 
