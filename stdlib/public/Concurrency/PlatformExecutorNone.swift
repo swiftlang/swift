@@ -13,7 +13,7 @@
 import Swift
 
 @available(StdlibDeploymentTarget 6.2, *)
-struct PlatformExecutorFactory: ExecutorFactory {
+public struct PlatformExecutorFactory: ExecutorFactory {
   public static let mainExecutor: any MainExecutor = UnimplementedMainExecutor()
   public static let defaultExecutor: any TaskExecutor = UnimplementedTaskExecutor()
 }
