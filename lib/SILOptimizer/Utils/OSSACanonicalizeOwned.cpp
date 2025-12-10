@@ -201,6 +201,17 @@ bool OSSACanonicalizeOwned::computeCanonicalLiveness() {
 
       // Conservatively treat a conversion to an unowned value as a pointer
       // escape. Is it legal to canonicalize ForwardingUnowned?
+      //
+      // FIXME: BitwiseEscape is defined as a leaf use for liveness purposes. It
+      // implies that any use of those bits that require liveness are already
+      // handled by something like mark_dependence or fix_lifetime. It should
+      // be treated as an InstantaneousUse here not a PointerEscape. This was a
+      // workaround for invalid SIL which may still miscompile in other passes.
+      // Valid fixes are:
+      // 1. Compile the stdlib with lexical lifetimes.
+      // 2. Fix the source to correctly extendLifetime when bit-casting.
+      // 3. Conservatively change operand ownership for the SIL instruction to
+      //    PointerEscape.
       case OperandOwnership::ForwardingUnowned:
       case OperandOwnership::PointerEscape:
       case OperandOwnership::BitwiseEscape:
