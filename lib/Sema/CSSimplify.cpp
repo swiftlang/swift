@@ -2747,6 +2747,12 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
       args.pop_back();
       for (const auto &elt : tuple->getElements())
         args.emplace_back(elt.getType(), elt.getName());
+
+      // If unpacking a tuple results in more arguments than parameters
+      // it would be diagnosed as a general mismatch because it's unclear
+      // whether it's a problem with missing or extraneous parameters.
+      if (args.size() > params.size())
+        return true;
     } else if (auto *typeVar = argType->getAs<TypeVariableType>()) {
       auto isParam = [](const Expr *expr) {
         if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
