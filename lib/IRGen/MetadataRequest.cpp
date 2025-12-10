@@ -886,7 +886,7 @@ bool irgen::isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
     return false;
   }
 
-  if (IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials) &&
+  if (IGM.isEmbeddedWithExistentials() &&
       (isa<StructType>(type) || isa<BoundGenericStructType>(type) ||
        isa<EnumType>(type) || isa<BoundGenericEnumType>(type))) {
     if (type->hasArchetype()) {
@@ -1263,7 +1263,7 @@ static MetadataResponse emitFixedArrayMetadataRef(IRGenFunction &IGF,
 static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
                                                  CanTupleType type,
                                                  DynamicMetadataRequest request) {
-  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+  if (IGF.IGM.isEmbeddedWithExistentials()) {
     return MetadataResponse::forComplete(IGF.IGM.getAddrOfTypeMetadata(type));
   }
 
@@ -1568,7 +1568,7 @@ static CanPackType getInducedPackType(AnyFunctionType::CanParamArrayRef params,
 static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
                                                     CanFunctionType type,
                                                     DynamicMetadataRequest request) {
-  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+  if (IGF.IGM.isEmbeddedWithExistentials()) {
     return MetadataResponse::forComplete(IGF.IGM.getAddrOfTypeMetadata(type));
   }
   auto result =

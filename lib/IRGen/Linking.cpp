@@ -632,7 +632,10 @@ SILDeclRef LinkEntity::getSILDeclRef() const {
 static bool isLazyEmissionOfPublicSymbolInMultipleModulesPossible(CanType ty) {
   // In embedded existenitals mode we generate lazy public metadata on demand
   // which makes it non unique.
-  if (ty->getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+  auto &langOpts = ty->getASTContext().LangOpts;
+  auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
+    langOpts.hasFeature(Feature::EmbeddedExistentials);
+  if (isEmbeddedWithExistentials) {
     if (auto nominal = ty->getAnyNominal()) {
       if (SILDeclRef::declHasNonUniqueDefinition(nominal)) {
         return true;
@@ -1144,14 +1147,18 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::TypeMetadata:
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
     switch (getMetadataAddress()) {
-    case TypeMetadataAddress::FullMetadata:
-      if (IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+    case TypeMetadataAddress::FullMetadata: {
+      auto &langOpts = IGM.Context.LangOpts;
+      auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
+        langOpts.hasFeature(Feature::EmbeddedExistentials);
+      if (isEmbeddedWithExistentials) {
         return IGM.EmbeddedExistentialsMetadataStructTy;
       }
       if (getType().getClassOrBoundGenericClass())
         return IGM.FullHeapMetadataStructTy;
       else
         return IGM.FullTypeMetadataStructTy;
+    }
     case TypeMetadataAddress::AddressPoint:
       return IGM.TypeMetadataStructTy;
     }
