@@ -7202,17 +7202,23 @@ void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {
   auto init = builder.beginStruct();
   init.setPacked(true);
 
+  auto isEmbedded =
+    IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials);
+
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     if (classDecl->isForeignReferenceType()) {
+      assert(!isEmbedded && "emitting foregin reference type not supported");
       ForeignReferenceTypeMetadataBuilder builder(IGM, classDecl, init);
       builder.layout();
 
       IGM.defineTypeMetadata(type, /*isPattern=*/false,
                              builder.canBeConstant(),
                              init.finishAndCreateFuture());
-      builder.createMetadataAccessFunction();
+      if (!isEmbedded)
+        builder.createMetadataAccessFunction();
     } else {
       assert(classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType);
+      assert(!isEmbedded && "emitting foregin cf class type not supported");
 
       ForeignClassMetadataBuilder builder(IGM, classDecl, init);
       builder.layout();
@@ -7220,28 +7226,37 @@ void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {
       IGM.defineTypeMetadata(type, /*isPattern=*/false,
                              builder.canBeConstant(),
                              init.finishAndCreateFuture());
-      builder.createMetadataAccessFunction();
+      if (!isEmbedded)
+        builder.createMetadataAccessFunction();
     }
   } else if (auto structDecl = dyn_cast<StructDecl>(decl)) {
     assert(isa<ClangModuleUnit>(structDecl->getModuleScopeContext()));
 
     ForeignStructMetadataBuilder builder(IGM, structDecl, init);
-    builder.layout();
+    if (isEmbedded)
+      builder.embeddedLayout();
+    else
+      builder.layout();
 
     IGM.defineTypeMetadata(type, /*isPattern=*/false,
                            builder.canBeConstant(),
                            init.finishAndCreateFuture());
-    builder.createMetadataAccessFunction();
+    if (!isEmbedded)
+      builder.createMetadataAccessFunction();
   } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
     assert(enumDecl->hasClangNode());
-    
+
     ForeignEnumMetadataBuilder builder(IGM, enumDecl, init);
-    builder.layout();
+    if (isEmbedded)
+      builder.embeddedLayout();
+    else
+      builder.layout();
 
     IGM.defineTypeMetadata(type, /*isPattern=*/false,
                            builder.canBeConstant(),
                            init.finishAndCreateFuture());
-    builder.createMetadataAccessFunction();
+    if (!isEmbedded)
+      builder.createMetadataAccessFunction();
   } else {
     llvm_unreachable("foreign metadata for unexpected type?!");
   }
