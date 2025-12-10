@@ -30,7 +30,7 @@ tools, and also builds WasmKit to execute stdlib tests:
 
 On macOS it's also best to avoid cross-compiling host tools from arm64 to x86 and vice versa, add this option to avoid that: `--infer-cross-compile-hosts-on-darwin=false`.
 
-If you need to only run the tests, switch to the build directory first
+If you need to only run compiler/stdlib tests after building everything with the `build-script` command listed above, switch to the build directory first:
 
 ```
 cd build/Ninja-RelWithDebInfoAssert
@@ -43,14 +43,14 @@ PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$PATH" \
   ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasmstdlib-macosx-arm64
 ```
 
-Filter to a subset of tests you'd like to run with `LIT_FILTER`, i.e. only tests with `embedded` in their file path:
+Filter to a subset of tests you'd like to run with `LIT_FILTER`. Here's an example to run only tests with `embedded` in their file path:
 
 ```
 LIT_FILTER='(embedded)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$PATH" \
   ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasmstdlib-macosx-arm64
 ```
 
-Filter out tests you don't want to run with `LIT_FILTER_OUT`, i.e. exclude tests containing `KeyPath` with
+Filter out tests you don't want to run with `LIT_FILTER_OUT`. Here's an example that excludes tests containing `KeyPath` in their file path:
 
 ```
 LIT_FILTER_OUT='(KeyPath)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$PATH" \
