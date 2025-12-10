@@ -852,6 +852,12 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       continue;
     }
 
+    if (isUpcomingFeatureFlag &&
+        argValue.compare("ApproachableConcurrency") == 0) {
+      psuedoFeatures.push_back(argValue);
+      continue;
+    }
+
     // For all other features, the argument format is `<name>[:migrate]`.
     StringRef featureName;
     std::optional<StringRef> featureMode;
@@ -965,6 +971,15 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
           Opts.StrictConcurrencyLevel = *level;
         }
       }
+      continue;
+    }
+
+    if (featureName->compare("ApproachableConcurrency") == 0) {
+      Opts.enableFeature(Feature::DisableOutwardActorInference);
+      Opts.enableFeature(Feature::GlobalActorIsolatedTypesUsability);
+      Opts.enableFeature(Feature::InferIsolatedConformances);
+      Opts.enableFeature(Feature::InferSendableFromCaptures);
+      Opts.enableFeature(Feature::NonisolatedNonsendingByDefault);
       continue;
     }
 
