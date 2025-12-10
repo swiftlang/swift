@@ -2410,6 +2410,14 @@ static ValueDecl *getTaskLocalValuePop(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
 }
 
+static ValueDecl *getTaskCancellationShieldPush(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
+}
+
+static ValueDecl *getTaskCancellationShieldPop(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -3516,6 +3524,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TaskLocalValuePop:
     return getTaskLocalValuePop(Context, Id);
+
+  case BuiltinValueKind::TaskCancellationShieldPush:
+    return getTaskCancellationShieldPush(Context, Id);
+
+  case BuiltinValueKind::TaskCancellationShieldPop:
+    return getTaskCancellationShieldPop(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

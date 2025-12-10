@@ -985,6 +985,20 @@ nonisolated(nonsending) func testTaskLocalValuePush<Value>(_ key: Builtin.RawPoi
 // CHECK: call swiftcc {} @swift_task_localValuePop()
 nonisolated(nonsending) func testTaskLocalValuePop() async {
   Builtin.taskLocalValuePop()
+} 
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins22testTaskLocalValuePushyyBp_xntYalF"(ptr swiftasync %0, i64 %1, i64 %2, ptr %3, ptr noalias %4, ptr %Value)
+// CHECK: [[TASK_VAR:%.*]] = call swiftcc ptr @swift_task_alloc({{.*}}
+// CHECK: call ptr %InitializeWithTake(ptr noalias [[TASK_VAR]], ptr noalias {{%.*}}, ptr %Value)
+// CHECK: call swiftcc {} @swift_task_localValuePush(ptr %3, ptr [[TASK_VAR]], ptr %Value)
+nonisolated(nonsending) func testTaskCancellationShieldPush<Value>(_ key: Builtin.RawPointer, _ value: consuming Value) async {
+  Builtin.taskCancellationShieldPush()
+}
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins21testTaskLocalValuePopyyYaF"(ptr swiftasync %0, i64 %1, i64 %2)
+// CHECK: call swiftcc {} @swift_task_localValuePop()
+nonisolated(nonsending) func taskCancellationShieldPop() async {
+  Builtin.taskCancellationShieldPop()
 }  
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}
