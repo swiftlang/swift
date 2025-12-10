@@ -758,6 +758,29 @@ bool CompareDeclSpecializationRequest::evaluate(
       unsigned numParams1 = params1.size();
       unsigned numParams2 = params2.size();
 
+      // Handle the following situation:
+      //
+      // struct S {
+      //    func test() {}
+      //    static func test(_: S) {}
+      // }
+      //
+      // Calling `S.test(s)` where `s` has a type `S` without any other context
+      // should prefer a complete call to a static member over a partial
+      // application of an instance once based on the choice of the base type.
+      //
+      // The behavior is consistent for double-applies as well i.e.
+      // `S.test(s)()` if static method produced a function type it would be
+      // preferred.
+      if (decl1->isInstanceMember() != decl2->isInstanceMember() &&
+          isa<FuncDecl>(decl1) && isa<FuncDecl>(decl2)) {
+        auto selfTy = decl1->isInstanceMember() ? selfTy2 : selfTy1;
+        auto params = decl1->isInstanceMember() ? params2 : params1;
+        if (params.size() == 1 && params[0].getPlainType()->isEqual(selfTy)) {
+          return completeResult(!decl1->isInstanceMember());
+        }
+      }
+
       if (numParams1 > numParams2)
         return completeResult(false);
 
