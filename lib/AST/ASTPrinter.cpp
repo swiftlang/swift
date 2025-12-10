@@ -243,6 +243,15 @@ bool PrintOptions::excludeAttr(const DeclAttribute *DA) const {
                     [CA](CustomAttr *other) { return other == CA; }))
       return true;
   }
+  if (SuppressCustomAvailability) {
+    if (auto availableAttr = dyn_cast<AvailableAttr>(DA)) {
+      if (auto owner = availableAttr->getOwner()) {
+        if (auto semanticAttr = owner->getSemanticAvailableAttr(availableAttr)) {
+          return semanticAttr->getDomain().isCustom();
+        }
+      }
+    }
+  }
   return false;
 }
 
@@ -3309,6 +3318,13 @@ static void
 suppressingFeatureLifetimes(PrintOptions &options,
                                      llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope(options.SuppressLifetimes, true);
+  action();
+}
+
+static void
+suppressingFeatureCustomAvailability(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressCustomAvailability, true);
   action();
 }
 

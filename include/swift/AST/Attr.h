@@ -904,6 +904,7 @@ private:
   const SourceRange DeprecatedRange;
   const llvm::VersionTuple Obsoleted;
   const SourceRange ObsoletedRange;
+  Decl *Owner = nullptr;
 
 public:
   /// Returns true if the `AvailabilityDomain` associated with the attribute
@@ -1001,6 +1002,9 @@ public:
   /// Returns the kind of availability the attribute specifies.
   Kind getKind() const { return static_cast<Kind>(Bits.AvailableAttr.Kind); }
 
+  /// Returns the declaration that owns this attribute.
+  Decl *getOwner() const { return Owner; }
+
   /// Create an `AvailableAttr` that specifies universal unavailability, e.g.
   /// `@available(*, unavailable)`.
   static AvailableAttr *createUniversallyUnavailable(ASTContext &C,
@@ -1070,6 +1074,9 @@ private:
   void setComputedSemanticAttr() {
     Bits.AvailableAttr.HasComputedSemanticAttr = true;
   }
+
+  friend class DeclAttribute;
+  void attachToDeclImpl(Decl *D);
 };
 
 /// Indicates that the given declaration is visible to Objective-C.
