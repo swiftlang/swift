@@ -7,11 +7,9 @@
 // RUN:   -scanner-prefix-map-paths %t /^tmp -I %t/include \
 // RUN:   %t/main.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas 
 
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
-// RUN: %swift_frontend_plain @%t/shim.cmd
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json A > %t/A.cmd
-// RUN: %swift_frontend_plain @%t/A.cmd
+// RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd
 
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json A > %t/A.cmd
 // RUN: %FileCheck %s -check-prefix CMD -input-file=%t/A.cmd
 // CMD: -blocklist-file
 // CMD-NEXT: /^tmp/blocklist.yml
@@ -24,17 +22,11 @@
 // FS-DAG: blocklist.yml
 // FS-DAG: empty.yml
 
-// RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
-
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
-
 // RUN: %target-swift-frontend \
 // RUN:   -target %target-future-triple \
 // RUN:   -emit-ir -o - -cache-compile-job -cas-path %t/cas -O \
-// RUN:   -swift-version 5 -disable-implicit-swift-modules \
+// RUN:   -swift-version 5 -module-name Test \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   -module-name Test -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   -blocklist-file /^tmp/blocklist.yml -blocklist-file /^tmp/empty.yml \
 // RUN:   -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation \
 // RUN:   -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation \

@@ -16,20 +16,14 @@
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s --check-prefix=FS
 
 // FS: MacroDefinition
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
-// RUN: %swift_frontend_plain @%t/SwiftShims.cmd
 
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json MyApp > %t/MyApp.cmd
-
-// RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
+// RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd
 
 // RUN: %target-swift-frontend -diagnostic-style=swift \
 // RUN:   -emit-module -o %t/Test.swiftmodule -cache-compile-job -cas-path %t/cas \
-// RUN:   -swift-version 5 -disable-implicit-swift-modules \
+// RUN:   -swift-version 5 -module-name MyApp -O \
 // RUN:   -external-plugin-path %t#%swift-plugin-server \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map.casid -O \
 // RUN:   %t/main.swift @%t/MyApp.cmd -serialize-diagnostics-path %t/Test.diag 2> %t/diag2.txt
 
 // RUN: diff %t/diag1.txt %t/diag2.txt
