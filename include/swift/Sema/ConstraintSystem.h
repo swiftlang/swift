@@ -95,10 +95,6 @@ Type typeCheckParameterDefault(Expr *&, DeclContext *, Type, bool, bool);
 
 } // end namespace swift
 
-/// Allocate memory within the given constraint system.
-void *operator new(size_t bytes, swift::constraints::ConstraintSystem& cs,
-                   size_t alignment = 8);
-
 namespace swift {
 
 /// Specify how we handle the binding of underconstrained (free) type variables

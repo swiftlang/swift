@@ -214,11 +214,6 @@ bool TypeVariableType::Implementation::isTernary() const {
   return locator && locator->directlyAt<TernaryExpr>();
 }
 
-void *operator new(size_t bytes, ConstraintSystem& cs,
-                   size_t alignment) {
-  return cs.getAllocator().Allocate(bytes, alignment);
-}
-
 bool constraints::computeTupleShuffle(TupleType *fromTuple,
                                       TupleType *toTuple,
                                       SmallVectorImpl<unsigned> &sources) {
