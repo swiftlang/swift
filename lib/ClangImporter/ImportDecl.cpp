@@ -3799,7 +3799,9 @@ namespace {
                   sourceManager.getFileID(decl->getLocation()))) {
             auto filename = file->getName();
             if (filename.ends_with("cmath") || filename.ends_with("math.h") ||
-                filename.ends_with("stdlib.h") || filename.ends_with("cstdlib")) {
+                ((filename.ends_with("stdlib.h") || filename.ends_with("cstdlib")) &&
+                 decl->getDeclName().isIdentifier() &&
+                 (decl->getName() == "abs" || decl->getName() == "div"))) {
               return nullptr;
             }
           }
