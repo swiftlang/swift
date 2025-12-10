@@ -261,6 +261,7 @@ split_embedded_sources(
   OUT_LIST_NORMAL SWIFTLIB_GYB_SOURCES
 
     NORMAL AtomicInt.swift.gyb
+  EMBEDDED FloatingPointFromString.swift
   EMBEDDED FloatingPointParsing.swift.gyb
   EMBEDDED FloatingPointToString.swift
   EMBEDDED FloatingPointTypes.swift.gyb

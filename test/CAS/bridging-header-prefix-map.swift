@@ -25,28 +25,21 @@
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps-2.json Test casFSRootID > %t/root-2.casid
 // RUN: diff %t/root-1.casid %t/root-2.casid
 
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps-1.json clang:SwiftShims > %t/shim.cmd
-// RUN: %swift_frontend_plain @%t/shim.cmd
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps-1.json bridgingHeader > %t/header.cmd
+// RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps-1.json -o %t/MyApp.cmd -b %t/header.cmd
+
 // RUN: %target-swift-frontend @%t/header.cmd /^header/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
 // RUN:   %target-swift-frontend @%t/header.cmd /^header/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch > %t/keys.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json > %t/key
 
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps-1.json Test > %t/MyApp.cmd
 // RUN: echo "\"-disable-implicit-string-processing-module-import\"" >> %t/MyApp.cmd
 // RUN: echo "\"-disable-implicit-concurrency-module-import\"" >> %t/MyApp.cmd
-// RUN: echo "\"-disable-implicit-swift-modules\"" >> %t/MyApp.cmd
 // RUN: echo "\"-import-objc-header\"" >> %t/MyApp.cmd
 // RUN: echo "\"/^header/Bridging.h\"" >> %t/MyApp.cmd
 // RUN: echo "\"-import-pch\"" >> %t/MyApp.cmd
 // RUN: echo "\"%t/bridging.pch\"" >> %t/MyApp.cmd
 // RUN: echo "\"-bridging-header-pch-key\"" >> %t/MyApp.cmd
 // RUN: echo "\"@%t/key\"" >> %t/MyApp.cmd
-// RUN: echo "\"-explicit-swift-module-map-file\"" >> %t/MyApp.cmd
-// RUN: echo "\"@%t/map.casid\"" >> %t/MyApp.cmd
-// RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps-1.json > %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
 // RUN: %target-swift-frontend  -cache-compile-job -module-name Test -O -cas-path %t/cas @%t/MyApp.cmd /^tmp/test.swift \
 // RUN:   -emit-module -o %t/Test.swiftmodule
 
