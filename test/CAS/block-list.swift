@@ -22,7 +22,7 @@
 // FS-DAG: blocklist.yml
 // FS-DAG: empty.yml
 
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -target %target-future-triple \
 // RUN:   -emit-ir -o - -cache-compile-job -cas-path %t/cas -O \
 // RUN:   -swift-version 5 -module-name Test \

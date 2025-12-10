@@ -13,7 +13,7 @@
 
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd
 
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -typecheck -verify -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -module-name MyApp -O \
 // RUN:   -plugin-path %swift-plugin-dir \

@@ -11,7 +11,7 @@
 // RUN:   -emit-module-interface-path %t/A.swiftinterface -enable-library-evolution -I %t \
 // RUN:   %t/A.swift
 
-// RUN: %target-swift-frontend -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache %t/main.swift \
+// RUN: %target-swift-frontend-plain -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache %t/main.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -o %t/deps.json -I %t -cache-compile-job -cas-path %t/cas -swift-version 5
 
@@ -27,7 +27,7 @@
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -c -cache-compile-job -cas-path %t/cas \
 // RUN:   -disable-implicit-swift-modules -o %t/test.o\
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \

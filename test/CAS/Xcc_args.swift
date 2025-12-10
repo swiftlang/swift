@@ -19,7 +19,7 @@
 // CHECK-NOT: -ivfsoverlay
 // CHECK-NOT: -fmodule-map-file
 
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -module-name Test \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
