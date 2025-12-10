@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if (os(macOS) || os(Linux)) && (arch(x86_64) || arch(arm64))
+#if (os(macOS) || os(Linux) || os(Windows)) && (arch(x86_64) || arch(arm64))
 
 #if canImport(Darwin)
 import Darwin
@@ -18,8 +18,9 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
-#elseif canImport(CRT)
+#elseif os(Windows)
 import CRT
+import WinSDK
 #endif
 
 @_spi(Formatting) import Runtime
@@ -90,6 +91,9 @@ internal struct SwiftBacktrace {
     var symbolicate: Symbolication = .full
     var format: OutputFormat = .text
     var outputPath: String = "/tmp"
+    #if os(Windows)
+    var parentPid: DWORD = 0
+    #endif
   }
 
   static var args = Arguments()
@@ -98,8 +102,8 @@ internal struct SwiftBacktrace {
   static var target: Target? = nil
   static var currentThread: Int = 0
 
-  static var now = timespec(tv_sec: 0, tv_nsec: 0)
-  static var backtraceDuration = timespec(tv_sec: 0, tv_nsec: 0)
+  static var now = Timestamp()
+  static var backtraceDuration = Duration()
 
   static var theme: any Theme {
     if args.color {
@@ -127,38 +131,6 @@ internal struct SwiftBacktrace {
     if flush {
       stream.flush()
     }
-  }
-
-  static func subtract(timespec ts: timespec, from: timespec) -> timespec {
-    var sec = from.tv_sec - ts.tv_sec
-    var nsec = from.tv_nsec - ts.tv_nsec
-    if nsec < 0 {
-      sec -= 1
-      nsec += 1000000000
-    }
-    return timespec(tv_sec: sec, tv_nsec: nsec)
-  }
-
-  // We can't use Foundation here, so there's no String(format:, ...)
-  static func format(duration: timespec) -> String {
-    let centisRounded = (duration.tv_nsec + 5000000) / 10000000
-    let centis = centisRounded % 100
-    let secs = duration.tv_sec + (centisRounded / 100)
-    let d1 = centis / 10
-    let d2 = centis % 10
-
-    return "\(secs).\(d1)\(d2)"
-  }
-
-  static func measureDuration(_ body: () -> ()) -> timespec {
-    var startTime = timespec(tv_sec: 0, tv_nsec: 0)
-    var endTime = timespec(tv_sec: 0, tv_nsec: 0)
-
-    clock_gettime(CLOCK_MONOTONIC, &startTime)
-    body()
-    clock_gettime(CLOCK_MONOTONIC, &endTime)
-
-    return subtract(timespec: startTime, from: endTime)
   }
 
   static func usage() {
@@ -477,6 +449,23 @@ Generate a backtrace for the parent process.
           usage()
           exit(1)
         }
+      #if os(Windows)
+      case "--pid":
+        if let v = value {
+          if let pid = DWORD(v) {
+            args.parentPid = pid
+          } else {
+            print("swift-backtrace: bad pid value \(v)",
+                  to: &standardError)
+            exit(1)
+          }
+        } else {
+          print("swift-backtrace: missing pid value",
+                to: &standardError)
+          usage()
+          exit(1)
+        }
+      #endif
       default:
         print("swift-backtrace: unknown argument '\(arg)'",
               to: &standardError)
@@ -486,10 +475,12 @@ Generate a backtrace for the parent process.
   }
 
   static func unblockSignals() {
+    #if !os(Windows)
     var mask = sigset_t()
 
     sigfillset(&mask)
     sigprocmask(SIG_UNBLOCK, &mask, nil)
+    #endif
   }
 
   static func getJsonBacktraceFormatterOptions() -> BacktraceJSONFormatterOptions {
@@ -571,21 +562,26 @@ Generate a backtrace for the parent process.
 
     // Target's initializer fetches and symbolicates backtraces, so
     // we want to time that part here.
-    backtraceDuration = measureDuration {
+    backtraceDuration = Duration.measure {
+      #if os(Windows)
+      target = Target(pid: args.parentPid,
+                      crashInfoAddr: crashInfoAddr,
+                      limit: args.limit, top: args.top,
+                      cache: args.cache,
+                      symbolicate: args.symbolicate)
+      #else
       target = Target(crashInfoAddr: crashInfoAddr,
                       limit: args.limit, top: args.top,
                       cache: args.cache,
                       symbolicate: args.symbolicate)
+      #endif
 
       currentThread = target!.crashingThreadNdx
     }
 
     // Grab the current wall clock time; if clock_gettime() fails, get a
     // lower resolution version instead.
-    if clock_gettime(CLOCK_REALTIME, &now) != 0 {
-      now.tv_sec = time(nil)
-      now.tv_nsec = 0
-    }
+    now = Timestamp.wallTime
 
     // Set up the output stream
     var didOpenOutput = false
@@ -599,7 +595,6 @@ Generate a backtrace for the parent process.
           // If the output path is a directory, generate a filename
           let name = target!.name
           let pid = target!.pid
-          let now = timespec(tv_sec: 0, tv_nsec: 0)
 
           let ext: String
           switch args.format {
@@ -610,31 +605,75 @@ Generate a backtrace for the parent process.
           }
 
           var filename =
-            "\(args.outputPath)/\(name)-\(pid)-\(now.tv_sec).\(now.tv_nsec).\(ext)"
+            "\(args.outputPath)/\(name)-\(pid)-\(now).\(ext)"
 
+          #if os(Windows)
+          var handle = CreateFile(filename,
+                                  DWORD(GENERIC_READ)|DWORD(GENERIC_WRITE),
+                                  DWORD(FILE_SHARE_READ),
+                                  nil,
+                                  DWORD(CREATE_NEW),
+                                  DWORD(FILE_ATTRIBUTE_NORMAL),
+                                  nil)
+          var failed = handle == INVALID_HANDLE_VALUE
+          #else
           var fd = open(filename, O_RDWR|O_CREAT|O_EXCL, 0o644)
+          var failed = fd < 0
+          #endif
           var ndx = 1
 
-          while fd < 0 && (errno == EEXIST || errno == EINTR) {
-            if errno != EINTR {
-              ndx += 1
-              filename = "\(args.outputPath)/\(name)-\(pid)-\(now.tv_sec).\(now.tv_nsec)-\(ndx).\(ext)"
+          while failed {
+            #if os(Windows)
+            let interrupted = false
+            let exists = GetLastError() == ERROR_ALREADY_EXISTS
+            #else
+            let interrupted = errno == EINTR
+            let exists = errno == EXIST
+            #endif
+
+            if !interrupted && !exists {
+              break
             }
+
+            if !interrupted {
+              ndx += 1
+              filename = "\(args.outputPath)/\(name)-\(pid)-\(now)-\(ndx).\(ext)"
+            }
+
+            #if os(Windows)
+            handle = CreateFile(filename,
+                                DWORD(GENERIC_READ)|DWORD(GENERIC_WRITE),
+                                DWORD(FILE_SHARE_READ),
+                                nil,
+                                DWORD(CREATE_NEW),
+                                DWORD(FILE_ATTRIBUTE_NORMAL),
+                                nil)
+            failed = handle == INVALID_HANDLE_VALUE
+            #else
             fd = open(filename, O_RDWR|O_CREAT|O_EXCL, 0o644)
+            failed = fd < 0
+            #endif
           }
 
-          if fd < 0 {
+          if failed {
             print("swift-backtrace: unable to create \(filename) for writing",
                   to: &standardError)
             outputStream = standardError
           }
 
+          #if os(Windows)
+          let fd = _open_osfhandle(Int(bitPattern: handle), 0)
+          let fdopen = _fdopen
+          let close = _close
+          let unlink = _unlink
+          #endif
+
           if let cFile = fdopen(fd, "wt") {
             didOpenOutput = true
             outputStream = CFileStream(fp: cFile)
           } else {
-            close(fd)
-            unlink(filename)
+            _ = close(fd)
+            _ = unlink(filename)
 
             print("swift-backtrace: unable to fdopen \(filename) for writing",
                   to: &standardError)
@@ -676,9 +715,7 @@ Generate a backtrace for the parent process.
 
         writeln("")
 
-        let formattedDuration = format(duration: backtraceDuration)
-
-        writeln("Backtrace took \(formattedDuration)s")
+        writeln("Backtrace took \(backtraceDuration)s")
         writeln("")
       case .json:
         guard let target = target else {
@@ -725,8 +762,10 @@ Generate a backtrace for the parent process.
     #endif
 
     if args.interactive {
+      #if !os(Windows)
       // Make sure we're line buffered
       setvbuf(stdout, nil, _IOLBF, 0)
+      #endif
 
       while let ch = waitForKey("Press space to interact, D to debug, or any other key to quit",
                                 timeout: args.timeout) {
@@ -804,26 +843,26 @@ Generate a backtrace for the parent process.
     }
 
     if let timeout = timeout {
-    var remaining = timeout
+      var remaining = timeout
 
-    while true {
-      write("\r\(message) (\(remaining)s) ", flush: true)
+      while true {
+        write("\r\(message) (\(remaining)s) ", flush: true)
 
-      var pfd = pollfd(fd: 0, events: Int16(POLLIN), revents: 0)
+        var pfd = pollfd(fd: 0, events: Int16(POLLIN), revents: 0)
 
-      let ret = poll(&pfd, 1, 1000)
-      if ret == 0 {
-        remaining -= 1
-        if remaining == 0 {
+        let ret = poll(&pfd, 1, 1000)
+        if ret == 0 {
+          remaining -= 1
+          if remaining == 0 {
+            break
+          }
+          continue
+        } else if ret < 0 {
           break
         }
-        continue
-      } else if ret < 0 {
-        break
-      }
 
-      return getchar()
-    }
+        return getchar()
+      }
     } else {
       write("\r\(message)", flush: true)
       return getchar()
@@ -833,19 +872,107 @@ Generate a backtrace for the parent process.
   }
   #elseif os(Windows)
   static func waitForKey(_ message: String, timeout: Int?) -> Int32? {
-    // ###TODO
+    let inputHandle = HANDLE(bitPattern: _get_osfhandle(0))
+    //let inputHandle = GetStdHandle(STD_INPUT_HANDLE)
+
+    defer {
+      write("\r\u{1b}[0K", flush: true)
+    }
+
+    _ = FlushConsoleInputBuffer(inputHandle)
+
+    if let timeout = timeout {
+      var target = GetTickCount() &+ DWORD(1000 * timeout)
+
+      while true {
+        let ticks = GetTickCount()
+
+        // ticks will wrap every 49 days, so take care!
+        var remainingMs = target &- ticks
+        if remainingMs >= 0x80000000 {
+          remainingMs = 0
+        }
+        let remaining = remainingMs / 1000
+
+        write("\r\(message) (\(remaining)s) ", flush: true)
+
+        let ret = WaitForSingleObject(inputHandle, min(remainingMs, 100))
+
+        if ret == WAIT_TIMEOUT {
+          if remaining == 0 {
+            break
+          }
+          continue
+        } else if ret == WAIT_FAILED {
+          break
+        } else if ret == WAIT_OBJECT_0 {
+          let result =
+            withUnsafeTemporaryAllocation(of: INPUT_RECORD.self,
+                                          capacity: 16) {
+              (buffer: UnsafeMutableBufferPointer<INPUT_RECORD>) -> Int32? in
+
+              // If inputHandle isn't a console, this might fail, which is
+              // fine; in that case, call _getch().  This might happen if
+              // the program is really running inside an older Windows
+              // terminal emulator that's using a pipe instead of the new
+              // pseudoconsole support.
+              var dwRead: DWORD = 0
+
+              if ReadConsoleInputA(inputHandle,
+                                   buffer.baseAddress,
+                                   DWORD(buffer.count),
+                                   &dwRead) {
+                for ndx in 0..<Int(dwRead) {
+                  let event = buffer[ndx]
+                  // Eat non-key-events
+                  if event.EventType != KEY_EVENT {
+                    continue
+                  }
+                  if event.Event.KeyEvent.bKeyDown.boolValue {
+                    return Int32(event.Event.KeyEvent.uChar.AsciiChar)
+                  }
+                }
+                return nil
+              } else {
+                return _getch()
+              }
+            }
+
+          if let result {
+            return result
+          }
+        }
+      }
+    } else {
+      write("\r\(message)", flush: true)
+      return _getch()
+    }
+
     return nil
   }
   #endif
 
   static func backtraceFormatter() -> BacktraceFormatter {
+    var width = 80
+
+    #if !os(Windows)
     var terminalSize = winsize(ws_row: 24, ws_col: 80,
                                ws_xpixel: 1024, ws_ypixel: 768)
+
     _ = ioctl(0, CUnsignedLong(TIOCGWINSZ), &terminalSize)
+
+    width = terminalSize.ws_col
+    #else
+    var consoleInfo = CONSOLE_SCREEN_BUFFER_INFO()
+    if GetConsoleScreenBufferInfo(outputStream!.handle,
+                                  &consoleInfo) {
+      width = Int(consoleInfo.dwSize.X)
+    }
+    #endif
 
     return BacktraceFormatter(formattingOptions
                               .theme(theme)
-                              .width(Int(terminalSize.ws_col)))
+                              .width(width))
   }
 
   static func printCrashLog() {
@@ -1518,6 +1645,29 @@ Generate a backtrace for the parent process.
     showGPR(name: "pc", context: context, register: .r15)
   }
 }
+
+#if os(Windows)
+let INVALID_HANDLE_VALUE = HANDLE(bitPattern: -1)!
+
+// Make CreateFile a bit easier to use
+func CreateFile(_ filename: String,
+                _ dwDesiredAccess: DWORD,
+                _ dwShareMode: DWORD,
+                _ lpSecurityAttributes: UnsafeMutablePointer<SECURITY_ATTRIBUTES>?,
+                _ dwCreationDisposition: DWORD,
+                _ dwFlagsAndAttributes: DWORD,
+                _ hTemplateFile: HANDLE?) -> HANDLE {
+  return filename.withCString(encodedAs: UTF16.self) { lpwszFilename in
+    return CreateFileW(lpwszFilename,
+                       dwDesiredAccess,
+                       dwShareMode,
+                       lpSecurityAttributes,
+                       dwCreationDisposition,
+                       dwFlagsAndAttributes,
+                       hTemplateFile)
+  }
+}
+#endif
 
 #else
 

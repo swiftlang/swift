@@ -132,6 +132,9 @@ Build and include the no-assert toolchain variant in the output.
 .PARAMETER Summary
 Display a build time summary at the end of the build. Helpful for performance analysis.
 
+.PARAMETER TraceExpand
+Enable trace-expand mode for CMake.
+
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -221,7 +224,8 @@ param
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
 
-  [switch] $Summary
+  [switch] $Summary,
+  [switch] $TraceExpand
 )
 
 ## Prepare the build environment.
@@ -1876,6 +1880,10 @@ function Build-CMakeProject {
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
     }
 
+    if ($TraceExpand) {
+      $cmakeGenerateArgs += @("--trace-expand")
+    }
+
     if ($UseBuiltCompilers.Contains("Swift")) {
       $env:Path = "$([IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", $ProductVersion, "usr", "bin"));$(Get-CMarkBinaryCache $BuildPlatform)\src;$($BuildPlatform.ToolchainInstallRoot)\usr\bin;$(Get-PinnedToolchainRuntime);${env:Path}"
     } elseif ($UsePinnedCompilers.Contains("Swift")) {
@@ -2698,6 +2706,7 @@ function Build-Runtime([Hashtable] $Platform) {
       SWIFT_ENABLE_SYNCHRONIZATION = "YES";
       SWIFT_ENABLE_BACKTRACING = "YES";
       SWIFT_ENABLE_RUNTIME_MODULE = "YES";
+      SWIFT_BUILD_LIBEXEC = "YES";
       SWIFT_ENABLE_VOLATILE = "YES";
       SWIFT_NATIVE_SWIFT_TOOLS_PATH = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin"));
       SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";

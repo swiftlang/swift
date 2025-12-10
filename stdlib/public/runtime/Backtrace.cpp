@@ -94,7 +94,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   true,
 
   // interactive
-#if TARGET_OS_OSX || defined(__linux__) // || defined(_WIN32)
+#if TARGET_OS_OSX || defined(__linux__) || defined(_WIN32)
   OnOffTty::TTY,
 #else
   OnOffTty::Off,
@@ -369,7 +369,7 @@ BacktraceInitializer::BacktraceInitializer() {
   if (_swift_backtraceSettings.enabled == OnOffTty::Default) {
 #if TARGET_OS_OSX
     _swift_backtraceSettings.enabled = OnOffTty::TTY;
-#elif defined(__linux__) // || defined(_WIN32)
+#elif defined(__linux__) || defined(_WIN32)
     _swift_backtraceSettings.enabled = OnOffTty::On;
 #else
     _swift_backtraceSettings.enabled = OnOffTty::Off;
@@ -1130,6 +1130,7 @@ char addr_buf[18];
 char timeout_buf[22];
 char limit_buf[22];
 char top_buf[22];
+char pid_buf[22];
 const char *backtracer_argv[] = {
   "swift-backtrace",            // 0
   "--unwind",                   // 1
@@ -1166,6 +1167,10 @@ const char *backtracer_argv[] = {
   "full",                       // 32
   "--format",                   // 33
   "text",                       // 34
+#ifdef _WIN32
+  "--pid",                      // 35
+  pid_buf,                      // 36
+#endif // defined(_WIN32)
   NULL
 };
 
@@ -1322,7 +1327,12 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 
   _swift_formatUnsigned(_swift_backtraceSettings.top, top_buf);
   _swift_formatAddress(crashInfo, addr_buf);
+  #ifdef _WIN32
+  _swift_formatUnsigned(GetCurrentProcessId(), pid_buf);
+  #endif
+#endif
 
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST || defined(__linux__)
   // Set-up the environment array
   const char *env[BACKTRACE_MAX_ENV_VARS + 1];
 
@@ -1333,9 +1343,7 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
     ptr += std::strlen(ptr) + 1;
   };
   env[nEnv] = 0;
-#endif
 
-#if TARGET_OS_OSX || TARGET_OS_MACCATALYST || defined(__linux__)
   pid_t child;
 
   // SUSv3 says argv and envp are "completely constant" and that the reason
@@ -1365,31 +1373,18 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   return false;
 
 #elif defined(_WIN32)
-  HANDLE hReadPipe, hWritePipe;
-  SECURITY_ATTRIBUTES saAttrs = {
-    sizeof(SECURITY_ATTRIBUTES),
-    NULL,
-    TRUE
-  };
-  struct {
-    DWORD  dwHandleSize;
-    HANDLE hProcess;
-    HANDLE hStdInput;
-  } packet = {
-    sizeof(HANDLE),
-    INVALID_HANDLE_VALUE,
-    INVALID_HANDLE_VALUE
-  };
-
-  // On Windows, we create an anonymous pipe that we use to pass some
-  // handles over to the child process.
-  if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttrs, sizeof(packet)))
-    return false;
+  HANDLE hOutput;
+  if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
+    hOutput = GetStdHandle(STD_ERROR_HANDLE);
+  else
+    hOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 
   // Windows actually uses a flat command line string with some rather
   // odd parsing rules.
   if (!flattenCommandLine(cmdline_buf, sizeof(cmdline_buf),
                           backtracer_argv)) {
+    const char *message = "Flatten failed\n\n";
+    WriteFile(hOutput, message, strlen(message), NULL, NULL);
     return false;
   }
 
@@ -1398,83 +1393,49 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
                                   cmdline_buf, -1,
                                   cmdline_wbuf,
                                   sizeof(cmdline_wbuf) / sizeof(WCHAR));
-  if (!len)
+  if (!len) {
+    const char *message = "MBTWCS failed\n\n";
+    WriteFile(hOutput, message, strlen(message), NULL, NULL);
     return false;
-
-  STARTUPINFO startupInfo;
-  ZeroMemory(&startupInfo, sizeof(startupInfo));
-  startupInfo.cb = sizeof(startupInfo);
-  startupInfo.dwFlags = STARTF_USESTDHANDLES;
-  startupInfo.hStdInput = hWritePipe;
-  startupInfo.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-  startupInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+  }
 
   PROCESS_INFORMATION processInfo;
+  STARTUPINFOW startupInfo;
+
+  memset(&processInfo, 0, sizeof(processInfo));
+  memset(&startupInfo, 0, sizeof(startupInfo));
+  startupInfo.cb = sizeof(startupInfo);
 
   // Create the backtracer process
   BOOL bRet = CreateProcessW(swiftBacktracePath,
                              cmdline_wbuf,
                              NULL,
                              NULL,
-                             TRUE,
+                             FALSE,
                              0,
-                             env,
+                             swiftBacktraceEnv,
                              NULL,
                              &startupInfo,
                              &processInfo);
-  if (!bRet)
+  if (!bRet) {
+    const char *message = "CreateProcess failed\n\n";
+    WriteFile(hOutput, message, strlen(message), NULL, NULL);
+    WriteFile(hOutput, swiftBacktracePath, wcslen(swiftBacktracePath) * 2, NULL, NULL);
+    WriteFile(hOutput, "\n", 1, NULL, NULL);
+    WriteFile(hOutput, cmdline_wbuf, wcslen(cmdline_wbuf) * 2, NULL, NULL);
+    WriteFile(hOutput, "\n", 1, NULL, NULL);
+    DebugBreak();
     return false;
+  }
 
   CloseHandle(processInfo.hThread);
-  CloseHandle(hReadPipe);
-
-  // Now duplicate our process handle into the backtracer's process
-  if (!DuplicateHandle(GetCurrentProcess(),
-                       GetCurrentProcess(),
-                       processInfo.hProcess,
-                       &packet.hProcess,
-                       PROCESS_SUSPEND_RESUME
-                       |PROCESS_QUERY_INFORMATION
-                       |PROCESS_VM_READ
-                       |SYNCHRONIZE
-                       |STANDARD_RIGHTS_READ,
-                       FALSE,
-                       0)) {
-    CloseHandle(processInfo.hProcess);
-    CloseHandle(hWritePipe);
-    return false;
-  }
-
-  // And duplicate our standard input handle into the backtracer's process
-  if (!DuplicateHandle(GetStdHandle(STD_INPUT_HANDLE),
-                       GetCurrentProcess(),
-                       processInfo.hProcess,
-                       &packet.hStdInput,
-                       0,
-                       FALSE,
-                       DUPLICATE_SAME_ACCESS)) {
-    CloseHandle(packet.hProcess);
-    CloseHandle(processInfo.hProcess);
-    CloseHandle(hWritePipe);
-    return false;
-  }
-
-  // Write them to the pipe
-  if (!WriteFile(hWritePipe, &packet, sizeof(packet), NULL, NULL)) {
-    CloseHandle(packet.hProcess);
-    CloseHandle(packet.hStdInput);
-    CloseHandle(processInfo.hProcess);
-    CloseHandle(hWritePipe);
-    return false;
-  }
-
-  // Close the pipe
-  CloseHandle(hWritePipe);
 
   // Wait for the process to terminate
   DWORD dwRet = WaitForSingleObject(processInfo.hProcess, INFINITE);
 
   if (dwRet != WAIT_OBJECT_0) {
+    const char *message = "dwRet != WAIT_OBJECT_0\n\n";
+    WriteFile(hOutput, message, strlen(message), NULL, NULL);
     CloseHandle(processInfo.hProcess);
     return false;
   }
@@ -1482,6 +1443,8 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   // Return based on the process exit code
   DWORD dwExitCode;
   if (!GetExitCodeProcess(processInfo.hProcess, &dwExitCode)) {
+    const char *message = "Can't get exit code\n\n";
+    WriteFile(hOutput, message, strlen(message), NULL, NULL);
     CloseHandle(processInfo.hProcess);
     return false;
   }
@@ -1519,7 +1482,7 @@ static sys_fd_t getOutputHandle() {
   return fd;
 }
 
-static void sys_print(sys_fd_t fd, sys_string_t str) {
+static void sys_print(sys_fd_t fd, const char *str) {
   write(fd, str, strlen(str));
 }
 #endif
@@ -1591,7 +1554,7 @@ static bool flattenCommandLine(char *buffer, size_t buflen,
   const char **parg = backtracer_argv;
 
   while (*parg) {
-    const char *argument = *parg;
+    const char *argument = *parg++;
     int slashCount = 0;
     bool quoted = false;
 
@@ -1682,12 +1645,11 @@ static bool flattenCommandLine(char *buffer, size_t buflen,
 
     if (ptr == end)
       return false;
-
-    *ptr++ = '\0';
-
-    return true;
   }
 
+  *ptr++ = '\0';
+
+  return true;
 }
 
 #endif

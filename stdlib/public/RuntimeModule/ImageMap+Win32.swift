@@ -22,6 +22,7 @@ internal import WinSDK
 internal import BacktracingImpl.ImageFormats.CodeView
 
 typealias CV_PDB70_INFO = swift.runtime.CV_PDB70_INFO
+typealias RTL_GET_VERSION_FN = @convention(c) (UnsafeMutablePointer<RTL_OSVERSIONINFOW>) -> NTSTATUS
 
 let hNtDll = GetModuleHandleA("ntdll.dll")
 
@@ -32,7 +33,7 @@ func GetNtFunc<T>(_ name: String) -> T {
   return unsafeBitCast(result, to: T.self)
 }
 
-let pfnRtlGetVersion: @convention(c) (UnsafeMutablePointer<RTL_OSVERSIONINFOW>) -> NTSTATUS = GetNtFunc("RtlGetVersion")
+let pfnRtlGetVersion: RTL_GET_VERSION_FN = GetNtFunc("RtlGetVersion")
 
 fileprivate func RtlGetVersion(
   _ versionInfo: inout RTL_OSVERSIONINFOW
@@ -66,7 +67,7 @@ fileprivate func GetModuleFileNameEx(
   _ hProcess: HANDLE,
   _ hModule: HMODULE
 ) -> String? {
-  return withUnsafeTemporaryAllocation(of: WCHAR.self, capacity: 32768) {
+  return withUnsafeTemporaryAllocation(of: WCHAR.self, capacity: 2048) {
     buffer in
 
     let dwRet = K32GetModuleFileNameExW(hProcess, hModule,
@@ -222,17 +223,31 @@ extension ImageMap {
     // Turn that into a list of Images
     var images: [Image] = []
     for hModule in hModules {
+      #if DEBUG_WIN32_IMAGEMAP_CAPTURE
+      print("hModule: \(String(describing: hModule))")
+      #endif
+
       let moduleName = GetModuleBaseName(hProcess, hModule!)
       let modulePath = GetModuleFileNameEx(hProcess, hModule!)
       var moduleInfo = MODULEINFO()
 
+      #if DEBUG_WIN32_IMAGEMAP_CAPTURE
+      print("name: \(moduleName)")
+      print("path: \(modulePath)")
+      #endif
+
       guard GetModuleInformation(hProcess, hModule!, &moduleInfo,
-                                 DWORD(MemoryLayout<MODULEINFO>.size)) else {
+                                 DWORD(MemoryLayout<MODULEINFO>.size))
+      else {
         #if DEBUG_WIN32_IMAGEMAP_CAPTURE
         print("GetModuleInformation() failed for \(hModule!)")
         #endif
         continue
       }
+
+      #if DEBUG_WIN32_IMAGEMAP_CAPTURE
+      print("info: \(moduleInfo)")
+      #endif
 
       var theUUID: [UInt8]? = nil
       let baseAddress = Address(UInt(bitPattern: moduleInfo.lpBaseOfDll))
@@ -366,6 +381,11 @@ extension ImageMap {
         debugEntry = optionalHeader.DataDirectory.6
       }
 
+
+      #if DEBUG_WIN32_IMAGEMAP_CAPTURE
+      print("Looking for debug directory")
+      #endif
+
       var fpoEntry: IMAGE_DEBUG_DIRECTORY? = nil
 
       // If there's a debug directory, scan for the UUID
@@ -398,10 +418,12 @@ extension ImageMap {
               if entry.Type == IMAGE_DEBUG_TYPE_CODEVIEW {
                 var pdbInfo = CV_PDB70_INFO()
                 bRet = withUnsafeMutablePointer(to: &pdbInfo) { ptr in
-                  ReadProcessMemory(hProcess,
-                                    moduleInfo.lpBaseOfDll + Int(entry.AddressOfRawData),
-                                    ptr, SIZE_T(MemoryLayout<CV_PDB70_INFO>.size),
-                                    &cbRead)
+                  let ret =
+                    ReadProcessMemory(hProcess,
+                                      moduleInfo.lpBaseOfDll + Int(entry.AddressOfRawData),
+                                      ptr, SIZE_T(MemoryLayout<CV_PDB70_INFO>.size),
+                                      &cbRead)
+                  return ret
                 }
 
                 if bRet {
@@ -422,6 +444,10 @@ extension ImageMap {
           }
         }
       }
+
+      #if DEBUG_WIN32_IMAGEMAP_CAPTURE
+      print("Looking for exception table")
+      #endif
 
       let exceptionTable: ExceptionTable?
       switch header.Machine {

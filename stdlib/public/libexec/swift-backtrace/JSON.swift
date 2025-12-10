@@ -89,7 +89,7 @@ extension SwiftBacktrace {
 
     let crashLogCapture =
       CrashLogCapture<HostContext.GPRValue>(memoryReader: target.reader)
-    
+
     let threads = target.threads.map {
       var thread = CrashLog<HostContext.Address>.Thread(
         backtraceThread: $0,

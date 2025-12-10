@@ -594,7 +594,6 @@ final class PeCoffImage {
 
     self.functions = functions
 
-    // ###FIXME: This part isn't working correctly yet
     for section in sections {
       var theName = section.Name
       var name = withUnsafeBytes(of: &theName) { buffer in
