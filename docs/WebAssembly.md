@@ -16,7 +16,7 @@ available yet, specifically:
 * Binary size is a high priority requirement. Since WebAssembly payloads are usually served in browsers,
 one wouldn't want end users to download multi-megabyte binaries.
 
-## Building and running Wasm stdlib tests
+## Running Wasm stdlib tests
 
 If you're a compiler/stdlib engineer, this invocation builds LLVM, Swift, installs those together with necessary
 tools, and also builds WasmKit to execute stdlib tests:
@@ -69,7 +69,7 @@ LIT_FILTER_OUT='(embedded|KeyPath)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)
 ## Building Swift SDK for WebAssembly
 
 The [Swift SDK](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0387-cross-compilation-destinations.md)
-for WebAssembly is built and tested using the following command:
+for WebAssembly is built and tested using the following command (exclude `--sccache` if it's not installed or build caching is not needed):
 
 ```bash
 ./utils/build-script --sccache --build-wasm-stdlib --wasmkit --install-llvm --install-swift --swiftpm --install-swiftpm \

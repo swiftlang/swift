@@ -653,7 +653,7 @@ func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable 
   }
 
   acceptAsyncSendableClosureInheriting {
-    await onlyOnMainActor() // expected-warning{{no 'async' operations occur within 'await' expression}}
+    await onlyOnMainActor() // expected-warning{{no 'async' operations occur within 'await' expression}}{{5-11=}}
   }
 }
 

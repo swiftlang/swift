@@ -1496,8 +1496,15 @@ void ConstraintSystem::openGenericRequirement(
   switch (kind) {
   case RequirementKind::Conformance: {
     auto protoDecl = req.getProtocolDecl();
-    // Determine whether this is the protocol 'Self' constraint we should
-    // skip.
+    // Determine whether this is the protocol 'Self' constraint we should skip.
+    //
+    // NOTE: At first glance it seems like this is just an optimization to avoid
+    // adding a redundant constraint, but it is in fact load bearing for
+    // DistributedActor since we can form a conformance to Actor in
+    // GetDistributedActorAsActorConformanceRequest despite the fact that
+    // DistributedActor does not require Actor conformance (although conforming
+    // types are guaranteed to have the witnesses). So a conformance check in
+    // that case would fail.
     if (skipProtocolSelfConstraint && protoDecl == outerDC &&
         protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
       return;
@@ -3098,7 +3105,7 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
           // method without any applications at all, which would get
           // miscompiled into a function with undefined behavior. Warn for
           // source compatibility.
-          bool isWarning = !getASTContext().isSwiftVersionAtLeast(5);
+          bool isWarning = !getASTContext().isLanguageModeAtLeast(5);
           (void)recordFix(
               AllowInvalidPartialApplication::create(isWarning, *this, locator));
         } else if (level == 1) {

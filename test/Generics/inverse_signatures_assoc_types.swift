@@ -79,6 +79,16 @@ extension Pri_IIII {}
 func test2<X, Y, Z>(_ x: X, y: Y, z: Z) where
   X: Pri_CI, Y: Pri_II, Z: Pri_IIII {}
 
+struct RequireCopy<X: Copyable> {}
+
+// CHECK-LABEL: .ImplyP@
+// CHECK-NEXT: Generic signature: <V where V : Pri_CI, V.[Pri_CI]A : Copyable>
+struct ImplyP<V> where V: Pri_CI {}
+
+// CHECK-LABEL: .implied1@
+// CHECK-NEXT: Generic signature: <T where T : Pri_CI, T.[Pri_CI]A : Copyable>
+func implied1<T>(_ t: ImplyP<T>) {}
+
 // CHECK-LABEL: .P3@
 // CHECK: Requirement signature: <Self where Self.[P3]B : Copyable>
 protocol P3 where Self: (~Copyable & ~Escapable) { associatedtype B: ~Escapable }
@@ -181,6 +191,28 @@ protocol Derived3<Elm>: Base where Elm: ~Copyable {}
 // CHECK-NEXT: Requirement signature: <Self where Self : Base>
 protocol Derived4<Elm>: Base, ~Copyable where Elm: ~Copyable {}
 
+// CHECK-LABEL: .Derived5@
+// CHECK-NEXT: Requirement signature: <Self where Self : Copyable, Self : Base, Self.[Base]Elm : Copyable>
+protocol Derived5: Base {}
+
+// CHECK-LABEL: .Derived6@
+// CHECK-NEXT: Requirement signature: <Self where Self : Copyable, Self : Base, Self.[Base]Elm : Copyable>
+protocol Derived6<Iter>: Base {}
+
+// CHECK-LABEL: .SecondOrder@
+// CHECK-NEXT: Requirement signature: <Self where Self : Derived6, Self.[Base]Iter : Copyable>
+protocol SecondOrder: Derived6 {}
+
+// CHECK-LABEL: .SecondOrderSupp1@
+// CHECK-NEXT: Requirement signature: <Self where Self : Derived6>
+protocol SecondOrderSupp1: Derived6 where Self.Iter: ~Copyable {}
+
+// CHECK-LABEL: .Derived7@
+// CHECK-NEXT: Requirement signature: <Self where Self : Copyable, Self : Base, Self.[Base]Elm : Copyable, Self.[Base]Iter : Copyable>
+protocol Derived7: Base {
+  associatedtype Iter
+}
+
 
 // CHECK-LABEL: .SameType@
 // CHECK-NEXT: Requirement signature: <Self where Self : Copyable, Self : Escapable,
@@ -231,3 +263,22 @@ func testExpansion1<T>(_ t: T, _ a: T.A, _ aa: T.A.A, _ aaa: T.A.A.A)
 func testExpansion2<T>(_ t: borrowing T) where
   T: ~Copyable & Ping, T.A: ~Copyable & Ping, T.A.A: ~Copyable & Ping,
   T.B: Ping, T.B.B: Ping {}
+
+
+// CHECK-LABEL: .Iterable@
+// CHECK-NEXT: Requirement signature: <Self where Self : Escapable, Self.[Iterable]Element : Escapable>
+protocol Iterable<Element>: ~Copyable {
+  associatedtype Element: ~Copyable
+}
+
+// CHECK-LABEL: .PersistedDictionary@
+// CHECK-NEXT: Requirement signature: <Self where Self : Iterable, Self.[Iterable]Element == Self.[PersistedDictionary]Value, Self.[PersistedDictionary]Key : Escapable, Self.[PersistedDictionary]Strategy : Escapable>
+protocol PersistedDictionary<Key, Value>: ~Copyable, Iterable<Self.Value> {
+  associatedtype Key: ~Copyable
+  associatedtype Value: ~Copyable
+  associatedtype Strategy: ~Copyable
+}
+
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=PersistedDictionary
+// CHECK-NEXT: Generic signature: <Self where Self : Copyable, Self : PersistedDictionary, Self.[Iterable]Element : Copyable, Self.[PersistedDictionary]Key : Copyable>
+extension PersistedDictionary {}

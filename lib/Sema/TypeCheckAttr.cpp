@@ -30,6 +30,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
@@ -1309,7 +1310,7 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
             diagnose(attr->getLocation(),
                      diag::access_control_non_objc_open_member, VD)
                 .fixItReplace(attr->getRange(), "public")
-                .warnUntilFutureSwiftVersion();
+                .warnUntilFutureLanguageMode();
           }
         }
       }
@@ -1408,7 +1409,7 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
     // Forbid stored properties marked SPI in frozen types.
     if (auto property = dyn_cast<VarDecl>(VD)) {
       if (auto NTD = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
-        if (property->isLayoutExposedToClients() && !NTD->isSPI()) {
+        if (property->isLayoutExposedToClients() == ExportedLevel::Exported && !NTD->isSPI()) {
           diagnoseAndRemoveAttr(attr,
                                 diag::spi_attribute_on_frozen_stored_properties,
                                 VD);
@@ -2201,7 +2202,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
 
     if (candidates.empty()) {
       auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-      bool shouldError = ctx.isSwiftVersionAtLeast(futureVersion);
+      bool shouldError = ctx.isLanguageModeAtLeast(futureVersion);
 
       // Diagnose as an error in resilient modules regardless of language
       // version since this will break the swiftinterface. Don't diagnose
@@ -2216,7 +2217,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
                   requiredAccessScope.requiredAccessForDiagnostics(),
                   /*isForSetter=*/false, /*useDefaultAccess=*/false,
                   /*updateAttr=*/false);
-      diag.warnUntilSwiftVersionIf(!shouldError, futureVersion);
+      diag.warnUntilLanguageModeIf(!shouldError, futureVersion);
 
       if (shouldError) {
         attr->setInvalid();
@@ -3034,7 +3035,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     diagnose(attr->getLocation(),
              diag::attr_ApplicationMain_deprecated,
              applicationMainKind)
-      .warnUntilSwiftVersion(6);
+        .warnUntilLanguageMode(6);
 
     diagnose(attr->getLocation(),
              diag::attr_ApplicationMain_deprecated_use_attr_main)
@@ -3590,6 +3591,12 @@ void AttributeChecker::visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr)
   }
 
   (void)attr->getSpecializedSignature(FD);
+
+  // Force resolution of interface types written in requirements here to check
+  // that generic types satisfy generic requirements, and so on.
+  WhereClauseOwner(FD, attr)
+      .visitRequirements(TypeResolutionStage::Interface,
+                         [](Requirement, RequirementRepr *) { return false; });
 }
 
 GenericSignature
@@ -3699,7 +3706,7 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
 
   // On internal declarations, @inlinable implies @usableFromInline.
   if (VD->getAttrs().hasAttribute<InlinableAttr>()) {
-    if (Ctx.isSwiftVersionAtLeast(4,2))
+    if (Ctx.isLanguageModeAtLeast(4, 2))
       diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline,
                             VD);
     return;
@@ -5627,7 +5634,7 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     // properties of Objective-C protocols.
     auto D = diag::ownership_invalid_in_protocols;
     Diags.diagnose(attr->getLocation(), D, ownershipKind)
-        .warnUntilSwiftVersion(5)
+        .warnUntilLanguageMode(5)
         .fixItRemove(attr->getRange());
     attr->setInvalid();
   }
@@ -7887,10 +7894,9 @@ void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
     auto value = cast<ValueDecl>(D);
     ActorIsolation isolation = getActorIsolation(value);
     if (isolation.isActorIsolated()) {
-      diagnoseAndRemoveAttr(
-          attr, diag::sendable_isolated_sync_function,
-          isolation, value)
-        .warnUntilSwiftVersion(6);
+      diagnoseAndRemoveAttr(attr, diag::sendable_isolated_sync_function,
+                            isolation, value)
+          .warnUntilLanguageMode(6);
     }
   }
   // Prevent Sendable Attr from being added to methods of non-sendable types
@@ -7974,13 +7980,13 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         if (var->supportsMutation() && !attr->isUnsafe() && !canBeNonisolated) {
           if (var->hasAttachedPropertyWrapper()) {
             diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
-              .warnUntilSwiftVersionIf(attr->isImplicit(), 6)
-              .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+                .warnUntilLanguageModeIf(attr->isImplicit(), 6)
+                .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             return;
           } else if (var->getAttrs().hasAttribute<LazyAttr>()) {
             diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
-              .warnUntilSwiftVersion(6)
-              .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+                .warnUntilLanguageMode(6)
+                .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             return;
           } else {
             diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
@@ -8060,7 +8066,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         if (!ctor->hasAsync()) {
           // the isolation for a synchronous init cannot be `nonisolated`.
           diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_sync_init)
-            .warnUntilSwiftVersion(6);
+              .warnUntilLanguageMode(6);
           return;
         }
       }
@@ -8186,7 +8192,7 @@ void AttributeChecker::visitInheritActorContextAttr(
     diagnose(attr->getLocation(),
              diag::inherit_actor_context_only_on_sending_or_Sendable_params,
              attr)
-        .warnUntilFutureSwiftVersion();
+        .warnUntilFutureLanguageMode();
   }
 
   // Either `async` or `@isolated(any)`.
@@ -8195,7 +8201,7 @@ void AttributeChecker::visitInheritActorContextAttr(
         attr,
         diag::inherit_actor_context_only_on_async_or_isolation_erased_params,
         attr)
-        .warnUntilFutureSwiftVersion();
+        .warnUntilFutureLanguageMode();
   }
 }
 
@@ -8279,7 +8285,7 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
     bool inConcurrencyModule = D->getDeclContext()->getParentModule()->getName()
         .str() == "_Concurrency";
     auto diag = fn->diagnose(diag::unsafe_inherits_executor_deprecated);
-    diag.warnUntilSwiftVersion(6);
+    diag.warnUntilLanguageMode(6);
     diag.limitBehaviorIf(inConcurrencyModule, DiagnosticBehavior::Warning);
     replaceUnsafeInheritExecutorWithDefaultedIsolationParam(fn, diag);
   }
@@ -8662,7 +8668,7 @@ public:
                    diag::isolated_parameter_closure_combined_global_actor_attr,
                    param->getName())
               .fixItRemove(attr->getRangeWithAt())
-              .warnUntilSwiftVersion(6);
+              .warnUntilLanguageMode(6);
           attr->setInvalid();
           break; // don't need to complain about this more than once.
         }

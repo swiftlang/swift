@@ -11,6 +11,7 @@
 # ===----------------------------------------------------------------------===#
 
 import os
+import shutil
 
 from . import scheme_mock
 
@@ -55,6 +56,39 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
 
         # Test that we're actually checking out the 'extra' scheme based on the output
         self.assertIn("git checkout refs/heads/main", output)
+
+    def test_clone_missing_repos(self):
+        output = self.call(
+            [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.source_root,
+                "--clone",
+            ]
+        )
+        self.assertNotIn(
+            "You don't have all swift sources. Call this script with --clone to get them.",
+            output,
+        )
+
+        repo = self.get_all_repos()[0]
+        repo_path = os.path.join(self.source_root, repo)
+        shutil.rmtree(repo_path)
+        output = self.call(
+            [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.source_root,
+            ]
+        )
+        self.assertIn(
+            "You don't have all swift sources. Call this script with --clone to get them.",
+            output,
+        )
 
 
 class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):

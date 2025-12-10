@@ -1,5 +1,4 @@
-// RUN: not %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
-
+// RUN: not %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -I %S/Inputs -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
 // README: If you just added support for protocol composition to the
 // ClangTypeConverter, please update this test to use a different type that we
 // don't support so the error messages here are still tested.

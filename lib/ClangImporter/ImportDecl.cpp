@@ -2127,6 +2127,86 @@ namespace {
       return;
     }
 
+    bool
+    injectBridgingConversionsForRefCountedSmartPtrs(NominalTypeDecl *smartPtr) {
+      for (const auto *attr : smartPtr->getAttrs()) {
+        if (const auto *customAttr = dyn_cast<CustomAttr>(attr)) {
+          if (!customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
+                  "_refCountedPtr"))
+            continue;
+          auto clangDecl = cast<clang::TagDecl>(smartPtr->getClangDecl());
+          StringRef ToRawPtrFuncName;
+          for (auto arg : *customAttr->getArgs()) {
+            if (arg.getLabel().str() == "ToRawPointer") {
+              if (const auto *literal =
+                      dyn_cast<StringLiteralExpr>(arg.getExpr()))
+                ToRawPtrFuncName = literal->getValue();
+            }
+          }
+          if (ToRawPtrFuncName.empty()) {
+            Impl.addImportDiagnostic(
+                clangDecl,
+                Diagnostic(diag::refcounted_ptr_missing_torawpointer,
+                           clangDecl),
+                clangDecl->getLocation());
+            return false;
+          }
+
+          auto results = getValueDeclsForName(smartPtr, ToRawPtrFuncName);
+          if (results.empty()) {
+            Impl.addImportDiagnostic(
+                clangDecl,
+                Diagnostic(
+                    diag::refcounted_ptr_torawpointer_lookup_failure,
+                    Impl.SwiftContext.AllocateCopy(ToRawPtrFuncName.str()),
+                    clangDecl),
+                clangDecl->getLocation());
+            return false;
+          }
+          if (results.size() > 1) {
+            Impl.addImportDiagnostic(
+                clangDecl,
+                Diagnostic(
+                    diag::refcounted_ptr_torawpointer_lookup_ambiguity,
+                    Impl.SwiftContext.AllocateCopy(ToRawPtrFuncName.str()),
+                    clangDecl),
+                clangDecl->getLocation());
+            return false;
+          }
+
+          auto toRawPtrFunc = dyn_cast<FuncDecl>(results.front());
+          if (!toRawPtrFunc) {
+            Impl.addImportDiagnostic(
+                clangDecl,
+                Diagnostic(diag::refcounted_ptr_torawpointer_not_function,
+                           toRawPtrFunc, clangDecl),
+                clangDecl->getLocation());
+            return false;
+          }
+
+          auto pointeeType = toRawPtrFunc->getResultInterfaceType()
+                                 ->lookThroughSingleOptionalType();
+          ClassDecl *referenceDecl = pointeeType->getClassOrBoundGenericClass();
+
+          if (toRawPtrFunc->getParameters()->size() != 0 || !referenceDecl) {
+            Impl.addImportDiagnostic(
+                clangDecl,
+                Diagnostic(diag::refcounted_ptr_torawpointer_wrong_signature,
+                           toRawPtrFunc, clangDecl),
+                clangDecl->getLocation());
+            return false;
+          }
+
+          auto asReferenceDecl =
+              synthesizer.createSmartPtrBridgingProperty(toRawPtrFunc);
+          smartPtr->addMember(asReferenceDecl);
+          smartPtr->addMemberToLookupTable(asReferenceDecl);
+          break;
+        }
+      }
+      return true;
+    }
+
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
       // Track whether this record contains fields we can't reference in Swift
       // as stored properties.
@@ -2545,6 +2625,12 @@ namespace {
           cxxRecordDecl->getName() == "pair") {
         forceMemberwiseInitializer = true;
       }
+      // If this is the type that wraps around a Swift closure for the purpose
+      // of std::function support, force a memberwise initializer. It will be
+      // called by the synthesized std::function initializer.
+      if (cxxRecordDecl && Impl.isSwiftFunctionWrapper(cxxRecordDecl))
+        forceMemberwiseInitializer = true;
+
       // We can assume that it is possible to correctly construct the object by
       // simply initializing its member variables to arbitrary supplied values
       // only when the same is possible in C++. While we could check for that
@@ -2565,7 +2651,7 @@ namespace {
             /*want param names*/ true,
             /*want body*/ hasUnreferenceableStorage);
         if (!hasUnreferenceableStorage)
-          valueCtor->setIsMemberwiseInitializer();
+          valueCtor->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
 
         if (isNonEscapable)
           markReturnsUnsafeNonescapable(valueCtor);
@@ -2645,7 +2731,8 @@ namespace {
           structResult->setIsCxxNonTrivial(isAddressOnly);
         }
 
-        for (auto &getterAndSetter : Impl.GetterSetterMap[result]) {
+        auto gettersAndSetters = Impl.GetterSetterMap[result];
+        for (auto &getterAndSetter : gettersAndSetters) {
           auto getter = getterAndSetter.second.first;
           auto setter = getterAndSetter.second.second;
           // We cannot make a computed property without a getter.
@@ -2735,6 +2822,9 @@ namespace {
 
       // If we need it, add an explicit "deinit" to this type.
       synthesizer.addExplicitDeinitIfRequired(result, decl);
+
+      if (!injectBridgingConversionsForRefCountedSmartPtrs(result))
+        return nullptr;
 
       result->setMemberLoader(&Impl, 0);
       return result;
@@ -3216,8 +3306,13 @@ namespace {
           conformToCxxPairIfNeeded(Impl, nominalDecl, decl);
           conformToCxxOptionalIfNeeded(Impl, nominalDecl, decl);
           conformToCxxVectorIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxFunctionIfNeeded(Impl, nominalDecl, decl);
           conformToCxxSpanIfNeeded(Impl, nominalDecl, decl);
+
+          if (Impl.needsClosureConstructor(decl)) {
+            if (auto closureCtor =
+                    synthesizer.makeClosureConstructor(nominalDecl))
+              nominalDecl->addMember(closureCtor);
+          }
         }
       }
 
@@ -3853,8 +3948,8 @@ namespace {
       if (!dc)
         return nullptr;
 
-      // We may have already imported this function decl before we imported the
-      // parent record. In such a case it's important we don't re-import.
+      // We may have already imported this function decl while importing its
+      // decl context. Check decl cache to make sure we don't import twice.
       auto known = Impl.ImportedDecls.find({decl, getVersion()});
       if (known != Impl.ImportedDecls.end()) {
         return known->second;
@@ -3992,6 +4087,13 @@ namespace {
             decl, Diagnostic(diag::invoked_func_not_imported, decl),
             decl->getSourceRange().getBegin());
         return nullptr;
+      }
+
+      // We may have already imported this function decl while importing its
+      // type signature. Check decl cache to make sure we don't import twice.
+      auto known2 = Impl.ImportedDecls.find({decl, getVersion()});
+      if (known2 != Impl.ImportedDecls.end()) {
+        return known2->second;
       }
 
       if (name && name.isSimpleName()) {
@@ -4520,6 +4622,29 @@ namespace {
 
       auto fieldType = desugarIfElaborated(decl->getType());
       ImportedType importedType = importer::findOptionSetEnum(fieldType, Impl);
+
+      // If this is a closure field of the __SwiftFunctionWrapper type, pretend
+      // that the type of the field is a Swift closure. The actual Clang type is
+      // a pair of two pointers: code and context.
+      if (!importedType && decl->getParent() &&
+          decl->getParent()->getIdentifier() &&
+          Impl.isSwiftFunctionWrapper(decl->getParent()) &&
+          name.is("closure")) {
+        auto &ctx = dc->getASTContext();
+        auto functionWrapperDecl = dc->getSelfStructDecl();
+        auto callAsFunctionOverloads =
+            functionWrapperDecl->lookupDirect(ctx.Id_callAsFunction);
+        ASSERT(callAsFunctionOverloads.size() == 1 &&
+               "__SwiftFunctionWrapper should only have one operator()");
+        auto callAsFunctionDecl =
+            cast<FuncDecl>(callAsFunctionOverloads.front());
+
+        auto closureType = callAsFunctionDecl->getInterfaceType()
+                               ->getAs<FunctionType>()
+                               ->getResult();
+
+        importedType = ImportedType(closureType, false);
+      }
 
       if (!importedType)
         importedType =
@@ -5974,7 +6099,7 @@ namespace {
 
       auto access = AccessLevel::Open;
       if (decl->hasAttr<clang::ObjCSubclassingRestrictedAttr>() &&
-          Impl.SwiftContext.isSwiftVersionAtLeast(5)) {
+          Impl.SwiftContext.isLanguageModeAtLeast(5)) {
         access = AccessLevel::Public;
       }
 
@@ -8786,7 +8911,9 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
   auto bufferID = sourceMgr.addMemBufferCopy(attributeText);
 
   auto info = GeneratedSourceInfo{GeneratedSourceInfo::AttributeFromClang,
-                                  CharSourceRange(),
+                                  // NB: This source range is not used by the diagnostic engine,
+                                  // but it is traversed by DiagnostciVerifier.
+                                  CharSourceRange(MappedDecl->getStartLoc(), 0),
                                   sourceMgr.getRangeForBuffer(bufferID)};
   info.astNode = static_cast<void *>(module);
   info.clangNode = MappedDecl->getClangNode();

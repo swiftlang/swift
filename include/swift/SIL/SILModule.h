@@ -999,6 +999,8 @@ public:
 
   IndexTrieNode *getIndexTrieRoot() { return indexTrieRoot.get(); }
 
+  TypeExpansionContext getMaximalTypeExpansionContext() const;
+
   /// Can value operations (copies and destroys) on the given lowered type
   /// be performed in this module?
   bool isTypeABIAccessible(SILType type,

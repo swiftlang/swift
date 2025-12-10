@@ -31,13 +31,17 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:string-interpolation-conformance>
 - <doc:deprecated-declaration>
 - <doc:implementation-only-deprecated>
+- <doc:dynamic-exclusivity>
 - <doc:embedded-restrictions>
+- <doc:explicit-sendable-annotations>
 - <doc:preconcurrency-import>
+- <doc:foreign-reference-type>
 - <doc:clang-declaration-import>
 - <doc:isolated-conformances>
 - <doc:error-in-future-swift-version>
 - <doc:module-version-missing>
 - <doc:result-builder-methods>
+- <doc:semantic-copies>
 - <doc:strict-language-features>
 - <doc:strict-memory-safety>
 - <doc:unknown-warning-group>
@@ -53,8 +57,11 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:string-interpolation-conformance>
 - <doc:deprecated-declaration>
 - <doc:implementation-only-deprecated>
+- <doc:dynamic-exclusivity>
 - <doc:embedded-restrictions>
+- <doc:explicit-sendable-annotations>
 - <doc:preconcurrency-import>
+- <doc:foreign-reference-type>
 - <doc:clang-declaration-import>
 - <doc:isolated-conformances>
 - <doc:error-in-future-swift-version>
@@ -69,6 +76,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:conformance-isolation>
 - <doc:protocol-type-non-conformance>
 - <doc:result-builder-methods>
+- <doc:semantic-copies>
 - <doc:sendable-metatypes>
 - <doc:sending-closure-risks-data-race>
 - <doc:sending-risks-data-race>

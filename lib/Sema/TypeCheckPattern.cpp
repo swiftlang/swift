@@ -1078,9 +1078,9 @@ NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
       ctx.Diags
           .diagnose(NLE->getLoc(), diag::value_type_comparison_with_nil_illegal,
                     patternTy)
-          .warnUntilSwiftVersion(6);
+          .warnUntilLanguageMode(6);
 
-      if (ctx.isSwiftVersionAtLeast(6))
+      if (ctx.isLanguageModeAtLeast(6))
         return nullptr;
     }
   }

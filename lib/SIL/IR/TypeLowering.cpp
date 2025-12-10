@@ -5542,6 +5542,19 @@ unsigned TypeConverter::countNumberOfFields(SILType Ty,
   return std::max(fieldsCount, 1U);
 }
 
+uint16_t FunctionType::getPointerAuthDiscriminator(
+    ModuleDecl &m, const clang::FunctionType *clangType) {
+  TypeConverter converter(m);
+  AbstractionPattern pattern =
+      clangType ? AbstractionPattern(getCanonicalType(), clangType)
+                : AbstractionPattern(getCanonicalType());
+  auto &typeLowering =
+      converter.getTypeLowering(pattern, Type(static_cast<TypeBase *>(this)),
+                                TypeExpansionContext::minimal());
+  auto functionType = typeLowering.getLoweredType().getAs<SILFunctionType>();
+  return functionType->getPointerAuthDiscriminator(nullptr);
+}
+
 void TypeLowering::print(llvm::raw_ostream &os) const {
   auto BOOL = [&](bool b) -> StringRef {
     if (b)

@@ -668,17 +668,9 @@ static std::pair<CxxCompatMode, version::Version>
 validateCxxInteropCompatibilityMode(StringRef mode) {
   if (mode == "off")
     return {CxxCompatMode::off, {}};
-  if (mode == "default")
+  if (mode == "default" || mode == "upcoming-swift" || mode == "swift-6" ||
+      mode == "swift-5.9")
     return {CxxCompatMode::enabled, {}};
-  if (mode == "upcoming-swift")
-    return {CxxCompatMode::enabled,
-            version::Version({version::getUpcomingCxxInteropCompatVersion()})};
-  if (mode == "swift-6")
-    return {CxxCompatMode::enabled, version::Version({6})};
-  // Swift-5.9 corresponds to the Swift 5 language mode when
-  // Swift 5 is the default language version.
-  if (mode == "swift-5.9")
-    return {CxxCompatMode::enabled, version::Version({5})};
   // Note: If this is updated, corresponding code in
   // InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl needs
   // to be updated also.
@@ -710,13 +702,6 @@ void LangOptions::setCxxInteropFromArgs(ArgList &Args,
     auto interopCompatMode = validateCxxInteropCompatibilityMode(A->getValue());
     EnableCXXInterop |=
         (interopCompatMode.first == CxxCompatMode::enabled);
-    if (EnableCXXInterop) {
-      cxxInteropCompatVersion = interopCompatMode.second;
-      // The default is tied to the current language version.
-      if (cxxInteropCompatVersion.empty())
-        cxxInteropCompatVersion =
-            EffectiveLanguageVersion.asMajorVersion();
-    }
 
     if (interopCompatMode.first == CxxCompatMode::invalid)
       diagnoseCxxInteropCompatMode(A, Args, Diags);
@@ -726,11 +711,6 @@ void LangOptions::setCxxInteropFromArgs(ArgList &Args,
     Diags.diagnose(SourceLoc(), diag::enable_interop_flag_deprecated);
     Diags.diagnose(SourceLoc(), diag::swift_will_maintain_compat);
     EnableCXXInterop |= true;
-    // Using the deprecated option only forces the 'swift-5.9' compat
-    // mode.
-    if (cxxInteropCompatVersion.empty())
-      cxxInteropCompatVersion =
-          validateCxxInteropCompatibilityMode("swift-5.9").second;
   }
 
   if (Arg *A = Args.getLastArg(options::OPT_formal_cxx_interoperability_mode)) {
@@ -906,8 +886,8 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     // If the current language mode enables the feature by default then
     // diagnose and skip it.
-    if (auto firstVersion = feature->getLanguageVersion()) {
-      if (Opts.isSwiftVersionAtLeast(*firstVersion)) {
+    if (auto firstVersion = feature->getLanguageMode()) {
+      if (Opts.isLanguageModeAtLeast(*firstVersion)) {
         Diags.diagnose(SourceLoc(),
                        diag::warning_upcoming_feature_on_by_default,
                        feature->getName(), *firstVersion);
@@ -1284,8 +1264,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // Add a future feature if it is not already implied by the language version.
   auto addFutureFeatureIfNotImplied = [&](Feature feature) {
     // Check if this feature was introduced already in this language version.
-    if (auto firstVersion = feature.getLanguageVersion()) {
-      if (Opts.isSwiftVersionAtLeast(*firstVersion))
+    if (auto firstVersion = feature.getLanguageMode()) {
+      if (Opts.isLanguageModeAtLeast(*firstVersion))
         return;
     }
 
@@ -1462,7 +1442,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasFlag(OPT_enable_nonfrozen_enum_exhaustivity_diagnostics,
                    OPT_disable_nonfrozen_enum_exhaustivity_diagnostics,
-                   Opts.isSwiftVersionAtLeast(5))) {
+                   Opts.isLanguageModeAtLeast(5))) {
     Opts.enableFeature(Feature::NonfrozenEnumExhaustivity);
   }
 
@@ -1838,6 +1818,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
 
+  if (Opts.hasFeature(Feature::EmbeddedExistentials) &&
+      !Opts.hasFeature(Feature::Embedded)) {
+      Diags.diagnose(SourceLoc(), diag::embedded_existentials_without_embedded);
+      HadError = true;
+  }
   if (Opts.hasFeature(Feature::Embedded)) {
     Opts.UnavailableDeclOptimizationMode = UnavailableDeclOptimization::Complete;
     Opts.DisableImplicitStringProcessingModuleImport = true;
@@ -1878,7 +1863,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
       HadError = true;
     }
-  } else if (Opts.isSwiftVersionAtLeast(6)) {
+  } else if (Opts.isLanguageModeAtLeast(6)) {
     Opts.UseCheckedAsyncObjCBridging = true;
   }
 
@@ -3231,8 +3216,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_passes))
     Opts.OptRecordPasses = A->getValue();
 
-  if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
-    Opts.OptRecordFile = A->getValue();
+  // Only use getLastArg for single -save-optimization-record-path.
+  // With multiple paths (multi-threaded WMO), FrontendTool will populate
+  // OptRecordFile and AuxOptRecordFiles from command-line arguments.
+  auto allOptRecordPaths = Args.getAllArgValues(OPT_save_optimization_record_path);
+  if (allOptRecordPaths.size() == 1)
+    Opts.OptRecordFile = allOptRecordPaths[0];
 
   // If any of the '-g<kind>', except '-gnone', is given,
   // tell the SILPrinter to print debug info as well

@@ -88,7 +88,7 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
   llvm::Value *srcMetadata = nullptr;
 
   // Embedded swift currently only supports existential -> concrete type casts.
-  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+  if (IGF.IGM.isEmbeddedWithExistentials()) {
     srcMetadata = llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
   } else {
     srcMetadata = IGF.emitTypeMetadataRef(srcType);

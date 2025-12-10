@@ -12,6 +12,7 @@ public struct S {
 typealias Int1 = Builtin.Int1
 
 class C {}
+class D: C {}
 
 sil @getC : $@convention(thin) () -> @owned C
 sil @barrier : $@convention(thin) () -> ()
@@ -534,3 +535,32 @@ bb2:
   %17 = tuple ()
   return %17
 }
+
+// CHECK-LABEL: sil [ossa] @dont_insert_destroy_for_uninitialized_object :
+// CHECK-NOT:     destroy_value
+// CHECK-LABEL: } // end sil function 'dont_insert_destroy_for_uninitialized_object'
+sil [ossa] @dont_insert_destroy_for_uninitialized_object : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $D      // D might not be initialized due to dead-end loop -> will lead to crash if it is destroyed here
+  %1 = upcast %0 to $C
+  br bb1
+
+bb1:
+  br bb1
+}
+
+// CHECK-LABEL: sil [ossa] @dont_insert_arg_destroy_for_uninitialized_object :
+// CHECK-NOT:     destroy_value
+// CHECK-LABEL: } // end sil function 'dont_insert_arg_destroy_for_uninitialized_object'
+sil [ossa] @dont_insert_arg_destroy_for_uninitialized_object : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $D      // D might not be initialized due to dead-end loop -> will lead to crash if it is destroyed here
+  br bb1(%0)
+
+bb1(%2 : @owned $D):
+  br bb2
+
+bb2:
+  br bb2
+}
+

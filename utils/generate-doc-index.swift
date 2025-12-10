@@ -66,7 +66,7 @@ let topicsHeader = "\n\n## Topics\n"
 let swiftIncludeDir = "include/swift"
 
 let groupsFileName = "\(swiftIncludeDir)/AST/DiagnosticGroups.def"
-let groupRegex = /GROUP\((?<name>[a-zA-Z]+), "(?<file>.+)"\)/
+let groupRegex = /GROUP\((?<name>[a-zA-Z]+),[^,]+,"(?<file>.+)"\)/
 
 let featuresFileName = "\(swiftIncludeDir)/Basic/Features.def"
 let featuresRegex = /UPCOMING_FEATURE\((?<name>[a-zA-Z]+), .+\)/
@@ -95,16 +95,16 @@ do {
 }
 
 func generateIndex() throws {
+  let groupsWithWarnings = try groupNamesWithWarnings()
+  let docs = try retrieveDocs(groupsWithWarnings).sorted { a, b in
+    return a.title < b.title
+  }
+
   let groupsHandle = try createIndex(name: groupsDocFileName, header: groupsHeader)
   defer { try? groupsHandle.close() }
 
   let featuresHandle = try createIndex(name: featuresDocFileName, header: featuresHeader)
   defer { try? featuresHandle.close() }
-
-  let groupsWithWarnings = try groupNamesWithWarnings()
-  let docs = try retrieveDocs(groupsWithWarnings).sorted { a, b in
-    return a.title < b.title
-  }
 
   try groupsHandle.write(contentsOf: "\n\n## Groups with warnings\n".data(using: .utf8)!)
   for doc in docs where doc.kind == .groupWithWarnings {
