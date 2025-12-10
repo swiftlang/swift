@@ -572,8 +572,11 @@ public:
   /// requirements down the subtype or equivalence chain.
   void inferTransitiveProtocolRequirements();
 
-  /// Check whether the given binding set covers any of the
-  /// literal protocols associated with this type variable.
+  /// Check whether the given binding set covers any of the literal protocols
+  /// associated with this type variable. The idea is that if a type variable
+  /// has a binding like Int and also it has a conformance requirement to
+  /// ExpressibleByIntegerLitral, we can avoid attempting the default type of
+  /// that literal literal if we already attempted Int.
   void determineLiteralCoverage();
 
   /// Finalize binding computation for key path type variables.
