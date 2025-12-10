@@ -1719,7 +1719,7 @@ function Write-PList {
       -OutFile $Path
 }
 
-function Load-LitTestOverrides($Filename) {
+  function Load-LitTestOverrides($Filename) {
   function Select-LitTestOverrides($Prefix) {
     $MatchingLines = Get-Content $Filename | Select-String -Pattern "`^${Prefix}.*$"
     return $MatchingLines | ForEach-Object { ($_ -replace $Prefix,"").Trim() }
