@@ -2951,7 +2951,8 @@ synthesizeFunctionConstructorBody(AbstractFunctionDecl *afd, void *context) {
   auto wrapperInstCtorIt =
       llvm::find_if(wrapperInstDecl->getMembers(), [&](Decl *member) -> bool {
         if (auto wrapperCtor = dyn_cast<ConstructorDecl>(member)) {
-          return wrapperCtor->isMemberwiseInitializer();
+          return wrapperCtor->isMemberwiseInitializer() ==
+                 MemberwiseInitKind::Regular;
         }
         return false;
       });
