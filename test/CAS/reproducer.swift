@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -scan-dependencies -module-name Test -O -module-cache-path %t/clang-module-cache \
+// RUN: %target-swift-frontend-plain -scan-dependencies -module-name Test -O -module-cache-path %t/clang-module-cache \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -import-objc-header %t/Bridging.h -scanner-output-dir %t -auto-bridging-header-chaining -scanner-debug-write-output \
 // RUN:   %t/test.swift %t/foo.swift -I %t/include -o %t/deps.json -cache-compile-job -cas-path %t/cas
@@ -9,9 +9,10 @@
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd -b %t/header.cmd
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader > %t/header.cmd
-// RUN: %target-swift-frontend @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch
+// RUN: %target-swift-frontend-plain @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
-// RUN:   %target-swift-frontend @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch > %t/keys.json
+// RUN:   %target-swift-frontend-plain @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch > %t/keys.json
+
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json > %t/key
 
 // RUN: echo "\"-disable-implicit-string-processing-module-import\"" >> %t/MyApp.cmd
@@ -23,7 +24,7 @@
 // RUN: echo "\"-bridging-header-pch-key\"" >> %t/MyApp.cmd
 // RUN: echo "\"@%t/key\"" >> %t/MyApp.cmd
 
-// RUN: %target-swift-frontend %t/test.swift %t/foo.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
+// RUN: %target-swift-frontend-plain %t/test.swift %t/foo.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
 // RUN:  -module-name Test -o %t/test.o -cache-compile-job -cas-path %t/cas @%t/MyApp.cmd -gen-reproducer -gen-reproducer-dir %t/crash
 
 // RUN: %FileCheck %s --input-file=%t/crash/reproduce.sh

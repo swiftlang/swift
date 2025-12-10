@@ -30,7 +30,7 @@
 // CMD-NEXT: "0"
 // CMD-NEXT: "1000.0.0"
 
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \

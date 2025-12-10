@@ -22,7 +22,7 @@
 // RUN: echo "\"-disable-implicit-string-processing-module-import\"" >> %t/MyApp.cmd
 // RUN: echo "\"-disable-implicit-concurrency-module-import\"" >> %t/MyApp.cmd
 
-// RUN: %target-swift-frontend  -cache-compile-job -module-name Test -O -cas-path %t/cas @%t/MyApp.cmd %t/test.swift \
+// RUN: %target-swift-frontend-plain -cache-compile-job -module-name Test -O -cas-path %t/cas @%t/MyApp.cmd %t/test.swift \
 // RUN:   -emit-module -o %t/test.swiftmodule
 
 //--- module.modulemap

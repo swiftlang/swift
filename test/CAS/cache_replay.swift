@@ -22,23 +22,23 @@
 // RUN: echo "\"@%t/map.casid\"" >> %t/MyApp.cmd
 
 /// Run the command first time, expect cache miss.
-// RUN: %target-swift-frontend -cache-compile-job -Rcache-compile-job %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c -emit-dependencies \
+// RUN: %target-swift-frontend-plain -cache-compile-job -Rcache-compile-job %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c -emit-dependencies \
 // RUN:  -module-name Test -o %t/test.o -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --check-prefix=CACHE-MISS %s
 
 /// Expect cache hit for second time.
-// RUN: %target-swift-frontend -cache-compile-job -Rcache-compile-job %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c -emit-dependencies \
+// RUN: %target-swift-frontend-plain -cache-compile-job -Rcache-compile-job %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c -emit-dependencies \
 // RUN:  -module-name Test -o %t/test.o -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --check-prefix=CACHE-HIT %s
 
 /// Expect cache miss a subset of outputs.
-// RUN: %target-swift-frontend -cache-compile-job -Rcache-compile-job %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
+// RUN: %target-swift-frontend-plain -cache-compile-job -Rcache-compile-job %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
 // RUN:  -module-name Test -o %t/test.o -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --check-prefix=CACHE-MISS %s
 
 /// Cache hit for retry.
-// RUN: %target-swift-frontend -cache-compile-job -Rcache-compile-job %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
+// RUN: %target-swift-frontend-plain -cache-compile-job -Rcache-compile-job %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
 // RUN:  -module-name Test -o %t/test.o -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --check-prefix=CACHE-HIT %s
 
 /// Skip cache
-// RUN: %target-swift-frontend -cache-compile-job -Rcache-compile-job -cache-disable-replay %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
+// RUN: %target-swift-frontend-plain -cache-compile-job -Rcache-compile-job -cache-disable-replay %t/test.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
 // RUN:  -module-name Test -o %t/test.o -cas-path %t/cas @%t/MyApp.cmd 2>&1 | %FileCheck --allow-empty --check-prefix=SKIP-CACHE %s
 
 // CACHE-MISS: remark: cache miss for input

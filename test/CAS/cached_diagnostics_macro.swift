@@ -19,7 +19,7 @@
 
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd
 
-// RUN: %target-swift-frontend -diagnostic-style=swift \
+// RUN: %target-swift-frontend-plain -diagnostic-style=swift \
 // RUN:   -emit-module -o %t/Test.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -module-name MyApp -O \
 // RUN:   -external-plugin-path %t#%swift-plugin-server \
