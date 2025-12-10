@@ -7,7 +7,6 @@ from concurrent.futures import ThreadPoolExecutor
 import shutil
 
 from .git_command import GitException
-
 from .runner_arguments import (
     RunnerArguments,
     AdditionalSwiftSourcesArguments,
@@ -84,7 +83,7 @@ class ParallelRunner:
     ):
         def run_safely(*args, **kwargs):
             try:
-                fn(*args, **kwargs)
+                return fn(*args, **kwargs)
             except GitException as e:
                 return e
 
@@ -158,6 +157,9 @@ class ParallelRunner:
         for r in results:
             if r is None:
                 continue
+            if isinstance(r, tuple) and len(r) == 3:
+                if r[1] == 0:
+                    continue
             if fail_count == 0:
                 print(f"======{operation} FAILURES======")
             fail_count += 1
