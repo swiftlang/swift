@@ -959,6 +959,57 @@ void BindingSet::introduceBinding(PotentialBinding binding, bool isTransitive) {
     }
   }
 
+  // If the type variable prefers subtypes, diasambiguate a situation
+  // when this type variable is simultaneously a supertype of `@Sendable`
+  // function type and a subtype of a non-Sendable one by using a supertype
+  // binding because it constitutes a "subtype" in this case.
+  //
+  // For example:
+  //
+  // @Sendable () -> Void conv $T
+  // $T argument conv () -> Void
+  //
+  // Either of the types could also be wrapped in a number of optionals. Even if
+  // there is an optionality mismatch, let's still prefer a supertype binding
+  // because that would be easier to diagnose.
+  //
+  // In particular, this is helpful with ternary operators where the context is
+  // non-Sendable, but one or both sides are.
+  if (TypeVar->getImpl().prefersSubtypeBinding()) {
+    if (auto *funcType = binding.BindingType->lookThroughAllOptionalTypes()
+                             ->getAs<FunctionType>()) {
+      if (binding.Kind == AllowedBindingKind::Supertypes &&
+          funcType->isSendable()) {
+        // Note that we are removing the bindings but leaving AdjacentVars
+        // intact to make sure that this doesn't affect assessment of the
+        // binding set i.e. \c involvesTypeVariables.
+        Bindings.remove_if([](const PotentialBinding &existing) {
+          if (existing.Kind != AllowedBindingKind::Subtypes)
+            return false;
+
+          auto *existingFn = existing.BindingType->lookThroughAllOptionalTypes()
+                                 ->getAs<FunctionType>();
+          return existingFn && !existingFn->isSendable();
+        });
+      }
+
+      // If there are existing `@Sendable` supertype bindings, we can skip this
+      // one.
+      if (binding.Kind == AllowedBindingKind::Subtypes &&
+          !funcType->isSendable()) {
+        if (llvm::any_of(Bindings, [](const PotentialBinding &existing) {
+              if (existing.Kind != AllowedBindingKind::Supertypes)
+                return false;
+              auto *existingFn =
+                  existing.BindingType->lookThroughAllOptionalTypes()
+                      ->getAs<FunctionType>();
+              return existingFn && existingFn->isSendable();
+            }))
+          return;
+      }
+    }
+  }
+
   // If this is a non-defaulted supertype binding,
   // check whether we can combine it with another
   // supertype binding by computing the 'join' of the types.
