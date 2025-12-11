@@ -203,7 +203,7 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // -- getters and setters
   // -- val.ref.val_prop
   // CHECK: [[BORROW:%.*]] = begin_borrow [[VAL_REF]]
-  // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!modify : (Ref) -> @yield_once () -> inout @yields Val
+  // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!modify : (Ref) -> @yield_once () yields (inout Val) -> ()
   // CHECK: ([[VAL_REF_VAL_PROP_MAT:%[0-9]+]], [[TOKEN:%.*]]) = begin_apply [[MAT_VAL_PROP_METHOD]]([[BORROW]])
   // -- val.ref.val_prop.z_tuple
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)

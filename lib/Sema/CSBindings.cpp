@@ -811,7 +811,8 @@ bool BindingSet::finalizeKeyPathBindings() {
 
           bool isKeyPathSendable = capability && capability->second;
           if (!isKeyPathSendable && extInfo.isSendable()) {
-            fnType = FunctionType::get(fnType->getParams(), fnType->getResult(),
+            fnType = FunctionType::get(fnType->getParams(), fnType->getYields(),
+                                       fnType->getResult(),
                                        extInfo.withSendable(false));
           }
 

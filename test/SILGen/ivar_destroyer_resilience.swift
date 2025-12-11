@@ -25,7 +25,7 @@ public class DoesNotNeedIVarDestroyer : Base {
 // CHECK-NEXT: #Base.init!allocator: (Base.Type) -> () -> Base
 // CHECK-NEXT: #NeedsIVarDestroyer.x!getter: (NeedsIVarDestroyer) -> () -> resilient_struct.ResilientInt
 // CHECK-NEXT: #NeedsIVarDestroyer.x!setter: (NeedsIVarDestroyer) -> (resilient_struct.ResilientInt) -> ()
-// CHECK-NEXT: #NeedsIVarDestroyer.x!modify: (NeedsIVarDestroyer) -> @yield_once () -> inout @yields resilient_struct.ResilientInt
+// CHECK-NEXT: #NeedsIVarDestroyer.x!modify: (NeedsIVarDestroyer) -> @yield_once () yields (inout resilient_struct.ResilientInt) -> ()
 // CHECK-NEXT: #NeedsIVarDestroyer.deinit!deallocator
 // CHECK-NEXT: #NeedsIVarDestroyer!ivardestroyer
 // CHECK-NEXT: }
@@ -34,6 +34,6 @@ public class DoesNotNeedIVarDestroyer : Base {
 // CHECK-NEXT: #Base.init!allocator: (Base.Type) -> () -> Base
 // CHECK-NEXT: #DoesNotNeedIVarDestroyer.x!getter: (DoesNotNeedIVarDestroyer) -> () -> MyResilientInt
 // CHECK-NEXT: #DoesNotNeedIVarDestroyer.x!setter: (DoesNotNeedIVarDestroyer) -> (MyResilientInt) -> ()
-// CHECK-NEXT: #DoesNotNeedIVarDestroyer.x!modify: (DoesNotNeedIVarDestroyer) -> @yield_once () -> inout @yields MyResilientInt
+// CHECK-NEXT: #DoesNotNeedIVarDestroyer.x!modify: (DoesNotNeedIVarDestroyer) -> @yield_once () yields (inout MyResilientInt) -> ()
 // CHECK-NEXT: #DoesNotNeedIVarDestroyer.deinit!deallocator
 // CHECK-NEXT: }

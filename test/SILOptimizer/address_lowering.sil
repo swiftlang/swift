@@ -1725,7 +1725,7 @@ bb0:
 
 sil hidden [ossa] @testBeginApply1DeadYield : $@convention(thin) <T> (@guaranteed TestGeneric<T>) -> () {
 bb0(%0 : @guaranteed $TestGeneric<T>):
-  %2 = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> @yield_once () -> @yields T, $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+  %2 = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> @yield_once () yields (T) -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
   (%3, %4) = begin_apply %2<T>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
   end_apply %4 as $()
   %10 = tuple ()
@@ -1735,7 +1735,7 @@ bb0(%0 : @guaranteed $TestGeneric<T>):
 // CHECK-LABEL: sil hidden [ossa] @testBeginApply2LoadableYieldWithIndirectConv :
 // CHECK: bb0(%0 : @guaranteed $TestGeneric<Klass>):
 // CHECK:   [[STK:%.*]] = alloc_stack $Klass
-// CHECK:   [[METH:%.*]] = class_method %0 : $TestGeneric<Klass>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> @yield_once () -> @yields T, $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+// CHECK:   [[METH:%.*]] = class_method %0 : $TestGeneric<Klass>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> @yield_once ()  yields (T) -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
 // CHECK:   ([[Y:%.*]], [[TOK:%.*]]) = begin_apply [[METH]]<Klass>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
 // CHECK:   copy_addr [[Y]] to [init] [[STK]] : $*Klass
 // CHECK:   end_apply [[TOK]] as $()
@@ -1743,7 +1743,7 @@ bb0(%0 : @guaranteed $TestGeneric<T>):
 // CHECK-LABEL: }
 sil hidden [ossa] @testBeginApply2LoadableYieldWithIndirectConv : $@convention(thin) <Klass> (@guaranteed TestGeneric<Klass>) -> () {
 bb0(%0 : @guaranteed $TestGeneric<Klass>):
-  %2 = class_method %0 : $TestGeneric<Klass>, #TestGeneric.borrowedGeneric!read : <Klass> (TestGeneric<Klass>) -> @yield_once () -> @yields Klass, $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+  %2 = class_method %0 : $TestGeneric<Klass>, #TestGeneric.borrowedGeneric!read : <Klass> (TestGeneric<Klass>) -> @yield_once () yields (Klass) -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
   (%3, %4) = begin_apply %2<Klass>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
   %5 = copy_value %3 : $Klass
   end_apply %4 as $()
@@ -1755,7 +1755,7 @@ bb0(%0 : @guaranteed $TestGeneric<Klass>):
 // CHECK-LABEL: sil hidden [ossa] @testBeginApply3OpaqueYield :
 // CHECK: bb0(%0 : @guaranteed $TestGeneric<T>):
 // CHECK:   [[STK:%.*]] = alloc_stack $T
-// CHECK:   [[M:%.*]] = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> @yield_once () -> @yields T, $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+// CHECK:   [[M:%.*]] = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> @yield_once () yields (T) -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
 // CHECK:   ([[Y:%.*]], [[TOK:%.*]]) = begin_apply %2<T>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
 // CHECK:   copy_addr [[Y]] to [init] [[STK]] : $*T
 // CHECK:   end_apply [[TOK]] as $()
@@ -1763,7 +1763,7 @@ bb0(%0 : @guaranteed $TestGeneric<Klass>):
 // CHECK-LABEL: } // end sil function 'testBeginApply3OpaqueYield'
 sil hidden [ossa] @testBeginApply3OpaqueYield : $@convention(thin) <T> (@guaranteed TestGeneric<T>) -> () {
 bb0(%0 : @guaranteed $TestGeneric<T>):
-  %2 = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> @yield_once () -> @yields T, $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+  %2 = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> @yield_once () yields (T) -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
   (%3, %4) = begin_apply %2<T>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
   %5 = copy_value %3 : $T
   end_apply %4 as $()

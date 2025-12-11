@@ -307,12 +307,12 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     GenericFunctionType::ExtInfo info;
     astFnTy = GenericFunctionType::get(
-        genSig, params, silFnTy->getAllResultsInterfaceType().getASTType(),
+        genSig, params, {}, silFnTy->getAllResultsInterfaceType().getASTType(),
         info);
   } else {
     FunctionType::ExtInfo info;
     astFnTy = FunctionType::get(
-        params, silFnTy->getAllResultsInterfaceType().getASTType(), info);
+        params, {}, silFnTy->getAllResultsInterfaceType().getASTType(), info);
   }
 
   Type resultType =

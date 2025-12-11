@@ -1717,37 +1717,6 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorType, Type)
 
-class YieldResultType : public TypeBase {
-  Type ResultType;
-  bool InOut = false;
-
-  YieldResultType(Type objectTy, bool InOut, const ASTContext *canonicalContext,
-                  RecursiveTypeProperties properties)
-  : TypeBase(TypeKind::YieldResult, canonicalContext, properties),
-    ResultType(objectTy), InOut(InOut) {}
-
-public:
-  static YieldResultType *get(Type originalType, bool InOut);
-
-  Type getResultType() const { return ResultType; }
-  bool isInOut() const { return InOut; }
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::YieldResult;
-  }
-};
-
-BEGIN_CAN_TYPE_WRAPPER(YieldResultType, Type)
-  PROXY_CAN_TYPE_SIMPLE_GETTER(getResultType)
-  bool isInOut() const {
-    return getPointer()->isInOut();
-  }
-  static CanYieldResultType get(CanType type, bool InOut) {
-    return CanYieldResultType(YieldResultType::get(type, InOut));
-  }
-END_CAN_TYPE_WRAPPER(YieldResultType, Type)
-  
 /// BuiltinType - An abstract class for all the builtin types.
 class BuiltinType : public TypeBase {
 protected:
@@ -3447,6 +3416,7 @@ END_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
 class AnyFunctionType : public TypeBase {
   const Type Output;
   uint16_t NumParams;
+  uint8_t NumYields;
 
 public:
   using Representation = FunctionTypeRepresentation;
@@ -3668,6 +3638,9 @@ public:
 
     CanType getType() const { return CanType(Yield::getType()); }
     CanParam asParam() const { return CanParam::getFromParam(Yield::asParam());}
+    static CanYield getFromYield(const Yield &yield) {
+      return yield.getCanonical();
+    }
 
     CanYield subst(SubstitutionMap subs,
                    SubstOptions options = std::nullopt) const {
@@ -3675,6 +3648,8 @@ public:
                       getFlags());
     }
   };
+  using CanYieldArrayRef = ArrayRefView<Yield, CanYield, CanYield::getFromYield,
+                                        /*AccessOriginal*/ true>;
 
 protected:
   /// Create an AnyFunctionType.
@@ -3683,7 +3658,7 @@ protected:
   /// ClangTypeInfo value if one is present.
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext, Type Output,
                   RecursiveTypeProperties properties, unsigned NumParams,
-                  std::optional<ExtInfo> Info)
+                  unsigned NumYields, std::optional<ExtInfo> Info)
       : TypeBase(Kind, CanTypeContext, properties), Output(Output) {
     if (Info.has_value()) {
       Bits.AnyFunctionType.HasExtInfo = true;
@@ -3710,7 +3685,9 @@ protected:
     }
     this->NumParams = NumParams;
     assert(this->NumParams == NumParams && "Params dropped!");
-    
+    this->NumYields = NumYields;
+    assert(this->NumYields == NumYields && "Yields dropped!");
+
     if (Info && CONDITIONAL_ASSERT_enabled()) {
       unsigned maxLifetimeTarget = NumParams + 1;
       if (auto outputFn = Output->getAs<AnyFunctionType>()) {
@@ -3748,6 +3725,8 @@ public:
   Type getResult() const { return Output; }
   ArrayRef<Param> getParams() const;
   unsigned getNumParams() const { return NumParams; }
+  ArrayRef<Yield> getYields() const;
+  unsigned getNumYields() const { return NumYields; }
 
   GenericSignature getOptGenericSignature() const;
   
@@ -4027,15 +4006,24 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   using ExtInfo = AnyFunctionType::ExtInfo;
   using ExtInfoBuilder = AnyFunctionType::ExtInfoBuilder;
   using CanParamArrayRef = AnyFunctionType::CanParamArrayRef;
+  using CanYieldArrayRef = AnyFunctionType::CanYieldArrayRef;
 
+  /*  static CanAnyFunctionType get(CanGenericSignature signature,
+                                  CanParamArrayRef params, CanType result,
+                                  std::optional<ExtInfo> info = std::nullopt);
+  */
   static CanAnyFunctionType get(CanGenericSignature signature,
-                                CanParamArrayRef params, CanType result,
+                                CanParamArrayRef params,
+                                CanYieldArrayRef yields, CanType result,
                                 std::optional<ExtInfo> info = std::nullopt);
 
   CanGenericSignature getOptGenericSignature() const;
 
   CanParamArrayRef getParams() const {
     return CanParamArrayRef(getPointer()->getParams());
+  }
+  CanYieldArrayRef getYields() const {
+    return CanYieldArrayRef(getPointer()->getYields());
   }
 
   PROXY_CAN_TYPE_SIMPLE_GETTER(getResult)
@@ -4065,13 +4053,18 @@ bool hasIsolatedParameter(ArrayRef<AnyFunctionType::Param> params);
 class FunctionType final
     : public AnyFunctionType,
       public llvm::FoldingSetNode,
-      private llvm::TrailingObjects<
-          FunctionType, AnyFunctionType::Param, ClangTypeInfo, Type,
-          size_t /*NumLifetimeDependencies*/, LifetimeDependenceInfo> {
+      private llvm::TrailingObjects<FunctionType, AnyFunctionType::Param,
+                                    AnyFunctionType::Yield, ClangTypeInfo, Type,
+                                    size_t /*NumLifetimeDependencies*/,
+                                    LifetimeDependenceInfo> {
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<AnyFunctionType::Param>) const {
     return getNumParams();
+  }
+
+  size_t numTrailingObjects(OverloadToken<AnyFunctionType::Yield>) const {
+    return getNumYields();
   }
 
   size_t numTrailingObjects(OverloadToken<ClangTypeInfo>) const {
@@ -4092,12 +4085,24 @@ class FunctionType final
 
 public:
   /// 'Constructor' Factory Function
+#if 0  
   static FunctionType *get(ArrayRef<Param> params, Type result,
+                           std::optional<ExtInfo> info = std::nullopt) {
+    return get(params, {}, result, info);
+  }
+#endif
+  static FunctionType *get(ArrayRef<Param> params, ArrayRef<Yield> yields,
+                           Type result,
                            std::optional<ExtInfo> info = std::nullopt);
 
   // Retrieve the input parameters of this function type.
   ArrayRef<Param> getParams() const {
     return {getTrailingObjects<Param>(), getNumParams()};
+  }
+
+  // Retrieve the yields of this function type.
+  ArrayRef<Yield> getYields() const {
+    return {getTrailingObjects<Yield>(), getNumYields()};
   }
 
   ClangTypeInfo getClangTypeInfo() const {
@@ -4152,10 +4157,11 @@ public:
     std::optional<ExtInfo> info = std::nullopt;
     if (hasExtInfo())
       info = getExtInfo();
-    Profile(ID, getParams(), getResult(), info);
+    Profile(ID, getParams(), getYields(), getResult(), info);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Param> params,
-                      Type result, std::optional<ExtInfo> info);
+                      ArrayRef<Yield> yields, Type result,
+                      std::optional<ExtInfo> info);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -4163,13 +4169,23 @@ public:
   }
       
 private:
-  FunctionType(ArrayRef<Param> params, Type result, std::optional<ExtInfo> info,
-               const ASTContext *ctx, RecursiveTypeProperties properties);
+  FunctionType(ArrayRef<Param> params, ArrayRef<Yield> yields, Type result,
+               std::optional<ExtInfo> info, const ASTContext *ctx,
+               RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
+#if 0
 static CanFunctionType get(CanParamArrayRef params, CanType result,
                            std::optional<ExtInfo> info = std::nullopt) {
   auto fnType = FunctionType::get(params.getOriginalArray(), result, info);
+  return cast<FunctionType>(fnType->getCanonicalType());
+}
+#endif
+static CanFunctionType get(CanParamArrayRef params, CanYieldArrayRef yields,
+                           CanType result,
+                           std::optional<ExtInfo> info = std::nullopt) {
+  auto fnType = FunctionType::get(params.getOriginalArray(),
+                                  yields.getOriginalArray(), result, info);
   return cast<FunctionType>(fnType->getCanonicalType());
 }
 
@@ -4244,9 +4260,9 @@ std::string getParamListAsString(ArrayRef<AnyFunctionType::Param> parameters);
 class GenericFunctionType final
     : public AnyFunctionType,
       public llvm::FoldingSetNode,
-      private llvm::TrailingObjects<GenericFunctionType, AnyFunctionType::Param,
-                                    Type, size_t /*NumLifetimeDependencies*/,
-                                    LifetimeDependenceInfo> {
+      private llvm::TrailingObjects<
+          GenericFunctionType, AnyFunctionType::Param, AnyFunctionType::Yield,
+          Type, size_t /*NumLifetimeDependencies*/, LifetimeDependenceInfo> {
   friend TrailingObjects;
       
   GenericSignature Signature;
@@ -4254,7 +4270,11 @@ class GenericFunctionType final
   size_t numTrailingObjects(OverloadToken<AnyFunctionType::Param>) const {
     return getNumParams();
   }
-                                    
+
+  size_t numTrailingObjects(OverloadToken<AnyFunctionType::Yield>) const {
+    return getNumYields();
+  }
+
   size_t numTrailingObjects(OverloadToken<Type>) const {
     return hasGlobalActor() + hasThrownError();
   }
@@ -4268,19 +4288,31 @@ class GenericFunctionType final
   }
 
   /// Construct a new generic function type.
-  GenericFunctionType(GenericSignature sig, ArrayRef<Param> params, Type result,
+  GenericFunctionType(GenericSignature sig, ArrayRef<Param> params,
+                      ArrayRef<Yield> yields, Type result,
                       std::optional<ExtInfo> info, const ASTContext *ctx,
                       RecursiveTypeProperties properties);
 
 public:
   /// Create a new generic function type.
+#if 0  
   static GenericFunctionType *get(GenericSignature sig, ArrayRef<Param> params,
                                   Type result,
+                                  std::optional<ExtInfo> info = std::nullopt) {
+    return get(sig, params, {}, result, info);
+  }
+#endif
+  static GenericFunctionType *get(GenericSignature sig, ArrayRef<Param> params,
+                                  ArrayRef<Yield> yields, Type result,
                                   std::optional<ExtInfo> info = std::nullopt);
 
   // Retrieve the input parameters of this function type.
   ArrayRef<Param> getParams() const {
     return {getTrailingObjects<Param>(), getNumParams()};
+  }
+
+  ArrayRef<Yield> getYields() const {
+    return {getTrailingObjects<Yield>(), getNumYields()};
   }
 
   Type getGlobalActor() const {
@@ -4339,11 +4371,12 @@ public:
     std::optional<ExtInfo> info = std::nullopt;
     if (hasExtInfo())
       info = getExtInfo();
-    Profile(ID, getGenericSignature(), getParams(), getResult(), info);
+    Profile(ID, getGenericSignature(), getParams(), getYields(), getResult(),
+            info);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, GenericSignature sig,
-                      ArrayRef<Param> params, Type result,
-                      std::optional<ExtInfo> info);
+                      ArrayRef<Param> params, ArrayRef<Yield> yields,
+                      Type result, std::optional<ExtInfo> info);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -4354,19 +4387,33 @@ public:
 BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
   /// Create a new generic function type.
 static CanGenericFunctionType get(CanGenericSignature sig,
-                                  CanParamArrayRef params, CanType result,
+                                  CanParamArrayRef params,
+                                  CanYieldArrayRef yields, CanType result,
                                   std::optional<ExtInfo> info = std::nullopt) {
   // Knowing that the argument types are independently canonical is
   // not sufficient to guarantee that the function type will be canonical.
-  auto fnType =
-      GenericFunctionType::get(sig, params.getOriginalArray(), result, info);
+  auto fnType = GenericFunctionType::get(
+      sig, params.getOriginalArray(), yields.getOriginalArray(), result, info);
   return cast<GenericFunctionType>(fnType->getCanonicalType());
 }
 
-  CanFunctionType substGenericArgs(SubstitutionMap subs) const;
+#if 0
+  static CanGenericFunctionType get(CanGenericSignature sig,
+                                    CanParamArrayRef params,
+                                    CanType result,
+                                    std::optional<ExtInfo> info = std::nullopt) {
+    // Knowing that the argument types are independently canonical is
+    // not sufficient to guarantee that the function type will be canonical.
+    auto fnType =
+      GenericFunctionType::get(sig, params.getOriginalArray(), result, info);
+    return cast<GenericFunctionType>(fnType->getCanonicalType());
+  }
+#endif
 
-  CanGenericSignature getGenericSignature() const {
-    return CanGenericSignature(getPointer()->getGenericSignature());
+CanFunctionType substGenericArgs(SubstitutionMap subs) const;
+
+CanGenericSignature getGenericSignature() const {
+  return CanGenericSignature(getPointer()->getGenericSignature());
   }
   
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const {
@@ -4379,6 +4426,7 @@ static CanGenericFunctionType get(CanGenericSignature sig,
   }
 END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 
+#if 0
 inline CanAnyFunctionType
 CanAnyFunctionType::get(CanGenericSignature signature, CanParamArrayRef params,
                         CanType result, std::optional<ExtInfo> extInfo) {
@@ -4386,6 +4434,19 @@ CanAnyFunctionType::get(CanGenericSignature signature, CanParamArrayRef params,
     return CanGenericFunctionType::get(signature, params, result, extInfo);
   } else {
     return CanFunctionType::get(params, result, extInfo);
+  }
+  }
+#endif
+
+inline CanAnyFunctionType
+CanAnyFunctionType::get(CanGenericSignature signature, CanParamArrayRef params,
+                        CanYieldArrayRef yields, CanType result,
+                        std::optional<ExtInfo> extInfo) {
+  if (signature) {
+    return CanGenericFunctionType::get(signature, params, yields, result,
+                                       extInfo);
+  } else {
+    return CanFunctionType::get(params, yields, result, extInfo);
   }
 }
 
@@ -8498,6 +8559,17 @@ inline ArrayRef<AnyFunctionType::Param> AnyFunctionType::getParams() const {
     return cast<FunctionType>(this)->getParams();
   case TypeKind::GenericFunction:
     return cast<GenericFunctionType>(this)->getParams();
+  default:
+    llvm_unreachable("Undefined function type");
+  }
+}
+
+inline ArrayRef<AnyFunctionType::Yield> AnyFunctionType::getYields() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getYields();
+  case TypeKind::GenericFunction:
+    return cast<GenericFunctionType>(this)->getYields();
   default:
     llvm_unreachable("Undefined function type");
   }

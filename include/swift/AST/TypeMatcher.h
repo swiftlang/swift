@@ -147,17 +147,6 @@ private:
       return mismatch(firstTuple.getPointer(), secondType, sugaredFirstType);
     }
 
-    bool visitYieldResultType(CanYieldResultType firstType, Type secondType,
-                              Type sugaredFirstType) {
-      if (auto secondYieldType = secondType->getAs<YieldResultType>())
-        if (!this->visit(firstType.getResultType(),
-                         secondYieldType->getResultType(),
-                         sugaredFirstType->getAs<YieldResultType>()->getResultType()))
-          return false;
-
-      return mismatch(firstType.getPointer(), secondType, sugaredFirstType);
-    }
-
     bool visitSILPackType(CanSILPackType firstPack, Type secondType,
                           Type sugaredFirstType) {
       if (auto secondPack = secondType->getAs<SILPackType>()) {

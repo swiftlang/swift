@@ -1892,11 +1892,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return;
     }
 
-    case TypeKind::YieldResult:
-      appendType(cast<YieldResultType>(tybase)->getResultType(), sig, forDecl);
-      appendOperator("Yy");
-      return;
-
     case TypeKind::SILMoveOnlyWrapped:
       // If we hit this, we just mangle the underlying name and move on.
       llvm_unreachable("should never be mangled?");
@@ -3382,6 +3377,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
                            forDecl ? fn->getLifetimeDependenceForResult(forDecl)
                                    : std::nullopt,
                            forDecl);
+  // TODO: Handle yields
   appendFunctionInputType(fn, fn->getParams(), sig, forDecl, isRecursedInto);
   if (fn->isAsync())
     appendOperator("Ya");
@@ -3600,10 +3596,7 @@ void ASTMangler::appendParameterTypeListElement(
     GenericSignature sig, const ValueDecl *forDecl) {
   if (auto *fnType = elementType->getAs<FunctionType>())
     appendFunctionType(fnType, sig, flags.isAutoClosure(), forDecl);
-  else if (auto *yieldType = elementType->getAs<YieldResultType>()) {
-    appendType(yieldType->getResultType(), sig, forDecl);
-    appendOperator("Yy");
-  } else
+  else
     appendType(elementType, sig, forDecl);
 
   if (flags.isNoDerivative()) {
@@ -4227,7 +4220,7 @@ CanType ASTMangler::getDeclTypeForMangling(
         isa<SubscriptDecl>(decl)) {
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
-      return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
+      return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)}, {},
                                   C.TheErrorType, info);
     }
     return C.TheErrorType;
@@ -4248,8 +4241,8 @@ CanType ASTMangler::getDeclTypeForMangling(
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
     genericSig = gft.getGenericSignature();
 
-    canTy = CanFunctionType::get(gft.getParams(), gft.getResult(),
-                                 gft->getExtInfo());
+    canTy = CanFunctionType::get(gft.getParams(), gft.getYields(),
+                                 gft.getResult(), gft->getExtInfo());
   }
 
   if (!canTy->hasError()) {

@@ -213,7 +213,7 @@ extension ASTGenVisitor {
       case .Concurrent:
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Concurrent))
       case .Coroutine:
-        fatalError("unimplemented")
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Coroutine))
       case nil where attrName == "_unavailableInEmbedded":
         return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
 

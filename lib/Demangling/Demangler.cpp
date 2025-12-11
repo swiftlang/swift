@@ -1018,9 +1018,6 @@ NodePointer Demangler::demangleTypeAnnotation() {
   case 'u':
     return createType(
         createWithChild(Node::Kind::Sending, popTypeAndGetChild()));
-  case 'y':
-    return createType(
-        createWithChild(Node::Kind::YieldResult, popTypeAndGetChild()));
   default:
     return nullptr;
   }

@@ -1296,7 +1296,10 @@ class TargetExtendedFunctionTypeFlags {
     NonIsolatedNonsending  = 0x00000004U,
 
     // Values if we have a sending result.
-    HasSendingResult  = 0x00000010U,
+    HasSendingResult       = 0x00000010U,
+
+    // Values if we have any yields
+    IsCoroutine            = 0x00000020U,
 
     /// A InvertibleProtocolSet in the high bits.
     InvertedProtocolshift = 16,
@@ -1339,6 +1342,12 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
+  withCoroutine(bool newValue = true) const {
+    return TargetExtendedFunctionTypeFlags<int_type>(
+        (Data & ~IsCoroutine) | (newValue ? IsCoroutine : 0));
+  }
+
+  const TargetExtendedFunctionTypeFlags<int_type>
   withInvertedProtocols(InvertibleProtocolSet inverted) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
         (Data & ~InvertedProtocolMask) |
@@ -1358,6 +1367,8 @@ public:
   bool hasSendingResult() const {
     return bool(Data & HasSendingResult);
   }
+
+  bool isCoroutine() const { return bool(Data & IsCoroutine); }
 
   int_type getIntValue() const {
     return Data;

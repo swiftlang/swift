@@ -547,10 +547,10 @@ extension HasConditionalSubscript: ConditionalSubscript where T: ConditionalSubs
 // CHECK-LABEL: sil_vtable DerivedForOverride {
 // CHECK:   #BaseForOverride.valueStored!getter: (BaseForOverride) -> () -> Int : @$s6modify18DerivedForOverrideC11valueStoredSivg
 // CHECK:   #BaseForOverride.valueStored!setter: (BaseForOverride) -> (Int) -> () : @$s6modify18DerivedForOverrideC11valueStoredSivs
-// CHECK:   #BaseForOverride.valueStored!modify: (BaseForOverride) -> @yield_once () -> inout @yields Int : @$s6modify18DerivedForOverrideC11valueStoredSivM
+// CHECK:   #BaseForOverride.valueStored!modify: (BaseForOverride) -> @yield_once () yields (inout Int) -> () : @$s6modify18DerivedForOverrideC11valueStoredSivM
 // CHECK:   #BaseForOverride.valueComputed!getter: (BaseForOverride) -> () -> Int : @$s6modify18DerivedForOverrideC13valueComputedSivg
 // CHECK:   #BaseForOverride.valueComputed!setter: (BaseForOverride) -> (Int) -> () : @$s6modify18DerivedForOverrideC13valueComputedSivs
-// CHECK:   #BaseForOverride.valueComputed!modify: (BaseForOverride) -> @yield_once () -> inout @yields Int : @$s6modify18DerivedForOverrideC13valueComputedSivM
+// CHECK:   #BaseForOverride.valueComputed!modify: (BaseForOverride) -> @yield_once () yields (inout Int) -> () : @$s6modify18DerivedForOverrideC13valueComputedSivM
 // CHECK: }
 
 // CHECK-LABEL: sil_witness_table hidden Bill: Totalled module modify {

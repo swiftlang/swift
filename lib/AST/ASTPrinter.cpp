@@ -4366,6 +4366,18 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         printFunctionParameters(decl);
       });
 
+    if (decl->isCoroutine()) {
+      TypeLoc YieldTyLoc(decl->getResultTypeRepr(),
+                         decl->getYieldsInterfaceType());
+
+      Printer.printStructurePre(PrintStructureKind::CoroutineYieldsTypes);
+      SWIFT_DEFER {
+        Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
+      };
+      Printer << " " << tok::kw_yield << " ";
+      printTypeLoc(YieldTyLoc, getNonRecursiveOptions(decl));
+    }
+
     Type ResultTy = decl->getResultInterfaceType();
     if (ResultTy && !ResultTy->isVoid()) {
       Printer.printStructurePre(PrintStructureKind::DeclResultTypeClause);
@@ -6278,13 +6290,6 @@ public:
       Printer << "_";
     }
   }
-      
-  void visitYieldResultType(YieldResultType *T, NonRecursivePrintOptions nrOption) {
-    if (T->isInOut())
-      Printer << "inout ";
-    Printer << "@yields ";
-    visit(T->getResultType());
-  }
 
   void visitErrorUnionType(ErrorUnionType *T,
                            NonRecursivePrintOptions nrOptions) {
@@ -6961,6 +6966,22 @@ public:
     Printer << ")";
   }
 
+  void visitAnyFunctionTypeYields(ArrayRef<AnyFunctionType::Yield> yields) {
+    Printer << "(";
+    for (auto [index, yield] : llvm::enumerate(yields)) {
+      if (index)
+        Printer << ", ";
+      Printer.callPrintStructurePre(PrintStructureKind::CoroutineYield);
+      SWIFT_DEFER {
+        Printer.printStructurePost(PrintStructureKind::CoroutineYield);
+      };
+      if (yield.isInOut())
+        Printer << "inout ";
+      visit(yield.getType());
+    }
+    Printer << ")";
+  }
+
   void visitFunctionType(FunctionType *T,
                          NonRecursivePrintOptions nrOptions) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
@@ -6989,6 +7010,14 @@ public:
           Printer << ")";
         }
       }
+    }
+
+    if (T->hasExtInfo() && T->isCoroutine()) {
+      Printer.callPrintStructurePre(PrintStructureKind::CoroutineYieldsTypes);
+      Printer << " ";
+      Printer.printKeyword("yields ", Options);
+      visitAnyFunctionTypeYields(T->getYields());
+      Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
     }
 
     Printer << " -> ";
@@ -7050,6 +7079,14 @@ public:
           Printer << ")";
         }
       }
+   }
+
+   if (T->hasExtInfo() && T->isCoroutine()) {
+     Printer.callPrintStructurePre(PrintStructureKind::CoroutineYieldsTypes);
+     Printer << " ";
+     Printer.printKeyword("yields ", Options);
+     visitAnyFunctionTypeYields(T->getYields());
+     Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
    }
 
     Printer << " -> ";

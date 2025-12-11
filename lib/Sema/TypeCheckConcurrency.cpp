@@ -7795,8 +7795,8 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
   }
 
   // Rebuild the (inner) function type.
-  fnType = FunctionType::get(
-      newTypeParams, newResultType, fnType->getExtInfo());
+  fnType =
+      FunctionType::get(newTypeParams, {}, newResultType, fnType->getExtInfo());
 
   if (!outerFnType)
     return fnType;
@@ -7805,11 +7805,11 @@ static AnyFunctionType *applyUnsafeConcurrencyToFunctionType(
   if (auto genericFnType = dyn_cast<GenericFunctionType>(outerFnType)) {
     return GenericFunctionType::get(
         genericFnType->getGenericSignature(), outerFnType->getParams(),
-        Type(fnType), outerFnType->getExtInfo());
+        outerFnType->getYields(), Type(fnType), outerFnType->getExtInfo());
   }
 
-  return FunctionType::get(
-      outerFnType->getParams(), Type(fnType), outerFnType->getExtInfo());
+  return FunctionType::get(outerFnType->getParams(), outerFnType->getYields(),
+                           Type(fnType), outerFnType->getExtInfo());
 }
 
 AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
@@ -7888,13 +7888,13 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
 
   // Rebuild the outer function type around it.
   if (auto genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
-    return GenericFunctionType::get(
-        genericFnType->getGenericSignature(), fnType->getParams(),
-        Type(innerFnType), fnType->getExtInfo());
+    return GenericFunctionType::get(genericFnType->getGenericSignature(),
+                                    fnType->getParams(), fnType->getYields(),
+                                    Type(innerFnType), fnType->getExtInfo());
   }
 
-  return FunctionType::get(
-      fnType->getParams(), Type(innerFnType), fnType->getExtInfo());
+  return FunctionType::get(fnType->getParams(), fnType->getYields(),
+                           Type(innerFnType), fnType->getExtInfo());
 }
 
 bool swift::completionContextUsesConcurrencyFeatures(const DeclContext *dc) {

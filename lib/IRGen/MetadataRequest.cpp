@@ -2235,11 +2235,6 @@ namespace {
                                     DynamicMetadataRequest request) {
       llvm_unreachable("error type should not appear in IRGen");
     }
-    MetadataResponse visitYieldResultType(CanYieldResultType type,
-                                          DynamicMetadataRequest request) {
-      llvm_unreachable("yields should have been lowered by SILGen");
-    }
-
     MetadataResponse visitIntegerType(CanIntegerType type,
                                       DynamicMetadataRequest request) {
       llvm_unreachable("integer type should not appear in IRGen");
@@ -3551,7 +3546,7 @@ public:
       //
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
-      return CanFunctionType::get({}, C.TheEmptyTupleType, info);
+      return CanFunctionType::get({}, {}, C.TheEmptyTupleType, info);
     }
     case SILFunctionType::Representation::Block:
       // All block types look like AnyObject.
@@ -3735,7 +3730,7 @@ namespace {
         // FIXME: Verify ExtInfo state is correct, not working by accident.
         CanFunctionType::ExtInfo info;
         return emitFromValueWitnessTable(
-            CanFunctionType::get({}, C.TheEmptyTupleType, info));
+            CanFunctionType::get({}, {}, C.TheEmptyTupleType, info));
       }
       case SILFunctionType::Representation::Block:
         // All block types look like AnyObject.

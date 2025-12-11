@@ -5751,15 +5751,6 @@ public:
     visitBuiltinTypeImpl(ty);
   }
 
-  void visitYieldResultType(const YieldResultType *ty) {
-    using namespace decls_block;
-    unsigned abbrCode = S.DeclTypeAbbrCodes[YieldResultTypeLayout::Code];
-
-    YieldResultTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                      S.addTypeRef(ty->getResultType()),
-                                      ty->isInOut());
-  }
-
   void visitTypeAliasType(const TypeAliasType *alias) {
     using namespace decls_block;
 
@@ -6509,8 +6500,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<DeclNameRefLayout>();
 
   registerDeclTypeAbbr<ClangTypeLayout>();
-
-  registerDeclTypeAbbr<YieldResultTypeLayout>();
 
   registerDeclTypeAbbr<TypeAliasLayout>();
   registerDeclTypeAbbr<GenericTypeParamTypeLayout>();

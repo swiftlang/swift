@@ -1351,12 +1351,6 @@ namespace decls_block {
     TypeIDField         // type
   >;
 
-  TYPE_LAYOUT(YieldResultTypeLayout,
-    YIELDS_TYPE,
-    TypeIDField, // inner type
-    BCFixed<1>   // inout?
-  );
-
   TYPE_LAYOUT(FunctionTypeLayout,
     FUNCTION_TYPE,
     TypeIDField,                     // output

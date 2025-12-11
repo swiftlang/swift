@@ -604,9 +604,11 @@ Type ASTBuilder::createFunctionType(
                    /*LifetimeDependenceInfo*/ {}, extFlags.hasSendingResult())
                    .withAsync(flags.isAsync())
                    .withSendable(flags.isSendable())
+                   .withCoroutine(extFlags.isCoroutine())
                    .build();
 
-  return FunctionType::get(funcParams, output, einfo);
+  assert(!extFlags.isCoroutine());
+  return FunctionType::get(funcParams, {}, output, einfo);
 }
 
 static ParameterConvention

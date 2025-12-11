@@ -831,9 +831,9 @@ static CanType removeThrownError(Type type) {
   return type.transformRec([](TypeBase *type) -> std::optional<Type> {
     if (auto funcTy = dyn_cast<FunctionType>(type)) {
       if (auto newExtInfo = extInfoRemovingThrownError(funcTy)) {
-        return FunctionType::get(
-                  funcTy->getParams(), funcTy->getResult(), *newExtInfo)
-          ->getCanonicalType();
+        return FunctionType::get(funcTy->getParams(), funcTy->getYields(),
+                                 funcTy->getResult(), *newExtInfo)
+            ->getCanonicalType();
       }
 
       return std::nullopt;
@@ -841,11 +841,11 @@ static CanType removeThrownError(Type type) {
 
     if (auto genericFuncTy = dyn_cast<GenericFunctionType>(type)) {
       if (auto newExtInfo = extInfoRemovingThrownError(genericFuncTy)) {
-        return GenericFunctionType::get(
-                  genericFuncTy->getGenericSignature(),
-                  genericFuncTy->getParams(), genericFuncTy->getResult(),
-                  *newExtInfo)
-          ->getCanonicalType();
+        return GenericFunctionType::get(genericFuncTy->getGenericSignature(),
+                                        genericFuncTy->getParams(),
+                                        genericFuncTy->getYields(),
+                                        genericFuncTy->getResult(), *newExtInfo)
+            ->getCanonicalType();
       }
 
       return std::nullopt;
