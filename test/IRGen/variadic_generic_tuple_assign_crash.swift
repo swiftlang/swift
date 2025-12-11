@@ -1,7 +1,10 @@
+// RUN: %target-swift-frontend -emit-sil %s -target %target-swift-5.9-abi-triple
 // RUN: %target-swift-frontend -emit-ir %s -target %target-swift-5.9-abi-triple
 
-// This test case reproduces a crash in projectTupleElementAddress during IRGen
-// when assigning a pack expansion to a tuple property via an unkeyed container.
+// This test case reproduces a crash in DefiniteInitialization when initializing
+// a struct property that is a tuple containing a pack expansion. The DI pass
+// was incorrectly trying to decompose pack-expansion tuples into individual
+// elements, but pack arity is unknown at compile time.
 
 import Foundation
 
