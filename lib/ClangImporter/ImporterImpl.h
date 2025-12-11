@@ -1128,6 +1128,12 @@ public:
   Type applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
                  llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn);
 
+  /// Determines whether the given Clang declaration has conflicting
+  /// Swift attributes and emits diagnostics for any violations found.
+  ///
+  /// \param decl The Clang record or function declaration to validate.
+  void validateSwiftAttributes(const clang::NamedDecl *decl);
+
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
   std::optional<Decl *> importDeclCached(const clang::NamedDecl *ClangDecl,
