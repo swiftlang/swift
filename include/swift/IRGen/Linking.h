@@ -1863,6 +1863,15 @@ public:
 
   bool isAlwaysSharedLinkage() const;
 
+  /// Partial apply forwarders always need real private linkage,
+  /// to ensure the correct implementation is used in case of
+  /// colliding symbols.
+  bool privateMeansPrivate() const {
+    return getKind() == Kind::PartialApplyForwarder ||
+           getKind() == Kind::PartialApplyForwarderAsyncFunctionPointer ||
+           getKind() == Kind::PartialApplyForwarderCoroFunctionPointer;
+  }
+
   /// Whether the link entity's definitions must be considered non-unique.
   ///
   /// This applies only in the Embedded Swift linkage model, and is used for
