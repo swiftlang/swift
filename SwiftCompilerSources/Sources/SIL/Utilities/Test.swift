@@ -144,6 +144,7 @@ public func registerTests() {
     parseTestSpecificationTest,
     smallProjectionPathTest,
     getAccessBaseTest,
+    accessPathTest,
     borrowIntroducersTest,
     enclosingValuesTest,
     forwardingDefUseTest,

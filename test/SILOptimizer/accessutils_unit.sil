@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -dump-access -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner -o /dev/null | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -44,6 +44,7 @@ sil @_getC : $@convention(thin) () -> @owned C
 // CHECK-NEXT: End accesses for readIdentifiedArg
 sil [ossa] @readIdentifiedArg : $@convention(thin) (@in Int64) -> Int64 {
 bb0(%0 : $*Int64):
+  specify_test "access_path"
   %res = load [trivial] %0 : $*Int64
   return %res : $Int64
 }
@@ -57,6 +58,7 @@ bb0(%0 : $*Int64):
 // CHECK-NEXT: End accesses for writeIdentifiedArg
 sil [ossa] @writeIdentifiedArg : $@convention(thin) (@inout Int64) -> () {
 bb0(%0 : $*Int64):
+  specify_test "access_path"
   %2 = integer_literal $Builtin.Int64, 42
   %3 = struct $Int64 (%2 : $Builtin.Int64)
   store %3 to [trivial] %0 : $*Int64
@@ -74,6 +76,7 @@ bb0(%0 : $*Int64):
 // CHECK-NEXT: End accesses for writeToHead
 sil [ossa] @writeToHead : $@convention(thin) (@guaranteed S) -> () {
 bb0(%0 : @guaranteed $S):
+  specify_test "access_path"
   debug_value %0 : $S, let, name "s", argno 1
   %2 = struct_extract %0 : $S, #S.l
   %3 = integer_literal $Builtin.Int64, 10
@@ -104,6 +107,7 @@ bb0(%0 : @guaranteed $S):
 // CHECK-NEXT: End accesses for storeToArgs
 sil [ossa] @storeToArgs : $@convention(thin) (@guaranteed List, @guaranteed List) -> () {
 bb0(%0 : @guaranteed $List, %1 : @guaranteed $List):
+  specify_test "access_path"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -143,6 +147,7 @@ bb3:
 // CHECK-NEXT: End accesses for storeMaybeLocalPhi
 sil @storeMaybeLocalPhi : $@convention(thin) (@guaranteed List) -> () {
 bb0(%0 : $List):
+  specify_test "access_path"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -177,6 +182,7 @@ bb3(%6 : $List):
 // CHECK-NEXT: End accesses for testStructPhiCommon
 sil [ossa] @testStructPhiCommon : $@convention(thin) (@inout Ptr) -> () {
 bb0(%0 : $*Ptr):
+  specify_test "access_path"
   %2 = struct_element_addr %0 : $*Ptr, #Ptr.p
   cond_br undef, bb1, bb2
 
@@ -206,6 +212,7 @@ bb3(%6 : $Builtin.RawPointer):
 // CHECK-NEXT: End accesses for testStructPhiDivergent
 sil [ossa] @testStructPhiDivergent : $@convention(thin) (@inout Ptr) -> () {
 bb0(%0 : $*Ptr):
+  specify_test "access_path"
   %1 = alloc_stack $Ptr
   cond_br undef, bb1, bb2
 
@@ -240,6 +247,7 @@ bb3(%9 : $Builtin.RawPointer):
 // CHECK-NEXT: End accesses for readIdentifiedBoxArg
 sil [ossa] @readIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int64 }) -> Int64 {
 bb0(%0 : @guaranteed ${ var Int64 }):
+  specify_test "access_path"
   %1 = project_box %0 : ${ var Int64 }, 0
   %5 = begin_access [read] [dynamic] %1 : $*Int64
   %6 = load [trivial] %5 : $*Int64
@@ -272,6 +280,7 @@ class B : A {
 // CHECK-NEXT: End accesses for testNonUniquePropertyIndex
 sil @testNonUniquePropertyIndex : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
+  specify_test "access_path"
   %1 = alloc_ref $B
   %2 = ref_element_addr %1 : $B, #B.prop1
   store %0 to %2 : $*Int64
@@ -329,6 +338,7 @@ struct MyArray<T> {
 // CHECK-NEXT: End accesses for testRefTailAndStruct0
 sil hidden [noinline] @testRefTailAndStruct0 : $@convention(thin) (@owned MyArray<String>) -> () {
 bb0(%0 : $MyArray<String>):
+  specify_test "access_path"
   %1 = struct_extract %0 : $MyArray<String>, #MyArray._buffer
   %2 = struct_extract %1 : $_MyArrayBuffer<String>, #_MyArrayBuffer._storage
   %3 = struct_extract %2 : $_MyBridgeStorage, #_MyBridgeStorage.rawValue
@@ -362,6 +372,7 @@ sil @yieldTwoAddresses : $@yield_once @convention(thin) () -> (@yields @in_guara
 // CHECK-NEXT:  End accesses for testBeginApply
 sil @testBeginApply : $@convention(thin) () -> () {
 bb0:
+  specify_test "access_path"
   %0 = function_ref @yieldTwoAddresses : $@yield_once @convention(thin) () -> (@yields @in_guaranteed String, @yields @in_guaranteed Int64)
   (%1, %2, %3) = begin_apply %0() : $@yield_once @convention(thin) () -> (@yields @in_guaranteed String, @yields @in_guaranteed Int64)
   %4 = load %1 : $*String
@@ -378,6 +389,7 @@ sil_global @somePointer : $Builtin.RawPointer
 
 sil [global_init] [ossa] @addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
+  specify_test "access_path"
   %0 = global_addr @global1 : $*Int64
   %1 = address_to_pointer %0 : $*Int64 to $Builtin.RawPointer
   return %1 : $Builtin.RawPointer
@@ -387,6 +399,7 @@ sil [global_init] [ossa] @external_addressor_of_global1 : $@convention(thin) () 
 
 sil [global_init] [ossa] @wrong_addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
+  specify_test "access_path"
   %0 = global_addr @somePointer : $*Builtin.RawPointer
   %1 = load [trivial] %0 : $*Builtin.RawPointer
   return %1 : $Builtin.RawPointer
@@ -401,6 +414,7 @@ bb0:
 // CHECK-NEXT:  End accesses for testSimpleGlobal
 sil [ossa] @testSimpleGlobal : $@convention(thin) () -> Int64 {
 bb0:
+  specify_test "access_path"
   %0 = global_addr @global1 : $*Int64
   %1 = load [trivial] %0 : $*Int64
   return %1 : $Int64
@@ -415,6 +429,7 @@ bb0:
 // CHECK-NEXT:  End accesses for testGlobalViaAddressor
 sil [ossa] @testGlobalViaAddressor : $@convention(thin) () -> Int64 {
 bb0:
+  specify_test "access_path"
   %0 = function_ref @addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer
   %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
@@ -431,6 +446,7 @@ bb0:
 // CHECK-NEXT:  End accesses for testGlobalViaUnknwonAddressor
 sil [ossa] @testGlobalViaUnknwonAddressor : $@convention(thin) () -> Int64 {
 bb0:
+  specify_test "access_path"
   %0 = function_ref @external_addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer
   %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
@@ -447,6 +463,7 @@ bb0:
 // CHECK-NEXT:  End accesses for testGlobalViaWrongAddressor
 sil [ossa] @testGlobalViaWrongAddressor : $@convention(thin) () -> Int64 {
 bb0:
+  specify_test "access_path"
   %0 = function_ref @wrong_addressor_of_global1 : $@convention(thin) () -> Builtin.RawPointer
   %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
@@ -463,6 +480,7 @@ sil @_isNotDistinct : $@convention(thin) <T1, T2> (@inout T1, @inout T2) -> ()
 // CHECK-NEXT: End accesses for testAccessBaseAliasing
 sil @testAccessBaseAliasing : $@convention(thin) (@inout Int64, @inout_aliasable Int64, @inout_aliasable Int64, Builtin.RawPointer, Builtin.RawPointer, @guaranteed B, @guaranteed B, @guaranteed { var Int64, var Int64 }, @guaranteed { var Int64, var Int64 }) -> () {
 bb0(%inoutArg : $*Int64, %aliasableArg1 : $*Int64, %aliasableArg2 : $*Int64, %3 : $Builtin.RawPointer, %4 : $Builtin.RawPointer, %5 : $B, %6 : $B, %7 : ${ var Int64, var Int64 }, %8 : ${ var Int64, var Int64 }):
+  specify_test "access_path"
   %pointer1 = pointer_to_address %3 : $Builtin.RawPointer to $*Int64
   %pointer2 = pointer_to_address %4 : $Builtin.RawPointer to $*Int64
 
@@ -593,6 +611,7 @@ bb0(%inoutArg : $*Int64, %aliasableArg1 : $*Int64, %aliasableArg2 : $*Int64, %3 
 // CHECK-NEXT: End accesses for testAccessPathAliasing
 sil @testAccessPathAliasing : $@convention(thin) (@inout TwoInts) -> () {
 bb0(%twoInts: $*TwoInts):
+  specify_test "access_path"
   %a = struct_element_addr %twoInts : $*TwoInts, #TwoInts.a
   %b = struct_element_addr %twoInts : $*TwoInts, #TwoInts.b
 
@@ -619,6 +638,7 @@ bb0(%twoInts: $*TwoInts):
 // CHECK-LABEL: End accesses for storeBorrow
 sil [ossa] @storeBorrow : $@convention(thin) (@guaranteed C) -> @owned C {
 bb0(%0 : @guaranteed $C):
+  specify_test "access_path"
   %1 = alloc_stack $C
   %2 = store_borrow %0 to %1 : $*C
   %3 = function_ref @_getC : $@convention(thin) () -> @owned C
@@ -663,6 +683,7 @@ bb0(%0 : @guaranteed $C):
 // CHECK-LABEL: End accesses for indexAddr
 sil @indexAddr : $@convention(thin) (@guaranteed C, Builtin.Word, Builtin.Word) -> () {
 bb0(%0 : $C, %1 : $Builtin.Word, %2 : $Builtin.Word):
+  specify_test "access_path"
   %3 = ref_tail_addr %0 : $C, $Int64
   %4 = integer_literal $Builtin.Word, 4
   %5 = integer_literal $Builtin.Word, 5
@@ -703,6 +724,7 @@ bb0(%0 : $C, %1 : $Builtin.Word, %2 : $Builtin.Word):
 // CHECK-LABEL: End accesses for mark_dependence
 sil [ossa] @mark_dependence : $@convention(thin) (@guaranteed List) -> Int64 {
 bb0(%0 : @guaranteed $List):
+  specify_test "access_path"
   %1 = ref_element_addr %0, #List.x
   %2 = address_to_pointer %1 to $Builtin.RawPointer
   %3 = mark_dependence %2 on %0
@@ -720,6 +742,7 @@ bb0(%0 : @guaranteed $List):
 // CHECK-LABEL: End accesses for vectors
 sil [ossa] @vectors : $@convention(thin) (@in_guaranteed VectorStruct) -> Int64 {
 bb0(%0 : $*VectorStruct):
+  specify_test "access_path"
   %1 = struct_element_addr %0, #VectorStruct.a
   %2 = vector_base_addr %1
   %3 = integer_literal $Builtin.Int64, 5

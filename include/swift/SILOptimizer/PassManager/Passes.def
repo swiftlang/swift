@@ -77,8 +77,6 @@ PASS(DeadEndBlockDumper, "dump-deadendblocks",
      "Tests the DeadEndBlocks utility")
 PASS(EmbeddedWitnessCallSpecialization, "embedded-witness-call-specialization",
      "Mandatory witness method call specialization")
-PASS(AccessDumper, "dump-access",
-     "Dump access information")
 PASS(ConstantCapturePropagation, "constant-capture-propagation",
      "Specialize closures with constant captures")
 PASS(ComputeEscapeEffects, "compute-escape-effects",
