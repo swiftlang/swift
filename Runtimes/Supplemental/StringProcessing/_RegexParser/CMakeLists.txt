@@ -45,4 +45,5 @@ install(TARGETS swift_RegexParser
 emit_swift_interface(swift_RegexParser)
 install_swift_interface(swift_RegexParser)
 
+generate_plist(swiftRegexParser "${CMAKE_PROJECT_VERSION}" swift_RegexParser)
 embed_manifest(swift_RegexParser)
