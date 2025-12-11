@@ -84,7 +84,7 @@ bb0:
 sil [no_allocation] [ossa] @deserialize_and_inline_after_devirtualize : $@convention(thin) (@in Int) -> () {
 bb0(%0 : $*Int):
   %1 = metatype $@thick Int.Type
-  %2 = witness_method $Int, #Comparable."<" : <Self where Self : Comparable, Self : ~Copyable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
+  %2 = witness_method $Int, #Comparable."<" : <Self where Self : Comparable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   %3 = apply %2<Int>(%0, %0, %1) : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   %4 = tuple()
   return %4 : $()
@@ -124,7 +124,7 @@ bb0(%0 : $*Int, %1 : $*Int, %2 : $@thick Int.Type):
 
 sil_witness_table public_external [serialized] Int: Comparable module Swift {
   base_protocol Equatable: Int: Equatable module Swift
-  method #Comparable."<": <Self where Self : Comparable, Self : ~Copyable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool : @$sSiSLsSL1loiySbx_xtFZTW
+  method #Comparable."<": <Self where Self : Comparable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool : @$sSiSLsSL1loiySbx_xtFZTW
 }
 
 sil [ossa] @get_int_value : $@convention(thin) () -> Int32 {
