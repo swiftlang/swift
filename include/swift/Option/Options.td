@@ -1556,7 +1556,7 @@ def Xfrontend : Separate<["-"], "Xfrontend">, Flags<[HelpHidden]>,
 
 def Xcc : Separate<["-"], "Xcc">,
   Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
-         SwiftSynthesizeInterfaceOption]>,
+         SwiftSynthesizeInterfaceOption, SwiftAPIDigesterOption]>,
   MetaVarName<"<arg>">,
   HelpText<"Pass <arg> to the C/C++/Objective-C compiler">;
 
