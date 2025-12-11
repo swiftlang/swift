@@ -12,9 +12,9 @@
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json A > %t/A.cmd
 // RUN: %FileCheck %s -check-prefix CMD -input-file=%t/A.cmd
 // CMD: -blocklist-file
-// CMD-NEXT: /^tmp/blocklist.yml
+// CMD-NEXT: /^tmp{{/|\\}}blocklist.yml
 // CMD-NEXT: -blocklist-file
-// CMD-NEXT: /^tmp/empty.yml
+// CMD-NEXT: /^tmp{{/|\\}}empty.yml
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json Test casFSRootID > %t/fs.casid
 // DISABLE: llvm-cas --cas %t/cas --ls-tree-recursive @%t/fs.casid | %FileCheck %s -check-prefix FS
