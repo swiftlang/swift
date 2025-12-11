@@ -918,19 +918,19 @@ void BridgedVerifier::runSwiftFunctionVerification(SILFunction * _Nonnull f, SIL
 }
 
 void BridgedVerifier::verifierError(BridgedStringRef message,
-                                    OptionalBridgedInstruction atInstruction) {
+                                    BridgedInstruction atInstruction) {
   verificationFailure(message.unbridged(), atInstruction.unbridged(),
                       /*extraContext=*/nullptr);
 }
 
 void BridgedVerifier::verifierError(BridgedStringRef message,
-                                    OptionalBridgedArgument atArgument) {
-  verificationFailure(message.unbridged(), atArgument.unbridged(),
+                                    BridgedArgument atArgument) {
+  verificationFailure(message.unbridged(), atArgument.getArgument(),
                       /*extraContext=*/nullptr);
 }
 
 void BridgedVerifier::verifierError(BridgedStringRef message,
-                                    OptionalBridgedValue atValue) {
+                                    BridgedValue atValue) {
   verificationFailure(message.unbridged(), SILValue(atValue.getSILValue()),
                       /*extraContext=*/nullptr);
 }
