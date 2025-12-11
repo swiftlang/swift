@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -dump-escape-info -module-name=test -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner -module-name=test -o /dev/null | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: objc_interop
@@ -31,6 +31,7 @@ sil @take_ptr : $@convention(thin) (UnsafeMutablePointer<Int>) -> ()
 // CHECK: End function call_array_adopt_storage
 sil @call_array_adopt_storage : $@convention(thin) () -> @owned Array<Int> {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $_ContiguousArrayStorage<Int>
   %1 = function_ref @array_adopt_storage : $@convention(thin) (@owned _ContiguousArrayStorage<Int>) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
   %2 = apply %1(%0) : $@convention(thin) (@owned _ContiguousArrayStorage<Int>) -> (@owned Array<Int>, UnsafeMutablePointer<Int>)
@@ -47,6 +48,7 @@ bb0:
 // CHECK: End function release_array
 sil @release_array : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = integer_literal $Builtin.Word, 2
   %1 = alloc_ref [tail_elems $Array<Int> * %0 : $Builtin.Word] $_ContiguousArrayStorage<X>
   %2 = alloc_ref $X
@@ -65,6 +67,7 @@ bb0:
 // CHECK: End function store_to_adopt_storage_result
 sil @store_to_adopt_storage_result : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = integer_literal $Builtin.Int64, 1
   %1 = struct $Int (%0 : $Builtin.Int64)
   %2 = integer_literal $Builtin.Word, 1

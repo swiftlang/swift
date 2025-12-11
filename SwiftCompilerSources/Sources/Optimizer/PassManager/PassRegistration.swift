@@ -151,8 +151,6 @@ private func registerSwiftPasses() {
   registerPass(aliasInfoDumper, { aliasInfoDumper.run($0) })
   registerPass(functionUsesDumper, { functionUsesDumper.run($0) })
   registerPass(silPrinterPass, { silPrinterPass.run($0) })
-  registerPass(escapeInfoDumper, { escapeInfoDumper.run($0) })
-  registerPass(addressEscapeInfoDumper, { addressEscapeInfoDumper.run($0) })
   registerPass(accessDumper, { accessDumper.run($0) })
   registerPass(deadEndBlockDumper, { deadEndBlockDumper.run($0) })
   registerPass(memBehaviorDumper, { memBehaviorDumper.run($0) })
