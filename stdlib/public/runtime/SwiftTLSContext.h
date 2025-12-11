@@ -13,16 +13,11 @@
 #ifndef SWIFT_RUNTIME_SWIFTTLSCONTEXT_H
 #define SWIFT_RUNTIME_SWIFTTLSCONTEXT_H
 
-#include "ExclusivityPrivate.h"
-
 namespace swift {
 namespace runtime {
 
 class SwiftTLSContext {
 public:
-  /// The set of tracked accesses.
-  AccessSet accessSet;
-
   // The "implicit" boolean parameter which is passed to a dynamically
   // replaceable function.
   // If true, the original function should be executed instead of the

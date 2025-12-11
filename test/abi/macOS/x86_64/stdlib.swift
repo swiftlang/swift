@@ -1156,3 +1156,12 @@ Added: _$ss13EncodingErrorO16debugDescriptionSSvg
 Added: _$ss13EncodingErrorO16debugDescriptionSSvpMV
 Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesMc
 Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesWP
+
+// New SPI for dynamic exclusivity checking.
+Added: _$ss15swift_endAccess6bufferySv_tF
+Added: _$ss17swift_beginAccess7pointer6buffer5flags2pcySV_SvSuSVSgtF
+Added: _$ss25swift_dumpTrackedAccessesyyF
+Added: _$ss31_swift_exclusivityAccessSetNext6access4nextySv_SvtF
+Added: _$ss33_swift_exclusivityAccessGetParent6access5childSvSgAD_ADtF
+Added: __swift_exclusivityAccessGetParent
+Added: __swift_exclusivityAccessSetNext
