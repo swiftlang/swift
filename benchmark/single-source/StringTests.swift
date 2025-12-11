@@ -14,7 +14,7 @@ import TestsUtils
 @_spi(_Unicode)
 import Swift
 
-public var benchmarks: [BenchmarkInfo] {
+public let benchmarks: [BenchmarkInfo] = {
   var result = [
     BenchmarkInfo(
       name: "StringEqualPointerComparison",
@@ -50,7 +50,7 @@ public var benchmarks: [BenchmarkInfo] {
         tags: [.validation, .String]))
   }
   return result
-}
+}()
 
 // FIXME(string)
 public func run_StringHasPrefixAscii(_ n: Int) {

@@ -771,6 +771,7 @@ Added: _$ss7UnicodeO5UTF32O27encodedReplacementCharacters15CollectionOfOneVys6UI
 Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_2_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_3_0ABvpZMV
+Added: _$sSo19_SwiftStdlibVersionasE6v6_4_0ABvpZMV
 Added: _$sSBsE5radixSivpZMV
 Added: _$sSFsE8ulpOfOnexvpZMV
 Added: _$sSUsE8isSignedSbvpZMV
@@ -1161,3 +1162,13 @@ Added: _$ss13EncodingErrorO16debugDescriptionSSvg
 Added: _$ss13EncodingErrorO16debugDescriptionSSvpMV
 Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesMc
 Added: _$ss13EncodingErrorOs28CustomDebugStringConvertiblesWP
+
+// SE-0494 Add isTriviallyIdentical(to:) Methods to String and Substring
+Added: _$sSS20isTriviallyIdentical2toSbSS_tF
+Added: _$sSs20isTriviallyIdentical2toSbSs_tF
+Added: _$sSS17UnicodeScalarViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSS8UTF8ViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSS9UTF16ViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSs17UnicodeScalarViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSs8UTF8ViewV20isTriviallyIdentical2toSbAB_tF
+Added: _$sSs9UTF16ViewV20isTriviallyIdentical2toSbAB_tF
