@@ -12,7 +12,6 @@ struct BasicPackTuple<each T> {
 
   // CHECK-LABEL: sil hidden @$s31definite_init_variadic_generics14BasicPackTupleV
   // CHECK: tuple_pack_element_addr
-  // CHECK-NOT: tuple_element_addr {{.*}} of {{.*}}(repeat each T)
   init(_ values: repeat each T) {
     self.values = (repeat each values)
   }

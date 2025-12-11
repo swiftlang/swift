@@ -222,7 +222,7 @@ static SILType getElementTypeRec(TypeExpansionContext context,
     assert(!IsSelfOfNonDelegatingInitializer && "self never has tuple type");
     // Tuples containing pack expansions are treated as single elements.
     if (TT->containsPackExpansionType()) {
-      assert(EltNo == 0);
+      assert(EltNo == 0 && "pack expansion tuple should be single element");
       return T;
     }
     for (unsigned i = 0, e = TT->getNumElements(); i < e; ++i) {
@@ -321,7 +321,7 @@ SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
       // Tuples containing pack expansions are treated as single elements
       // since they have a dynamic number of elements.
       if (TT->containsPackExpansionType()) {
-        assert(EltNo == 0 && "Element count problem");
+        assert(EltNo == 0 && "pack expansion tuple should be single element");
         return Ptr;
       }
 
@@ -424,7 +424,7 @@ static void getPathStringToElementRec(TypeExpansionContext context,
 
   // Tuples containing pack expansions are treated as single elements.
   if (TT->containsPackExpansionType()) {
-    assert(EltNo == 0 && "Element count problem");
+    assert(EltNo == 0 && "pack expansion tuple should be single element");
     return;
   }
 
