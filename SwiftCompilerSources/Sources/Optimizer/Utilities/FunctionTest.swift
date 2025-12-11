@@ -54,7 +54,9 @@ public func registerOptimizerTests() {
     variableIntroducerTest,
     destroyBarrierTest,
     escapeInfoTest,
-    addressEscapeInfoTest
+    addressEscapeInfoTest,
+    aliasingTest,
+    memoryEffectsTest
   )
 
   // Finally register the thunk they all call through.

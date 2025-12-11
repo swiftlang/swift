@@ -148,11 +148,9 @@ private func registerSwiftPasses() {
   registerForSILCombine(EndCOWMutationAddrInst.self, { run(EndCOWMutationAddrInst.self, $0) })
 
   // Test passes
-  registerPass(aliasInfoDumper, { aliasInfoDumper.run($0) })
   registerPass(functionUsesDumper, { functionUsesDumper.run($0) })
   registerPass(silPrinterPass, { silPrinterPass.run($0) })
   registerPass(deadEndBlockDumper, { deadEndBlockDumper.run($0) })
-  registerPass(memBehaviorDumper, { memBehaviorDumper.run($0) })
   registerPass(rangeDumper, { rangeDumper.run($0) })
   registerPass(testInstructionIteration, { testInstructionIteration.run($0) })
   registerPass(updateBorrowedFromPass, { updateBorrowedFromPass.run($0) })

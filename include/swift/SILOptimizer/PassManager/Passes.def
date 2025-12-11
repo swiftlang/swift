@@ -63,8 +63,6 @@ PASS(AllocBoxToStack, "allocbox-to-stack",
      "stack promotion of box objects")
 PASS(CopyToBorrowOptimization, "copy-to-borrow-optimization",
      "Convert load [copy] instructions to load_borrow and remove copies of borrowed values")
-PASS(AliasInfoDumper, "dump-alias-info",
-     "Dump Alias Analysis over all Pairs")
 PASS(AssumeSingleThreaded, "sil-assume-single-threaded",
      "Assume Single-Threaded Environment")
 PASS(BooleanLiteralFolding, "boolean-literal-folding",
@@ -110,8 +108,6 @@ PASS(LifetimeDependenceInsertion,
 PASS(LifetimeDependenceScopeFixup,
      "lifetime-dependence-scope-fixup",
      "Fixup scope for lifetime dependence")
-PASS(MemBehaviorDumper, "dump-mem-behavior",
-     "Print SIL Instruction MemBehavior from Alias Analysis over all Pairs")
 PASS(MergeCondFails, "merge-cond_fails",
      "Merge SIL cond_fail to Eliminate Redundant Overflow Checks")
 PASS(ObjCBridgingOptimization, "objc-bridging-opt",
