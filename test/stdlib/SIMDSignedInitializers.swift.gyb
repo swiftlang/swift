@@ -23,9 +23,9 @@ import Swift
 func repeating${n}_int${bits}(_ scalar: Int${bits}) -> SIMD${n}<Int${bits}> {
   SIMD${n}(repeating: scalar)
 }
-// CHECK: repeating${n}_int${bits}{{.*}} {
+// CHECK: define {{.*}} @"{{.*}}repeating${n}_int${bits}{{.*}}"({{(ptr noalias sret\(.+\) captures\(none\) %0, )?}}{{(.+)}} [[ARG:%[0-9]+]])
 // CHECK: entry:
-// CHECK: [[TMP:%[0-9]+]] = insertelement <${n} x i${bits}> {{.*}}, i${bits} %0, i32 0
+// CHECK: [[TMP:%[0-9]+]] = insertelement <${n} x i${bits}> {{.*}}, i${bits} [[ARG]], i32 0
 // CHECK-NEXT: [[REP:%[0-9]+]] = shufflevector <${n} x i${bits}> [[TMP]], <${n} x i${bits}> {{.*}}, <${n} x i32> zeroinitializer
 
 %  end
