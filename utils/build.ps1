@@ -2687,6 +2687,14 @@ function Build-Runtime([Hashtable] $Platform) {
     }
   }
 
+  # Only enable backtracing for platforms other than 32-bit Windows;
+  # right now, the Swift compiler doesn't properly support stdcall.
+  if ($Platform.OS -ne [OS]::Windows -or $Platform.Architecture.ShortName -ne "x86") {
+    $PlatformDefines += @{
+      SWIFT_ENABLE_BACKTRACING = "YES";
+    }
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift `
     -Bin (Get-ProjectBinaryCache $Platform Runtime) `
@@ -2704,7 +2712,6 @@ function Build-Runtime([Hashtable] $Platform) {
       SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
       SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
       SWIFT_ENABLE_SYNCHRONIZATION = "YES";
-      SWIFT_ENABLE_BACKTRACING = "YES";
       SWIFT_ENABLE_RUNTIME_MODULE = "YES";
       SWIFT_BUILD_LIBEXEC = "YES";
       SWIFT_ENABLE_VOLATILE = "YES";
