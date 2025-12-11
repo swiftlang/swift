@@ -1597,6 +1597,10 @@ def gen_reproducer_dir
     : Separate<["-"], "gen-reproducer-dir">,
       HelpText<"Path to directory where reproducers write to.">;
 
+def disable_embedded_existentials
+    : Flag<["-"], "disable-embedded-existentials">,
+      HelpText<"Disable embedded existential support.">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
 
 def disable_experimental_parser_round_trip : Flag<["-"],

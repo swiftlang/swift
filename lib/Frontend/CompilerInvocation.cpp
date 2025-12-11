@@ -1818,6 +1818,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
 
+  // Enable support for existentials in embedded per default.
+  if (Opts.hasFeature(Feature::Embedded) &&
+      !Args.hasArg(OPT_disable_embedded_existentials))
+    Opts.enableFeature(Feature::EmbeddedExistentials);
+
   if (Opts.hasFeature(Feature::EmbeddedExistentials) &&
       !Opts.hasFeature(Feature::Embedded)) {
       Diags.diagnose(SourceLoc(), diag::embedded_existentials_without_embedded);
