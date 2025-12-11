@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -target %target-swift-5.9-abi-triple
+// RUN: %target-swift-frontend -emit-sil %s -target %target-swift-5.9-abi-triple | %FileCheck %s
 
 // This test verifies that definite initialization correctly handles
 // structs with tuple properties containing pack expansions.
@@ -10,6 +10,9 @@
 struct BasicPackTuple<each T> {
   let values: (repeat each T)
 
+  // CHECK-LABEL: sil hidden @$s31definite_init_variadic_generics14BasicPackTupleV
+  // CHECK: tuple_pack_element_addr
+  // CHECK-NOT: tuple_element_addr {{.*}} of {{.*}}(repeat each T)
   init(_ values: repeat each T) {
     self.values = (repeat each values)
   }
@@ -22,6 +25,8 @@ struct MixedProperties<each T> {
   let packed: (repeat each T)
   let suffix: String
 
+  // CHECK-LABEL: sil hidden @$s31definite_init_variadic_generics15MixedPropertiesV
+  // CHECK: tuple_pack_element_addr
   init(prefix: Int, suffix: String, _ values: repeat each T) {
     self.prefix = prefix
     self.packed = (repeat each values)
@@ -35,6 +40,8 @@ struct ConditionalInit<each T> {
   let values: (repeat each T)
   let flag: Bool
 
+  // CHECK-LABEL: sil hidden @$s31definite_init_variadic_generics15ConditionalInitV
+  // CHECK: tuple_pack_element_addr
   init(condition: Bool, _ values: repeat each T) {
     self.flag = condition
     if condition {
@@ -51,6 +58,8 @@ struct Outer<each T> {
   struct Inner {
     let data: (repeat each T)
 
+    // CHECK-LABEL: sil hidden @$s31definite_init_variadic_generics5OuterV5InnerV
+    // CHECK: tuple_pack_element_addr
     init(_ values: repeat each T) {
       self.data = (repeat each values)
     }
@@ -68,6 +77,8 @@ struct Outer<each T> {
 class ClassWithPackTuple<each T> {
   let values: (repeat each T)
 
+  // CHECK-LABEL: sil hidden {{.*}}@$s31definite_init_variadic_generics18ClassWithPackTupleC
+  // CHECK: tuple_pack_element_addr
   init(_ values: repeat each T) {
     self.values = (repeat each values)
   }
@@ -78,6 +89,8 @@ class ClassWithPackTuple<each T> {
 struct FailablePackInit<each T> {
   let values: (repeat each T)
 
+  // CHECK-LABEL: sil hidden @$s31definite_init_variadic_generics16FailablePackInitV
+  // CHECK: tuple_pack_element_addr
   init?(_ values: repeat each T, shouldFail: Bool) {
     if shouldFail {
       return nil
@@ -91,6 +104,8 @@ struct FailablePackInit<each T> {
 struct ThrowingPackInit<each T> {
   let values: (repeat each T)
 
+  // CHECK-LABEL: sil hidden @$s31definite_init_variadic_generics16ThrowingPackInitV
+  // CHECK: tuple_pack_element_addr
   init(_ values: repeat each T) throws {
     self.values = (repeat each values)
   }
