@@ -7,12 +7,14 @@
 // RUN: %target-swift-frontend %t/Library.swift -parse-as-library -entry-point-function-name Library_main -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -emit-sil -emit-module-path %t/Modules/Library.swiftmodule -o - | %FileCheck -check-prefix LIBRARY-SIL %s
 
 // IR checking to ensure we get the right weak symbols.
-// RUN: %target-swift-frontend %t/Library.swift -parse-as-library -entry-point-function-name Library_main -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -emit-ir -o - | %FileCheck -check-prefix LIBRARY-IR --dump-input-filter all %s
+// RUN: %target-swift-frontend %t/Library.swift -disable-embedded-existentials -parse-as-library -entry-point-function-name Library_main -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -emit-ir -o - | %FileCheck -check-prefix LIBRARY-IR --dump-input-filter all %s
+// RUN: %target-swift-frontend %t/Library.swift -parse-as-library -entry-point-function-name Library_main -enable-experimental-feature Embedded -enable-experimental-feature DeferredCodeGen -emit-ir -o - | %FileCheck -check-prefix LIBRARY-EXIST-IR --dump-input-filter all %s
 
 // Application module
 
 // RUN: %target-swift-frontend %t/Application.swift -I %t/Modules -parse-as-library -entry-point-function-name Application_main -enable-experimental-feature Embedded -emit-sil -o - | %FileCheck -check-prefix APPLICATION-SIL %s
 
+// RUN: %target-swift-frontend %t/Application.swift -disable-embedded-existentials -I %t/Modules -parse-as-library -entry-point-function-name Application_main -enable-experimental-feature Embedded -emit-ir -o - | %FileCheck -check-prefix APPLICATION-IR --dump-input-filter all %s
 // RUN: %target-swift-frontend %t/Application.swift -I %t/Modules -parse-as-library -entry-point-function-name Application_main -enable-experimental-feature Embedded -emit-ir -o - | %FileCheck -check-prefix APPLICATION-IR --dump-input-filter all %s
 
 // REQUIRES: swift_in_compiler
@@ -22,6 +24,7 @@
 //--- Library.swift
 
 // LIBRARY-IR: @"$e7Library10PointClassCN" = linkonce_odr {{.*}}global
+// LIBRARY-EXIST-IR: @"$e7Library10PointClassCMf" = {{.*}}linkonce_odr {{.*}}global
 
 // Never referenced.
 // LIBRARY-IR-NOT: @"$es23_swiftEmptyArrayStorageSi_S3itvp" = linkonce_odr {{(protected |dllexport )?}}global

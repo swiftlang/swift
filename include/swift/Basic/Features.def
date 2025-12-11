@@ -557,7 +557,7 @@ EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TildeSendable, false)
 
 /// Allow use of protocol typed values in Embedded mode (`Any` and friends)
-EXPERIMENTAL_FEATURE(EmbeddedExistentials, false)
+EXPERIMENTAL_FEATURE(EmbeddedExistentials, true)
 
 /// Allow use of the 'anyAppleOS' availability domain.
 EXPERIMENTAL_FEATURE(AnyAppleOSAvailability, true)
