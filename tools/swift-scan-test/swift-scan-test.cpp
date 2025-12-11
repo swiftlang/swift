@@ -23,6 +23,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/ThreadPool.h"
 
@@ -264,8 +265,12 @@ static int action_scan_dependency(std::vector<const char *> &Args,
 
 static std::vector<const char *>
 createArgs(ArrayRef<std::string> Cmd, StringSaver &Saver, Actions Action) {
-  if (!Cmd.empty() && StringRef(Cmd.front()).ends_with("swift-frontend"))
-    Cmd = Cmd.drop_front();
+  if (!Cmd.empty()) {
+    llvm::SmallString<261> path;
+    llvm::sys::path::native(Twine{Cmd.front()}, path);
+    if (llvm::sys::path::filename(path).starts_with("swift-frontend"))
+      Cmd = Cmd.drop_front();
+  }
 
   // Quote all the arguments before passing to scanner. The scanner is currently
   // tokenize the command-line again before parsing.
