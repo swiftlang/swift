@@ -2123,7 +2123,7 @@ static inline Type applyToFunctionType(
   if (auto funcType = type->getAs<FunctionType>()) {
     auto newExtInfo = transform(funcType->getExtInfo());
     if (!newExtInfo.isEqualTo(funcType->getExtInfo(), /*useClangTypes=*/true))
-      return FunctionType::get(funcType->getParams(), funcType->getResult(),
+      return FunctionType::get(funcType->getParams(), {}, funcType->getResult(),
                                newExtInfo);
   }
 

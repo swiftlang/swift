@@ -437,9 +437,9 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
                                                    D->getLocation());
                        }, /*AllowsNSUIntegerAsInt*/true,
                        Bridgeability::None, { });
-  swift::Type GetterTy = FunctionType::get({}, Ty.getType(), ASTExtInfo{});
+  swift::Type GetterTy = FunctionType::get({}, {}, Ty.getType(), ASTExtInfo{});
   swift::Type SetterTy =
-      FunctionType::get({AnyFunctionType::Param(Ty.getType())},
+      FunctionType::get({AnyFunctionType::Param(Ty.getType())}, {},
                         Ctx.TheEmptyTupleType, ASTExtInfo{});
 
   /* Storage */

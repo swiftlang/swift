@@ -1766,8 +1766,9 @@ private:
     // throw it away before lowering.
     else if (isa<GenericFunctionType>(BaseTy)) {
       auto *fTy = cast<AnyFunctionType>(BaseTy);
-      auto *nongenericTy = FunctionType::get(fTy->getParams(), fTy->getResult(),
-                                             fTy->getExtInfo());
+      auto *nongenericTy =
+          FunctionType::get(fTy->getParams(), fTy->getYields(),
+                            fTy->getResult(), fTy->getExtInfo());
 
       FunTy = IGM.getLoweredType(nongenericTy).castTo<SILFunctionType>();
     } else
@@ -2388,7 +2389,6 @@ private:
     case TypeKind::BuiltinNonDefaultDistributedActorStorage:
     case TypeKind::SILMoveOnlyWrapped:
     case TypeKind::Integer:
-    case TypeKind::YieldResult:
       LLVM_DEBUG(llvm::dbgs() << "Unhandled type: ";
                  DbgTy.getType()->dump(llvm::dbgs()); llvm::dbgs() << "\n");
       MangledName = "<unknown>";

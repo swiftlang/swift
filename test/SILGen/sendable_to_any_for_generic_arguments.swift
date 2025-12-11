@@ -207,7 +207,7 @@ func test_subscript_computed_property_and_mutating_access(u: User) {
   // CHECK-NEXT: {{.*}} = apply [[SUBSCRIPT_GETTER]]<String, Any, String>({{.*}}, [[BORROWED_COPY]])
   _ = u.dict[entry: ""]
 
-  // CHECK: [[DICT_MODIFY:%.*]] = class_method %0, #User.dict!modify : (User) -> @yield_once () -> inout @yields [String : any Sendable], $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK: [[DICT_MODIFY:%.*]] = class_method %0, #User.dict!modify : (User) -> @yield_once () yields (inout [String : any Sendable]) -> (), $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
   // CHECK-NEXT: ([[DICT_ADDR:%.*]], {{.*}}) = begin_apply [[DICT_MODIFY]]({{.*}}) : $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
   // CHECK-NEXT: [[ANY_DICT:%.*]] = alloc_stack $Dictionary<String, Any>
   // CHECK-NEXT: [[LOADED_DICT:%.*]] = load [copy] [[DICT_ADDR]]
@@ -231,7 +231,7 @@ func test_subscript_computed_property_and_mutating_access(u: User) {
   // CHECK-NEXT: {{.*}} = apply [[GETTER]]([[ANY_DICT]]) : $@convention(method) (@guaranteed Dictionary<String, Any>) -> Optional<Int>
   _ = u.dict.test
 
-  // CHECK: [[DICT_MODIFY:%.*]] = class_method %0, #User.dict!modify : (User) -> @yield_once () -> inout @yields [String : any Sendable], $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK: [[DICT_MODIFY:%.*]] = class_method %0, #User.dict!modify : (User) -> @yield_once () yields (inout [String : any Sendable]) -> (), $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
   // CHECK-NEXT: ([[DICT:%.*]], {{.*}}) = begin_apply [[DICT_MODIFY]]({{.*}}) : $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
   // CHECK-NEXT: [[ANY_DICT:%.*]] = alloc_stack $Dictionary<String, Any>
   // CHECK-NEXT: [[LOADED_DICT:%.*]] = load [copy] [[DICT]]
@@ -246,7 +246,7 @@ func test_subscript_computed_property_and_mutating_access(u: User) {
   // CHECK-NEXT: assign [[COPIED_SENDABLE_DICT]] to [[DICT]]
   u.dict.test = 42
 
-  // CHECK: [[DICT_MODIFY:%.*]] = class_method %0, #User.dict!modify : (User) -> @yield_once () -> inout @yields [String : any Sendable], $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK: [[DICT_MODIFY:%.*]] = class_method %0, #User.dict!modify : (User) -> @yield_once () yields (inout [String : any Sendable]) -> (), $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
   // CHECK-NEXT: ([[DICT:%.*]], {{.*}}) = begin_apply [[DICT_MODIFY:%.*]](%0) : $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
   // CHECK-NEXT: [[ANY_DICT:%.*]] = alloc_stack $Dictionary<String, Any>
   // CHECK-NEXT: [[LOADED_DICT:%.*]] = load [copy] [[DICT]]

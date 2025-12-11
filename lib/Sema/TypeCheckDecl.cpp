@@ -2059,13 +2059,12 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case AccessorKind::MutableAddress:
       return buildAddressorResultType(accessor, storage->getValueInterfaceType());
 
-    // Coroutine accessors yield storage value types
+    // Coroutine accessors yield their storage value type
     case AccessorKind::Read:
     case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
     case AccessorKind::YieldingMutate:
-      return YieldResultType::get(storage->getValueInterfaceType(),
-                                  isYieldingMutableAccessor(kind));
+      return TupleType::getEmpty(ctx);
     }
   }
 
@@ -2121,6 +2120,60 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
                                       /*placeholderOpener*/ nullptr,
                                       /*packElementOpener*/ nullptr)
       .resolveType(resultTyRepr);
+}
+
+Type YieldsTypeRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
+  auto &ctx = decl->getASTContext();
+
+  //  Accessors always inherit their yield type from their storage.
+  if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
+    auto *storage = accessor->getStorage();
+
+    auto kind = accessor->getAccessorKind();
+    switch (kind) {
+    case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
+    case AccessorKind::Borrow:
+    case AccessorKind::DidSet:
+    case AccessorKind::WillSet:
+    case AccessorKind::Set:
+    case AccessorKind::Init:
+    case AccessorKind::Mutate:
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
+      return TupleType::getEmpty(ctx);
+
+    // Coroutine accessors yield storage value types
+    case AccessorKind::Read:
+    case AccessorKind::YieldingBorrow:
+      return storage->getValueInterfaceType();
+
+    case AccessorKind::Modify:
+    case AccessorKind::YieldingMutate:
+      return InOutType::get(storage->getValueInterfaceType());
+    }
+  }
+
+  TypeRepr *yieldTyRepr = nullptr;
+  if (const auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
+    yieldTyRepr = funcDecl->getYieldTypeRepr();
+
+    assert(funcDecl->isCoroutine() && yieldTyRepr);
+
+    auto options = TypeResolutionOptions(TypeResolverContext::FunctionResult);
+    if (funcDecl->isCoroutine())
+      options |= TypeResolutionFlags::Coroutine;
+
+    auto *const dc = decl->getInnermostDeclContext();
+    return TypeResolution::forInterface(dc, options,
+                                        /*unboundTyOpener*/ nullptr,
+                                        /*placeholderOpener*/ nullptr,
+                                        /*packElementOpener*/ nullptr)
+        .resolveType(yieldTyRepr);
+  }
+
+  assert(0 && "unexpected coroutine decl");
+  return ErrorType::get(ctx); // TupleType::getEmpty(ctx);
 }
 
 ParamSpecifier
@@ -2535,6 +2588,17 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       resultTy = TupleType::getEmpty(AFD->getASTContext());
     }
 
+    // Yields
+    SmallVector<AnyFunctionType::Yield, 1> yields;
+    if (AFD->isCoroutine()) {
+      auto yieldTy = cast<FuncDecl>(AFD)->getYieldsInterfaceType();
+      if (auto inOutType = yieldTy->getAs<InOutType>()) {
+        yields.emplace_back(inOutType->getObjectType(), ParamSpecifier::InOut);
+      } else {
+        yields.emplace_back(yieldTy, ParamSpecifier::Default);
+      }
+    }
+
     auto lifetimeDependenceInfo = AFD->getLifetimeDependencies();
 
     // (Args...) -> Result
@@ -2566,9 +2630,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       auto info = infoBuilder.build();
 
       if (sig && !hasSelf) {
-        funcTy = GenericFunctionType::get(sig, argTy, resultTy, info);
+        funcTy = GenericFunctionType::get(sig, argTy, yields, resultTy, info);
       } else {
-        funcTy = FunctionType::get(argTy, resultTy, info);
+        funcTy = FunctionType::get(argTy, yields, resultTy, info);
       }
     }
 
@@ -2589,9 +2653,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       auto selfInfo = selfInfoBuilder.build();
       if (sig) {
-        funcTy = GenericFunctionType::get(sig, {selfParam}, funcTy, selfInfo);
+        funcTy =
+            GenericFunctionType::get(sig, {selfParam}, {}, funcTy, selfInfo);
       } else {
-        funcTy = FunctionType::get({selfParam}, funcTy, selfInfo);
+        funcTy = FunctionType::get({selfParam}, {}, funcTy, selfInfo);
       }
     }
 
@@ -2617,9 +2682,9 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     auto info = infoBuilder.build();
     if (auto sig = SD->getGenericSignature()) {
-      funcTy = GenericFunctionType::get(sig, argTy, elementTy, info);
+      funcTy = GenericFunctionType::get(sig, argTy, {}, elementTy, info);
     } else {
-      funcTy = FunctionType::get(argTy, elementTy, info);
+      funcTy = FunctionType::get(argTy, {}, elementTy, info);
     }
 
     return funcTy;
@@ -2642,7 +2707,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      resultTy = FunctionType::get(argTy, resultTy, info);
+      resultTy = FunctionType::get(argTy, {}, resultTy, info);
     }
 
     auto lifetimeDependenceInfo = getLifetimeDependencies(Context, EED);
@@ -2654,7 +2719,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
-      resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy,
+      resultTy = GenericFunctionType::get(genericSig, {selfTy}, {}, resultTy,
                                           infoBuilder.build());
 
     } else {
@@ -2663,7 +2728,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
-      resultTy = FunctionType::get({selfTy}, resultTy, infoBuilder.build());
+      resultTy = FunctionType::get({selfTy}, {}, resultTy, infoBuilder.build());
     }
 
     return resultTy;
@@ -2680,11 +2745,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     if (auto genericSig = macro->getGenericSignature()) {
       GenericFunctionType::ExtInfo info;
-      return GenericFunctionType::get(
-          genericSig, paramTypes, resultType, info);
+      return GenericFunctionType::get(genericSig, paramTypes, {}, resultType,
+                                      info);
     } else {
       FunctionType::ExtInfo info;
-      return FunctionType::get(paramTypes, resultType, info);
+      return FunctionType::get(paramTypes, {}, resultType, info);
     }
   }
   }

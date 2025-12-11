@@ -1180,14 +1180,15 @@ namespace {
       // callee params, hand it over to the conditional 'self' call, and use it
       // to update the type of the called expression with respect to whether
       // it's 'self'-curried.
-      auto *const newCalleeFnTy = FunctionType::get(
-          newCalleeParams, calleeFnTy->getResult(), calleeFnTy->getExtInfo());
+      auto *const newCalleeFnTy =
+          FunctionType::get(newCalleeParams, {}, calleeFnTy->getResult(),
+                            calleeFnTy->getExtInfo());
 
       // If given, apply the base expression to the curried 'self'
       // parameter first.
       if (baseExpr) {
-        fnExpr->setType(FunctionType::get(fnTy->getParams(), newCalleeFnTy,
-                                          fnTy->getExtInfo()));
+        fnExpr->setType(FunctionType::get(fnTy->getParams(), fnTy->getYields(),
+                                          newCalleeFnTy, fnTy->getExtInfo()));
         cs.cacheType(fnExpr);
 
         fnExpr = DotSyntaxCallExpr::create(ctx, fnExpr, SourceLoc(),
@@ -2518,8 +2519,7 @@ namespace {
           flags = flags.withInOut(true);
 
         auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
-        return FunctionType::get({selfParam},
-                                 resultTy->getResult(),
+        return FunctionType::get({selfParam}, {}, resultTy->getResult(),
                                  resultTy->getExtInfo());
       };
 
@@ -5246,9 +5246,8 @@ namespace {
       //     return "{ [$kp$ = \(E)] in $0[keyPath: $kp$] }"
 
       FunctionType::ExtInfo closureInfo;
-      auto closureTy =
-          FunctionType::get({FunctionType::Param(baseTy)}, kpResultTy,
-                            closureInfo);
+      auto closureTy = FunctionType::get({FunctionType::Param(baseTy)}, {},
+                                         kpResultTy, closureInfo);
       auto closure = new (ctx)
           AutoClosureExpr(/*set body later*/nullptr, kpResultTy, dc);
 
@@ -7622,7 +7621,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             param.withFlags(param.getParameterFlags().withNoDerivative(true));
         }
 
-        fromFunc = FunctionType::get(params, fromFunc->getResult(), newEI);
+        fromFunc = FunctionType::get(params, fromFunc->getYields(),
+                                     fromFunc->getResult(), newEI);
         switch (toEI.getDifferentiabilityKind()) {
         // TODO: Ban `Normal` and `Forward` cases.
         case DifferentiabilityKind::Normal:
@@ -7775,9 +7775,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         };
 
         if (requiresRuntimeCheck()) {
-          auto isolatedToType =
-              FunctionType::get(toFunc->getParams(), toFunc->getResult(),
-                                toEI.withGlobalActor(fromEI.getGlobalActor()));
+          auto isolatedToType = FunctionType::get(
+              toFunc->getParams(), toFunc->getYields(), toFunc->getResult(),
+              toEI.withGlobalActor(fromEI.getGlobalActor()));
 
           // Global actor might not be the only difference, let's introduce
           // a function conversion first but with matching isolation.
@@ -7849,7 +7849,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 #define TYPE(Name, Parent)
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Error:
-  case TypeKind::YieldResult:
   case TypeKind::Module:
   case TypeKind::Enum:
   case TypeKind::Struct:
@@ -7938,7 +7937,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::GenericFunction:
   case TypeKind::LValue:
   case TypeKind::InOut:
-  case TypeKind::YieldResult:
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
   case TypeKind::PackElement:
@@ -8295,9 +8293,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         bodyArgFnTy = cast<FunctionType>(
           bodyArgFnTy->withExtInfo(bodyArgFnTy->getExtInfo().withNoEscape(false)));
         bodyFnTy = cast<FunctionType>(
-          FunctionType::get(bodyFnTy->getParams()[0].withType(bodyArgFnTy),
-                            bodyFnTy->getResult())
-            ->withExtInfo(bodyFnTy->getExtInfo().withNoEscape()));
+            FunctionType::get(bodyFnTy->getParams()[0].withType(bodyArgFnTy),
+                              {}, bodyFnTy->getResult())
+                ->withExtInfo(bodyFnTy->getExtInfo().withNoEscape()));
         body = coerceToType(body, bodyFnTy, locator);
         assert(body && "can't make nonescaping?!");
 
@@ -9126,7 +9124,7 @@ static Expr *wrapAsyncLetInitializer(
 
   // Form the autoclosure expression. The actual closure here encapsulates the
   // child task.
-  auto closureType = FunctionType::get({ }, initializerType, extInfo);
+  auto closureType = FunctionType::get({}, {}, initializerType, extInfo);
   Expr *autoclosureExpr = cs.buildAutoClosureExpr(
       initializer, closureType, dc, /*isDefaultWrappedValue=*/false,
       /*isAsyncLetWrapper=*/true);

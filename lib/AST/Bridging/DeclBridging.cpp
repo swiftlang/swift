@@ -223,7 +223,8 @@ BridgedFuncDecl BridgedFuncDecl_createParsed(
     SourceLoc funcKeywordLoc, swift::Identifier name, SourceLoc nameLoc,
     BridgedNullableGenericParamList genericParamList,
     BridgedParameterList parameterList, SourceLoc asyncLoc, SourceLoc throwsLoc,
-    BridgedNullableTypeRepr thrownType, BridgedNullableTypeRepr returnType,
+    BridgedNullableTypeRepr thrownType, SourceLoc yieldsLoc,
+    BridgedNullableTypeRepr yieldType, BridgedNullableTypeRepr returnType,
     BridgedNullableTrailingWhereClause genericWhereClause) {
   ASTContext &context = cContext.unbridged();
 
@@ -234,8 +235,9 @@ BridgedFuncDecl BridgedFuncDecl_createParsed(
   auto *decl = FuncDecl::create(
       context, staticLoc, unbridged(cStaticSpelling), funcKeywordLoc, declName,
       nameLoc, asyncLoc.isValid(), asyncLoc, throwsLoc.isValid(), throwsLoc,
-      thrownType.unbridged(), genericParamList.unbridged(), paramList,
-      returnType.unbridged(), cDeclContext.unbridged());
+      thrownType.unbridged(), yieldsLoc, yieldType.unbridged(),
+      genericParamList.unbridged(), paramList, returnType.unbridged(),
+      cDeclContext.unbridged());
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
 
   return decl;

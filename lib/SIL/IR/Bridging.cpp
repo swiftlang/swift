@@ -241,7 +241,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
           newParams, {newResult}, FunctionTypeRepresentation::Block);
 
       return FunctionType::get(
-          newParams, newResult,
+          newParams, {}, newResult,
           funTy->getExtInfo()
               .intoBuilder()
               .withRepresentation(FunctionType::Representation::Block)

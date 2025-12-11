@@ -2358,12 +2358,6 @@ ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleYieldResult(Node *node, unsigned depth) {
-  RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1));
-  Buffer << "Yy";
-  return ManglingError::Success;
-}
-
 ManglingError Remangler::mangleInfixOperator(Node *node, unsigned depth) {
   mangleIdentifierImpl(node, /*isOperator*/ true);
   Buffer << "oi";

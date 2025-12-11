@@ -1384,32 +1384,20 @@ AnyFunctionRef::getYieldResultsImpl(SmallVectorImpl<AnyFunctionType::Yield> &buf
   assert(buffer.empty());
   if (auto *AFD = getAbstractFunctionDecl()) {
     if (AFD->isCoroutine()) {
-      auto fnType = AFD->getInterfaceType();
+      auto fnType = AFD->getInterfaceType()->castTo<AnyFunctionType>();
       if (fnType->hasError())
         return {};
 
-      auto resType = fnType->castTo<AnyFunctionType>()->getResult();
+      auto resType = fnType->getResult();
       if (auto *resFnType = resType->getAs<AnyFunctionType>())
-        resType = resFnType->getResult();
+        fnType = resFnType;
 
-      auto addYieldInfo =
-        [&](const YieldResultType *yieldResultTy) {
-          Type valueTy = yieldResultTy->getResultType();
-          if (mapIntoContext)
-            valueTy = AFD->mapTypeIntoEnvironment(valueTy);
-          YieldTypeFlags flags(yieldResultTy->isInOut() ?
-                               ParamSpecifier::InOut : ParamSpecifier::LegacyShared);
-            buffer.push_back(AnyFunctionType::Yield(valueTy, flags));
-        };
-
-      if (auto *tupleResTy = resType->getAs<TupleType>())
-        for (const auto &elt : tupleResTy->getElements()) {
-          Type eltTy = elt.getType();
-          if (auto *yieldResTy = eltTy->getAs<YieldResultType>())
-            addYieldInfo(yieldResTy);
-        }
-      else if (auto *yieldResTy = resType->getAs<YieldResultType>())
-        addYieldInfo(yieldResTy);
+      for (const auto &yield : fnType->getYields()) {
+        Type yieldTy = yield.getType();
+        if (mapIntoContext)
+          yieldTy = AFD->mapTypeIntoEnvironment(yieldTy);
+        buffer.emplace_back(yieldTy, yield.getFlags());
+      }
 
       return buffer;
     }
@@ -4240,6 +4228,14 @@ static Type mapSignatureParamType(ASTContext &ctx, Type type) {
   return mapSignatureType(ctx, type);
 }
 
+/// Map a signature type for a yield.
+static Type mapSignatureYieldType(ASTContext &ctx, Type type) {
+  // TODO: Do we really need something like here as mapSignatureType
+  // transforms only function types? Are we supposed to be able to
+  // yield *a function*?
+  return mapSignatureType(ctx, type);
+}
+
 /// Map an ExtInfo for a function type.
 ///
 /// When checking if two signatures should be equivalent for overloading,
@@ -4256,7 +4252,9 @@ static AnyFunctionType::ExtInfo
 mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
                     bool topLevelFunction) {
   if (topLevelFunction)
-    return AnyFunctionType::ExtInfo();
+    return AnyFunctionType::ExtInfoBuilder()
+        .withCoroutine(info.isCoroutine())
+        .build();
   return AnyFunctionType::ExtInfoBuilder()
       .withRepresentation(info.getRepresentation())
       .withSendable(info.isSendable())
@@ -4317,6 +4315,13 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     newParams.push_back(newParam);
   }
 
+  // Map yields
+  SmallVector<AnyFunctionType::Yield, 4> newYields;
+  for (const auto &yield : funcTy->getYields()) {
+    auto newYieldType = mapSignatureYieldType(ctx, yield.getType());
+    newYields.emplace_back(newYieldType, yield.getFlags());
+  }
+
   // Map the result type.
   auto resultTy = mapSignatureFunctionType(
     ctx, funcTy->getResult(), topLevelFunction, false, isInitializer,
@@ -4330,9 +4335,9 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
   // Rebuild the resulting function type.
   if (auto genericFuncTy = dyn_cast<GenericFunctionType>(funcTy))
     return GenericFunctionType::get(genericFuncTy->getGenericSignature(),
-                                    newParams, resultTy, info);
+                                    newParams, newYields, resultTy, info);
 
-  return FunctionType::get(newParams, resultTy, info);
+  return FunctionType::get(newParams, newYields, resultTy, info);
 }
 
 OverloadSignature ValueDecl::getOverloadSignature() const {
@@ -11268,6 +11273,11 @@ void FuncDecl::setResultInterfaceType(Type type) {
                                         std::move(type));
 }
 
+void FuncDecl::setYieldInterfaceType(Type type) {
+  getASTContext().evaluator.cacheOutput(YieldsTypeRequest{this},
+                                        std::move(type));
+}
+
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                SourceLoc StaticLoc,
                                StaticSpellingKind StaticSpelling,
@@ -11318,8 +11328,8 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling, SourceLoc FuncLoc,
                            DeclName Name, SourceLoc NameLoc, bool Async,
                            SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
-                           TypeRepr *ThrownTyR,
-                           GenericParamList *GenericParams,
+                           TypeRepr *ThrownTyR, SourceLoc YieldsLoc,
+                           TypeRepr *YieldTyR, GenericParamList *GenericParams,
                            ParameterList *BodyParams, TypeRepr *ResultTyR,
                            DeclContext *Parent) {
   auto *const FD = FuncDecl::createImpl(
@@ -11328,6 +11338,7 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
       ClangNode());
   FD->setParameters(BodyParams);
   FD->FnRetType = TypeLoc(ResultTyR);
+  FD->FnYieldType = TypeLoc(YieldTyR);
   if (llvm::isa_and_nonnull<SendingTypeRepr>(ResultTyR))
     FD->setSendingResult();
   return FD;
@@ -11421,6 +11432,7 @@ AccessorDecl *AccessorDecl::createDeserialized(ASTContext &ctx,
       throws, SourceLoc(), TypeLoc::withoutLoc(thrownType), parent,
       ClangNode());
   D->setResultInterfaceType(fnRetType);
+
   return D;
 }
 
@@ -11437,6 +11449,13 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx, SourceLoc declLoc,
       throws, throwsLoc, thrownType, parent, clangNode);
   D->setParameters(bodyParams);
   D->setResultInterfaceType(fnRetType);
+  if (isYieldingAccessor(accessorKind)) {
+    auto yieldType = storage->getValueInterfaceType();
+    if (isYieldingMutableAccessor(accessorKind))
+      yieldType = InOutType::get(yieldType);
+    D->setYieldInterfaceType(yieldType);
+  }
+
   return D;
 }
 
@@ -11456,6 +11475,13 @@ AccessorDecl *AccessorDecl::createImplicit(ASTContext &ctx,
       /*clangNode=*/ClangNode());
   D->setImplicit();
   D->setResultInterfaceType(fnRetType);
+  if (isYieldingAccessor(accessorKind)) {
+    auto yieldType = storage->getValueInterfaceType();
+    if (isYieldingMutableAccessor(accessorKind))
+      yieldType = InOutType::get(yieldType);
+    D->setYieldInterfaceType(yieldType);
+  }
+
   return D;
 }
 
@@ -11676,64 +11702,22 @@ std::optional<Type> FuncDecl::getCachedResultInterfaceType() const {
   return ResultTypeRequest{mutableThis}.getCachedResult();
 }
 
-Type FuncDecl::getResultInterfaceTypeWithoutYields() const {
-  auto resultType = getResultInterfaceType();
-  if (resultType->hasError())
-    return resultType;
-
-  // Coroutine result type should either be a yield result
-  // or a tuple containing both yielded and normal result types.
-  // In both cases, strip the @yield result types
-  if (isCoroutine()) {
-    if (auto *tupleResTy = resultType->getAs<TupleType>()) {
-      // Strip @yield results on the first level of tuple
-      SmallVector<TupleTypeElt, 4> elements;
-      for (const auto &elt : tupleResTy->getElements()) {
-        Type eltTy = elt.getType();
-        if (eltTy->is<YieldResultType>())
-          continue;
-        elements.push_back(elt);
-      }
-
-      // Handle vanishing tuples --  flatten to produce the
-      // element type.
-      if (elements.size() == 1)
-          resultType = elements[0].getType();
-      else
-          resultType = TupleType::get(elements, getASTContext());
-    } else if (resultType->is<YieldResultType>()) {
-      resultType = TupleType::getEmpty(getASTContext());
-    }
-  }
-
-  return resultType;
-}
-
 Type FuncDecl::getYieldsInterfaceType() const {
-  auto resultType = getResultInterfaceType();
-  if (resultType->hasError())
-    return resultType;
+  auto &ctx = getASTContext();
 
   if (!isCoroutine())
     return TupleType::getEmpty(getASTContext());
 
-  // Coroutine result type should either be a yield result
-  // or a tuple containing both yielded and normal result types.
-  // In both cases, strip the @yield result types
-  if (auto *tupleResTy = resultType->getAs<TupleType>()) {
-    // Keep @yield results on the first level of tuple
-    for (const auto &elt : tupleResTy->getElements()) {
-      Type eltTy = elt.getType();
-      if (eltTy->is<YieldResultType>())
-        return eltTy;
-      }
+  auto mutableThis = const_cast<FuncDecl *>(this);
+  if (auto type = evaluateOrDefault(ctx.evaluator,
+                                    YieldsTypeRequest{mutableThis}, Type()))
+    return type;
+  return ErrorType::get(ctx);
+}
 
-    llvm_unreachable("coroutine must have a yield result");
-  } else if (!resultType->is<YieldResultType>()) {
-    resultType = TupleType::getEmpty(getASTContext());
-  }
-
-  return resultType;
+std::optional<Type> FuncDecl::getCachedYieldsInterfaceType() const {
+  auto mutableThis = const_cast<FuncDecl *>(this);
+  return YieldsTypeRequest{mutableThis}.getCachedResult();
 }
 
 bool FuncDecl::isUnaryOperator() const {
@@ -12075,9 +12059,10 @@ Type ConstructorDecl::getInitializerInterfaceType() {
 
   Type initFuncTy;
   if (auto sig = getGenericSignature()) {
-    initFuncTy = GenericFunctionType::get(sig, {initSelfParam}, funcTy, info);
+    initFuncTy =
+        GenericFunctionType::get(sig, {initSelfParam}, {}, funcTy, info);
   } else {
-    initFuncTy = FunctionType::get({initSelfParam}, funcTy, info);
+    initFuncTy = FunctionType::get({initSelfParam}, {}, funcTy, info);
   }
   InitializerInterfaceType = initFuncTy;
 

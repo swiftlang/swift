@@ -764,7 +764,8 @@ public:
   ASTExtInfoBuilder withCoroutine(bool coroutine = true) const {
     return ASTExtInfoBuilder(
         coroutine ? (bits | CoroutineMask) : (bits & ~CoroutineMask),
-        clangTypeInfo, globalActor, thrownError, lifetimeDependencies);
+        clangTypeInfo, globalActor, thrownError, sendableDependentType,
+        lifetimeDependencies);
   }
 
   [[nodiscard]]

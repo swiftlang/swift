@@ -2352,8 +2352,6 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return convertInOutType(cast<InOutType>(ty));
   case TypeKind::Tuple:
     return convertTupleType(cast<TupleType>(ty));
-  case TypeKind::YieldResult:
-    llvm_unreachable("AST YieldResultType should be lowered by SILGen");
   case TypeKind::Function:
   case TypeKind::GenericFunction:
     llvm_unreachable("AST FunctionTypes should be lowered by SILGen");

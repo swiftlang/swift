@@ -105,6 +105,9 @@ enum class PrintStructureKind {
   FunctionParameterList,
   /// '@attribute ParamTy...' in parameter declarations.
   FunctionParameterType,
+  CoroutineYield,
+  /// 'yields Tys...`
+  CoroutineYieldsTypes,
 };
 
 /// ---------------------------------

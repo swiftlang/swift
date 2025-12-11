@@ -170,10 +170,11 @@ TEST_F(SemaTest, TestCaptureListIsNotOpenedEarly) {
   auto *closureType = cs.getType(closure)->castTo<TypeVariableType>();
 
   ASTExtInfo extInfo;
-  ASSERT_TRUE(cs.resolveClosure(
-      closureType,
-      FunctionType::get(/*params*/ {}, Context.TheEmptyTupleType, extInfo),
-      cs.getConstraintLocator(closure)));
+  ASSERT_TRUE(
+      cs.resolveClosure(closureType,
+                        FunctionType::get(/*params*/ {}, /*yields*/ {},
+                                          Context.TheEmptyTupleType, extInfo),
+                        cs.getConstraintLocator(closure)));
 
   for (const auto &capture : captureList->getCaptureList()) {
     ASSERT_TRUE(cs.hasType(capture.getVar()));

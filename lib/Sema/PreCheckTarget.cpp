@@ -2495,6 +2495,12 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
       assert(ThrownTypeRepr && "Parser ensures that this never fails");
     }
 
+    TypeRepr *YieldTypeRepr = nullptr;
+    if (auto yieldTypeExpr = AE->getYieldExpr()) {
+      YieldTypeRepr = extractTypeRepr(yieldTypeExpr);
+      assert(YieldTypeRepr && "Parser ensures that this never fails");
+    }
+
     TypeRepr *ResultTypeRepr = extractTypeRepr(AE->getResultExpr());
     if (!ResultTypeRepr) {
       Ctx.Diags.diagnose(AE->getResultExpr()->getLoc(),
@@ -2504,8 +2510,8 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
 
     auto NewTypeRepr = new (Ctx)
         FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getAsyncLoc(),
-                         AE->getThrowsLoc(), ThrownTypeRepr, AE->getArrowLoc(),
-                         ResultTypeRepr);
+                         AE->getThrowsLoc(), ThrownTypeRepr, AE->getYieldsLoc(),
+                         YieldTypeRepr, AE->getArrowLoc(), ResultTypeRepr);
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
   

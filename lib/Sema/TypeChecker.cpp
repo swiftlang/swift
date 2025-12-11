@@ -659,8 +659,8 @@ bool TypeChecker::diagnoseInvalidFunctionType(
         : "c";
       auto extInfo2 =
         extInfo.withRepresentation(AnyFunctionType::Representation::Swift);
-      auto simpleFnTy = FunctionType::get(fnTy->getParams(), fnTy->getResult(),
-                                          extInfo2);
+      auto simpleFnTy = FunctionType::get(fnTy->getParams(), fnTy->getYields(),
+                                          fnTy->getResult(), extInfo2);
       ctx.Diags.diagnose(loc, diag::objc_convention_invalid,
                          simpleFnTy, strName);
       hadAnyError = true;

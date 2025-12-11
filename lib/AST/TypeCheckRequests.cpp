@@ -1134,6 +1134,26 @@ void ResultTypeRequest::cacheResult(Type type) const {
 }
 
 //----------------------------------------------------------------------------//
+// YieldTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<Type> YieldsTypeRequest::getCachedResult() const {
+  Type type;
+  auto *const funcDecl = std::get<0>(getStorage());
+  type = funcDecl->FnYieldType.getType();
+
+  if (type.isNull())
+    return std::nullopt;
+
+  return type;
+}
+
+void YieldsTypeRequest::cacheResult(Type type) const {
+  auto *const funcDecl = std::get<0>(getStorage());
+  funcDecl->FnYieldType.setType(type);
+}
+
+//----------------------------------------------------------------------------//
 // PatternBindingEntryRequest computation.
 //----------------------------------------------------------------------------//
 

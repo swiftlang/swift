@@ -118,7 +118,7 @@ class C {
 // CHECK-LABEL: sil hidden [ossa] @testCoroutineBorrow : $@convention(thin) (@owned C, Builtin.Int64) -> () {
 // CHECK-LABEL: bb0(%0 : @owned $C, %1 : $Builtin.Int64):
 // CHECK-NOT: borrow
-// CHECK:   class_method %0 : $C, #C.float!modify : (C) -> @yield_once () -> inout @yields Builtin.Int64, $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Builtin.Int64
+// CHECK:   class_method %0 : $C, #C.float!modify : (C) -> @yield_once () yields (inout Builtin.Int64) -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Builtin.Int64
 // CHECK:   begin_apply %{{.*}}(%0) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Builtin.Int64
 // CHECK-NOT: borrow
 // CHECK:   destroy_value %0 : $C
@@ -126,7 +126,7 @@ class C {
 sil hidden [ossa] @testCoroutineBorrow : $@convention(thin) (@owned C, Builtin.Int64) -> () {
 bb0(%0 : @owned $C, %1 : $Builtin.Int64):
   %14 = begin_borrow %0 : $C
-  %15 = class_method %14 : $C, #C.float!modify : (C) -> @yield_once () -> inout @yields Builtin.Int64, $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Builtin.Int64
+  %15 = class_method %14 : $C, #C.float!modify : (C) -> @yield_once () yields (inout Builtin.Int64) -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Builtin.Int64
   (%16, %17) = begin_apply %15(%14) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Builtin.Int64
   store %1 to [trivial] %16 : $*Builtin.Int64
   end_apply %17 as $()

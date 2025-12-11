@@ -1659,7 +1659,7 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 
     // <T> () async throws -> T
     CanType functionTy =
-        GenericFunctionType::get(genericSig, {}, genericResult, extInfo)
+        GenericFunctionType::get(genericSig, {}, {}, genericResult, extInfo)
             ->getCanonicalType();
     AbstractionPattern origParamType(genericSig, functionTy);
     CanType substParamType = fnArg.getSubstRValueType();
@@ -1801,7 +1801,7 @@ SILGenFunction::emitCreateAsyncMainTask(SILLocation loc, SubstitutionMap subs,
   bool hasSending = ctx.LangOpts.hasFeature(Feature::SendingArgsAndResults);
   CanType functionType =
       FunctionType::get(
-          {}, ctx.TheEmptyTupleType,
+          {}, {}, ctx.TheEmptyTupleType,
           ASTExtInfo().withAsync().withThrows().withSendable(!hasSending))
           ->getCanonicalType();
 

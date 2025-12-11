@@ -1452,7 +1452,8 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
         SmallVector<FunctionType::Param, 2> params;
         for (auto &paramGen : fnParamGens)
           params.push_back(FunctionType::Param(paramGen.build(builder)));
-        return FunctionType::get(params, fnResultGen.build(builder), extInfo);
+        return FunctionType::get(params, {}, fnResultGen.build(builder),
+                                 extInfo);
       }};
   // Eagerly build the type of the first arg, then use that to compute the type
   // of the result.
@@ -1523,7 +1524,7 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
       auto innerFunction =
-          FunctionType::get(params, linearFnResultGen.build(builder), info);
+          FunctionType::get(params, {}, linearFnResultGen.build(builder), info);
       return innerFunction->withExtInfo(extInfo);
     }
   };
@@ -1635,7 +1636,7 @@ static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
           _label("taskName", _defaulted(_optional(_rawPointer), _nil)),
           _label("operation",
                  _sending(_function(_async(_throws(_thick)), _typeparam(0),
-                                    _parameters())))),
+                                    _parameters(), _yields())))),
       _tuple(_nativeObject, _rawPointer));
 }
 
@@ -1659,7 +1660,7 @@ static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
                             _nil)),
           _label("taskName", _defaulted(_optional(_rawPointer), _nil)),
           _label("operation", _sending(_function(_async(_throws(_thick)), _void,
-                                                 _parameters())))),
+                                                 _parameters(), _yields())))),
       _tuple(_nativeObject, _rawPointer));
 }
 
@@ -1693,7 +1694,7 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
     operationResultType = makeGenericParam().build(builder); // <T>
   }
   builder.addParameter(
-      makeConcrete(FunctionType::get({}, operationResultType, extInfo)),
+      makeConcrete(FunctionType::get({}, {}, operationResultType, extInfo)),
       ParamSpecifier::Default,
       areSendingArgsEnabled /*isSending*/); // operation
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
@@ -1703,8 +1704,8 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id,
 static ValueDecl *getTaskRunInline(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       ctx, id, _thin, _generics(_unrestricted, _conformsToDefaults(0)),
-      _parameters(
-          _function(_async(_noescape(_thick)), _typeparam(0), _parameters())),
+      _parameters(_function(_async(_noescape(_thick)), _typeparam(0),
+                            _parameters(), _yields())),
       _typeparam(0));
 }
 
@@ -1779,7 +1780,7 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
                      .withSendingResult(hasSendingResult)
                      .build();
   builder.addParameter(
-      makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+      makeConcrete(FunctionType::get({}, {}, genericParam, extInfo)));
 
   // -> Builtin.RawPointer
   builder.setResult(makeConcrete(synthesizeType(SC, _rawPointer)));
@@ -2234,7 +2235,7 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
                                    /*throws*/ false, Type())
           .withClangFunctionType(ClangType)
           .build();
-  auto BlockTy = FunctionType::get(CFuncParams, VoidTy, Thin);
+  auto BlockTy = FunctionType::get(CFuncParams, {}, VoidTy, Thin);
   SmallVector<swift::Type, 3> ArgTypes = {HandleTy, BlockTy};
   if (withContext) {
     ArgTypes.push_back(ContextTy);
@@ -2267,7 +2268,7 @@ static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
 
   auto voidTy = ctx.TheEmptyTupleType;
   auto extInfo = FunctionType::ExtInfoBuilder().withNoEscape().build();
-  auto *fnTy = FunctionType::get(params, voidTy, extInfo);
+  auto *fnTy = FunctionType::get(params, {}, voidTy, extInfo);
 
   builder.addParameter(makeConcrete(fnTy));
 
@@ -2381,8 +2382,7 @@ static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
       .build();
 
   auto fnParamTy = FunctionType::get(FunctionType::Param(ctx.TheRawPointerType),
-                                     ctx.TheEmptyTupleType,
-                                     extInfo);
+                                     {}, ctx.TheEmptyTupleType, extInfo);
 
   builder.addParameter(makeConcrete(fnParamTy), ParamSpecifier::Borrowing);
   builder.setResult(T);
@@ -2395,7 +2395,7 @@ static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
 static ValueDecl *getTaskAddCancellationHandler(ASTContext &ctx,
                                                 Identifier id) {
   auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
-  auto fnType = FunctionType::get({}, ctx.TheEmptyTupleType, extInfo);
+  auto fnType = FunctionType::get({}, {}, ctx.TheEmptyTupleType, extInfo);
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_label("handler", fnType)),
                             _unsafeRawPointer);
@@ -2416,7 +2416,7 @@ static ValueDecl *getTaskAddPriorityEscalationHandler(ASTContext &ctx,
   // (UInt8, UInt8) -> ()
   auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
   auto *functionType =
-      FunctionType::get(params, ctx.TheEmptyTupleType, extInfo);
+      FunctionType::get(params, {}, ctx.TheEmptyTupleType, extInfo);
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_label("handler", functionType)),
                             _unsafeRawPointer);

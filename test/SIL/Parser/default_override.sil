@@ -24,21 +24,21 @@ sil @B_i_modify : $@yield_once @convention(method) (@guaranteed B) -> @yields @i
 sil @B_i_yielding_mutate : $@yield_once_2 @convention(method) (@guaranteed B) -> @yields @inout Int
 
 sil_vtable B {
-  #B.i!read: (B) -> @yield_once () -> @yields Int : @B_i_read
-  #B.i!yielding_borrow: (B) -> @yield_once () -> @yields Int : @B_i_yielding_borrow
+  #B.i!read: (B) -> @yield_once () yields (Int) -> () : @B_i_read
+  #B.i!yielding_borrow: (B) -> @yield_once () yields (Int) -> (): @B_i_yielding_borrow
   #B.i!setter: (B) -> (Int) -> () : @B_i_set
-  #B.i!modify: (B) -> @yield_once () -> inout @yields Int : @B_i_modify
-  #B.i!yielding_mutate: (B) -> @yield_once () -> inout @yields Int : @B_i_yielding_mutate
+  #B.i!modify: (B) -> @yield_once () yields (inout Int) -> () : @B_i_modify
+  #B.i!yielding_mutate: (B) -> @yield_once () yields (inout Int) -> () : @B_i_yielding_mutate
 }
 
 sil @B_i_yielding_borrow_default_override : $@yield_once_2 @convention(method) (@guaranteed B) -> @yields Int
 sil @B_i_yielding_mutate_default_override : $@yield_once_2 @convention(method) (@guaranteed B) -> @yields @inout Int
 
 // CHECK-LABEL: sil_default_override_table B {
-// CHECK-NEXT:    #B.i!yielding_borrow: #B.i!read: (B) -> @yield_once () -> @yields Int : @B_i_yielding_borrow_default_override
-// CHECK-NEXT:    #B.i!yielding_mutate: #B.i!modify: (B) -> @yield_once () -> inout @yields Int : @B_i_yielding_mutate_default_override
+// CHECK-NEXT:    #B.i!yielding_borrow: #B.i!read: (B) -> @yield_once () yields (Int) -> () : @B_i_yielding_borrow_default_override
+// CHECK-NEXT:    #B.i!yielding_mutate: #B.i!modify: (B) -> @yield_once () yields (inout Int) -> () : @B_i_yielding_mutate_default_override
 // CHECK-NEXT:  }
 sil_default_override_table B {
-  #B.i!yielding_borrow: #B.i!read: (B) -> @yield_once () -> @yields Int : @B_i_yielding_borrow_default_override
-  #B.i!yielding_mutate: #B.i!modify: (B) -> @yield_once () -> inout @yields Int : @B_i_yielding_mutate_default_override
+  #B.i!yielding_borrow: #B.i!read: (B) -> @yield_once () yields (Int) -> () : @B_i_yielding_borrow_default_override
+  #B.i!yielding_mutate: #B.i!modify: (B) -> @yield_once () yields (inout Int) -> () : @B_i_yielding_mutate_default_override
 }

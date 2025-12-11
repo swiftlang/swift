@@ -1125,17 +1125,15 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(SILDeclRef(fd));
   emitProlog(fd, captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(),
-             fd->getResultInterfaceTypeWithoutYields(), fd->getEffectiveThrownErrorType(),
+             fd->getResultInterfaceType(), fd->getEffectiveThrownErrorType(),
              fd->getThrowsLoc());
 
   if (fd->isDistributedActorFactory()) {
     // Synthesize the factory function body
     emitDistributedActorFactory(fd);
   } else {
-    prepareEpilog(fd,
-                  fd->getResultInterfaceTypeWithoutYields(),
-                  fd->getEffectiveThrownErrorType(),
-                  CleanupLocation(fd));
+    prepareEpilog(fd, fd->getResultInterfaceType(),
+                  fd->getEffectiveThrownErrorType(), CleanupLocation(fd));
 
     if (fd->requiresUnavailableDeclABICompatibilityStubs())
       emitApplyOfUnavailableCodeReached();

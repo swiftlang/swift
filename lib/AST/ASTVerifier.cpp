@@ -1105,7 +1105,7 @@ public:
       bool hasInOutResult = false;
 
       if (auto *FD = dyn_cast<FuncDecl>(func)) {
-        resultType = FD->getResultInterfaceTypeWithoutYields();
+        resultType = FD->getResultInterfaceType();
         resultType = FD->mapTypeIntoEnvironment(resultType);
         hasInOutResult = FD->getInterfaceType()
                              ->castTo<AnyFunctionType>()
@@ -1965,6 +1965,12 @@ public:
       FunctionType *FT = E->getFn()->getType()->getAs<FunctionType>();
       if (!FT) {
         Out << "callee of apply expression does not have function type:";
+        E->getFn()->getType().print(Out);
+        Out << "\n";
+        abort();
+      }
+      if (FT->hasExtInfo() && FT->isCoroutine()) {
+        Out << "cannot apply a coroutine yet:";
         E->getFn()->getType().print(Out);
         Out << "\n";
         abort();

@@ -39,7 +39,7 @@ public func bar(t: T2) -> MyClass<T2> {
 // CHECK-SIL: sil_vtable $MyClass<T2> {
 // CHECK-SIL:   #MyClass.t!getter: <T> (MyClass<T>) -> () -> T : @$e4main7MyClassC1txvgAA2T2V_Tg5 // specialized MyClass.t.getter
 // CHECK-SIL:   #MyClass.t!setter: <T> (MyClass<T>) -> (T) -> () : @$e4main7MyClassC1txvsAA2T2V_Tg5 // specialized MyClass.t.setter
-// CHECK-SIL:   #MyClass.t!modify: <T> (MyClass<T>) -> @yield_once () -> inout @yields T : @$e4main7MyClassC1txvMAA2T2V_Tg5  // specialized MyClass.t.modify
+// CHECK-SIL:   #MyClass.t!modify: <T> (MyClass<T>) -> @yield_once () yields (inout T) -> () : @$e4main7MyClassC1txvMAA2T2V_Tg5  // specialized MyClass.t.modify
 // CHECK-SIL:   #MyClass.init!allocator: <T> (MyClass<T>.Type) -> (T) -> MyClass<T> : @$e4main7MyClassC1tACyxGx_tcfCAA2T2V_Tg5  // specialized MyClass.__allocating_init(t:)
 // CHECK-SIL:   #MyClass.deinit!deallocator: @$e4main7MyClassCfDAA2T2V_Tg5  // specialized MyClass.__deallocating_deinit
 // CHECK-SIL: }
@@ -47,7 +47,7 @@ public func bar(t: T2) -> MyClass<T2> {
 // CHECK-SIL: sil_vtable $MyClass<T1> {
 // CHECK-SIL:   #MyClass.t!getter: <T> (MyClass<T>) -> () -> T : @$e4main7MyClassC1txvgAA2T1V_Tg5 // specialized MyClass.t.getter
 // CHECK-SIL:   #MyClass.t!setter: <T> (MyClass<T>) -> (T) -> () : @$e4main7MyClassC1txvsAA2T1V_Tg5 // specialized MyClass.t.setter
-// CHECK-SIL:   #MyClass.t!modify: <T> (MyClass<T>) -> @yield_once () -> inout @yields T : @$e4main7MyClassC1txvMAA2T1V_Tg5  // specialized MyClass.t.modify
+// CHECK-SIL:   #MyClass.t!modify: <T> (MyClass<T>) -> @yield_once () yields (inout T) -> () : @$e4main7MyClassC1txvMAA2T1V_Tg5  // specialized MyClass.t.modify
 // CHECK-SIL:   #MyClass.init!allocator: <T> (MyClass<T>.Type) -> (T) -> MyClass<T> : @$e4main7MyClassC1tACyxGx_tcfCAA2T1V_Tg5  // specialized MyClass.__allocating_init(t:)
 // CHECK-SIL:   #MyClass.deinit!deallocator: @$e4main7MyClassCfDAA2T1V_Tg5  // specialized MyClass.__deallocating_deinit
 // CHECK-SIL: }

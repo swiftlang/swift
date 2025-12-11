@@ -970,10 +970,17 @@ static Type getStrippedType(Type type, ASTContext &ctx) {
           break;
         }
       }
+      auto yields = funcType->getYields();
+      SmallVector<AnyFunctionType::Yield, 1> newYields;
+      for (auto yield : yields) {
+        newYields.emplace_back(getStrippedType(yield.getType(), ctx),
+                               yield.getFlags());
+      }
       auto newExtInfo = funcType->getExtInfo().withRepresentation(
           AnyFunctionType::Representation::Swift);
       return FunctionType::get(
-          newParams, getStrippedType(funcType->getResult(), ctx), newExtInfo);
+        newParams, newYields,
+        getStrippedType(funcType->getResult(), ctx), newExtInfo);
     }
 
     return std::nullopt;

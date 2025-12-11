@@ -838,7 +838,8 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
   // FIXME: This operation doesn't really make sense with a generic function type.
   // We should open the signature instead.
   if (auto *gft = t->getAs<GenericFunctionType>()) {
-    t = FunctionType::get(gft->getParams(), gft->getResult(), gft->getExtInfo());
+    t = FunctionType::get(gft->getParams(), gft->getYields(), gft->getResult(),
+                          gft->getExtInfo());
   }
 
   return t.transformRec(

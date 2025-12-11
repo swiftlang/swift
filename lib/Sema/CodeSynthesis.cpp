@@ -250,7 +250,7 @@ static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
         varInterfaceType->lookThroughAllOptionalTypes()->is<AnyFunctionType>();
     if (!isStructuralFunctionType) {
       auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
-      varInterfaceType = FunctionType::get({}, varInterfaceType, extInfo);
+      varInterfaceType = FunctionType::get({}, {}, varInterfaceType, extInfo);
     }
   }
 

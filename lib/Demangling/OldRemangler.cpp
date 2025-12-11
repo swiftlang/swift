@@ -1832,11 +1832,6 @@ ManglingError Remangler::mangleImplInvocationSubstitutions(Node *node,
   return ManglingError::Success;
 }
 
-ManglingError Remangler::mangleYieldResult(Node *node, unsigned depth) {
-  // The old mangler does not encode yield result.
-  return ManglingError::Success;
-}
-
 ManglingError Remangler::mangleCoroutine(Node *node, unsigned depth) {
   // The old mangler does not encode coroutines.
   return ManglingError::Success;

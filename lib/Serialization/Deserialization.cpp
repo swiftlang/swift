@@ -7330,20 +7330,6 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
   return NominalType::get(nominal, parentTy.get(), MF.getContext());
 }
 
-Expected<Type> DESERIALIZE_TYPE(YIELDS_TYPE)(ModuleFile &MF,
-                                             SmallVectorImpl<uint64_t> &scratch,
-                                             StringRef blobData) {
-  TypeID yieldResultTyID;
-  bool isIonOut = false;
-  decls_block::YieldResultTypeLayout::readRecord(scratch, yieldResultTyID, isIonOut);
-
-  auto yieldResultTy = MF.getTypeChecked(yieldResultTyID);
-  if (!yieldResultTy)
-    return yieldResultTy.takeError();
-
-  return YieldResultType::get(yieldResultTy.get(), isIonOut);
-}
-
 Expected<Type> DESERIALIZE_TYPE(TUPLE_TYPE)(ModuleFile &MF,
                                             SmallVectorImpl<uint64_t> &scratch,
                                             StringRef blobData) {
@@ -7459,6 +7445,9 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   if (!resultTy)
     return resultTy.takeError();
 
+  assert(!info.isCoroutine() && "NYU");
+  SmallVector<AnyFunctionType::Yield, 1> yields;
+
   SmallVector<AnyFunctionType::Param, 8> params;
   while (true) {
     BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
@@ -7517,11 +7506,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
 
   if (!isGeneric) {
     assert(genericSig.isNull());
-    return FunctionType::get(params, resultTy.get(), info);
+    return FunctionType::get(params, yields, resultTy.get(), info);
   }
 
   assert(!genericSig.isNull());
-  return GenericFunctionType::get(genericSig, params, resultTy.get(), info);
+  return GenericFunctionType::get(genericSig, params, yields, resultTy.get(),
+                                  info);
 }
 
 Expected<Type> DESERIALIZE_TYPE(FUNCTION_TYPE)(

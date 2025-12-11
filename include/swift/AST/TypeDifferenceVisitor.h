@@ -187,10 +187,6 @@ public:
                                type1->getElements(), type2->getElements());
   }
 
-  bool visitYieldResultType(CanYieldResultType type1, CanYieldResultType type2) {
-    return asImpl().visit(type1.getResultType(), type2.getResultType());
-  }
-
   bool visitComponent(CanType type1, CanType type2,
                       const TupleTypeElt &elt1, const TupleTypeElt &elt2) {
     if (elt1.getName() != elt2.getName())

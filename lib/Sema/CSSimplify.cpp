@@ -7549,24 +7549,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
       return result;
     }
-      
-    case TypeKind::YieldResult: {
-      if (kind != ConstraintKind::Bind && kind != ConstraintKind::Subtype)
-        return getTypeMatchFailure(locator);
-
-      auto *yield1 = cast<YieldResultType>(desugar1);
-      auto *yield2 = cast<YieldResultType>(desugar2);
-
-      // TODO: In theory we can convert inout yield to non-inout one,
-      // however, we disallow this for now as overall generic coroutine
-      // semantics is a bit vague.
-      if (yield1->isInOut() != yield2->isInOut())
-        return getTypeMatchFailure(locator);
-
-      return matchTypes(yield1->getResultType(), yield2->getResultType(),
-                        ConstraintKind::Bind, subflags,
-                  locator.withPathElement(ConstraintLocator::LValueConversion));
-    }
 
     case TypeKind::Placeholder: {
       // If it's allowed to attempt fixes, let's delegate
@@ -8583,7 +8565,7 @@ ConstraintSystem::simplifyConstructionConstraint(
     // let's diagnose it.
     if (shouldAttemptFixes()) {
       if (valueType->isVoid() && fnType->getNumParams() > 0) {
-        auto contextualType = FunctionType::get({}, fnType->getResult());
+        auto contextualType = FunctionType::get({}, {}, fnType->getResult());
         if (fixExtraneousArguments(
                 *this, contextualType, fnType->getParams(),
                 fnType->getNumParams(),
@@ -8667,7 +8649,6 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::Function:
   case TypeKind::LValue:
   case TypeKind::InOut:
-  case TypeKind::YieldResult:
   case TypeKind::Module:
   case TypeKind::Pack:
   case TypeKind::PackExpansion:
@@ -12402,9 +12383,8 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       FunctionTypeIsolation::forParameter());
   }
 
-  auto closureType =
-      FunctionType::get(parameters, inferredClosureType->getResult(),
-                        closureExtInfo);
+  auto closureType = FunctionType::get(
+      parameters, {}, inferredClosureType->getResult(), closureExtInfo);
   assignFixedType(typeVar, closureType);
 
   // If there is a result builder to apply, do so now.
@@ -12964,7 +12944,8 @@ ConstraintSystem::simplifyKeyPathConstraint(
       // `{ root in root[keyPath: kp] }` so any conversions that are valid with
       // a source type of `(Root) -> Value` should be valid here too.
       auto rootParam = AnyFunctionType::Param(rootTy);
-      auto kpFnTy = FunctionType::get(rootParam, valueTy, fnTy->getExtInfo());
+      auto kpFnTy =
+          FunctionType::get(rootParam, {}, valueTy, fnTy->getExtInfo());
 
       // Note: because the keypath is applied to `root` as a parameter internal
       // to the closure, we use the function parameter's "parameter type" rather
@@ -12974,7 +12955,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
       // ```
       auto paramTy = fnTy->getParams()[0].getParameterType();
       auto paramParam = AnyFunctionType::Param(paramTy);
-      auto paramFnTy = FunctionType::get(paramParam, fnTy->getResult(),
+      auto paramFnTy = FunctionType::get(paramParam, {}, fnTy->getResult(),
                                          fnTy->getExtInfo());
 
       // Form a key path type as well to make sure that root and value
@@ -13765,7 +13746,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
 
         // The original application type with all the trailing closures
         // dropped from it and result replaced to the implicit variable.
-        func1 = FunctionType::get(func1->getParams().drop_back(numTrailing),
+        func1 = FunctionType::get(func1->getParams().drop_back(numTrailing), {},
                                   callableType, func1->getExtInfo());
 
         auto matchCallResult = ::matchCallArguments(
@@ -13784,7 +13765,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
             *this, callAsFunctionResultTy, implicitCallArgumentList, calleeLoc);
 
         auto callAsFunctionArguments =
-            FunctionType::get(trailingClosureTypes, callAsFunctionResultTy,
+            FunctionType::get(trailingClosureTypes, {}, callAsFunctionResultTy,
                               FunctionType::ExtInfo());
 
         // Form an unsolved constraint to apply trailing closures to a
@@ -14131,8 +14112,8 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
 
   // Create a type variable for the argument to the `dynamicallyCall` method.
   auto tvParam = createTypeVariable(loc, TVO_CanBindToNoEscape);
-  AnyFunctionType *funcType =
-    FunctionType::get({ AnyFunctionType::Param(tvParam) }, func1->getResult());
+  AnyFunctionType *funcType = FunctionType::get(
+      {AnyFunctionType::Param(tvParam)}, {}, func1->getResult());
   addConstraint(ConstraintKind::DynamicCallableApplicableFunction,
                 funcType, tv, locator);
 

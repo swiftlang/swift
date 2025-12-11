@@ -1,41 +1,41 @@
 // RUN: %target-typecheck-verify-swift
 
-@yield_once func coro(_ x : inout Float) -> inout @yields Float {
+@yield_once func coro(_ x : inout Float) yields (inout Float) -> () {
   var _x = Float(0.0)
   yield &_x
   x = Float(_x)
 }
 
-func retCoro() -> @yield_once (_ x : inout Float) -> inout @yields Float {
+func retCoro() -> @yield_once (inout Float) yields (inout Float) -> () {
   return coro
 }
 
-@yield_once func coroWithResult(_ x : Float) -> (yield: inout @yields Float, result: Float) {
+@yield_once func coroWithResult(_ x : Float) yields (inout Float) -> Float {
   var _x = Float(0.0)
   yield &_x
   return _x
 }
 
-func retCoroWithResult() -> @yield_once (_ x : Float) -> (inout @yields Float, Float) {
+func retCoroWithResult() -> @yield_once (Float) yields (inout Float) -> (Float) {
   return coroWithResult
 }
 
-@yield_once func coroGen<T>(_ x : inout T) -> inout @yields T {
+@yield_once func coroGen<T>(_ x : inout T) yields (inout T) -> () {
   var _x = x
   yield &_x
   x = _x
 }
 
-func retGenCoro<T>() -> @yield_once (_ x : inout T) -> inout @yields T {
+func retGenCoro<T>() -> @yield_once (inout T) yields (inout T) -> () {
   return coroGen
 }
 
-@yield_once func coroGenWithResult<T>(_ x : T) -> (yield: inout @yields T, result: T) {
+@yield_once func coroGenWithResult<T>(_ x : T) yields (inout T) -> T {
   var _x = x
   yield &_x
   return _x
 }
 
-func retCoroGenWithResult<T>() -> @yield_once (_ x : T) -> (inout @yields T, T) {
+func retCoroGenWithResult<T>() -> @yield_once (T) yields (inout T) -> T {
   return coroGenWithResult
 }

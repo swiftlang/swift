@@ -570,7 +570,7 @@ namespace {
       // to the input type of the subscript operator.
       auto addApplicableFn = [&]() {
         CS.addApplicationConstraint(
-            FunctionType::get(params, outputTy), memberTy,
+            FunctionType::get(params, {}, outputTy), memberTy,
             /*trailingClosureMatching=*/std::nullopt, CurDC, fnLocator);
       };
 
@@ -648,9 +648,9 @@ namespace {
 
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
-      CS.addApplicationConstraint(FunctionType::get(params, outputTy), memberTy,
-                                  /*trailingClosureMatching=*/std::nullopt,
-                                  CurDC, fnLocator);
+      CS.addApplicationConstraint(
+          FunctionType::get(params, {}, outputTy), memberTy,
+          /*trailingClosureMatching=*/std::nullopt, CurDC, fnLocator);
       return outputTy;
     }
 
@@ -972,7 +972,7 @@ namespace {
           TVO_CanBindToNoEscape);
 
       CS.addApplicationConstraint(
-          FunctionType::get(params, resultType), memberType,
+          FunctionType::get(params, {}, resultType), memberType,
           /*trailingClosureMatching=*/std::nullopt, CurDC, fnLoc);
 
       if (constr->isFailable())
@@ -2071,7 +2071,7 @@ namespace {
         extInfo = extInfo.withSendable();
       }
 
-      auto *fnTy = FunctionType::get(closureParams, resultTy, extInfo);
+      auto *fnTy = FunctionType::get(closureParams, {}, resultTy, extInfo);
       return CS.replaceInferableTypesWithTypeVars(
           fnTy, CS.getConstraintLocator(closure))->castTo<FunctionType>();
     }
@@ -2538,7 +2538,7 @@ namespace {
           // Equal constraints require ExtInfo comparison.
           // FIXME: Verify ExtInfo state is correct, not working by accident.
           FunctionType::ExtInfo info;
-          Type functionType = FunctionType::get(params, outputType, info);
+          Type functionType = FunctionType::get(params, {}, outputType, info);
 
           // TODO: Convert to own constraint? Note that ApplicableFn isn't quite
           // right, as pattern matching has data flowing *into* the apply result
@@ -2848,7 +2848,8 @@ namespace {
       getMatchingParams(expr->getArgs(), params);
 
       CS.addApplicationConstraint(
-          FunctionType::get(params, resultType, extInfo), CS.getType(fnExpr),
+          FunctionType::get(params, {}, resultType, extInfo),
+          CS.getType(fnExpr),
           /*trailingClosureMatching=*/std::nullopt, CurDC,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
@@ -3612,12 +3613,9 @@ namespace {
           TVO_CanBindToNoEscape);
 
       CS.addApplicationConstraint(
-          FunctionType::get(params, resultType),
-          macroRefType,
-          /*trailingClosureMatching=*/std::nullopt,
-          CurDC,
-          CS.getConstraintLocator(
-            expr, ConstraintLocator::ApplyFunction));
+          FunctionType::get(params, {}, resultType), macroRefType,
+          /*trailingClosureMatching=*/std::nullopt, CurDC,
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
       return resultType;
     }

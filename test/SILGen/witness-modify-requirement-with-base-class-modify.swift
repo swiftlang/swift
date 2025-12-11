@@ -23,5 +23,5 @@ public class Derived<T: P> : Base<T>, Q where T.A == S {}
 // CHECK-LABEL: sil_witness_table [serialized] <T where T : P, T.A == S> Derived<T>: Q module main {
 // CHECK-NEXT:    method #Q.foo!getter: <Self where Self : Q> (Self) -> () -> S? : @$s4main7DerivedCyxGAA1QA2aEP3fooAA1SVSgvgTW
 // CHECK-NEXT:    method #Q.foo!setter: <Self where Self : Q> (inout Self) -> (S?) -> () : @$s4main7DerivedCyxGAA1QA2aEP3fooAA1SVSgvsTW
-// CHECK-NEXT:    method #Q.foo!modify: <Self where Self : Q> (inout Self) -> @yield_once () -> inout @yields S? : @$s4main7DerivedCyxGAA1QA2aEP3fooAA1SVSgvMTW
+// CHECK-NEXT:    method #Q.foo!modify: <Self where Self : Q> (inout Self) -> @yield_once () yields (inout S?) -> () : @$s4main7DerivedCyxGAA1QA2aEP3fooAA1SVSgvMTW
 // CHECK-NEXT:  }
