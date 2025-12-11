@@ -8,7 +8,6 @@
 
 swift_compiler_sources(Optimizer
   FunctionUsesDumper.swift
-  DeadEndBlockDumper.swift
   SILPrinter.swift
   RangeDumper.swift
   UpdateBorrowedFrom.swift

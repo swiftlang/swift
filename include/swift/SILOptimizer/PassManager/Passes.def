@@ -71,8 +71,6 @@ PASS(DestroyHoisting, "destroy-hoisting",
      "Hoist destroy_value instructions")
 PASS(MandatoryDestroyHoisting, "mandatory-destroy-hoisting",
      "Hoist destroy_value instructions for non-lexical values")
-PASS(DeadEndBlockDumper, "dump-deadendblocks",
-     "Tests the DeadEndBlocks utility")
 PASS(EmbeddedWitnessCallSpecialization, "embedded-witness-call-specialization",
      "Mandatory witness method call specialization")
 PASS(ConstantCapturePropagation, "constant-capture-propagation",

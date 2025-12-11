@@ -150,7 +150,6 @@ private func registerSwiftPasses() {
   // Test passes
   registerPass(functionUsesDumper, { functionUsesDumper.run($0) })
   registerPass(silPrinterPass, { silPrinterPass.run($0) })
-  registerPass(deadEndBlockDumper, { deadEndBlockDumper.run($0) })
   registerPass(rangeDumper, { rangeDumper.run($0) })
   registerPass(testInstructionIteration, { testInstructionIteration.run($0) })
   registerPass(updateBorrowedFromPass, { updateBorrowedFromPass.run($0) })

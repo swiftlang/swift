@@ -53,6 +53,7 @@ public func registerOptimizerTests() {
     rangeOverlapsPathTest,
     variableIntroducerTest,
     destroyBarrierTest,
+    deadEndBlockTest,
     escapeInfoTest,
     addressEscapeInfoTest,
     aliasingTest,
