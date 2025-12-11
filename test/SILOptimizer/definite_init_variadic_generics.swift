@@ -110,6 +110,29 @@ struct ThrowingPackInit<each T> {
   }
 }
 
+// MARK: - Crash case: throwing call AFTER pack tuple assignment
+// This is the minimal reproducer for the DI crash. The crash occurs when:
+// 1. Struct has multiple properties including a pack expansion tuple
+// 2. Pack tuple is assigned first
+// 3. A throwing call comes AFTER the pack tuple assignment
+// DI must generate cleanup code to destroy the pack tuple if the throw occurs,
+// and was incorrectly using tuple_element_addr instead of treating it as opaque.
+
+func produceValue<T>(type: T.Type) -> T { fatalError() }
+func throwingCall() throws -> Int { return 0 }
+
+struct ThrowingAfterPackInit<each T> {
+  let packed: (repeat each T)
+  let other: Int
+
+  // CHECK-LABEL: sil hidden @$s31definite_init_variadic_generics21ThrowingAfterPackInitV
+  // CHECK: tuple_pack_element_addr
+  init() throws {
+    self.packed = (repeat produceValue(type: (each T).self))
+    self.other = try throwingCall()
+  }
+}
+
 // MARK: - Test instantiations to ensure code generation works
 
 func testInstantiations() {

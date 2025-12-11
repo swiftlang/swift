@@ -2,36 +2,26 @@
 // RUN: %target-swift-frontend -emit-ir %s -target %target-swift-5.9-abi-triple
 
 // This test case reproduces a crash in DefiniteInitialization when initializing
-// a struct property that is a tuple containing a pack expansion. The DI pass
-// was incorrectly trying to decompose pack-expansion tuples into individual
-// elements, but pack arity is unknown at compile time.
+// a struct property that is a tuple containing a pack expansion.
+//
+// The crash occurs when:
+// 1. Struct has multiple properties including a pack expansion tuple
+// 2. Pack tuple is assigned first
+// 3. A throwing call comes AFTER the pack tuple assignment
+//
+// DI must generate cleanup code to destroy the pack tuple if the throw occurs.
+// The bug was that DI incorrectly used tuple_element_addr (which requires static
+// indices) instead of treating the pack tuple as a single opaque element.
 
-import Foundation
+func produceValue<T>(type: T.Type) -> T { fatalError() }
+func throwingCall() throws -> Int { return 0 }
 
-public struct CorpusEntry<each Input: Codable & Sendable>: Sendable, Codable {
+public struct CrashCase<each Input> {
     public let input: (repeat each Input)
     public let foo: Int
 
-    public func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CorpusEntryCodingKeys.self)
-        var dataList = [Data]()
-        (repeat try dataList.append(JSONEncoder().encode(each input)))
-
-        try container.encode(dataList, forKey: .input)
-        try container.encode(foo, forKey: .foo)
+    public init() throws {
+        self.input = (repeat produceValue(type: (each Input).self))
+        self.foo = try throwingCall()
     }
-
-    public init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CorpusEntryCodingKeys.self)
-        var contentsContainer = try container.nestedUnkeyedContainer(forKey: .input)
-
-        self.input = try (repeat contentsContainer.decode((each Input).self))
-
-        self.foo = try container.decode(Int.self, forKey: .foo)
-    }
-}
-
-public enum CorpusEntryCodingKeys: String, CodingKey {
-    case input
-    case foo
 }
