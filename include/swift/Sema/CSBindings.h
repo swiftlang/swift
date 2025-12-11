@@ -592,15 +592,26 @@ public:
   void dump(llvm::raw_ostream &out, unsigned indent) const;
 
 private:
-  /// Add a new binding to the set.
+  /// Introduce a new binding to the set. The binding might not
+  /// actually be added due to subtyping or other rule like
+  /// CGFloat/Double implicit conversion. This method should be
+  /// be preferred over \c addBinding when adding new bindings.
   ///
   /// \param binding The binding to add.
   /// \param isTransitive Indicates whether this binding has been
   /// acquired through transitive inference and requires validity
   /// checking.
-  void addBinding(PotentialBinding binding, bool isTransitive);
+  void introduceBinding(PotentialBinding binding, bool isTransitive);
 
   void addLiteralRequirement(Constraint *literal);
+
+  /// Insert the given binding into \c Bindings.
+  ///
+  /// This method is going to compute referenced variables before
+  /// forwarding to the other overload.
+  void addBinding(const PotentialBinding &&binding);
+  void addBinding(const PotentialBinding &&binding,
+                  llvm::SmallPtrSetImpl<TypeVariableType *> &referencedVars);
 
   void addDefault(Constraint *constraint);
 

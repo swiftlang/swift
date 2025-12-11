@@ -43,7 +43,7 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
     : CS(CS), TypeVar(TypeVar), Info(info) {
 
   for (const auto &binding : info.Bindings)
-    addBinding(binding, /*isTransitive=*/false);
+    introduceBinding(binding, /*isTransitive=*/false);
 
   for (auto *constraint : info.Constraints) {
     switch (constraint->getKind()) {
@@ -596,7 +596,7 @@ void BindingSet::inferTransitiveKeyPathBindings() {
 
                 // Copy the bindings over to the root.
                 for (const auto &binding : bindings.Bindings)
-                  addBinding(binding, /*isTransitive=*/true);
+                  introduceBinding(binding, /*isTransitive=*/true);
 
                 // Make a note that the key path root is transitively adjacent
                 // to contextual root type variable and all of its variables.
@@ -606,7 +606,7 @@ void BindingSet::inferTransitiveKeyPathBindings() {
                                     bindings.AdjacentVars.end());
               }
             } else {
-              addBinding(
+              introduceBinding(
                   binding.withSameSource(inferredRootTy, AllowedBindingKind::Exact),
                   /*isTransitive=*/true);
             }
@@ -679,7 +679,7 @@ void BindingSet::inferTransitiveSupertypeBindings() {
       if (ConstraintSystem::typeVarOccursInType(TypeVar, type))
         continue;
 
-      addBinding(binding.withSameSource(type, AllowedBindingKind::Supertypes),
+      introduceBinding(binding.withSameSource(type, AllowedBindingKind::Supertypes),
                  /*isTransitive=*/true);
     }
   }
@@ -713,7 +713,7 @@ void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
                   continue;
             }
 
-            addBinding({protocolTy, AllowedBindingKind::Exact, constraint},
+            introduceBinding({protocolTy, AllowedBindingKind::Exact, constraint},
                        /*isTransitive=*/false);
           }
         }
@@ -889,7 +889,22 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
   }
 }
 
-void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
+void BindingSet::addBinding(const PotentialBinding &&binding) {
+   SmallPtrSet<TypeVariableType *, 4> referencedVars;
+   binding.BindingType->getTypeVariables(referencedVars);
+
+   addBinding(std::move(binding), referencedVars);
+}
+
+void BindingSet::addBinding(const PotentialBinding &&binding,
+                            SmallPtrSetImpl<TypeVariableType *> &referencedVars) {
+  for (auto *adjacentVar : referencedVars)
+    AdjacentVars.insert(adjacentVar);
+
+  (void)Bindings.insert(binding);
+}
+
+void BindingSet::introduceBinding(PotentialBinding binding, bool isTransitive) {
   if (Bindings.count(binding))
     return;
 
@@ -976,7 +991,7 @@ void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
     }
 
     for (const auto &binding : joined)
-      (void)Bindings.insert(binding);
+      addBinding(std::move(binding));
 
     // If new binding has been joined with at least one of existing
     // bindings, there is no reason to include it into the set.
@@ -984,10 +999,7 @@ void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
       return;
   }
 
-  for (auto *adjacentVar : referencedTypeVars)
-    AdjacentVars.insert(adjacentVar);
-
-  (void)Bindings.insert(std::move(binding));
+  addBinding(std::move(binding), referencedTypeVars);
 }
 
 void BindingSet::determineLiteralCoverage() {
