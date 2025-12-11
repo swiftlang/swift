@@ -1412,6 +1412,16 @@ performModuleScanImpl(
       instance->getDiags(),
       instance->getInvocation().getFrontendOptions().ParallelDependencyScan);
 
+  auto initError = scanner.initializeWorkerClangScanningTool();
+  if (initError) {
+    llvm::handleAllErrors(
+        std::move(initError), [&](const llvm::StringError &E) {
+          instance->getDiags().diagnose(
+              SourceLoc(), diag::clang_dependency_scan_error, E.getMessage());
+        });
+    return std::make_error_code(std::errc::invalid_argument);
+  }
+
   // Identify imports of the main module and add an entry for it
   // to the dependency graph.
   auto mainModuleName = instance->getMainModule()->getNameStr();
@@ -1425,6 +1435,17 @@ performModuleScanImpl(
   auto allModules = scanner.performDependencyScan(mainModuleID);
   if (diagnoseCycle(*instance, cache, mainModuleID))
     return std::make_error_code(std::errc::not_supported);
+
+  auto finError = scanner.finalizeWorkerClangScanningTool();
+  if (finError) {
+    llvm::handleAllErrors(std::move(finError), [&](const llvm::StringError &E) {
+      instance->getDiags().diagnose(
+          SourceLoc(), diag::clang_dependency_scan_error, E.getMessage());
+    });
+    // TODO:it is not expected that the finialization fails. Maybe we should
+    // turn this into an assert.
+    return std::make_error_code(std::errc::not_supported);
+  }
 
   auto topologicallySortedModuleList =
       computeTopologicalSortOfExplicitDependencies(allModules, cache);
