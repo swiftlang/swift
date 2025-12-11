@@ -25,11 +25,16 @@
 namespace swift {
 
 // MARK: - ClangTypeInfo
+const clang::Type *ClangTypeInfo::makeCanonical(const clang::Type *type) {
+  if (!type)
+    return nullptr;
+  return type->getCanonicalTypeInternal().getTypePtr();
+}
 
 bool operator==(ClangTypeInfo lhs, ClangTypeInfo rhs) {
   if (lhs.type == rhs.type)
     return true;
-  if (lhs.type && rhs.type)
+  if (lhs.type && rhs.type && lhs.equivalentType == rhs.equivalentType)
     return lhs.type->getCanonicalTypeInternal() ==
            rhs.type->getCanonicalTypeInternal();
   return false;
@@ -39,10 +44,15 @@ bool operator!=(ClangTypeInfo lhs, ClangTypeInfo rhs) {
   return !(lhs == rhs);
 }
 
+bool ClangTypeInfo::isEquivalentType(const ClangTypeInfo &other) const {
+  return equivalentType == other.equivalentType;
+}
+
 ClangTypeInfo ClangTypeInfo::getCanonical() const {
   if (!type)
     return ClangTypeInfo();
-  return ClangTypeInfo(type->getCanonicalTypeInternal().getTypePtr());
+  return ClangTypeInfo(type->getCanonicalTypeInternal().getTypePtr(),
+                       equivalentType->getCanonicalTypeInternal().getTypePtr());
 }
 
 void ClangTypeInfo::printType(ClangModuleLoader *cml,
@@ -86,7 +96,8 @@ UnexpectedClangTypeError::checkClangType(SILFunctionTypeRepresentation silRep,
     if (isBlock && !type->isBlockPointerType())
       return {{Kind::NotBlockPointer, type}};
     if (!isBlock && !(type->isFunctionPointerType()
-                      || type->isFunctionReferenceType()))
+                      || type->isFunctionReferenceType()
+                      || type->isFunctionType()))
       return {{Kind::NotFunctionPointerOrReference, type}};
     return std::nullopt;
   }
@@ -121,8 +132,8 @@ void UnexpectedClangTypeError::dump() {
     return;
   }
   case Kind::NotFunctionPointerOrReference: {
-    e << ("Expected function pointer/reference type for @convention(c) function"
-          " but found:\n");
+    e << ("Expected function or function pointer/reference type for "
+          "@convention(c) function but found:\n");
     type->dump();
     return;
   }

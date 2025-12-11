@@ -10,7 +10,7 @@ import Closure
 // CHECK: %[[V2:.*]] = alloc_stack $@block_storage @callee_guaranteed (@in_guaranteed ARCWeak) -> ()
 // CHECK: %[[V3:.*]] = project_block_storage %[[V2]] : $*@block_storage @callee_guaranteed (@in_guaranteed ARCWeak) -> ()
 // CHECK: store %[[V1]] to %[[V3]] : $*@callee_guaranteed (@in_guaranteed ARCWeak) -> ()
-// CHECK: %[[V7:.*]] = function_ref @$sSo7ARCWeakVIegn_ABIeyBi_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed ARCWeak) -> (), @in ARCWeak) -> ()
+// CHECK: %[[V7:.*]] = function_ref @$sSo7ARCWeakVIegn_ABIeyzB31_ZTSU13block_pointerFv7ARCWeakEi_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed ARCWeak) -> (), @in ARCWeak) -> ()
 // CHECK: %[[V6:.*]] = init_block_storage_header %[[V2]] : $*@block_storage @callee_guaranteed (@in_guaranteed ARCWeak) -> (), invoke %[[V7]] : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed ARCWeak) -> (), @in ARCWeak) -> (), type $@convention(block) (@in ARCWeak) -> ()
 // CHECK: %[[V8:.*]] = copy_block %[[V6]] : $@convention(block) (@in ARCWeak) -> ()
 // CHECK: dealloc_stack %[[V2]] : $*@block_storage @callee_guaranteed (@in_guaranteed ARCWeak) -> ()
@@ -20,7 +20,7 @@ import Closure
 // CHECK: %[[V12:.*]] = tuple ()
 // CHECK: return %[[V12]] : $()
 
-// CHECK: sil shared [transparent] [reabstraction_thunk] @$sSo7ARCWeakVIegn_ABIeyBi_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed ARCWeak) -> (), @in ARCWeak) -> () {
+// CHECK: sil shared [transparent] [reabstraction_thunk] @$sSo7ARCWeakVIegn_ABIeyzB31_ZTSU13block_pointerFv7ARCWeakEi_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed ARCWeak) -> (), @in ARCWeak) -> () {
 // CHECK: bb0(%[[V0:.*]] : $*@block_storage @callee_guaranteed (@in_guaranteed ARCWeak) -> (), %[[V1:.*]] : $*ARCWeak):
 // CHECK: %[[V2:.*]] = project_block_storage %[[V0]] : $*@block_storage @callee_guaranteed (@in_guaranteed ARCWeak) -> ()
 // CHECK: %[[V3:.*]] = load %[[V2]] : $*@callee_guaranteed (@in_guaranteed ARCWeak) -> ()
