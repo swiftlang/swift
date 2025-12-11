@@ -1597,7 +1597,7 @@ VarDecl *ResultBuilder::buildVar(SourceLoc loc) {
   Identifier name =
       ctx.getIdentifier(("$__builder" + Twine(VarCounter++)).str());
   auto var = new (ctx)
-      VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var, loc, name, DC);
+      VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, loc, name, DC);
   var->setImplicit();
   return var;
 }
