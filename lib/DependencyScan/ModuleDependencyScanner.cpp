@@ -620,6 +620,23 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
       break;
     }
 
+    if (ScanASTContext.LangOpts.EnableCXXInterop) {
+      StringRef mainModuleName = mainModule->getName().str();
+      if (mainModuleName != CXX_MODULE_NAME)
+        mainDependencies.addModuleImport(CXX_MODULE_NAME, /* isExported */ false,
+                                         AccessLevel::Public,
+                                         &alreadyAddedModules);
+      if (llvm::none_of(llvm::ArrayRef<StringRef>{CXX_MODULE_NAME,
+                            ScanASTContext.Id_CxxStdlib.str(), "std"},
+                        [mainModuleName](StringRef Name) {
+                          return mainModuleName == Name;
+                        }))
+        mainDependencies.addModuleImport(ScanASTContext.Id_CxxStdlib.str(),
+                                         /* isExported */ false,
+                                         AccessLevel::Public,
+                                         &alreadyAddedModules);
+    }
+
     // Add any implicit module names.
     for (const auto &import : importInfo.AdditionalUnloadedImports) {
       mainDependencies.addModuleImport(
