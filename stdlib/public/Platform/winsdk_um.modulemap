@@ -607,5 +607,35 @@ module WinSDK [system] {
 
     link "wlanapi.lib"
   }
+
+  module WTypesBase {
+    header "../shared/wtypesbase.h"
+    export *
+  }
+
+  module WTypes {
+    header "../shared/wtypes.h"
+    export *
+  }
+
+  module RoApi {
+    header "../winrt/roapi.h"
+    export *
+  }
+
+  module MinWinDef {
+    header "../shared/minwindef.h"
+    export *
+  }
+
+  module SDKDDKVer {
+    header "../shared/sdkddkver.h"
+    export *
+  }
+
+  module WinError {
+    header "../shared/winerror.h"
+    export *
+  }
 }
 
