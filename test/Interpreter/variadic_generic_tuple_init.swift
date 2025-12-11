@@ -174,22 +174,41 @@ suite.test("Throwing init") {
   }
 }
 
-// MARK: - Original crash case: struct similar to Codable use case
-// (Actual Codable conformance for tuples isn't supported, but the crash
-// was in DI during initialization, not in Codable synthesis)
+// MARK: - Throwing initializer with pack expansion tuple (crash case)
+// This is a minimal reproducer for the DI crash. The crash occurs when:
+// 1. Struct has multiple properties including a pack expansion tuple
+// 2. Throwing initializer where a throwing call comes AFTER the pack tuple assignment
+// 3. DI generates cleanup code that incorrectly uses tuple_element_addr on the pack tuple
 
-struct Container<each Input> {
+func produceValue<T>(type: T.Type) -> T {
+  fatalError("not called in test")
+}
+
+func produceInt() throws -> Int {
+  return 42
+}
+
+struct ThrowingContainer<each Input> {
   let inputs: (repeat each Input)
+  let tag: Int
 
-  init(inputs: repeat each Input) {
+  init() throws {
+    self.inputs = (repeat produceValue(type: (each Input).self))
+    self.tag = try produceInt()
+  }
+
+  init(inputs: repeat each Input, tag: Int) {
     self.inputs = (repeat each inputs)
+    self.tag = tag
   }
 }
 
-suite.test("Container struct with pack tuple") {
-  let c = Container<Int, String>(inputs: 42, "test")
+suite.test("Throwing init with pack tuple - success path") {
+  // Use the non-throwing init for runtime test
+  let c = ThrowingContainer<Int, String>(inputs: 42, "test", tag: 99)
   expectEqual(42, c.inputs.0)
   expectEqual("test", c.inputs.1)
+  expectEqual(99, c.tag)
 }
 
 runAllTests()
