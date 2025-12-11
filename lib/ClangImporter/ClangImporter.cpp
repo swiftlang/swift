@@ -5455,26 +5455,32 @@ static bool checkConditionalParams(
 }
 
 static std::set<StringRef>
-getConditionalAttrParams(const clang::RecordDecl *decl, StringRef attrName) {
+getConditionalAttrParams(clang::SwiftAttrAttr *swiftAttr, StringRef attrName) {
   std::set<StringRef> result;
-  if (!decl->hasAttrs())
-    return result;
-  for (auto attr : decl->getAttrs()) {
-    if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-      StringRef params = swiftAttr->getAttribute();
-      if (params.consume_front(attrName)) {
-        auto commaPos = params.find(',');
-        StringRef nextParam = params.take_front(commaPos);
-        while (!nextParam.empty() && commaPos != StringRef::npos) {
-          result.insert(nextParam.trim());
-          params = params.drop_front(nextParam.size() + 1);
-          commaPos = params.find(',');
-          nextParam = params.take_front(commaPos);
-        }
-      }
+  StringRef params = swiftAttr->getAttribute();
+  if (params.consume_front(attrName)) {
+    auto commaPos = params.find(',');
+    StringRef nextParam = params.take_front(commaPos);
+    while (!nextParam.empty() && commaPos != StringRef::npos) {
+      result.insert(nextParam.trim());
+      params = params.drop_front(nextParam.size() + 1);
+      commaPos = params.find(',');
+      nextParam = params.take_front(commaPos);
     }
   }
   return result;
+}
+
+static std::set<StringRef>
+getConditionalAttrParams(const clang::NamedDecl *decl, StringRef attrName) {
+  if (decl->hasAttrs()) {
+    for (auto attr : decl->getAttrs()) {
+      if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+        return getConditionalAttrParams(swiftAttr, attrName);
+    }
+  }
+
+  return {};
 }
 
 static std::set<StringRef>
@@ -5509,15 +5515,6 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
   // escapability annotations, malformed escapability annotations)
 
   bool hasUnknown = false;
-  auto desugared = desc.type->getUnqualifiedDesugaredType();
-  if (const auto *recordType = desugared->getAs<clang::RecordType>()) {
-    auto recordDecl = recordType->getDecl();
-    // If the root type has a SWIFT_ESCAPABLE annotation, we import the type as
-    // Escapable without entering the loop
-    if (hasEscapableAttr(recordDecl))
-      return CxxEscapability::Escapable;
-  }
-
   llvm::SmallVector<const clang::Type *, 4> stack;
   // Keep track of Types we've seen to avoid cycles
   llvm::SmallDenseSet<const clang::Type *, 4> seen;
@@ -5551,13 +5548,6 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
         hasUnknown &= checkConditionalParams<CxxEscapability>(
             recordDecl, desc.impl, STLParams, conditionalParams,
             maybePushToStack);
-
-        if (desc.impl) {
-          HeaderLoc loc{recordDecl->getLocation()};
-          for (auto name : conditionalParams)
-            desc.impl->diagnose(loc, diag::unknown_template_parameter, name);
-        }
-
         continue;
       }
       // Only try to infer escapability if the record doesn't have any
@@ -8593,16 +8583,12 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
       auto conditionalParams = getConditionalCopyableAttrParams(recordDecl);
 
       if (!STLParams.empty() || !conditionalParams.empty()) {
-        hasUnknown &= checkConditionalParams<CxxValueSemanticsKind>(
-            recordDecl, importerImpl, STLParams, conditionalParams,
-            maybePushToStack);
-
-        if (importerImpl) {
-          HeaderLoc loc{recordDecl->getLocation()};
-          for (auto name : conditionalParams)
-            importerImpl->diagnose(loc, diag::unknown_template_parameter, name);
+        if (isa<clang::ClassTemplateSpecializationDecl>(recordDecl) &&
+            importerImpl) {
+          hasUnknown &= checkConditionalParams<CxxValueSemanticsKind>(
+              recordDecl, importerImpl, STLParams, conditionalParams,
+              maybePushToStack);
         }
-
         continue;
       }
     }
@@ -8636,7 +8622,8 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
     if (!hasDestroyTypeOperations(cxxRecordDecl) ||
         (!isCopyable && !isMovable)) {
 
-      if (hasConstructorWithUnsupportedDefaultArgs(cxxRecordDecl))
+      if (hasConstructorWithUnsupportedDefaultArgs(cxxRecordDecl) &&
+          importerImpl)
         importerImpl->addImportDiagnostic(
             cxxRecordDecl, Diagnostic(diag::record_unsupported_default_args),
             cxxRecordDecl->getLocation());
@@ -9261,6 +9248,85 @@ swift::importer::getCxxRefConventionWithAttrs(const clang::Decl *decl) {
   }
 
   return std::nullopt;
+}
+
+static const std::vector<std::vector<std::pair<StringRef, StringRef>>>
+    ConflictingSwiftAttrs = {
+        {{"Escapable", "SWIFT_ESCAPABLE"},
+         {"~Escapable", "SWIFT_NONESCAPABLE"},
+         {"escapable_if:", "SWIFT_ESCAPABLE_IF"}},
+        {{"~Copyable", "SWIFT_NONCOPYABLE"},
+         {"copyable_if:", "SWIFT_COPYABLE_IF"}},
+        {{"mutating", "SWIFT_MUTATING"}, {"nonmutating", "'nonmutating'"}}};
+
+static bool isConditionalAttr(StringRef attrName) {
+  return attrName == "escapable_if:" || attrName == "copyable_if:";
+}
+
+void ClangImporter::Implementation::validateSwiftAttributes(
+    const clang::NamedDecl *decl) {
+  if (!decl->hasAttrs())
+    return;
+
+  for (const auto &groupOfAttrs : ConflictingSwiftAttrs) {
+    // stores this decl's attributes, grouped by annotation kind
+    llvm::StringMap<std::vector<clang::SwiftAttrAttr *>> found;
+    unsigned count = 0;
+    for (auto [attrName, annotationName] : groupOfAttrs) {
+      for (auto attr : decl->getAttrs()) {
+        auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
+        if (swiftAttr && swiftAttr->getAttribute().starts_with(attrName)) {
+          found[annotationName].push_back(swiftAttr);
+          count += 1;
+
+          // in the common case, we validate at most one conditional attribute
+          if (isConditionalAttr(attrName)) {
+            auto specDecl =
+                dyn_cast<clang::ClassTemplateSpecializationDecl>(decl);
+            if (!specDecl) {
+              diagnose(HeaderLoc{swiftAttr->getLocation()},
+                       diag::invalid_conditional_attr, annotationName);
+              continue;
+            }
+            auto conditionalParams =
+                getConditionalAttrParams(swiftAttr, attrName);
+            while (specDecl && !conditionalParams.empty()) {
+              auto templateDecl = specDecl->getSpecializedTemplate();
+              for (auto [idx, param] :
+                   llvm::enumerate(*templateDecl->getTemplateParameters()))
+                conditionalParams.erase(param->getName());
+
+              const clang::DeclContext *dc = specDecl;
+              specDecl = nullptr;
+              while ((dc = dc->getParent())) {
+                specDecl = dyn_cast<clang::ClassTemplateSpecializationDecl>(dc);
+                if (specDecl)
+                  break;
+              }
+            }
+            for (auto name : conditionalParams)
+              diagnose(HeaderLoc{decl->getLocation()},
+                       diag::unknown_template_parameter, name);
+          }
+        }
+      }
+    }
+
+    if (count > 1) {
+      if (found.size() == 1)
+        diagnose(HeaderLoc{decl->getLocation()}, diag::repeating_swift_attrs,
+                 found.begin()->getKey(), decl);
+      else
+        diagnose(HeaderLoc{decl->getLocation()}, diag::conflicting_swift_attrs,
+                 decl);
+
+      for (auto &[annotationName, attrs] : found) {
+        for (auto attr : attrs)
+          diagnose(HeaderLoc{attr->getLocation()}, diag::annotation_here,
+                   annotationName);
+      }
+    }
+  }
 }
 
 NominalType *swift::stripInlineNamespaces(NominalType *outer,
