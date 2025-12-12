@@ -7,7 +7,6 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
-  FunctionUsesDumper.swift
   SILPrinter.swift
   RangeDumper.swift
   UpdateBorrowedFrom.swift

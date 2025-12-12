@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -wmo -dump-function-uses %s -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt -wmo -test-function-uses %s -o /dev/null | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

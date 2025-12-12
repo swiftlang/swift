@@ -71,6 +71,8 @@ public func registerOptimizerTests() {
     memoryEffectsTest
   )
 
+  registerModuleTest(functionUsesTest, { functionUsesTest.pass.run($0) })
+
   // Finally register the thunk they all call through.
   registerFunctionTestThunk(functionTestThunk)
 }
