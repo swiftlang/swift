@@ -108,6 +108,13 @@ struct ExistentialLayout {
   /// Determine whether this refers to any non-marker protocols.
   bool containsNonMarkerProtocols() const;
 
+  /// Is the memory representation of this layout ABI-compatible with another?
+  ///
+  /// ABI compatability primarily has to do with which protocol's witness tables
+  /// will exist in the layout. Having any differences in terms of which witness
+  /// tables are present is an ABI difference.
+  bool isABICompatibleWith(ExistentialLayout const &other) const;
+
   ArrayRef<ParameterizedProtocolType *> getParameterizedProtocols() const & {
     return parameterized;
   }
