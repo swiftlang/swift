@@ -2568,6 +2568,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     Printer << " {";
     if (mutatingGetter) printWithSpace("mutating");
 
+    // TODO: Print borrow/yielding borrow here?
     printWithSpace("get");
 
     if (asyncGet) printWithSpace("async");
@@ -2580,6 +2581,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     if (settable) {
       if (nonmutatingSetter) printWithSpace("nonmutating");
 
+      // TODO: Print mutate/yielding mutate here?
       printWithSpace("set");
     }
     Printer << " }";

@@ -388,6 +388,8 @@ public:
     Setter,
     ModifyCoroutine,
     ReadCoroutine,
+    Borrow,
+    Mutate
   };
 
 private:
@@ -460,6 +462,8 @@ public:
     case Kind::Init:
     case Kind::Getter:
     case Kind::Setter:
+    case Kind::Borrow:
+    case Kind::Mutate:
       return false;
     case Kind::ModifyCoroutine:
     case Kind::ReadCoroutine:
@@ -631,6 +635,8 @@ public:
     ModifyCoroutine,
     AssociatedTypeAccessFunction,
     AssociatedConformanceAccessFunction,
+    Borrow,
+    Mutate
   };
 
 private:
@@ -693,6 +699,8 @@ public:
     case Kind::Setter:
     case Kind::AssociatedTypeAccessFunction:
     case Kind::AssociatedConformanceAccessFunction:
+    case Kind::Borrow:
+    case Kind::Mutate:
       return false;
     case Kind::ReadCoroutine:
     case Kind::ModifyCoroutine:

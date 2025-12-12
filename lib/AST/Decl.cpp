@@ -3314,6 +3314,8 @@ static AccessStrategy getOpaqueReadAccessStrategy(
     return AccessStrategy::getAccessor(AccessorKind::YieldingBorrow, dispatch);
   if (storage->requiresOpaqueReadCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
+  if (storage->requiresOpaqueBorrowAccessor())
+    return AccessStrategy::getAccessor(AccessorKind::Borrow, dispatch);
   return AccessStrategy::getAccessor(AccessorKind::Get, dispatch);
 }
 
@@ -3471,8 +3473,11 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
     return requiresOpaqueModifyCoroutine();
   case AccessorKind::YieldingMutate:
     return requiresOpaqueYieldingMutateCoroutine();
-
-  // Other accessors are never part of the opaque-accessors set.
+  case AccessorKind::Borrow:
+    return requiresOpaqueBorrowAccessor();
+  case AccessorKind::Mutate:
+    return requiresOpaqueMutateAccessor();
+    // Other accessors are never part of the opaque-accessors set.
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"
@@ -3494,7 +3499,8 @@ bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
     return requiresCorrespondingUnderscoredCoroutineAccessor(
         AccessorKind::YieldingBorrow);
 
-  return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
+  return getOpaqueReadOwnership() == OpaqueReadOwnership::YieldingBorrow ||
+         getOpaqueReadOwnership() == OpaqueReadOwnership::OwnedOrBorrowed;
 }
 
 bool AbstractStorageDecl::requiresOpaqueYieldingBorrowCoroutine() const {
@@ -3522,6 +3528,10 @@ bool AbstractStorageDecl::requiresOpaqueYieldingBorrowCoroutine() const {
   return getOpaqueReadOwnership() !=  OpaqueReadOwnership::Owned;
 }
 
+bool AbstractStorageDecl::requiresOpaqueBorrowAccessor() const {
+  return getOpaqueReadOwnership() == OpaqueReadOwnership::Borrow;
+}
+
 bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(
@@ -3538,6 +3548,10 @@ bool AbstractStorageDecl::requiresOpaqueYieldingMutateCoroutine() const {
       RequiresOpaqueModifyCoroutineRequest{
           const_cast<AbstractStorageDecl *>(this), /*isUnderscored=*/false},
       false);
+}
+
+bool AbstractStorageDecl::requiresOpaqueMutateAccessor() const {
+  return getAccessor(AccessorKind::Mutate) != nullptr;
 }
 
 AccessorDecl *
@@ -3647,6 +3661,12 @@ void AbstractStorageDecl::visitExpectedOpaqueAccessors(
 
   if (requiresOpaqueYieldingMutateCoroutine())
     visit(AccessorKind::YieldingMutate);
+
+  if (requiresOpaqueBorrowAccessor())
+    visit(AccessorKind::Borrow);
+
+  if (requiresOpaqueMutateAccessor())
+    visit(AccessorKind::Mutate);
 }
 
 void AbstractStorageDecl::visitOpaqueAccessors(

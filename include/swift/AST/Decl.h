@@ -6305,7 +6305,8 @@ public:
 
   /// Does this storage require a 'get' accessor in its opaque-accessors set?
   bool requiresOpaqueGetter() const {
-    return getOpaqueReadOwnership() != OpaqueReadOwnership::YieldingBorrow;
+    return getOpaqueReadOwnership() != OpaqueReadOwnership::YieldingBorrow &&
+           getOpaqueReadOwnership() != OpaqueReadOwnership::Borrow;
   }
 
   /// Does this storage require a '_read' accessor in its opaque-accessors set?
@@ -6313,6 +6314,9 @@ public:
 
   /// Does this storage require a 'read' accessor in its opaque-accessors set?
   bool requiresOpaqueYieldingBorrowCoroutine() const;
+
+  /// Does this storage require a 'borrow' accessor in its opaque-accessors set?
+  bool requiresOpaqueBorrowAccessor() const;
 
   /// Does this storage require a 'set' accessor in its opaque-accessors set?
   bool requiresOpaqueSetter() const;
@@ -6329,6 +6333,9 @@ public:
   /// ABI stability?
   bool requiresCorrespondingUnderscoredCoroutineAccessor(
       AccessorKind kind, AccessorDecl const *decl = nullptr) const;
+
+  /// Does this storage require a 'mutate' accessor in its opaque-accessors set?
+  bool requiresOpaqueMutateAccessor() const;
 
   /// Does this storage have any explicit observers (willSet or didSet) attached
   /// to it?

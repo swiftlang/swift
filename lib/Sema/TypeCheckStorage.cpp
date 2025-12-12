@@ -1069,7 +1069,7 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     return OpaqueReadOwnership::YieldingBorrow;
 
   if (storage->getAccessor(AccessorKind::Borrow))
-    return OpaqueReadOwnership::YieldingBorrow;
+    return OpaqueReadOwnership::Borrow;
 
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
@@ -2757,6 +2757,60 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
 }
 
 static AccessorDecl *
+createBorrowMutateAccessorPrototype(AbstractStorageDecl *storage,
+                                    AccessorKind kind, ASTContext &ctx) {
+  SourceLoc loc = storage->getLoc();
+
+  auto dc = storage->getDeclContext();
+
+  // The forwarding index parameters.
+  auto *params = buildIndexForwardingParamList(storage, {}, ctx);
+
+  auto *accessor = AccessorDecl::create(
+      ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(), kind, storage,
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
+      params, Type(), dc);
+  accessor->setSynthesized();
+
+  // TODO: Update self access kind when ownership variations are introduced for
+  // borrow and mutate accessors.
+  if (kind == AccessorKind::Mutate) {
+    accessor->setSelfAccessKind(SelfAccessKind::Mutating);
+  } else {
+    accessor->setSelfAccessKind(SelfAccessKind::NonMutating);
+  }
+
+  // If the storage does not provide this accessor as an opaque accessor,
+  // we can't add a dynamically-dispatched method entry for the accessor,
+  // so force it to be statically dispatched. ("final" would be inappropriate
+  // because the property can still be overridden.)
+  if (!storage->requiresOpaqueAccessor(kind))
+    accessor->setForcedStaticDispatch(true);
+
+  // Make sure the coroutine is available enough to access
+  // the storage.
+  SmallVector<const Decl *, 2> asAvailableAs;
+  asAvailableAs.push_back(storage);
+
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    addPropertyWrapperAccessorAvailability(var, kind, asAvailableAs);
+  }
+
+  AvailabilityInference::applyInferredAvailableAttrs(accessor, asAvailableAs);
+
+  // A mutate accessor should have the same SPI visibility as the setter.
+  if (kind == AccessorKind::Mutate) {
+    if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set))
+      applyInferredSPIAccessControlAttr(accessor, setter, ctx);
+  }
+
+  finishImplicitAccessor(accessor, ctx);
+
+  return accessor;
+}
+
+static AccessorDecl *
 createReadCoroutinePrototype(AbstractStorageDecl *storage,
                              ASTContext &ctx) {
   return createCoroutineAccessorPrototype(storage, AccessorKind::Read, ctx);
@@ -2776,6 +2830,18 @@ createModifyCoroutinePrototype(AbstractStorageDecl *storage,
 static AccessorDecl *
 createYieldingMutateCoroutinePrototype(AbstractStorageDecl *storage, ASTContext &ctx) {
   return createCoroutineAccessorPrototype(storage, AccessorKind::YieldingMutate, ctx);
+}
+
+static AccessorDecl *createBorrowAccessorPrototype(AbstractStorageDecl *storage,
+                                                   ASTContext &ctx) {
+  return createBorrowMutateAccessorPrototype(storage, AccessorKind::Borrow,
+                                             ctx);
+}
+
+static AccessorDecl *createMutateAccessorPrototype(AbstractStorageDecl *storage,
+                                                   ASTContext &ctx) {
+  return createBorrowMutateAccessorPrototype(storage, AccessorKind::Mutate,
+                                             ctx);
 }
 
 AccessorDecl *
@@ -2812,6 +2878,12 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
 
   case AccessorKind::YieldingMutate:
     return createYieldingMutateCoroutinePrototype(storage, ctx);
+
+  case AccessorKind::Borrow:
+    return createBorrowAccessorPrototype(storage, ctx);
+
+  case AccessorKind::Mutate:
+    return createMutateAccessorPrototype(storage, ctx);
 
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
