@@ -109,6 +109,16 @@ function(add_swift_compiler_modules_library name)
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
 
+  # Pass the declared C++ stdlib for swift's internal clang.
+  set(swift_compile_cxx_flags ${CMAKE_CXX_FLAGS})
+  separate_arguments(swift_compile_cxx_flags)
+  foreach(cxx_flag ${swift_compile_cxx_flags})
+    if (cxx_flag MATCHES "^-stdlib=")
+      list(APPEND swift_compile_options "-Xcc" ${cxx_flag})
+      break()
+    endif()
+  endforeach()
+
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     if(SWIFT_MIN_RUNTIME_VERSION)
       list(APPEND swift_compile_options
