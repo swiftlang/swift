@@ -95,10 +95,6 @@ Type typeCheckParameterDefault(Expr *&, DeclContext *, Type, bool, bool);
 
 } // end namespace swift
 
-/// Allocate memory within the given constraint system.
-void *operator new(size_t bytes, swift::constraints::ConstraintSystem& cs,
-                   size_t alignment = 8);
-
 namespace swift {
 
 /// Specify how we handle the binding of underconstrained (free) type variables
@@ -5270,7 +5266,7 @@ public:
 
   /// Determine whether given type variable with its set of bindings is viable
   /// to be attempted on the next step of the solver.
-  std::optional<BindingSet> determineBestBindings(
+  const BindingSet *determineBestBindings(
       llvm::function_ref<void(const BindingSet &)> onCandidate);
 
   /// Get bindings for the given type variable based on current
@@ -6200,7 +6196,7 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
 public:
   using Element = TypeVariableBinding;
 
-  TypeVarBindingProducer(BindingSet &bindings);
+  TypeVarBindingProducer(const BindingSet &bindings);
 
   /// Retrieve a set of bindings available in the current state.
   ArrayRef<Binding> getCurrentBindings() const { return Bindings; }

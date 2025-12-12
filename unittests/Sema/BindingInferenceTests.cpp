@@ -196,7 +196,7 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
                      cs.getConstraintLocator({}, LocatorPathElt::ContextualType(
                                                      CTP_Initialization)));
 
-    auto bindings = inferBindings(cs, typeVar);
+    auto &bindings = inferBindings(cs, typeVar);
     ASSERT_TRUE(bindings.getConformanceRequirements().empty());
     ASSERT_TRUE(bool(bindings.TransitiveProtocols));
     verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
@@ -218,7 +218,7 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
     cs.addConstraint(ConstraintKind::Conversion, typeVar, GPT1,
                      cs.getConstraintLocator({}));
 
-    auto bindings = inferBindings(cs, typeVar);
+    auto &bindings = inferBindings(cs, typeVar);
     ASSERT_TRUE(bindings.getConformanceRequirements().empty());
     ASSERT_TRUE(bool(bindings.TransitiveProtocols));
     verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
@@ -281,10 +281,10 @@ TEST_F(SemaTest, TestComplexTransitiveProtocolInference) {
   cs.addConstraint(ConstraintKind::Equal, typeVar1, typeVar5, nilLocator);
   cs.addConstraint(ConstraintKind::Conversion, typeVar5, typeVar6, nilLocator);
 
-  auto bindingsForT1 = inferBindings(cs, typeVar1);
-  auto bindingsForT2 = inferBindings(cs, typeVar2);
-  auto bindingsForT3 = inferBindings(cs, typeVar3);
-  auto bindingsForT5 = inferBindings(cs, typeVar5);
+  auto &bindingsForT1 = inferBindings(cs, typeVar1);
+  auto &bindingsForT2 = inferBindings(cs, typeVar2);
+  auto &bindingsForT3 = inferBindings(cs, typeVar3);
+  auto &bindingsForT5 = inferBindings(cs, typeVar5);
 
   ASSERT_TRUE(bool(bindingsForT1.TransitiveProtocols));
   verifyProtocolInferenceResults(*bindingsForT1.TransitiveProtocols,
@@ -335,7 +335,7 @@ TEST_F(SemaTest, TestTransitiveProtocolInferenceThroughEquivalenceChains) {
   cs.addConstraint(ConstraintKind::ConformsTo, typeVar2, protocolTy0, nilLocator);
   cs.addConstraint(ConstraintKind::ConformsTo, typeVar3, protocolTy1, nilLocator);
 
-  auto bindings = inferBindings(cs, typeVar0);
+  auto &bindings = inferBindings(cs, typeVar0);
 
   ASSERT_TRUE(bool(bindings.TransitiveProtocols));
   verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
