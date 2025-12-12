@@ -33,6 +33,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PackExpansionMatcher.h"
@@ -46,6 +47,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/EnumMap.h"
 #include "swift/Basic/FixedBitSet.h"
@@ -4442,6 +4444,18 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     return ErrorType::get(ctx);
   }
 
+  auto const lifetimeAttr = claim<LifetimeTypeAttr>(attrs);
+  llvm::ArrayRef<LifetimeDependenceInfo> lifetimeDependence = {};
+  // TODO: Is it valid to only compute lifetime dependence in the interface stage?
+  if (inStage(TypeResolutionStage::Interface)) {
+    if (auto const resolvedLifetimeDependence = getLifetimeDependenceFromAST(
+            repr, params, outputTy,
+            lifetimeAttr ? lifetimeAttr->getLifetimeEntry() : nullptr,
+            getDeclContext())) {
+      lifetimeDependence = *resolvedLifetimeDependence;
+    }
+  }
+
   // If this is a function type without parens around the parameter list,
   // diagnose this and produce a fixit to add them.
   if (!repr->isWarnedAbout()) {
@@ -4488,7 +4502,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      /*LifetimeDependenceInfo*/ {}, hasSendingResult);
+      lifetimeDependence, hasSendingResult);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)

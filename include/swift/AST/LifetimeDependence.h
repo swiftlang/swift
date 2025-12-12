@@ -316,6 +316,12 @@ public:
   /// ownership modifiers.
   static std::optional<ArrayRef<LifetimeDependenceInfo>> get(ValueDecl *decl);
 
+  /// Builds LifetimeDependenceINfo from a Swift closure expr, either from the
+  /// explicit lifetime dependence specifiers or by inference based on types and
+  /// ownership modifiers. Most closure expressions lack an explicit result
+  /// type, so one must also be supplied.
+  static std::optional<ArrayRef<LifetimeDependenceInfo>> get(ClosureExpr *ce, Type resultTy);
+
   /// Builds LifetimeDependenceInfo from SIL
   static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   getFromSIL(FunctionTypeRepr *funcRepr, ArrayRef<SILParameterInfo> params,
