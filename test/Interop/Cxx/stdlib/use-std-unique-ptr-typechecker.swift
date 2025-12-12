@@ -10,3 +10,7 @@ func takeCopyable<T: Copyable>(_ x: T) {}
 let vecUniquePtr = getVectorNonCopyableUniquePtr()
 takeCopyable(vecUniquePtr)
 // CHECK: error: global function 'takeCopyable' requires that 'std{{.*}}vector{{.*}}unique_ptr{{.*}}NonCopyable{{.*}}' conform to 'Copyable'
+
+let uniqueIntVec = HasUniqueIntVector()
+takeCopyable(uniqueIntVec)
+// CHECK: error: global function 'takeCopyable' requires that 'HasUniqueIntVector' conform to 'Copyable'

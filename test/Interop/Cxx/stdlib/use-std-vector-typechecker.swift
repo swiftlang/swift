@@ -29,3 +29,11 @@ let vecFloat = VectorOfFloat()
 takeCopyable(vecFloat)
 takeCxxVector(vecFloat)
 // CHECK-NOT: error
+
+let hasVector = HasVector()
+takeCopyable(hasVector)
+// CHECK: error: global function 'takeCopyable' requires that 'HasVector' conform to 'Copyable'
+
+let baseHasVector = BaseHasVector()
+takeCopyable(baseHasVector)
+// CHECK: error: global function 'takeCopyable' requires that 'BaseHasVector' conform to 'Copyable'
