@@ -9257,6 +9257,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           req->is<LocatorPathElt::TypeParameterRequirement>()) {
         auto *memberLoc = getConstraintLocator(anchor, path.front());
 
+        if (hasFixFor(memberLoc))
+          return SolutionKind::Solved;
+
         auto signature = path[path.size() - 2]
                              .castTo<LocatorPathElt::OpenedGeneric>()
                              .getSignature();
@@ -10677,7 +10680,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
             candidate,
             MemberLookupResult::UR_InvalidStaticMemberOnProtocolMetatype);
       }
-
       return;
     } else {
       if (!hasStaticMembers) {
@@ -11625,8 +11627,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                                  alreadyDiagnosed, locator);
 
       auto instanceTy = baseObjTy->getMetatypeInstanceType();
-
-      auto impact = 4;
+      auto impact = 2;
       // Impact is higher if the base type is any function type
       // because function types can't have any members other than self
       if (instanceTy->is<AnyFunctionType>()) {
@@ -11654,10 +11655,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           }
         }
 
-        // Increasing the impact for missing member in any argument position so
-        // it doesn't affect situations where there are another fixes involved.
+        // Increasing the impact for missing member in any argument position
+        // which may be less likely than other potential mistakes
         if (getArgumentLocator(anchorExpr))
-          impact += 5;
+          impact += 1;
       }
 
       if (recordFix(fix, impact))
