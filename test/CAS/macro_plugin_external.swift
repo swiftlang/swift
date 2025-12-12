@@ -35,7 +35,7 @@
 
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd
 
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -typecheck -verify -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -module-name MyApp \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
@@ -50,7 +50,7 @@
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s --check-prefix=FS-REMAP -DLIB=%target-library-name(MacroDefinition)
 
 /// CASFS is remapped.
-// FS-REMAP: /^test/plugins/[[LIB]]
+// FS-REMAP: /^test{{/|\\}}plugins{{/|\\}}[[LIB]]
 
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps2.json -o %t/MyApp2.cmd
 
@@ -59,9 +59,9 @@
 
 // CMD-REMAP: -resolved-plugin-verification
 // CMD-REMAP-NEXT: -load-resolved-plugin
-// CMD-REMAP-NEXT: /^test/plugins/[[LIB]]#/^bin/swift-plugin-server#MacroDefinition
+// CMD-REMAP-NEXT: /^test{{/|\\}}plugins{{/|\\}}[[LIB]]#/^bin{{/|\\}}swift-plugin-server{{(.exe)?}}#MacroDefinition
 
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
 // RUN:   -swift-version 5 -O \
@@ -74,10 +74,10 @@
 /// Encoded PLUGIN_SEARCH_OPTION is remapped.
 // RUN: llvm-bcanalyzer -dump %t/Macro.swiftmodule | %FileCheck %s --check-prefix=MOD -DLIB=%target-library-name(MacroDefinition)
 
-// MOD: <PLUGIN_SEARCH_OPTION abbrevid=7 op0=4/> blob data = '/^test/plugins/[[LIB]]#/^bin/swift-plugin-server#MacroDefinition'
+// MOD: <PLUGIN_SEARCH_OPTION abbrevid=7 op0=4/> blob data = '/^test{{/|\\}}plugins{{/|\\}}[[LIB]]#/^bin{{/|\\}}swift-plugin-server{{(.exe)?}}#MacroDefinition'
 
 /// Cache hit has no macro-loading remarks because no macro is actually loaded and the path might not be correct due to different mapping.
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
 // RUN:   -swift-version 5 -O \
@@ -89,7 +89,7 @@
 
 /// Update timestamp, the build should still work.
 // RUN: touch %t/plugins/%target-library-name(MacroDefinition)
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
 // RUN:   -swift-version 5 -O \
@@ -99,7 +99,7 @@
 
 /// Typecheck swift interface with macro plugin.
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
-// RUN:   %target-swift-frontend \
+// RUN:   %target-swift-frontend-plain \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
 // RUN:   -swift-version 5 -O \
@@ -108,7 +108,7 @@
 // RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir > %t/keys.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json /^test/macro.swift > %t/key
 
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -typecheck-module-from-interface %t/Macro.swiftinterface \
 // RUN:   -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -O \
@@ -119,7 +119,7 @@
 
 /// Change the dylib content, this will fail the build.
 // RUN: echo " " >> %t/plugins/%target-library-name(MacroDefinition)
-// RUN: not %target-swift-frontend \
+// RUN: not %target-swift-frontend-plain \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -emit-module-interface-path %t/Macro.swiftinterface \
 // RUN:   -swift-version 5 -O \

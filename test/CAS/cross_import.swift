@@ -31,7 +31,7 @@
 // CMD-NEXT: [[CMI2:[B|C]]]
 // CMD-NEXT: [[CMI2]].swiftcrossimport{{/|\\}}A.swiftoverlay
 
-// RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule  \
+// RUN: %target-swift-frontend-plain -emit-module -o %t/Test.swiftmodule  \
 // RUN:   -emit-module-interface-path %t/Test.swiftinterface \
 // RUN:   -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -enable-cross-import-overlays \
