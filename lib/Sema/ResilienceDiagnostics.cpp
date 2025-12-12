@@ -248,6 +248,7 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
   case ExportabilityReason::ExtensionWithConditionalConformances:
     return true;
   case ExportabilityReason::Inheritance:
+  case ExportabilityReason::ImplicitlyPublicInheritance:
     return isa<ProtocolDecl>(D);
   case ExportabilityReason::AvailableAttribute:
     // If the context is an extension and that extension has an explicit

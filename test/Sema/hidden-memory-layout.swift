@@ -385,7 +385,7 @@ public struct ExposedLayoutPublicUser: ProtocolFromDirect {
 }
 
 internal struct ExposedLayoutInternalUser: ProtocolFromDirect {
-// expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
+// expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 
   private var privateField: StructFromDirect
   // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
@@ -422,7 +422,7 @@ internal struct ExposedLayoutInternalUser: ProtocolFromDirect {
 }
 
 private struct ExposedLayoutPrivateUser: ProtocolFromDirect {
-// expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
+// expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 
   private var privateField: StructFromDirect
   // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
@@ -517,7 +517,7 @@ public enum PublicEnumUser: ProtocolFromDirect {
 }
 
 internal enum InternalEnumUser: ProtocolFromDirect {
-// expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
+// expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
     case a(StructFromDirect) // expected-opt-in-error {{cannot use struct 'StructFromDirect' here; 'directs' has been imported as implementation-only}}
 
     case e(ExposedLayoutPublic)
@@ -540,7 +540,7 @@ internal enum InternalEnumUser: ProtocolFromDirect {
 }
 
 private enum PrivateEnumUser: ProtocolFromDirect {
-// expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
+// expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
     case a(StructFromDirect) // expected-opt-in-error {{cannot use struct 'StructFromDirect' here; 'directs' has been imported as implementation-only}}
 
     case e(ExposedLayoutPublic)
@@ -559,7 +559,7 @@ private enum PrivateEnumUser: ProtocolFromDirect {
     case i(HiddenProtocol) // expected-opt-in-error {{cannot use protocol 'HiddenProtocol' here; 'HiddenProtocol' is marked '@_implementationOnly'}}
 }
 
-internal enum InternalEnumWithRawType : RawTypeFromDirect { // expected-opt-in-error {{cannot use struct 'RawTypeFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
+internal enum InternalEnumWithRawType : RawTypeFromDirect { // expected-opt-in-error {{cannot use struct 'RawTypeFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
   typealias RawValue = RawTypeFromDirect
   case a
 }
@@ -694,7 +694,7 @@ public class FixedClassUser: ProtocolFromDirect {
 }
 
 internal class InternalClassUser: ProtocolFromDirect {
-// expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
+// expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 
   public init() { fatalError() }
 
@@ -719,7 +719,7 @@ internal class InternalClassUser: ProtocolFromDirect {
 }
 
 private class PrivateClassUser: ProtocolFromDirect {
-// expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
+// expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 
   public init() { fatalError() }
 

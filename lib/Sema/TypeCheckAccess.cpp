@@ -2493,9 +2493,13 @@ public:
       flags |= DeclAvailabilityFlag::
           AllowPotentiallyUnavailableAtOrBelowDeploymentTarget;
 
+    ExportabilityReason reason =
+      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
+        ExportabilityReason::ImplicitlyPublicInheritance :
+        ExportabilityReason::Inheritance;
     for (TypeLoc inherited : nominal->getInherited().getEntries()) {
       checkType(inherited.getType(), inherited.getTypeRepr(), nominal,
-                ExportabilityReason::Inheritance,
+                reason,
                 flags | DeclAvailabilityFlag::DisableUnsafeChecking);
     }
   }
@@ -2597,9 +2601,13 @@ public:
     // must be exported.
     DeclAvailabilityFlags flags = DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
     flags |= DeclAvailabilityFlag::DisableUnsafeChecking;
+    ExportabilityReason inheritanceReason =
+      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
+        ExportabilityReason::ImplicitlyPublicInheritance :
+        ExportabilityReason::Inheritance;
     for (TypeLoc inherited : ED->getInherited().getEntries()) {
       checkType(inherited.getType(), inherited.getTypeRepr(), ED,
-                ExportabilityReason::Inheritance, flags);
+                inheritanceReason, flags);
     }
 
     auto wasWhere = Where;

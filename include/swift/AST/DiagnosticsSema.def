@@ -3855,6 +3855,7 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
       "in an extension with public or '@usableFromInline' members|" \
       "in an extension with conditional conformances|" \
       "in a public or '@usableFromInline' conformance|" \
+      "in a conformance on a type not marked '@_implementationOnly'|" \
       "in an '@available' attribute here|" \
       "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context|" \
       "in a property declaration member of a type not marked '@_implementationOnly'}"
