@@ -496,6 +496,7 @@ static bool usesFeatureTildeSendable(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(AnyAppleOSAvailability)
+UNINTERESTING_FEATURE(StrictAccessControl)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
