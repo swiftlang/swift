@@ -4008,6 +4008,7 @@ namespace {
 
       ImportedType resultType;
       bool selfIsInOut = false;
+      bool selfIsConsuming = false;
       ParameterList *bodyParams = nullptr;
       if (!dc->isModuleScopeContext() && !isClangNamespace(dc) &&
           !isa<clang::CXXMethodDecl>(decl)) {
@@ -4020,6 +4021,8 @@ namespace {
             !dc->getDeclaredInterfaceType()->hasReferenceSemantics()) {
           auto selfParam = decl->getParamDecl(*selfIdx);
           auto selfParamTy = selfParam->getType();
+          if (selfParamTy->isRValueReferenceType())
+            selfIsConsuming = true;
           if ((selfParamTy->isPointerType() ||
                selfParamTy->isReferenceType()) &&
               !selfParamTy->getPointeeType().isConstQualified()) {
@@ -4073,6 +4076,8 @@ namespace {
                 !isa<ClassDecl>(dc) &&
                 Impl.SwiftContext.getClangModuleLoader()->isCXXMethodMutating(
                     mdecl);
+            selfIsConsuming =
+                mdecl->getRefQualifier() == clang::RefQualifierKind::RQ_RValue;
           }
         }
       }
@@ -4130,7 +4135,9 @@ namespace {
         result = func;
 
         if (!dc->isModuleScopeContext()) {
-          if (selfIsInOut) {
+          if (selfIsConsuming) {
+            func->setSelfAccessKind(SelfAccessKind::Consuming);
+          } else if (selfIsInOut) {
             func->setSelfAccessKind(SelfAccessKind::Mutating);
           } else {
             if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
