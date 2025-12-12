@@ -82,6 +82,20 @@ static inline void crash(const char *message) {
   swift_unreachable("Expected compiler to crash.");
 }
 
+#if !SWIFT_RUNTIME_EMBEDDED
+/// A hook function set by Swift Testing, XCTest, etc. that is called by
+/// `fatalErrorv()` before the process terminates.
+///
+/// When the runtime calls this function, it atomically swaps it for `nullptr`
+/// to avoid recursively calling it. (That is, the runtime only calls it once
+/// before the process terminates.)
+///
+/// - Warning: This hook function is called after a fatal error has already
+///   occurred. As such, the runtime, stdlib, etc. are in an undefined state.
+SWIFT_RUNTIME_EXPORT
+std::atomic<void (*)(uint32_t, const char *, void *)> _swift_willAbort;
+#endif
+
 // swift::fatalErrorv() halts with a crash log message,
 // but makes no attempt to preserve register state.
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN
