@@ -149,6 +149,7 @@ public func registerTests() {
     enclosingValuesTest,
     forwardingDefUseTest,
     forwardingUseDefTest,
+    rangeTest,
     addressableTest
   )
 

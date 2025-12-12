@@ -85,8 +85,6 @@ PASS(TestInstructionIteration, "test-instruction-iteration",
      "Tests instruction iteration")
 PASS(InitializeStaticGlobals, "initialize-static-globals",
      "Initializes static global variables")
-PASS(RangeDumper, "dump-ranges",
-     "Dumps block and instruction ranges")
 PASS(MandatoryRedundantLoadElimination, "mandatory-redundant-load-elimination",
      "Mandatory Redundant Load Elimination")
 PASS(EarlyRedundantLoadElimination, "early-redundant-load-elimination",

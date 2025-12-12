@@ -8,7 +8,6 @@
 
 swift_compiler_sources(Optimizer
   SILPrinter.swift
-  RangeDumper.swift
   UpdateBorrowedFrom.swift
   TestInstructionIteration.swift
 )
