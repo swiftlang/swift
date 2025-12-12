@@ -64,7 +64,7 @@ extension _StringGuts {
   internal init(_ storage: __SharedStringStorage) {
     self.init(_StringObject(storage))
   }
-  
+
 #if !$Embedded
 internal init(
   constantCocoa cocoa: AnyObject,
@@ -159,9 +159,9 @@ extension _StringGuts {
   }
 
   @inlinable @inline(__always)
-  internal func withFastUTF8<R>(
-    _ f: (UnsafeBufferPointer<UInt8>) throws -> R
-  ) rethrows -> R {
+  internal func withFastUTF8<Success, Failure: Error>(
+    _ f: (UnsafeBufferPointer<UInt8>) throws(Failure) -> Success
+  ) throws(Failure) -> Success {
     _internalInvariant(isFastUTF8)
 
     if self.isSmall { return try _SmallString(_object).withUTF8(f) }
@@ -181,10 +181,10 @@ extension _StringGuts {
   }
 
   @inlinable @inline(__always)
-  internal func withFastCChar<R>(
-    _ f: (UnsafeBufferPointer<CChar>) throws -> R
-  ) rethrows -> R {
-    return try unsafe self.withFastUTF8 { utf8 in
+  internal func withFastCChar<Success, Failure: Error>(
+    _ f: (UnsafeBufferPointer<CChar>) throws(Failure) -> Success
+  ) throws(Failure) -> Success {
+    return try unsafe self.withFastUTF8 { (utf8) throws(Failure) in
       return try unsafe utf8.withMemoryRebound(to: CChar.self, f)
     }
   }
@@ -219,26 +219,40 @@ extension _StringGuts {
 // C String interop
 extension _StringGuts {
   @inlinable @inline(__always) // fast-path: already C-string compatible
-  internal func withCString<Result>(
-    _ body: (UnsafePointer<Int8>) throws -> Result
-  ) rethrows -> Result {
+  internal func withCString<Success, Failure: Error>(
+    _ body: (UnsafePointer<Int8>) throws(Failure) -> Success
+  ) throws(Failure) -> Success {
     if _slowPath(!_object.isFastZeroTerminated) {
       return try unsafe _slowWithCString(body)
     }
 
-    return try unsafe self.withFastCChar {
-      return try unsafe body($0.baseAddress._unsafelyUnwrappedUnchecked)
+    return try unsafe self.withFastCChar { (pointer) throws(Failure) in
+      return try unsafe body(pointer.baseAddress._unsafelyUnwrappedUnchecked)
     }
+  }
+
+  @abi(
+    func _slowWithCString<Result>(
+      _ body: (UnsafePointer<Int8>) throws -> Result
+    ) rethrows -> Result
+  )
+  @inline(never) // slow-path
+  @usableFromInline
+  internal func __rethrows_slowWithCString<Result>(
+    _ body: (UnsafePointer<Int8>) throws -> Result
+  ) throws -> Result {
+    return try unsafe self._slowWithCString(body)
   }
 
   @inline(never) // slow-path
   @usableFromInline
-  internal func _slowWithCString<Result>(
-    _ body: (UnsafePointer<Int8>) throws -> Result
-  ) rethrows -> Result {
+  @_alwaysEmitIntoClient
+  internal func _slowWithCString<Success, Failure: Error>(
+    _ body: (UnsafePointer<Int8>) throws(Failure) -> Success
+  ) throws(Failure) -> Success {
     _internalInvariant(!_object.isFastZeroTerminated)
-    return try unsafe String(self).utf8CString.withUnsafeBufferPointer {
-      let ptr = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
+    return try unsafe String(self).utf8CString.withUnsafeBufferPointer { (bufferPointer) throws(Failure) in
+      let ptr = unsafe bufferPointer.baseAddress._unsafelyUnwrappedUnchecked
       return try unsafe body(ptr)
     }
   }
@@ -285,7 +299,7 @@ extension _StringGuts {
       unsafe ptr += 1
       numWritten += 1
     }
-    
+
     return numWritten
     #else
     fatalError("No foreign strings on Linux in this version of Swift")
