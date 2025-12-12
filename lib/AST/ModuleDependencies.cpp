@@ -738,8 +738,6 @@ ModuleDependenciesCache::findSwiftDependency(StringRef moduleName) const {
     return found;
   if (auto found = findDependency(moduleName, ModuleDependencyKind::SwiftBinary))
     return found;
-  if (auto found = findDependency(moduleName, ModuleDependencyKind::SwiftSource))
-    return found;
   return std::nullopt;
 }
 
@@ -770,6 +768,10 @@ bool ModuleDependenciesCache::hasDependency(StringRef moduleName) const {
 
 bool ModuleDependenciesCache::hasSwiftDependency(StringRef moduleName) const {
   return findSwiftDependency(moduleName).has_value();
+}
+
+bool ModuleDependenciesCache::hasNegativeSwiftDependency(StringRef moduleName) const {
+  return negativeSwiftDependencyCache.contains(moduleName);
 }
 
 void ModuleDependenciesCache::recordDependency(
@@ -846,6 +848,34 @@ void ModuleDependenciesCache::recordClangDependency(
     diagnoseExtraCommandLineFlags(newClangModuleDetails,
                                   priorClangModuleDetails, false);
   }
+}
+
+void ModuleDependenciesCache::addHeaderVisibleClangModules(
+    ModuleDependencyID moduleID,
+    const std::vector<std::string> &visibleModules) {
+  ASSERT(moduleID.Kind == ModuleDependencyKind::SwiftSource ||
+         moduleID.Kind == ModuleDependencyKind::SwiftInterface ||
+         moduleID.Kind == ModuleDependencyKind::SwiftBinary);
+
+  if (visibleModules.empty())
+    return;
+  auto dependencyInfo = findKnownDependency(moduleID);
+  auto updatedDependencyInfo = dependencyInfo;
+  updatedDependencyInfo.addVisibleClangModules(visibleModules);
+  updateDependency(moduleID, updatedDependencyInfo);
+}
+
+void ModuleDependenciesCache::addVisibleClangModules(
+    ModuleDependencyID moduleID,
+    ModuleDependencyID clangDependencyID,
+    const std::vector<std::string> &visibleModules) {
+  ASSERT(moduleID.Kind == ModuleDependencyKind::SwiftSource ||
+         moduleID.Kind == ModuleDependencyKind::SwiftInterface ||
+         moduleID.Kind == ModuleDependencyKind::SwiftBinary);
+  ASSERT(clangDependencyID.Kind == ModuleDependencyKind::Clang);
+
+  addHeaderVisibleClangModules(moduleID, visibleModules);
+  clangModulesVisibleFrom[clangDependencyID.ModuleName] = visibleModules;
 }
 
 void ModuleDependenciesCache::updateDependency(
@@ -942,22 +972,24 @@ ModuleDependencyIDCollectionView ModuleDependenciesCache::getAllDependencies(
       moduleInfo.getImportedClangDependencies());
 }
 
-void ModuleDependenciesCache::addVisibleClangModules(
-    ModuleDependencyID moduleID, const std::vector<std::string> &moduleNames) {
-  if (moduleNames.empty())
-    return;
-  auto dependencyInfo = findKnownDependency(moduleID);
-  auto updatedDependencyInfo = dependencyInfo;
-  updatedDependencyInfo.addVisibleClangModules(moduleNames);
-  updateDependency(moduleID, updatedDependencyInfo);
+void ModuleDependenciesCache::cacheNegativeSwiftDependency(
+    StringRef moduleIdentifier) {
+  negativeSwiftDependencyCache.insert(moduleIdentifier);
 }
 
-llvm::StringSet<> &ModuleDependenciesCache::getVisibleClangModules(
+llvm::StringSet<> ModuleDependenciesCache::getVisibleClangModules(
     ModuleDependencyID moduleID) const {
   ASSERT(moduleID.Kind == ModuleDependencyKind::SwiftSource ||
          moduleID.Kind == ModuleDependencyKind::SwiftInterface ||
          moduleID.Kind == ModuleDependencyKind::SwiftBinary);
   return findKnownDependency(moduleID).getVisibleClangModules();
+}
+
+std::vector<std::string> ModuleDependenciesCache::getVisibleClangModulesFrom(
+    ModuleDependencyID moduleID) const {
+  ASSERT(moduleID.Kind == ModuleDependencyKind::Clang);
+  return clangModulesVisibleFrom.contains(moduleID.ModuleName) ?
+         clangModulesVisibleFrom.at(moduleID.ModuleName) : std::vector<std::string>() ;
 }
 
 ModuleDependencyIDCollectionView
