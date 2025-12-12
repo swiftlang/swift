@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 979; // inferred_immutable
+const uint16_t SWIFTMODULE_VERSION_MINOR = 980; // opaque read ownership
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -194,7 +194,8 @@ using FileHashField = BCVBR<16>;
 // the module version.
 enum class OpaqueReadOwnership : uint8_t {
   Owned,
-  Borrowed,
+  YieldingBorrow,
+  Borrow,
   OwnedOrBorrowed,
 };
 using OpaqueReadOwnershipField = BCFixed<2>;
