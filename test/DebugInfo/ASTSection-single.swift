@@ -10,6 +10,6 @@
 // RUN: %target-swift-modulewrap %t/a0.swiftmodule -o %t/a0-mod.o
 
 // RUN: %lldb-moduleimport-test -verbose %t/a0-mod.o | %FileCheck %s
-// CHECK: Path: {{.*}}/Inputs, framework=false, system=false
+// CHECK: Path: {{.*}}{{/|\\}}Inputs, framework=false, system=false
 // CHECK: Importing a0...
 // CHECK: Import successful!
