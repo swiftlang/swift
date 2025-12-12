@@ -18,9 +18,6 @@ func getInt() async -> Int { return 5 }
 func test2(
   defaulted: Int = await getInt() // expected-error{{'async' call cannot occur in a default argument}}
 ) async {
-  defer {
-    _ = await getInt() // expected-error{{'async' call cannot occur in a defer body}}
-  }
   print("foo")
 }
 
@@ -182,10 +179,10 @@ func testAsyncLet() async throws {
   }
 
   defer {
-    async let deferX: Int = await getInt() // expected-error {{'async let' cannot be used on declarations in a defer body}}
-    _ = await deferX // expected-error {{async let 'deferX' cannot be referenced in a defer body}}
-    async let _: Int = await getInt() // expected-error {{'async let' cannot be used on declarations in a defer body}}
-    async let _ = await getInt() // expected-error {{'async let' cannot be used on declarations in a defer body}}
+    async let deferX: Int = await getInt()
+    _ = await deferX
+    async let _: Int = await getInt()
+    async let _ = await getInt()
   }
 
   async let x1 = getIntUnsafely() // okay, try is implicit here
