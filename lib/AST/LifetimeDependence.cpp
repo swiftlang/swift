@@ -1084,6 +1084,8 @@ protected:
 
     // Infer non-Escapable results.
     if (isDiagnosedNonEscapable(getResultOrYield())) {
+      inferNonEscapableResultOnSameTypeParam();
+
       if (isInit() && isImplicitOrSIL()) {
         inferImplicitInit();
       } else if (hasImplicitSelfParam()) {
@@ -1103,6 +1105,45 @@ protected:
 
     // Infer inout parameters - `inout` parameter default rule.
     inferInoutParams();
+  }
+
+  // Infer a dependency to the ~Escapable result from all parameters of the same
+  // type.
+  void inferNonEscapableResultOnSameTypeParam() {
+    // The function declaration's substituted result type.
+    CanType resultTy = getResultOrYield()->getCanonicalType();
+
+    TargetDeps *targetDeps = depBuilder.getInferredTargetDeps(resultIndex);
+    if (!targetDeps)
+      return;
+
+    // Ignore mutating self. An 'inout' modifier effectively makes the parameter
+    // a different type for lifetime inference.
+    if (hasImplicitSelfParam() && !afd->getImplicitSelfDecl()->isInOut()) {
+      Type selfTy = afd->mapTypeIntoEnvironment(dc->getSelfInterfaceType());
+      if (selfTy->getCanonicalType() == resultTy) {
+        targetDeps->inheritIndices.set(selfIndex);
+      }
+    }
+
+    unsigned paramIndex = 0;
+    for (auto *param : *afd->getParameters()) {
+      SWIFT_DEFER { paramIndex++; };
+
+      // Ignore 'inout' parameters. An 'inout' modifier effectively makes the
+      // parameter a different type for lifetime inference. An 'inout' parameter
+      // defaults to being the source and target of a self-dependency, as
+      // covered by the 'inout' rule.
+      if (param->isInOut())
+        continue;
+
+      CanType paramTy = afd->mapTypeIntoEnvironment(
+        param->getInterfaceType())->getCanonicalType();
+      if (paramTy != resultTy)
+        continue;
+
+      targetDeps->inheritIndices.set(paramIndex);
+    }
   }
 
   // Infer dependence for an accessor whose non-escapable result depends on
