@@ -511,3 +511,29 @@ extension _SliceBuffer {
     return ContiguousArray(_buffer: result)
   }
 }
+
+extension _SliceBuffer {
+  @_alwaysEmitIntoClient
+  internal func isTriviallyIdentical(to other: Self) -> Bool {
+#if $Embedded
+    if
+      self.owner == other.owner,
+      unsafe (self.subscriptBaseAddress == other.subscriptBaseAddress),
+      self.startIndex == other.startIndex,
+      self.endIndexAndFlags == other.endIndexAndFlags
+    {
+      return true
+    }
+#else
+    if
+      self.owner === other.owner,
+      unsafe (self.subscriptBaseAddress == other.subscriptBaseAddress),
+      self.startIndex == other.startIndex,
+      self.endIndexAndFlags == other.endIndexAndFlags
+    {
+      return true
+    }
+#endif
+    return false
+  }
+}
