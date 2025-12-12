@@ -2154,3 +2154,63 @@ extension Dictionary.Index: @unchecked Sendable
   where Key: Sendable, Value: Sendable {}
 extension Dictionary.Iterator: @unchecked Sendable
   where Key: Sendable, Value: Sendable {}
+
+extension Dictionary {
+  /// Returns a boolean value indicating whether this dictionary is identical to
+  /// `other`.
+  ///
+  /// Two dictionary values are identical if there is no way to distinguish
+  /// between them.
+  ///
+  /// For any values `a`, `b`, and `c`:
+  ///
+  /// - `a.isTriviallyIdentical(to: a)` is always `true`. (Reflexivity)
+  /// - `a.isTriviallyIdentical(to: b)` implies `b.isTriviallyIdentical(to: a)`.
+  /// (Symmetry)
+  /// - If `a.isTriviallyIdentical(to: b)` and `b.isTriviallyIdentical(to: c)`
+  /// are both `true`, then `a.isTriviallyIdentical(to: c)` is also `true`.
+  /// (Transitivity)
+  /// - If `a` and `b` are `Equatable`, then `a.isTriviallyIdentical(b)` implies
+  /// `a == b`. `a == b` does not imply `a.isTriviallyIdentical(b)`
+  ///
+  /// Values produced by copying the same value, with no intervening mutations,
+  /// will compare identical:
+  ///
+  /// ```swift
+  /// let d = c
+  /// print(c.isTriviallyIdentical(to: d))
+  /// // Prints true
+  /// ```
+  /// 
+  /// Comparing dictionaries this way includes comparing (normally) hidden
+  /// implementation details such as the memory location of any underlying
+  /// dictionary storage object. Therefore, identical dictionaries are
+  /// guaranteed to compare equal with `==`, but not all equal dictionaries are
+  /// considered identical.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+#if _runtime(_ObjC)
+    if
+      self._variant.isNative,
+      other._variant.isNative,
+      unsafe (self._variant.asNative._storage === other._variant.asNative._storage)
+    {
+      return true
+    }
+    if
+      !self._variant.isNative,
+      !other._variant.isNative,
+      self._variant.asCocoa.object === other._variant.asCocoa.object
+    {
+      return true
+    }
+#else
+    if unsafe (self._variant.asNative._storage === other._variant.asNative._storage) {
+      return true
+    }
+#endif
+    return false
+  }
+}
