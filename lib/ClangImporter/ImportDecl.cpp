@@ -1501,23 +1501,6 @@ namespace {
         // or the original C type.
         clang::QualType ClangType = Decl->getUnderlyingType();
 
-        // Prevent import of typedefs to forward-declared explicit template
-        // specializations, which would trigger assertion in Clang.
-        if (auto *templateSpec = dyn_cast<clang::TemplateSpecializationType>(
-                importer::desugarIfElaborated(ClangType).getTypePtr())) {
-          if (auto *recordType =
-                  templateSpec->desugar()->getAs<clang::RecordType>()) {
-            if (auto *spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(
-                    recordType->getDecl())) {
-              if (spec->getSpecializationKind() ==
-                      clang::TSK_ExplicitSpecialization &&
-                  !spec->isCompleteDefinition()) {
-                return nullptr;
-              }
-            }
-          }
-        }
-
         SwiftType = Impl.importTypeIgnoreIUO(
             ClangType, ImportTypeKind::Typedef,
             ImportDiagnosticAdder(Impl, Decl, Decl->getLocation()),
@@ -3344,6 +3327,15 @@ namespace {
       if (decl->isInStdNamespace() && decl->getIdentifier() &&
           (decl->getName() == "conditional" || decl->getName() == "__or_" ||
             decl->getName() == "_Expr" || decl->getName() == "__val_expr"))
+        return nullptr;
+
+      // Don't even try to specialize/import this template if it's
+      // a forward-declared specialization like this:
+      //
+      //    template <> struct MyTemplate<int>;
+      //
+      if (decl->getSpecializationKind() == clang::TSK_ExplicitSpecialization &&
+          !decl->isCompleteDefinition())
         return nullptr;
 
       // `decl->getDefinition()` can return nullptr before the call to sema and
