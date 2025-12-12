@@ -1050,7 +1050,7 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
         break;
       }
     }
-    return OpaqueReadOwnership::Borrowed;
+    return OpaqueReadOwnership::YieldingBorrow;
   };
 
   if (auto *accessorDecl = storage->getAccessor(AccessorKind::Read)) {
@@ -1059,17 +1059,17 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
       for (auto &lifetimeDependenceInfo : *lifetimeDependencies) {
         if (lifetimeDependenceInfo.hasScopeLifetimeParamIndices()) {
           // A scoped lifetime dependence borrows its source.
-          return OpaqueReadOwnership::Borrowed;
+          return OpaqueReadOwnership::YieldingBorrow;
         }
       }
     }
   }
 
   if (storage->getAccessor(AccessorKind::YieldingBorrow))
-    return OpaqueReadOwnership::Borrowed;
+    return OpaqueReadOwnership::YieldingBorrow;
 
   if (storage->getAccessor(AccessorKind::Borrow))
-    return OpaqueReadOwnership::Borrowed;
+    return OpaqueReadOwnership::YieldingBorrow;
 
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);

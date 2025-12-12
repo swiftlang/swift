@@ -6305,7 +6305,7 @@ public:
 
   /// Does this storage require a 'get' accessor in its opaque-accessors set?
   bool requiresOpaqueGetter() const {
-    return getOpaqueReadOwnership() != OpaqueReadOwnership::Borrowed;
+    return getOpaqueReadOwnership() != OpaqueReadOwnership::YieldingBorrow;
   }
 
   /// Does this storage require a '_read' accessor in its opaque-accessors set?

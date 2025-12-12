@@ -36,7 +36,7 @@ ReadImplKind StorageImplInfo::getOpaqueReadImpl(OpaqueReadOwnership ownership,
   case OpaqueReadOwnership::Owned:
     return ReadImplKind::Get;
   case OpaqueReadOwnership::OwnedOrBorrowed:
-  case OpaqueReadOwnership::Borrowed:
+  case OpaqueReadOwnership::YieldingBorrow:
     if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
       return ReadImplKind::YieldingBorrow;
     return ReadImplKind::Read;
