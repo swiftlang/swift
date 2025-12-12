@@ -1056,6 +1056,8 @@ NOTE(regionbasedisolation_named_value_used_after_explicit_sending, none,
 NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
       "%select{%1 |}0%2 is captured by a %3 closure. %3 uses in closure may race against later %4 uses",
       (bool, StringRef, Identifier, StringRef, StringRef))
+NOTE(regionbasedisolation_named_isolated_closure_yields_race_mutable, none,
+     "%0 closure captures reference to mutable %1 which remains modifiable by %select{%3 code|code in the current task}2", (StringRef, Identifier, bool, StringRef))
 
 NOTE(regionbasedisolation_typed_use_after_sending, none,
       "Passing value of non-Sendable type %0 as a 'sending' argument risks causing races in between local and caller code",

@@ -50,7 +50,7 @@ func testMutableCopyableSendableStructWithEscapingMainActorAsync() {
   let _ = {
     escapingAsyncUse { @MainActor in
       useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{main actor-isolated closure captures reference to mutable 'x' which remains modifiable by code in the current task}}
     }
   }
 }
@@ -142,7 +142,7 @@ func testMutableNoncopyableSendableStructWithEscapingMainActorAsync() {
   let _ = {
     escapingAsyncUse { @MainActor in
       useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{main actor-isolated closure captures reference to mutable 'x' which remains modifiable by code in the current task}}
     }
   }
 }
@@ -191,7 +191,7 @@ func testNoncopyableNonsendableStructWithNonescapingMainActorAsync() {
   let x = NoncopyableStructNonsendable()
   let _ = {
     nonescapingAsyncUse { @MainActor in
-      useValue(x)  // expected-error {{sending 'x' risks causing data races}}
+      useValue(x) // expected-error {{sending 'x' risks causing data races}}
       // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
@@ -382,7 +382,7 @@ func testCopyableSendableClassWithEscapingMainActorAsyncWeakCapture() {
   let _ = { [weak x] in
     escapingAsyncUse { @MainActor in
       useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{main actor-isolated closure captures reference to mutable 'x' which remains modifiable by code in the current task}}
     }
   }
 }
@@ -393,7 +393,7 @@ func testMutableCopyableSendableClassWithEscapingMainActorAsyncWeakCapture() {
   let _ = { [weak x] in
     escapingAsyncUse { @MainActor in
       useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{main actor-isolated closure captures reference to mutable 'x' which remains modifiable by code in the current task}}
     }
   }
 }
@@ -424,7 +424,7 @@ func testCopyableSendableClassWithNonescapingMainActorAsyncWeakCapture() {
   let _ = { [weak x] in
     nonescapingAsyncUse { @MainActor in
       useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{main actor-isolated closure captures reference to mutable 'x' which remains modifiable by code in the current task}}
     }
   }
 }
@@ -435,7 +435,7 @@ func testMutableCopyableSendableClassWithNonescapingMainActorAsyncWeakCapture() 
   let _ = { [weak x] in
     nonescapingAsyncUse { @MainActor in
       useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{main actor-isolated closure captures reference to mutable 'x' which remains modifiable by code in the current task}}
     }
   }
 }
@@ -556,7 +556,7 @@ func testGenericSendableWithEscapingMainActorAsync<T : ~Copyable>(_ value: consu
   let _ = {
     escapingAsyncUse { @MainActor in
       useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{main actor-isolated closure captures reference to mutable 'x' which remains modifiable by code in the current task}}
     }
   }
 }
@@ -569,7 +569,7 @@ func testMutableGenericSendableWithEscapingMainActorAsync<T : ~Copyable>(
   let _ = {
     escapingAsyncUse { @MainActor in
       useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{main actor-isolated closure captures reference to mutable 'x' which remains modifiable by code in the current task}}
     }
   }
 }
