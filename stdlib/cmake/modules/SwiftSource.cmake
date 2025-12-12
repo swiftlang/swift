@@ -549,7 +549,9 @@ function(_compile_swift_files
   endif()
 
   # The standard library and overlays are built resiliently when SWIFT_STDLIB_STABLE_ABI=On.
-  if(SWIFTFILE_IS_STDLIB AND NOT SWIFTFILE_IS_FRAGILE AND SWIFT_STDLIB_STABLE_ABI)
+  if(SWIFTFILE_IS_STDLIB AND NOT SWIFTFILE_IS_FRAGILE
+      AND SWIFT_STDLIB_STABLE_ABI
+      AND NOT "${SWIFTFILE_SDK}" STREQUAL "LINUX_STATIC")
     list(APPEND swift_flags "-enable-library-evolution")
     list(APPEND swift_flags "-library-level" "api")
     list(APPEND swift_flags "-Xfrontend" "-require-explicit-availability=ignore")
@@ -725,7 +727,9 @@ function(_compile_swift_files
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
 
-    if(SWIFT_ENABLE_MODULE_INTERFACES AND NOT SWIFTFILE_IS_FRAGILE)
+    if(SWIFT_ENABLE_MODULE_INTERFACES
+        AND NOT SWIFTFILE_IS_FRAGILE
+        AND NOT "${SWIFTFILE_SDK}" STREQUAL "LINUX_STATIC")
       set(interface_file "${module_base}.swiftinterface")
       set(interface_file_static "${module_base_static}.swiftinterface")
       set(private_interface_file "${module_base}.private.swiftinterface")
