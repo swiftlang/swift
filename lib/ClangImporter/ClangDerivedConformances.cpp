@@ -18,7 +18,9 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
+#include "clang/AST/CXXInheritance.h"
 #include "clang/Sema/DelayedDiagnostic.h"
+#include "clang/Sema/Lookup.h"
 #include "clang/Sema/Overload.h"
 
 using namespace swift;
@@ -56,6 +58,29 @@ static CxxStdType identifyCxxStdTypeByName(StringRef name) {
       .CaseStd(span)
       .Default(CxxStdType::uncategorized);
 #undef CxxStdCase
+}
+
+static const clang::TypeDecl *
+lookupCxxTypeMember(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
+                    StringRef name) {
+  auto R = clang::LookupResult(Sema, &Sema.PP.getIdentifierTable().get(name),
+                               clang::SourceLocation(),
+                               clang::Sema::LookupMemberName);
+  R.suppressDiagnostics();
+
+  auto *Ctx = static_cast<const clang::DeclContext *>(Rec);
+  Sema.LookupQualifiedName(R, const_cast<clang::DeclContext *>(Ctx));
+
+  if (R.isSingleResult()) {
+    if (auto *paths = R.getBasePaths();
+        paths && R.getBasePaths()->front().Access != clang::AS_public)
+      return nullptr;
+
+    for (auto *nd : R)
+      if (auto *td = dyn_cast<clang::TypeDecl>(nd))
+        return td;
+  }
+  return nullptr;
 }
 
 /// Alternative to `NominalTypeDecl::lookupDirect`.
@@ -127,32 +152,6 @@ static FuncDecl *getInsertFunc(NominalTypeDecl *decl,
     }
   }
   return insert;
-}
-
-static clang::TypeDecl *
-lookupNestedClangTypeDecl(const clang::CXXRecordDecl *clangDecl,
-                          StringRef name) {
-  clang::IdentifierInfo *nestedDeclName =
-      &clangDecl->getASTContext().Idents.get(name);
-  auto nestedDecls = clangDecl->lookup(nestedDeclName);
-  // If this is a templated typedef, Clang might have instantiated several
-  // equivalent typedef decls. If they aren't equivalent, Clang has already
-  // complained about this. Let's assume that they are equivalent. (see
-  // filterNonConflictingPreviousTypedefDecls in clang/Sema/SemaDecl.cpp)
-  if (nestedDecls.empty())
-    return nullptr;
-  auto nestedDecl = nestedDecls.front();
-  return dyn_cast_or_null<clang::TypeDecl>(nestedDecl);
-}
-
-static clang::TypeDecl *
-getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
-  return lookupNestedClangTypeDecl(clangDecl, "iterator_category");
-}
-
-static clang::TypeDecl *
-getIteratorConceptDecl(const clang::CXXRecordDecl *clangDecl) {
-  return lookupNestedClangTypeDecl(clangDecl, "iterator_concept");
 }
 
 static ValueDecl *lookupOperator(NominalTypeDecl *decl, Identifier id,
@@ -420,8 +419,18 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
   return true;
 }
 
-bool swift::isIterator(const clang::CXXRecordDecl *clangDecl) {
-  return getIteratorCategoryDecl(clangDecl);
+bool swift::hasIteratorCategory(const clang::CXXRecordDecl *clangDecl) {
+  clang::IdentifierInfo *name =
+      &clangDecl->getASTContext().Idents.get("iterator_category");
+  auto members = clangDecl->lookup(name);
+  if (members.empty())
+    return false;
+  // NOTE: If this is a templated typedef, Clang might have instantiated
+  // several equivalent typedef decls, so members.isSingleResult() may
+  // return false here. But if they aren't equivalent, Clang should have
+  // already complained about this. Let's assume that they are equivalent.
+  // (see filterNonConflictingPreviousTypedefDecls in clang/Sema/SemaDecl.cpp)
+  return isa<clang::TypeDecl>(members.front());
 }
 
 ValueDecl *
@@ -453,6 +462,7 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   PrettyStackTraceDecl trace("trying to conform to UnsafeCxxInputIterator", decl);
   ASTContext &ctx = decl->getASTContext();
   clang::ASTContext &clangCtx = clangDecl->getASTContext();
+  clang::Sema &clangSema = impl.getClangSema();
 
   if (!ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator))
     return;
@@ -460,13 +470,19 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   // We consider a type to be an input iterator if it defines an
   // `iterator_category` that inherits from `std::input_iterator_tag`, e.g.
   // `using iterator_category = std::input_iterator_tag`.
-  auto iteratorCategory = getIteratorCategoryDecl(clangDecl);
-  if (!iteratorCategory)
+  //
+  // FIXME: The second hasIteratorCategory() is more conservative than it should
+  // be  because it doesn't consider things like inheritance, but checking this
+  // here maintains existing behavior and ensures consistency across
+  // ClangImporter, where clang::Sema isn't always readily available.
+  const auto *iteratorCategory =
+      lookupCxxTypeMember(clangSema, clangDecl, "iterator_category");
+  if (!iteratorCategory || !hasIteratorCategory(clangDecl))
     return;
 
   auto unwrapUnderlyingTypeDecl =
-      [](clang::TypeDecl *typeDecl) -> clang::CXXRecordDecl * {
-    clang::CXXRecordDecl *underlyingDecl = nullptr;
+      [](const clang::TypeDecl *typeDecl) -> const clang::CXXRecordDecl * {
+    const clang::CXXRecordDecl *underlyingDecl = nullptr;
     if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(typeDecl)) {
       auto type = typedefDecl->getUnderlyingType();
       underlyingDecl = type->getAsCXXRecordDecl();
@@ -525,7 +541,8 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   // `iterator_concept`. It is not possible to detect a contiguous iterator
   // based on its `iterator_category`. The type might not have an
   // `iterator_concept` defined.
-  if (auto iteratorConcept = getIteratorConceptDecl(clangDecl)) {
+  if (const auto *iteratorConcept =
+          lookupCxxTypeMember(clangSema, clangDecl, "iterator_concept")) {
     if (auto underlyingConceptDecl =
             unwrapUnderlyingTypeDecl(iteratorConcept)) {
       isContiguousIterator = isContiguousIteratorDecl(underlyingConceptDecl);
@@ -726,7 +743,7 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
   // it isn't directly usable from Swift. Let's explicitly instantiate a
   // constructor with the wrapped value type, and then import it into Swift.
 
-  auto valueTypeDecl = lookupNestedClangTypeDecl(clangDecl, "value_type");
+  auto valueTypeDecl = lookupCxxTypeMember(clangSema, clangDecl, "value_type");
   if (!valueTypeDecl)
     // `std::optional` without a value_type?!
     return;
@@ -1174,8 +1191,8 @@ static void conformToCxxSpan(ClangImporter::Implementation &impl,
   if (!elementType || !sizeType)
     return;
 
-  auto pointerTypeDecl = lookupNestedClangTypeDecl(clangDecl, "pointer");
-  auto countTypeDecl = lookupNestedClangTypeDecl(clangDecl, "size_type");
+  auto pointerTypeDecl = lookupCxxTypeMember(clangSema, clangDecl, "pointer");
+  auto countTypeDecl = lookupCxxTypeMember(clangSema, clangDecl, "size_type");
 
   if (!pointerTypeDecl || !countTypeDecl)
     return;
