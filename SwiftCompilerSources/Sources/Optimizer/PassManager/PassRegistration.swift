@@ -23,7 +23,7 @@ public func initializeSwiftModules() {
   registerOptimizerTests()
 }
 
-private func registerPass(
+func registerPass(
       _ pass: ModulePass,
       _ runFn: @escaping (@convention(c) (BridgedContext) -> ())) {
   pass.name._withBridgedStringRef { nameStr in
