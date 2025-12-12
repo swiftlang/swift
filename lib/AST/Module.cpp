@@ -2990,10 +2990,10 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
   assert(targetModule != getParentModule() &&
          "getImportAccessLevel doesn't support checking for a self-import");
 
-  /// Order of relevancy of `import` to reach `targetModule` assuming the same
-  /// visibility level. Lower is better/more authoritative.
+  /// Order of relevancy of `import` to reach `targetModule`.
+  /// Lower is better/more authoritative.
   auto rateImport = [&](const ImportAccessLevel import) -> int {
-    auto importedModule = import->module.importedModule->getTopLevelModule();
+    auto importedModule = import->module.importedModule;
 
     // Prioritize public names:
     if (targetModule->getExportAsName() == importedModule->getBaseIdentifier())
@@ -3008,14 +3008,9 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
     if (targetModule == importedModule->getUnderlyingModuleIfOverlay())
       return 3;
 
-    // Any import in the sources:
-    if (import->importLoc.isValid()) {
-      // Prefer clang submodules to their top level modules:
-      if (import->module.importedModule != importedModule)
-        return 4;
-
-      return 5;
-    }
+    // Any import in the sources.
+    if (import->importLoc.isValid())
+      return 4;
 
     return 10;
   };
@@ -3025,12 +3020,11 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
   auto &imports = getASTContext().getImportCache();
   ImportAccessLevel restrictiveImport = std::nullopt;
   for (auto &import : *Imports) {
-    auto importedModule = import.module.importedModule->getTopLevelModule();
     if ((!restrictiveImport.has_value() ||
          import.accessLevel > restrictiveImport->accessLevel ||
          (import.accessLevel == restrictiveImport->accessLevel &&
           rateImport(import) < rateImport(restrictiveImport))) &&
-        imports.isImportedBy(targetModule, importedModule)) {
+        imports.isImportedBy(targetModule, import.module.importedModule)) {
       restrictiveImport = import;
     }
   }
