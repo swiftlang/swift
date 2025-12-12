@@ -88,12 +88,12 @@ emptyMessage()
 // expected-error@-1{{'emptyMessage()' is unavailable:  }}
 // expected-note@-3{{'emptyMessage()' has been explicitly marked unavailable here}}
 
-// expected-error@+1{{'message' cannot be an extended escaping string literal}}
+// OK.
 @available(*, unavailable, message: #"""
   foobar message.
   """#)
 func extendedEscapedMultilineMessage() {}
 
-// expected-error@+1{{'renamed' cannot be an extended escaping string literal}}
+// OK.
 @available(*, unavailable, renamed: #"available()"#)
 func extendedEscapedRenamed() {}
