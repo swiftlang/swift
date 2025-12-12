@@ -26,6 +26,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -52,6 +53,12 @@
 #include <optional>
 
 using namespace swift;
+
+#define DEBUG_TYPE "DependencyScanner"
+STATISTIC(DepScanSwiftModuleQueries,
+          "# of times the dependency scanner performed a named lookup of a Swift module");
+STATISTIC(DepScanClangModuleQueries,
+          "# of times the dependency scanner performed a named lookup of a Clang module");
 
 static void findPath_dfs(ModuleDependencyID X, ModuleDependencyID Y,
                          ModuleDependencyIDSet &visited,
@@ -299,6 +306,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
 SwiftModuleScannerQueryResult
 ModuleDependencyScanningWorker::scanFilesystemForSwiftModuleDependency(
     Identifier moduleName, bool isTestableImport) {
+  DepScanSwiftModuleQueries++;
   return swiftModuleScannerLoader->lookupSwiftModule(moduleName,
                                                      isTestableImport);
 }
@@ -309,6 +317,7 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     LookupModuleOutputCallback lookupModuleOutput,
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenModules) {
+  DepScanClangModuleQueries++;
   auto clangModuleDependencies = clangScanningTool.getModuleDependencies(
       moduleName.str(), clangScanningModuleCommandLineArgs,
       clangScanningWorkingDirectoryPath, alreadySeenModules,
