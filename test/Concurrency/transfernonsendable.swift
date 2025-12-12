@@ -65,6 +65,7 @@ final class FinalMainActorIsolatedKlass {
 func useInOut<T>(_ x: inout T) {}
 func useValue<T>(_ x: T) {}
 func useValueAsync<T>(_ x: T) async {}
+func useValueNoncopyable<T : ~Copyable>(_ x: borrowing T) {}
 @concurrent func useValueAsyncConcurrent<T>(_ x: T) async {}
 
 @MainActor func transferToMain<T>(_ t: T) async {}
@@ -90,11 +91,17 @@ struct SendableGenericStruct : Sendable {
   var x = SendableKlass()
 }
 
+struct NoncopyableStructNonsendable : ~Copyable {
+  var x = NonSendableKlass()
+}
+
 enum MyEnum<T> {
     case none
     indirect case some(NonSendableKlass)
     case more(T)
 }
+
+func nonescapingAsyncClosure(_ x: () async -> ()) {}
 
 ////////////////////////////
 // MARK: Actor Self Tests //
@@ -498,6 +505,16 @@ extension MyActor {
 
     // But this will error since we race.
     closure() // expected-note {{access can happen concurrently}}
+  }
+}
+
+func testNoncopyableNonsendableStructWithNonescapingMainActorAsync() {
+  let x = NoncopyableStructNonsendable()
+  let _ = {
+    nonescapingAsyncClosure { @MainActor in
+      useValueNoncopyable(x) // expected-warning {{sending 'x' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    }
   }
 }
 
