@@ -26,7 +26,7 @@ public class Decl: CustomStringConvertible, Hashable {
   /// The parent DeclContext.
   final public var parentDeclContext: DeclContext? {
     if let decl = bridged.getParent().decl {
-      return decl as! DeclContext
+      return (decl as! DeclContext)
     }
     if let bridgedDeclContext = BridgedDeclContext(bridged: bridged.getDeclContext()) {
       // A DeclContext which is not a Decl.
