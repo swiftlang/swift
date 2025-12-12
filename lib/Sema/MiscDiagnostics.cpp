@@ -2648,6 +2648,232 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
   const_cast<Expr *>(E)->walk(DiagnoseWalker(ctx, ACE));
 }
 
+// MARK: -
+
+/// Diagnose cases where weak/unowned capture list items rebind a value with
+/// strong reference ownership that is itself implicitly captured (i.e. not
+/// itself a capture list item) in an ancestor escaping closure. The purpose
+/// is to surface cases where the change in ownership may be accidental or
+/// otherwise subvert programmer intent.
+static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
+                                                const DeclContext *DC) {
+  if (!E || isa<ErrorExpr>(E) || !E->getType())
+    return;
+
+  class Util {
+  public:
+    static ReferenceOwnership getDeclOwnership(const Decl *D) {
+      if (auto attr = D->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
+        return attr->get();
+      }
+      // Default to strong if unspecified
+      return ReferenceOwnership::Strong;
+    }
+
+    static bool isLessThanStrongOwnership(const ReferenceOwnership ownership) {
+      return isLessStrongThan(ownership, ReferenceOwnership::Strong);
+    }
+
+    static bool isEscapingClosure(const AbstractClosureExpr *ACE) {
+      return !ACE->getType()->isNoEscape();
+    }
+  };
+
+  /// Info regarding weak/unowned capture list items that have simple inits
+  /// binding to a corresponding Decl that has strong ownership. i.e. the
+  /// capture list item changed ownership from strong to weak/unowned.
+  struct WeakToStrongCaptureItemInfo {
+    // The LHS of the binding
+    VarDecl *itemDecl;
+    // The Decl referenced from the RHS of the binding
+    ValueDecl *itemReferent;
+    // The RHS init expression of the binding
+    Expr *itemInit;
+    // The ownership of the binding
+    ReferenceOwnership itemDeclOwnership;
+  };
+
+  class ImplicitWeakToStrongCaptureWalker : public BaseDiagnosticWalker {
+    ASTContext &Ctx;
+
+  public:
+    ImplicitWeakToStrongCaptureWalker(ASTContext &ctx) : Ctx(ctx) {}
+
+    /// Stack for tracking the current (escaping) closure expression.
+    llvm::SmallSetVector<AbstractClosureExpr *, 8> EscapingClosureStack;
+
+    /// Strong capture item Decls from escaping closures.
+    llvm::SmallSetVector<ValueDecl *, 8> EscapingStrongCaptureDecls;
+
+    // We're looking for captures like [weak a], [unowned b] here,
+    // where the bound Decl has strong ownership. We'll also keep
+    // track of capture list items formed for escaping closures.
+    void recordOrDiagnoseDeclIfNeeded(Decl *D) {
+
+      // We only care about pattern bindings
+      if (!isa<PatternBindingDecl>(D))
+        return;
+
+      auto PBD = cast<PatternBindingDecl>(D);
+
+      // We only handle single variable bindings currently
+      auto VD = PBD->getSingleVar();
+      if (!VD)
+        return;
+
+      // If this Decl isn't part of a capture list, ignore it
+      if (!VD->isCaptureList())
+        return;
+
+      // We're only concerned with escaping closures
+      auto ACE = VD->getParentCaptureList()->getClosureBody();
+      if (!Util::isEscapingClosure(ACE))
+        return;
+
+      // If the capture item Decl has strong ownership, remember it for later
+      auto ownership = Util::getDeclOwnership(VD);
+      if (!Util::isLessThanStrongOwnership(ownership)) {
+        EscapingStrongCaptureDecls.insert(VD);
+        return;
+      }
+
+      // If there's no ancestor escaping closure, no need to do anything
+      // further since we won't diagnose in such cases.
+      if (EscapingClosureStack.empty())
+        return;
+
+      // Get the initialization expression
+      auto itemInit = PBD->getInit(0);
+      if (!itemInit)
+        return;
+
+      ValueDecl *itemReferent = itemInit->getReferencedDecl().getDecl();
+
+      // If we didn't find a referenced Decl for some reason, or it doesn't
+      // have strong ownership, there's nothing to diagnose.
+      if (!itemReferent ||
+          Util::isLessThanStrongOwnership(Util::getDeclOwnership(itemReferent)))
+        return;
+
+      // As a policy choice, don't diagnose if the capture is explicitly
+      // assigned within the capture list item. E.g. we will treat things like
+      //
+      // { [weak self = self] in }
+      //
+      // as an indication that the programmer is aware of any consequences of
+      // the ownership change.
+      // TODO: is there a better way to check this state?
+      // TODO: should such PDBs have their implicit bit set?
+      auto srcRange = PBD->getSourceRange();
+      if (srcRange.isValid() && srcRange.Start != srcRange.End)
+        return;
+
+      WeakToStrongCaptureItemInfo captureInfo = {VD, itemReferent, itemInit,
+                                                 ownership};
+      diagnoseCaptureIfNeeded(captureInfo);
+    }
+
+    void diagnoseCaptureIfNeeded(WeakToStrongCaptureItemInfo captureItem) {
+      // If an escaping closure contains the 'weakified' referent, as an
+      // explicit strong capture list item then we don't need to diagnose
+      // anything. We rely on the AST walk visiting ancestor DCs before
+      // their children here. i.e. we don't want to diagnose cases like:
+      //
+      //  outer { [self] in
+      //    inner { [weak self] in ... }
+      //  }
+      if (EscapingStrongCaptureDecls.contains(captureItem.itemReferent))
+        return;
+
+      // Walk up the DC hierarchy to see if we find an escaping closure that
+      // sits between the capture item and its re-bound Decl. We look for the
+      // outermost such closure for reporting purposes.
+      DeclContext *currentDC = captureItem.itemDecl->getDeclContext();
+      DeclContext *itemReferentDC = captureItem.itemReferent->getDeclContext();
+      std::optional<AbstractClosureExpr *> outermostCapturingClosure;
+
+      while (currentDC && currentDC != itemReferentDC) {
+        SWIFT_DEFER { currentDC = currentDC->getParent(); };
+
+        if (isa<AbstractClosureExpr>(currentDC)) {
+          AbstractClosureExpr *ACE = cast<AbstractClosureExpr>(currentDC);
+          if (EscapingClosureStack.contains(ACE))
+            outermostCapturingClosure = ACE;
+        }
+      }
+
+      // No outer capturing closure found, so don't diagnose
+      if (!outermostCapturingClosure)
+        return;
+
+      // We found something to diagnose.
+      Ctx.Diags.diagnose(captureItem.itemDecl->getLoc(),
+                         diag::implicit_weak_to_strong_capture,
+                         captureItem.itemDeclOwnership, captureItem.itemDecl);
+
+      const auto initialCaptureLoc =
+          outermostCapturingClosure.value()->getLoc();
+
+      // Point to the implicit capture location
+      Ctx.Diags.diagnose(initialCaptureLoc,
+                         diag::implicit_weak_to_strong_capture_loc,
+                         captureItem.itemReferent);
+
+      // Suggest adding a capture list item there
+      // FIXME: this should have a fixit
+      Ctx.Diags.diagnose(
+          initialCaptureLoc,
+          diag::implicit_weak_to_strong_capture_add_capture_list_item,
+          captureItem.itemReferent);
+
+      // Suggest a fixit to silence the diagnostic by adding an assignment in
+      // the capture list item. i.e. turning:
+      //  `{ [weak xyz] in ...}`
+      //  into
+      //  `{ [weak xyz = xyz] in ... }`
+      Ctx.Diags
+          .diagnose(captureItem.itemDecl->getLoc(),
+                    diag::implicit_weak_to_strong_capture_assign_to_silence)
+          .fixItInsertAfter(captureItem.itemDecl->getLoc(),
+                            (" = " + captureItem.itemDecl->getNameStr()).str());
+      // TODO: should/could we ensure that the names explicitly match?
+    }
+
+    // MARK: ASTWalker
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return Action::SkipNode(E);
+
+      if (auto ACE = dyn_cast<AbstractClosureExpr>(E))
+        if (Util::isEscapingClosure(ACE)) {
+          EscapingClosureStack.insert(ACE);
+        }
+
+      return Action::Continue(E);
+    }
+
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+      if (auto ACE = dyn_cast<AbstractClosureExpr>(E))
+        if (Util::isEscapingClosure(ACE)) {
+          assert(EscapingClosureStack.size() > 0);
+          EscapingClosureStack.pop_back();
+        }
+
+      return Action::Continue(E);
+    }
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      // Check for capture list entries to record info about them
+      recordOrDiagnoseDeclIfNeeded(D);
+      return Action::Continue();
+    }
+  };
+
+  ImplicitWeakToStrongCaptureWalker Walker(DC->getASTContext());
+  const_cast<Expr *>(E)->walk(Walker);
+}
+
 bool TypeChecker::getDefaultGenericArgumentsString(
     SmallVectorImpl<char> &buf,
     const swift::GenericTypeDecl *typeDecl,
@@ -6487,6 +6713,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
   diagRecursivePropertyAccess(E, DC);
   diagnoseImplicitSelfUseInClosure(E, DC);
+  diagnoseImplicitWeakToStrongCapture(E, DC);
   diagnoseUnintendedOptionalBehavior(E, DC);
   maybeDiagnoseCallToKeyValueObserveMethod(E, DC);
   diagnoseExplicitUseOfLazyVariableStorage(E, DC);
