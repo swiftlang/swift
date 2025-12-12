@@ -1092,8 +1092,8 @@ NOTE(modularization_issue_conformance_xref_note,none,
      "Breaks conformances of '%0' to %1",
      (StringRef, DeclName))
 ERROR(modularization_issue_conformance_error,none,
-      "Conformances of '%0' "
-      "do not match requirement signature of %1; "
+      "Listed conformances of '%0' "
+      "do not match current requirement signature of %1; "
       "%2 conformances for %3 requirements",
       (StringRef, DeclName, unsigned int, unsigned int))
 
