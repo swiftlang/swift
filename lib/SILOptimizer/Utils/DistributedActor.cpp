@@ -20,12 +20,15 @@
 
 namespace swift {
 
-void emitDistributedActorSystemWitnessCall(
+/// \returns the result of the call, if returned directly.
+std::optional<SILValue> emitDistributedActorSystemWitnessCall(
     SILBuilder &B, SILLocation loc, DeclName methodName, SILValue base,
     // types to be passed through to SubstitutionMap:
     SILType actorType,
     // call arguments, except the base which will be passed last
     ArrayRef<SILValue> args,
+    // pre-allocated, uninitialized indirect result storage, if needed
+    std::optional<SILValue> indirectResult,
     std::optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets) {
   auto &F = B.getFunction();
   auto &M = B.getModule();
@@ -73,7 +76,6 @@ void emitDistributedActorSystemWitnessCall(
           KnownProtocolKind::DistributedActor);
       assert(actorProto);
 
-      ProtocolConformanceRef conformance;
       auto distributedActorConfRef = lookupConformance(
           actorType.getASTType(), actorProto);
       assert(!distributedActorConfRef.isInvalid() &&
@@ -85,42 +87,61 @@ void emitDistributedActorSystemWitnessCall(
     subs = SubstitutionMap::get(genericSig, subTypes, subConformances);
   }
 
-  std::optional<SILValue> temporaryArgumentBuffer;
-
-  // If the self parameter is indirect but the base is a value, put it
-  // into a temporary allocation.
   auto methodSILFnTy = methodSILTy.castTo<SILFunctionType>();
-  std::optional<SILValue> temporaryActorSystemBuffer;
-  if (methodSILFnTy->getSelfParameter().isFormalIndirect() &&
-      !base->getType().isAddress()) {
-    auto buf = B.createAllocStack(loc, base->getType(), std::nullopt);
-    base = B.emitCopyValueOperation(loc, base);
-    B.emitStoreValueOperation(
-        loc, base, buf, StoreOwnershipQualifier::Init);
-    temporaryActorSystemBuffer = SILValue(buf);
-  }
+  SILFunctionConventions conv(methodSILFnTy, M);
+
+  // Since this code lives outside of SILGen, manage our clean-ups manually.
+  SmallVector<SILInstruction *, 2> cleanups;
+
+  auto prepareArgument = [&](SILParameterInfo param, SILValue arg) -> SILValue {
+    if (conv.isSILIndirect(param)) {
+      // Does it need temporary stack storage?
+      if (!arg->getType().isAddress() &&
+          !dyn_cast<AnyMetatypeType>(arg->getType().getASTType())) {
+        auto buf = B.createAllocStack(loc, arg->getType(), std::nullopt);
+        cleanups.push_back(buf);
+
+        auto copy = B.emitCopyValueOperation(loc, arg);
+        B.emitStoreValueOperation(
+            loc, copy, buf, StoreOwnershipQualifier::Init);
+
+        return buf;
+      }
+      return arg; // no temporary storage needed
+    }
+
+    // Otherwise, it's a direct convention. Borrow if needed.
+    if (arg->getType().isAddress()) {
+      arg = B.emitLoadBorrowOperation(loc, arg);
+      cleanups.push_back(arg.getDefiningInstruction());
+    }
+    return arg;
+  };
+
+  SILValue selfArg = prepareArgument(methodSILFnTy->getSelfParameter(), base);
 
   // === Call the method.
   // --- Push the arguments
   SmallVector<SILValue, 2> allArgs;
+
+  const bool hasIndirectResult = conv.getNumIndirectSILResults() > 0;
+  ASSERT(hasIndirectResult == indirectResult.has_value() && "no indirectResult storage given!");
+  ASSERT(conv.getNumIndirectSILResults() <= 1);
+
+  const bool hasDirectResult = conv.getNumDirectSILResults() > 0;
+  ASSERT(!(hasIndirectResult && hasDirectResult) && "indirect AND direct results aren't supported");
+  ASSERT(conv.getNumDirectSILResults() <= 1);
+
+  if (hasIndirectResult) {
+    allArgs.push_back(*indirectResult);
+  }
+
   auto params = methodSILFnTy->getParameters();
   for (size_t i = 0; i < args.size(); ++i) {
-    auto arg = args[i];
-    if (params[i].isFormalIndirect() &&
-        !arg->getType().isAddress() &&
-        !dyn_cast<AnyMetatypeType>(arg->getType().getASTType())) {
-      auto buf = B.createAllocStack(loc, arg->getType(), std::nullopt);
-      auto argCopy = B.emitCopyValueOperation(loc, arg);
-      B.emitStoreValueOperation(
-          loc, argCopy, buf, StoreOwnershipQualifier::Init);
-      temporaryArgumentBuffer = SILValue(buf);
-      allArgs.push_back(*temporaryArgumentBuffer);
-    } else {
-      allArgs.push_back(arg);
-    }
+    allArgs.push_back(prepareArgument(params[i], args[i]));
   }
+
   // Push the self argument
-  auto selfArg = temporaryActorSystemBuffer ? *temporaryActorSystemBuffer : base;
   allArgs.push_back(selfArg);
 
   SILInstruction *apply;
@@ -132,7 +153,7 @@ void emitDistributedActorSystemWitnessCall(
     apply = B.createApply(loc, witnessMethod, subs, allArgs);
   }
 
-  // Local function to emit a cleanup after the call.
+  // Local function to emit cleanups after the call in successor blocks.
   auto emitCleanup = [&](llvm::function_ref<void(SILBuilder &builder)> fn) {
     if (tryTargets) {
       {
@@ -148,25 +169,45 @@ void emitDistributedActorSystemWitnessCall(
     }
   };
 
-  // ==== If we had to create a buffers we need to clean them up
-  // --- Cleanup id buffer
-  if (temporaryArgumentBuffer) {
-    emitCleanup([&](SILBuilder & builder) {
-      auto value = builder.emitLoadValueOperation(
-          loc, *temporaryArgumentBuffer, LoadOwnershipQualifier::Take);
-      builder.emitDestroyValueOperation(loc, value);
-      builder.createDeallocStack(loc, *temporaryArgumentBuffer);
-    });
+  // Emit clean-ups in reverse order, to preserve stack nesting, etc.
+  for (auto inst : reverse(cleanups)) {
+    if (auto asi = dyn_cast<AllocStackInst>(inst)) {
+      auto buf = asi->getResult(0);
+      emitCleanup([&](SILBuilder & builder) {
+        // FIXME: could do destroy_addr rather than take + destroy_value
+        auto value = builder.emitLoadValueOperation(
+            loc, buf, LoadOwnershipQualifier::Take);
+        builder.emitDestroyValueOperation(loc, value);
+        builder.createDeallocStack(loc, buf);
+      });
+      continue;
+    }
+
+    if (auto lb = dyn_cast<LoadBorrowInst>(inst)) {
+      auto borrow = lb->getResult(0);
+      emitCleanup([&](SILBuilder & builder) {
+        builder.emitEndBorrowOperation(loc, borrow);
+      });
+      continue;
+    }
+
+    if (isa<LoadInst>(inst)) {
+      // no clean-ups required
+      continue;
+    }
+
+    llvm_unreachable("unknown instruction kind to clean-up!");
   }
-  // --- Cleanup base buffer
-  if (temporaryActorSystemBuffer) {
-    emitCleanup([&](SILBuilder & builder) {
-      auto value = builder.emitLoadValueOperation(
-          loc, *temporaryActorSystemBuffer, LoadOwnershipQualifier::Take);
-      builder.emitDestroyValueOperation(loc, value);
-      builder.createDeallocStack(loc, *temporaryActorSystemBuffer);
-    });
+
+  // If this was a try_apply, then the result is the BB argument of the
+  // successor block. We let our caller figure that out themselves.
+  //
+  // Otherwise, the apply had a single direct result, so we return that.
+  if (hasDirectResult && !tryTargets) {
+    return apply->getResult(0);
   }
+
+  return std::nullopt;
 }
 
 void emitActorReadyCall(SILBuilder &B, SILLocation loc, SILValue actor,

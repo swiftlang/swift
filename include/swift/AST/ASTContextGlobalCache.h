@@ -84,6 +84,10 @@ struct ASTContext::GlobalCache {
     const NormalProtocolConformance *,
     std::vector<ConformanceIsolationError>
   > conformanceIsolationErrors;
+
+  /// The static build configuration. This points to an instance of the Swift
+  /// StaticBuildConfiguration.
+  void *StaticBuildConfiguration = nullptr;
 };
 
 } // end namespace 

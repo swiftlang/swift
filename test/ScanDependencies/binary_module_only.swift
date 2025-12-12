@@ -10,7 +10,7 @@ import Foo
 
 // BINARY_MODULE_ONLY: "swiftPrebuiltExternal": "Foo"
 // BINARY_MODULE_ONLY:  "swiftPrebuiltExternal": {
-// BINARY_MODULE_ONLY-NEXT:  "compiledModulePath": "BUILD_DIR/{{.*}}/ScanDependencies/Output/binary_module_only.swift.tmp/binaryModuleOnly/Foo.swiftmodule",
+// BINARY_MODULE_ONLY-NEXT:  "compiledModulePath": "TMP_DIR/binaryModuleOnly/Foo.swiftmodule",
 
 // HAS_NO_COMPILED-NOT: "{{.*}}Foo.swiftmodule{{.*}}.swiftmodule"
 

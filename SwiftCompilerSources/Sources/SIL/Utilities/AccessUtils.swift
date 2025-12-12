@@ -512,6 +512,22 @@ public extension PointerToAddressInst {
     }
     return nil
   }
+
+  // If this address is the result of a call to unsafe[Mutable]Address, return the 'self' operand of the apply. This
+  // represents the base value into which this address projects.
+  func isResultOfUnsafeAddressor() -> Operand? {
+    if isStrict,
+       let extract = pointer as? StructExtractInst,
+       extract.`struct`.type.isAnyUnsafePointer,
+       let addressorApply = extract.`struct` as? ApplyInst,
+       let addressorFunc = addressorApply.referencedFunction,
+       addressorFunc.isAddressor
+    {
+      let selfArgIdx = addressorFunc.selfArgumentIndex!
+      return addressorApply.argumentOperands[selfArgIdx]
+    }
+    return nil
+  }
 }
 
 /// TODO: migrate AccessBase to use this instead of GlobalVariable because many utilities need to get back to a

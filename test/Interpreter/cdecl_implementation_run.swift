@@ -5,9 +5,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Lib)) %t/Lib.swift \
 // RUN:   -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -emit-clang-header-path %t/cdecl.h \
-// RUN:   -import-objc-header %t/BridgingHeader.h \
-// RUN:   -enable-experimental-feature CDecl \
-// RUN:   -enable-experimental-feature CImplementation
+// RUN:   -import-objc-header %t/BridgingHeader.h
 // RUN: %target-codesign %t/%target-library-name(Lib)
 
 /// Build a C client against cdecl.h.
@@ -25,8 +23,6 @@
 // RUN: %target-run %t/a.out %t/%target-library-name(Lib) > %t/run.log
 // RUN: %FileCheck %t/Client.swift --check-prefix=PRINTS --input-file %t/run.log
 
-// REQUIRES: swift_feature_CDecl
-// REQUIRES: swift_feature_CImplementation
 // REQUIRES: executable_test
 
 //--- BridgingHeader.h
@@ -44,23 +40,23 @@ extern void renamed_clangSide(ptrdiff_t arg);
 
 //--- Lib.swift
 
-@cdecl @implementation
+@c @implementation
 public func simple(_ x: Int32, _ y: Int32) -> Int32 {
     print(x, y)
     return x
 }
 
-@implementation @cdecl
+@implementation @c
 public func primitiveTypes(_ i: Int, _ ci: CInt, _ l: CLong, _ c: CChar, _ f: Float, _ d: Double, _ b: Bool) {
     print(i, ci, l, c, f, d, b)
 }
 
-@cdecl(sameName) @implementation
+@c(sameName) @implementation
 public func sameName() {
     print("sameName")
 }
 
-@cdecl(renamed_clangSide) @implementation
+@c(renamed_clangSide) @implementation
 public func renamed_swiftSide(_ arg: Int) {
     print(arg)
 }

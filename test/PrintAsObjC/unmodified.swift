@@ -4,13 +4,17 @@
 // RUN: %S/../Inputs/getmtime.py %t/out.h > %t/orig-mtime.txt
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -verify -emit-objc-header-path %t/out.h
-// RUN: diff %t/orig-mtime.txt <(%S/../Inputs/getmtime.py %t/out.h)
+// RUN: %S/../Inputs/getmtime.py %t/out.h > %t/new-mtime.txt
+// RUN: diff %t/orig-mtime.txt %t/new-mtime.txt
+
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -verify -emit-objc-header-path %t/out.h -DPRIVATE_EXTRA
-// RUN: diff %t/orig-mtime.txt <(%S/../Inputs/getmtime.py %t/out.h)
+// RUN: %S/../Inputs/getmtime.py %t/out.h > %t/private-mtime.txt
+// RUN: diff %t/orig-mtime.txt %t/private-mtime.txt
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -verify -emit-objc-header-path %t/out.h -DPUBLIC_EXTRA
-// RUN: not diff %t/orig-mtime.txt <(%S/../Inputs/getmtime.py %t/out.h)
+// RUN: %S/../Inputs/getmtime.py %t/out.h > %t/public-mtime.txt
+// RUN: not diff %t/orig-mtime.txt %t/public-mtime.txt
 
 // REQUIRES: objc_interop
 

@@ -1,10 +1,11 @@
 // Tests for fix-its on `-verify` mode.
 
-// RUN: not %target-typecheck-verify-swift 2>&1 | %FileCheck %s
+// RUN: not %target-typecheck-verify-swift 2>&1 | %FileCheck %s --implicit-check-not error: --implicit-check-not note: --implicit-check-not warning:
 
 func labeledFunc(aa: Int, bb: Int) {}
 
 func testNoneMarkerCheck() {
+  // CHECK: [[@LINE+2]]:78: error: expected no fix-its; actual fix-it seen: {{.*}}3-16=unlabeledFunc{{.*}}
   // CHECK: [[@LINE+1]]:87: error: A second {{\{\{}}none}} was found. It may only appear once in an expectation.
   undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}} {{none}} {{none}}
 
@@ -197,34 +198,44 @@ func test1Fixits() {
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-18=xx}} {{15-18=aa}} {{none}}
 
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{200:15-200:18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{201:15-201:18=aa}}
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{202:15-18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{203:15-18=aa}}
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-204:18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15-205:18=aa}}
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{-0:15-+0:18=aa}}
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{15--0:18=aa}}
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {+0:15-210:18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {+0:15-211:18=aa}}
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
   labeledFunc(aa: 0, // expected-error {{incorrect argument label in call (have 'aa:bbx:', expected 'aa:bb:')}} {{+1:15-+1:18=bb}}
               bbx: 1)
   // CHECK-NOT: [[@LINE+1]]:{{[0-9]+}}: error:
-  labeledFunc(aa: 0, // expected-error {{incorrect argument label in call (have 'aa:bbx:', expected 'aa:bb:')}} {{216:15-+1:18=bb}}
+  labeledFunc(aa: 0, // expected-error {{incorrect argument label in call (have 'aa:bbx:', expected 'aa:bb:')}} {{217:15-+1:18=bb}}
               bbx: 1)
 
   // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{\{\{}}15-18=aa}}
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{61:15-18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{62:15-18=aa}}
   // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{\{\{}}15-18=aa}}
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{-1:15-18=aa}}
   // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{\{\{}}15-18=aa}}
   labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{+0:15--1:18=aa}}
   // CHECK: [[@LINE+1]]:121: error: expected fix-it not seen; actual fix-it seen: {{\{\{}}15-18=aa}}
-  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{61:15-+1:18=aa}}
+  labeledFunc(aax: 0, bb: 1) // expected-error {{incorrect argument label in call (have 'aax:bb:', expected 'aa:bb:')}} {{62:15-+1:18=aa}}
 }
 
+// CHECK: [[@LINE+10]]:6: error: unexpected note produced: 'unlabeledFunc' declared here
+// CHECK: [[@LINE+9]]:6: error: unexpected note produced: 'unlabeledFunc' declared here
+// CHECK: [[@LINE+8]]:6: error: unexpected note produced: 'unlabeledFunc' declared here
+// CHECK: [[@LINE+7]]:6: error: unexpected note produced: 'unlabeledFunc' declared here
+// CHECK: [[@LINE+6]]:6: error: unexpected note produced: 'unlabeledFunc' declared here
+// CHECK: [[@LINE+5]]:6: error: unexpected note produced: 'unlabeledFunc' declared here
+// CHECK: [[@LINE+4]]:6: error: unexpected note produced: 'unlabeledFunc' declared here
+// CHECK: [[@LINE+3]]:6: error: unexpected note produced: 'unlabeledFunc' declared here
+// CHECK: [[@LINE+2]]:6: error: unexpected note produced: 'unlabeledFunc' declared here
+// CHECK: [[@LINE+1]]:6: error: unexpected note produced: 'unlabeledFunc' declared here
 func unlabeledFunc(_ aa: Int) {}
 
 func testDefaultedLineNumbers() {

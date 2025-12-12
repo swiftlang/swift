@@ -45,7 +45,7 @@ SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
   // Emit the implicit 'self' argument.
   SILType selfType = conventions.getSILArgumentType(
       conventions.getNumSILArguments() - 1, F.getTypeExpansionContext());
-  selfType = F.mapTypeIntoContext(selfType);
+  selfType = F.mapTypeIntoEnvironment(selfType);
   SILValue selfValue = F.begin()->createFunctionArgument(selfType, selfDecl);
 
   uint16_t ArgNo = 1; // Hardcoded for destructors.
@@ -127,7 +127,7 @@ struct LoweredParamGenerator {
     assert(!isFormalParameterPack || parameterInfo.isPack());
 
     auto paramType =
-        SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo, fnTy));
+        SGF.F.mapTypeIntoEnvironment(SGF.getSILType(parameterInfo, fnTy));
     ManagedValue mv = SGF.B.createInputFunctionArgument(
         paramType, paramDecl, isNoImplicitCopy, lifetimeAnnotation,
         /*isClosureCapture*/ false, isFormalParameterPack, isImplicitParameter);
@@ -597,9 +597,11 @@ public:
                                                 {&substEltType});
 
       SGF.emitDynamicPackLoop(loc, inducedPackType, packComponentIndex,
-                              openedEnv, [&](SILValue indexWithinComponent,
-                                             SILValue expansionPackIndex,
-                                             SILValue packIndex) {
+                              openedEnv,
+                              []() -> SILBasicBlock * { return nullptr; },
+                              [&](SILValue indexWithinComponent,
+                                  SILValue expansionPackIndex,
+                                  SILValue packIndex) {
         componentInit->performPackExpansionInitialization(SGF, loc,
                                             indexWithinComponent,
                                             [&](Initialization *eltInit) {
@@ -631,7 +633,6 @@ class ArgumentInitHelper {
   std::optional<FunctionInputGenerator> FormalParamTypes;
 
   SmallPtrSet<ParamDecl *, 2> ScopedDependencies;
-  SmallPtrSet<ParamDecl *, 2> AddressableParams;
 
 public:
   ArgumentInitHelper(SILGenFunction &SGF,
@@ -729,16 +730,15 @@ private:
                                         : AbstractionPattern(substType));
 
       // A parameter can be directly marked as addressable, or its
-      // addressability can be implied by a scoped dependency.
-      bool isAddressable = false;
-      
-      isAddressable = pd->isAddressable()
-        || (ScopedDependencies.contains(pd)
-            && SGF.getTypeProperties(origType, substType)
-                  .isAddressableForDependencies());
-      if (isAddressable) {
-        AddressableParams.insert(pd);
-      }
+      // addressability can be implied by a scoped dependency or a borrow
+      // dependency.
+      bool isAddressable =
+          pd->isAddressable() ||
+          (ScopedDependencies.contains(pd) &&
+           SGF.getTypeProperties(origType, substType)
+               .isAddressableForDependencies()) ||
+          SGF.getFunction().getConventions().hasAddressResult() ||
+          SGF.getFunction().getConventions().hasGuaranteedResult();
       paramValue = argEmitter.handleParam(origType, substType, pd,
                                           isAddressable);
     }
@@ -793,6 +793,10 @@ private:
         }
       }
     }
+    // If we're relying on ManualOwnership for explicit-copies enforcement,
+    // we don't need @noImplicitCopy / MoveOnlyWrapper.
+    if (SGF.B.hasManualOwnershipAttr())
+      isNoImplicitCopy = false;
 
     // If we have a no implicit copy argument and the argument is trivial,
     // we need to use copyable to move only to convert it to its move only
@@ -1062,7 +1066,7 @@ private:
   void emitParam(ParamDecl *PD) {
     // Register any auxiliary declarations for the parameter to be
     // visited later.
-    PD->visitAuxiliaryDecls([&](VarDecl *localVar) {
+    PD->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *localVar) {
       SGF.LocalAuxiliaryDecls.push_back(localVar);
     });
 
@@ -1151,9 +1155,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SILLocation Loc(expr);
     Loc.markAsPrologue();
 
-    auto interfaceType = expr->getType()->mapTypeOutOfContext();
+    auto interfaceType = expr->getType()->mapTypeOutOfEnvironment();
 
-    auto type = SGF.F.mapTypeIntoContext(interfaceType);
+    auto type = SGF.F.mapTypeIntoEnvironment(interfaceType);
     auto &lowering = SGF.getTypeLowering(type);
     SILType ty = lowering.getLoweredType();
 
@@ -1211,13 +1215,14 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     isPack = true;
   }
 
-  auto type = SGF.F.mapTypeIntoContext(interfaceType);
+  auto type = SGF.F.mapTypeIntoEnvironment(interfaceType);
   auto &lowering = SGF.getTypeLowering(type);
   SILType ty = lowering.getLoweredType();
 
   bool isNoImplicitCopy;
-  
-  if (ty.isTrivial(SGF.F) || ty.isMoveOnly()) {
+
+  if (ty.isTrivial(SGF.F) || ty.isMoveOnly() ||
+      SGF.B.hasManualOwnershipAttr()) {
     isNoImplicitCopy = false;
   } else if (VD->isNoImplicitCopy()) {
     isNoImplicitCopy = true;
@@ -1328,11 +1333,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   case CaptureKind::Immutable: {
     auto argIndex = SGF.F.begin()->getNumArguments();
     // Non-escaping stored decls are captured as the address of the value.
-    auto argConv = SGF.F.getConventions().getSILArgumentConvention(argIndex);
-    bool isInOut = (argConv == SILArgumentConvention::Indirect_Inout ||
-                    argConv == SILArgumentConvention::Indirect_InoutAliasable);
-    auto param = SGF.F.getConventions().getParamInfoForSILArg(argIndex);
-    if (SGF.F.getConventions().isSILIndirect(param)) {
+    auto fnConv = SGF.F.getConventions();
+    auto paramInfo = fnConv.getParamInfoForSILArg(argIndex);
+    if (fnConv.isSILIndirect(paramInfo)) {
       ty = ty.getAddressType();
     }
     auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
@@ -1340,30 +1343,14 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     arg = SILValue(fArg);
     
     if (isNoImplicitCopy && !arg->getType().isMoveOnly()) {
-      switch (argConv) {
-      case SILArgumentConvention::Indirect_Inout:
-      case SILArgumentConvention::Indirect_InoutAliasable:
-      case SILArgumentConvention::Indirect_In:
-      case SILArgumentConvention::Indirect_In_Guaranteed:
-      case SILArgumentConvention::Indirect_In_CXX:
-      case SILArgumentConvention::Pack_Inout:
-      case SILArgumentConvention::Pack_Owned:
-      case SILArgumentConvention::Pack_Guaranteed:
+      if (fnConv.isSILIndirect(paramInfo)) {
         arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(VD, arg);
-        break;
-        
-      case SILArgumentConvention::Direct_Owned:
-        arg = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(VD, arg);
-        break;
-      
-      case SILArgumentConvention::Direct_Guaranteed:
+
+      } else if (paramInfo.isGuaranteedInCallee()) {
         arg = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(VD, arg);
-        break;
-      
-      case SILArgumentConvention::Direct_Unowned:
-      case SILArgumentConvention::Indirect_Out:
-      case SILArgumentConvention::Pack_Out:
-        llvm_unreachable("should be impossible");
+
+      } else {
+        arg = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(VD, arg);
       }
     }
 
@@ -1374,6 +1361,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // in SIL since it is illegal to capture an inout value in an escaping
     // closure. The later code knows how to handle that we have the
     // mark_unresolved_non_copyable_value here.
+    bool isInOut = paramInfo.isIndirectMutating();
     if (isInOut && arg->getType().isMoveOnly()) {
       arg = SGF.B.createMarkUnresolvedNonCopyableValueInst(
           Loc, arg,
@@ -1455,8 +1443,8 @@ void SILGenFunction::emitProlog(
 
     if (capture.isOpaqueValue()) {
       OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
-      Type type = opaqueValue->getType()->mapTypeOutOfContext();
-      type = F.mapTypeIntoContext(type);
+      Type type = opaqueValue->getType()->mapTypeOutOfEnvironment();
+      type = F.mapTypeIntoEnvironment(type);
       auto &lowering = getTypeLowering(type);
       SILType ty = lowering.getLoweredType();
       SILValue val = F.begin()->createFunctionArgument(ty);
@@ -1545,7 +1533,7 @@ static void emitIndirectResultParameters(SILGenFunction &SGF,
   }
 
   CanType resultTypeInContext =
-    DC->mapTypeIntoContext(resultType)->getCanonicalType();
+    DC->mapTypeIntoEnvironment(resultType)->getCanonicalType();
 
   // Tuples in the original result type are expanded.
   if (origResultType.isTuple()) {
@@ -1610,7 +1598,7 @@ static void emitIndirectErrorParameter(SILGenFunction &SGF,
                                        AbstractionPattern origErrorType,
                                        DeclContext *DC) {
   CanType errorTypeInContext =
-    DC->mapTypeIntoContext(errorType)->getCanonicalType();
+    DC->mapTypeIntoEnvironment(errorType)->getCanonicalType();
 
   // If the error type is address-only, emit the indirect error argument.
 
@@ -1665,7 +1653,8 @@ uint16_t SILGenFunction::emitBasicProlog(
   emitIndirectResultParameters(*this, resultType, origResultType, DC);
 
   std::optional<AbstractionPattern> origErrorType;
-  if (origClosureType && !origClosureType->isTypeParameterOrOpaqueArchetype()) {
+  if (origClosureType && !origClosureType->isTypeParameterOrOpaqueArchetype() &&
+      !origClosureType->isClangType()) {
     origErrorType = origClosureType->getFunctionThrownErrorType();
     if (origErrorType && !errorType)
       errorType = origErrorType->getEffectiveThrownErrorType();
@@ -1712,7 +1701,7 @@ uint16_t SILGenFunction::emitBasicProlog(
   // Record the ArgNo of the artificial $error inout argument. 
   if (errorType && IndirectErrorResult == nullptr) {
     CanType errorTypeInContext =
-      DC->mapTypeIntoContext(*errorType)->getCanonicalType();
+      DC->mapTypeIntoEnvironment(*errorType)->getCanonicalType();
     auto loweredErrorTy = getLoweredType(*origErrorType, errorTypeInContext);
     ManagedValue undef = emitUndef(loweredErrorTy);
     SILDebugVariable dbgVar("$error", /*Constant*/ false, ++ArgNo);

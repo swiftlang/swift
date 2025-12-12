@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/large_int_array.swift
 // RUN: %target-swift-frontend -typecheck -verify %t/large_int_array.swift
-// RUN: %target-swift-frontend %t/large_int_array.swift -emit-sil -o %t
+
+// verification is disabled because the ownership verifier takes too long: rdar://162566682
+// RUN: %target-swift-frontend -sil-verify-none %t/large_int_array.swift -emit-sil -o %t
 
 % num_elements = 65537
 

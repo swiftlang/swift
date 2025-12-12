@@ -48,7 +48,7 @@ PackConformance::PackConformance(PackType *conformingType,
 
   assert(ConformingType->getNumElements() == conformances.size());
   std::uninitialized_copy(conformances.begin(), conformances.end(),
-                          getTrailingObjects<ProtocolConformanceRef>());
+                          getTrailingObjects());
 }
 
 size_t PackConformance::numTrailingObjects(
@@ -63,8 +63,7 @@ bool PackConformance::isInvalid() const {
 
 ArrayRef<ProtocolConformanceRef>
 PackConformance::getPatternConformances() const {
-  return {getTrailingObjects<ProtocolConformanceRef>(),
-          ConformingType->getNumElements()};
+  return getTrailingObjects(ConformingType->getNumElements());
 }
 
 bool PackConformance::isCanonical() const {

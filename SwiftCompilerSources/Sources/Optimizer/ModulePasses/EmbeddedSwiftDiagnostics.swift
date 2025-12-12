@@ -88,7 +88,18 @@ private struct FunctionChecker {
          is InitExistentialAddrInst,
          is InitExistentialValueInst,
          is ExistentialMetatypeInst:
-      throw Diagnostic(.embedded_swift_existential_type, instruction.operands[0].value.type, at: instruction.location)
+      if !context.options.enableEmbeddedSwiftExistentials {
+        throw Diagnostic(.embedded_swift_existential_type, instruction.operands[0].value.type, at: instruction.location)
+      } else if let ie = instruction as? InitExistentialAddrInst {
+        for conf in ie.conformances {
+          try checkConformance(conf, location: ie.location)
+        }
+      } else if instruction is OpenExistentialAddrInst {
+          // okay in embedded with exitentials
+      } else {
+          // not supported even in embedded with exitentials
+        throw Diagnostic(.embedded_swift_existential_type, instruction.operands[0].value.type, at: instruction.location)
+      }
 
     case let aeb as AllocExistentialBoxInst:
       throw Diagnostic(.embedded_swift_existential_type, aeb.type, at: instruction.location)
@@ -114,7 +125,20 @@ private struct FunctionChecker {
 
     case is CheckedCastAddrBranchInst,
          is UnconditionalCheckedCastAddrInst:
-      throw Diagnostic(.embedded_swift_dynamic_cast, at: instruction.location)
+      if !context.options.enableEmbeddedSwiftExistentials {
+        throw Diagnostic(.embedded_swift_dynamic_cast, at: instruction.location)
+      } else {
+         if let checkedCast = instruction as? CheckedCastAddrBranchInst {
+           if !checkedCast.supportedInEmbeddedSwift {
+             throw Diagnostic(.embedded_swift_dynamic_cast, at: instruction.location)
+           }
+         } else {
+           let checkedCast = instruction as! UnconditionalCheckedCastAddrInst
+           if !checkedCast.supportedInEmbeddedSwift {
+             throw Diagnostic(.embedded_swift_dynamic_cast, at: instruction.location)
+           }
+         }
+      }
 
     case let abi as AllocBoxInst:
       // It needs a bit of work to support alloc_box of generic non-copyable structs/enums with deinit,
@@ -219,7 +243,8 @@ private struct FunctionChecker {
     else {
       return
     }
-    if !conformance.protocol.requiresClass {
+    if !context.options.enableEmbeddedSwiftExistentials &&
+       !conformance.protocol.requiresClass {
       throw Diagnostic(.embedded_swift_existential_protocol, conformance.protocol.name, at: location)
     }
 
@@ -345,7 +370,7 @@ private extension Function {
         if decl is DestructorDecl || decl is ConstructorDecl {
           return 4
         }
-        if let parent = decl.parent, parent is ClassDecl {
+        if let parent = decl.parentDeclContext, parent is ClassDecl {
           return 2
         }
       }

@@ -15,6 +15,9 @@ struct DoubleWrapper {
   int getValuePlusArg(int arg) const { return m.getValuePlusArg(arg); }
 };
 
+template <class T>
+struct EmptyWrapper {};
+
 typedef MagicWrapper<int> WrappedMagicInt;
 typedef MagicWrapper<const int> WrappedMagicIntConst;
 typedef MagicWrapper<const long> WrappedMagicLongConst;
@@ -26,6 +29,8 @@ typedef MagicWrapper<long[]> WrappedMagicLongArr;
 typedef MagicWrapper<int[123]> WrappedMagicIntFixedSizeArr1;
 typedef MagicWrapper<int[124]> WrappedMagicIntFixedSizeArr2;
 typedef MagicWrapper<std::nullptr_t> WrappedMagicNullPtr;
+typedef MagicWrapper<const int[]> WrappedMagicConstIntArr;
+typedef EmptyWrapper<volatile int &> WrappedVolatileIntRef;
 
 typedef DoubleWrapper<MagicWrapper<int>> DoubleWrappedInt;
 typedef DoubleWrapper<MagicWrapper<const int>> DoubleWrappedIntConst;

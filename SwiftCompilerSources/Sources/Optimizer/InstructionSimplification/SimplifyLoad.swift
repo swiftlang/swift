@@ -75,7 +75,7 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
        index < stringLiteral.value.count {
 
       let builder = Builder(before: self, context)
-      let charLiteral = builder.createIntegerLiteral(Int(stringLiteral.value[index]), type: type)
+      let charLiteral = builder.createIntegerLiteral(stringLiteral.value[index], type: type)
       uses.replaceAll(with: charLiteral, context)
       context.erase(instruction: self)
       return true

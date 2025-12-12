@@ -8,7 +8,7 @@ _ = "HI!
 
 // FIXME: This used to produce a localized diagnostic.
 
-var self1 = self1 // expected-note 2{{through reference here}}
+var self1 = self1 // expected-note {{through reference here}}
 // expected-error@-1 {{circular reference}}
 
 struct Broken {

@@ -125,6 +125,11 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
         return nullptr;
     }
 
+    auto &ctx = DC->getASTContext();
+    auto *constantTyNominal = constantType->getAnyNominal();
+    if (!constantTyNominal)
+      return nullptr;
+
     if (auto *integer = dyn_cast<clang::IntegerLiteral>(parsed)) {
       // Determine the value.
       llvm::APSInt value{integer->getValue(), clangTy->isUnsignedIntegerType()};
@@ -140,6 +145,17 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
         }
       }
 
+      // Make sure the destination type actually conforms to the builtin literal
+      // protocol or is Bool before attempting to import, otherwise we'll crash
+      // since `createConstant` expects it to.
+      // FIXME: We ought to be careful checking conformance here since it can
+      // result in cycles. Additionally we ought to consider checking for the
+      // non-builtin literal protocol to allow any ExpressibleByIntegerLiteral
+      // type to be supported.
+      if (!isBoolOrBoolEnumType(constantType) &&
+          !ctx.getIntBuiltinInitDecl(constantTyNominal)) {
+        return nullptr;
+      }
       return createMacroConstant(Impl, MI, name, DC, constantType,
                                  clang::APValue(value),
                                  ConstantConvertKind::None,
@@ -157,6 +173,16 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
       if (signTok && signTok->is(clang::tok::minus)) {
         value.changeSign();
       }
+
+      // Make sure the destination type actually conforms to the builtin literal
+      // protocol before attempting to import, otherwise we'll crash since
+      // `createConstant` expects it to.
+      // FIXME: We ought to be careful checking conformance here since it can
+      // result in cycles. Additionally we ought to consider checking for the
+      // non-builtin literal protocol to allow any ExpressibleByFloatLiteral
+      // type to be supported.
+      if (!ctx.getFloatBuiltinInitDecl(constantTyNominal))
+        return nullptr;
 
       return createMacroConstant(Impl, MI, name, DC, constantType,
                                  clang::APValue(value),
@@ -422,8 +448,8 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
                         SourceLoc(), alias, DC);
   V->setAccess(swift::AccessLevel::Public);
   V->setInterfaceType(Ty.getType());
-  V->getAttrs().add(new (Ctx) TransparentAttr(/*Implicit*/true));
-  V->getAttrs().add(new (Ctx) InlineAttr(InlineKind::Always));
+  V->addAttribute(new (Ctx) TransparentAttr(/*Implicit*/ true));
+  V->addAttribute(new (Ctx) InlineAttr(InlineKind::AlwaysUnderscored));
 
   /* Accessor */
   swift::AccessorDecl *G = nullptr;
@@ -621,7 +647,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       clang::LookupResult R(S, {{tok.getIdentifierInfo()}, {}},
                             clang::Sema::LookupAnyName);
       if (S.LookupName(R, S.TUScope))
-        if (R.getResultKind() == clang::LookupResult::LookupResultKind::Found)
+        if (R.getResultKind() == clang::LookupResultKind::Found)
           if (const auto *VD = dyn_cast<clang::ValueDecl>(R.getFoundDecl()))
             return importDeclAlias(impl, DC, VD, name);
     }

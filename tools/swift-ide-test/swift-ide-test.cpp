@@ -43,6 +43,8 @@
 #include "swift/IDE/IDERequests.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
 #include "swift/IDE/REPLCodeCompletion.h"
+#include "swift/IDE/SignatureHelp.h"
+#include "swift/IDE/SignatureHelpFormatter.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/TypeContextInfo.h"
@@ -53,7 +55,7 @@
 #include "swift/Markup/Markup.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "llvm/ADT/RewriteBuffer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
@@ -117,6 +119,7 @@ enum class ActionType {
   Range,
   TypeContextInfo,
   ConformingMethodList,
+  SignatureHelp,
 };
 
 class NullDebuggerClient : public DebuggerClient {
@@ -251,7 +254,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "Print types for all expressions in the file"),
            clEnumValN(ActionType::ConformingMethodList,
 	                    "conforming-methods",
-                      "Perform conforming method analysis for expression")));
+                      "Perform conforming method analysis for expression"),
+           clEnumValN(ActionType::SignatureHelp, "signature-help",
+                      "Perform signature help")));
 
 static llvm::cl::opt<std::string>
 SourceFilename("source-filename", llvm::cl::desc("Name of the source file"),
@@ -1451,6 +1456,99 @@ printCodeCompletionLookedupTypeNames(ArrayRef<NullTerminatedStringRef> names,
   OS << "]\n";
 }
 
+static void printWithEscaping(StringRef Str, llvm::raw_ostream &OS) {
+  for (char C : Str) {
+    switch (C) {
+    case '\n':
+      OS << "\\n";
+      break;
+    case '\r':
+      OS << "\\r";
+      break;
+    case '\t':
+      OS << "\\t";
+      break;
+    case '\v':
+      OS << "\\v";
+      break;
+    case '\f':
+      OS << "\\f";
+      break;
+    default:
+      OS << C;
+      break;
+    }
+  }
+}
+
+static void printSignatureHelpResultsImpl(const FormattedSignatureHelp &Result,
+                                          llvm::raw_ostream &OS) {
+  OS << "Begin signatures, " << Result.Signatures.size() << " items\n";
+
+  for (unsigned i = 0; i < Result.Signatures.size(); ++i) {
+    const auto &Signature = Result.Signatures[i];
+    if (i == Result.ActiveSignature) {
+      OS << "Signature[Active]: ";
+    } else {
+      OS << "Signature: ";
+    }
+
+    StringRef signatureText = Signature.Text;
+
+    unsigned currentPos = 0;
+    for (unsigned j = 0; j < Signature.Params.size(); ++j) {
+      const auto &Param = Signature.Params[j];
+
+      if (Param.Offset > currentPos) {
+        OS << signatureText.substr(currentPos, Param.Offset - currentPos);
+      }
+
+      OS << "<param";
+      if (!Param.Name.empty()) {
+        OS << " name=\"" << Param.Name << '"';
+      }
+      if (Signature.ActiveParam && *Signature.ActiveParam == j) {
+        OS << " active";
+      }
+      OS << ">";
+      OS << signatureText.substr(Param.Offset, Param.Length);
+      OS << "</param>";
+
+      currentPos = Param.Offset + Param.Length;
+    }
+
+    if (currentPos < signatureText.size()) {
+      OS << signatureText.substr(currentPos);
+    }
+
+    if (!Signature.DocComment.empty()) {
+      OS << "; Documentation=";
+      printWithEscaping(Signature.DocComment, OS);
+    }
+
+    OS << "\n";
+  }
+
+  OS << "End signatures\n";
+}
+
+static int printSignatureHelpResults(
+    CancellableResult<SignatureHelpResults> CancellableResult) {
+  llvm::raw_fd_ostream &OS = llvm::outs();
+  return printResult<SignatureHelpResults>(
+      CancellableResult, [&](const SignatureHelpResults &Results) {
+        if (Results.Result) {
+          llvm::BumpPtrAllocator Allocator;
+          SignatureHelpFormatter Formatter(Allocator);
+          auto FormattedResult = Formatter.format(*Results.Result);
+          printSignatureHelpResultsImpl(FormattedResult, OS);
+        } else {
+          OS << "No signature help results\n";
+        }
+        return 0;
+      });
+}
+
 static int printCodeCompletionResults(
     CancellableResult<CodeCompleteResult> CancellableResult,
     bool IncludeKeywords, bool IncludeComments, bool IncludeSourceText,
@@ -1465,6 +1563,27 @@ static int printCodeCompletionResults(
         printCodeCompletionLookedupTypeNames(
             Result.Info.completionContext->LookedupNominalTypeNames, OS);
         return 0;
+      });
+}
+
+static int doSignatureHelp(const CompilerInvocation &InitInvok,
+                           StringRef SourceFilename,
+                           StringRef SecondSourceFileName,
+                           StringRef SignatureHelpToken,
+                           bool SignatureHelpDiagnostics) {
+  return performWithCompletionLikeOperationParams(
+      InitInvok, SourceFilename, SecondSourceFileName, SignatureHelpToken,
+      SignatureHelpDiagnostics,
+      [&](CompletionLikeOperationParams Params) -> bool {
+        IDEInspectionInstance Inst(std::make_shared<PluginRegistry>());
+        int ExitCode = 2;
+        Inst.signatureHelp(Params.Invocation, Params.Args, Params.FileSystem,
+                           Params.CompletionBuffer, Params.Offset, Params.DiagC,
+                           /*CancellationFlag=*/nullptr,
+                           [&](CancellableResult<SignatureHelpResults> Result) {
+                             ExitCode = printSignatureHelpResults(Result);
+                           });
+        return ExitCode;
       });
 }
 
@@ -2154,7 +2273,7 @@ static int doDumpImporterLookupTables(const CompilerInvocation &InitInvok,
 class StructureAnnotator : public ide::SyntaxModelWalker {
   SourceManager &SM;
   unsigned BufferID;
-  clang::RewriteBuffer RewriteBuf;
+  llvm::RewriteBuffer RewriteBuf;
   std::vector<SyntaxStructureNode> NodeStack;
   CharSourceRange LastPoppedNodeRange;
 
@@ -3469,19 +3588,6 @@ public:
   ASTCommentPrinter(SourceManager &SM, XMLValidator &TheXMLValidator)
       : OS(llvm::outs()), SM(SM), TheXMLValidator(TheXMLValidator) {}
 
-  void printWithEscaping(StringRef Str) {
-    for (char C : Str) {
-      switch (C) {
-      case '\n': OS << "\\n"; break;
-      case '\r': OS << "\\r"; break;
-      case '\t': OS << "\\t"; break;
-      case '\v': OS << "\\v"; break;
-      case '\f': OS << "\\f"; break;
-      default:   OS << C;     break;
-      }
-    }
-  }
-
   void printDeclName(const ValueDecl *VD) {
     if (auto *NTD = dyn_cast<NominalTypeDecl>(VD->getDeclContext())) {
       Identifier Id = NTD->getName();
@@ -3554,7 +3660,7 @@ public:
     }
     OS << "[";
     for (auto &SRC : RC.Comments)
-      printWithEscaping(SRC.RawText);
+      printWithEscaping(SRC.RawText, OS);
     OS << "]";
   }
 
@@ -3565,7 +3671,7 @@ public:
       return;
     }
     OS << "[";
-    printWithEscaping(Brief);
+    printWithEscaping(Brief, OS);
     OS << "]";
   }
 
@@ -3581,7 +3687,7 @@ public:
       return;
     }
     OS << "[";
-    printWithEscaping(XML);
+    printWithEscaping(XML, OS);
     OS << "]";
 
     auto Status = TheXMLValidator.validate(XML);
@@ -4002,7 +4108,7 @@ public:
 
     if (T) {
       T = T->getRValueType();
-      tryDemangleType(T->mapTypeOutOfContext(),
+      tryDemangleType(T->mapTypeOutOfEnvironment(),
                       (NestedDCs.empty()
                        ? D->getDeclContext()
                        : NestedDCs.back()),
@@ -4016,7 +4122,7 @@ private:
     Mangle::ASTMangler Mangler(Ctx);
     auto sig = DC->getGenericSignatureOfContext();
     std::string mangledName(Mangler.mangleTypeForDebugger(T, sig));
-    Type ReconstructedType = DC->mapTypeIntoContext(
+    Type ReconstructedType = DC->mapTypeIntoEnvironment(
         Demangle::getTypeForMangling(Ctx, mangledName));
     Stream << "type: ";
     if (ReconstructedType) {
@@ -4520,22 +4626,8 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().EnableObjCInterop =
         llvm::Triple(options::Triple).isOSDarwin();
   }
-  if (options::EnableCxxInterop) {
+  if (options::EnableCxxInterop || !options::CxxInteropVersion.empty()) {
     InitInvok.getLangOptions().EnableCXXInterop = true;
-  }
-  if (!options::CxxInteropVersion.empty()) {
-    InitInvok.getLangOptions().EnableCXXInterop = true;
-    if (options::CxxInteropVersion == "upcoming-swift")
-      InitInvok.getLangOptions().cxxInteropCompatVersion =
-          version::Version({version::getUpcomingCxxInteropCompatVersion()});
-    else if (options::CxxInteropVersion == "swift-6")
-      InitInvok.getLangOptions().cxxInteropCompatVersion =
-          version::Version({6});
-    else if (options::CxxInteropVersion == "swift-5.9")
-      InitInvok.getLangOptions().cxxInteropCompatVersion =
-          version::Version({5, 9});
-    else
-      llvm::errs() << "invalid CxxInteropVersion\n";
   }
   if (options::CxxInteropGettersSettersAsProperties) {
     InitInvok.getLangOptions().CxxInteropGettersSettersAsProperties = true;
@@ -4854,6 +4946,16 @@ int main(int argc, char *argv[]) {
         InitInvok, options::SourceFilename, options::SecondSourceFilename,
         options::CodeCompletionToken, options::CodeCompletionDiagnostics,
         options::ConformingMethodListExpectedTypes, PrintOpts);
+    break;
+
+  case ActionType::SignatureHelp:
+    if (options::CodeCompletionToken.empty()) {
+      llvm::errs() << "signature help token name required\n";
+      return 1;
+    }
+    ExitCode = doSignatureHelp(
+        InitInvok, options::SourceFilename, options::SecondSourceFilename,
+        options::CodeCompletionToken, options::CodeCompletionDiagnostics);
     break;
 
   case ActionType::SyntaxColoring:

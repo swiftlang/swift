@@ -154,12 +154,12 @@ protected:
     Implicit : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(CollectionExpr, Expr, 64-NumExprBits,
+  SWIFT_INLINE_BITFIELD_FULL(CollectionExpr, Expr, 64-NumberOfExprBits,
     /// True if the type of this collection expr was inferred by the collection
     /// fallback type, like [Any].
     IsTypeDefaulted : 1,
     /// Number of comma source locations.
-    NumCommas : 32 - 1 - NumExprBits,
+    NumCommas : 32 - 1 - NumberOfExprBits,
     /// Number of entries in the collection. If this is a DictionaryExpr,
     /// each entry is a Tuple with the key and value pair.
     NumSubExprs : 32
@@ -256,8 +256,8 @@ protected:
     LitKind : 3
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractClosureExpr, Expr, (16-NumExprBits)+16,
-    : 16 - NumExprBits, // Align and leave room for subclasses
+  SWIFT_INLINE_BITFIELD(AbstractClosureExpr, Expr, (16-NumberOfExprBits)+16,
+    : 16 - NumberOfExprBits, // Align and leave room for subclasses
     Discriminator : 16
   );
 
@@ -505,6 +505,10 @@ public:
   /// children, and if there is a closure within the expression, this does not
   /// walk into the body of it (unless it is single-expression).
   void forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback);
+
+  /// Apply the specified function to all variables referenced in any
+  /// child UnresolvedPatternExprs.
+  void forEachUnresolvedVariable(llvm::function_ref<void(VarDecl *)> f) const;
 
   /// Determine whether this expression refers to a type by name.
   ///
@@ -3293,8 +3297,7 @@ private:
       DstExpr(dstExpr) {
     Bits.DestructureTupleExpr.NumElements = destructuredElements.size();
     std::uninitialized_copy(destructuredElements.begin(),
-                            destructuredElements.end(),
-                            getTrailingObjects<OpaqueValueExpr *>());
+                            destructuredElements.end(), getTrailingObjects());
   }
 
 public:
@@ -3306,8 +3309,8 @@ public:
          Expr *srcExpr, Expr *dstExpr, Type ty);
 
   ArrayRef<OpaqueValueExpr *> getDestructuredElements() const {
-    return {getTrailingObjects<OpaqueValueExpr *>(),
-            static_cast<size_t>(Bits.DestructureTupleExpr.NumElements)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.DestructureTupleExpr.NumElements));
   }
 
   Expr *getResultExpr() const {
@@ -3712,7 +3715,7 @@ class UnresolvedSpecializeExpr final : public Expr,
       SubExpr(SubExpr), LAngleLoc(LAngleLoc), RAngleLoc(RAngleLoc) {
     Bits.UnresolvedSpecializeExpr.NumUnresolvedParams = UnresolvedParams.size();
     std::uninitialized_copy(UnresolvedParams.begin(), UnresolvedParams.end(),
-                            getTrailingObjects<TypeRepr *>());
+                            getTrailingObjects());
   }
 
 public:
@@ -3726,8 +3729,8 @@ public:
   /// Retrieve the list of type parameters. These parameters have not yet
   /// been bound to archetypes of the entity to be specialized.
   ArrayRef<TypeRepr *> getUnresolvedParams() const {
-    return {getTrailingObjects<TypeRepr *>(),
-            static_cast<size_t>(Bits.UnresolvedSpecializeExpr.NumUnresolvedParams)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.UnresolvedSpecializeExpr.NumUnresolvedParams));
   }
   
   SourceLoc getLoc() const { return LAngleLoc; }
@@ -3984,7 +3987,7 @@ class SequenceExpr final : public Expr,
     Bits.SequenceExpr.NumElements = elements.size();
     assert(Bits.SequenceExpr.NumElements > 0 && "zero-length sequence!");
     std::uninitialized_copy(elements.begin(), elements.end(),
-                            getTrailingObjects<Expr*>());
+                            getTrailingObjects());
   }
 
 public:
@@ -4000,11 +4003,13 @@ public:
   unsigned getNumElements() const { return Bits.SequenceExpr.NumElements; }
 
   MutableArrayRef<Expr*> getElements() {
-    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.SequenceExpr.NumElements)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.SequenceExpr.NumElements));
   }
 
   ArrayRef<Expr*> getElements() const {
-    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.SequenceExpr.NumElements)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.SequenceExpr.NumElements));
   }
 
   Expr *getElement(unsigned i) const {
@@ -4470,10 +4475,6 @@ public:
     return ExplicitResultTypeAndBodyState.getPointer()->getTypeRepr();
   }
 
-  /// Returns the resolved macro for the given custom attribute
-  /// attached to this closure expression.
-  MacroDecl *getResolvedMacro(CustomAttr *customAttr);
-
   /// Determine whether the closure has a single expression for its
   /// body.
   ///
@@ -4641,7 +4642,7 @@ class CaptureListExpr final : public Expr,
     assert(closureBody);
     Bits.CaptureListExpr.NumCaptures = captureList.size();
     std::uninitialized_copy(captureList.begin(), captureList.end(),
-                            getTrailingObjects<CaptureListEntry>());
+                            getTrailingObjects());
   }
 
 public:
@@ -4650,8 +4651,8 @@ public:
                                  AbstractClosureExpr *closureBody);
 
   ArrayRef<CaptureListEntry> getCaptureList() {
-    return {getTrailingObjects<CaptureListEntry>(),
-            static_cast<size_t>(Bits.CaptureListExpr.NumCaptures)};
+    return getTrailingObjects(
+        static_cast<size_t>(Bits.CaptureListExpr.NumCaptures));
   }
   AbstractClosureExpr *getClosureBody() { return closureBody; }
   const AbstractClosureExpr *getClosureBody() const { return closureBody; }
@@ -5763,14 +5764,13 @@ class EditorPlaceholderExpr : public Expr {
   SourceLoc Loc;
   TypeRepr *PlaceholderTy;
   TypeRepr *ExpansionTyR;
-  Expr *SemanticExpr;
 
 public:
   EditorPlaceholderExpr(Identifier Placeholder, SourceLoc Loc,
                         TypeRepr *PlaceholderTy, TypeRepr *ExpansionTyR)
       : Expr(ExprKind::EditorPlaceholder, /*Implicit=*/false),
         Placeholder(Placeholder), Loc(Loc), PlaceholderTy(PlaceholderTy),
-        ExpansionTyR(ExpansionTyR), SemanticExpr(nullptr) {}
+        ExpansionTyR(ExpansionTyR) {}
 
   Identifier getPlaceholder() const { return Placeholder; }
   SourceRange getSourceRange() const { return Loc; }
@@ -5782,9 +5782,6 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::EditorPlaceholder;
   }
-
-  Expr *getSemanticExpr() const { return SemanticExpr; }
-  void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
 };
 
 /// A LazyInitializerExpr is used to embed an existing typechecked
@@ -6497,16 +6494,20 @@ public:
   }
 };
 
+struct ForCollectionInit {
+  VarDecl *ForAccumulatorDecl;
+  PatternBindingDecl *ForAccumulatorBinding;
+};
+
 /// An expression that may wrap a statement which produces a single value.
 class SingleValueStmtExpr : public Expr {
 public:
-  enum class Kind {
-    If, Switch, Do, DoCatch
-  };
+  enum class Kind { If, Switch, Do, DoCatch, For };
 
 private:
   Stmt *S;
   DeclContext *DC;
+  std::optional<ForCollectionInit> ForExpressionPreamble;
 
   SingleValueStmtExpr(Stmt *S, DeclContext *DC)
       : Expr(ExprKind::SingleValueStmt, /*isImplicit*/ true), S(S), DC(DC) {}
@@ -6571,6 +6572,14 @@ public:
 
   SourceRange getSourceRange() const;
 
+  std::optional<ForCollectionInit> getForExpressionPreamble() const {
+    return this->ForExpressionPreamble;
+  }
+
+  void setForExpressionPreamble(ForCollectionInit newPreamble) {
+    this->ForExpressionPreamble = newPreamble;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::SingleValueStmt;
   }
@@ -6591,7 +6600,7 @@ class TypeJoinExpr final : public Expr,
   }
 
   MutableArrayRef<Expr *> getMutableElements() {
-    return { getTrailingObjects<Expr *>(), getNumElements() };
+    return getTrailingObjects(getNumElements());
   }
 
   TypeJoinExpr(llvm::PointerUnion<DeclRefExpr *, TypeBase *> result,
@@ -6634,7 +6643,7 @@ public:
   }
 
   ArrayRef<Expr *> getElements() const {
-    return { getTrailingObjects<Expr *>(), getNumElements() };
+    return getTrailingObjects(getNumElements());
   }
 
   Expr *getElement(unsigned i) const {

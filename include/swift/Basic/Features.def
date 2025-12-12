@@ -50,8 +50,8 @@
 // Swift compiler.
 //
 // OPTIONAL_LANGUAGE_FEATURE is the same as LANGUAGE_FEATURE, but describes
-// accepted features that can be enabled independently of language version and
-// are not scheduled to be enabled in some specific language version. Examples
+// accepted features that can be enabled independently of language mode and
+// are not scheduled to be enabled in some specific language mode. Examples
 // of optional language features include strict memory safety checking (SE-0458)
 // and Embedded Swift.
 //===----------------------------------------------------------------------===//
@@ -82,11 +82,11 @@
       defined(UPCOMING_FEATURE)
 #    error ambiguous defines when including Features.def
 #  elif defined(SUPPRESSIBLE_LANGUAGE_FEATURE)
-#    define SUPPRESSIBLE_UPCOMING_FEATURE(FeatureName, SENumber, Version) \
+#    define SUPPRESSIBLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode) \
        SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
 #  else
-#    define SUPPRESSIBLE_UPCOMING_FEATURE(FeatureName, SENumber, Version) \
-       UPCOMING_FEATURE(FeatureName, SENumber, Version)
+#    define SUPPRESSIBLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode) \
+       UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)
 #  endif
 #endif
 
@@ -136,10 +136,10 @@
 // feature is disabled.
 #ifndef MIGRATABLE_UPCOMING_FEATURE
   #if defined(UPCOMING_FEATURE)
-    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
-      UPCOMING_FEATURE(FeatureName, SENumber, Version)
+    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)   \
+      UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)
   #else
-    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
+    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)   \
       LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
   #endif
 #endif
@@ -161,7 +161,7 @@
 #endif
 
 #ifndef UPCOMING_FEATURE
-  #define UPCOMING_FEATURE(FeatureName, SENumber, Version)                     \
+  #define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)                \
     LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
 #endif
 
@@ -276,6 +276,8 @@ LANGUAGE_FEATURE(InlineArrayTypeSugar, 483, "Type sugar for InlineArray")
 LANGUAGE_FEATURE(LifetimeDependenceMutableAccessors, 0, "Support mutable accessors returning ~Escapable results")
 LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
 SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums")
+LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)")
+LANGUAGE_FEATURE(BuiltinConcurrencyStackNesting, 0, "Concurrency Stack Nesting Builtins")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -308,6 +310,8 @@ UPCOMING_FEATURE(ImmutableWeakCaptures, 481, 7)
 /// safety.
 MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(StrictMemorySafety, 458, "Strict memory safety")
 
+OPTIONAL_LANGUAGE_FEATURE(LibraryEvolution, 0, "Library evolution")
+
 // Experimental features
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
@@ -320,9 +324,6 @@ EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, false)
 EXPERIMENTAL_FEATURE(SameElementRequirements, false)
 EXPERIMENTAL_FEATURE(KeyPathWithMethodMembers, false)
-
-// Whether to enable @_used and @_section attributes
-EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
 
 // Whether to emit an Embedded Swift module with "deferred" code generation,
 // meaning that the only code that will be emitted into the object file is
@@ -422,6 +423,9 @@ EXPERIMENTAL_FEATURE(ThenStatements, false)
 /// Enable 'do' expressions.
 EXPERIMENTAL_FEATURE(DoExpressions, false)
 
+/// Enable 'for' expressions.
+EXPERIMENTAL_FEATURE(ForExpressions, false)
+
 /// Enable implicitly treating the last expression in a function, closure,
 /// and 'if'/'switch' expression as the result.
 EXPERIMENTAL_FEATURE(ImplicitLastExprResults, false)
@@ -435,8 +439,12 @@ EXPERIMENTAL_FEATURE(Embedded, true)
 /// Enables importing the Volatile module
 EXPERIMENTAL_FEATURE(Volatile, true)
 
-// Enables ~Copyable and ~Escapable annotations on associatedtype declarations.
+// LEGACY: Enables ~Copyable and ~Escapable annotations on associatedtype declarations.
 EXPERIMENTAL_FEATURE(SuppressedAssociatedTypes, true)
+
+// Enables ~Copyable and ~Escapable annotations on associatedtype declarations,
+// and infers defaults for them.
+EXPERIMENTAL_FEATURE(SuppressedAssociatedTypesWithDefaults, true)
 
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
@@ -447,7 +455,9 @@ EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
-/// Enable the `@_manualOwnership` attribute.
+/// Enable the ManualOwnership diagnostic groups:
+///   * -Wwarning SemanticCopies
+///   * -Wwarning DynamicExclusivity
 EXPERIMENTAL_FEATURE(ManualOwnership, false)
 
 /// Enable the @extractConstantsFromMembers attribute.
@@ -463,9 +473,6 @@ EXPERIMENTAL_FEATURE(ClosureIsolation, true)
 // due to resilient stored properties. Requires OS support; this flag exists for
 // staging purposes.
 EXPERIMENTAL_FEATURE(ObjCImplementationWithResilientStorage, true)
-
-// Enable @implementation on @_cdecl functions.
-EXPERIMENTAL_FEATURE(CImplementation, true)
 
 // Enable @sensitive attribute.
 EXPERIMENTAL_FEATURE(Sensitive, true)
@@ -492,15 +499,6 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 
 /// Import inherited non-public members when importing C++ classes.
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
-
-/// Suppress the synthesis of static factory methods for C++ foreign reference
-/// types and importing them as Swift initializers.
-EXPERIMENTAL_FEATURE(SuppressCXXForeignReferenceTypeInitializers, true)
-
-/// Emit a warning when a C++ API returns a SWIFT_SHARED_REFERENCE type
-/// without being explicitly annotated with either SWIFT_RETURNS_RETAINED
-/// or SWIFT_RETURNS_UNRETAINED.
-EXPERIMENTAL_FEATURE(WarnUnannotatedReturnOfCxxFrt, true)
 
 /// modify/read single-yield coroutines
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
@@ -529,12 +527,6 @@ EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
 /// Allow declarations of Swift runtime symbols using @_silgen_name.
 EXPERIMENTAL_FEATURE(AllowRuntimeSymbolDeclarations, true)
 
-/// Allow use of `@cdecl`
-EXPERIMENTAL_FEATURE(CDecl, false)
-
-/// Allow use of `Module::name` syntax
-EXPERIMENTAL_FEATURE(ModuleSelector, false)
-
 /// Allow use of `using` declaration that control default isolation
 /// in a file scope.
 EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
@@ -542,11 +534,44 @@ EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
 /// Enable @_lifetime attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 
+/// Excludes '(file)private' properties with initial values from the memberwise
+/// initializer if there is a more accessible initializable property.
+EXPERIMENTAL_FEATURE(ExcludePrivateFromMemberwiseInit, true)
+
 /// Allow macro based aliases to be imported into Swift
 EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 
 /// Enable borrow/mutate accessors
 EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, false)
+
+/// Allow use of @inline(always) attribute
+SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
+
+/// Allow use of 'Swift' (Swift runtime version) in @available attributes
+EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
+
+/// 'Swift' availability is always standalone, even when targeting platforms
+/// that have a built-in Swift runtime. Implies 'SwiftRuntimeAvailability'.
+EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
+
+/// Allow use of `~Sendable`.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TildeSendable, false)
+
+/// Allow use of protocol typed values in Embedded mode (`Any` and friends)
+EXPERIMENTAL_FEATURE(EmbeddedExistentials, true)
+
+/// Allow use of the 'anyAppleOS' availability domain.
+EXPERIMENTAL_FEATURE(AnyAppleOSAvailability, true)
+
+/// Check @_implementationOnly imports in non-library-evolution mode.
+EXPERIMENTAL_FEATURE(CheckImplementationOnly, true)
+
+/// Extends CheckImplementationOnly with an extra check at serialization to
+/// report references to implementation-only imported modules.
+EXPERIMENTAL_FEATURE(CheckImplementationOnlyStrict, false)
+
+/// Check that use sites have the required @_spi import for operators.
+EXPERIMENTAL_FEATURE(EnforceSPIOperatorGroup, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

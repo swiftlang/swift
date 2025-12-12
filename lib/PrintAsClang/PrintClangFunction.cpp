@@ -794,7 +794,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     ClangSyntaxPrinter(FD->getASTContext(), functionSignatureOS)
         .printNominalTypeOutsideMemberDeclTemplateSpecifiers(typeDecl);
   }
-  if (FD->isGeneric()) {
+  if (FD->hasGenericParamList()) {
     auto Signature = FD->getGenericSignature().getCanonicalSignature();
     if (!cxx_translation::isExposableToCxx(Signature))
       return ClangRepresentation::unsupported;
@@ -1257,7 +1257,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   if (typeDeclContext)
     ClangSyntaxPrinter(FD->getASTContext(), os).printNominalTypeOutsideMemberDeclInnerStaticAssert(
         typeDeclContext);
-  if (FD->isGeneric()) {
+  if (FD->hasGenericParamList()) {
     auto Signature = FD->getGenericSignature().getCanonicalSignature();
     ClangSyntaxPrinter(FD->getASTContext(), os).printGenericSignatureInnerStaticAsserts(Signature);
   }
@@ -1686,7 +1686,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   if (!isDefinition) {
     os << ";\n";
     if (result.isObjCxxOnly())
-      os << "#endif\n";
+      os << "#endif // defined(__OBJC__)\n";
     return;
   }
 
@@ -1699,7 +1699,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
                     dispatchInfo);
   os << "  }\n";
   if (result.isObjCxxOnly())
-    os << "#endif\n";
+    os << "#endif // defined(__OBJC__)\n";
 }
 
 /// Returns true if the given property name like `isEmpty` can be remapped
@@ -1895,13 +1895,27 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
     PrimitiveTypeMapping &typeMapping,
     SwiftToClangInteropContext &interopContext, DeclAndTypePrinter &declPrinter,
     const ModuleDecl *emittedModule, Type ty) {
+  auto [it, inserted] = declPrinter.typeRepresentations.try_emplace(ty);
+  // If we already seen the type but do not have a representation yet assume
+  // representable for now. This can happen for recursive types like:
+  //
+  //    public enum E {
+  //      case foo([E?])
+  //    }
+  //
+  // We make a decision about these types when the function that first
+  // encountered them returns.
+  if (!inserted)
+    return it->second ? (*it->second) : ClangRepresentation::representable;
   CFunctionSignatureTypePrinterModifierDelegate delegate;
   CFunctionSignatureTypePrinter typePrinter(
       llvm::nulls(), llvm::nulls(), typeMapping, OutputLanguageMode::Cxx,
       interopContext, delegate, emittedModule, declPrinter,
       FunctionSignatureTypeUse::TypeReference);
-  return typePrinter.visit(ty, OptionalTypeKind::OTK_None,
-                           /*isInOutParam=*/false);
+  auto result = typePrinter.visit(ty, OptionalTypeKind::OTK_None,
+                                  /*isInOutParam=*/false);
+  declPrinter.typeRepresentations[ty] = result;
+  return result;
 }
 
 void DeclAndTypeClangFunctionPrinter::printTypeName(

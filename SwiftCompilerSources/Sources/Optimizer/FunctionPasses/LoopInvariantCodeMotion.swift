@@ -296,13 +296,15 @@ private func collectMovableInstructions(
           continue
         }
         
-        if !analyzedInstructions.sideEffectsMayRelease || !analyzedInstructions.loopSideEffectsMayWriteTo(address: fixLifetimeInst.operand.value, context.aliasAnalysis) {
+        if !analyzedInstructions.sideEffectsMayRelease ||
+            !analyzedInstructions.sideEffectsMayWrite(to: fixLifetimeInst.operand.value, context.aliasAnalysis)
+        {
           movableInstructions.sinkDown.append(fixLifetimeInst)
         }
       case let loadInst as LoadInst:
         // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
         if loadInstCounter * analyzedInstructions.loopSideEffects.count < 8000,
-           !analyzedInstructions.loopSideEffectsMayWriteTo(address: loadInst.operand.value, context.aliasAnalysis) {
+           !analyzedInstructions.sideEffectsMayWrite(to: loadInst.address, context.aliasAnalysis) {
           movableInstructions.hoistUp.append(loadInst)
         }
         
@@ -532,13 +534,41 @@ private extension AnalyzedInstructions {
   
   /// Returns true if `loopSideEffects` contains any memory writes which
   /// may alias with the memory `address`.
-  func loopSideEffectsMayWriteTo(address: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
+  func sideEffectsMayWrite(to address: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
     return loopSideEffects
       .contains { sideEffect in
         sideEffect.mayWrite(toAddress: address, aliasAnalysis)
       }
   }
-  
+
+  func sideEffectsMayWrite(to address: Value,
+                           outsideOf scope: InstructionRange,
+                           _ context: FunctionPassContext
+  ) -> Bool {
+    for sideEffectInst in loopSideEffects {
+      if sideEffectInst.mayWrite(toAddress: address, context.aliasAnalysis),
+         !scope.inclusiveRangeContains(sideEffectInst)
+      {
+        return true
+      }
+    }
+    return false
+  }
+
+  func sideEffectsMayReadOrWrite(to address: Value,
+                                 outsideOf scope: InstructionRange,
+                                 _ context: FunctionPassContext
+  ) -> Bool {
+    for sideEffectInst in loopSideEffects {
+      if sideEffectInst.mayReadOrWrite(address: address, context.aliasAnalysis),
+         !scope.inclusiveRangeContains(sideEffectInst)
+      {
+        return true
+      }
+    }
+    return false
+  }
+
   /// Find all loads that contain `accessPath`. Split them into a load with
   /// identical `accessPath` and a set of non-overlapping loads. Add the new
   /// non-overlapping loads to `loads`.
@@ -693,6 +723,12 @@ private extension MovableInstructions {
     accessPath: AccessPath,
     context: FunctionPassContext
   ) -> Bool {
+
+    // If the memory is not initialized at all exits, it would be wrong to insert stores at exit blocks.
+    guard memoryIsInitializedAtAllExits(of: loop, accessPath: accessPath, context) else {
+      return false
+    }
+
     // Initially load the value in the loop pre header.
     let builder = Builder(before: loop.preheader!.terminator, context)
     var firstStore: StoreInst?
@@ -721,7 +757,18 @@ private extension MovableInstructions {
     guard let firstStore else {
       return false
     }
-    
+
+    // We currently don't support split `load [take]`, i.e. `load [take]` which does _not_ load all
+    // non-trivial fields of the initial value.
+    for case let load as LoadInst in loadsAndStores {
+      if load.loadOwnership == .take,
+         let path = accessPath.getProjection(to: load.address.accessPath),
+         !firstStore.destination.type.isProjectingEntireNonTrivialMembers(path: path, in: load.parentFunction)
+      {
+        return false
+      }
+    }
+
     var ssaUpdater = SSAUpdater(
       function: firstStore.parentFunction,
       type: firstStore.destination.type.objectType,
@@ -792,7 +839,13 @@ private extension MovableInstructions {
       let rootVal = currentVal ?? ssaUpdater.getValue(inMiddleOf: block)
       
       if loadInst.operand.value.accessPath == accessPath {
-        loadInst.replace(with: rootVal, context)
+        if loadInst.loadOwnership == .copy {
+          let builder = Builder(before: loadInst, context)
+          let copy = builder.createCopyValue(operand: rootVal)
+          loadInst.replace(with: copy, context)
+        } else {
+          loadInst.replace(with: rootVal, context)
+        }
         changed = true
         continue
       }
@@ -802,7 +855,11 @@ private extension MovableInstructions {
       }
     
       let builder = Builder(before: loadInst, context)
-      let projection = rootVal.createProjection(path: projectionPath, builder: builder)
+      let projection = if loadInst.loadOwnership == .copy {
+        rootVal.createProjectionAndCopy(path: projectionPath, builder: builder)
+      } else {
+        rootVal.createProjection(path: projectionPath, builder: builder)
+      }
       loadInst.replace(with: projection, context)
       
       changed = true
@@ -830,6 +887,69 @@ private extension MovableInstructions {
     }
     
     return changed
+  }
+
+  func memoryIsInitializedAtAllExits(of loop: Loop, accessPath: AccessPath, _ context: FunctionPassContext) -> Bool {
+
+    // Perform a simple dataflow analysis which checks if there is a path from a `load [take]`
+    // (= the only kind of instruction which can de-initialize the memory) to a loop exit without
+    // a `store` in between.
+
+    var stores = InstructionSet(context)
+    defer { stores.deinitialize() }
+    for case let store as StoreInst in loadsAndStores where store.storesTo(accessPath) {
+      stores.insert(store)
+    }
+
+    var exitInsts = InstructionSet(context)
+    defer { exitInsts.deinitialize() }
+    exitInsts.insert(contentsOf: loop.exitBlocks.lazy.map { $0.instructions.first! })
+
+    var worklist = InstructionWorklist(context)
+    defer { worklist.deinitialize() }
+    for case let load as LoadInst in loadsAndStores where load.loadOwnership == .take && load.loadsFrom(accessPath) {
+      worklist.pushIfNotVisited(load)
+    }
+
+    while let inst = worklist.pop() {
+      if stores.contains(inst) {
+        continue
+      }
+      if exitInsts.contains(inst) {
+        return false
+      }
+      worklist.pushSuccessors(of: inst)
+    }
+    return true
+  }
+}
+
+private extension Type {
+  func isProjectingEntireNonTrivialMembers(path: SmallProjectionPath, in function: Function) -> Bool {
+    let (kind, index, subPath) = path.pop()
+    switch kind {
+    case .root:
+      return true
+    case .structField:
+      guard let fields = getNominalFields(in: function) else {
+        return false
+      }
+      for (fieldIdx, fieldType) in fields.enumerated() {
+        if fieldIdx != index && !fieldType.isTrivial(in: function) {
+          return false
+        }
+      }
+      return fields[index].isProjectingEntireNonTrivialMembers(path: subPath, in: function)
+    case .tupleField:
+      for (elementIdx, elementType) in tupleElements.enumerated() {
+        if elementIdx != index && !elementType.isTrivial(in: function) {
+          return false
+        }
+      }
+      return tupleElements[index].isProjectingEntireNonTrivialMembers(path: subPath, in: function)
+    default:
+      fatalError("path is not materializable")
+    }
   }
 }
 
@@ -879,19 +999,6 @@ private extension Instruction {
         move(before: terminator, context)
       }
     }
-    
-    if let singleValueInst = self as? SingleValueInstruction,
-       !(self is ScopedInstruction || self is AllocStackInst),
-       let identicalInst = (loop.preheader!.instructions.first { otherInst in
-         return singleValueInst != otherInst && singleValueInst.isIdenticalTo(otherInst)
-    }) {
-      guard let identicalSingleValueInst = identicalInst as? SingleValueInstruction else {
-        return true
-      }
-      
-      singleValueInst.replace(with: identicalSingleValueInst, context)
-    }
-
     return true
   }
   
@@ -1001,8 +1108,20 @@ private extension LoadInst {
   }
   
   func overlaps(accessPath: AccessPath) -> Bool {
-    // Don't use `AccessPath.mayOverlap`. We only want definite overlap.
-    return accessPath.isEqualOrContains(self.operand.value.accessPath) || self.operand.value.accessPath.isEqualOrContains(accessPath)
+    if let path = accessPath.getProjection(to: self.operand.value.accessPath),
+       // If the accessPath is wider than load, it needs to be materializable.
+       // Otherwise we won't be able to project it.
+       path.isMaterializable {
+      // The load is narrower than the access path.
+      return true
+    }
+    
+    if self.operand.value.accessPath.isEqualOrContains(accessPath) {
+      // The load is wider than the access path.
+      return true
+    }
+    
+    return false
   }
 }
 
@@ -1104,49 +1223,19 @@ private extension ScopedInstruction {
     case is BeginApplyInst:
       return true // Has already been checked with other full applies.
     case let loadBorrowInst as LoadBorrowInst:
-      for case let destroyAddrInst as DestroyAddrInst in analyzedInstructions.loopSideEffects {
-        if context.aliasAnalysis.mayAlias(loadBorrowInst.address, destroyAddrInst.destroyedAddress) {
-          if !scope.contains(destroyAddrInst) {
-            return false
-          }
-        }
-      }
-      
-      for storeInst in analyzedInstructions.stores {
-        if storeInst.mayWrite(toAddress: loadBorrowInst.address, context.aliasAnalysis) {
-          if !scope.contains(storeInst) {
-            return false
-          }
-        }
-      }
-      
-      fallthrough
-    case is BeginAccessInst:
-      for fullApplyInst in analyzedInstructions.fullApplies {
-        guard mayWriteToMemory && fullApplyInst.mayReadOrWrite(address: operands.first!.value, context.aliasAnalysis) ||
-              !mayWriteToMemory && fullApplyInst.mayWrite(toAddress: operands.first!.value, context.aliasAnalysis) else {
-          continue
-        }
+      return !analyzedInstructions.sideEffectsMayWrite(to: loadBorrowInst.address, outsideOf: scope, context)
 
-        // After hoisting the begin/end_access the apply will be within the scope, so it must not have a conflicting access.
-        if !scope.contains(fullApplyInst) {
-          return false
-        }
-      }
-      
-      switch operands.first!.value.accessPath.base {
-      case .class, .global:
-        for sideEffect in analyzedInstructions.loopSideEffects where sideEffect.mayRelease {
-          // Since a class might have a deinitializer, hoisting begin/end_access pair could violate
-          // exclusive access if the deinitializer accesses address used by begin_access.
-          if !scope.contains(sideEffect) {
-            return false
-          }
-        }
-
-        return true
-      default:
-        return true
+    case let beginAccess as BeginAccessInst:
+      if beginAccess.accessKind == .read {
+        // Check that we don't generate nested accesses when extending the access scope. Also, we must not
+        // extend a "read" access scope over a memory write (to the same address) even if the write is _not_
+        // in an access scope, because this would confuse alias analysis.
+        return !analyzedInstructions.sideEffectsMayWrite(to: beginAccess.address, outsideOf: scope, context)
+      } else {
+        // This does not include memory-reading instructions which are not in `loopSideEffects`, like a
+        // plain `load`. This is fine because we can extend a "modify" access scope over memory reads
+        // (of the same address) as long as we are not generating nested accesses.
+        return !analyzedInstructions.sideEffectsMayReadOrWrite(to: beginAccess.address, outsideOf: scope, context)
       }
     case is BeginBorrowInst, is StoreBorrowInst:
       // Ensure the value is produced outside the loop.

@@ -120,10 +120,11 @@ public protocol Down {
 }
 
 public typealias DependentAlias<T : Up> = T.A.A
+// CHECK-DAG: ![[DEPENDENTALIAS:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "DependentAlias", {{.*}} baseType: ![[INTTYPE]])
 
 extension Up where A.A == Int {
   public func foo() {
-    // CHECK-DAG: !DILocalVariable(name: "gg",{{.*}} type: ![[INTTYPE]]
+    // CHECK-DAG: !DILocalVariable(name: "gg",{{.*}} type: ![[DEPENDENTALIAS]]
     var gg: DependentAlias<Self> = 123
   }
 }

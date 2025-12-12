@@ -746,7 +746,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         //   subscript, or ObjC literal since it used to be accepted.
         // - member type expressions rooted on non-identifier types, e.g.
         //   '[X].Y' since they used to be accepted without the '.self'.
-        if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
+        if (!Ctx.isLanguageModeAtLeast(6)) {
           if (isa<SubscriptExpr>(ParentExpr) ||
               isa<DynamicSubscriptExpr>(ParentExpr) ||
               isa<ObjectLiteralExpr>(ParentExpr)) {
@@ -1897,7 +1897,7 @@ public:
 
     // Prior to Swift 6, use the old validation logic.
     auto &ctx = inClosure->getASTContext();
-    if (!ctx.isSwiftVersionAtLeast(6))
+    if (!ctx.isLanguageModeAtLeast(6))
       return selfDeclAllowsImplicitSelf510(DRE, ty, inClosure);
 
     return selfDeclAllowsImplicitSelf(DRE->getDecl(), ty, inClosure,
@@ -2282,7 +2282,7 @@ public:
 
   bool shouldRecordClosure(const AbstractClosureExpr *E) {
     // Record all closures in Swift 6 mode.
-    if (Ctx.isSwiftVersionAtLeast(6))
+    if (Ctx.isLanguageModeAtLeast(6))
       return true;
 
     // Only record closures requiring self qualification prior to Swift 6
@@ -2298,7 +2298,7 @@ public:
     std::optional<unsigned> warnUntilVersion;
     // Prior to Swift 6, we may need to downgrade to a warning for compatibility
     // with the 5.10 diagnostic behavior.
-    if (!Ctx.isSwiftVersionAtLeast(6) &&
+    if (!Ctx.isLanguageModeAtLeast(6) &&
         invalidImplicitSelfShouldOnlyWarn510(base, closure)) {
       warnUntilVersion.emplace(6);
     }
@@ -2306,12 +2306,12 @@ public:
     // macro to preserve compatibility with the Swift 6 diagnostic behavior
     // where we previously skipped diagnosing.
     auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-    if (!Ctx.isSwiftVersionAtLeast(futureVersion) && isInMacro())
+    if (!Ctx.isLanguageModeAtLeast(futureVersion) && isInMacro())
       warnUntilVersion.emplace(futureVersion);
 
     auto diag = Ctx.Diags.diagnose(loc, ID, std::move(Args)...);
     if (warnUntilVersion)
-      diag.warnUntilSwiftVersion(*warnUntilVersion);
+      diag.warnUntilLanguageMode(*warnUntilVersion);
 
     return diag;
   }
@@ -2370,7 +2370,7 @@ public:
 
     if (memberLoc.isValid()) {
       const AbstractClosureExpr *parentDisallowingImplicitSelf = nullptr;
-      if (Ctx.isSwiftVersionAtLeast(6) && selfDRE && selfDRE->getDecl()) {
+      if (Ctx.isLanguageModeAtLeast(6) && selfDRE && selfDRE->getDecl()) {
         parentDisallowingImplicitSelf = parentClosureDisallowingImplicitSelf(
             selfDRE->getDecl(), selfDRE->getType(), ACE);
       }
@@ -3167,11 +3167,11 @@ static bool fixItOverrideDeclarationTypesImpl(
       });
     }
     if (auto *method = dyn_cast<FuncDecl>(decl)) {
-      auto resultType = method->mapTypeIntoContext(
+      auto resultType = method->mapTypeIntoEnvironment(
           method->getResultInterfaceType());
 
       auto *baseMethod = cast<FuncDecl>(base);
-      auto baseResultType = baseMethod->mapTypeIntoContext(
+      auto baseResultType = baseMethod->mapTypeIntoEnvironment(
           baseMethod->getResultInterfaceType());
 
       fixedAny |= checkType(resultType, ParamDecl::Specifier::Default,
@@ -3194,8 +3194,8 @@ static bool fixItOverrideDeclarationTypesImpl(
     }
 
     auto resultType =
-        subscript->mapTypeIntoContext(subscript->getElementInterfaceType());
-    auto baseResultType = baseSubscript->mapTypeIntoContext(
+        subscript->mapTypeIntoEnvironment(subscript->getElementInterfaceType());
+    auto baseResultType = baseSubscript->mapTypeIntoEnvironment(
         baseSubscript->getElementInterfaceType());
     fixedAny |= checkType(resultType, ParamDecl::Specifier::Default,
                           baseResultType, ParamDecl::Specifier::Default,
@@ -3227,7 +3227,7 @@ bool swift::computeFixitsForOverriddenDeclaration(
 }
 
 //===----------------------------------------------------------------------===//
-// Per func/init diagnostics
+// MARK: Per func/init diagnostics
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -3693,7 +3693,7 @@ public:
     // If we have one successful candidate, then save it as the underlying
     // substitutions of the opaque decl.
     OpaqueDecl->setUniqueUnderlyingTypeSubstitutions(
-        std::get<1>(candidate).mapReplacementTypesOutOfContext());
+        std::get<1>(candidate).mapReplacementTypesOutOfEnvironment());
   }
 
   // There is no clear winner here since there are candidates within
@@ -3759,14 +3759,14 @@ public:
       conditionalSubstitutions.push_back(
           OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
               Ctx, queries,
-              std::get<1>(candidate).mapReplacementTypesOutOfContext()));
+              std::get<1>(candidate).mapReplacementTypesOutOfEnvironment()));
     }
 
     // Add universally available choice as the last one.
     conditionalSubstitutions.push_back(
         OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
             Ctx, {AvailabilityQuery::universallyConstant(true)},
-            universalSubstMap.mapReplacementTypesOutOfContext()));
+            universalSubstMap.mapReplacementTypesOutOfEnvironment()));
 
     OpaqueDecl->setConditionallyAvailableSubstitutions(
         conditionalSubstitutions);
@@ -5131,7 +5131,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       info->isUnavailability() ? "#unavailable" : "#available";
 
   bool hasValidSpecs = false;
-  bool allValidSpecsArePlatform = true;
+  bool wildcardRequiredInList = false;
   std::optional<SourceLoc> wildcardLoc;
   llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
   for (auto spec : info->getSemanticAvailabilitySpecs(DC)) {
@@ -5144,6 +5144,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
     auto domain = spec.getDomain();
     auto loc = parsedSpec->getStartLoc();
     bool hasVersion = !spec.getVersion().empty();
+    bool mustBeSpecifiedAlone = domain.mustBeSpecifiedAlone();
 
     if (!domain.supportsQueries()) {
       diags.diagnose(loc, diag::availability_query_not_allowed, domain,
@@ -5151,7 +5152,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       return true;
     }
 
-    if (!domain.isPlatform() && info->getQueries().size() > 1) {
+    if (mustBeSpecifiedAlone && info->getQueries().size() > 1) {
       diags.diagnose(loc, diag::availability_must_occur_alone, domain,
                      hasVersion);
       return true;
@@ -5199,8 +5200,8 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
     }
 
     hasValidSpecs = true;
-    if (!domain.isPlatform())
-      allValidSpecsArePlatform = false;
+    if (!mustBeSpecifiedAlone)
+      wildcardRequiredInList = true;
   }
 
   if (info->isUnavailability()) {
@@ -5210,7 +5211,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
                     diag::unavailability_query_wildcard_not_required)
           .fixItRemove(*wildcardLoc);
     }
-  } else if (!wildcardLoc && hasValidSpecs && allValidSpecsArePlatform) {
+  } else if (!wildcardLoc && hasValidSpecs && wildcardRequiredInList) {
     if (info->getQueries().size() > 0) {
       auto insertLoc = info->getQueries().back()->getSourceRange().End;
       diags.diagnose(insertLoc, diag::availability_query_wildcard_required)
@@ -5222,7 +5223,8 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
   // restriction, macros would need to either be expanded when printed in
   // swiftinterfaces or be parsable as macros by module clients.
   auto fragileKind = DC->getFragileFunctionKind();
-  if (fragileKind.kind != FragileFunctionKind::None) {
+  if (fragileKind.kind != FragileFunctionKind::None &&
+      fragileKind.kind != FragileFunctionKind::EmbeddedAlwaysEmitIntoClient) {
     for (auto availSpec : info->getQueries()) {
       if (availSpec->getMacroLoc().isValid()) {
         diags.diagnose(availSpec->getMacroLoc(),
@@ -5482,7 +5484,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
       // Do not warn on coercions from implicitly unwrapped optionals
       // for Swift versions less than 5.
-      if (!Ctx.isSwiftVersionAtLeast(5) &&
+      if (!Ctx.isLanguageModeAtLeast(5) &&
           hasImplicitlyUnwrappedResult(subExpr))
         return;
 
@@ -6373,8 +6375,6 @@ static bool isReturningFRT(const clang::NamedDecl *ND,
 static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
                                                  clang::QualType retType,
                                                  ASTContext &Ctx) {
-  if (!Ctx.LangOpts.hasFeature(Feature::WarnUnannotatedReturnOfCxxFrt))
-    return false;
 
   auto attrInfo = importer::ReturnOwnershipInfo(ND);
   if (attrInfo.hasRetainAttr())
@@ -6452,7 +6452,7 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
       if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx)) {
         SourceLoc diagnosticLoc = func->getLoc();
         if (diagnosticLoc.isInvalid() && func->getClangDecl()) {
-          // Fixme: Remove the diagnosticLoc once the source locations of the
+          // FIXME: Remove the diagnosticLoc once the source locations of the
           // objc method declarations are imported correctly.
           diagnosticLoc = Ctx.getClangModuleLoader()->importSourceLocation(
               ND->getLocation());
@@ -6474,7 +6474,7 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
 }
 
 //===----------------------------------------------------------------------===//
-// High-level entry points.
+// MARK: High-level entry points.
 //===----------------------------------------------------------------------===//
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
@@ -6491,16 +6491,14 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   maybeDiagnoseCallToKeyValueObserveMethod(E, DC);
   diagnoseExplicitUseOfLazyVariableStorage(E, DC);
   diagnoseComparisonWithNaN(E, DC);
-  if (!ctx.isSwiftVersionAtLeast(5))
+  if (!ctx.isLanguageModeAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)
     diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
-  if (ctx.LangOpts.hasFeature(Feature::CompileTimeValues) &&
-      !ctx.LangOpts.hasFeature(Feature::CompileTimeValuesPreview))
-    diagnoseInvalidConstExpressions(E, DC, isConstInitExpr);
+  diagnoseInvalidConstExpressions(E, DC, isConstInitExpr);
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
   diagnoseMissingMemberImports(E, DC);
@@ -6525,7 +6523,7 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
 }
 
 //===----------------------------------------------------------------------===//
-// Utility functions
+// MARK: Utility functions
 //===----------------------------------------------------------------------===//
 
 void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
@@ -6751,7 +6749,7 @@ TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
     resultType = func->getResultInterfaceType();
-    resultType = func->mapTypeIntoContext(resultType);
+    resultType = func->mapTypeIntoEnvironment(resultType);
     returnsSelf = func->getResultInterfaceType()->hasDynamicSelfType();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;

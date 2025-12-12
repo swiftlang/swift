@@ -76,12 +76,15 @@ extension ASTGenVisitor {
     // Name reference to `appendLiteral(_:)`
     let appendLiteral = BridgedDeclNameRef.createParsed(
       self.ctx,
+      moduleSelector: nil,
       baseName: .init(self.ctx.getIdentifier("appendLiteral")),
       argumentLabels: CollectionOfOne(Identifier()).bridgedArray(in: self)
     )
     // Name reference to `appendInterpolation`. Arguments labels are not determined yet.
     let appendInterpolation = BridgedDeclNameRef.createParsed(
-      .init(self.ctx.getIdentifier("appendInterpolation"))
+      self.ctx,
+      moduleSelector: nil,
+      baseName: .init(self.ctx.getIdentifier("appendInterpolation"))
     )
 
     // Total byte length of "literal" segments.

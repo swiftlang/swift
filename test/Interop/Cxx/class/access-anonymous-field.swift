@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -swift-version 6 -cxx-interoperability-mode=upcoming-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -swift-version 6 -cxx-interoperability-mode=upcoming-swift
 
 // CHECK: Foobar
 

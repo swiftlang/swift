@@ -71,7 +71,7 @@ struct SubstitutionMapWithLocalArchetypes {
       auto *newEnv = found->second;
 
       auto interfaceTy = local->getInterfaceType();
-      return newEnv->mapTypeIntoContext(interfaceTy);
+      return newEnv->mapTypeIntoEnvironment(interfaceTy);
     }
 
     if (SubsMap)
@@ -89,7 +89,7 @@ struct SubstitutionMapWithLocalArchetypes {
     if (SubsMap) {
       if (origType->is<PrimaryArchetypeType>() ||
           origType->is<PackArchetypeType>()) {
-        origType = origType->mapTypeOutOfContext();
+        origType = origType->mapTypeOutOfEnvironment();
       }
 
       return SubsMap->lookupConformance(
@@ -216,6 +216,8 @@ public:
   void cloneFunctionBody(SILFunction *F, SILBasicBlock *clonedEntryBB,
                          ArrayRef<SILValue> entryArgs,
                          bool replaceOriginalFunctionInPlace = false);
+
+  void cloneFunctionBody(SILFunction *F);
 
   /// Clone all blocks in this function and all instructions in those
   /// blocks.
@@ -836,8 +838,30 @@ void SILCloner<ImplClass>::cloneFunctionBody(SILFunction *F,
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::cloneFunctionBody(SILFunction *F) {
+  assert(!Builder.getFunction().empty() && "Expect the entry block to already be created");
+
+  assert(F != &Builder.getFunction() && "Must clone into a new function.");
+  assert(BBMap.empty() && "This API does not allow clients to map blocks.");
+
+  SILBasicBlock *clonedEntryBB = Builder.getFunction().getEntryBlock();
+  BBMap.insert(std::make_pair(&*F->begin(), clonedEntryBB));
+
+  Builder.setInsertionPoint(clonedEntryBB);
+
+  // This will layout all newly cloned blocks immediate after clonedEntryBB.
+  visitBlocksDepthFirst(&*F->begin());
+
+  commonFixUp(F);
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::cloneFunction(SILFunction *origF) {
   SILFunction *newF = &Builder.getFunction();
+  if (!newF->empty()) {
+    cloneFunctionBody(origF);
+    return;
+  }
 
   auto *newEntryBB = newF->createBasicBlock();
 
@@ -861,23 +885,12 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::cloneFunctionBody(
     SILFunction *F, SILBasicBlock *clonedEntryBB, ArrayRef<SILValue> entryArgs,
     llvm::function_ref<SILValue(SILValue)> entryArgIndexToOldArgIndex) {
-  assert(F != clonedEntryBB->getParent() && "Must clone into a new function.");
-  assert(BBMap.empty() && "This API does not allow clients to map blocks.");
   assert(ValueMap.empty() && "Stale ValueMap.");
-
   assert(entryArgs.size() == F->getArguments().size());
   for (unsigned i = 0, e = entryArgs.size(); i != e; ++i) {
     ValueMap[entryArgIndexToOldArgIndex(entryArgs[i])] = entryArgs[i];
   }
-
-  BBMap.insert(std::make_pair(&*F->begin(), clonedEntryBB));
-
-  Builder.setInsertionPoint(clonedEntryBB);
-
-  // This will layout all newly cloned blocks immediate after clonedEntryBB.
-  visitBlocksDepthFirst(&*F->begin());
-
-  commonFixUp(F);
+  cloneFunctionBody(F);
 }
 
 template<typename ImplClass>
@@ -1049,6 +1062,7 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
       true
 #endif
   );
+  NewInst->setStackAllocationIsNested(Inst->isStackAllocationNested());
   recordClonedInstruction(Inst, NewInst);
 }
 
@@ -2235,6 +2249,19 @@ void SILCloner<ImplClass>::visitCopyableToMoveOnlyWrapperValueInst(
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitUncheckedOwnershipInst(
+    UncheckedOwnershipInst *uoi) {
+  getBuilder().setCurrentDebugScope(getOpScope(uoi->getDebugScope()));
+  if (!getBuilder().hasOwnership()) {
+    return recordFoldedValue(uoi, getOpValue(uoi->getOperand()));
+  }
+
+  recordClonedInstruction(
+      uoi, getBuilder().createUncheckedOwnership(
+               getOpLocation(uoi->getLoc()), getOpValue(uoi->getOperand())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitReleaseValueInst(ReleaseValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
@@ -3141,6 +3168,16 @@ void SILCloner<ImplClass>::visitUncheckedOwnershipConversionInst(
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitImplicitActorToOpaqueIsolationCastInst(
+    ImplicitActorToOpaqueIsolationCastInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+
+  recordClonedInstruction(
+      Inst, getBuilder().createImplicitActorToOpaqueIsolationCast(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getValue())));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitMarkDependenceInst(MarkDependenceInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
@@ -3392,6 +3429,22 @@ SILCloner<ImplClass>::visitReturnInst(ReturnInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createReturn(getOpLocation(Inst->getLoc()),
                                       getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitReturnBorrowInst(ReturnBorrowInst *rbi) {
+  getBuilder().setCurrentDebugScope(getOpScope(rbi->getDebugScope()));
+  if (!getBuilder().hasOwnership()) {
+    return recordClonedInstruction(
+        rbi, getBuilder().createReturn(getOpLocation(rbi->getLoc()),
+                                       getOpValue(rbi->getReturnValue())));
+  }
+
+  auto enclosingValues = getOpValueArray<8>(rbi->getEnclosingValues());
+  recordClonedInstruction(
+      rbi, getBuilder().createReturnBorrow(getOpLocation(rbi->getLoc()),
+                                           getOpValue(rbi->getReturnValue()),
+                                           enclosingValues));
 }
 
 template<typename ImplClass>

@@ -16,6 +16,7 @@
 
 #include "TypeCheckAvailability.h"
 #include "MiscDiagnostics.h"
+#include "TypeCheckAccess.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
@@ -29,6 +30,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -84,12 +86,12 @@ ExportContext::ExportContext(DeclContext *DC,
                              AvailabilityContext availability,
                              FragileFunctionKind kind,
                              llvm::SmallVectorImpl<UnsafeUse> *unsafeUses,
-                             bool spi, bool exported,
+                             bool spi, ExportedLevel exported,
                              bool implicit)
     : DC(DC), Availability(availability), FragileKind(kind),
       UnsafeUses(unsafeUses) {
   SPI = spi;
-  Exported = exported;
+  Exported = unsigned(exported);
   Implicit = implicit;
   Reason = unsigned(ExportabilityReason::General);
 }
@@ -176,7 +178,7 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
     computeExportContextBits(Ctx, D, &spi, &implicit);
   });
 
-  bool exported = ::isExported(D);
+  ExportedLevel exported = ::isExported(D);
 
   return ExportContext(DC, availabilityContext, fragileKind, nullptr,
                        spi, exported, implicit);
@@ -192,7 +194,7 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
   forEachOuterDecl(
       DC, [&](Decl *D) { computeExportContextBits(Ctx, D, &spi, &implicit); });
 
-  bool exported = false;
+  ExportedLevel exported = ExportedLevel::None;
 
   return ExportContext(DC, availabilityContext, fragileKind, nullptr,
                        spi, exported, implicit);
@@ -203,8 +205,9 @@ ExportContext ExportContext::forConformance(DeclContext *DC,
   assert(isa<ExtensionDecl>(DC) || isa<NominalTypeDecl>(DC));
   auto where = forDeclSignature(DC->getInnermostDeclarationDeclContext());
 
-  where.Exported &= proto->getFormalAccessScope(
-      DC, /*usableFromInlineAsPublic*/true).isPublic();
+  if (!proto->getFormalAccessScope(
+        DC, /*usableFromInlineAsPublic*/true).isPublic())
+    where.Exported = unsigned(ExportedLevel::None);
 
   return where;
 }
@@ -217,7 +220,7 @@ ExportContext ExportContext::withReason(ExportabilityReason reason) const {
 
 ExportContext ExportContext::withExported(bool exported) const {
   auto copy = *this;
-  copy.Exported = isExported() && exported;
+  copy.Exported = exported ? Exported : unsigned(ExportedLevel::None);
   return copy;
 }
 
@@ -231,6 +234,37 @@ ExportContext ExportContext::withRefinedAvailability(
 
 bool ExportContext::mustOnlyReferenceExportedDecls() const {
   return Exported || FragileKind.kind != FragileFunctionKind::None;
+}
+
+bool ExportContext::canReferenceOrigin(DisallowedOriginKind originKind) const {
+  if (originKind == DisallowedOriginKind::None)
+    return true;
+
+  // Exportability checks for non-library-evolution mode have less restrictions
+  // than the library-evolution ones. Implicitly always emit into client code
+  // in embedded mode and implicitly exported layouts in non-library-evolution
+  // mode can reference SPIs and non-public dependencies.
+  auto reason = getExportabilityReason();
+  if (getFragileFunctionKind().kind ==
+        FragileFunctionKind::EmbeddedAlwaysEmitIntoClient ||
+      (reason && *reason == ExportabilityReason::ImplicitlyPublicVarDecl)) {
+    switch (originKind) {
+    case DisallowedOriginKind::None:
+    case DisallowedOriginKind::NonPublicImport:
+    case DisallowedOriginKind::SPIOnly:
+    case DisallowedOriginKind::SPIImported:
+    case DisallowedOriginKind::SPILocal:
+      return true;
+    case DisallowedOriginKind::MissingImport:
+    case DisallowedOriginKind::InternalBridgingHeaderImport:
+    case DisallowedOriginKind::ImplementationOnly:
+    case DisallowedOriginKind::FragileCxxAPI:
+    case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
+      break;
+    }
+  }
+
+  return false;
 }
 
 std::optional<ExportabilityReason>
@@ -1040,15 +1074,22 @@ static bool diagnosePotentialUnavailability(
   {
     auto type = rootConf->getType();
     auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-    auto err = ctx.Diags.diagnose(
-        loc, diag::conformance_availability_only_version_newer, type, proto,
-        domain, availability);
+    auto err = availability.hasMinimumVersion()
+        ? ctx.Diags.diagnose(
+            loc, diag::conformance_availability_only_version_newer, type, proto,
+            domain, availability)
+        : ctx.Diags.diagnose(
+            loc, diag::conformance_availability_not_available, type, proto,
+            domain);
 
     auto behaviorLimit = behaviorLimitForExplicitUnavailability(rootConf, dc);
-    if (behaviorLimit >= DiagnosticBehavior::Warning)
+    if (!availability.hasMinimumVersion()) {
+      // Don't downgrade
+    } else if (behaviorLimit >= DiagnosticBehavior::Warning) {
       err.limitBehavior(behaviorLimit);
-    else
-      err.warnUntilSwiftVersion(6);
+    } else {
+      err.warnUntilLanguageMode(6);
+    }
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(loc, dc, domain,
@@ -1698,9 +1739,10 @@ bool shouldHideDomainNameForConstraintDiagnostic(
   case AvailabilityDomain::Kind::Custom:
   case AvailabilityDomain::Kind::PackageDescription:
     return true;
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
   case AvailabilityDomain::Kind::Platform:
     return false;
-  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
     switch (constraint.getReason()) {
     case AvailabilityConstraint::Reason::UnavailableUnconditionally:
     case AvailabilityConstraint::Reason::UnavailableUnintroduced:
@@ -1745,7 +1787,7 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
                 shouldHideDomainNameForConstraintDiagnostic(constraint),
                 domainAndRange.getDomain(), EncodedMessage.Message)
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
-      .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
+      .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6, 6);
 
   switch (constraint.getReason()) {
   case AvailabilityConstraint::Reason::UnavailableUnconditionally:
@@ -2121,7 +2163,7 @@ bool diagnoseExplicitUnavailability(
     return false;
 
   auto Attr = constraint.getAttr();
-  if (Attr.getDomain().isSwiftLanguage() && !Attr.isVersionSpecific()) {
+  if (Attr.getDomain().isSwiftLanguageMode() && !Attr.isVersionSpecific()) {
     if (shouldAllowReferenceToUnavailableInSwiftDeclaration(D, Where))
       return false;
   }
@@ -2231,9 +2273,6 @@ class ExprAvailabilityWalker : public BaseDiagnosticWalker {
   enum class KeyPathAccessContext : uint8_t {
     /// The context does not involve a key path access.
     None,
-
-    /// The context is an expression that is coerced to a read-only key path.
-    ReadOnlyCoercion,
 
     /// The context is a key path application (`x[keyPath: \.member]`).
     Application,
@@ -2360,15 +2399,6 @@ public:
                                           FCE->getType(),
                                           FCE->getLoc(),
                                           Where.getDeclContext());
-    }
-    if (auto DTBE = dyn_cast<DerivedToBaseExpr>(E)) {
-      if (auto ty = DTBE->getType()) {
-        if (ty->isKeyPath()) {
-          walkInKeyPathAccessContext(DTBE->getSubExpr(),
-                                     KeyPathAccessContext::ReadOnlyCoercion);
-          return Action::SkipChildren(E);
-        }
-      }
     }
     if (auto KP = dyn_cast<KeyPathExpr>(E)) {
       maybeDiagKeyPath(KP);
@@ -2586,19 +2616,49 @@ private:
 
   StorageAccessKind getStorageAccessKindForKeyPath(KeyPathExpr *KP) const {
     switch (KeyPathAccess) {
-    case KeyPathAccessContext::None:
-      // Use the key path's type to determine the access kind.
-      if (!KP->isObjC())
-        if (auto keyPathType = KP->getKeyPathType())
-          if (keyPathType->isKeyPath())
+    case KeyPathAccessContext::None: {
+      // Obj-C key paths are always considered mutable.
+      if (KP->isObjC())
+        return StorageAccessKind::GetSet;
+
+      // Check whether key path type indicates immutability, in which case only
+      // the getter will be used.
+      if (auto keyPathType = KP->getKeyPathType())
+        if (keyPathType->isKnownImmutableKeyPathType())
+          return StorageAccessKind::Get;
+
+      // Check if there's a conversion expression containing this one directly
+      // above it in the stack. If so, and that conversion is to an immutable
+      // key path type, then we should infer that use of the key path only
+      // implies use of the getter.
+      ArrayRef<const Expr *> exprs = ExprStack;
+      // Must be called while visiting the given key path expression.
+      ASSERT(exprs.back() == KP);
+
+      for (auto *expr : llvm::reverse(exprs.drop_back())) {
+        // Only traverse through conversions on the stack.
+        if (!isa<ImplicitConversionExpr>(expr) &&
+            !isa<OpenExistentialExpr>(expr))
+          break;
+
+        if (auto ty = expr->getType()) {
+          if (ty->isKnownImmutableKeyPathType())
             return StorageAccessKind::Get;
 
-      return StorageAccessKind::GetSet;
+          if (auto *existential = ty->getAs<ExistentialType>()) {
+            if (auto superclass =
+                    existential->getExistentialLayout().getSuperclass()) {
+              if (superclass->isKnownImmutableKeyPathType())
+                return StorageAccessKind::Get;
+            }
+          }
+        }
+      }
 
-    case KeyPathAccessContext::ReadOnlyCoercion:
-      // The type of this key path is being coerced to the type KeyPath<_, _> so
-      // ignore the actual key path type.
-      return StorageAccessKind::Get;
+      // We failed to prove that the key path is only used immutably,
+      // so diagnose both get and set access.
+      return StorageAccessKind::GetSet;
+    }
 
     case KeyPathAccessContext::Application:
       // The key path is being applied directly to a base so treat it as if it
@@ -2909,9 +2969,9 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
     if (D->preconcurrency()) {
       diag.limitBehavior(DiagnosticBehavior::Warning);
     } else if (shouldWarnUntilFutureVersion()) {
-      diag.warnUntilFutureSwiftVersion();
+      diag.warnUntilFutureLanguageMode();
     } else {
-      diag.warnUntilSwiftVersion(6);
+      diag.warnUntilLanguageMode(6);
     }
 
     if (!attr->getRename().empty()) {
@@ -2933,9 +2993,9 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
     auto diag = ctx.Diags.diagnose(diagLoc, diag::async_unavailable_decl, D,
                                    attr->Message);
     if (shouldWarnUntilFutureVersion()) {
-      diag.warnUntilFutureSwiftVersion();
+      diag.warnUntilFutureLanguageMode();
     } else {
-      diag.warnUntilSwiftVersion(6);
+      diag.warnUntilLanguageMode(6);
     }
   }
   D->diagnose(diag::decl_declared_here, D);
@@ -2996,6 +3056,13 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   // Diagnose for deprecation
   if (!isAccessorWithDeprecatedStorage)
     diagnoseIfDeprecated(R, Where, D, call);
+
+  // A reference to a compatibility memberwise initializer should be diagnosed
+  // as if it were deprecated.
+  if (auto *init = dyn_cast<ConstructorDecl>(D)) {
+    if (init->isMemberwiseInitializer() == MemberwiseInitKind::Compatibility)
+      TypeChecker::diagnoseCompatMemberwiseInitIfNeeded(init, R.Start);
+  }
 
   if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)
         && isa<ProtocolDecl>(D))
@@ -3078,7 +3145,7 @@ ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R)
     // If we emit a deprecation diagnostic, produce a fixit hint as well.
     auto diag =
         Context.Diags.diagnose(R.Start, diag::availability_decl_unavailable, D,
-                               true, AvailabilityDomain::forSwiftLanguage(),
+                               true, AvailabilityDomain::forSwiftLanguageMode(),
                                "it has been removed in Swift 3");
     if (isa<PrefixUnaryExpr>(call)) {
       // Prefix: remove the ++ or --.
@@ -3127,7 +3194,7 @@ ExprAvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
   EncodedDiagnosticMessage EncodedMessage(Attr.getMessage());
   auto diag = Context.Diags.diagnose(
       R.Start, diag::availability_decl_unavailable, D, true,
-      AvailabilityDomain::forSwiftLanguage(), EncodedMessage.Message);
+      AvailabilityDomain::forSwiftLanguageMode(), EncodedMessage.Message);
   diag.highlight(R);
 
   StringRef Prefix = "MemoryLayout<";
@@ -3613,9 +3680,7 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
   }
 
   // Skip functions emitted into clients, SPI or implicit.
-  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
-      decl->isSPI() ||
-      decl->isImplicit())
+  if (decl->isAlwaysEmittedIntoClient() || decl->isSPI() || decl->isImplicit())
     return false;
 
   // Skip unavailable decls.

@@ -333,6 +333,10 @@ struct SILDeclRef {
   /// Produce a mangled form of this constant.
   std::string mangle(ManglingKind MKind = ManglingKind::Default) const;
 
+  /// If the symbol has a specific name for use at the LLVM IR level,
+  /// produce that name. This may be different than the mangled name in SIL.
+  std::optional<std::string> getAsmName() const;
+
   /// True if the SILDeclRef references a function.
   bool isFunc() const {
     return kind == Kind::Func;
@@ -404,14 +408,20 @@ struct SILDeclRef {
   SerializedKind_t getSerializedKind() const;
   /// True if the function has noinline attribute.
   bool isNoinline() const;
-  /// True if the function has __always inline attribute.
+  /// True if the function has always inline attribute.
   bool isAlwaysInline() const;
+  /// True if the function has __always inline attribute.
+  bool isUnderscoredAlwaysInline() const;
   /// True if the function has the @backDeployed attribute.
   bool isBackDeployed() const;
 
   /// True if this entity should have a non-unique definition based on the
   /// embedded linkage model.
   bool hasNonUniqueDefinition() const;
+
+  /// True if the declaration is explicitly marked as being exposed to a
+  /// foreign language or environment,
+  static bool declExposedToForeignLanguage(const ValueDecl *decl);
 
   /// True if the declaration should have a non-unique definition based on the
   /// embedded linkage model.

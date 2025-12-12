@@ -62,3 +62,12 @@ func test_no_incorrect_favoring(v: Int?, o: Int) {
   sameType(s1, as: Int?.self)
   sameType(s2, as: Int?.self)
 }
+
+extension Int {
+  func test() -> Int { 42 }
+}
+
+func test_optional_chaining(v: Int?, defaultV: Int) {
+  // CHECK: declref_expr type="(consuming Int?, @autoclosure () throws -> Int?) throws -> Int?" {{.*}} decl="Swift.(file).??
+  _ = (v ?? defaultV)?.test() // Ok (no warnings)
+}

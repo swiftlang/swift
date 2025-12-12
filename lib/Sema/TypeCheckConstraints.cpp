@@ -214,11 +214,6 @@ bool TypeVariableType::Implementation::isTernary() const {
   return locator && locator->directlyAt<TernaryExpr>();
 }
 
-void *operator new(size_t bytes, ConstraintSystem& cs,
-                   size_t alignment) {
-  return cs.getAllocator().Allocate(bytes, alignment);
-}
-
 bool constraints::computeTupleShuffle(TupleType *fromTuple,
                                       TupleType *toTuple,
                                       SmallVectorImpl<unsigned> &sources) {
@@ -535,7 +530,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       isAutoClosure ? CTP_AutoclosureDefaultParameter : CTP_DefaultParameter,
       paramType, /*isDiscarded=*/false);
 
-  auto paramInterfaceTy = paramType->mapTypeOutOfContext();
+  auto paramInterfaceTy = paramType->mapTypeOutOfEnvironment();
 
   // Attempt to pre-check expression first, if that fails - skip type-checking.
   // This would make sure that diagnostics about invalid AST are never dropped.
@@ -695,10 +690,10 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       // In Swift 6.2 and below we incorrectly missed checking this rule for
       // methods, downgrade to a warning until the next language mode.
       auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-      if (!anchor->hasCurriedSelf() || ctx.isSwiftVersionAtLeast(futureVersion))
+      if (!anchor->hasCurriedSelf() || ctx.isLanguageModeAtLeast(futureVersion))
         return Type();
 
-      diag.warnUntilFutureSwiftVersion();
+      diag.warnUntilFutureLanguageMode();
     }
   }
 
@@ -893,7 +888,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   return hadError;
 }
 
-bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt) {
+bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
+                                           bool skipWhere) {
   auto &Context = dc->getASTContext();
   FrontendStatsTracer statsTracer(Context.Stats, "typecheck-for-each", stmt);
   PrettyStackTraceStmt stackTrace(Context, "type-checking-for-each", stmt);
@@ -902,18 +898,20 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt) {
   if (!typeCheckTarget(target))
     return true;
 
-  if (auto *where = stmt->getWhere()) {
-    auto boolType = dc->getASTContext().getBoolType();
-    if (!boolType)
-      return true;
+  if (!skipWhere) {
+    if (auto *where = stmt->getWhere()) {
+      auto boolType = dc->getASTContext().getBoolType();
+      if (!boolType)
+        return true;
 
-    SyntacticElementTarget whereClause(where, dc, {boolType, CTP_Condition},
-                                       /*isDiscarded=*/false);
-    auto result = typeCheckTarget(whereClause);
-    if (!result)
-      return true;
+      SyntacticElementTarget whereClause(where, dc, {boolType, CTP_Condition},
+                                         /*isDiscarded=*/false);
+      auto result = typeCheckTarget(whereClause);
+      if (!result)
+        return true;
 
-    stmt->setWhere(result->getAsExpr());
+      stmt->setWhere(result->getAsExpr());
+    }
   }
 
   // Check to see if the sequence expr is throwing (in async context),
@@ -925,13 +923,7 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt) {
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
-  // If this expression is already typechecked and has type Bool, then just
-  // re-typecheck it.
-  if (expr->getType() && expr->getType()->isBool()) {
-    auto resultTy =
-        TypeChecker::typeCheckExpression(expr, dc);
-    return !resultTy;
-  }
+  ASSERT(!expr->getType() && "the bool condition is already type checked");
 
   auto *boolDecl = dc->getASTContext().getBoolDecl();
   if (!boolDecl)
@@ -952,7 +944,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                   "typecheck-expr-pattern", EP);
   PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
 
-  EP->getMatchVar()->setInterfaceType(rhsType->mapTypeOutOfContext());
+  EP->getMatchVar()->setInterfaceType(rhsType->mapTypeOutOfEnvironment());
 
   // Check the expression as a condition.
   auto target = SyntacticElementTarget::forExprPattern(EP);
@@ -978,7 +970,7 @@ static Type openTypeParameter(ConstraintSystem &cs,
   }
 
   auto *paramTy = interfaceTy->castTo<GenericTypeParamType>();
-  auto archetypeTy = env->mapTypeIntoContext(paramTy)->castTo<ArchetypeType>();
+  auto archetypeTy = env->mapTypeIntoEnvironment(paramTy)->castTo<ArchetypeType>();
 
   auto found = types.find(archetypeTy);
   if (found != types.end())
@@ -1129,6 +1121,16 @@ bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
 }
 
 Expr *
+TypeChecker::addImplicitBorrowExpr(ASTContext &Ctx, Expr *E,
+                                 std::function<Type(Expr *)> getType,
+                                 std::function<void(Expr *, Type)> setType) {
+  auto objectType = getType(E)->getRValueType();
+  auto *BE = BorrowExpr::createImplicit(Ctx, E->getLoc(), E, objectType);
+  setType(BE, objectType);
+  return BE;
+}
+
+Expr *
 TypeChecker::addImplicitLoadExpr(ASTContext &Context, Expr *expr,
                                  std::function<Type(Expr *)> getType,
                                  std::function<void(Expr *, Type)> setType) {
@@ -1189,10 +1191,7 @@ TypeChecker::coerceToRValue(ASTContext &Context, Expr *expr,
                             llvm::function_ref<Type(Expr *)> getType,
                             llvm::function_ref<void(Expr *, Type)> setType) {
   Type exprTy = getType(expr);
-
-  // If expr has no type, just assume it's the right expr.
-  if (!exprTy)
-    return expr;
+  ASSERT(exprTy);
 
   // If the type is already materializable, then we're already done.
   if (!exprTy->hasLValueType())

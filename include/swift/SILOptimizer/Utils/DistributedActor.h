@@ -15,6 +15,7 @@
 
 #include "swift/AST/Decl.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "swift/SIL/SILValue.h"
 #include <optional>
 #include <utility>
 
@@ -30,7 +31,6 @@ class SILArgument;
 class SILFunction;
 class SILLocation;
 class SILType;
-class SILValue;
 
 /// Creates a reference to the distributed actor's \p actorSystem
 /// stored property.
@@ -46,11 +46,16 @@ SILValue refDistributedActorSystem(SILBuilder &B,
 /// \param actorType If non-empty, the type of the distributed actor that is
 /// provided as one of the arguments.
 /// \param args The arguments provided to the call, not including the base.
+/// \param indirectResult If the result is known to be returned indirect,
+///                       this is the temporary storage for it.
 /// \param tryTargets For a call that can throw, the normal and error basic
 /// blocks that the call will branch to.
-void emitDistributedActorSystemWitnessCall(
+/// \returns If the apply result is known to be returned directly,
+///          and there are no tryTargets, then the result is returned.
+std::optional<SILValue> emitDistributedActorSystemWitnessCall(
     SILBuilder &B, SILLocation loc, DeclName methodName, SILValue base,
     SILType actorType, llvm::ArrayRef<SILValue> args,
+    std::optional<SILValue> indirectResult = std::nullopt,
     std::optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets =
         std::nullopt);
 

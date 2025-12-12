@@ -13,7 +13,7 @@
 
 // CHECK2: define {{.*}}swiftcc void @"$s1A4testyyF"()
 // CHECK2:  [[T:%.*]] = call swiftcc ptr @"$s1A9ContainerV3AllAA1GVySiGycAA1VVySiGcycvau"()
-// CHECK2:  [[T1:%.*]] = getelementptr inbounds %swift.function, ptr [[T]], i32 0, i32 0
+// CHECK2:  [[T1:%.*]] = getelementptr inbounds{{.*}} %swift.function, ptr [[T]], i32 0, i32 0
 // CHECK2:  [[T4:%.*]] = load ptr, ptr [[T1]]
 // CHECK2:  call swiftcc { ptr, ptr } [[T4]]({{.*}}) [ "ptrauth"(i32 0, i64 58141) ]
 

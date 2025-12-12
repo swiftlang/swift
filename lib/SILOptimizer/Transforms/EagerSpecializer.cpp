@@ -440,7 +440,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   else {
     auto resultTy = GenericFunc->getConventions().getSILResultType(
         Builder.getTypeExpansionContext());
-    auto GenResultTy = GenericFunc->mapTypeIntoContext(resultTy);
+    auto GenResultTy = GenericFunc->mapTypeIntoEnvironment(resultTy);
 
     SILValue CastResult =
         Builder.createUncheckedForwardingCast(Loc, Result, GenResultTy);
@@ -469,7 +469,7 @@ void EagerDispatch::
 emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
               Type SubTy) {
   // Instantiate a thick metatype for T.Type
-  auto ContextTy = GenericFunc->mapTypeIntoContext(ParamTy);
+  auto ContextTy = GenericFunc->mapTypeIntoEnvironment(ParamTy);
   auto GenericMT = Builder.createMetatype(
     Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
 
@@ -506,7 +506,7 @@ void EagerDispatch::emitIsTrivialCheck(SILBasicBlock *FailedTypeCheckBB,
                                        LayoutConstraint Layout) {
   auto &Ctx = Builder.getASTContext();
   // Instantiate a thick metatype for T.Type
-  auto ContextTy = GenericFunc->mapTypeIntoContext(ParamTy);
+  auto ContextTy = GenericFunc->mapTypeIntoEnvironment(ParamTy);
   auto GenericMT = Builder.createMetatype(
       Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
   auto BoolTy = SILType::getBuiltinIntegerType(1, Ctx);
@@ -531,7 +531,7 @@ void EagerDispatch::emitTrivialAndSizeCheck(SILBasicBlock *FailedTypeCheckBB,
   }
   auto &Ctx = Builder.getASTContext();
   // Instantiate a thick metatype for T.Type
-  auto ContextTy = GenericFunc->mapTypeIntoContext(ParamTy);
+  auto ContextTy = GenericFunc->mapTypeIntoEnvironment(ParamTy);
   auto GenericMT = Builder.createMetatype(
     Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
 
@@ -568,7 +568,7 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
                                               LayoutConstraint Layout) {
   auto &Ctx = Builder.getASTContext();
   // Instantiate a thick metatype for T.Type
-  auto ContextTy = GenericFunc->mapTypeIntoContext(ParamTy);
+  auto ContextTy = GenericFunc->mapTypeIntoEnvironment(ParamTy);
   auto GenericMT = Builder.createMetatype(
     Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
 

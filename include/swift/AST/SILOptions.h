@@ -45,13 +45,12 @@ enum class CopyPropagationOption : uint8_t {
   // Do not add any copy propagation passes.
   Off = 0,
 
-  // Only add the copy propagation passes requested by other flags, currently
-  // just -enable-ossa-modules.
+  // Only add the copy propagation passes requested by other flags.
   RequestedPassesOnly,
 
   // Run copy propagation during optimized builds only.
   //
-  // If a setting, e.g. -enable-ossa-modules, requests to add copy propagation
+  // If a setting, requests to add copy propagation
   // to the performance pipeline, do so.
   Optimizing,
 
@@ -108,10 +107,6 @@ public:
   /// Controls whether specific OSSA optimizations are run. For benchmarking
   /// purposes.
   bool EnableOSSAOptimizations = true;
-
-  /// Controls whether to turn on speculative devirtualization.
-  /// It is turned off by default.
-  bool EnableSpeculativeDevirtualization = false;
 
   /// Controls whether to emit actor data-race checks.
   bool EnableActorDataRaceChecks = false;
@@ -188,11 +183,6 @@ public:
   /// Whether to stop the optimization pipeline right before we lower ownership
   /// and go from OSSA to non-ownership SIL.
   bool StopOptimizationBeforeLoweringOwnership = false;
-
-  /// Do we always serialize SIL in OSSA form?
-  ///
-  /// If this is disabled we do not serialize in OSSA form when optimizing.
-  bool EnableOSSAModules = true;
 
   /// Allow recompilation of a non-OSSA module to an OSSA module when imported
   /// from another OSSA module.
@@ -308,10 +298,6 @@ public:
 
   /// Are we building in embedded Swift + -no-allocations?
   bool NoAllocations = false;
-
-  /// Should we use the experimental Swift based closure-specialization
-  /// optimization pass instead of the existing C++ one.
-  bool EnableExperimentalSwiftBasedClosureSpecialization = false;
 
   /// The name of the file to which the backend should save optimization
   /// records.

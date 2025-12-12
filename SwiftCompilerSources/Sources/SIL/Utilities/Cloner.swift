@@ -67,7 +67,9 @@ public struct Cloner<Context: MutatingContext> {
     if let entryBlock = targetFunction.blocks.first {
       return entryBlock
     }
-    return targetFunction.appendNewBlock(context)
+    let entryBlock = targetFunction.appendNewBlock(context)
+    bridged.setInsertionBlockIfNotSet(entryBlock.bridged)
+    return entryBlock
   }
 
   public func cloneFunctionBody(from originalFunction: Function, entryBlockArguments: [Value]) {

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-objc-interop
 
 infix operator +++
 
@@ -472,7 +472,9 @@ do {
 }
 
 class testStdlibType {
-  let _: Array // expected-error {{reference to generic type 'Array' requires arguments in <...>}} {{15-15=<Any>}}
+  let _: Array
+  // expected-error@-1 {{reference to generic type 'Array' requires arguments in <...>}} {{15-15=<Any>}}
+  // expected-error@-2 {{property declaration does not bind any variables}}
 }
 
 // rdar://problem/32697033
@@ -1038,8 +1040,8 @@ func test_requirement_failures_in_ambiguous_context() {
 // rdar://106054263 - failed to produce a diagnostic upon generic argument mismatch
 func test_mismatches_with_dependent_member_generic_arguments() {
   struct Binding<T, U> {}
-  // expected-note@-1 {{arguments to generic parameter 'T' ('Double?' and 'Data.SomeAssociated') are expected to be equal}}
-  // expected-note@-2 {{arguments to generic parameter 'U' ('Int' and 'Data.SomeAssociated') are expected to be equal}}
+  // expected-note@-1 {{arguments to generic parameter 'T' ('Double?' and 'Data.SomeAssociated' (aka 'String')) are expected to be equal}}
+  // expected-note@-2 {{arguments to generic parameter 'U' ('Int' and 'Data.SomeAssociated' (aka 'String')) are expected to be equal}}
 
   struct Data : SomeProtocol {
     typealias SomeAssociated = String
@@ -1056,7 +1058,7 @@ func test_mismatches_with_dependent_member_generic_arguments() {
 
   test2(Optional<Int>(nil), Data())
   // expected-error@-1 {{cannot convert value of type 'Optional<Int>' to expected argument type 'Optional<Data.SomeAssociated>'}}
-  // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Int' and 'Data.SomeAssociated') are expected to be equal}}
+  // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Int' and 'Data.SomeAssociated' (aka 'String')) are expected to be equal}}
 }
 
 extension Dictionary where Value == Any { // expected-note {{where 'Value' = 'any P'}}

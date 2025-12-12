@@ -1120,8 +1120,7 @@ static StringRef calculateMangledName(SDKContext &Ctx, ValueDecl *VD) {
     return Ctx.buffer(attr->Name);
   }
   Mangle::ASTMangler NewMangler(VD->getASTContext());
-  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, true,
-                                    /*bool respectOriginallyDefinedIn*/true));
+  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, /*addPrefix*/ true));
 }
 
 static StringRef calculateLocation(SDKContext &SDKCtx, Decl *D) {
@@ -1380,7 +1379,7 @@ StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
   for (auto attr : D->getSemanticAvailableAttrs()) {
     auto domain = attr.getDomain();
 
-    if (domain.isSwiftLanguage() && attr.getIntroduced()) {
+    if (domain.isSwiftLanguageMode() && attr.getIntroduced()) {
       return buffer(attr.getIntroduced()->getAsString());
     }
   }
@@ -1765,7 +1764,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     // Exclude decls with @_alwaysEmitIntoClient if we are checking ABI.
     // These decls are considered effectively public because they are usable
     // from inline, so we have to manually exclude them here.
-    if (D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    if (D->isAlwaysEmittedIntoClient())
       return true;
   } else {
     if (D->isPrivateSystemDecl(false))

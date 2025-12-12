@@ -45,8 +45,8 @@ extension ObservableConvertibleType {
         return CatchSequence.#^CATCHSEQUENCE_DOT^#
     }
 }
-// CATCHSEQUENCE_DOT-DAG: Keyword[self]/CurrNominal:          self[#CatchSequence<_>.Type#]; name=self
-// CATCHSEQUENCE_DOT-DAG: Keyword/CurrNominal:                Type[#CatchSequence<_>.Type#]; name=Type
-// CATCHSEQUENCE_DOT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#CatchSequence<_>#]; name=init()
-// CATCHSEQUENCE_DOT-DAG: Decl[StaticMethod]/Super/TypeRelation[Convertible]: catchError()[#Observable<CatchSequence<_>.T>#]; name=catchError()
-// CATCHSEQUENCE_DOT-DAG: Decl[TypeAlias]/Super: T[#Observable<_.Element.T>.T#]; name=T
+// CATCHSEQUENCE_DOT-DAG: Keyword[self]/CurrNominal:          self[#CatchSequence<S>.Type#]; name=self
+// CATCHSEQUENCE_DOT-DAG: Keyword/CurrNominal:                Type[#CatchSequence<S>.Type#]; name=Type
+// CATCHSEQUENCE_DOT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#CatchSequence<S>#]; name=init()
+// CATCHSEQUENCE_DOT-DAG: Decl[StaticMethod]/Super/TypeRelation[Convertible]: catchError()[#Observable<CatchSequence<S>.T>#]; name=catchError()
+// CATCHSEQUENCE_DOT-DAG: Decl[TypeAlias]/Super: T[#Observable<S.Element.T>.T#]; name=T

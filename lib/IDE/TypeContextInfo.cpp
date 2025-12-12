@@ -129,14 +129,14 @@ void ContextInfoCallbacks::readyForTypeChecking(SourceFile *SrcFile) {
   SmallVector<TypeContextInfoItem, 2> results;
 
   for (auto T : TypeCheckCallback.getTypes()) {
-    if (T->is<ErrorType>() || T->is<UnresolvedType>())
+    if (T->is<ErrorType>())
       continue;
 
     T = T->getRValueType();
 
     auto interfaceTy = T;
     if (interfaceTy->hasArchetype())
-      interfaceTy = interfaceTy->mapTypeOutOfContext();
+      interfaceTy = interfaceTy->mapTypeOutOfEnvironment();
 
     // TODO: Do we need '.none' for Optionals?
     auto objTy = T->lookThroughAllOptionalTypes();

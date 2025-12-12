@@ -41,7 +41,7 @@ InlineCost instructionInlineCost(SILInstruction &I);
 
 class SILInliner {
 public:
-  enum class InlineKind { MandatoryInline, PerformanceInline };
+  enum class InlineKind { MandatoryInline, PerformanceInline, InlineAlwaysInline };
 
   using DeletionFuncTy = std::function<void(SILInstruction *)>;
 

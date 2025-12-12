@@ -25,20 +25,16 @@ class SourceLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
   std::vector<ModuleDecl *> ModulesToBindExtensions;
-  bool EnableLibraryEvolution;
 
   explicit SourceLoader(ASTContext &ctx,
-                        bool enableResilience,
                         DependencyTracker *tracker)
-    : ModuleLoader(tracker), Ctx(ctx),
-      EnableLibraryEvolution(enableResilience) {}
+    : ModuleLoader(tracker), Ctx(ctx) {}
 
 public:
   static std::unique_ptr<SourceLoader>
-  create(ASTContext &ctx, bool enableResilience,
-         DependencyTracker *tracker = nullptr) {
+  create(ASTContext &ctx, DependencyTracker *tracker = nullptr) {
     return std::unique_ptr<SourceLoader>{
-      new SourceLoader(ctx, enableResilience, tracker)
+      new SourceLoader(ctx, tracker)
     };
   }
 

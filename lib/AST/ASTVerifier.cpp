@@ -688,7 +688,7 @@ public:
           // Mapping the archetype out and back in should produce the
           // same archetype.
           auto interfaceType = archetype->getInterfaceType();
-          auto contextType = archetypeEnv->mapTypeIntoContext(interfaceType);
+          auto contextType = archetypeEnv->mapTypeIntoEnvironment(interfaceType);
 
           if (!contextType->isEqual(archetype)) {
             Out << "Archetype " << archetype->getString() << " does not appear"
@@ -1097,9 +1097,15 @@ public:
     void verifyChecked(ReturnStmt *S) {
       auto func = Functions.back();
       Type resultType;
+      bool hasInOutResult = false;
+
       if (auto *FD = dyn_cast<FuncDecl>(func)) {
         resultType = FD->getResultInterfaceType();
-        resultType = FD->mapTypeIntoContext(resultType);
+        resultType = FD->mapTypeIntoEnvironment(resultType);
+        hasInOutResult = FD->getInterfaceType()
+                             ->castTo<AnyFunctionType>()
+                             ->getExtInfo()
+                             .hasInOutResult();
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
       } else if (isa<ConstructorDecl>(func)) {
@@ -1112,6 +1118,9 @@ public:
         auto result = S->getResult();
         auto returnType = result->getType();
         // Make sure that the return has the same type as the function.
+        if (hasInOutResult) {
+          resultType = InOutType::get(resultType);
+        }
         checkSameType(resultType, returnType, "return type");
       } else {
         // Make sure that the function has a Void result type.
@@ -2185,7 +2194,7 @@ public:
     void verifyChecked(OptionalTryExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying OptionalTryExpr", E);
 
-      if (Ctx.LangOpts.isSwiftVersionAtLeast(5)) {
+      if (Ctx.isLanguageModeAtLeast(5)) {
         checkSameType(E->getType(), E->getSubExpr()->getType(),
                       "OptionalTryExpr and sub-expression");
       }
@@ -2497,6 +2506,24 @@ public:
       }
 
       verifyCheckedBase(E);
+    }
+
+    void verifyChecked(BorrowExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying BorrowExpr", E);
+
+      auto toType = E->getType();
+      auto fromType = E->getSubExpr()->getType();
+
+      // FIXME: doesStorageProduceLValue should not return false for a 'let',
+      //   so that you can borrow from it.
+      if (!fromType->hasLValueType())
+        error("borrow source must be an l-value", E);
+
+      // Result type can be either l-value or r-value.
+      // Ensure underlying type matches.
+      if (fromType->getRValueType()->getCanonicalType() !=
+          toType->getRValueType()->getCanonicalType())
+        error("borrow should not be performing a cast", E);
     }
 
     void verifyChecked(ABISafeConversionExpr *E) {
@@ -3230,7 +3257,7 @@ public:
     void verifyParsed(DestructorDecl *DD) {
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
-      if (DD->isGeneric()) {
+      if (DD->hasGenericParamList()) {
         Out << "DestructorDecl cannot be generic";
         abort();
       }

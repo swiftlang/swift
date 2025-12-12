@@ -14,6 +14,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -732,14 +733,10 @@ SILValue swift::ArraySemanticsCall::getArrayElementStoragePointer() const {
   return getArrayUninitializedInitResult(*this, 1);
 }
 
-bool swift::ArraySemanticsCall::mapInitializationStores(
-    llvm::DenseMap<uint64_t, StoreInst *> &ElementValueMap) {
-  if (getKind() != ArrayCallKind::kArrayUninitialized &&
-      getKind() != ArrayCallKind::kArrayUninitializedIntrinsic)
-    return false;
-  SILValue ElementBuffer = getArrayElementStoragePointer();
+static SILValue getElementBaseAddress(ArraySemanticsCall initArray) {
+  SILValue ElementBuffer = initArray.getArrayElementStoragePointer();
   if (!ElementBuffer)
-    return false;
+    return SILValue();
 
   // Match initialization stores into ElementBuffer. E.g.
   // %82 = struct_extract %element_buffer : $UnsafeMutablePointer<Int>
@@ -756,9 +753,29 @@ bool swift::ArraySemanticsCall::mapInitializationStores(
   // mark_dependence can be an operand of the struct_extract or its user.
 
   SILValue UnsafeMutablePointerExtract;
-  if (getKind() == ArrayCallKind::kArrayUninitializedIntrinsic) {
+  if (initArray.getKind() == ArrayCallKind::kArrayUninitializedIntrinsic) {
     UnsafeMutablePointerExtract = dyn_cast_or_null<MarkDependenceInst>(
         getSingleNonDebugUser(ElementBuffer));
+    if (!UnsafeMutablePointerExtract) {
+      SILValue array = initArray.getArrayValue();
+      ValueWorklist worklist(array);
+      while (SILValue v = worklist.pop()) {
+        for (auto use : v->getUses()) {
+          switch (use->getUser()->getKind()) {
+            case SILInstructionKind::UncheckedRefCastInst:
+            case SILInstructionKind::StructExtractInst:
+            case SILInstructionKind::BeginBorrowInst:
+              worklist.pushIfNotVisited(cast<SingleValueInstruction>(use->getUser()));
+              break;
+            case SILInstructionKind::RefTailAddrInst:
+              return cast<RefTailAddrInst>(use->getUser());
+            default:
+              break;
+          }
+        }
+      }
+      return SILValue();
+    }
   } else {
     auto user = getSingleNonDebugUser(ElementBuffer);
     // Match mark_dependence (struct_extract or
@@ -774,21 +791,33 @@ bool swift::ArraySemanticsCall::mapInitializationStores(
     }
   }
   if (!UnsafeMutablePointerExtract)
-    return false;
+    return SILValue();
 
   auto *PointerToAddress = dyn_cast_or_null<PointerToAddressInst>(
       getSingleNonDebugUser(UnsafeMutablePointerExtract));
   if (!PointerToAddress)
+    return SILValue();
+  return PointerToAddress;
+}
+
+bool swift::ArraySemanticsCall::mapInitializationStores(
+    llvm::DenseMap<uint64_t, StoreInst *> &ElementValueMap) {
+  if (getKind() != ArrayCallKind::kArrayUninitialized &&
+      getKind() != ArrayCallKind::kArrayUninitializedIntrinsic)
+    return false;
+
+  SILValue elementAddr = getElementBaseAddress(*this);
+  if (!elementAddr)
     return false;
 
   // Match the stores. We can have either a store directly to the address or
   // to an index_addr projection.
-  for (auto *Op : PointerToAddress->getUses()) {
+  for (auto *Op : elementAddr->getUses()) {
     auto *Inst = Op->getUser();
 
     // Store to the base.
     auto *SI = dyn_cast<StoreInst>(Inst);
-    if (SI && SI->getDest() == PointerToAddress) {
+    if (SI && SI->getDest() == elementAddr) {
       // We have already seen an entry for this index bail.
       if (ElementValueMap.count(0))
         return false;

@@ -237,11 +237,16 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     // current thread.  If the task suspends somewhere, it should
     // update the task status appropriately; we don't need to update
     // it afterwards.
-    task->flagAsRunning();
+    [[maybe_unused]]
+    uint32_t dispatchOpaquePriority = task->flagAsRunning();
 
     auto traceHandle = concurrency::trace::job_run_begin(job);
     task->runInFullyEstablishedContext();
     concurrency::trace::job_run_end(traceHandle);
+
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    swift_dispatch_thread_reset_override_self(dispatchOpaquePriority);
+#endif
 
     assert(ActiveTask::get() == nullptr &&
            "active task wasn't cleared before suspending?");
@@ -2774,7 +2779,8 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
 
   // TODO: remove this memset eventually, today we only do this to not have
   //       to modify the destructor logic, as releasing zeroes is no-op
-  memset(alloc + 1, 0, metadata->getInstanceSize() - sizeof(HeapObject));
+  memset((void *)(alloc + 1), 0,
+         metadata->getInstanceSize() - sizeof(HeapObject));
 
   // TODO(distributed): a remote one does not have to have the "real"
   //  default actor body, e.g. we don't need an executor at all; so

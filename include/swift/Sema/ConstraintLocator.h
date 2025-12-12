@@ -61,7 +61,6 @@ enum ContextualTypePurpose : uint8_t {
   /// 'foo(a : @autoclosure () -> Int = 42)'.
   CTP_AutoclosureDefaultParameter,
 
-  CTP_CalleeResult,     ///< Constraint is placed on the result of a callee.
   CTP_CallArgument,     ///< Call to function or operator requires type.
   CTP_ClosureResult,    ///< Closure result expects a specific type.
   CTP_ArrayElement,     ///< ArrayExpr wants elements to have a specific type.
@@ -78,16 +77,12 @@ enum ContextualTypePurpose : uint8_t {
                         ///  to a type of a switch subject or an `Error` type.
   CTP_ForEachSequence,  ///< Sequence expression associated with `for-in` loop.
   CTP_WrappedProperty,  ///< Property type expected to match 'wrappedValue' type
-  CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
-                               ///< former 'wrappedValue' type
 
   CTP_SingleValueStmtBranch, ///< The contextual type for a branch in a single
                              ///< value statement expression.
 
   CTP_ExprPattern,      ///< `~=` operator application associated with expression
                         /// pattern.
-
-  CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
 
 namespace constraints {
@@ -1010,26 +1005,6 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::PlaceholderType;
-  }
-};
-
-class LocatorPathElt::ImplicitConversion final
-    : public StoredIntegerElement<1> {
-public:
-  ImplicitConversion(ConversionRestrictionKind kind)
-      : StoredIntegerElement(ConstraintLocator::ImplicitConversion,
-                             static_cast<unsigned>(kind)) {}
-
-  ConversionRestrictionKind getConversionKind() const {
-    return static_cast<ConversionRestrictionKind>(getValue());
-  }
-
-  bool is(ConversionRestrictionKind kind) const {
-    return getConversionKind() == kind;
-  }
-
-  static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::ImplicitConversion;
   }
 };
 

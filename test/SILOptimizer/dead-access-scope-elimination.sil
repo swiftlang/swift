@@ -1,0 +1,309 @@
+// RUN: %target-sil-opt %s -dead-access-scope-elimination | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+sil_global @g1: $Int
+sil_global @g2: $Int
+
+sil @unknown : $@convention(thin) () -> ()
+sil @readonly : $@convention(thin) () -> () {
+[global: read]
+}
+sil @pure : $@convention(thin) () -> () {
+[global: ]
+}
+
+// CHECK-LABEL: sil [ossa] @simple_dead :
+// CHECK-NOT:     begin_access
+// CHECK-NOT:     end_access
+// CHECK:       } // end sil function 'simple_dead'
+sil [ossa] @simple_dead : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @g1 : $*Int
+  %2 = begin_access [modify] [dynamic] %0
+  fix_lifetime %2
+  debug_value %2 : $*Int, name "g1"
+  end_access %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @simple_alive :
+// CHECK:         [[A:%.*]] = begin_access
+// CHECK:         [[L:%.*]] = load [trivial] [[A]]
+// CHECK:         return [[L]]
+// CHECK:       } // end sil function 'simple_alive'
+sil [ossa] @simple_alive : $@convention(thin) () -> Int {
+bb0:
+  %0 = global_addr @g1 : $*Int
+  %2 = begin_access [modify] [dynamic] %0
+  %3 = load [trivial] %2
+  end_access %2
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @conflicting :
+// CHECK:         %1 = begin_access [modify]
+// CHECK:         %2 = begin_access [read]
+// CHECK:         end_access %2
+// CHECK:         end_access %1
+// CHECK:       } // end sil function 'conflicting'
+sil [ossa] @conflicting : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @g1 : $*Int
+  %1 = begin_access [modify] [dynamic] %0
+  %2 = begin_access [read] [dynamic] %0
+  end_access %2
+  end_access %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @not_conflicting :
+// CHECK-NOT:     begin_access
+// CHECK-NOT:     end_access
+// CHECK:       } // end sil function 'not_conflicting'
+sil [ossa] @not_conflicting : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @g1 : $*Int
+  %1 = begin_access [read] [dynamic] %0
+  %2 = begin_access [read] [dynamic] %0
+  end_access %2
+  end_access %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @not_aliasing :
+// CHECK-NOT:     begin_access
+// CHECK-NOT:     end_access
+// CHECK:       } // end sil function 'not_aliasing'
+sil [ossa] @not_aliasing : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @g1 : $*Int
+  %1 = global_addr @g2 : $*Int
+  %2 = begin_access [modify] [dynamic] %0
+  %3 = begin_access [read] [dynamic] %1
+  end_access %3
+  end_access %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @call_with_potential_access :
+// CHECK:         %2 = begin_access [read]
+// CHECK:         %3 = begin_access [read]
+// CHECK:         end_access %3
+// CHECK:         end_access %2
+// CHECK:       } // end sil function 'call_with_potential_access'
+sil [ossa] @call_with_potential_access : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @g1 : $*Int
+  %1 = global_addr @g2 : $*Int
+  %2 = begin_access [read] [dynamic] %0
+  %3 = begin_access [read] [dynamic] %1
+  %4 = function_ref @unknown : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  end_access %3
+  end_access %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @call_pure :
+// CHECK-NOT:     begin_access
+// CHECK-NOT:     end_access
+// CHECK:       } // end sil function 'call_pure'
+sil [ossa] @call_pure : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @g1 : $*Int
+  %1 = global_addr @g2 : $*Int
+  %2 = begin_access [read] [dynamic] %0
+  %3 = begin_access [read] [dynamic] %1
+  %4 = function_ref @pure : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  end_access %3
+  end_access %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @call_readonly :
+// CHECK:         %3 = begin_access
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_access %3
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'call_readonly'
+sil [ossa] @call_readonly : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @g1 : $*Int
+  %1 = global_addr @g2 : $*Int
+  %2 = function_ref @readonly : $@convention(thin) () -> ()
+  %3 = begin_access [modify] [dynamic] %0
+  %4 = apply %2() : $@convention(thin) () -> ()
+  end_access %3
+  %6 = begin_access [read] [dynamic] %0
+  %7 = apply %2() : $@convention(thin) () -> ()
+  end_access %6
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @unknown_call_via_destructor :
+// CHECK:         %2 = begin_access [read]
+// CHECK:         end_access %2
+// CHECK:       } // end sil function 'unknown_call_via_destructor'
+sil [ossa] @unknown_call_via_destructor : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0: @owned $AnyObject):
+  %1 = global_addr @g1 : $*Int
+  %2 = begin_access [read] [dynamic] %1
+  destroy_value %0
+  end_access %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @two_inner_accesses :
+// CHECK:         %1 = begin_access [read]
+// CHECK-NEXT:    %2 = begin_access [modify]
+// CHECK-NEXT:    end_access %2
+// CHECK-NEXT:    end_access %1
+// CHECK:       } // end sil function 'two_inner_accesses'
+sil [ossa] @two_inner_accesses : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @g1 : $*Int
+  %1 = begin_access [read] [dynamic] %0
+  %2 = begin_access [modify] [dynamic] %0
+  end_access %2
+  %4 = begin_access [read] [dynamic] %0
+  end_access %4
+  end_access %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @partially_overlapping_accesses :
+// CHECK:         %2 = begin_access [read] [dynamic] %1
+// CHECK:         apply
+// CHECK-NEXT:    end_access %2
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'partially_overlapping_accesses'
+sil [ossa] @partially_overlapping_accesses : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @g1 : $*Int
+  %1 = global_addr @g2 : $*Int
+  %2 = begin_access [read] [dynamic] %0
+  %3 = begin_access [read] [dynamic] %1
+  end_access %2
+  %4 = function_ref @unknown : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  %6 = begin_access [read] [dynamic] %0
+  end_access %3
+  end_access %6
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @multi_block1 :
+// CHECK:       bb0:
+// CHECK:         %1 = begin_access
+// CHECK:       bb1:
+// CHECK:         %3 = begin_access
+// CHECK:       bb2:
+// CHECK:         %6 = begin_access
+// CHECK:       bb3:
+// CHECK:         %9 = begin_access
+// CHECK:       } // end sil function 'multi_block1'
+sil [ossa] @multi_block1 : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @g1 : $*Int
+  %1 = begin_access [modify] [dynamic] %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = begin_access [read] [dynamic] %0
+  end_access %3
+  br bb3
+
+bb2:
+  %6 = begin_access [read] [dynamic] %0
+  end_access %6
+  br bb3
+
+bb3:
+  %9 = begin_access [read] [dynamic] %0
+  end_access %9
+  end_access %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @multi_block2 :
+// CHECK:       bb0:
+// CHECK:         %1 = begin_access
+// CHECK:       bb1:
+// CHECK:         %3 = begin_access
+// CHECK:       bb2:
+// CHECK:         end_access %1
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'multi_block2'
+sil [ossa] @multi_block2 : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @g1 : $*Int
+  %1 = begin_access [modify] [dynamic] %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = begin_access [read] [dynamic] %0
+  end_access %3
+  end_access %1
+  br bb3
+
+bb2:
+  end_access %1
+  %8 = begin_access [read] [dynamic] %0
+  end_access %8
+  br bb3
+
+bb3:
+  %11 = begin_access [read] [dynamic] %0
+  end_access %11
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @nested_static :
+// CHECK-NOT:     begin_access [modify] [static]
+// CHECK:       } // end sil function 'nested_static'
+sil [ossa] @nested_static : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @g1 : $*Int
+  %1 = begin_access [modify] [dynamic] %0
+  %2 = begin_access [modify] [static] %1
+  end_access %2
+  end_access %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @non_dead_inside_dead :
+// CHECK:         begin_access [modify]
+// CHECK:         begin_access [read]
+// CHECK:       } // end sil function 'non_dead_inside_dead'
+sil [ossa] @non_dead_inside_dead : $@convention(thin) () -> Int {
+bb0:
+  %0 = global_addr @g1 : $*Int
+  %1 = begin_access [modify] [dynamic] %0
+  %2 = begin_access [read] [dynamic] %0
+  %3 = load [trivial] %2
+  end_access %2
+  end_access %1
+  return %3
+}
+

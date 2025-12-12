@@ -17,6 +17,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
@@ -41,6 +42,7 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileSystem.h"
@@ -754,6 +756,16 @@ IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC,
   if (M->isClangHeaderImportModule())
     return OBJC_HEADER_MODULE_ID;
 
+  // Reject references to hidden dependencies.
+  if (getASTContext().LangOpts.hasFeature(
+          Feature::CheckImplementationOnlyStrict) &&
+      !allowCompilerErrors() &&
+      this->M->isImportedImplementationOnly(M, /*assumeImported=*/false)) {
+    getASTContext().Diags.diagnose(SourceLoc(),
+        diag::serialization_xref_to_hidden_dependency,
+        M, crossReferencedDecl);
+  }
+
   auto exportedModuleName = file->getExportedModuleName();
   assert(!exportedModuleName.empty());
   auto moduleID = M->getASTContext().getIdentifier(exportedModuleName);
@@ -840,7 +852,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(control_block, TARGET);
   BLOCK_RECORD(control_block, SDK_NAME);
   BLOCK_RECORD(control_block, REVISION);
-  BLOCK_RECORD(control_block, IS_OSSA);
   BLOCK_RECORD(control_block, ALLOWABLE_CLIENT_NAME);
   BLOCK_RECORD(control_block, CHANNEL);
   BLOCK_RECORD(control_block, SDK_VERSION);
@@ -883,6 +894,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, DEPENDENCY_DIRECTORY);
   BLOCK_RECORD(input_block, MODULE_INTERFACE_PATH);
   BLOCK_RECORD(input_block, IMPORTED_MODULE_SPIS);
+  BLOCK_RECORD(input_block, IMPORTED_MODULE_PATH);
   BLOCK_RECORD(input_block, EXTERNAL_MACRO);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
@@ -974,7 +986,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_SOURCE_LOC_REF);
   BLOCK_RECORD(sil_block, SIL_DEBUG_VALUE);
   BLOCK_RECORD(sil_block, SIL_DEBUG_VALUE_DELIMITER);
-
+  BLOCK_RECORD(sil_block, SIL_EXTRA_STRING);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -994,6 +1006,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_DIFFERENTIABILITY_WITNESS_OFFSETS);
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_OVERRIDE_TABLE_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_OVERRIDE_TABLE_OFFSETS);
+  BLOCK_RECORD(sil_index_block, SIL_ASM_NAMES);
 
   BLOCK(INCREMENTAL_INFORMATION_BLOCK);
   BLOCK_RECORD(fine_grained_dependencies::record_block, METADATA);
@@ -1016,7 +1029,6 @@ void Serializer::writeHeader() {
     control_block::SDKVersionLayout SDKVersion(Out);
     control_block::RevisionLayout Revision(Out);
     control_block::ChannelLayout Channel(Out);
-    control_block::IsOSSALayout IsOSSA(Out);
     control_block::AllowableClientLayout Allowable(Out);
 
     // Write module 'real name', which can be different from 'name'
@@ -1072,8 +1084,6 @@ void Serializer::writeHeader() {
     Revision.emit(ScratchRecord, revision);
 
     Channel.emit(ScratchRecord, version::getCurrentCompilerChannel());
-
-    IsOSSA.emit(ScratchRecord, Options.IsOSSA);
 
     {
       llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);
@@ -1336,7 +1346,8 @@ static ImportSet getImportsAsSet(const ModuleDecl *M,
 void Serializer::writeInputBlock() {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 4);
   input_block::ImportedModuleLayout importedModule(Out);
-  input_block::ImportedModuleLayoutSPI ImportedModuleSPI(Out);
+  input_block::ImportedModuleSPILayout ImportedModuleSPI(Out);
+  input_block::ImportedModulePathLayout ImportedModulePath(Out);
   input_block::LinkLibraryLayout LinkLibrary(Out);
   input_block::ImportedHeaderLayout ImportedHeader(Out);
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
@@ -1512,9 +1523,17 @@ void Serializer::writeInputBlock() {
     llvm::SmallSetVector<Identifier, 4> spis;
     M->lookupImportedSPIGroups(import.importedModule, spis);
 
-    importedModule.emit(ScratchRecord,
-                        static_cast<uint8_t>(stableImportControl),
-                        !import.accessPath.empty(), !spis.empty(), importPath);
+    StringRef path;
+    if (Options.ExplicitModuleBuild && import.importedModule &&
+        !import.importedModule->isNonSwiftModule()) {
+      path = import.importedModule->getCacheKey();
+      if (path.empty())
+        path = import.importedModule->getModuleLoadedFilename();
+    }
+
+    importedModule.emit(
+        ScratchRecord, static_cast<uint8_t>(stableImportControl),
+        !import.accessPath.empty(), !spis.empty(), !path.empty(), importPath);
 
     if (!spis.empty()) {
       SmallString<64> out;
@@ -1524,6 +1543,9 @@ void Serializer::writeInputBlock() {
           [&outStream] { outStream << StringRef("\0", 1); });
       ImportedModuleSPI.emit(ScratchRecord, out);
     }
+
+    if (!path.empty())
+      ImportedModulePath.emit(ScratchRecord, path);
   }
 
   if (!Options.ModuleLinkName.empty())
@@ -1797,7 +1819,7 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
   assert(GenericEnvironmentsToSerialize.hasRef(genericEnv));
 
   switch (genericEnv->getKind()) {
-  case GenericEnvironment::Kind::OpenedExistential: {
+  case GenericEnvironment::Kind::Existential: {
     auto kind = GenericEnvironmentKind::OpenedExistential;
     auto existentialTypeID = addTypeRef(genericEnv->getOpenedExistentialType());
     auto parentSigID = addGenericSignatureRef(genericEnv->getGenericSignature());
@@ -1811,7 +1833,7 @@ void Serializer::writeASTBlockEntity(const GenericEnvironment *genericEnv) {
     return;
   }
 
-  case GenericEnvironment::Kind::OpenedElement: {
+  case GenericEnvironment::Kind::Element: {
     auto kind = GenericEnvironmentKind::OpenedElement;
     auto shapeClassID = addTypeRef(genericEnv->getOpenedElementShapeClass());
     auto parentSigID = addGenericSignatureRef(genericEnv->getGenericSignature());
@@ -1935,7 +1957,7 @@ void Serializer::writeLocalNormalProtocolConformance(
       // in terms of interface types; hence the hasPrimaryArchetype() check is
       // necessary for correctness, not just as a fast path.
       if (subs.getRecursiveProperties().hasPrimaryArchetype())
-        subs = subs.mapReplacementTypesOutOfContext();
+        subs = subs.mapReplacementTypesOutOfEnvironment();
 
       data.push_back(addSubstitutionMapRef(subs));
       data.push_back(witness.getEnterIsolation().has_value() ? 1 : 0);
@@ -2439,6 +2461,8 @@ void Serializer::writeCrossReference(const Decl *D) {
   using namespace decls_block;
 
   unsigned abbrCode;
+
+  llvm::SaveAndRestore<const Decl *> SaveDecl(crossReferencedDecl, D);
 
   if (auto op = dyn_cast<OperatorDecl>(D)) {
     writeCrossReference(op->getDeclContext(), 1);
@@ -3058,6 +3082,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::Export: {
+      auto *theAttr = cast<ExportAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[ExportDeclAttrLayout::Code];
+      ExportDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       (unsigned)theAttr->exportKind);
+      return;
+    }
+        
     case DeclAttrKind::NonSendable: {
       auto *theAttr = cast<NonSendableAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[NonSendableDeclAttrLayout::Code];
@@ -3134,8 +3166,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         switch (domain.getKind()) {
           case AvailabilityDomain::Kind::Universal:
             return AvailabilityDomainKind::Universal;
-          case AvailabilityDomain::Kind::SwiftLanguage:
-            return AvailabilityDomainKind::SwiftLanguage;
+          case AvailabilityDomain::Kind::SwiftLanguageMode:
+            return AvailabilityDomainKind::SwiftLanguageMode;
+          case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+            return AvailabilityDomainKind::StandaloneSwiftRuntime;
           case AvailabilityDomain::Kind::PackageDescription:
             return AvailabilityDomainKind::PackageDescription;
           case AvailabilityDomain::Kind::Embedded:
@@ -3148,7 +3182,18 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       };
 
       auto domainKind = getDomainKind(domain);
-      const Decl *domainDecl = domain.getDecl();
+
+      // Custom availablity domains provided via the command line don't have
+      // corresponding declarations. Serialize them as identifiers instead.
+      DeclID customDomainID = 0;
+      if (auto custom = domain.getCustomDomain()) {
+        if (auto customDecl = custom->getDecl()) {
+          customDomainID = S.addDeclRef(customDecl) << 1;
+        } else {
+          // emit the name,
+          customDomainID = (S.addDeclBaseNameRef(custom->getName()) << 1) | 0x1;
+        }
+      }
 
       llvm::SmallString<32> blob;
       blob.append(theAttr->getMessage());
@@ -3163,7 +3208,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isSPI(),
           static_cast<uint8_t>(domainKind),
           static_cast<unsigned>(domain.getPlatformKind()),
-          S.addDeclRef(domainDecl),
+          customDomainID,
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
@@ -3304,7 +3349,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto theAttr = cast<CustomAttr>(DA);
 
       // Macro attributes are not serialized.
-      if (D->getResolvedMacro(const_cast<CustomAttr *>(theAttr)))
+      if (theAttr->getResolvedMacro())
         return;
 
       auto attrType =
@@ -3922,7 +3967,7 @@ private:
 
       // If we have a contextual type, map out to an interface type.
       if (type->hasArchetype())
-        type = type->mapTypeOutOfContext();
+        type = type->mapTypeOutOfEnvironment();
 
       return type;
     };
@@ -4723,7 +4768,6 @@ public:
                           rawIntroducer,
                           var->isGetterMutating(),
                           var->isSetterMutating(),
-                          var->isLazyStorageProperty(),
                           var->isTopLevelGlobal(),
                           S.addDeclRef(lazyStorage),
                           accessors.OpaqueReadOwnership,
@@ -4786,7 +4830,7 @@ public:
         param->isCompileTimeLiteral(),
         param->isConstVal(),
         param->isSending(),
-        param->isCallerIsolated(),
+        param->isAddressable(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
         getRawStableActorIsolationKind(isolation.getKind()),
@@ -4881,41 +4925,50 @@ public:
 
     auto genericSigID = S.addGenericSignatureRef(opaqueDecl->getGenericSignature());
 
+    uint8_t rawAccessLevel =
+        getRawStableAccessLevel(opaqueDecl->getFormalAccess());
+    bool exportUnderlyingType = opaqueDecl->exportUnderlyingType();
+
+    bool hasUnderlyingType = false;
     SubstitutionMapID underlyingSubsID = 0;
     if (auto underlying = opaqueDecl->getUniqueUnderlyingTypeSubstitutions()) {
       underlyingSubsID = S.addSubstitutionMapRef(*underlying);
+      hasUnderlyingType = true;
     } else if (opaqueDecl->hasConditionallyAvailableSubstitutions()) {
       // Universally available type doesn't have any availability conditions
-      // so it could be serialized into "unique" slot to safe space.
+      // so it could be serialized into "unique" slot to save space.
       auto universal =
           opaqueDecl->getConditionallyAvailableSubstitutions().back();
       underlyingSubsID = S.addSubstitutionMapRef(universal->getSubstitutions());
+      hasUnderlyingType = true;
     }
-    uint8_t rawAccessLevel =
-        getRawStableAccessLevel(opaqueDecl->getFormalAccess());
-    bool exportDetails = opaqueDecl->exportUnderlyingType();
 
-    unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code];
-    OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+    OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord,
+                                 S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code],
                                  contextID.getOpaqueValue(), namingDeclID,
                                  interfaceSigID, interfaceTypeID, genericSigID,
-                                 underlyingSubsID, rawAccessLevel,
-                                 exportDetails);
+                                 rawAccessLevel, hasUnderlyingType,
+                                 exportUnderlyingType);
     writeGenericParams(opaqueDecl->getGenericParams());
+
+    if (!hasUnderlyingType)
+      return;
+
+    UnderlyingSubstitutionLayout::emitRecord(
+        S.Out, S.ScratchRecord,
+        S.DeclTypeAbbrCodes[UnderlyingSubstitutionLayout::Code],
+        underlyingSubsID);
 
     // Serialize all of the conditionally available substitutions expect the
     // last one - universal, it's serialized into "unique" slot.
     if (opaqueDecl->hasConditionallyAvailableSubstitutions()) {
-      unsigned abbrCode =
-          S.DeclTypeAbbrCodes[ConditionalSubstitutionLayout::Code];
       for (const auto *subs :
            opaqueDecl->getConditionallyAvailableSubstitutions().drop_back()) {
         ConditionalSubstitutionLayout::emitRecord(
-            S.Out, S.ScratchRecord, abbrCode,
+            S.Out, S.ScratchRecord,
+            S.DeclTypeAbbrCodes[ConditionalSubstitutionLayout::Code],
             S.addSubstitutionMapRef(subs->getSubstitutions()));
 
-        unsigned condAbbrCode =
-            S.DeclTypeAbbrCodes[ConditionalSubstitutionConditionLayout::Code];
         for (const auto &query : subs->getAvailabilityQueries()) {
           // FIXME: [availability] Support arbitrary domains (rdar://156513787).
           DEBUG_ASSERT(query.getDomain().isPlatform());
@@ -4927,8 +4980,9 @@ public:
                            std::optional<llvm::VersionTuple>(
                                availableRange.getRawMinimumVersion()));
           ConditionalSubstitutionConditionLayout::emitRecord(
-              S.Out, S.ScratchRecord, condAbbrCode, query.isUnavailability(),
-              LIST_VER_TUPLE_PIECES(osVersion));
+              S.Out, S.ScratchRecord,
+              S.DeclTypeAbbrCodes[ConditionalSubstitutionConditionLayout::Code],
+              query.isUnavailability(), LIST_VER_TUPLE_PIECES(osVersion));
         }
       }
     }
@@ -5367,6 +5421,19 @@ bool Serializer::shouldSkipDecl(const Decl *D) const {
 void Serializer::writeASTBlockEntity(const Decl *D) {
   using namespace decls_block;
 
+  if (Options.SkipImplementationOnlyDecls) {
+    // Skip @_implementationOnly types.
+    if (D->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+      return;
+
+    // Skip non-public @export(interface) functions.
+    auto FD = dyn_cast<AbstractFunctionDecl>(D);
+    if (FD && FD->isNeverEmittedIntoClient() &&
+        !FD->getFormalAccessScope(/*useDC*/nullptr,
+          /*treatUsableFromInlineAsPublic*/true).isPublicOrPackage())
+      return;
+  }
+
   PrettyStackTraceDecl trace("serializing", D);
   assert(DeclsToSerialize.hasRef(D));
 
@@ -5525,6 +5592,7 @@ static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
   SIMPLE_CASE(ResultConvention, Pack)
   SIMPLE_CASE(ResultConvention, GuaranteedAddress)
   SIMPLE_CASE(ResultConvention, Guaranteed)
+  SIMPLE_CASE(ResultConvention, Inout)
   }
   llvm_unreachable("bad result convention kind");
 }
@@ -5572,6 +5640,31 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
   return cast<TypeAliasDecl>(CurModuleResults[0]);
 }
 
+namespace {
+struct ImplementationOnlyWalker : TypeWalker {
+  bool hadImplementationOnlyDecl = false;
+  const ModuleDecl *currentModule;
+  ImplementationOnlyWalker(const ModuleDecl *M) : currentModule(M) {}
+  Action walkToTypePre(Type ty) override {
+    if (auto *typeAlias = dyn_cast<TypeAliasType>(ty.getPointer())) {
+      if (importedImplementationOnly(typeAlias->getDecl()))
+        return Action::Stop;
+    } else if (auto *nominal = ty->getAs<NominalType>()) {
+      if (importedImplementationOnly(nominal->getDecl()))
+        return Action::Stop;
+    }
+    return Action::Continue;
+  }
+  bool importedImplementationOnly(const Decl *D) {
+    if (currentModule->isImportedImplementationOnly(D->getModuleContext())) {
+      hadImplementationOnlyDecl = true;
+      return true;
+    }
+    return false;
+  }
+};
+} // namespace
+
 class Serializer::TypeSerializer : public TypeVisitor<TypeSerializer> {
   Serializer &S;
 
@@ -5590,17 +5683,6 @@ public:
       return;
     }
     llvm_unreachable("should not serialize an ErrorType");
-  }
-
-  void visitUnresolvedType(const UnresolvedType *) {
-    // If for some reason we have an unresolved type while compiling with
-    // errors, just serialize an ErrorType and continue.
-    if (S.getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
-      visitErrorType(
-          cast<ErrorType>(ErrorType::get(S.getASTContext()).getPointer()));
-      return;
-    }
-    llvm_unreachable("should not serialize an UnresolvedType");
   }
 
   void visitPlaceholderType(const PlaceholderType *) {
@@ -5925,10 +6007,23 @@ public:
     using namespace decls_block;
 
     auto resultType = S.addTypeRef(fnTy->getResult());
-    auto clangType =
-      S.getASTContext().LangOpts.UseClangFunctionTypes
-      ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
-      : ClangTypeID(0);
+    bool shouldSerializeClangType = true;
+    if (S.hadImplementationOnlyImport && S.M &&
+        S.M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+      // Deserializing clang types from implementation only modules could crash
+      // as the transitive clang module might not be available to retrieve the
+      // declarations from. In an optimal world we would make the deseriaization
+      // more resilient to these problems but the failure is in Clang's
+      // deserialization code path that is not architected with potentially
+      // missing declarations in mind.
+      ImplementationOnlyWalker walker{S.M};
+      Type(const_cast<FunctionType *>(fnTy)).walk(walker);
+      if (walker.hadImplementationOnlyDecl)
+        shouldSerializeClangType = false;
+    }
+    auto clangType = shouldSerializeClangType
+                         ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
+                         : ClangTypeID(0);
 
     auto isolation = encodeIsolation(fnTy->getIsolation());
 
@@ -6321,6 +6416,9 @@ public:
   void writeTypeCoupledDeclRefInfo(clang::TypeCoupledDeclRefInfo info) {
     llvm_unreachable("TypeCoupledDeclRefInfo shouldn't be reached from swift");
   }
+  void writeHLSLSpirvOperand(clang::SpirvOperand) {
+    llvm_unreachable("SpirvOperand shouldn't be reached from swift");
+  }
 };
 
 }
@@ -6481,6 +6579,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<MembersLayout>();
   registerDeclTypeAbbr<XRefLayout>();
 
+  registerDeclTypeAbbr<UnderlyingSubstitutionLayout>();
   registerDeclTypeAbbr<ConditionalSubstitutionLayout>();
   registerDeclTypeAbbr<ConditionalSubstitutionConditionLayout>();
 
@@ -6865,14 +6964,15 @@ static void recordDerivativeFunctionConfig(
   auto &ctx = AFD->getASTContext();
   Mangle::ASTMangler Mangler(AFD->getASTContext());
   for (auto *attr : AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
-    auto mangledName = ctx.getIdentifier(Mangler.mangleDeclAsUSR(AFD, ""));
+    auto mangledName = ctx.getIdentifier(Mangler.mangleDeclWithPrefix(AFD, ""));
     derivativeConfigs[mangledName].insert(
         {ctx.getIdentifier(attr->getParameterIndices()->getString()),
          attr->getDerivativeGenericSignature()});
   }
   for (auto *attr : AFD->getAttrs().getAttributes<DerivativeAttr>()) {
     auto *origAFD = attr->getOriginalFunction(ctx);
-    auto mangledName = ctx.getIdentifier(Mangler.mangleDeclAsUSR(origAFD, ""));
+    auto mangledName =
+        ctx.getIdentifier(Mangler.mangleDeclWithPrefix(origAFD, ""));
     derivativeConfigs[mangledName].insert(
         {ctx.getIdentifier(attr->getParameterIndices()->getString()),
          AFD->getGenericSignature()});
@@ -7010,8 +7110,13 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     nextFile->getTopLevelDeclsWithAuxiliaryDecls(fileDecls);
 
     for (auto D : fileDecls) {
-      if (isa<ImportDecl>(D) || isa<MacroExpansionDecl>(D) ||
-          isa<TopLevelCodeDecl>(D) || isa<UsingDecl>(D)) {
+      if (const auto *ID = dyn_cast<ImportDecl>(D)) {
+        if (ID->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+          hadImplementationOnlyImport = true;
+        continue;
+      }
+      if (isa<MacroExpansionDecl>(D) || isa<TopLevelCodeDecl>(D) ||
+          isa<UsingDecl>(D)) {
         continue;
       }
 
@@ -7242,7 +7347,7 @@ void Serializer::writeToStream(
     BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
     S.writeHeader();
     S.writeInputBlock();
-    S.writeSIL(SILMod, options.SerializeAllSIL, options.SerializeDebugInfoSIL);
+    S.writeSIL(SILMod);
     S.writeAST(DC);
 
     if (S.hadError)

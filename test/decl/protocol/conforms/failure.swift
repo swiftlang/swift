@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 protocol P1 {
   func foo() // expected-note {{protocol requires function 'foo()'}}
@@ -240,7 +240,7 @@ protocol P12 {
   // '(Self) -> Never' instead of '(Self) -> Self.A.Element', and the invalid
   // type parameter is never found (see 'hasInvalidTypeInConformanceContext').
   // This happens because getInterfaceType() on properties returns contextual
-  // types that have been mapped out of context, but mapTypeOutOfContext() does
+  // types that have been mapped out of context, but mapTypeOutOfEnvironment() does
   // not reconstitute type parameters that were substituted with concrete types.
   // Instead, patterns should be refactored to use interface types, at least if
   // they appear in type contexts.

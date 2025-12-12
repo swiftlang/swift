@@ -184,8 +184,7 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts, SourceLoc rbloc,
     : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
       LBLoc(lbloc), RBLoc(rbloc) {
   Bits.BraceStmt.NumElements = elts.size();
-  std::uninitialized_copy(elts.begin(), elts.end(),
-                          getTrailingObjects<ASTNode>());
+  std::uninitialized_copy(elts.begin(), elts.end(), getTrailingObjects());
 
 #ifndef NDEBUG
   for (auto elt : elts)
@@ -222,7 +221,11 @@ SourceLoc BraceStmt::getEndLoc() const {
 
 SourceLoc BraceStmt::getContentStartLoc() const {
   for (auto elt : getElements()) {
-    if (auto loc = elt.getStartLoc()) {
+    if (auto *D = elt.dyn_cast<Decl *>()) {
+      // FIXME: This should really be the default behavior of Decl::getStartLoc.
+      if (auto range = D->getSourceRangeIncludingAttrs())
+        return range.Start;
+    } else if (auto loc = elt.getStartLoc()) {
       return loc;
     }
   }
@@ -592,6 +595,28 @@ bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
   }
 
   return false;
+}
+
+Expr *StmtConditionElement::getSynthesizedShorthandInitOrNull() const {
+  auto *init = getInitializerOrNull();
+  if (!init)
+    return nullptr;
+
+  auto *pattern = dyn_cast_or_null<OptionalSomePattern>(getPattern());
+  if (!pattern)
+    return nullptr;
+
+  auto *var = pattern->getSubPattern()->getSingleVar();
+  if (!var)
+    return nullptr;
+
+  // If the right-hand side has the same location as the variable, it was
+  // synthesized.
+  if (var->getLoc().isValid() && var->getLoc() == init->getStartLoc() &&
+      init->getStartLoc() == init->getEndLoc()) {
+    return init;
+  }
+  return nullptr;
 }
 
 SourceRange ConditionalPatternBindingInfo::getSourceRange() const {
@@ -998,7 +1023,7 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                                EndLoc);
 
   std::uninitialized_copy(Cases.begin(), Cases.end(),
-                          theSwitch->getTrailingObjects<CaseStmt *>());
+                          theSwitch->getTrailingObjects());
   for (auto *caseStmt : theSwitch->getCases())
     caseStmt->setParentStmt(theSwitch);
 

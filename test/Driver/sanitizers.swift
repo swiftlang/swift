@@ -40,6 +40,21 @@
 // RUN: %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=undefined -target x86_64-unknown-windows-msvc %s 2>&1 | %FileCheck -check-prefix=UBSAN_WINDOWS %s
 
 /*
+ * MemTagStack Sanitizer Tests
+ */
+// RUN: %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=memtag-stack -target arm64-apple-macosx10.9 %s 2>&1 | %FileCheck -check-prefix=MEMTAGSAN -check-prefix=MEMTAGSAN_OSX_ARM64 %s
+// RUN: not %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=memtag-stack -target x86_64-apple-macosx10.9 %s 2>&1 | %FileCheck -check-prefix=MEMTAGSAN_OSX_X86 %s
+// RUN: not %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=memtag-stack -target x86-apple-macosx10.9 %s 2>&1 | %FileCheck -check-prefix=MEMTAGSAN_OSX_32 %s
+// RUN: not %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=memtag-stack -target x86_64-apple-ios7.1-simulator %s 2>&1 | %FileCheck -check-prefix=MEMTAGSAN_IOSSIM %s
+// RUN: %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=memtag-stack -target arm64-apple-ios7.1 %s 2>&1 | %FileCheck -check-prefix=MEMTAGSAN_IOS %s
+// RUN: not %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=memtag-stack -target x86_64-apple-tvos9.0-simulator %s 2>&1 | %FileCheck -check-prefix=MEMTAGSAN_tvOS_SIM %s
+// RUN: %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=memtag-stack -target arm64-apple-tvos9.0 %s 2>&1 | %FileCheck -check-prefix=MEMTAGSAN_tvOS %s
+// RUN: not %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=memtag-stack -target i386-apple-watchos2.0-simulator %s 2>&1 | %FileCheck -check-prefix=MEMTAGSAN_watchOS_SIM %s
+// RUN: not %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=memtag-stack -target armv7k-apple-watchos2.0 %s 2>&1  | %FileCheck -check-prefix=MEMTAGSAN_watchOS %s
+// RUN: not %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=memtag-stack -target x86_64-unknown-windows-msvc %s 2>&1 | %FileCheck -check-prefix=MEMTAGSAN_WINDOWS %s
+// RUN: not %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=memtag-stack -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=MEMTAGSAN_LINUX %s
+
+/*
  * Multiple Sanitizers At Once
  */
 // RUN: %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -sanitize=address,undefined,fuzzer -target x86_64-unknown-linux-gnu %s 2>&1 | %FileCheck -check-prefix=MULTIPLE_SAN_LINUX %s
@@ -50,6 +65,7 @@
 // RUN: not %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -target x86_64-apple-macosx10.9 -sanitize=address,unknown %s 2>&1 | %FileCheck -check-prefix=BADARG %s
 // RUN: not %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -target x86_64-apple-macosx10.9 -sanitize=address -sanitize=unknown %s 2>&1 | %FileCheck -check-prefix=BADARG %s
 // RUN: not %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -target x86_64-apple-macosx10.9 -sanitize=address,thread %s 2>&1 | %FileCheck -check-prefix=INCOMPATIBLESANITIZERS %s
+// RUN: not %swiftc_driver -sdk '""' -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ -driver-print-jobs -target arm64-apple-macosx10.9 -sanitize=memtag-stack,address %s 2>&1 | %FileCheck -check-prefix=INCOMPATIBLESANITIZERS_2 %s
 
 /*
  * Make sure we don't accidentally add the sanitizer library path when building libraries or modules
@@ -106,7 +122,23 @@
 
 // UBSAN: -rpath @executable_path
 
+// MEMTAGSAN: swift
+// MEMTAGSAN: -sanitize=memtag-stack
+
+// MEMTAGSAN_OSX_ARM64-NOT: unsupported option '-sanitize=memtag-stack' for target 'arm64-apple-macosx10.9'
+// MEMTAGSAN_OSX_X86: unsupported option '-sanitize=memtag-stack' for target 'x86_64-apple-macosx10.9'
+// MEMTAGSAN_OSX_32: unsupported option '-sanitize=memtag-stack' for target 'x86-apple-macosx10.9'
+// MEMTAGSAN_IOSSIM: unsupported option '-sanitize=memtag-stack' for target 'x86_64-apple-ios7.1-simulator'
+// MEMTAGSAN_IOS-NOT: unsupported option '-sanitize=memtag-stack' for target 'arm64-apple-ios7.1'
+// MEMTAGSAN_tvOS_SIM: unsupported option '-sanitize=memtag-stack' for target 'x86_64-apple-tvos9.0-simulator'
+// MEMTAGSAN_tvOS-NOT: unsupported option '-sanitize=memtag-stack' for target 'arm64-apple-tvos9.0'
+// MEMTAGSAN_watchOS_SIM: unsupported option '-sanitize=memtag-stack' for target 'i386-apple-watchos2.0-simulator'
+// MEMTAGSAN_watchOS: unsupported option '-sanitize=memtag-stack' for target 'armv7k-apple-watchos2.0'
+// MEMTAGSAN_LINUX: unsupported option '-sanitize=memtag-stack' for target 'x86_64-unknown-linux-gnu'
+// MEMTAGSAN_WINDOWS: unsupported option '-sanitize=memtag-stack' for target 'x86_64-unknown-windows-msvc'
+
 // MULTIPLE_SAN_LINUX: -fsanitize=address,undefined,fuzzer
 
 // BADARG: unsupported argument 'unknown' to option '-sanitize='
 // INCOMPATIBLESANITIZERS: argument '-sanitize=address' is not allowed with '-sanitize=thread'
+// INCOMPATIBLESANITIZERS_2: argument '-sanitize=address' is not allowed with '-sanitize=memtag-stack'

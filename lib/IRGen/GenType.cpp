@@ -1373,12 +1373,13 @@ namespace {
     llvm::Constant *getStaticStride(IRGenModule &IGM) const override {
       return nullptr;
     }
-    StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                               const llvm::Twine &name) const override {
+    StackAddress
+    allocateStack(IRGenFunction &IGF, SILType T, const llvm::Twine &name,
+                  StackAllocationIsNested_t isNested) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
-    void deallocateStack(IRGenFunction &IGF, StackAddress addr,
-                         SILType T) const override {
+    void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T,
+                         StackAllocationIsNested_t isNested) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
     void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
@@ -1993,7 +1994,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Map the archetype out of its own generic environment and into the
   // canonical generic environment.
   auto interfaceType = t->getInterfaceType();
-  auto exemplar = canGenericEnv->mapTypeIntoContext(interfaceType)
+  auto exemplar = canGenericEnv->mapTypeIntoEnvironment(interfaceType)
                     ->castTo<ArchetypeType>();
   assert(isExemplarArchetype(exemplar));
   return exemplar;
@@ -2051,7 +2052,7 @@ const TypeInfo *TypeConverter::getTypeEntry(CanType canonicalTy) {
   auto contextTy = canonicalTy;
   if (contextTy->hasTypeParameter()) {
     // The type we got should be lowered, so lower it like a SILType.
-    contextTy = getGenericEnvironment()->mapTypeIntoContext(
+    contextTy = getGenericEnvironment()->mapTypeIntoEnvironment(
                   IGM.getSILModule(),
                   SILType::getPrimitiveAddressType(contextTy)).getASTType();
   }
@@ -2255,6 +2256,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinNativeObject:
     return &getNativeObjectTypeInfo();
+  case TypeKind::BuiltinImplicitActor:
+    return &getImplicitActorTypeInfo();
   case TypeKind::BuiltinBridgeObject:
     return &getBridgeObjectTypeInfo();
   case TypeKind::BuiltinUnsafeValueBuffer:

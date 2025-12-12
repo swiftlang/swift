@@ -1,8 +1,4 @@
 // RUN: %target-typecheck-verify-swift
-// REQUIRES: objc_interop
-
-import Foundation
-import CoreGraphics
 
 /////////////
 
@@ -16,26 +12,6 @@ func foo1(x: (x: Int, y: Int)?, y: (Int, Int)) -> G<(x: Int, y: Int)> {
 }
 
 func foo2(x: (Int, Int)?, y: (x: Int, y: Int)) -> G<(Int, Int)> {
-  let g = G(t: x ?? y)
-  return g
-}
-
-func foo3(x: (@convention(block) () -> ())?, y: @escaping () -> ()) -> G<@convention(block) () -> ()> {
-  let g = G(t: x ?? y)
-  return g
-}
-
-func foo4(x: (() -> ())?, y: @escaping @convention(block) () -> ()) -> G<() -> ()> {
-  let g = G(t: x ?? y)
-  return g
-}
-
-func foo5(x: CGFloat?, y: Double) -> G<CGFloat> {
-  let g = G(t: x ?? y)
-  return g
-}
-
-func foo6(x: Double?, y: CGFloat) -> G<Double> {
   let g = G(t: x ?? y)
   return g
 }
@@ -54,28 +30,6 @@ func bar2(x: (Int, Int)) {
   f(id(x))
 }
 
-func bar3(x: @escaping () -> ()) {
-  func f(_: @escaping @convention(block) () -> ()) {}
-  // FIXME
-  f(id(x))  // expected-error {{conflicting arguments to generic parameter 'T' ('@convention(block) () -> ()' vs. '() -> ()')}}
-}
-
-func bar4(x: @escaping @convention(block) () -> ()) {
-  func f(_: @escaping () -> ()) {}
-  // FIXME
-  f(id(x))  // expected-error {{conflicting arguments to generic parameter 'T' ('() -> ()' vs. '@convention(block) () -> ()')}}
-}
-
-func bar5(x: Double) {
-  func f(_: CGFloat) {}
-  f(id(x))
-}
-
-func bar6(x: CGFloat) {
-  func f(_: Double) {}
-  f(id(x))
-}
-
 /////////////
 
 func unwrap<T>(_: T?) -> T {}
@@ -90,23 +44,36 @@ func baz2(x: (Int, Int)?) {
   f(unwrap(x))
 }
 
-func baz3(x: (() -> ())?) {
-  func f(_: @escaping @convention(block) () -> ()) {}
-  f(unwrap(x))
+/////////////
+
+func borrowingFn(fn: @escaping (borrowing AnyObject) -> ()) -> (AnyObject) -> () {
+  return id(id(fn))
 }
 
-func baz4(x: (@convention(block) () -> ())?) {
-  func f(_: @escaping () -> ()) {}
-  f(unwrap(x))
+/////////////
+
+infix operator <+
+infix operator >+
+
+protocol P {
+  static func <+ (lhs: borrowing Self, rhs: borrowing Self)
+  static func >+ (lhs: borrowing Self, rhs: borrowing Self)
 }
 
-func baz5(x: Double?) {
-  func f(_: CGFloat) {}
-  f(unwrap(x))
+extension P {
+  static func >+ (lhs: borrowing Self, rhs: borrowing Self) {}
 }
 
-func baz6(x: CGFloat?) {
-  func f(_: Double) {}
-  f(unwrap(x))
+struct S: P {
+  static func <+ (lhs: Self, rhs: Self) {}
 }
 
+let _: (S, S) -> () = false ? (<+) : (>+)
+
+/////////////
+
+struct MyString: Comparable {
+  static func < (lhs: Self, rhs: Self) -> Bool { fatalError() }
+}
+
+let _: (MyString, MyString) -> Bool = false ? (<) : (>)

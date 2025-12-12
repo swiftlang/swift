@@ -3,9 +3,9 @@
 // RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/MemberImportVisibility -o %t %S/Inputs/MemberImportVisibility/Categories_B.swift
 // RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/MemberImportVisibility -o %t %S/Inputs/MemberImportVisibility/Categories_C.swift
 // RUN: %target-swift-frontend -emit-module -I %t -I %S/Inputs/MemberImportVisibility -o %t %S/Inputs/MemberImportVisibility/Categories_E.swift
-// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/MemberImportVisibility -import-objc-header %S/Inputs/MemberImportVisibility/Bridging.h -verify -swift-version 5 -verify-additional-prefix no-member-visibility-
-// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/MemberImportVisibility -import-objc-header %S/Inputs/MemberImportVisibility/Bridging.h -verify -swift-version 6 -verify-additional-prefix no-member-visibility-
-// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/MemberImportVisibility -import-objc-header %S/Inputs/MemberImportVisibility/Bridging.h -verify -swift-version 5 -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/MemberImportVisibility -import-objc-header %S/Inputs/MemberImportVisibility/Bridging.h -verify -verify-ignore-unrelated -swift-version 5 -verify-additional-prefix no-member-visibility-
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/MemberImportVisibility -import-objc-header %S/Inputs/MemberImportVisibility/Bridging.h -verify -verify-ignore-unrelated -swift-version 6 -verify-additional-prefix no-member-visibility-
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/MemberImportVisibility -import-objc-header %S/Inputs/MemberImportVisibility/Bridging.h -verify -verify-ignore-unrelated -swift-version 5 -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_MemberImportVisibility

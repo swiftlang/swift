@@ -122,6 +122,10 @@ entry(%flag : $Builtin.Int1):
   %0 = function_ref @test_simple : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @owned Biggish<T>)
   (%value, %token) = begin_apply %0<SomeSubclass>() : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @owned Biggish<T>)
 
+  // CHECK:         call void @swift_release(ptr [[R0_ORIG]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R1_ORIG]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R2_ORIG]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R3_ORIG]])
   //   Branch.
   // CHECK-NEXT:    br i1 %0,
   cond_br %flag, yes, no
@@ -147,13 +151,9 @@ no:
   br cont
 
 cont:
-  // CHECK:         call void @swift_release(ptr [[R0_ORIG]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R1_ORIG]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R2_ORIG]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R3_ORIG]])
   destroy_value %value : $Biggish<SomeSubclass>
 
-  // CHECK-NEXT:    ret void
+  // CHECK:         ret void
   %ret = tuple ()
   return %ret : $()
 }

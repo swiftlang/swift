@@ -290,7 +290,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   return conformance;
 }
 
-SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfContext() const {
+SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfEnvironment() const {
   return subst(MapTypeOutOfContext(),
                LookUpConformanceInModule(),
                SubstFlags::PreservePackExpansionLevel |
@@ -412,14 +412,14 @@ OverrideSubsInfo::OverrideSubsInfo(const NominalTypeDecl *baseNominal,
     // substitution map to store the concrete conformance C: P
     // and not the abstract conformance T: P.
     if (genericEnv) {
-      derivedNominalTy = genericEnv->mapTypeIntoContext(
+      derivedNominalTy = genericEnv->mapTypeIntoEnvironment(
           derivedNominalTy);
     }
 
     BaseSubMap = derivedNominalTy->getContextSubstitutionMap(
         baseNominal, genericEnv);
 
-    BaseSubMap = BaseSubMap.mapReplacementTypesOutOfContext();
+    BaseSubMap = BaseSubMap.mapReplacementTypesOutOfEnvironment();
   }
 
   if (auto derivedNominalSig = derivedNominal->getGenericSignature())
@@ -519,7 +519,6 @@ void SubstitutionMap::verify(bool allowInvalid) const {
           !substType->is<PackElementType>() &&
           !substType->is<ArchetypeType>() &&
           !substType->isTypeVariableOrMember() &&
-          !substType->is<UnresolvedType>() &&
           !substType->is<PlaceholderType>() &&
           !substType->is<ErrorType>()) {
         ABORT([&](auto &out) {
@@ -621,6 +620,18 @@ bool SubstitutionMap::isIdentity() const {
 
 SubstitutionMap swift::substOpaqueTypesWithUnderlyingTypes(
     SubstitutionMap subs, TypeExpansionContext context) {
+  if (!context.shouldLookThroughOpaqueTypeArchetypes())
+    return subs;
+
+  if (!subs.getRecursiveProperties().hasOpaqueArchetype() &&
+      !llvm::any_of(subs.getConformances(),
+                    [&](ProtocolConformanceRef ref) {
+                      return (!ref.isInvalid() &&
+                              ref.getType()->hasOpaqueArchetype());
+                    })) {
+    return subs;
+  }
+
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
       context.getContext(), context.getResilienceExpansion(),
       context.isWholeModuleContext());

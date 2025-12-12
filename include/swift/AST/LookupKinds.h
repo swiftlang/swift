@@ -104,6 +104,9 @@ enum class ModuleLookupFlags : unsigned {
   /// If @abi attributes are present, return the decls representing the ABI,
   /// not the API.
   ABIProviding = 1 << 1,
+  /// The lookup is qualified by a module selector which has specified this
+  /// module explicitly.
+  HasModuleSelector = 1 << 2,
 };
 
 } // end namespace swift

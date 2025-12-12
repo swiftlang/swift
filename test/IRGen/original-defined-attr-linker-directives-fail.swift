@@ -15,11 +15,11 @@ public struct Entity {
   public func removeEntity(_ e: Entity) {}
 }
 
-// CHECK-SYMBOLS: $ld$previous$/System/OriginalModule.dylib$$1$10.8$10.10$_$s14OriginalModule6EntityVMn$
-// CHECK-SYMBOLS: $ld$previous$/System/OriginalModule.dylib$$1$10.8$10.10$_$s14OriginalModule6EntityV03addC0yyACF$
-// CHECK-SYMBOLS: $ld$previous$/System/OriginalModule.dylib$$1$10.8$10.10$_$s14OriginalModule6EntityVN$
-// CHECK-SYMBOLS: $ld$previous$/System/OriginalModule.dylib$$1$10.8$10.10$_$s14OriginalModule6EntityVMa$
-// CHECK-SYMBOLS: $ld$previous$/System/OriginalModule.dylib$$1$10.8$10.10$_$s14OriginalModule6EntityV06removeC0yyACF$
+// CHECK-SYMBOLS: $ld$previous$/System/OriginalModule.dylib$$1$1.0$10.10$_$s14OriginalModule6EntityVMn$
+// CHECK-SYMBOLS: $ld$previous$/System/OriginalModule.dylib$$1$1.0$10.10$_$s14OriginalModule6EntityV03addC0yyACF$
+// CHECK-SYMBOLS: $ld$previous$/System/OriginalModule.dylib$$1$1.0$10.10$_$s14OriginalModule6EntityVN$
+// CHECK-SYMBOLS: $ld$previous$/System/OriginalModule.dylib$$1$1.0$10.10$_$s14OriginalModule6EntityVMa$
+// CHECK-SYMBOLS: $ld$previous$/System/OriginalModule.dylib$$1$1.0$10.10$_$s14OriginalModule6EntityV06removeC0yyACF$
 
 // CHECK-SYMBOLS-LOW-TARGET: $ld$previous$/System/OriginalModule.dylib$$1$1.0$10.10$_$s14OriginalModule6EntityVMn$
 // CHECK-SYMBOLS-LOW-TARGET: $ld$previous$/System/OriginalModule.dylib$$1$1.0$10.10$_$s14OriginalModule6EntityV03addC0yyACF$

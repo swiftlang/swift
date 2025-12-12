@@ -363,7 +363,7 @@ protected:
     } else {
       Expr *buildBlockResult = buildBlockVarRef.get();
       // Otherwise, it's a top-level brace and we need to synthesize
-      // a call to `buildFialBlock` if supported.
+      // a call to `buildFinalBlock` if supported.
       if (builder.supports(ctx.Id_buildFinalResult, {Identifier()})) {
         buildBlockResult =
             builder.buildCall(resultLoc, ctx.Id_buildFinalResult,
@@ -956,7 +956,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
     options |= ConstraintSystemFlags::DebugConstraints;
 
   auto resultInterfaceTy = func->getResultInterfaceType();
-  auto resultContextType = func->mapTypeIntoContext(resultInterfaceTy);
+  auto resultContextType = func->mapTypeIntoEnvironment(resultInterfaceTy);
 
   // Determine whether we're inferring the underlying type for the opaque
   // result type of this function.
@@ -982,7 +982,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   // parameters to appear in the result builder type, because
   // the result builder type will only be used inside the body
   // of this decl; it's not part of the interface type.
-  builderType = func->mapTypeIntoContext(builderType);
+  builderType = func->mapTypeIntoEnvironment(builderType);
 
   {
     auto result = cs.matchResultBuilder(
@@ -1053,9 +1053,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
 
     case SolutionResult::Kind::TooComplex:
       reportSolutionsToSolutionCallback(salvagedResult);
-      func->diagnose(diag::expression_too_complex)
-        .highlight(func->getBodySourceRange());
-      salvagedResult.markAsDiagnosed();
+      cs.diagnoseTooComplex(func->getLoc(), salvagedResult);
       return nullptr;
     }
 

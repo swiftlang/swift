@@ -79,7 +79,7 @@ public struct ResilientStructSPIMembers {
   @_spi(Foo) public var computedProperty: SPIType { SPIType() }
 
   @_spi(Foo) public var storedProperty1: SPIType
-  // expected-error@-1 {{cannot use class 'SPIType' here; it is SPI}}
+  // expected-error@-1 {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
   // expected-error@-2 {{stored property 'storedProperty1' cannot be declared '@_spi' in a '@frozen' struct}}
 
   @_spi(Foo) public var storedProperty2 = SPIType()
@@ -89,7 +89,7 @@ public struct ResilientStructSPIMembers {
   // expected-error@-1 {{stored property 'lazyProperty1' cannot be declared '@_spi' in a '@frozen' struct}}
 
   @_spi(Foo) public lazy var lazyProperty2: SPIType = SPIType()
-  // expected-error@-1 {{cannot use class 'SPIType' here; it is SPI}}
+  // expected-error@-1 {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
   // expected-error@-2 {{stored property 'lazyProperty2' cannot be declared '@_spi' in a '@frozen' struct}}
 
   @_spi(Foo) @Wrapper public var wrappedProperty1: SPIType
@@ -108,24 +108,24 @@ public struct ResilientStructSPIMembers {
   public func method(_: SPIType) {} // expected-error {{cannot use class 'SPIType' here; it is SPI}}
 
   public var storedProperty1: SPIType
-  // expected-error@-1 {{cannot use class 'SPIType' here; it is SPI}}
+  // expected-error@-1 {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 
   public var storedProperty2 = SPIType()
-  // expected-error@-1 {{cannot use class 'SPIType' here; it is SPI}}
+  // expected-error@-1 {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
   // expected-error@-2 {{class 'SPIType' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
   // expected-error@-3 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
-  public var computedProperty: SPIType { SPIType() } // expected-error {{cannot use class 'SPIType' here; it is SPI}}
+  public var computedProperty: SPIType { SPIType() } // expected-error {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 
-  public lazy var lazyProperty1 = SPIType() // expected-error {{cannot use class 'SPIType' here; it is SPI}}
+  public lazy var lazyProperty1 = SPIType() // expected-error {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 
-  public lazy var lazyProperty2: SPIType = SPIType() // expected-error {{cannot use class 'SPIType' here; it is SPI}}
+  public lazy var lazyProperty2: SPIType = SPIType() // expected-error {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 
   @Wrapper public var wrappedProperty1: SPIType
-  // expected-error@-1 {{cannot use class 'SPIType' here; it is SPI}}
+  // expected-error@-1 {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 
   @Wrapper public var wrappedProperty2 = SPIType()
-  // expected-error@-1 {{cannot use class 'SPIType' here; it is SPI}}
+  // expected-error@-1 {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
   // expected-error@-2 {{class 'SPIType' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
   // expected-error@-3 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
@@ -140,24 +140,24 @@ public struct ResilientStructSPIMembers {
   private func method(_: SPIType) {}
 
   private var storedProperty1: SPIType
-  // expected-error@-1 {{cannot use class 'SPIType' here; it is SPI}}
+  // expected-error@-1 {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 
   private var storedProperty2 = SPIType()
-  // expected-error@-1 {{cannot use class 'SPIType' here; it is SPI}}
+  // expected-error@-1 {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
   // expected-error@-2 {{class 'SPIType' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
   // expected-error@-3 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private var computedProperty: SPIType { SPIType() }
 
-  private lazy var lazyProperty1 = SPIType() // expected-error {{cannot use class 'SPIType' here; it is SPI}}
+  private lazy var lazyProperty1 = SPIType() // expected-error {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 
-  private lazy var lazyProperty2: SPIType = SPIType() // expected-error {{cannot use class 'SPIType' here; it is SPI}}
+  private lazy var lazyProperty2: SPIType = SPIType() // expected-error {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 
   @Wrapper private var wrappedProperty1: SPIType
-  // expected-error@-1 {{cannot use class 'SPIType' here; it is SPI}}
+  // expected-error@-1 {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 
   @Wrapper private var wrappedProperty2 = SPIType()
-  // expected-error@-1 {{cannot use class 'SPIType' here; it is SPI}}
+  // expected-error@-1 {{cannot use class 'SPIType' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
   // expected-error@-2 {{class 'SPIType' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
   // expected-error@-3 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 }

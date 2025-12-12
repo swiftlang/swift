@@ -276,9 +276,9 @@ public:
 
 /// Determine whether the given declaration has
 /// a C-compatible interface.
-class IsCCompatibleFuncDeclRequest :
-    public SimpleRequest<IsCCompatibleFuncDeclRequest,
-                         bool(FuncDecl *),
+class IsCCompatibleDeclRequest :
+    public SimpleRequest<IsCCompatibleDeclRequest,
+                         bool(ValueDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -287,7 +287,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, FuncDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Caching.
@@ -561,10 +561,11 @@ public:
   void cacheResult(bool value) const;
 };
 
-class StructuralRequirementsRequest :
-    public SimpleRequest<StructuralRequirementsRequest,
-                         ArrayRef<StructuralRequirement>(ProtocolDecl *),
-                         RequestFlags::Cached> {
+class StructuralRequirementsRequest
+    : public SimpleRequest<StructuralRequirementsRequest,
+                       std::pair<ArrayRef<StructuralRequirement>,
+                                 ArrayRef<InverseRequirement>>(ProtocolDecl *),
+                       RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -572,7 +573,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ArrayRef<StructuralRequirement>
+  std::pair<ArrayRef<StructuralRequirement>, ArrayRef<InverseRequirement>>
   evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
 
 public:
@@ -611,6 +612,25 @@ private:
 
   // Evaluation.
   ArrayRef<ProtocolDecl *>
+  evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class ProtocolInversesRequest :
+    public SimpleRequest<ProtocolInversesRequest,
+                         ArrayRef<InverseRequirement>(ProtocolDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<InverseRequirement>
   evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
 
 public:
@@ -1598,27 +1618,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Find out if a distributed method is implementing a distributed protocol
-/// requirement.
-class GetDistributedMethodWitnessedProtocolRequirements :
-    public SimpleRequest<GetDistributedMethodWitnessedProtocolRequirements,
-                         llvm::ArrayRef<ValueDecl *> (AbstractFunctionDecl *),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  llvm::ArrayRef<ValueDecl *> evaluate(
-      Evaluator &evaluator,
-      AbstractFunctionDecl *nominal) const;
-
-public:
-  // Caching
-  bool isCached() const { return true; }
-};
-
 /// Retrieve the static "shared" property within a global actor that provides
 /// the actor instance representing the global actor.
 ///
@@ -1950,6 +1949,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Request to obtain a list of properties that can be initalized.
+class InitializablePropertiesRequest
+    : public SimpleRequest<InitializablePropertiesRequest,
+                           ArrayRef<VarDecl *>(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<VarDecl *> evaluate(Evaluator &evaluator,
+                               NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Request to obtain a list of computed properties with init accesors
 /// in the given nominal type.
 class InitAccessorPropertiesRequest :
@@ -1962,11 +1980,9 @@ public:
 private:
   friend SimpleRequest;
 
+  // Evaluation.
   ArrayRef<VarDecl *>
   evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -1974,21 +1990,39 @@ public:
 
 /// Request to obtain a list of properties that will be reflected in the parameters of a
 /// memberwise initializer.
-class MemberwiseInitPropertiesRequest :
-    public SimpleRequest<MemberwiseInitPropertiesRequest,
-                         ArrayRef<VarDecl *>(NominalTypeDecl *),
-                         RequestFlags::Cached> {
+class MemberwiseInitPropertiesRequest
+    : public SimpleRequest<MemberwiseInitPropertiesRequest,
+                           ArrayRef<VarDecl *>(NominalTypeDecl *,
+                                               MemberwiseInitKind),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  ArrayRef<VarDecl *>
-  evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+  // Evaluation.
+  ArrayRef<VarDecl *> evaluate(Evaluator &evaluator, NominalTypeDecl *decl,
+                               MemberwiseInitKind initKind) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// The maximum access level the memberwise initializer can be for a given
+/// nominal decl.
+class MemberwiseInitMaxAccessLevel
+    : public SimpleRequest<MemberwiseInitMaxAccessLevel,
+                           AccessLevel(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+  AccessLevel evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
 
 public:
   bool isCached() const { return true; }
@@ -2829,7 +2863,8 @@ public:
 
 /// Checks whether this type has a synthesized memberwise initializer.
 class HasMemberwiseInitRequest
-    : public SimpleRequest<HasMemberwiseInitRequest, bool(StructDecl *),
+    : public SimpleRequest<HasMemberwiseInitRequest,
+                           bool(StructDecl *, MemberwiseInitKind),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2838,7 +2873,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, StructDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, StructDecl *decl,
+                MemberwiseInitKind initKind) const;
 
 public:
   // Caching.
@@ -2848,7 +2884,8 @@ public:
 /// Synthesizes a memberwise initializer for a given type.
 class SynthesizeMemberwiseInitRequest
     : public SimpleRequest<SynthesizeMemberwiseInitRequest,
-                           ConstructorDecl *(NominalTypeDecl *),
+                           ConstructorDecl *(NominalTypeDecl *,
+                                             MemberwiseInitKind),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2857,7 +2894,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+  ConstructorDecl *evaluate(Evaluator &evaluator, NominalTypeDecl *decl,
+                            MemberwiseInitKind initKind) const;
 
 public:
   // Caching.
@@ -2999,9 +3037,6 @@ enum class ImplicitMemberAction : uint8_t {
   ResolveCodingKeys,
   ResolveEncodable,
   ResolveDecodable,
-  ResolveDistributedActor,
-  ResolveDistributedActorID,
-  ResolveDistributedActorSystem,
 };
 
 class ResolveImplicitMemberRequest
@@ -3728,6 +3763,8 @@ public:
   ArrayRef<TypeRepr *> getGenericArgs() const;
   ArgumentList *getArgs() const;
 
+  DeclContext *getDeclContext() const;
+
   /// Returns the macro roles corresponding to this macro reference.
   MacroRoles getMacroRoles() const;
 
@@ -3753,8 +3790,7 @@ void simple_display(llvm::raw_ostream &out,
 /// Resolve a given custom attribute to an attached macro declaration.
 class ResolveMacroRequest
     : public SimpleRequest<ResolveMacroRequest,
-                           ConcreteDeclRef(UnresolvedMacroReference,
-                                           DeclContext *),
+                           ConcreteDeclRef(UnresolvedMacroReference),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3763,8 +3799,7 @@ private:
   friend SimpleRequest;
 
   ConcreteDeclRef evaluate(Evaluator &evaluator,
-                           UnresolvedMacroReference macroRef,
-                           DeclContext *decl) const;
+                           UnresolvedMacroReference macroRef) const;
 
 public:
   bool isCached() const { return true; }
@@ -4948,7 +4983,7 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Check @cdecl functions for compatibility with the foreign language.
+/// Check @c functions for compatibility with the foreign language.
 class TypeCheckCDeclFunctionRequest
     : public SimpleRequest<TypeCheckCDeclFunctionRequest,
                            evaluator::SideEffect(FuncDecl *FD,
@@ -4967,7 +5002,25 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Check @cdecl enums for compatibility with C.
+/// A request to emit performance hints
+class EmitPerformanceHints
+: public SimpleRequest<EmitPerformanceHints,
+                       evaluator::SideEffect(SourceFile *),
+                       RequestFlags::Cached> {
+public:
+using SimpleRequest::SimpleRequest;
+
+private:
+friend SimpleRequest;
+
+evaluator::SideEffect
+evaluate(Evaluator &evaluator, SourceFile *SF) const;
+
+public:
+bool isCached() const { return true; }
+};
+
+/// Check @c enums for compatibility with C.
 class TypeCheckCDeclEnumRequest
     : public SimpleRequest<TypeCheckCDeclEnumRequest,
                            evaluator::SideEffect(EnumDecl *ED,

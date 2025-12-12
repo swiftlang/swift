@@ -89,6 +89,11 @@ bool swift::requiresForeignToNativeThunk(ValueDecl *vd) {
     if (proto->isObjC())
       return true;
 
+  // If there is only a C entrypoint from a Swift function, we will need
+  // foreign-to-native thunks to deal with them.
+  if (vd->hasOnlyCEntryPoint())
+    return true;
+
   if (auto fd = dyn_cast<FuncDecl>(vd))
     return fd->hasClangNode();
 
@@ -111,6 +116,9 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   if (vd->hasClangNode())
     return true;
 
+  if (vd->hasOnlyCEntryPoint())
+    return true;
+
   if (auto *accessor = dyn_cast<AccessorDecl>(vd)) {
     // Property accessors should be generated alongside the property.
     if (accessor->isGetterOrSetter()) {
@@ -128,7 +136,9 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
                        bool isRuntimeAccessible,
                        SILDeclRef::BackDeploymentKind backDeploymentKind,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
-    : loc(vd), kind(kind), isForeign(isForeign), distributedThunk(isDistributedThunk),
+    : loc(vd), kind(kind),
+      isForeign(isForeign),
+      distributedThunk(isDistributedThunk),
       isKnownToBeLocal(isKnownToBeLocal),
       isRuntimeAccessible(isRuntimeAccessible),
       backDeploymentKind(backDeploymentKind), defaultArgIndex(0),
@@ -467,7 +477,8 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     // Native-to-foreign thunks for methods are always just private, since
     // they're anchored by Objective-C metadata.
     auto &attrs = fn->getAttrs();
-    if (constant.isNativeToForeignThunk() && !attrs.hasAttribute<CDeclAttr>()) {
+    if (constant.isNativeToForeignThunk() &&
+        !(attrs.hasAttribute<CDeclAttr>() && !fn->hasOnlyCEntryPoint())) {
       auto isTopLevel = fn->getDeclContext()->isModuleScopeContext();
       return isTopLevel ? Limit::OnDemand : Limit::Private;
     }
@@ -494,14 +505,14 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::Deallocator:
   case Kind::IsolatedDeallocator:
   case Kind::Destroyer: {
-    // @_alwaysEmitIntoClient declarations are like the default arguments of
+    // Always-emit-into-client declarations are like the default arguments of
     // public functions; they are roots for dead code elimination and have
     // serialized bodies, but no public symbol in the generated binary.
-    if (d->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    if (d->isAlwaysEmittedIntoClient())
       return Limit::AlwaysEmitIntoClient;
     if (auto accessor = dyn_cast<AccessorDecl>(d)) {
       auto *storage = accessor->getStorage();
-      if (storage->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+      if (storage->isAlwaysEmittedIntoClient())
         return Limit::AlwaysEmitIntoClient;
     }
     break;
@@ -1014,7 +1025,8 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
     // @objc thunks for top-level functions are serializable since they're
     // referenced from @convention(c) conversions inside inlinable
     // functions.
-    return IsSerialized;
+    if (isThunk())
+      return IsSerialized;
   }
 
   // Declarations imported from Clang modules are serialized if
@@ -1065,13 +1077,13 @@ bool SILDeclRef::isNoinline() const {
   return false;
 }
 
-/// True if the function has the @inline(__always) attribute.
+/// True if the function has the @inline(always) attribute.
 bool SILDeclRef::isAlwaysInline() const {
   swift::Decl *decl = nullptr;
   if (hasDecl()) {
     decl = getDecl();
   } else if (auto *ce = getAbstractClosureExpr()) {
-    // Closures within @inline(__always) functions should be always inlined, too.
+    // Closures within @inline(always) functions should be always inlined, too.
     // Note that this is different from @inline(never), because closures inside
     // @inline(never) _can_ be inlined within the inline-never function.
     decl = ce->getParent()->getInnermostDeclarationDeclContext();
@@ -1092,6 +1104,39 @@ bool SILDeclRef::isAlwaysInline() const {
     auto *storage = accessorDecl->getStorage();
     if (auto *attr = storage->getAttrs().getAttribute<InlineAttr>())
       if (attr->getKind() == InlineKind::Always)
+        return true;
+  }
+
+  return false;
+}
+
+/// True if the function has the @inline(__always) attribute.
+bool SILDeclRef::isUnderscoredAlwaysInline() const {
+  swift::Decl *decl = nullptr;
+  if (hasDecl()) {
+    decl = getDecl();
+  } else if (auto *ce = getAbstractClosureExpr()) {
+    // Closures within @inline(__always) functions should be always inlined, too.
+    // Note that this is different from @inline(never), because closures inside
+    // @inline(never) _can_ be inlined within the inline-never function.
+    decl = ce->getParent()->getInnermostDeclarationDeclContext();
+    if (!decl)
+      return false;
+  } else {
+    return false;
+  }
+
+  ASSERT(ABIRoleInfo(decl).providesAPI()
+            && "should not get inline attr from ABI-only decl");
+
+  if (auto attr = decl->getAttrs().getAttribute<InlineAttr>())
+    if (attr->getKind() == InlineKind::AlwaysUnderscored)
+      return true;
+
+  if (auto *accessorDecl = dyn_cast<AccessorDecl>(decl)) {
+    auto *storage = accessorDecl->getStorage();
+    if (auto *attr = storage->getAttrs().getAttribute<InlineAttr>())
+      if (attr->getKind() == InlineKind::AlwaysUnderscored)
         return true;
   }
 
@@ -1120,19 +1165,64 @@ bool SILDeclRef::hasNonUniqueDefinition() const {
   return false;
 }
 
+bool SILDeclRef::declExposedToForeignLanguage(const ValueDecl *decl) {
+  // @c / @_cdecl / @objc.
+  if (decl->getAttrs().hasAttribute<CDeclAttr>() ||
+      (decl->getAttrs().hasAttribute<ObjCAttr>() &&
+       decl->getDeclContext()->isModuleScopeContext())) {
+    return true;
+  }
+
+  // @_expose that isn't negated.
+  for (auto *expose : decl->getAttrs().getAttributes<ExposeAttr>()) {
+    switch (expose->getExposureKind()) {
+      case ExposureKind::Cxx:
+      case ExposureKind::Wasm:
+        return true;
+
+      case ExposureKind::NotCxx:
+        continue;
+    }
+  }
+
+  return false;
+}
+
 bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   // This function only forces the issue in embedded.
   if (!decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return false;
 
-  // If the declaration is marked as @_neverEmitIntoClient, it has a unique
-  // definition.
+  // If the declaration is marked as never being emitted into the client, it
+  // has a unique definition.
   if (decl->isNeverEmittedIntoClient())
     return false;
 
-  /// @_alwaysEmitIntoClient means that we have a non-unique definition.
-  if (decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+  /// Always-emit-into-client means that we have a non-unique definition.
+  if (decl->isAlwaysEmittedIntoClient())
     return true;
+
+  // If the declaration is marked in a manner that indicates that other
+  // systems will expect it to have a symbol, then it has a unique definition.
+  // There are a few cases here.
+
+  // - @implementation explicitly says that we are implementing something to
+  // be called from another language, so call it non-unique.
+  if (decl->isObjCImplementation())
+    return false;
+
+  // - @c / @_cdecl / @objc / @_expose expect to be called from another
+  // language if the symbol itself would be visible.
+  if (declExposedToForeignLanguage(decl) &&
+      decl->getFormalAccess() >= AccessLevel::Internal) {
+    return false;
+  }
+
+  // - @section and @used imply that external tools will look for this symbol.
+  if (decl->getAttrs().hasAttribute<SectionAttr>() ||
+      decl->getAttrs().hasAttribute<UsedAttr>()) {
+    return false;
+  }
 
   auto module = decl->getModuleContext();
   auto &ctx = module->getASTContext();
@@ -1185,6 +1275,10 @@ bool SILDeclRef::isNativeToForeignThunk() const {
       return false;
     // No thunk is required if the decl directly references an external decl.
     if (getDecl()->getAttrs().hasAttribute<ExternAttr>())
+      return false;
+
+    // No thunk is required if the decl directly exposes a C entry point.
+    if (getDecl()->hasOnlyCEntryPoint())
       return false;
 
     // Only certain kinds of SILDeclRef can expose native-to-foreign thunks.
@@ -1293,18 +1387,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         silConfig);
   }
 
-  // As a special case, Clang functions and globals don't get mangled at all
-  // - except \c objc_direct decls.
-  if (hasDecl() && !isDefaultArgGenerator()) {
-    if (getDecl()->getClangDecl()) {
-      if (!isForeignToNativeThunk() && !isNativeToForeignThunk()) {
-        auto clangMangling = mangleClangDecl(getDecl(), isForeign);
-        if (!clangMangling.empty())
-          return clangMangling;
-      }
-    }
-  }
-
   // Mangle prespecializations.
   if (getSpecializedSignature()) {
     SILDeclRef nonSpecializedDeclRef = *this;
@@ -1348,24 +1430,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
       if (!NameA->Name.empty() && !isThunk()) {
         return NameA->Name.str();
-      }
-
-    if (auto *ExternA = ExternAttr::find(getDecl()->getAttrs(), ExternKind::C)) {
-      assert(isa<FuncDecl>(getDecl()) && "non-FuncDecl with @_extern should be rejected by typechecker");
-      return ExternA->getCName(cast<FuncDecl>(getDecl())).str();
-    }
-
-    // Use a given cdecl name for native-to-foreign thunks.
-    if (getDecl()->getAttrs().hasAttribute<CDeclAttr>())
-      if (isNativeToForeignThunk()) {
-        // If this is an @implementation @_cdecl, mangle it like the clang
-        // function it implements.
-        if (auto objcInterface = getDecl()->getImplementedObjCDecl()) {
-          auto clangMangling = mangleClangDecl(objcInterface, isForeign);
-          if (!clangMangling.empty())
-            return clangMangling;
-        }
-        return getDecl()->getCDeclName().str();
       }
 
     if (SKind == ASTMangler::SymbolKind::DistributedThunk) {
@@ -1454,6 +1518,39 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   llvm_unreachable("bad entity kind!");
 }
+
+std::optional<std::string> SILDeclRef::getAsmName() const {
+  if (isAutoDiffDerivativeFunction())
+    return std::nullopt;
+
+  if (hasDecl() && !isDefaultArgGenerator() &&
+      (getDecl()->getClangDecl() || getDecl()->getImplementedObjCDecl())) {
+    // If there is a Clang declaration, use its mangled name.
+    if (isNativeToForeignThunk() || isForeign) {
+      auto decl = getDecl();
+      auto hasClangDecl = decl->getClangDecl()
+          ? decl : decl->getImplementedObjCDecl();
+      auto clangMangling = mangleClangDecl(hasClangDecl, isForeign);
+      if (!clangMangling.empty())
+        return clangMangling;
+    }
+  }
+
+  if (isForeign && hasDecl()) {
+    // @_extern(c)
+    auto decl = getDecl();
+    if (auto *EA = ExternAttr::find(decl->getAttrs(), ExternKind::C))
+      if (auto VD = dyn_cast<ValueDecl>(decl))
+        return std::string(EA->getCName(VD));
+
+    // @c/@_cdecl
+    if (decl->getAttrs().hasAttribute<CDeclAttr>())
+      return std::string(decl->getCDeclName());
+  }
+
+  return std::nullopt;
+}
+
 
 // Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
 // FIXME(https://github.com/apple/swift/issues/54833): Also consider derived declaration `@derivative` attributes.

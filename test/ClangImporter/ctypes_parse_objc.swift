@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %clang-importer-sdk -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated %clang-importer-sdk -enable-objc-interop
 
 import ctypes
 import CoreGraphics

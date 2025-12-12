@@ -92,29 +92,34 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   // Dynamic declarations were mistakenly not checked in Swift 4.2.
   // Do enforce the restriction even in pre-Swift-5 modes if the module we're
   // building is resilient, though.
-  if (D->shouldUseObjCDispatch() && !Context.isSwiftVersionAtLeast(5) &&
+  if (D->shouldUseObjCDispatch() && !Context.isLanguageModeAtLeast(5) &&
       !DC->getParentModule()->isResilient()) {
     return false;
   }
+
+  // Embedded functions can reference non-public decls as they are visible
+  // to clients.
+  if (fragileKind.kind == FragileFunctionKind::EmbeddedAlwaysEmitIntoClient)
+    return false;
 
   DowngradeToWarning downgradeToWarning = DowngradeToWarning::No;
 
   // Swift 4.2 did not perform any checks for type aliases.
   if (isa<TypeAliasDecl>(D)) {
-    if (!Context.isSwiftVersionAtLeast(4, 2))
+    if (!Context.isLanguageModeAtLeast(4, 2))
       return false;
-    if (!Context.isSwiftVersionAtLeast(5))
+    if (!Context.isLanguageModeAtLeast(5))
       downgradeToWarning = DowngradeToWarning::Yes;
   }
 
   // Swift 4.2 did not check accessor accessibility.
   if (auto accessor = dyn_cast<AccessorDecl>(D)) {
-    if (!accessor->isInitAccessor() && !Context.isSwiftVersionAtLeast(5))
+    if (!accessor->isInitAccessor() && !Context.isLanguageModeAtLeast(5))
       downgradeToWarning = DowngradeToWarning::Yes;
   }
 
   // Swift 5.0 did not check the underlying types of local typealiases.
-  if (isa<TypeAliasDecl>(DC) && !Context.isSwiftVersionAtLeast(6))
+  if (isa<TypeAliasDecl>(DC) && !Context.isLanguageModeAtLeast(6))
     downgradeToWarning = DowngradeToWarning::Yes;
 
   auto diagID = diag::resilience_decl_unavailable;
@@ -168,7 +173,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
   auto ignoredDowngradeToWarning = DowngradeToWarning::No;
   auto originKind =
       getDisallowedOriginKind(D, where, ignoredDowngradeToWarning);
-  if (originKind == DisallowedOriginKind::None)
+  if (where.canReferenceOrigin(originKind))
     return false;
 
   // As an exception, if the import of the module that defines the desugared
@@ -190,7 +195,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD, definingModule->getNameStr(), D->getNameStr(),
                   static_cast<unsigned>(*reason), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilSwiftVersionIf(warnPreSwift6, 6);
+        .warnUntilLanguageModeIf(warnPreSwift6, 6);
   } else {
     ctx.Diags
         .diagnose(loc,
@@ -198,12 +203,12 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD, definingModule->getNameStr(), D->getNameStr(),
                   fragileKind.getSelector(), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilSwiftVersionIf(warnPreSwift6, 6);
+        .warnUntilLanguageModeIf(warnPreSwift6, 6);
   }
   D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
 
   if (originKind == DisallowedOriginKind::MissingImport &&
-      !ctx.LangOpts.isSwiftVersionAtLeast(6))
+      !ctx.isLanguageModeAtLeast(6))
     addMissingImport(loc, D, where);
 
   // If limited by an import, note which one.
@@ -255,6 +260,8 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
   case ExportabilityReason::General:
   case ExportabilityReason::ResultBuilder:
   case ExportabilityReason::PropertyWrapper:
+  case ExportabilityReason::PublicVarDecl:
+  case ExportabilityReason::ImplicitlyPublicVarDecl:
     return false;
   }
 }
@@ -288,6 +295,10 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
         }
       });
 
+  if (where.canReferenceOrigin(originKind))
+    return false;
+
+  auto fragileKind = where.getFragileFunctionKind();
   switch (originKind) {
   case DisallowedOriginKind::None:
     // The decl does not come from a source that needs to be checked for
@@ -321,10 +332,11 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
       return false;
     break;
 
-  case DisallowedOriginKind::ImplementationOnly:
   case DisallowedOriginKind::SPIImported:
   case DisallowedOriginKind::SPILocal:
+  case DisallowedOriginKind::ImplementationOnly:
   case DisallowedOriginKind::FragileCxxAPI:
+  case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
     break;
   }
 
@@ -335,7 +347,6 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
       return false;
   }
 
-  auto fragileKind = where.getFragileFunctionKind();
   if (fragileKind.kind == FragileFunctionKind::None) {
     DiagnosticBehavior limit = downgradeToWarning == DowngradeToWarning::Yes
                              ? DiagnosticBehavior::Warning
@@ -357,7 +368,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
     ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module, D,
                        fragileKind.getSelector(), definingModule->getName(),
                        static_cast<unsigned>(originKind))
-        .warnUntilSwiftVersionIf(downgradeToWarning == DowngradeToWarning::Yes,
+        .warnUntilLanguageModeIf(downgradeToWarning == DowngradeToWarning::Yes,
                                  6);
 
     if (originKind == DisallowedOriginKind::MissingImport &&
@@ -430,27 +441,27 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
       });
 
   auto originKind = getDisallowedOriginKind(ext, where);
-  if (originKind == DisallowedOriginKind::None)
+  if (where.canReferenceOrigin(originKind))
     return false;
 
   auto reason = where.getExportabilityReason();
   if (!reason.has_value())
     reason = ExportabilityReason::General;
 
-  ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,
-                     rootConf->getType(),
-                     rootConf->getProtocol()->getName(),
-                     static_cast<unsigned>(*reason),
-                     M->getName(),
-                     static_cast<unsigned>(originKind))
-      .warnUntilSwiftVersionIf((warnIfConformanceUnavailablePreSwift6 &&
-                                originKind != DisallowedOriginKind::SPIOnly &&
-                                originKind != DisallowedOriginKind::NonPublicImport) ||
-                               originKind == DisallowedOriginKind::MissingImport,
-                               6);
+  ctx.Diags
+      .diagnose(loc, diag::conformance_from_implementation_only_module,
+                rootConf->getType(), rootConf->getProtocol()->getName(),
+                static_cast<unsigned>(*reason), M->getName(),
+                static_cast<unsigned>(originKind))
+      .warnUntilLanguageModeIf(
+          (warnIfConformanceUnavailablePreSwift6 &&
+           originKind != DisallowedOriginKind::SPIOnly &&
+           originKind != DisallowedOriginKind::NonPublicImport) ||
+              originKind == DisallowedOriginKind::MissingImport,
+          6);
 
   if (originKind == DisallowedOriginKind::MissingImport &&
-      !ctx.LangOpts.isSwiftVersionAtLeast(6))
+      !ctx.isLanguageModeAtLeast(6))
     addMissingImport(loc, ext, where);
 
   // If limited by an import, note which one.

@@ -77,11 +77,6 @@ enum class DiagnosticOptions {
 
   /// A diagnostic warning about an unused element.
   NoUsage,
-
-  /// The diagnostic should be ignored by default, but will be re-enabled
-  /// by various warning options (-Wwarning, -Werror). This only makes sense
-  /// for warnings.
-  DefaultIgnore,
 };
 struct StoredDiagnosticInfo {
   DiagnosticKind kind : 2;
@@ -90,17 +85,16 @@ struct StoredDiagnosticInfo {
   bool isAPIDigesterBreakage : 1;
   bool isDeprecation : 1;
   bool isNoUsage : 1;
-  bool defaultIgnore : 1;
   DiagGroupID groupID;
 
   constexpr StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken,
                                  bool fatal, bool isAPIDigesterBreakage,
                                  bool deprecation, bool noUsage,
-                                 bool defaultIgnore, DiagGroupID groupID)
+                                 DiagGroupID groupID)
       : kind(k), pointsToFirstBadToken(firstBadToken), isFatal(fatal),
         isAPIDigesterBreakage(isAPIDigesterBreakage),
         isDeprecation(deprecation), isNoUsage(noUsage),
-        defaultIgnore(defaultIgnore), groupID(groupID) {}
+        groupID(groupID) {}
   constexpr StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts,
                                  DiagGroupID groupID)
       : StoredDiagnosticInfo(k,
@@ -109,7 +103,6 @@ struct StoredDiagnosticInfo {
                              opts == DiagnosticOptions::APIDigesterBreakage,
                              opts == DiagnosticOptions::Deprecation,
                              opts == DiagnosticOptions::NoUsage,
-                             opts == DiagnosticOptions::DefaultIgnore,
                              groupID) {}
 };
 } // end anonymous namespace
@@ -154,14 +147,29 @@ static constexpr const char *const fixItStrings[] = {
 };
 
 DiagnosticState::DiagnosticState() {
-  // Initialize our ignored diagnostics to defaults
-  ignoredDiagnostics.reserve(NumDiagIDs);
-  for (const auto &info : storedDiagnosticInfos) {
-    ignoredDiagnostics.push_back(info.defaultIgnore);
-  }
+  // Initialize ignored diagnostic groups to defaults
+  ignoredDiagnosticGroups.resize(DiagGroupsCount);
+  // Ensure that for each `DefaultIgnoreWarnings` group,
+  // we propagate this behavior to its child groups.
+  for (const auto &groupInfo : diagnosticGroupsInfo)
+    if (groupInfo.defaultIgnoreWarnings)
+      getDiagGroupInfoByID(groupInfo.id).traverseDepthFirst([&](auto group) {
+        ignoredDiagnosticGroups[(unsigned)group.id] = true;
+      });
 
   // Initialize warningsAsErrors to default
   warningsAsErrors.resize(DiagGroupsCount);
+
+  // Initialize compilerIgnoredDiagnostics
+  compilerIgnoredDiagnostics.resize(NumDiagIDs);
+}
+
+bool DiagnosticState::isIgnoredDiagnosticGroupTree(DiagGroupID id) const {
+  bool anyEnabled = false;
+  getDiagGroupInfoByID(id).traverseDepthFirst([&](auto group) {
+    anyEnabled |= !isIgnoredDiagnosticGroup(group.id);
+  });
+  return !anyEnabled;
 }
 
 Diagnostic::Diagnostic(DiagID ID)
@@ -175,6 +183,16 @@ std::optional<const DiagnosticInfo *> Diagnostic::getWrappedDiagnostic() const {
   }
 
   return std::nullopt;
+}
+
+SourceLoc Diagnostic::getLocOrDeclLoc() const {
+  if (auto loc = getLoc())
+    return loc;
+
+  if (auto *D = getDecl())
+    return D->getLoc();
+
+  return SourceLoc();
 }
 
 static CharSourceRange toCharSourceRange(SourceManager &SM, SourceRange SR) {
@@ -441,8 +459,8 @@ InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
 }
 
 InFlightDiagnostic &
-InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
-    DiagnosticBehavior limit, unsigned majorVersion) {
+InFlightDiagnostic::limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
+                                                   unsigned majorVersion) {
   if (!Engine->languageVersion.isVersionAtLeast(majorVersion)) {
     // If the behavior limit is a warning or less, wrap the diagnostic
     // in a message that this will become an error in a later Swift
@@ -469,14 +487,14 @@ InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
   return *this;
 }
 
-InFlightDiagnostic &InFlightDiagnostic::warnUntilFutureSwiftVersion() {
+InFlightDiagnostic &InFlightDiagnostic::warnUntilFutureLanguageMode() {
   using namespace version;
-  return warnUntilSwiftVersion(Version::getFutureMajorLanguageVersion());
+  return warnUntilLanguageMode(Version::getFutureMajorLanguageVersion());
 }
 
 InFlightDiagnostic &
-InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
-  return limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning,
+InFlightDiagnostic::warnUntilLanguageMode(unsigned majorVersion) {
+  return limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning,
                                         majorVersion);
 }
 
@@ -587,10 +605,8 @@ void DiagnosticEngine::setWarningsAsErrorsRules(
       if (auto groupID = getDiagGroupIDByName(name);
           groupID && *groupID != DiagGroupID::no_group) {
         getDiagGroupInfoByID(*groupID).traverseDepthFirst([&](auto group) {
-          state.setWarningsAsErrorsForDiagGroupID(*groupID, isEnabled);
-          for (DiagID diagID : group.diagnostics) {
-            state.setIgnoredDiagnostic(diagID, false);
-          }
+          state.setWarningsAsErrorsForDiagGroupID(group.id, isEnabled);
+          state.setIgnoredDiagnosticGroup(group.id, false);
         });
       } else {
         unknownGroups.push_back(std::string(name));
@@ -983,11 +999,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
       needsQualification = typeSpellingIsAmbiguous(type, Args, printOptions);
     }
 
-    // If a type has an unresolved type, print it with syntax sugar removed for
+    // If a type has a bare error type, print it with syntax sugar removed for
     // clarity. For example, print `Array<_>` instead of `[_]`.
-    if (type->hasUnresolvedType()) {
+    if (type->hasBareError())
       type = type->getWithoutSyntaxSugar();
-    }
 
     if (needsQualification &&
         isa<OpaqueTypeArchetypeType>(type.getPointer()) &&
@@ -1334,16 +1349,23 @@ DiagnosticState::determineBehavior(const Diagnostic &diag) const {
     if (!showDiagnosticsAfterFatalError && lvl != DiagnosticBehavior::Note)
       lvl = DiagnosticBehavior::Ignore;
 
-  //   3) If the user ignored this specific diagnostic, follow that
-  if (ignoredDiagnostics[(unsigned)diag.getID()])
-    lvl = DiagnosticBehavior::Ignore;
+  // Handle compiler-internal ignored diagnostics
+  if (compilerIgnoredDiagnostics[(unsigned)diag.getID()])
+      lvl = DiagnosticBehavior::Ignore;
 
-  //   4) If the user substituted a different behavior for this behavior, apply
+  //   3) If the user substituted a different behavior for this warning, apply
   //      that change
   if (lvl == DiagnosticBehavior::Warning) {
-    if (getWarningsAsErrorsForDiagGroupID(diag.getGroupID()))
+    if (isIgnoredDiagnosticGroup(diag.getGroupID()))
+      lvl = DiagnosticBehavior::Ignore;
+    else if (getWarningsAsErrorsForDiagGroupID(diag.getGroupID()))
       lvl = DiagnosticBehavior::Error;
     if (suppressWarnings)
+      lvl = DiagnosticBehavior::Ignore;
+  }
+
+  if (lvl == DiagnosticBehavior::Note) {
+    if (suppressNotes)
       lvl = DiagnosticBehavior::Ignore;
   }
   
@@ -1434,24 +1456,18 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
     return std::nullopt;
 
   // Figure out the source location.
-  SourceLoc loc = diagnostic.getLoc();
+  SourceLoc loc = diagnostic.getLocOrDeclLoc();
   if (loc.isInvalid() && diagnostic.getDecl()) {
+    // If the location of the decl is invalid, try to pretty-print it into a
+    // buffer and capture the source location there. Make sure we don't have an
+    // active request running since printing AST can kick requests that may
+    // themselves emit diagnostics. This won't help the underlying cycle, but it
+    // at least stops us from overflowing the stack.
     const Decl *decl = diagnostic.getDecl();
-    // If a declaration was provided instead of a location, and that declaration
-    // has a location we can point to, use that location.
-    loc = decl->getLoc();
-
-    // If the location of the decl is invalid still, try to pretty-print the
-    // declaration into a buffer and capture the source location there. Make
-    // sure we don't have an active request running since printing AST can
-    // kick requests that may themselves emit diagnostics. This won't help the
-    // underlying cycle, but it at least stops us from overflowing the stack.
-    if (loc.isInvalid()) {
-      PrettyPrintDeclRequest req(decl);
-      auto &eval = decl->getASTContext().evaluator;
-      if (!eval.hasActiveRequest(req))
-        loc = evaluateOrDefault(eval, req, SourceLoc());
-    }
+    PrettyPrintDeclRequest req(decl);
+    auto &eval = decl->getASTContext().evaluator;
+    if (!eval.hasActiveRequest(req))
+      loc = evaluateOrDefault(eval, req, SourceLoc());
   }
 
   auto groupID = diagnostic.getGroupID();
@@ -1779,6 +1795,20 @@ void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
     auto I = TransactionStrings.insert(content).first;
     argument = DiagnosticArgument(StringRef(I->getKeyData()));
   }
+}
+
+void DiagnosticQueue::forEach(
+    llvm::function_ref<void(const Diagnostic &)> body) const {
+  for (auto &activeDiag : QueueEngine.TentativeDiagnostics)
+    body(activeDiag.Diag);
+}
+
+void DiagnosticQueue::filter(
+    llvm::function_ref<bool(const Diagnostic &)> predicate) {
+  llvm::erase_if(QueueEngine.TentativeDiagnostics,
+                 [&](detail::ActiveDiagnostic &activeDiag) {
+                   return !predicate(activeDiag.Diag);
+                 });
 }
 
 EncodedDiagnosticMessage::EncodedDiagnosticMessage(StringRef S)

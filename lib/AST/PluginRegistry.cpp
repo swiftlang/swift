@@ -172,6 +172,16 @@ PluginRegistry::loadExecutablePlugin(StringRef path, bool disableSandbox) {
   return storage.get();
 }
 
+LoadedExecutablePlugin::~LoadedExecutablePlugin() {
+  if (Process) {
+    // If the process is alive, send an empty message as the termination signal.
+    // The plugin should exit itself when receiving it.
+    if (auto error = sendMessage(""))
+      llvm::consumeError(std::move(error));
+    Process.reset();
+  }
+}
+
 llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
   if (Process) {
     // NOTE: We don't check the mtime here because 'stat(2)' call is too heavy.

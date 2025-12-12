@@ -96,14 +96,14 @@ To motivate the concept, let $G$ be this generic signature:
                     τ_0_1 == τ_0_0.[Collection]SubSequence>
 \end{verbatim}
 \end{quote}
-We will also be working with the \texttt{String}, \texttt{Substring}, and \texttt{Character} nominal types from the standard library, and their conformances to various protocols. We already studied \tCollection\ in \ExRef{protocol collection example} and \ExRef{protocol collection graph}. \ListingRef{conformance paths listing} recalls the protocol declarations, and lists the relevant facts about the following normal conformances:
+We will also be working with the \texttt{String}, \texttt{Substring}, and \texttt{Character} types from the standard library, and their conformances to \tSequence\ and \tCollection. We already studied these protocols in \ExRef{protocol collection example} and \ExRef{protocol collection graph}. \ListingRef{conformance paths listing} recalls the protocol declarations, and lists the relevant facts about the following normal conformances:
 \begin{gather*}
 \StringCollection\\
 \SubstringCollection\\
 \StringSequence\\
 \SubstringSequence
 \end{gather*}
-W're going to apply this \index{substitution map}substitution map to various dependent member types:
+We're going to apply this \index{substitution map}substitution map to various dependent member types:
 \begin{align*}
 \Sigma := \SubstMapC{
 &\SubstType{\rT}{String},\\
@@ -143,7 +143,7 @@ This time, $\rUSequence$ is not an explicit conformance requirement of~$G$. Usin
 \qquad {} = \Proto{Sequence} \otimes \texttt{Substring}\\
 \qquad {} = \SubstringSequence
 \end{gather*}
-However, we wish to recover $\SubstringSequence$ from $\Sigma$ alone, without resorting to a \index{global conformance lookup}\emph{global} conformance lookup, as we did in the above calculation. We don't have a lot of options. In fact, pretty much the \emph{only} thing local confomance lookup can do is take one of the \index{root conformance}root conformances stored in the substitution map, and proceed to apply \index{associated conformance projection}associated conformance projection operations.
+However, we wish to recover $\SubstringSequence$ from $\Sigma$ alone, without resorting to a \index{global conformance lookup}\emph{global} conformance lookup, as we did in the above calculation. We don't have a lot of options. In fact, pretty much the \emph{only} thing local conformance lookup can do is take one of the \index{root conformance}root conformances stored in the substitution map, and proceed to apply \index{associated conformance projection}associated conformance projection operations.
 
 Our generic signature $G$ only has one explicit conformance requirement, so we start with the lone root conformance of $\Sigma$:
 \[
@@ -180,15 +180,15 @@ If we set aside for now the question of \emph{why} this appears to work---a very
 \qquad {} = \texttt{IndexingIterator<Substring>}
 \end{gather*}
 \IndexDefinition{conformance path}%
-If we peel off the type witness projection and substitution map on either end of the long expression in the middle, we're left with a conformance path for the abstract conformance $\rUSequence$ of $G$:
+If we peel off the type witness projection and substitution map at either end of the long expression in the middle, we're left with a conformance path for the abstract conformance $\rUSequence$ of $G$:
 \[\SelfSequence \otimes \SelfSubSequence \otimes \rTCollection\]
-A conformance path only depends on the generic signature, and not on any particular substitution map. We can use this conformance path to perform a local conformance lookup of $\rUSequence$ in \emph{any} substitution map for our generic signature~$G$.
+A conformance path only depends on the generic signature, and not on any particular substitution map. We can use the above conformance path to perform a local conformance lookup of $\rUSequence$ within \emph{any} substitution map with the same input generic signature~$G$.
 \end{example}
 
 \begin{definition}\label{conformance path def}
 Let $G$ be a generic signature. Formally, a \IndexDefinition{conformance path}\emph{conformance path} is an \index{ordered tuple}ordered tuple $(s_1,\,\ldots,\,s_n)$ of \IndexDefinition{conformance path length}length $n \geq 1$, such that the first step~$s_1$ is a \index{root abstract conformance}root abstract conformance of~$G$, and each subsequent step~$s_i$ is an \index{associated conformance requirement}associated conformance requirement stated by the protocol that appears on the right-hand side of the previous step. However, instead of using tuple notation, we write conformance paths from \emph{right to left}:
 \[s_n\otimes\cdots \otimes s_1\]
-Alteratively, we can write something like this:
+Alternatively, we can write something like this:
 \[\AssocConf{Self.$\tU_n$}{$\tP_n$} \otimes \cdots \otimes \AssocConf{Self.$\tU_2$}{$\tP_2$} \otimes \TPOne \]
 A conformance path of length~1 is just single root abstract conformance $\TPOne$.
 \end{definition}
@@ -247,7 +247,7 @@ So, $\ConfReq{\rU}{Sequence}$ and $\ConfReq{\rT.[Collection]SubSequence}{Sequenc
 \item Is every valid abstract conformance equivalent to a principal abstract conformance?
 \item Given a valid abstract conformance, can we find a conformance path representing an equivalent principal abstract conformance?
 \end{enumerate}
-We will answer (1) and (2) first, before we present \AlgRef{find conformance path algorithm} to solve (3) in the next section. Recall that $\TP$ is a \index{valid abstract conformance}valid abstract conformance if $G\vdash\TP$. To establish (1), we can show that a conformance path can be translated into a special kind of derivation.
+We will answer (1) and (2) first, before we look at \AlgRef{find conformance path algorithm} to solve (3) in the next section. Recall that $\TP$ is a \index{valid abstract conformance}valid abstract conformance if $G\vdash\TP$. To establish (1), we can show that a conformance path can be translated into a special kind of derivation.
 
 \begin{definition}\label{principal derivation def}
 Let $G$ be a generic signature. A \IndexDefinition{principal derivation}\emph{principal derivation} is a derivation of a conformance requirement that consists of a single \IndexStep{Conf}\textsc{Conf} elementary statement, followed by zero or more steps that apply \IndexStep{AssocConf}\textsc{AssocConf} to the conclusion of the previous step, with no unused conclusions or other kinds of steps:
@@ -283,28 +283,30 @@ First, we need a preliminary result, which will also be useful in \SecRef{rqm co
 \SameNameStepDef\\
 \SameDeclStepDef
 \end{gather*}
-These rules wrap both sides of a same-type requirement in a dependent member type, increasing their lengths by one. The below construction shows that this also allows us to derive ``longer'' same-type requirements. This requires proof by induction, together with some facts about well-formed generic signatures (\SecRef{generic signature validity}).
+These rules wrap both sides of a same-type requirement in a dependent member type, increasing their lengths by one. The below lemma shows that we can also iterate these steps and produce ``longer'' same-type requirements. This requires proof by induction, together with some facts about well-formed generic signatures (\SecRef{generic signature validity}).
 
 \begin{lemma}\label{general member type}
-Suppose that $G$ is a \index{well-formed generic signature}well-formed generic signature, \tT\ and \tU\ are \index{valid type parameter}valid type parameters of $G$, and finally, \texttt{T.V} and \texttt{U.V} are two type parameters formed by repeatedly wrapping \tT~and~\tU\ in dependent member types having pairwise identical identifiers or associated type declarations, so for some $n\geq 0$:
-\begin{gather*}
-\texttt{T.V} := \texttt{T.$\nA_1$...$\nA_n$}\\
-\texttt{U.V} := \texttt{U.$\nA_1$...$\nA_n$}
-\end{gather*}
-Under these assumptions, if $G\vdash\TU$ and $G\vdash\texttt{U.V}$, then $G\vdash\SameReq{T.V}{U.V}$. The same conclusion also holds if we start with $G\vdash\texttt{T.V}$, instead of $G\vdash\texttt{U.V}$.
+Let $G$ be a \index{well-formed generic signature}well-formed generic signature, with $G\vdash\TU$ for some type parameters \tT~and~\tU. Suppose that \texttt{T.V} and \texttt{U.V} are type parameters formed by wrapping \tT~and~\tU\ in dependent member types with pairwise identical identifiers or associated type declarations, so for some $n\geq 0$:
+\[
+\texttt{T.V} := \texttt{T.$\nA_1$...$\nA_n$} \qquad \texttt{and} \qquad \texttt{U.V} := \texttt{U.$\nA_1$...$\nA_n$}
+\]
+Also, suppose that at least one of \texttt{T.U} or \texttt{U.V} is valid, so $G\vdash\texttt{T.V}$ or $G\vdash\texttt{U.V}$. Then:
+\[
+G\vdash\SameReq{T.V}{U.V}
+\]
 \end{lemma}
 \begin{proof}
-We establish the $G\vdash\texttt{U.V}$ case first. Note that \index{type parameter length}$|\texttt{T.V}|=|\tT| + n$ and $|\texttt{U.V}|=|\tU|+n$. We proceed by \index{induction}induction on~$n$.
+We consider the case where $G\vdash\texttt{U.V}$ first. Note that \index{type parameter length}$|\texttt{T.V}|=|\tT| + n$ and $|\texttt{U.V}|=|\tU|+n$. We proceed by \index{induction}induction on~$n$.
 
 \BaseCase If $n=0$, then \texttt{T.V} is just \tT, and \texttt{U.V} is also \tU. We have $G\vdash\TU$ by assumption, so we already have the desired conclusion $G\vdash\SameReq{T.V}{U.V}$.
 
-\InductiveStep Suppose that $n>0$, and consider the outermost dependent member type of \texttt{U.V}, which is either \index{bound dependent member type}bound \texttt{$\tUp$.[P]A} or \index{bound dependent member type}unbound \texttt{$\tUp$.A}, for some type parameter~$\tUp$ and associated type~\nA\ of a protocol \tP. By assumption, \texttt{T.V} has the same form \texttt{$\tTp$.[P]A} or \texttt{$\tTp$.A}, for some type parameter $\tTp$.
+\InductiveStep Suppose that $n>0$, and consider the outermost dependent member type of \texttt{U.V}, which is either \index{bound dependent member type}bound \texttt{$\tUp$.[P]A} or \index{bound dependent member type}unbound \texttt{$\tUp$.A}, for some type parameter~$\tUp$ and associated type~\nA\ of a protocol \tP. By assumption, \texttt{T.V} has the same form \texttt{$\tTp$.[P]A} or \texttt{$\tTp$.A}, for some type parameter $\tTp$. Note that $|\tTp|=|\tT|-1$ and $|\tUp|=|\tU|-1$.
 
-By \PropRef{valid type param alt}, we know $G\vdash\texttt{U.V}$ implies $G\vdash\ConfReq{$\tUp$}{P}$, so we start by deriving:
+Since $G\vdash\texttt{U.V}$, we have $G\vdash\ConfReq{$\tUp$}{P}$ by \PropRef{valid type param alt}:
 \begin{gather*}
 \AnyStep{\ConfReq{$\tUp$}{P}}{1}
 \end{gather*}
-Since $G$ is well-formed, we also have $G\vdash\tUp$, so by the induction hypothesis, we get:
+Also, $G$ is well-formed, so $G\vdash\tUp$. Applying the induction hypothesis, we get:
 \begin{gather*}
 \AnyStep{\SameReq{$\tTp$}{$\tUp$}}{2}
 \end{gather*}
@@ -316,7 +318,7 @@ If \texttt{U.V} is \texttt{$\tTp$.A} and \texttt{U.V} is \texttt{$\tUp$.A}, we a
 \begin{gather*}
 \SameNameStep{1}{2}{$\tTp$.A}{$\tUp$.A}{3}
 \end{gather*}
-Thus, $G\vdash\texttt{U.V}$ implies $G\vdash\SameReq{T.V}{U.V}$.
+In both cases, we conclude that $G\vdash\SameReq{T.V}{U.V}$, closing the induction.
 
 To prove the same result from $G\vdash\texttt{T.V}$ instead of $G\vdash\texttt{U.V}$, we flip $\SameReq{T}{U}$ using \IndexStep{Sym}\textsc{Sym}, and repeat the above construction with $\SameReq{U}{T}$ to get $\SameReq{U.V}{T.V}$. A second application of \textsc{Sym} yields $G\vdash\SameReq{T.V}{U.V}$.
 \end{proof}
@@ -330,7 +332,7 @@ If~$G$ is the generic signature of \ExRef{conformance path example}, we can use 
 \begin{theorem}\label{conformance paths theorem} Let $G$ be a \index{well-formed generic signature}well-formed generic signature. If $G\vdash\TP$ for some type parameter~\tT\ and protocol~\tP, there exists a valid type parameter $\tTp$ such that $G\vdash\ConfReq{$\tTp$}{P}$ via a principal derivation, and $G\vdash\SameReq{T}{$\tTp$}$.
 \end{theorem}
 
-Before we present the proof, we refer to~\AppendixRef{derived summary} and observe that conformance requirements are always derived by one of three kinds of derivation steps:
+Before we look at the proof, the reader may wish to review~\AppendixRef{derived summary}, and recall that conformance requirements are always derived by one of three kinds of steps:
 \begin{gather*}
 \ConfStepDef\\
 \SameConfStepDef\\
@@ -341,7 +343,7 @@ If $G\vdash\TP$ does not involve \textsc{SameConf}, it is already principal, and
 \begin{proof}
 We proceed by \index{structural induction}structural induction on the \index{derived requirement!structural induction}derivation of $G\vdash\TP$. We will construct the two desired derivations at each step.
 
-\BaseCase A \textsc{Conf} elementary statement is the \index{base case}base case of our structural induction, because it has no assumptions. A derivation of an explicit conformance requirement is already principal by our definition, so we set $\tTp := \tT$. Our first derivation is just:
+\BaseCase A \textsc{Conf} elementary statement is the base case of our structural induction, because it has no assumptions. A derivation of an explicit conformance requirement is already principal by our definition, so we set $\tTp := \tT$. Our first derivation is just:
 \[
 \ConfStepDef
 \]
@@ -362,7 +364,7 @@ The remaining case is when our derivation ends with \IndexStep{AssocConf}\textsc
 \AssocConfStepDefX
 \]
 This is the ``untangling'' part. While $G\vdash\ConfReq{U}{Q}$ might not be principal, by induction,
-it splits up into a principal derivation $G\vdash\ConfReq{$\tUp$}{Q}$ for some~$\tUp$, and a same-type requirement $G\vdash\SameReq{U}{$\tUp$}$. We apply \textsc{AssocConf} to the first derivation to get a conformance to~\tQ, but with some other subject type \texttt{$\tUp$.V}:
+it splits up into a principal derivation $G\vdash\ConfReq{$\tUp$}{Q}$ for some~$\tUp$, and a same-type requirement $G\vdash\SameReq{U}{$\tUp$}$. We apply \textsc{AssocConf} to the first derivation to get a conformance to~\tP, but with some other subject type \texttt{$\tUp$.V}:
 \begin{gather*}
 \AnyStep{\ConfReq{$\tUp$}{Q}}{1}\\
 \AssocConfStep{1}{$\tUp$.V}{P}{2}
@@ -372,7 +374,7 @@ This is our desired principal derivation, so we set $\tTp := \tUp\texttt{.V}$. S
 
 \section{The Conformance Path Graph}\label{finding conformance paths}
 
-We embarked on our tour of type substitution in \ChapRef{substmaps}, with the following three algorithms marking key waypoints along the journey:
+We embarked on our tour of type substitution in \ChapRef{chap:substitution maps}, with the following three algorithms marking key waypoints along the journey:
 \begin{enumerate}
 \item \AlgRef{type subst algo} implements type parameter substitution, handling generic parameter types directly while delegating the \index{dependent member type}dependent member type case.
 \item \AlgRef{dependent member type substitution} implements dependent member type substitution in terms of local conformance lookup.
@@ -387,7 +389,7 @@ Let $G$ be a generic signature. The \IndexDefinition{conformance path graph}\emp
 \item For each pair of abstract conformances $\TP$ and $\ConfReq{$\tTp$}{Q}$ such that $\ConfReq{$\tTp$}{Q}$ is equivalent to $\TP \otimes \AssocConf{Self.U}{Q}$ for some \index{associated conformance projection!conformance path graph}associated conformance projection $\AssocConf{Self.U}{Q}$, we add an \index{edge!conformance path graph}edge with \index{source vertex!conformance path graph}source vertex $\TP$ and \index{destination vertex!conformance path graph}destination vertex $\ConfReq{$\tTp$}{Q}$. The edge is labeled $\AssocConf{Self.U}{Q}$.
 \end{itemize}
 \end{definition}
-A conformance path is just a \index{path!conformance path graph}path in the conformance path graph. The path \index{source vertex!conformance path}starts from a \index{root abstract conformance!conformance path}root abstract conformance, and \index{destination vertex!conformance path}ends at the \index{principal abstract conformance}principal abstract conformance that the conformance path represents; the vertices visited along the way are the intermediate values of~$\TP$ in \AlgRef{invertconformancepath}. We previously studied directed graphs in \SecRef{type parameter graph} when discussing the \index{type parameter graph}type parameter graph of a generic signature. The conformance path graph construction is similar, and it is instructive to compare the two:
+A conformance path is just a \index{path!conformance path graph}path in the conformance path graph. The path starts from a \index{root abstract conformance!conformance path}root abstract conformance, and \index{destination vertex!conformance path}ends at the \index{principal abstract conformance}principal abstract conformance that the conformance path represents; the vertices visited along the way are the intermediate values of~$\TP$ in \AlgRef{invertconformancepath}. We previously studied directed graphs in \SecRef{type parameter graph} when discussing the \index{type parameter graph!conformance path graph}type parameter graph of a generic signature. The conformance path graph construction is similar, and it is instructive to compare the two:
 \begin{center}
 \begin{tabular}{lll}
 \toprule
@@ -490,7 +492,7 @@ We say that two conformance paths are \IndexDefinition{conformance path!equivale
 \end{algorithm}
 While the requirement order of \AlgRef{requirement order} is a partial order in general, it is linear on conformance requirements, so Step~5 cannot return ``$\bot$'', and the conformance path order is linear as well. The argument used in \PropRef{well founded type order} can also show that the conformance path order is \index{well-founded order}well-founded. Therefore, each equivalence class of conformance paths contains a unique minimum element, or a \IndexDefinition{reduced conformance path}\emph{reduced conformance path}.
 
-While \AlgRef{conformance path order alg} is part of the formal model, the compiler does not implement it directly. Instead, we ensure that our breadth-first search always visits requirements in increasing order at each step, which is enough to guarantee that we always find the reduced conformance path in each equivalence class first. The breadth-first search requires some persistent state with each generic signature $G$:
+While \AlgRef{conformance path order alg} is part of the formal model, the compiler does not implement it directly. Instead, we ensure that our breadth-first search always visits requirements in increasing order at each step, which is enough to guarantee that we always find the reduced conformance path in each equivalence class first. The breadth-first search associates some persistent state with each generic signature $G$:
 \begin{itemize}
 \item A hash table, mapping reduced abstract conformances to conformance paths.
 \item An integer $N$, initially 0.
@@ -498,7 +500,7 @@ While \AlgRef{conformance path order alg} is part of the formal model, the compi
 \item A growable array $B_1$, to temporarily hold all conformance paths of length $N+1$.
 \end{itemize}
 
-Here is the actual algorithm at least. Each invocation will either immediately return an existing conformance path from the table, or proceed to enumerate conformance paths in increasing order, until the one we are looking for appears in the table.
+Here is the actual algorithm at last. Each invocation will either immediately return an existing conformance path from the table, or proceed to enumerate conformance paths in increasing order, until the one we are looking for appears in the table.
 
 \begin{algorithm}[Find conformance path]\label{find conformance path algorithm}
 Receives a generic signature $G$ and a valid abstract conformance $\TP$ as input. Outputs the reduced conformance path for $\TP$.
@@ -534,7 +536,7 @@ Receives a generic signature $G$ and a valid abstract conformance $\TP$ as input
 In Step~1, we bail out if the given type parameter~\tT\ does not actually conform to \tP, because then we will never find a conformance path for $\TP$. Once we establish the precondition, we can guarantee termination, by \ThmRef{conformance paths theorem} together with our choice of conformance path order. In particular, this means that the $B$ array will never be empty at the start of Step~5, because then we would enter an infinite loop, contradicting our theorem. We don't \emph{have to} show why it cannot be empty! (Let's do it anyway. If $B$~is empty but~$N>0$, our generic signature $G$ has a finite set of conformance paths, and we've already enumerated all of them on a previous invocation. In this case though, Step~3 will always return a value before we get to Step~5.)
 
 \begin{example}\label{free monoid first time}
-Termination is great, but how large is ``finite''? In the worst case, the running time of \AlgRef{find conformance path algorithm} is \index{asymptotic complexity}exponential in the \index{type parameter length}length of the subject type parameter. Consider the protocol protocol signature $G_\texttt{M}$, with \texttt{M} as below:
+Termination is great, but how large is ``finite''? In the worst case, the running time of \AlgRef{find conformance path algorithm} is \index{asymptotic complexity}exponential in the \index{type parameter length}length of the subject type parameter. Consider the protocol generic signature $G_\texttt{M}$, with \texttt{M} as below:
 \begin{Verbatim}
 protocol M {
   associatedtype A: M
@@ -556,20 +558,20 @@ func caller<T: M>(_: T.Type) {
 For now at least, we have yet to observe this form of combinatorial explosion in practice. In realistic programs, conformance path graphs tend to be relatively simple, and type parameters tend not to be overly long.
 \end{example}
 
-Now, we pause to take a breather. Our implementation of \AlgRef{type subst algo} is almost completely filled in, except for the \IndexQuery{getReducedType}$\Query{getReducedType}{}$ and \IndexQuery{conformsToProtocol}$\Query{requiresProtocol}{}$ generic signature queries, whose implementation is explained in \PartRef{part rqm}. It is worth noting that the pathological protocol~\texttt{M} shown above is quite interesting for other reasons, and it will reappear in \SecRef{monoidsasprotocols}.
+Now, we pause to take a breather. Our implementation of \AlgRef{type subst algo} is almost completely filled in, except for the \IndexQuery{getReducedType}$\Query{getReducedType}{}$ and \IndexQuery{requiresProtocol}$\Query{requiresProtocol}{}$ generic signature queries, whose implementation is explained in \PartRef{part rqm}. It is worth noting that the pathological protocol~\texttt{M} shown above is quite interesting for other reasons, and it will reappear in \SecRef{monoidsasprotocols}.
 
 \section{Recursive Conformances}\label{recursive conformances}
 
-We classified generic signatures into three families of increasing complexity in \SecRef{archetype builder}. A generic signature may either have a finite set of type parameters in all, an infinite set of type parameters that collapse into a finite set of equivalence classes, or most generally, an infinite set of equivalence classes.
+In \SecRef{archetype builder}, we classified generic signatures into three families of increasing complexity. To review, a generic signature may have a finite set of type parameters in all, an infinite set of type parameters that collapse down to a finite set of equivalence classes, or most generally, an infinite set of equivalence classes.
 
-The vertices in the type parameter graph are equivalence classes of type parameters, so in the first two cases, the type parameter graph is finite. Furthermore, in the first case, our graph must be \index{DAG|see {directed acyclic graph}}\IndexDefinition{directed acyclic graph}\emph{acyclic}, meaning it does not contain a \index{cycle}\emph{cycle}, which is a non-empty \index{path}path with the same source and destination. Indeed, if we follow a cycle an arbitrary number of times, we can exhibit an infinite sequence of equivalent valid type parameters.
+We can restate this in terms of the type parameter graph, as follows. In the first two cases, the type parameter graph is finite. Furthermore, in the first case, the type parameter graph is a \index{directed acyclic graph}directed acyclic graph (\DefRef{dag def}). Indeed, as \ExRef{protocol collection graph} shows, we can exhibit an infinite sequence of equivalent type parameters by following a \index{cycle}cycle an arbitrary number of times.
 
-We get a similar classification of generic signatures if we consider the conformance path graph instead. Our conformance path graph might be finite and acyclic, so we only have finitely many conformance paths, or it might be finite but contain a cycle, so we have a finite set of equivalence classes where at least one contains infinitely many paths, or we might have \index{infinite graph!conformance path graph}infinitelt many equivalence classes of conformance paths.
+We will now see that we obtain a similar classification of generic signatures if we instead consider the conformance path graph. Our conformance path graph might be finite and acyclic, so we only have finitely many conformance paths, or it might be finite but contain a cycle, so we have a finite set of equivalence classes where at least one contains infinitely many paths, or we might have \index{infinite graph!conformance path graph}infinitely many equivalence classes of conformance paths.
 
 It turns out that the two classifications overlap, but do not completely coincide. To understand why, we introduce another directed graph.
 
 \begin{definition}\label{protocol dependency graph def}
-The \IndexDefinition{protocol dependency graph}\emph{protocol dependency graph} is the \index{directed graph!protocol dependency graph}directed graph where the vertices are protocol declarations, or more precisely, the \index{vertex}vertex set is the universe of all \index{protocol declaration!protocol dependency graph}protocol declarations visible to name lookup, which we denoted by $\ProtoObj$ in \SecRef{conformance lookup}. The edge set consists of all \index{associated conformance requirement!protocol dependency graph}associated conformance requirements from all protocols, such that the \index{source vertex!protocol dependency graph}source vertex of $\AssocConfReq{Self.U}{Q}{P}$ is~\tP\ and the \index{destination vertex!protocol dependency graph}destination vertex is~\tQ.
+The \IndexDefinition{protocol dependency graph}\emph{protocol dependency graph} is the \index{directed graph!protocol dependency graph}directed graph whose vertices are protocol declarations, or more precisely, its \index{vertex}vertex set is the universe of all \index{protocol declaration!protocol dependency graph}protocol declarations visible to name lookup, which we denoted by $\ProtoObj$ in \SecRef{conformance lookup}. The edge set consists of all \index{associated conformance requirement!protocol dependency graph}associated conformance requirements from all protocols, such that the \index{source vertex!protocol dependency graph}source vertex of $\AssocConfReq{Self.U}{Q}{P}$ is~\tP\ and the \index{destination vertex!protocol dependency graph}destination vertex is~\tQ.
 \end{definition}
 
 We will encounter the protocol dependency graph again in \SecRef{protocol component}, when we describe the construction of the requirement machine for a generic signature.
@@ -643,11 +645,11 @@ protocol Foe {
 An \index{associated conformance requirement!recursive}associated conformance requirement is \IndexDefinition{recursive conformance requirement}\emph{recursive} if its edge is part of a \index{cycle!protocol dependency graph}cycle in the protocol dependency graph.
 \end{definition}
 
-In the previous three examples we saw, $\AssocConfReq{Self.SubSequence}{Collection}{Collection}$, $\AssocConfReq{Self.A}{N}{N}$, $\AssocConfReq{Self.Foo}{Foe}{Fee}$, and $\AssocConfReq{Self.Foo}{Fee}{Foe}$ are all recursive. We recall from \SecRef{archetype builder} that recursive conformance requirements appeared in \IndexSwift{4.1}Swift~4.1~\cite{se0157}; prior to this, the protocol dependency graph was always \index{directed acyclic graph}acyclic.
+In the three preceding examples, all of $\AssocConfReq{Self.SubSequence}{Collection}{Collection}$, $\AssocConfReq{Self.A}{N}{N}$, $\AssocConfReq{Self.Foo}{Foe}{Fee}$, and $\AssocConfReq{Self.Foo}{Fee}{Foe}$ are all recursive. We recall from \SecRef{archetype builder} that recursive conformance requirements appeared in \IndexSwift{4.1}Swift~4.1~\cite{se0157}; prior to this, the protocol dependency graph was always \index{directed acyclic graph}acyclic.
 
 To relate the conformance path graph with the protocol dependency graph, consider the function $\pi\colon\ConfObj{G}\rightarrow\ProtoObj$:
 \[\pi(\XP):=\tP\]
-This operation makes sense with both on abstract and concrete conformances. When restricted to abstract conformances, this maps the vertices of the conformance path graph to the vertices of the protocol dependency graph. Furthermore, if two vertices in the conformance path graph are joined by an edge, the corresponding vertices in the protocol dependency graph are also joined by an edge with the same label.
+This operation is defined on both abstract and concrete conformances. If we consider its restriction to abstract conformances, we see that it maps the vertices of the conformance path graph to the vertices of the protocol dependency graph. Furthermore, if two vertices in the conformance path graph are joined by an edge, the corresponding vertices in the protocol dependency graph are also joined by an edge with the same label.
 
 \begin{definition}
 Let $X:=(V_X,E_X)$ and $Y:=(V_Y,E_Y)$ be directed graphs. A \index{homomorphism}\IndexDefinition{graph homomorphism}\emph{graph homomorphism} $f\colon X\rightarrow Y$ is a pair of functions, $f_v\colon V_X\rightarrow V_Y$ for mapping \index{vertex!graph homomorphism}vertices to vertices, and $f_e\colon E_X\rightarrow E_Y$ for mapping \index{edge!graph homomorphism}edges to edges, such that for all $e\in E_X$,
@@ -658,7 +660,7 @@ f_v(\Dst(e)) = \Dst(f_e(e))
 Note that $f_e$ is permitted to map $\Src(e)$ and $\Dst(e)$ to the same vertex as long as $Y$ has a \index{loop!graph homomorphism}loop---an edge with the same source and destination---at this vertex.
 \end{definition}
 
-We can also apply our graph homomorphism to a \index{path!graph homomorphism}path in~$G_1$, by first applying it to the source vertex and then each successive edge. By induction, the result is a valid path in~$G_2$. If we apply $\pi$ to a \index{path!conformance path graph}path in the conformance path graph, we get a path in the protocol dependency graph. A \index{path!protocol dependency graph}path in the protocol dependency graph is a sequence of \index{associated conformance projection}associated conformance projections, so it's like a conformance path except that the first step is missing. The general form of a path from $\tP_1$ to $\tP_n$ can be denoted by:
+We can also apply our graph homomorphism to a \index{path!graph homomorphism}path in~$G_1$, by first applying it to the source vertex, and then to each successive edge. By induction, the result is a valid path in~$G_2$. In particular, if we apply~$\pi$ to a \index{path!conformance path graph}path in the conformance path graph, we get a path in the protocol dependency graph. A \index{path!protocol dependency graph}path in the protocol dependency graph is a sequence of \index{associated conformance projection}associated conformance projections, so it's like a conformance path but without the first step. The general form of a path from $\tP_1$ to $\tP_n$ can be denoted by:
 \[\AssocConf{Self.$\tU_n$}{$\tP_n$} \otimes \cdots \otimes \AssocConf{Self.$\tU_1$}{$\tP_1$}\]
 We can now state this interesting fact.
 
@@ -680,7 +682,7 @@ Swift does not allow circular \index{inherited protocol!circularity}protocol inh
 Let $G$ be a \index{well-formed generic signature}well-formed generic signature. If $G$ has an infinite set of conformance paths, then $G$ has an infinite set of \index{valid type parameter}valid type parameters.
 \end{proposition}
 
-Therefore, if $G$ has a finite set of valid type parameters, that is, if the type parameter graph of $G$ is finite and acyclic, then the conformance path graph of $G$ must be finite and acyclic as well. However, we cannot strenghten this to an ``if and only if,'' as the following example shows.
+Therefore, if $G$ has a finite set of valid type parameters, that is, if the type parameter graph of $G$ is finite and acyclic, then the conformance path graph of $G$ must be finite and acyclic as well. However, we cannot strengthen this to an ``if and only if,'' as the following example shows.
 
 \begin{example}
 Let $G$ be the generic signature of the protocol extension:
@@ -705,7 +707,7 @@ $(1 \Rightarrow 2)$ We take the reduced type parameter from each equivalence cla
 $(2 \Rightarrow 1)$ We choose an conformance path from each equivalence class, and find the reduced abstract conformance for each one. This gives us an infinite set of reduced abstract conformances. Consider a function $g$ that maps an abstract conformance to its subject type. There can only be finitely many distinct reduced abstract conformances with the same subject type, because there are only finitely many protocols in $\ProtoObj$. Thus, $g$ maps the infinite set of reduced abstract conformances to an infinite set of reduced type parameters.
 \end{proof}
 
-To summarize, we can refine our classification of generic signatures into \emph{four} families, by considering the type parameter graph and conformance path graph together:
+To summarize, we can refine our classification of generic signatures into \emph{four} families, by considering the \index{type parameter graph}type parameter graph and \index{conformance path graph}conformance path graph together:
 \begin{enumerate}
 \item Both graphs are finite and acyclic.
 \item Both graphs are finite, but only the conformance path graph is acyclic.
@@ -779,10 +781,10 @@ We now ask, if $\XN$ is a conformance to \tN, what does the conformance substitu
 \item Another infinite ray.
 \item A finite path leading to a cycle.
 \end{enumerate}
-Another way of saying this is that there can only be three possible outcomes if start with $\XN$ and repeatedly apply $\SelfAToN$:
+Therefore, if start with $\XN$ and repeatedly apply $\SelfAToN$, one of three things will eventually happen:
 \begin{enumerate}
-\item We eventually end up back at $\XN$.
-\item We get an infinite sequence of distinct conformances to \tN.
+\item We end up back at $\XN$.
+\item We produce an infinite sequence of distinct conformances to \tN.
 \item We end up at a conformance we've already seen, but not $\XN$.
 \end{enumerate}
 We will now construct an example of each behavior, followed by a surprise.
@@ -927,7 +929,7 @@ We also write the type witness of $\FN$ using a conformance path:
 \end{gather*}
 We will now attempt to calculate the substituted return type of the below call to \verb|f()|:
 \begin{Verbatim}
-func f<T: N>(_: T) -> T.A { ... }
+func f<T: N>(_: T) -> T.A {...}
 
 let value = f(F<S>())  // What is the type of `value'?
 \end{Verbatim}
@@ -948,13 +950,13 @@ Unfortunately, our only remaining move is to apply (1), but that brings us back 
 \end{gather*}
 
 \paragraph{Normal forms.}
-We've been making the tacit assumption that every valid expression written using the $\otimes$ ``turntable'' operator can be reduced to a \emph{normal form}---a single type, substitution map, or conformance---by the finite application of algebraic identities, until no occurrences of $\otimes$ remain. This turns out to be a false assumption. In the last example, the record keeps spinning and the party doesn't stop:$\quad \otimes \quad \oplus \quad \otimes \quad \oplus \quad \otimes \quad \cdots$
+We've been making the tacit assumption that every valid expression written using the $\otimes$ ``turntable'' operator can be reduced to a \emph{normal form}---a single type, substitution map, or conformance---by the finite application of algebraic identities, until no occurrences of $\otimes$ remain. This turns out to be a false assumption. In the prior example, the record keeps spinning and the party doesn't stop:$\quad \otimes \quad \oplus \quad \otimes \quad \oplus \quad \otimes \quad \cdots$
 
 We showed that \AlgRef{find conformance path algorithm} for \emph{finding} a conformance path always terminates, but we clearly cannot say the same about \AlgRef{local conformance lookup algorithm} for \emph{evaluating} a conformance path! Local conformance lookup---or more generally, the $\otimes$ operator---is actually a \index{partial function}\emph{partial} function, which does not always produce a result. Similarly, the substitution map~$\SigmaS$ described above does not \emph{have} a conformance substitution graph.
 
 At the present time, the compiler terminates with a stack overflow if a non-terminating type substitution is attempted. While \AlgRef{local conformance lookup algorithm} itself is a simple counted loop, the recursion is coming from Step~4. If $C$ is a \index{specialized conformance!recursive}specialized conformance, projecting an associated conformance from $C$ applies a substitution map to some other conformance; if this conformance is abstract, we recursively call into \index{local conformance lookup!recursive}local conformance lookup again. Our example happens to arrange everything just right so that we end up repeating the \emph{same} local conformance lookup.
 
-\section{The Halting Problem}\label{tag systems}
+\section{The Halting Problem}\label{halting problem}
 
 In the future, the compiler should detect non-terminating type substitution and diagnose the problem, instead of crashing. Two approaches spring to mind:
 \begin{enumerate}
@@ -962,12 +964,12 @@ In the future, the compiler should detect non-terminating type substitution and 
 \item We could try to detect such behavior ahead of time, by carefully analyzing all substitution maps and conformances in the program, and rejecting those that encode non-terminating computation.
 \end{enumerate}
 
-It turns out that we cannot hope to do better than (1) above in general. Before we can understand why, we first recall some computability theory. The interested reader can refer to~\cite{cutland} for details.
+It turns out that we cannot hope to do better than (1) above in general. Before we can understand why, we first recall some computability theory. A classic text for the below is~\cite{cutland}, while~\cite{maccormick2018can} has a gentler introduction.
 
 \paragraph{Computable numbers.}
 In 1937, \index{Alan Turing}Alan Turing set out to formalize what is meant by a \index{computable number}``computable number,'' in the sense that $1/3$, $(1+\sqrt{5})/2$, and $\pi := 3.14159\ldots$ are computable \cite{turing}. If we start from the observation that every integer is ``inherently'' computable by virtue of being representable by a finite sequence of binary digits, then it remains to define the computability of real numbers in the interval $(0,1)$. The binary representation of such a number consists of the radix point, followed by an infinite sequence of ``0''~and~``1'' digits; if we can write down an \emph{effective procedure} for generating this sequence of digits to any degree of precision, the number is computable.
 
-To describe such an effective procedure, Turing introduced what we now call the  \index{Turing machine}\emph{Turing machine} formalism. The precise definition can be found in the literature, but for our purposes, a Turing machine is the following:
+To describe such an \IndexDefinition{effective procedure}effective procedure, Turing introduced what we now call the  \index{Turing machine}\emph{Turing machine} formalism. The precise definition can be found in the literature, but for our purposes, a Turing machine is the following:
 \begin{enumerate}
 \item The fixed \emph{machine description} consists of a finite set of \emph{symbols} (``0'' and ``1'' will do), a finite set of \emph{states} one of which is the \emph{initial state}, and a table mapping (state, symbol) keys to (state, symbol, direction) values.
 
@@ -1312,7 +1314,7 @@ The remaining identities are similar.
 \end{proof}
 
 \begin{example}
-To append ``$c$'' at the end of ``$ab$'', we compose on the \emph{left} with $\SigmaC$; notice how it trades places with each neighbour until it reaches $\SigmaEnd$, at which point it morphs into $\SigmaCC$:
+To append ``$c$'' at the end of ``$ab$'', we compose on the \emph{left} with $\SigmaC$; notice how it trades places with each neighbor until it reaches $\SigmaEnd$, at which point it morphs into $\SigmaCC$:
 \begin{gather*}
 \SigmaC\otimes\SigmaAA\otimes\SigmaBB\otimes\SigmaEnd\\
 \qquad {} = \SigmaAA\otimes\SigmaC\otimes\SigmaBB\otimes\SigmaEnd\\
@@ -1385,17 +1387,17 @@ A similar calculation establishes the rest.
 \end{proof}
 
 \begin{example}
-The following program calculates the Collatz sequence for $3$ at compile time. It traps at run time, but that's irrelevant for our purposes:
+The following program calculates the Collatz sequence for $3$ at compile time. (The \texttt{fatalError()} call traps at run time, but that's irrelevant here.)
 \begin{Verbatim}
 func collatz<T: Tag>(_: T) -> T.Next {
   fatalError()
 }
 
-collatz(AA<AA<AA<End>>>())  // here
+let x = collatz(AA<AA<AA<End>>>())  // what is the type of `x'?
 \end{Verbatim}
-To get the substituted return type for the call to \texttt{collatz()}, we apply the substitution map $\SigmaAA\otimes\SigmaAA\otimes\SigmaAA\otimes\SigmaEnd$ to the dependent member type \texttt{$\uptau$.Next}, which is just \texttt{Halt}, because the Collatz sequence for 3 reaches 1.
+To get the substituted return type for the call expression, we apply the substitution map $\SigmaAA\otimes\SigmaAA\otimes\SigmaAA\otimes\SigmaEnd$ to the original return type \texttt{$\uptau$.Next}. The substituted type will happen to be \texttt{Halt}, because the Collatz sequence for 3 reaches 1.
 
-To save space, we're just going to consider what happens when the substitution map is $\SigmaAA \otimes \SigmaAA \otimes \SigmaEnd$, which evaluates the Collatz sequence for $2$. We make use of the above lemmas. The parentheses indicate the next sub-expression to reduce:
+For a worked example, we instead consider what happens when the substitution map is $\SigmaAA \otimes \SigmaAA \otimes \SigmaEnd$, which just evaluates the Collatz sequence for $2$. We make use of the previous lemmas. Each pair of parentheses indicates the next reduction step:
 \begin{gather*}
 \left(\TNext\otimes\SigmaAA\right)\otimes\SigmaAA\otimes\SigmaEnd \tag{\LemmaRef{tag next lemma}}\\
 \qquad {} = \TNext \otimes \SigmaC \otimes \SigmaB \otimes \left(\SigmaDel \otimes \SigmaAA\right)\otimes\SigmaEnd \tag{\LemmaRef{tag del lemma}}\\
@@ -1409,21 +1411,22 @@ To save space, we're just going to consider what happens when the substitution m
 \qquad {} = \TNext \otimes \SigmaC \otimes \SigmaB \otimes \left( \SigmaDel \otimes \SigmaEnd\right) \tag{\LemmaRef{tag halt lemma}}\\
 \qquad {} = \TNext \otimes \SigmaC \otimes \left(\SigmaB \otimes \SigmaHalt\right) \tag{\LemmaRef{tag halt abc lemma}}\\
 \qquad {} = \TNext \otimes \left(\SigmaC \otimes \SigmaHalt\right) \tag{\LemmaRef{tag halt abc lemma}}\\
-\qquad {} = \TNext \otimes \SigmaHalt \tag{\LemmaRef{tag next lemma}}\\
+\qquad {} = \left(\TNext \otimes \SigmaHalt\right) \tag{\LemmaRef{tag next lemma}}\\
 \qquad {} = \Halt
 \end{gather*}
 \end{example}
-The Collatz sequence for 2 is just 2 followed by 1, so clearly, our encoding is not very efficient; it takes a great deal of work just to compute $2\div 2 = 1$! Evaluating the Collatz tag system with $n=19$ takes approximately $1/10$th of a second on the author's machine, while attempting $n=27$ traps with a stack overflow, because the intermediate strings are too long. Practical concerns aside, it should be clear that our scheme can encode any tag system. We can add new symbols, change the deletion number and production rules as needed, and specify an arbitrary input string. Without a doubt:
+The Collatz sequence for 2 is just 2 followed by 1, so clearly, our encoding is not very efficient; it takes a great deal of work just to compute $2\div 2 = 1$! Evaluating the Collatz tag system with $n=19$ takes approximately $1/10$th of a second on the author's machine, while attempting $n=27$ traps with a stack overflow, because the intermediate strings are too long. Practical concerns aside, it should be clear that our scheme can encode any tag system. We can add new symbols, change the deletion number and production rules as needed, and kick it off with an arbitrary input string. Without a doubt:
 
 \begin{theorem}
 Swift type substitution is Turing-complete.
 \end{theorem}
 
 \paragraph{Further discussion.}
-In \SecRef{conditional conformance}, we looked at an example of a non-terminating conditional conformance check in Swift, and cited a similar example in \index{Rust}Rust. Later, \SecRef{word problem} will show that Swift reduced type equality is also undecidable in the general case, but we will provide a termination guarantee by restricting the problem.
-Another source of Turing-completeness in type checking is described in a post to the Swift forums \cite{brainfuck}, where it is shown that an interpreter for the ``Brainfuck'' programming language can be encoded by using the \emph{key path member lookup} feature \cite{se0252}.
+In \SecRef{sec:conditional conformances}, we looked at an example of a non-terminating conditional conformance check in Swift, and cited a similar example in \index{Rust}Rust. In fact, the construction in this section can be tweaked slightly to encode the tag system in terms of conditional conformances instead, so Swift conditional conformance checking is again Turing-complete, beyond simply encoding infinite loops. Looking ahead, \SecRef{word problem} will show that Swift reduced type equality is also undecidable in the general case, but we will get a termination guarantee by restricting the problem.
 
-Countless other examples of undecidable type checking problems are described in the literature. We will cite just two more. The Turing-completeness of \index{Java}Java generics is shown in \cite{java_undecidable}, and of \index{TypeScript}TypeScript in \cite{tscollatz}; the latter example also encodes the Collatz sequence, but in a completely different manner than we did in this section. For further discussion of the Collatz conjecture, see \cite{collatzbook} and \cite{wolframtag}.
+A contributor to the Swift forums discovered another Turing machine in the Swift type system \cite{brainfuck}, by constructing an interpreter for the ``Brainfuck'' programming language in terms of the \emph{key path member lookup} feature \cite{se0252}. Countless other examples of undecidable type checking problems are described in the literature. For example, \index{Java}Java generics are known to be Turing-complete \cite{java_wildcards,java_undecidable}.
+
+Finally, an encoding of the Collatz sequence in the \index{TypeScript}TypeScript language is described in \cite{tscollatz}. For further discussion of the Collatz conjecture, see \cite{collatzbook} and \cite{wolframtag}.
 
 \section{Source Code Reference}
 
@@ -1445,7 +1448,7 @@ A wrapper around \verb|ArrayRef<ConformancePath::Entry>| which represents a conf
 
 \IndexSource{local conformance lookup}
 \apiref{SubstitutionMap}{class}
-The \verb|lookupConformance()| method implements \AlgRef{local conformance lookup algorithm} for performing a local conformance lookup. For other methods, see \SecRef{substmapsourcecoderef}.
+The \verb|lookupConformance()| method implements \AlgRef{local conformance lookup algorithm} for performing a local conformance lookup. For other methods, see \SecRef{src:substitution maps}.
 
 \subsection*{Finding Conformance Paths}
 
@@ -1455,7 +1458,7 @@ Key source files:
 \end{itemize}
 
 \apiref{GenericSignatureImpl}{class}
-The \texttt{getConformancePath()} method returns the reduced conformance path for a given type parameter and protocol declaration. For other methods, see \SecRef{genericsigsourceref}.
+The \texttt{getConformancePath()} method returns the reduced conformance path for a given type parameter and protocol declaration. For other methods, see \SecRef{src:generic signatures}.
 
 \apiref{rewriting::RequirementMachine}{class}
 The \texttt{getConformancePath()} method on \texttt{GenericSignature} calls the method with the same name on the \texttt{RequirementMachine} class. The latter implements \AlgRef{find conformance path algorithm}. The \texttt{RequirementMachine} class has a pair of instance variables to store the algorithm's persistent state:
@@ -1463,6 +1466,6 @@ The \texttt{getConformancePath()} method on \texttt{GenericSignature} calls the 
 \item \texttt{ConformancePaths} is the table of known conformance paths.
 \item \texttt{CurrentConformancePaths} is the buffer of conformance paths at the currently enumerated length, which we denoted by~$B$.
 \end{itemize}
-\AlgRef{find conformance path algorithm} traffics in reduced type parameters, while the actual implementation deals with instances of \verb|Term|. A term is the internal Requirement Machine representation of a type parameter, as we will learn in \ChapRef{symbols terms rules}. This avoids round-trip conversions between \verb|Term| and \verb|Type| when computing reduced types, but does not fundamentally alter the algorithm.
+\AlgRef{find conformance path algorithm} traffics in reduced type parameters, while the actual implementation deals with instances of \verb|Term|. A term is the internal Requirement Machine representation of a type parameter, as we will learn in \ChapRef{chap:symbols terms rules}. This avoids round-trip conversions between \verb|Term| and \verb|Type| when computing reduced types, but does not fundamentally alter the algorithm.
 
 \end{document}

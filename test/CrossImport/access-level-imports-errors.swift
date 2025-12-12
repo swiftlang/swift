@@ -8,7 +8,7 @@
 // RUN: %target-swift-emit-module-interface(%t/lib/swift/SomeUnrelatedModule.swiftinterface) %t/SomeUnrelatedModule.swift -module-name SomeUnrelatedModule
 
 //--- BothPublic.swift
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/BothPublic.swift -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary -verify
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/BothPublic.swift -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary -verify -verify-ignore-unrelated
 
 public import DeclaringLibrary
 public import BystandingLibrary
@@ -18,7 +18,7 @@ public func fn(_: OverlayLibraryTy) {}
 
 
 //--- BothHidden.swift
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/BothHidden.swift -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary -verify
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/BothHidden.swift -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary -verify -verify-ignore-unrelated
 
 internal import DeclaringLibrary
 internal import BystandingLibrary
@@ -29,7 +29,7 @@ public func fn(_: OverlayLibraryTy) {}
 
 
 //--- FirstHidden.swift
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/FirstHidden.swift -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary -verify
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/FirstHidden.swift -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary -verify -verify-ignore-unrelated
 
 internal import DeclaringLibrary
 public import BystandingLibrary
@@ -40,7 +40,7 @@ public func fn(_: OverlayLibraryTy) {}
 
 
 //--- SecondHidden.swift
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/SecondHidden.swift -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary -verify
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/SecondHidden.swift -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary -verify -verify-ignore-unrelated
 
 public import DeclaringLibrary
 internal import BystandingLibrary
@@ -51,7 +51,7 @@ public func fn(_: OverlayLibraryTy) {}
 
 
 //--- PrivateVsInternal.swift
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/PrivateVsInternal.swift -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary -verify
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/PrivateVsInternal.swift -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary -verify -verify-ignore-unrelated
 
 private import DeclaringLibrary
 internal import BystandingLibrary
@@ -62,7 +62,7 @@ internal func fn(_: OverlayLibraryTy) {}
 
 
 //--- InternalVsPrivate.swift
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/InternalVsPrivate.swift -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary -verify
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/InternalVsPrivate.swift -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary -verify -verify-ignore-unrelated
 
 internal import DeclaringLibrary
 private import BystandingLibrary
@@ -73,7 +73,7 @@ internal func fn(_: OverlayLibraryTy) {}
 
 
 //--- UnusedOverlay.swift
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/UnusedOverlay.swift -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary -verify
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %t/UnusedOverlay.swift -enable-cross-import-overlays -I %t/lib/swift -module-name ClientLibrary -verify -verify-ignore-unrelated
 
 public import DeclaringLibrary // expected-warning {{public import of 'DeclaringLibrary' was not used in public declarations or inlinable code}}
 public import BystandingLibrary // expected-warning {{public import of 'BystandingLibrary' was not used in public declarations or inlinable code}}

@@ -56,7 +56,7 @@ public struct MutableSpan<Element: ~Copyable>
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension MutableSpan: @unchecked Sendable where Element: Sendable {}
+extension MutableSpan: @unchecked Sendable where Element: Sendable & ~Copyable {}
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
@@ -89,6 +89,7 @@ extension MutableSpan where Element: ~Copyable {
 
   @unsafe
   @_alwaysEmitIntoClient
+  @_transparent
   @lifetime(borrow start)
   public init(
     _unsafeStart start: UnsafeMutablePointer<Element>,
@@ -236,6 +237,7 @@ extension MutableSpan where Element: ~Copyable {
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
+  @_semantics("fixed_storage.get_count")
   public var count: Int { _assumeNonNegative(_count) }
 
   @_alwaysEmitIntoClient
@@ -279,8 +281,14 @@ extension MutableSpan where Element: BitwiseCopyable {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableSpan where Element: ~Copyable {
-
-  /// Accesses the element at the specified position in the `Span`.
+  // SILOptimizer looks for fixed_storage.check_index semantics for bounds check optimizations.
+  @_semantics("fixed_storage.check_index")
+  @inline(__always)
+  @_alwaysEmitIntoClient
+  internal func _checkIndex(_ position: Index) {
+    _precondition(indices.contains(position), "index out of bounds")
+  }
+  /// Accesses the element at the specified position in the `MutableSpan`.
   ///
   /// - Parameter position: The offset of the element to access. `position`
   ///     must be greater or equal to zero, and less than `count`.
@@ -288,18 +296,20 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
+    @_transparent
     unsafeAddress {
-      _precondition(indices.contains(position), "index out of bounds")
+      _checkIndex(position)
       return unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: position))
     }
+    @_transparent
     @lifetime(self: copy self)
     unsafeMutableAddress {
-      _precondition(indices.contains(position), "index out of bounds")
+      _checkIndex(position)
        return unsafe _unsafeAddressOfElement(unchecked: position)
     }
   }
 
-  /// Accesses the element at the specified position in the `Span`.
+  /// Accesses the element at the specified position in the `MutableSpan`.
   ///
   /// This subscript does not validate `position`; this is an unsafe operation.
   ///
@@ -310,9 +320,11 @@ extension MutableSpan where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
+    @_transparent
     unsafeAddress {
       unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: position))
     }
+    @_transparent
     @lifetime(self: copy self)
     unsafeMutableAddress {
       unsafe _unsafeAddressOfElement(unchecked: position)

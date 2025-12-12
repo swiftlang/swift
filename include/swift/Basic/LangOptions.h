@@ -188,6 +188,9 @@ namespace swift {
     /// Swift runtime version to compile for.
     version::Version RuntimeVersion = version::Version::getCurrentLanguageVersion();
 
+    /// The minimum Swift runtime version that the progam can be deployed to.
+    version::Version MinSwiftRuntimeVersion;
+
     /// PackageDescription version to compile for.
     version::Version PackageDescriptionVersion;
 
@@ -242,9 +245,6 @@ namespace swift {
     // Availability macros definitions to be expanded at parsing.
     SmallVector<std::string, 4> AvailabilityMacros;
 
-    /// Require public declarations to declare that they are Sendable (or not).
-    bool RequireExplicitSendable = false;
-
     /// Detect and automatically import modules' cross-import overlays.
     bool EnableCrossImportOverlays = false;
 
@@ -269,9 +269,6 @@ namespace swift {
 
     /// Emit a remark when indexing a system module.
     bool EnableIndexingSystemModuleRemarks = false;
-
-    /// Emit a remark on early exit in explicit interface build
-    bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
 
     ///
     /// Support for alternate usage modes
@@ -335,10 +332,6 @@ namespace swift {
     /// language mode of clang on a per-header or even per-module basis. Also
     /// disabled because it is not complete.
     bool EnableCXXInterop = false;
-
-    /// The C++ interoperability source compatibility version. Defaults
-    /// to the Swift language version.
-    version::Version cxxInteropCompatVersion;
 
     /// What version of C++ interoperability a textual interface was originally
     /// generated with (if at all).
@@ -455,6 +448,9 @@ namespace swift {
     /// unsafe to read.
     bool EnableDeserializationSafety =
       ::getenv("SWIFT_ENABLE_DESERIALIZATION_SAFETY");
+
+    /// Disable injecting deserializes module paths into the explict module map.
+    bool DisableDeserializationOfExplicitPaths = false;
 
     /// Attempt to recover for imported modules with broken modularization
     /// in an unsafe way. Currently applies only to xrefs where the target
@@ -648,6 +644,9 @@ namespace swift {
     /// Enables dumping macro expansions.
     bool DumpMacroExpansions = false;
 
+    /// Emits a remark with the content of each macro expansion line, for matching with -verify
+    bool RemarkMacroExpansions = false;
+
     /// Enables dumping imports for each SourceFile.
     bool DumpSourceFileImports = false;
 
@@ -678,9 +677,6 @@ namespace swift {
 #else
     bool RestrictNonProductionExperimentalFeatures = false;
 #endif
-
-    /// Set to true if we support AArch64TBI.
-    bool HasAArch64TBI = false;
 
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
@@ -748,16 +744,9 @@ namespace swift {
     ///
     /// This is usually the check you want; for example, when introducing
     /// a new language feature which is only visible in Swift 5, you would
-    /// check for isSwiftVersionAtLeast(5).
-    bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
+    /// check for isLanguageModeAtLeast(5).
+    bool isLanguageModeAtLeast(unsigned major, unsigned minor = 0) const {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
-    }
-
-    /// Whether the C++ interoperability compatibility version is at least
-    /// 'major'.
-    bool isCxxInteropCompatVersionAtLeast(unsigned major,
-                                          unsigned minor = 0) const {
-      return cxxInteropCompatVersion.isVersionAtLeast(major, minor);
     }
 
     /// Sets the "_hasAtomicBitWidth" conditional.
@@ -1018,7 +1007,7 @@ namespace swift {
     bool SolverDisableSplitter = false;
 
     /// Enable the experimental "prepared overloads" optimization.
-    bool SolverEnablePreparedOverloads = false;
+    bool SolverEnablePreparedOverloads = true;
   };
 
   /// Options for controlling the behavior of the Clang importer.
@@ -1147,6 +1136,10 @@ namespace swift {
     /// in versioned attributes, where the importer must select the appropriate
     /// ones to apply.
     bool LoadVersionIndependentAPINotes = false;
+
+    /// Whether the importer should skip SafeInteropWrappers, even though the
+    /// feature is enabled.
+    bool DisableSafeInteropWrappers = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

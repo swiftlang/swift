@@ -357,7 +357,8 @@ static bool isOptimizableApplySite(ApplySite Apply) {
     return false;
 
   // Do not optimize always_inlinable functions.
-  if (callee->getInlineStrategy() == Inline_t::AlwaysInline)
+  if (callee->getInlineStrategy() == Inline_t::HeuristicAlwaysInline ||
+      callee->getInlineStrategy() == Inline_t::AlwaysInline)
     return false;
 
   if (callee->getLinkage() != SILLinkage::Private)

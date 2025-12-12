@@ -62,7 +62,6 @@ import SubE
 // CHECK-SAME: Bridging.h
 
 // CHECK-NEXT: "sourceFiles":
-// CHECK-NEXT: ChainedBridgingHeader.h
 // CHECK-NEXT: Bridging.h
 // CHECK-NEXT: BridgingOther.h
 

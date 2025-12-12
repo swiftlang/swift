@@ -430,6 +430,16 @@ func convertVoidPayloads() {
   convertPayloads(as: Void.self)
 }
 
+// CHECK-LABEL:   sil{{.*}} [ossa] @{{.*}}convertPayloads{{.*}} :
+// CHECK:           ignored_use {{.*}}
+// CHECK-NEXT:      unreachable
+//
+// CHECK:           bb1:
+// CHECK-NOT:         Preds
+// CHECK:             [[BOGUS_ALLOC:%.*]] = alloc_stack $(repeat each Value)
+// CHECK-NEXT:        copy_addr [take] undef to [init] [[BOGUS_ALLOC]]
+//
+// CHECK:             = tuple_pack_element_addr {{.*}} of [[BOGUS_ALLOC]]
 func convertPayloads<each Value>(as valueTypes: repeat (each Value).Type) -> (repeat each Value) {
   fatalError()
 }

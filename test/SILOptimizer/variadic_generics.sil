@@ -3,7 +3,7 @@
 import Swift
 import Builtin
 
-sil [ossa] [always_inline] @scalar_pack_index : $<each T> () -> () {
+sil [ossa] [heuristic_always_inline] @scalar_pack_index : $<each T> () -> () {
 bb0:
   %0 = scalar_pack_index 0 of $Pack{Int, repeat each T}
   %1 = scalar_pack_index 1 of $Pack{repeat each T, Int}
@@ -33,7 +33,7 @@ bb0:
   return %ret : $()
 }
 
-sil [ossa] [always_inline] @pack_pack_index : $<each T> (Builtin.Word) -> () {
+sil [ossa] [heuristic_always_inline] @pack_pack_index : $<each T> (Builtin.Word) -> () {
 bb0(%i: $Builtin.Word):
   %index = dynamic_pack_index %i of $Pack{repeat each T}
   %0 = pack_pack_index 1, %index of $Pack{Int, repeat each T}
@@ -69,7 +69,7 @@ bb0(%i: $Builtin.Word):
   return %ret : $()
 }
 
-sil [ossa] [always_inline] @tuple_pack_element : $<each T> (Builtin.Word, @inout (repeat each T)) -> () {
+sil [ossa] [heuristic_always_inline] @tuple_pack_element : $<each T> (Builtin.Word, @inout (repeat each T)) -> () {
 bb0(%i: $Builtin.Word, %tuple : $*(repeat each T)):
   %index = dynamic_pack_index %i of $Pack{repeat each T}
   %tok = open_pack_element %index of <each Z> at <Pack{repeat each T}>, shape $Z, uuid "01234567-89AB-CDEF-0123-000000000000"

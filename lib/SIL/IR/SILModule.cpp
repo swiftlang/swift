@@ -112,7 +112,6 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
     : Stage(SILStage::Raw), loweredAddresses(!Options.EnableSILOpaqueValues),
       indexTrieRoot(new IndexTrieNode()), Options(Options),
       irgenOptions(irgenOptions), serialized(false),
-      regDeserializationNotificationHandlerForNonTransparentFuncOME(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
       hasAccessMarkerHandler(false),
       prespecializedFunctionDeclsImported(false), SerializeSILAction(),
@@ -478,6 +477,13 @@ void SILModule::eraseFunction(SILFunction *F) {
   FunctionTable.erase(F->getName());
   F->setName(zombieName);
 
+  // Remove from the asmname table.
+  if (!F->asmName().empty()) {
+    auto known = FunctionByAsmNameTable.find(F->asmName());
+    if (known != FunctionByAsmNameTable.end() && known->second == F)
+      FunctionByAsmNameTable.erase(known);
+  }
+
   // The function is dead, but we need it later (at IRGen) for debug info
   // or vtable stub generation. So we move it into the zombie list.
   getFunctionList().remove(F);
@@ -502,7 +508,41 @@ void SILModule::invalidateFunctionInSILCache(SILFunction *F) {
 void SILModule::eraseGlobalVariable(SILGlobalVariable *gv) {
   getSILLoader()->invalidateGlobalVariable(gv);
   GlobalVariableMap.erase(gv->getName());
+
+  if (gv->asmName().empty()) {
+    auto known = GlobalVariableByAsmNameMap.find(gv->asmName());
+    if (known != GlobalVariableByAsmNameMap.end() && known->second == gv)
+      GlobalVariableByAsmNameMap.erase(known);
+  }
+
   getSILGlobalList().erase(gv);
+}
+
+void SILModule::eraseDifferentiabilityWitness(SILDifferentiabilityWitness *dw) {
+  getSILLoader()->invalidateDifferentiabilityWitness(dw);
+
+  Mangle::ASTMangler mangler(getASTContext());
+  auto originalFunction = dw->getOriginalFunction()->getName();
+  auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
+    originalFunction, dw->getKind(), dw->getConfig());
+  DifferentiabilityWitnessMap.erase(mangledKey);
+  llvm::erase(DifferentiabilityWitnessesByFunction[originalFunction], dw);
+
+  getDifferentiabilityWitnessList().erase(dw);
+}
+
+void SILModule::eraseAllDifferentiabilityWitnesses(SILFunction *f) {
+  Mangle::ASTMangler mangler(getASTContext());
+
+  for (auto *dw : DifferentiabilityWitnessesByFunction.at(f->getName())) {
+    getSILLoader()->invalidateDifferentiabilityWitness(dw);
+    auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
+      f->getName(), dw->getKind(), dw->getConfig());
+    DifferentiabilityWitnessMap.erase(mangledKey);
+    getDifferentiabilityWitnessList().erase(dw);
+  }
+
+  DifferentiabilityWitnessesByFunction.erase(f->getName());
 }
 
 SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
@@ -805,7 +845,10 @@ unsigned SILModule::getFieldIndex(NominalTypeDecl *decl, VarDecl *field) {
   if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
     for (auto *superDecl = classDecl->getSuperclassDecl(); superDecl != nullptr;
          superDecl = superDecl->getSuperclassDecl()) {
-      index += superDecl->getStoredProperties().size();
+      if (!superDecl->isResilient(getSwiftModule(),
+                                  ResilienceExpansion::Maximal)) {
+        index += superDecl->getStoredProperties().size();
+      }
     }
   }
   for (VarDecl *property : decl->getStoredProperties()) {
@@ -889,8 +932,8 @@ void SILModule::notifyMovedInstruction(SILInstruction *inst,
 bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
   const auto &IntrinsicInfo = getIntrinsicInfo(Name);
   if (IntrinsicInfo.ID != llvm::Intrinsic::not_intrinsic) {
-    return IntrinsicInfo.getOrCreateAttributes(getASTContext())
-        .hasFnAttr(llvm::Attribute::NoReturn);
+    return IntrinsicInfo.getOrCreateFnAttributes(getASTContext())
+        .hasAttribute(llvm::Attribute::NoReturn);
   }
   const auto &BuiltinInfo = getBuiltinInfo(Name);
   switch (BuiltinInfo.ID) {
@@ -1036,6 +1079,10 @@ void SILModule::moveAfter(SILModule::iterator moveAfter, SILFunction *fn) {
 
   getFunctionList().remove(fn->getIterator());
   getFunctionList().insertAfter(moveAfter, fn);
+}
+
+TypeExpansionContext SILModule::getMaximalTypeExpansionContext() const {
+  return TypeExpansionContext::maximal(getAssociatedContext(), isWholeModule());
 }
 
 SILProperty *

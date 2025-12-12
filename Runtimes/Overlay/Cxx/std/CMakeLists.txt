@@ -25,6 +25,7 @@ target_compile_options(swiftCxxStdlib PRIVATE
 target_link_libraries(swiftCxxStdlib PRIVATE
   $<$<BOOL:${HAVE___GLIBCXX__}>:libstdcxx>
   $<$<NOT:$<PLATFORM_ID:Darwin>>:cxxshim>
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>
   swiftCxx
   swiftCore
   swift_Builtin_float
@@ -34,7 +35,7 @@ target_link_libraries(swiftCxxStdlib PRIVATE
 install(FILES std.apinotes
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift/apinotes)
 install(TARGETS swiftCxxStdlib
-  EXPORT SwiftOverlayTargets
+  EXPORT SwiftCxxOverlayTargets
   ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

@@ -378,6 +378,7 @@ struct TermArgSources {
     switch (cast<TermInst>(inst)->getTermKind()) {
     case TermKind::UnreachableInst:
     case TermKind::ReturnInst:
+    case TermKind::ReturnBorrowInst:
     case TermKind::ThrowInst:
     case TermKind::ThrowAddrInst:
     case TermKind::YieldInst:
@@ -537,34 +538,23 @@ static bool isAsyncLetBeginPartialApply(PartialApplyInst *pai) {
 
 /// Returns true if this is a function argument that is able to be sent in the
 /// body of our function.
+///
+/// Needs to stay in sync with SILIsolationInfo::get(SILArgument *).
 static bool canFunctionArgumentBeSent(SILFunctionArgument *arg) {
   // Indirect out parameters can never be sent.
   if (arg->isIndirectResult() || arg->isIndirectErrorResult())
     return false;
 
-  // If we have a function argument that is closure captured by a Sendable
-  // closure, allow for the argument to be sent.
-  //
-  // DISCUSSION: The reason that we do this is that in the case of us
-  // having an actual Sendable closure there are two cases we can see:
-  //
-  // 1. If we have an actual Sendable closure, the AST will emit an
-  // earlier error saying that we are capturing a non-Sendable value in a
-  // Sendable closure. So we want to squelch the error that we would emit
-  // otherwise. This only occurs when we are not in swift-6 mode since in
-  // swift-6 mode we will error on the earlier error... but in the case of
-  // us not being in swift 6 mode lets not emit extra errors.
-  //
-  // 2. If we have an async-let based Sendable closure, we want to allow
-  // for the argument to be sent in the async let's statement and
-  // not emit an error.
-  //
-  // TODO: Once the async let refactoring change this will no longer be needed
-  // since closure captures will have sending parameters and be
-  // non-Sendable.
-  if (arg->isClosureCapture() &&
-      arg->getFunction()->getLoweredFunctionType()->isSendable())
-    return true;
+  // If we have a closure capture...
+  if (arg->isClosureCapture()) {
+    // And that closure capture is from an async let, treat it as sending. This
+    // is because we allow for disconnected values to be sent into async let
+    // closures.
+    if (auto declRef = arg->getFunction()->getDeclRef();
+        declRef && declRef.isAsyncLetClosure) {
+      return true;
+    }
+  }
 
   // Otherwise, we only allow for the argument to be sent if it is explicitly
   // marked as a 'sending' parameter.
@@ -1723,9 +1713,13 @@ struct PartitionOpBuilder {
         PartitionOp::Send(lookupValueID(representative), op));
   }
 
-  void addUndoSend(SILValue representative, SILInstruction *unsendingInst) {
+  void addUndoSend(TrackableValue value, SILInstruction *unsendingInst) {
+    if (value.isSendable())
+      return;
+
+    auto representative = value.getRepresentative().getValue();
     assert(valueHasID(representative) &&
-           "value should already have been encountered");
+           "sent value should already have been encountered");
 
     currentInstPartitionOps->emplace_back(
         PartitionOp::UndoSend(lookupValueID(representative), unsendingInst));
@@ -2430,7 +2424,7 @@ public:
                 }))
           continue;
 
-        builder.addUndoSend(trackedArgValue.getRepresentative().getValue(), ai);
+        builder.addUndoSend(trackedArgValue, ai);
       }
     }
   }
@@ -2567,59 +2561,52 @@ public:
     // gather our non-sending parameters.
     SmallVector<Operand *, 8> nonSendingParameters;
     SmallVector<Operand *, 8> sendingIndirectResults;
-    if (fas.getNumArguments()) {
-      // NOTE: We want to process indirect parameters as if they are
-      // parameters... so we process them in nonSendingParameters.
-      for (auto &op : fas.getOperandsWithoutSelf()) {
-        // If op is the callee operand, skip it.
-        if (fas.isCalleeOperand(op))
+
+    // NOTE: We want to process indirect parameters as if they are
+    // parameters... so we process them in nonSendingParameters.
+    for (auto &op : fas->getAllOperands()) {
+      // If op is the callee operand or type dependent operand, skip it.
+      if (op.isTypeDependent())
+        continue;
+
+      if (fas.isCalleeOperand(op)) {
+        if (auto calleeResult = tryToTrackValue(op.get())) {
+          builder.addRequire(*calleeResult);
+        }
+        continue;
+      }
+
+      // If our parameter is not sending, just add it to the non-sending
+      // parameters array and continue.
+      if (!fas.isSending(op)) {
+        nonSendingParameters.push_back(&op);
+        continue;
+      }
+
+      // Otherwise, first handle indirect result operands.
+      if (fas.isIndirectResultOperand(op)) {
+        sendingIndirectResults.push_back(&op);
+        continue;
+      }
+
+      // Attempt to lookup the value we are passing as sending. We want to
+      // require/send value if it is non-Sendable and require its base if it
+      // is non-Sendable as well.
+      if (auto lookupResult = tryToTrackValue(op.get())) {
+        builder.addRequire(*lookupResult);
+        builder.addSend(lookupResult->value, &op);
+      }
+    }
+
+    SWIFT_DEFER {
+      for (auto &op : fas->getAllOperands()) {
+        if (!fas.isInOutSending(op))
           continue;
-
-        if (fas.isSending(op)) {
-          if (fas.isIndirectResultOperand(op)) {
-            sendingIndirectResults.push_back(&op);
-            continue;
-          }
-
-          // Attempt to lookup the value we are passing as sending. We want to
-          // require/send value if it is non-Sendable and require its base if it
-          // is non-Sendable as well.
-          if (auto lookupResult = tryToTrackValue(op.get())) {
-            builder.addRequire(*lookupResult);
-            builder.addSend(lookupResult->value, &op);
-          }
-        } else {
-          nonSendingParameters.push_back(&op);
+        if (auto lookupResult = tryToTrackValue(op.get())) {
+          builder.addUndoSend(lookupResult->value, op.getUser());
         }
       }
-    }
-
-    // If our self parameter was sending, send it. Otherwise, just
-    // stick it in the non self operand values array and run multiassign on
-    // it.
-    if (fas.hasSelfArgument()) {
-      auto &selfOperand = fas.getSelfArgumentOperand();
-      if (fas.getArgumentParameterInfo(selfOperand)
-              .hasOption(SILParameterInfo::Sending)) {
-        if (auto lookupResult = tryToTrackValue(selfOperand.get())) {
-          builder.addRequire(*lookupResult);
-          builder.addSend(lookupResult->value, &selfOperand);
-        }
-      } else {
-        nonSendingParameters.push_back(&selfOperand);
-      }
-    }
-
-    // Require our callee operand if it is non-Sendable.
-    //
-    // DISCUSSION: Even though we do not include our callee operand in the same
-    // region as our operands/results, we still need to require that it is live
-    // at the point of application. Otherwise, we will not emit errors if the
-    // closure before this function application is already in the same region as
-    // a sent value. In such a case, the function application must error.
-    if (auto calleeResult = tryToTrackValue(fas.getCallee())) {
-      builder.addRequire(*calleeResult);
-    }
+    };
 
     SmallVector<SILValue, 8> applyResults;
     getApplyResults(*fas, applyResults);
@@ -2688,35 +2675,76 @@ public:
 
   /// Handles the semantics for SIL applies that cross isolation.
   ///
-  /// Semantically this causes all arguments of the applysite to be sent.
+  /// Semantically we are attempting to implement the following:
+  ///
+  /// * Step 1: Require all non-sending parameters and then send those
+  ///   parameters. We perform all of the requires first and the sends second
+  ///   since all of the parameters are getting sent to the same isolation
+  ///   domains and become part of the same region in our callee. So in a
+  ///   certain sense, we are performing a require over the entire merge of the
+  ///   parameter regions and then send each constituant part of the region
+  ///   without requiring again so we do not emit use-after-send diagnostics.
+  ///
+  /// * Step 2: Require/Send each of the sending parameters one by one. This
+  ///   includes both 'sending' and 'inout sending' parameters. We purposely
+  ///   interleave the require/send operations to ensure that if one passes a
+  ///   value twice to different 'sending' or 'inout sending' parameters, we
+  ///   will emit an error.
+  ///
+  /// * Step 3: Unsend each of the unsending parameters. Since our caller
+  ///   ensures that 'inout sending' parameters are disconnected on return and
+  ///   are in different regions from all other parameters, we can just simply
+  ///   unsend the parameter so we can use it again later.
   void translateIsolationCrossingSILApply(FullApplySite applySite) {
-    // Require all operands first before we emit a send.
-    for (auto op : applySite.getArguments()) {
-      if (auto lookupResult = tryToTrackValue(op)) {
+    SmallVector<TrackableValue, 8> inoutSendingParams;
+
+    // First go through and require all of our operands that are not 'sending'
+    for (auto &op : applySite.getArgumentOperands()) {
+      if (applySite.isSending(op))
+        continue;
+      if (auto lookupResult = tryToTrackValue(op.get()))
         builder.addRequire(*lookupResult);
-      }
     }
 
-    auto handleSILOperands = [&](MutableArrayRef<Operand> operands) {
-      for (auto &op : operands) {
-        if (auto lookupResult = tryToTrackValue(op.get())) {
-          builder.addSend(lookupResult->value, &op);
-        }
+    // Then go through our operands again and send all of our non-sending
+    // parameters. We do not interleave these sends with our requires since we
+    // are considering these values to be merged into the same region. We could
+    // also merge them in the caller but there is no point in doing so
+    // semantically since the values cannot be used again locally.
+    for (auto &op : applySite.getOperandsWithoutIndirectResults()) {
+      if (applySite.isSending(op))
+        continue;
+      if (auto lookupResult = tryToTrackValue(op.get())) {
+        builder.addSend(lookupResult->value, &op);
       }
     };
 
-    auto handleSILSelf = [&](Operand *self) {
-      if (auto lookupResult = tryToTrackValue(self->get())) {
-        builder.addSend(lookupResult->value, self);
+    // Then go through our 'sending' params and require/send each in sequence.
+    //
+    // We do this interleaved so that if a value is passed to multiple 'sending'
+    // parameters, we emit errors.
+    for (auto &op : applySite.getOperandsWithoutIndirectResults()) {
+      if (!applySite.isSending(op))
+        continue;
+      auto lookupResult = tryToTrackValue(op.get());
+      if (!lookupResult)
+        continue;
+      builder.addRequire(*lookupResult);
+      builder.addSend(lookupResult->value, &op);
+    }
+
+    // Now use a SWIFT_DEFER so that when the function is done executing, we
+    // unsend 'inout sending' params.
+    SWIFT_DEFER {
+      for (auto &op : applySite.getOperandsWithoutIndirectResults()) {
+        if (!applySite.isInOutSending(op))
+          continue;
+        auto lookupResult = tryToTrackValue(op.get());
+        if (!lookupResult)
+          continue;
+        builder.addUndoSend(lookupResult->value, *applySite);
       }
     };
-
-    if (applySite.hasSelfArgument()) {
-      handleSILOperands(applySite.getOperandsWithoutIndirectResultsOrSelf());
-      handleSILSelf(&applySite.getSelfArgumentOperand());
-    } else {
-      handleSILOperands(applySite.getOperandsWithoutIndirectResults());
-    }
 
     // Create a new assign fresh for each one of our values and unless our
     // return value is sending, emit an extra error bit on the results that are
@@ -2954,7 +2982,7 @@ public:
   /// dest to src. If the \p dest could be aliased, then we must instead treat
   /// them as merges, to ensure any aliases of \p dest are also updated.
   void translateSILStore(Operand *dest, Operand *src,
-                          SILIsolationInfo resultIsolationInfoOverride = {}) {
+                         SILIsolationInfo resultIsolationInfoOverride = {}) {
     SILValue destValue = dest->get();
 
     if (auto destResult = tryToTrackValue(destValue)) {
@@ -2982,7 +3010,14 @@ public:
                                resultIsolationInfoOverride);
     }
 
-    // Stores to storage of non-Sendable type can be ignored.
+    // If we reached this point, our destination is something that is Sendable
+    // and is not an address that comes from a non-Sendable base... so we can
+    // ignore the store part. But we still need tosee if our src (which also
+    // must be Sendable) comes from a non-Sendable base. In such a case, we need
+    // to require that.
+    if (auto srcResult = tryToTrackValue(src->get())) {
+      builder.addRequire(*srcResult);
+    }
   }
 
   void translateSILTupleAddrConstructor(TupleAddrConstructorInst *inst) {
@@ -3400,6 +3435,7 @@ CONSTANT_TRANSLATION(UncheckedAddrCastInst, Assign)
 CONSTANT_TRANSLATION(UncheckedOwnershipConversionInst, Assign)
 CONSTANT_TRANSLATION(IndexRawPointerInst, Assign)
 CONSTANT_TRANSLATION(MarkDependenceAddrInst, Assign)
+CONSTANT_TRANSLATION(ImplicitActorToOpaqueIsolationCastInst, Assign)
 
 CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Assign)
@@ -3443,6 +3479,7 @@ CONSTANT_TRANSLATION(MoveOnlyWrapperToCopyableBoxInst, LookThrough)
 CONSTANT_TRANSLATION(MoveOnlyWrapperToCopyableAddrInst, LookThrough)
 CONSTANT_TRANSLATION(CopyableToMoveOnlyWrapperAddrInst, LookThrough)
 CONSTANT_TRANSLATION(MarkUninitializedInst, LookThrough)
+CONSTANT_TRANSLATION(UncheckedOwnershipInst, LookThrough)
 // We identify destructured results with their operand's region.
 CONSTANT_TRANSLATION(DestructureTupleInst, LookThrough)
 CONSTANT_TRANSLATION(DestructureStructInst, LookThrough)
@@ -3846,6 +3883,15 @@ PartitionOpTranslator::visitLoadBorrowInst(LoadBorrowInst *lbi) {
 }
 
 TranslationSemantics PartitionOpTranslator::visitReturnInst(ReturnInst *ri) {
+  addEndOfFunctionChecksForInOutSendingParameters(ri);
+  if (ri->getFunction()->getLoweredFunctionType()->hasSendingResult()) {
+    return TranslationSemantics::SendingNoResult;
+  }
+  return TranslationSemantics::Require;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitReturnBorrowInst(ReturnBorrowInst *ri) {
   addEndOfFunctionChecksForInOutSendingParameters(ri);
   if (ri->getFunction()->getLoweredFunctionType()->hasSendingResult()) {
     return TranslationSemantics::SendingNoResult;

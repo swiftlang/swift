@@ -12,12 +12,12 @@ func bar(_ ptr: Swift.UnsafePointer<Swift.CInt>, _ len: Swift.Int) -> () {
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func foo(_ ptr: Swift.UnsafeBufferPointer<Swift.Int>) -> Swift.Void {
-// CHECK-NEXT:     let len = unsafe ptr.count
+// CHECK-NEXT:     let len = ptr.count
 // CHECK-NEXT:     return unsafe foo(ptr.baseAddress!, len)
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func bar(_ ptr: Swift.UnsafeBufferPointer<Swift.CInt>) -> () {
-// CHECK-NEXT:     let len = unsafe ptr.count
+// CHECK-NEXT:     let len = ptr.count
 // CHECK-NEXT:     return unsafe bar(ptr.baseAddress!, len)
 // CHECK-NEXT: }

@@ -52,13 +52,22 @@ private:
   /// The SIL module that the global variable belongs to.
   SILModule &Module;
 
-  /// The module that defines this global variable. This member should only be
-  /// when a global variable is deserialized to be emitted into another module.
-  ModuleDecl *ParentModule = nullptr;
+  /// Either the declaration context of the global variable or the parent
+  /// module in which the global variable resides.
+  ///
+  /// The latter is only used for a deserialized global variable.
+  llvm::PointerUnion<DeclContext *, ModuleDecl *> DeclCtxOrParentModule;
 
   /// The mangled name of the variable, which will be propagated to the
   /// binary.  A pointer into the module's lookup table.
   StringRef Name;
+
+  /// The name that this variable should have when lowered to LLVM IR. If empty,
+  /// the mangled name of the variable will be used instead.
+  StringRef AsmName;
+
+  /// Name of a section if @section attribute was used, otherwise empty.
+  StringRef Section;
 
   /// The lowered type of the variable.
   SILType LoweredType;
@@ -79,7 +88,7 @@ private:
   /// once (either in its declaration, or once later), making it immutable.
   unsigned IsLet : 1;
 
-  /// Whether this declaration was marked `@_used`, meaning that it should be
+  /// Whether this declaration was marked `@used`, meaning that it should be
   /// added to the llvm.used list.
   unsigned IsUsed : 1;
 
@@ -124,13 +133,21 @@ public:
 
   SILModule &getModule() const { return Module; }
 
-  /// Returns the module that defines this function.
+  /// Returns the module that defines this global variable.
   ModuleDecl *getParentModule() const;
 
-  /// Sets \c ParentModule as fallback if \c DeclCtxt is not available to
-  /// provide the parent module.
+  /// Get the declaration context of this global variable, if it has one.
+  DeclContext *getDeclContext() const;
+
+  /// Sets the parent module for a deserialized global variable.
   void setParentModule(ModuleDecl *module) {
-    ParentModule = module;
+    DeclCtxOrParentModule = module;
+  }
+
+  /// Sets the declaration context for a global variable that's not anchored to
+  /// a declaration.
+  void setDeclContext(DeclContext *declCtx) {
+    DeclCtxOrParentModule = declCtx;
   }
 
   SILType getLoweredType() const { return LoweredType; }
@@ -150,7 +167,15 @@ public:
   }
 
   StringRef getName() const { return Name; }
-  
+
+  /// Return custom assembler name, otherwise empty.
+  StringRef asmName() const { return AsmName; }
+  void setAsmName(StringRef value);
+
+  /// Return custom section name if @section was used, otherwise empty
+  StringRef section() const { return Section; }
+  void setSection(StringRef value) { Section = value; }
+
   void setDeclaration(bool isD) { IsDeclaration = isD; }
 
   /// True if this is a definition of the variable.
@@ -227,19 +252,10 @@ public:
     StaticInitializerBlock.eraseAllInstructions(Module);
   }
 
-  /// Returns true if this global variable has `@_used` attribute.
+  /// Returns true if this global variable has `@used` attribute.
   bool markedAsUsed() const { return IsUsed; }
 
   void setMarkedAsUsed(bool used) { IsUsed = used; }
-
-  /// Returns a SectionAttr if this global variable has `@_section` attribute.
-  SectionAttr *getSectionAttr() const {
-    auto *V = getDecl();
-    if (!V)
-      return nullptr;
-
-    return V->getAttrs().getAttribute<SectionAttr>();
-  }
 
   /// Return whether this variable corresponds to a Clang node.
   bool hasClangNode() const;

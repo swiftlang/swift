@@ -351,6 +351,8 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
 
   // Check if the destroyArray destroys the tail elements of allocRef.
   auto destroyPath = AccessPath::compute(destroyArray->getArguments()[1]);
+  if (!destroyPath.isValid())
+    return false;
   AccessStorage storage = destroyPath.getStorage();
   if (auto *beginDealloc = dyn_cast<BeginDeallocRefInst>(storage.getRoot())) {
     destroyPath = AccessPath(

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown
 
 // Simple structs with all Codable properties whose CodingKeys come from a
 // typealias should get derived conformance to Codable.

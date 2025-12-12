@@ -995,7 +995,7 @@ function(add_swift_host_tool executable)
   endif()
 
   # Opt-out of OpenBSD BTCFI if instructed where it is enforced by default.
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL "OPENBSD" AND SWIFT_HOST_VARIANT_ARCH STREQUAL "aarch64" AND NOT SWIFT_OPENBSD_BTCFI)
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL "OPENBSD" AND SWIFT_HOST_VARIANT_ARCH MATCHES "aarch64|x86_64" AND NOT SWIFT_OPENBSD_BTCFI)
     target_link_options(${executable} PRIVATE "LINKER:-z,nobtcfi")
   endif()
 

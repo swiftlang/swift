@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,32 +10,37 @@
 //
 //===----------------------------------------------------------------------===//
 
-import XCTest
+import Testing
+
 @testable import SwiftXcodeGen
 
 fileprivate func assertParse(
-  _ str: String, executable: String? = nil, args: [Command.Argument],
+  _ str: String,
+  executable: String? = nil,
+  args: [Command.Argument],
   knownCommandOnly: Bool = false,
-  file: StaticString = #file, line: UInt = #line
+  sourceLocation: SourceLocation = #_sourceLocation
 ) {
   do {
     let command = try knownCommandOnly ? CommandParser.parseKnownCommandOnly(str)
                                        : CommandParser.parseCommand(str)
     guard let command else {
-      XCTFail("Failed to parse command")
+      Issue.record("Failed to parse command")
       return
     }
     if let executable {
-      XCTAssertEqual(executable, command.executable.rawPath, file: file, line: line)
+      #expect(executable == command.executable.rawPath, sourceLocation: sourceLocation)
     }
-    XCTAssertEqual(args, command.args, file: file, line: line)
+    #expect(args == command.args, sourceLocation: sourceLocation)
   } catch {
-    XCTFail("\(error)", file: file, line: line)
+    Issue.record("\(error)", sourceLocation: sourceLocation)
   }
 }
 
-class CompileCommandsTests: XCTestCase {
-  func testClangCommandParse() {
+@Suite
+struct CompileCommandsTests {
+  @Test
+  func clangCommandParse() {
     assertParse("x -a -b", executable: "x", args: [.value("-a"), .value("-b")])
 
     assertParse("x -D -I", executable: "x", args: [.value("-D"), .value("-I")])
@@ -194,7 +199,8 @@ class CompileCommandsTests: XCTestCase {
     )
   }
 
-  func testSwiftCommandParse() {
+  @Test
+  func swiftCommandParse() {
     assertParse(
       #"swiftc -FX"#,
       args: [.option(.F, spacing: .unspaced, value: "X")]
@@ -213,52 +219,56 @@ class CompileCommandsTests: XCTestCase {
     )
   }
 
-  func testCommandEscape() {
-    XCTAssertEqual(Command.Argument.flag(.I).printedArgs, ["-I"])
-    XCTAssertEqual(Command.Argument.value("hello").printedArgs, ["hello"])
-    XCTAssertEqual(Command.Argument.value("he llo").printedArgs, [#""he llo""#])
-    XCTAssertEqual(Command.Argument.value(#""hello""#).printedArgs, [#"\"hello\""#])
-    XCTAssertEqual(Command.Argument.value(#""he llo""#).printedArgs, [#""\"he llo\"""#])
+  @Test
+  func commandEscape() throws {
+    #expect(Command.Argument.flag(.I).printedArgs == ["-I"])
+    #expect(Command.Argument.value("hello").printedArgs == ["hello"])
+    #expect(Command.Argument.value("he llo").printedArgs == [#""he llo""#])
+    #expect(Command.Argument.value(#""hello""#).printedArgs == [#"\"hello\""#])
+    #expect(Command.Argument.value(#""he llo""#).printedArgs == [#""\"he llo\"""#])
 
-    XCTAssertEqual(
+    #expect(
       Command.Argument.option(
-        .I, spacing: .unspaced, value: "he llo"
-      ).printedArgs,
-      [#"-I"he llo""#]
+        .I,
+        spacing: .unspaced,
+        value: "he llo"
+      ).printedArgs == [#"-I"he llo""#]
     )
 
-    XCTAssertEqual(
+    #expect(
       Command.Argument.option(
-        .I, spacing: .spaced, value: "he llo"
-      ).printedArgs,
-      ["-I", #""he llo""#]
+        .I,
+        spacing: .spaced,
+        value: "he llo"
+      ).printedArgs == ["-I", #""he llo""#]
     )
 
-    XCTAssertEqual(
+    #expect(
       Command.Argument.option(
-        .I, spacing: .unspaced, value: #""he llo""#
-      ).printedArgs,
-      [#"-I"\"he llo\"""#]
+        .I,
+        spacing: .unspaced,
+        value: #""he llo""#
+      ).printedArgs == [#"-I"\"he llo\"""#]
     )
 
-    XCTAssertEqual(
+    #expect(
       Command.Argument.option(
-        .I, spacing: .spaced, value: #""he llo""#
-      ).printedArgs,
-      ["-I", #""\"he llo\"""#]
+        .I,
+        spacing: .spaced,
+        value: #""he llo""#
+      ).printedArgs == ["-I", #""\"he llo\"""#]
     )
 
-    XCTAssertEqual(
-      try CommandParser.parseCommand(#"swift \\ \ "#).printed,
-      #"swift \\ " ""#
+    #expect(
+      try CommandParser.parseCommand(#"swift \\ \ "#).printed == #"swift \\ " ""#
     )
-    XCTAssertEqual(
-      try CommandParser.parseCommand(#"swift "\\ ""#).printed,
-      #"swift "\\ ""#
+    #expect(
+      try CommandParser.parseCommand(#"swift "\\ ""#).printed == #"swift "\\ ""#
     )
   }
 
-  func testEmptyArg() {
+  @Test
+  func emptyArg() {
     // The empty string immediately after '-I' is effectively ignored.
     assertParse(#"swiftc -I"" """#, args: [
       .option(.I, spacing: .spaced, value: ""),
@@ -279,7 +289,8 @@ class CompileCommandsTests: XCTestCase {
     ])
   }
 
-  func testSpaceBeforeCommand() {
+  @Test
+  func spaceBeforeCommand() {
     assertParse("  swiftc  ", executable: "swiftc", args: [])
     assertParse("\t\tswiftc\t\ta b\t", executable: "swiftc", args: [
       .value("a"),

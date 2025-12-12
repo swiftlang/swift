@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend-verify -typecheck %s -enable-objc-interop -import-objc-header %S/../Inputs/objc_direct.h
+// RUN: %target-swift-frontend-verify -verify-ignore-unrelated -typecheck %s -enable-objc-interop -import-objc-header %S/../Inputs/objc_direct.h
 
 // REQUIRES: objc_interop
 

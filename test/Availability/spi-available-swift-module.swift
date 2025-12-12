@@ -3,7 +3,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -parse-as-library %t/Foo.swift -emit-module -library-level api -emit-module-path %t/Foo.swiftmodule -module-name Foo
-// RUN: %target-swift-frontend-typecheck -parse-as-library %t/Client.swift -verify -library-level api -I %t
+// RUN: %target-swift-frontend-typecheck -parse-as-library %t/Client.swift -verify -verify-ignore-unrelated -library-level api -I %t
 
 //--- Foo.swift
 
@@ -21,6 +21,6 @@ import Foo
 
 @available(macOS 10.10, iOS 8.0, *)
 public struct Foo {
-  public var macos: MacOSSPIClass // expected-error {{cannot use class 'MacOSSPIClass' here; it is an SPI imported from 'Foo'}}
+  public var macos: MacOSSPIClass // expected-error {{cannot use class 'MacOSSPIClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is an SPI imported from 'Foo'}}
   public var ios: iOSSPIClass
 }

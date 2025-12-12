@@ -1,4 +1,6 @@
-# Protocol conformances crossing into actor-isolated code
+# Protocol conformances crossing into actor-isolated code (ConformanceIsolation)
+
+## Overview
 
 Protocol conformances crossing into actor-isolated code can cause data races in your program. Resolve this error by ensuring access to isolated state is always done within the actor.
 

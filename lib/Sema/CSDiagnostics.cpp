@@ -96,42 +96,12 @@ Type FailureDiagnostic::getRawType(ASTNode node) const {
 
 Type FailureDiagnostic::resolveType(Type rawType, bool reconstituteSugar,
                                     bool wantRValue) const {
-  rawType = rawType.transformRec([&](Type type) -> std::optional<Type> {
-    if (auto *typeVar = type->getAs<TypeVariableType>()) {
-      auto resolvedType = S.simplifyType(typeVar);
+  rawType = S.simplifyType(rawType);
 
-      if (!resolvedType->hasUnresolvedType())
-        return resolvedType;
-
-      // If type variable was simplified to an unresolved pack expansion
-      // type, let's examine its original pattern type because it could
-      // contain type variables replaceable with their generic parameter
-      // types.
-      if (auto *expansion = resolvedType->getAs<PackExpansionType>()) {
-        auto *locator = typeVar->getImpl().getLocator();
-        auto *openedExpansionTy =
-            locator->castLastElementTo<LocatorPathElt::PackExpansionType>()
-                .getOpenedType();
-        auto patternType = resolveType(openedExpansionTy->getPatternType());
-        return PackExpansionType::get(patternType, expansion->getCountType());
-      }
-
-      Type GP = typeVar->getImpl().getGenericParameter();
-      return resolvedType->is<UnresolvedType>() && GP
-          ? ErrorType::get(GP)
-          : resolvedType;
-    }
-
-    if (type->hasElementArchetype()) {
-      auto *env = getDC()->getGenericEnvironmentOfContext();
-      return env->mapElementTypeIntoPackContext(type);
-    }
-
-    if (type->isPlaceholder())
-      return Type(type->getASTContext().TheUnresolvedType);
-
-    return std::nullopt;
-  });
+  if (rawType->hasElementArchetype()) {
+    auto *env = getDC()->getGenericEnvironmentOfContext();
+    rawType = env->mapElementTypeIntoPackContext(rawType);
+  }
 
   if (reconstituteSugar)
     rawType = rawType->reconstituteSugar(/*recursive*/ true);
@@ -183,7 +153,7 @@ StringRef FailureDiagnostic::getEditorPlaceholder(
     llvm::SmallVectorImpl<char> &scratch) const {
   llvm::raw_svector_ostream OS(scratch);
   OS << "<#";
-  if (!ty || ty->is<UnresolvedType>()) {
+  if (!ty || ty->isBareErrorType()) {
     OS << description;
   } else {
     OS << "T##";
@@ -893,11 +863,8 @@ GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_CaseStmt:
   case CTP_ThrowStmt:
   case CTP_ForEachSequence:
-  case CTP_ComposedPropertyWrapper:
   case CTP_Unused:
-  case CTP_CannotFail:
   case CTP_YieldByReference:
-  case CTP_CalleeResult:
   case CTP_EnumCaseRawValue:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
@@ -1005,7 +972,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
 
     case ConstraintLocator::ContextualType: {
       auto purpose = getContextualTypePurpose();
-      assert(!(purpose == CTP_Unused || purpose == CTP_CannotFail));
+      assert(purpose != CTP_Unused);
 
       // If this is call to a closure e.g. `let _: A = { B() }()`
       // let's point diagnostic to its result.
@@ -1788,7 +1755,7 @@ class VarDeclMultipleReferencesChecker : public ASTWalker {
       if (name.isSimpleName(varDecl->getName()) && loc.isValid()) {
         auto *otherDecl =
             ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
-                                            name.getFullName(), loc);
+                                            name, loc);
         if (otherDecl == varDecl)
           ++count;
       }
@@ -1836,7 +1803,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   auto *unwrappedExpr = anchor->getValueProvidingExpr();
 
   if (auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrappedExpr)) {
-    bool isSwift5OrGreater = getASTContext().isSwiftVersionAtLeast(5);
+    bool isSwift5OrGreater = getASTContext().isLanguageModeAtLeast(5);
     auto subExprType = getType(tryExpr->getSubExpr());
     bool subExpressionIsOptional = (bool)subExprType->getOptionalObjectType();
 
@@ -2172,7 +2139,9 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
       return false;
 
     const ParameterList *paramList = callee->getParameters();
-    const ParamDecl *param = paramList->getArray().back();
+    if (!paramList || paramList->size() == 0)
+      return false;
+    const ParamDecl *param = paramList->back();
 
     // Soundness-check that the trailing closure corresponds to this parameter.
     if (!param->hasInterfaceType() ||
@@ -2262,7 +2231,7 @@ bool AssignmentFailure::diagnoseAsError() {
 
       auto type = getType(immutableExpr);
 
-      if (isKnownKeyPathType(type))
+      if (type->isKnownKeyPathType())
         message += " is read-only";
       else if (VD->isCaptureList())
         message += " is an immutable capture";
@@ -2979,12 +2948,7 @@ static std::optional<Diag<Type>>
 getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   switch (CTP) {
   case CTP_Unused:
-  case CTP_CannotFail:
-    llvm_unreachable("These contextual type purposes cannot fail with a "
-                     "conversion type specified!");
-  case CTP_CalleeResult:
-    llvm_unreachable("CTP_CalleeResult does not actually install a "
-                     "contextual type");
+    llvm_unreachable("Expected a contextual purpose");
   case CTP_Initialization:
     return diag::cannot_convert_initializer_value_nil;
 
@@ -2997,7 +2961,6 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_ForEachSequence:
   case CTP_YieldByReference:
   case CTP_WrappedProperty:
-  case CTP_ComposedPropertyWrapper:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
     return std::nullopt;
@@ -3782,11 +3745,8 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 
   case CTP_ThrowStmt:
   case CTP_ForEachSequence:
-  case CTP_ComposedPropertyWrapper:
   case CTP_Unused:
-  case CTP_CannotFail:
   case CTP_YieldByReference:
-  case CTP_CalleeResult:
   case CTP_ExprPattern:
     break;
   }
@@ -4706,7 +4666,7 @@ bool UnintendedExtraGenericParamMemberFailure::diagnoseAsError() {
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
   auto archetype = baseType->getMetatypeInstanceType()->castTo<ArchetypeType>();
   auto genericTy =
-      archetype->mapTypeOutOfContext()->castTo<GenericTypeParamType>();
+      archetype->mapTypeOutOfEnvironment()->castTo<GenericTypeParamType>();
   SourceLoc loc = genericTy->getDecl()->getSourceRange().End;
   StringRef replacement;
 
@@ -5681,7 +5641,7 @@ bool MissingArgumentsFailure::diagnoseMissingResultBuilderElement() const {
   auto fixIt = getEditorPlaceholder("result", paramType, scratch);
   auto fixItLoc = call->getStartLoc();
 
-  if (paramType->is<UnresolvedType>()) {
+  if (paramType->isBareErrorType()) {
     emitDiagnostic(diag::result_builder_missing_element,
                    resultBuilder->getName())
         .fixItInsertAfter(fixItLoc, fixIt);
@@ -5804,7 +5764,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
   auto argType = solution.simplifyType(solution.getType(unaryArg));
   auto paramType = fnType->getParams()[1].getPlainType();
 
-  if (isExpr<ClosureExpr>(unaryArg) && argType->is<UnresolvedType>()) {
+  if (isExpr<ClosureExpr>(unaryArg) && argType->is<ErrorType>()) {
     auto unwrappedParamTy = paramType->lookThroughAllOptionalTypes();
     if (unwrappedParamTy->is<FunctionType>() || unwrappedParamTy->isAny())
       return true;
@@ -5958,7 +5918,7 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
     };
 
     auto isValidType = [](Type resultType) -> bool {
-      return resultType && !resultType->hasUnresolvedType() &&
+      return resultType && !resultType->hasError() &&
              !resultType->hasTypeVariable();
     };
 
@@ -6351,10 +6311,7 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
 
   if (baseExpr) {
     auto *locator = getConstraintLocator(baseExpr, ConstraintLocator::Member);
-    const auto &solution = getSolution();
-    if (llvm::any_of(solution.Fixes, [&locator](const ConstraintFix *fix) {
-          return fix->getLocator() == locator;
-        }))
+    if (hasFixFor(getSolution(), locator))
       return false;
   }
 
@@ -6371,6 +6328,55 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
   }
 
   emitDiagnosticAt(Member, diag::decl_declared_here, Member);
+  return true;
+}
+
+bool MemberFromWrongModuleFailure::diagnoseAsError() {
+  auto anchor = getRawAnchor();
+  // Let's try to avoid over-diagnosing chains of wrong-module
+  // members e.g.:
+  //
+  // struct A {
+  //   struct B {
+  //     struct C {}
+  //   }
+  // }
+  //
+  // _ = A.Other::B.Other::C()
+  Expr *baseExpr = nullptr;
+  DeclNameLoc nameLoc;
+  if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
+    baseExpr = UDE->getBase();
+    nameLoc = UDE->getNameLoc();
+  } else if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor)) {
+    nameLoc = UME->getNameLoc();
+  } else if (auto *SE = getAsExpr<SubscriptExpr>(anchor)) {
+    baseExpr = SE->getBase();
+  } else if (auto *call = getAsExpr<CallExpr>(anchor)) {
+    baseExpr = call->getFn();
+  }
+
+  if (baseExpr) {
+    auto *locator = getConstraintLocator(baseExpr, ConstraintLocator::Member);
+    if (hasFixFor(getSolution(), locator))
+      return false;
+  }
+
+  auto modSelLoc = nameLoc.getModuleSelectorLoc();
+  auto loc = nameLoc.isValid() ? nameLoc.getStartLoc() : ::getLoc(anchor);
+
+  emitDiagnosticAt(loc, diag::wrong_module_selector, Member->getName(),
+                   Name.getModuleSelector());
+
+  Identifier actualModuleName =
+      Member->getModuleContext()->getNameForModuleSelector();
+  ASSERT(actualModuleName != Name.getModuleSelector() &&
+         "Module selector failure on member in same module?");
+  emitDiagnosticAt(loc, diag::note_change_module_selector, actualModuleName)
+      .fixItReplace(modSelLoc, actualModuleName.str());
+
+  emitDiagnosticAt(Member, diag::decl_declared_here, Member);
+
   return true;
 }
 
@@ -6619,7 +6625,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
     // statement it has to be diagnosed as pattern match if there are
     // holes present in the contextual type.
     if (purpose == ContextualTypePurpose::CTP_ForEachSequence &&
-        contextualType->hasUnresolvedType()) {
+        contextualType->hasError()) {
       auto diagnostic = emitDiagnostic(
           (contextualType->is<TupleType>() && !eltType->is<TupleType>())
               ? diag::cannot_match_expr_tuple_pattern_with_nontuple_value
@@ -7487,10 +7493,10 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 
   // Unresolved key path argument requires a tailored diagnostic
   // that doesn't mention a fallback type - `KeyPath<_, _>`.
-  if (argType->isKeyPath() && !isKnownKeyPathType(paramType)) {
+  if (argType->isKeyPath() && !paramType->isKnownKeyPathType()) {
     auto keyPathTy = argType->castTo<BoundGenericType>();
     auto rootTy = keyPathTy->getGenericArgs()[0];
-    if (rootTy->is<UnresolvedType>()) {
+    if (rootTy->isBareErrorType()) {
       emitDiagnostic(diag::cannot_convert_unresolved_key_path_argument_value,
                      paramType);
       return true;
@@ -7627,7 +7633,7 @@ bool ArgumentMismatchFailure::diagnosePatternMatchingMismatch() const {
   auto rhsType = getType(rhsExpr);
 
   auto diagnostic =
-      lhsType->is<UnresolvedType>()
+      lhsType->isBareErrorType()
           ? emitDiagnostic(
                 diag::cannot_match_unresolved_expr_pattern_with_value, rhsType)
           : emitDiagnostic(diag::cannot_match_expr_pattern_with_value, lhsType,
@@ -7852,7 +7858,7 @@ bool ArgumentMismatchFailure::diagnoseKeyPathAsFunctionResultMismatch() const {
   auto argType = getFromType();
   auto paramType = getToType();
 
-  if (!isKnownKeyPathType(argType))
+  if (!argType->isKnownKeyPathType())
     return false;
 
   auto kpType = argType->castTo<BoundGenericType>();
@@ -8142,7 +8148,7 @@ bool SendingMismatchFailure::diagnoseAsError() {
 bool SendingMismatchFailure::diagnoseArgFailure() {
   emitDiagnostic(diag::sending_function_wrong_sending, getFromType(),
                  getToType())
-      .warnUntilSwiftVersion(6);
+      .warnUntilLanguageMode(6);
   emitDiagnostic(diag::sending_function_param_with_sending_param_note);
   return true;
 }
@@ -8150,7 +8156,7 @@ bool SendingMismatchFailure::diagnoseArgFailure() {
 bool SendingMismatchFailure::diagnoseResultFailure() {
   emitDiagnostic(diag::sending_function_wrong_sending, getFromType(),
                  getToType())
-      .warnUntilSwiftVersion(6);
+      .warnUntilLanguageMode(6);
   emitDiagnostic(diag::sending_function_result_with_sending_param_note);
   return true;
 }
@@ -8217,6 +8223,20 @@ bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
   }
 
   return false;
+}
+
+bool NonMetatypeDynamicTypeFailure::diagnoseAsError() {
+  auto instanceTy = getFromType();
+  auto metatypeTy = getToType();
+  if (instanceTy->isBareErrorType()) {
+    emitDiagnostic(diag::cannot_convert_typeof_to_non_metatype, metatypeTy)
+        .highlight(getSourceRange());
+  } else {
+    emitDiagnostic(diag::cannot_convert_metatype_to_non_metatype,
+                   MetatypeType::get(instanceTy), metatypeTy)
+        .highlight(getSourceRange());
+  }
+  return true;
 }
 
 bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
@@ -8286,7 +8306,7 @@ bool UnableToInferClosureParameterType::diagnoseAsError() {
       if (parentExpr) {
         // Missing or invalid member reference in call.
         if (auto *AE = dyn_cast<ApplyExpr>(parentExpr)) {
-          if (getType(AE->getFn())->is<UnresolvedType>())
+          if (getType(AE->getFn())->is<ErrorType>())
             return false;
         }
 
@@ -9389,8 +9409,9 @@ bool InvalidWeakAttributeUse::diagnoseAsError() {
 }
 
 bool TupleLabelMismatchWarning::diagnoseAsError() {
-  emitDiagnostic(diag::tuple_label_mismatch_warning, getFromType(), getToType())
-      .highlight(getSourceRange());
+  emitDiagnostic(diag::tuple_label_mismatch, getFromType(), getToType())
+      .highlight(getSourceRange())
+      .warnUntilFutureLanguageMode();
   return true;
 }
 

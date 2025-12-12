@@ -1423,7 +1423,7 @@ private:
       // because it's a diagnostic inflicted on /clients/, but it's close
       // enough. It really is invalid to call +new when -init is unavailable.
       StringRef annotationName = "SWIFT_UNAVAILABLE_MSG";
-      if (!getASTContext().isSwiftVersionAtLeast(5))
+      if (!getASTContext().isLanguageModeAtLeast(5))
         annotationName = "SWIFT_DEPRECATED_MSG";
       os << "+ (nonnull instancetype)new " << annotationName
          << "(\"-init is unavailable\");\n";
@@ -1574,7 +1574,7 @@ private:
     }
     os << "\n";
     if (representation.isObjCxxOnly())
-      os << "#endif\n";
+      os << "#endif // defined(__OBJC__)\n";
     return representation;
   }
 
@@ -1684,7 +1684,7 @@ private:
         FD->getParameters(), funcTy->isThrowing(), funcTy);
     os << "}\n";
     if (result.isObjCxxOnly())
-      os << "#endif\n";
+      os << "#endif // defined(__OBJC__)\n";
   }
 
   enum class PrintLeadingSpace : bool {
@@ -1821,6 +1821,14 @@ public:
       case PlatformKind::visionOSApplicationExtension:
         plat = "visionos_app_extension";
         break;
+      case PlatformKind::DriverKit:
+        plat = "driverkit";
+        break;
+      case PlatformKind::Swift:
+      case PlatformKind::anyAppleOS:
+        // FIXME: [runtime availability] Figure out how to support this.
+        ASSERT(0);
+        break;
       case PlatformKind::FreeBSD:
         plat = "freebsd";
         break;
@@ -1829,6 +1837,9 @@ public:
         break;
       case PlatformKind::Windows:
         plat = "windows";
+        break;
+      case PlatformKind::Android:
+        plat = "android";
         break;
       case PlatformKind::none:
         llvm_unreachable("handled above");
@@ -2370,7 +2381,7 @@ private:
 
     if (auto *clangTypeDecl =
           dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
-      assert(!alias->isGeneric()
+      assert(!alias->hasGenericParamList()
              && "generic typealias backed by clang typedecl?");
 
       maybePrintTagKeyword(alias);
@@ -2380,7 +2391,7 @@ private:
         printNullability(optionalKind);
     } else if (auto *clangObjCClass
                = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
-      assert(!alias->isGeneric()
+      assert(!alias->hasGenericParamList()
              && "generic typealias backed by clang interface?");
 
       os << clangObjCClass->getName() << " *";
@@ -2418,7 +2429,7 @@ private:
     if (ED && !NTD->hasClangNode()) {
       if (ED->isCDeclEnum()) {
         // We should be able to use the tag macro for all printed enums but
-        // for now restrict it to @cdecl to guard it behind the feature flag.
+        // for now restrict it to @c to guard it behind the feature flag.
         os << "SWIFT_ENUM_TAG ";
       } else {
         os << "enum ";
@@ -2702,7 +2713,7 @@ private:
 
     if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
       const ClassDecl *extendedClass = extension->getSelfClassDecl();
-      assert(extendedClass->isGeneric());
+      assert(extendedClass->hasGenericParamList());
       assert(extension->getGenericParams()->size() ==
              extendedClass->getGenericParams()->size() &&
              "extensions with custom generic parameters?");
@@ -3056,7 +3067,7 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
       return false;
   }
 
-  // In C output mode print only the C variant `@cdecl` (no `@_cdecl`),
+  // In C output mode print only the C variant `@c` (no `@_cdecl`),
   // while in other modes print only `@_cdecl`.
   std::optional<ForeignLanguage> cdeclKind = std::nullopt;
   if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD))
@@ -3066,14 +3077,14 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
        (outputLang == OutputLanguageMode::C))
     return false;
 
-  // C output mode only prints @cdecl functions and enums.
+  // C output mode only prints @c functions and enums.
   if (outputLang == OutputLanguageMode::C &&
       !cdeclKind && !isa<EnumDecl>(VD)) {
     return false;
   }
 
-  // The C mode prints @cdecl enums and reject other enums,
-  // while other modes accept other enums and reject @cdecl ones.
+  // The C mode prints @c enums and reject other enums,
+  // while other modes accept other enums and reject @c ones.
   if (isa<EnumDecl>(VD) &&
       VD->getAttrs().hasAttribute<CDeclAttr>() !=
         (outputLang == OutputLanguageMode::C)) {

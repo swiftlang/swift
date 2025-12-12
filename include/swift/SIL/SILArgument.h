@@ -426,6 +426,15 @@ public:
 
   bool isSending() const;
 
+  /// Returns true if this SILFunctionArgument is an 'inout sending' parameter.
+  bool isInOutSending() const;
+
+  bool isIsolated() const {
+    return !isIndirectResult() && !isIndirectErrorResult() &&
+           getKnownParameterInfo().getOptions().contains(
+               SILParameterInfo::Isolated);
+  }
+
   Lifetime getLifetime() const {
     return getType()
         .getLifetime(*getFunction())

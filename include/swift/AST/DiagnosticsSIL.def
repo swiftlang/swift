@@ -142,6 +142,10 @@ ERROR(deserialize_function_type_mismatch,Fatal,
       "type mismatch of function '%0', declared as %1 but used in a swift module as %2",
       (StringRef, Type, Type))
 
+ERROR(deserialize_function_linkage_mismatch,Fatal,
+      "linkage mismatch of function '%0', declared as %1 but expected as %2",
+      (StringRef, StringRef, StringRef))
+
 ERROR(without_actually_escaping_on_isolated_any,none,
       "withoutActuallyEscaping is currently unimplemented for '@isolated(any)' "
       "function values", ())
@@ -433,14 +437,31 @@ ERROR(wrong_linkage_for_serialized_function,none,
       "function has wrong linkage to be called from %0", (StringRef))
 NOTE(performance_called_from,none,
       "called from here", ())
-ERROR(manualownership_copy,none,
-      "explicit 'copy' required here", ())
+
+// ManualOwnership diagnostics
+GROUPED_WARNING(manualownership_copy,SemanticCopies,none,
+      "implicit 'copy' happens here; please report this vague diagnostic as a bug", ())
+GROUPED_WARNING(manualownership_copy_happened,SemanticCopies,none,
+      "accessing %0 may produce a copy; write 'copy' to acknowledge or 'consume' to elide", (Identifier))
+GROUPED_WARNING(manualownership_copy_demanded,SemanticCopies,none,
+      "independent copy of %0 is required here; write 'copy' to acknowledge or 'consume' to elide", (Identifier))
+GROUPED_WARNING(manualownership_copy_captured,SemanticCopies,none,
+      "closure capture of '%0' requires independent copy of it; write [%0 = copy %0] in the closure's capture list to acknowledge", (StringRef))
+
+GROUPED_WARNING(manualownership_exclusivity,DynamicExclusivity,none,
+      "exclusive access here will be checked at runtime; please report this vague diagnostic as a bug", ())
+GROUPED_WARNING(manualownership_exclusivity_named,DynamicExclusivity,none,
+      "accessing %0 here may incur runtime exclusivity check%1", (Identifier, StringRef))
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,none,
       "inlining 'transparent' functions forms circular loop", ())
 NOTE(note_while_inlining,none,
      "while inlining here", ())
+
+// '@inline(always)' diagnostics
+ERROR(circular_inlineAlways,none,
+      "inlining '@inline(always)' functions forms circular loop", ())
 
 // Pre-specializations
 ERROR(cannot_prespecialize,none,
@@ -1065,7 +1086,7 @@ NOTE(regionbasedisolation_typed_tns_passed_to_sending, none,
      "causing races inbetween %0 uses and uses reachable from the callee",
      (StringRef, Type))
 
-ERROR(regionbasedisolation_typed_tns_passed_sending_closure, none,
+GROUPED_ERROR(regionbasedisolation_typed_tns_passed_sending_closure, SendingClosureRisksDataRace, none,
      "passing closure as a 'sending' parameter risks causing data races between %0 and concurrent execution of the closure",
      (StringRef))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value, none,
@@ -1191,6 +1212,12 @@ NOTE(rbi_add_generic_parameter_sendable_conformance,none,
      "consider making generic parameter %0 conform to the 'Sendable' protocol",
      (Type))
 
+ERROR(regionbasedisolation_inout_sending_in_same_region, none,
+      "'inout sending' parameters %0 and %1 can be potentially accessed from each other at function return risking data races in caller",
+      (Identifier, Identifier))
+NOTE(regionbasedisolation_inout_sending_in_same_region_note, none,
+     "caller function assumes on return that %0 and %1 cannot be used to access each other implying sending them to different isolation domains does not risk a data race", (Identifier, Identifier))
+
 // Concurrency related diagnostics
 ERROR(cannot_find_executor_factory_type, none,
       "the DefaultExecutorFactory type could not be found", ())
@@ -1229,6 +1256,8 @@ NOTE(lifetime_outside_scope_use, none,
      "this use of the lifetime-dependent value is out of scope", ())
 NOTE(lifetime_outside_scope_escape, none,
      "this use causes the lifetime-dependent value to escape", ())
+
+NOTE(implicit_function_note, none, "error in compiler-generated '%0'", (StringRef))
 
 ERROR(noncopyable_shared_case_block_unimplemented, none,
       "matching a non-'Copyable' value using a case label that has multiple patterns is not implemented", ())

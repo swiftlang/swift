@@ -51,12 +51,9 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
-  // Even though begin_access/destroy_value/copy_value/end_lifetime have
-  // side-effects, they can be DCE'ed if they do not have useful
-  // dependencies/reverse dependencies
-  if (isa<BeginAccessInst>(I) || isa<CopyValueInst>(I) ||
-      isa<DestroyValueInst>(I) || isa<EndLifetimeInst>(I) ||
-      isa<EndBorrowInst>(I))
+  // Even though end_lifetime has side-effects, it can be DCE'ed if it does not
+  // have useful dependencies/reverse dependencies
+  if (isa<EndLifetimeInst>(I))
     return false;
 
   if (isa<UnconditionalCheckedCastInst>(I)) {
@@ -206,6 +203,7 @@ class DCE {
 
   void markValueLive(SILValue V);
   void markInstructionLive(SILInstruction *Inst);
+  void markOwnedDeadValueLive(SILValue v);
   void markTerminatorArgsLive(SILBasicBlock *Pred, SILBasicBlock *Succ,
                               size_t ArgIndex);
   void markControllingTerminatorsLive(SILBasicBlock *Block);
@@ -266,6 +264,20 @@ void DCE::markInstructionLive(SILInstruction *Inst) {
   LLVM_DEBUG(llvm::dbgs() << "Marking as live: " << *Inst);
 
   Worklist.push_back(Inst);
+}
+
+void DCE::markOwnedDeadValueLive(SILValue v) {
+  if (v->getOwnershipKind() == OwnershipKind::Owned) {
+    // When an owned value has no lifetime ending uses it means that it is in a
+    // dead-end region. We must not remove and inserting compensating destroys
+    // for it because that would potentially destroy the value too early.
+    // TODO: we can remove this once we have complete OSSA lifetimes
+    for (Operand *use : v->getUses()) {
+      if (use->isLifetimeEnding())
+        return;
+    }
+    markValueLive(v);
+  }
 }
 
 /// Gets the producing instruction of a cond_fail condition. Currently these
@@ -334,6 +346,9 @@ void DCE::markLive() {
   // to be live in the sense that they are not trivially something we
   // can delete by examining only that instruction.
   for (auto &BB : *F) {
+    for (SILArgument *arg : BB.getArguments()) {
+      markOwnedDeadValueLive(arg);
+    }
     for (auto &I : BB) {
       switch (I.getKind()) {
       case SILInstructionKind::CondFailInst: {
@@ -359,22 +374,6 @@ void DCE::markLive() {
         } else {
           markInstructionLive(&I);
         }
-        break;
-      }
-      case SILInstructionKind::EndAccessInst: {
-        // An end_access is live only if it's begin_access is also live.
-        auto *beginAccess = cast<EndAccessInst>(&I)->getBeginAccess();
-        addReverseDependency(beginAccess, &I);
-        break;
-      }
-      case SILInstructionKind::DestroyValueInst: {
-        auto phi = PhiValue(I.getOperand(0));
-        // Disable DCE of phis which are lexical or may have a pointer escape.
-        if (phi && (phi->isLexical() || findPointerEscape(phi))) {
-          markInstructionLive(&I);
-        }
-        // The instruction is live only if it's operand value is also live
-        addReverseDependency(I.getOperand(0), &I);
         break;
       }
       case SILInstructionKind::EndBorrowInst: {
@@ -414,6 +413,9 @@ void DCE::markLive() {
       default:
         if (seemsUseful(&I))
           markInstructionLive(&I);
+        for (SILValue result : I.getResults()) {
+          markOwnedDeadValueLive(result);
+        }
       }
     }
   }
@@ -465,6 +467,7 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
 
   switch (Term->getTermKind()) {
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
   case TermKind::ThrowInst:
   case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
@@ -576,6 +579,7 @@ void DCE::propagateLiveness(SILInstruction *I) {
     return;
 
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
   case TermKind::ThrowInst:
   case TermKind::CondBranchInst:
   case TermKind::SwitchEnumInst:

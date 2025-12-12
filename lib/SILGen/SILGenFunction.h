@@ -58,7 +58,8 @@ class ExecutorBreadcrumb;
 struct LValueOptions {
   bool IsNonAccessing = false;
   bool TryAddressable = false;
-  bool NeedsBorrow = false;
+  bool ForGuaranteedReturn = false;
+  bool ForGuaranteedAddressReturn = false;
 
   /// Derive options for accessing the base of an l-value, given that
   /// applying the derived component might touch the memory.
@@ -83,9 +84,15 @@ struct LValueOptions {
     return copy;
   }
 
-  LValueOptions withBorrow(bool borrow) const {
+  LValueOptions forGuaranteedReturn(bool value) const {
     auto copy = *this;
-    copy.NeedsBorrow = borrow;
+    copy.ForGuaranteedReturn = value;
+    return copy;
+  }
+
+  LValueOptions forGuaranteedAddressReturn(bool value) const {
+    auto copy = *this;
+    copy.ForGuaranteedAddressReturn = value;
     return copy;
   }
 };
@@ -882,12 +889,12 @@ public:
   }
 
   SILType getSILTypeInContext(SILResultInfo result, CanSILFunctionType fnTy) {
-    auto t = F.mapTypeIntoContext(getSILType(result, fnTy));
+    auto t = F.mapTypeIntoEnvironment(getSILType(result, fnTy));
     return getTypeLowering(t).getLoweredType().getCategoryType(t.getCategory());
   }
 
   SILType getSILTypeInContext(SILParameterInfo param, CanSILFunctionType fnTy) {
-    auto t = F.mapTypeIntoContext(getSILType(param, fnTy));
+    auto t = F.mapTypeIntoEnvironment(getSILType(param, fnTy));
     return getTypeLowering(t).getLoweredType().getCategoryType(t.getCategory());
   }
 
@@ -1892,11 +1899,10 @@ public:
   ManagedValue emitUndef(Type type);
   ManagedValue emitUndef(SILType type);
   RValue emitUndefRValue(SILLocation loc, Type type);
-  
-  std::pair<ManagedValue, SILValue>
-  emitUninitializedArrayAllocation(Type ArrayTy,
-                                   SILValue Length,
-                                   SILLocation Loc);
+
+  ManagedValue emitUninitializedArrayAllocation(Type ArrayTy,
+                                                SILValue Length,
+                                                SILLocation Loc);
 
   CleanupHandle enterDeallocateUninitializedArrayCleanup(SILValue array);
   void emitUninitializedArrayDeallocation(SILLocation loc, SILValue array);
@@ -2072,18 +2078,18 @@ public:
                                       SmallVectorImpl<ManagedValue> &yields,
                                       bool isOnSelfParameter);
 
-  ManagedValue emitBorrowAccessor(SILLocation loc, SILDeclRef accessor,
-                                  SubstitutionMap substitutions,
-                                  ArgumentSource &&selfValue, bool isSuper,
-                                  bool isDirectUse,
-                                  PreparedArguments &&subscriptIndices,
-                                  bool isOnSelfParameter);
+  ManagedValue emitBorrowMutateAccessor(SILLocation loc, SILDeclRef accessor,
+                                        SubstitutionMap substitutions,
+                                        ArgumentSource &&selfValue,
+                                        bool isSuper, bool isDirectUse,
+                                        PreparedArguments &&subscriptIndices,
+                                        bool isOnSelfParameter);
 
-  ManagedValue applyBorrowAccessor(SILLocation loc, ManagedValue fn,
-                                   bool canUnwind, SubstitutionMap subs,
-                                   ArrayRef<ManagedValue> args,
-                                   CanSILFunctionType substFnType,
-                                   ApplyOptions options);
+  ManagedValue applyBorrowMutateAccessor(SILLocation loc, ManagedValue fn,
+                                         bool canUnwind, SubstitutionMap subs,
+                                         ArrayRef<ManagedValue> args,
+                                         CanSILFunctionType substFnType,
+                                         ApplyOptions options);
 
   RValue emitApplyConversionFunction(SILLocation loc,
                                      Expr *funcExpr,
@@ -2266,6 +2272,10 @@ public:
 
   void emitReturnExpr(SILLocation loc, Expr *ret);
 
+  bool
+  emitBorrowOrMutateAccessorResult(SILLocation loc, Expr *ret,
+                                   SmallVectorImpl<SILValue> &directResults);
+
   void emitYield(SILLocation loc, MutableArrayRef<ArgumentSource> yieldValues,
                  ArrayRef<AbstractionPattern> origTypes,
                  JumpDest unwindDest);
@@ -2388,9 +2398,8 @@ public:
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       CanSILFunctionType fnTy,
                                       ExecutorBreadcrumb prevExecutor,
-                                      SILResultInfo errorResult,
-                                      SILValue indirectErrorAddr,
-                                      bool isSuppressed);
+                                      TaggedUnion<SILValue, SILType> errorAddrOrType,
+                                      bool suppressErrorPath);
 
   /// Emit a dynamic member reference.
   RValue emitDynamicMemberRef(SILLocation loc, SILValue operand,
@@ -3165,6 +3174,7 @@ public:
   ///   within the loop; can be null to bind no elements
   /// \param reverse - if true, iterate the elements in reverse order,
   ///   starting at index limitWithinComponent - 1
+  /// \param emitLoopLatch - emit the entry block.
   /// \param emitBody - a function that will be called to emit the body of
   ///   the loop. It's okay if this has paths that exit the body of the loop,
   ///   but it should leave the insertion point set at the end.
@@ -3182,20 +3192,20 @@ public:
       SILLocation loc, CanPackType formalPackType, unsigned componentIndex,
       SILValue startingAfterIndexWithinComponent, SILValue limitWithinComponent,
       GenericEnvironment *openedElementEnv, bool reverse,
+      llvm::function_ref<SILBasicBlock *()> emitLoopLatch,
       llvm::function_ref<void(SILValue indexWithinComponent,
                               SILValue packExpansionIndex, SILValue packIndex)>
-          emitBody,
-      SILBasicBlock *loopLatch = nullptr);
+          emitBody);
 
   /// A convenience version of dynamic pack loop that visits an entire
   /// pack expansion component in forward order.
   void emitDynamicPackLoop(
       SILLocation loc, CanPackType formalPackType, unsigned componentIndex,
       GenericEnvironment *openedElementEnv,
+      llvm::function_ref<SILBasicBlock *()> emitLoopLatch,
       llvm::function_ref<void(SILValue indexWithinComponent,
                               SILValue packExpansionIndex, SILValue packIndex)>
-          emitBody,
-      SILBasicBlock *loopLatch = nullptr);
+          emitBody);
 
   /// Emit a transform on each element of a pack-expansion component
   /// of a pack, write the result into a pack-expansion component of

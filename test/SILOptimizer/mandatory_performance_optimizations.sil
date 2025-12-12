@@ -9,8 +9,13 @@ import Builtin
 import Swift
 import SwiftShims
 
+struct NonTrivialStruct {
+  var s: String
+}
+
 sil_global [let] @g1 : $Int32
 sil_global [let] @g2 : $Int32
+sil_global [let] @g3 : $Int32
 
 sil @paable : $@convention(thin) (Builtin.Int64) -> ()
 sil @moved_pai_callee : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
@@ -79,7 +84,7 @@ bb0:
 sil [no_allocation] [ossa] @deserialize_and_inline_after_devirtualize : $@convention(thin) (@in Int) -> () {
 bb0(%0 : $*Int):
   %1 = metatype $@thick Int.Type
-  %2 = witness_method $Int, #Comparable."<" : <Self where Self : Comparable> (Self.Type) -> (Self, Self) -> Bool : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
+  %2 = witness_method $Int, #Comparable."<" : <Self where Self : Comparable, Self : ~Copyable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   %3 = apply %2<Int>(%0, %0, %1) : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
   %4 = tuple()
   return %4 : $()
@@ -119,7 +124,7 @@ bb0(%0 : $*Int, %1 : $*Int, %2 : $@thick Int.Type):
 
 sil_witness_table public_external [serialized] Int: Comparable module Swift {
   base_protocol Equatable: Int: Equatable module Swift
-  method #Comparable."<": <Self where Self : Comparable> (Self.Type) -> (Self, Self) -> Bool : @$sSiSLsSL1loiySbx_xtFZTW
+  method #Comparable."<": <Self where Self : Comparable, Self : ~Copyable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool : @$sSiSLsSL1loiySbx_xtFZTW
 }
 
 sil [ossa] @get_int_value : $@convention(thin) () -> Int32 {
@@ -155,6 +160,25 @@ bb0:
   store %3 to [trivial] %1 : $*Int32
   %6 = tuple ()
   return %6 : $()
+}
+
+// CHECK-LABEL: sil [global_init_once_fn] [no_locks] [perf_constraint] [ossa] @remove_loads_and_stores_in_globalinit :
+// CHECK-NOT:     store
+// CHECK:         debug_step
+// CHECK-NOT:     load
+// CHECK:       } // end sil function 'remove_loads_and_stores_in_globalinit'
+sil [global_init_once_fn] [no_locks] [ossa] @remove_loads_and_stores_in_globalinit : $@convention(c) () -> () {
+bb0:
+  alloc_global @g3
+  %1 = global_addr @g3 : $*Int32
+  %2 = integer_literal $Builtin.Int32, 10
+  %3 = struct $Int32 (%2)
+  store %3 to [trivial] %1
+  debug_step
+  %6 = load [trivial] %1
+  store %6 to [trivial] %1
+  %r = tuple ()
+  return %r
 }
 
 // Check that we don't crash on global init-once declarations.
@@ -201,6 +225,27 @@ bb2:
   br bb3
 bb3:
   return %1 : $Int32
+}
+
+sil @createNonTrivialStruct : $@convention(thin) (Int) -> @owned NonTrivialStruct
+
+// CHECK-LABEL: sil [no_allocation] [perf_constraint] [ossa] @test_dead_alloc_elimination_with_mark_dependence :
+// CHECK-NOT:     alloc_stack
+// CHECK:       } // end sil function 'test_dead_alloc_elimination_with_mark_dependence'
+sil [ossa] [no_allocation] @test_dead_alloc_elimination_with_mark_dependence : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack [lexical] $Int
+  store %0 to [trivial] %1
+  %4 = load [trivial] %1
+  %5 = function_ref @createNonTrivialStruct : $@convention(thin) (Int) -> @owned NonTrivialStruct
+  %6 = apply %5(%4) : $@convention(thin) (Int) -> @owned NonTrivialStruct
+  %7 = mark_dependence [nonescaping] %6 on %1
+  %9 = mark_dependence [nonescaping] %7 on %1
+  %10 = destructure_struct %9
+  destroy_value %10
+  %12 = tuple ()
+  dealloc_stack %1
+  return %12
 }
 
 // CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @remove_metatype_arg :

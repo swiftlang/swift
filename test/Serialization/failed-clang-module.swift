@@ -13,7 +13,7 @@
 // RUN: %target-swift-frontend -emit-module %S/Inputs/SwiftModB.swift -module-name SwiftModB -F %t -o %t -module-cache-path %t/mcp
 
 // RUN: %target-swift-frontend -typecheck %s -I %t -module-cache-path %t/mcp
-// RUN: %target-swift-frontend -typecheck %s -Xcc -DFAIL -I %t -module-cache-path %t/mcp -show-diagnostics-after-fatal -verify -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck %s -Xcc -DFAIL -I %t -module-cache-path %t/mcp -show-diagnostics-after-fatal -verify -verify-ignore-unrelated -verify-ignore-unknown
 
 import SwiftModB // expected-error {{missing required module}}
 _ = TyB() // expected-error {{cannot find 'TyB' in scope}}

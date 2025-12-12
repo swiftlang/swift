@@ -389,15 +389,6 @@ static void desugarConformanceRequirement(
 
   // Fast path.
   if (constraintType->is<ProtocolType>()) {
-    // Diagnose attempts to introduce a value generic like 'let N: P' where 'P'
-    // is some protocol in either the defining context or in an extension where
-    // clause.
-    if (req.getFirstType()->isValueParameter()) {
-      errors.push_back(
-        RequirementError::forInvalidValueGenericConformance(req, loc));
-      return;
-    }
-
     if (req.getFirstType()->isTypeParameter()) {
       result.push_back(req);
       return;
@@ -538,7 +529,26 @@ void swift::rewriting::realizeTypeRequirement(DeclContext *dc,
                                  Type constraintType,
                                  SourceLoc loc,
                                  SmallVectorImpl<StructuralRequirement> &result,
-                                 SmallVectorImpl<RequirementError> &errors) {
+                                 SmallVectorImpl<RequirementError> &errors,
+                                 bool isFromInheritanceClause) {
+  // Handle value generics first.
+  if (subjectType->isValueParameter()) {
+    if (isFromInheritanceClause) {
+      if (!constraintType->isLegalValueGenericType()) {
+        // The definition of a generic value parameter has an unsupported type,
+        // e.g. `<let N: UInt8>`.
+        errors.push_back(RequirementError::forInvalidValueGenericType(
+            subjectType, constraintType, loc));
+      }
+    } else {
+      // A generic value parameter was used as the subject of a subtype
+      // constraint, e.g. `N: X` in `struct S<let N: Int> where N: X`.
+      errors.push_back(RequirementError::forInvalidValueGenericConstraint(
+          subjectType, constraintType, loc));
+    }
+    return;
+  }
+
   // The GenericSignatureBuilder allowed the right hand side of a
   // conformance or superclass requirement to reference a protocol
   // typealias whose underlying type was a protocol or class.
@@ -574,22 +584,6 @@ void swift::rewriting::realizeTypeRequirement(DeclContext *dc,
     result.push_back({Requirement(RequirementKind::Superclass,
                                   subjectType, constraintType),
                       loc});
-  } else if (subjectType->isValueParameter() && !isa<ExtensionDecl>(dc)) {
-    // This is a correct value generic definition where 'let N: Int'.
-    //
-    // Note: This definition is only valid in non-extension contexts. If we are
-    // in an extension context then the user has written something like:
-    // 'extension T where N: Int' which is weird and not supported.
-    if (constraintType->isLegalValueGenericType()) {
-      return;
-    }
-
-    // Otherwise, we're trying to define a value generic parameter with an
-    // unsupported type right now e.g. 'let N: UInt8'.
-    errors.push_back(
-        RequirementError::forInvalidValueGenericType(subjectType,
-                                                     constraintType,
-                                                     loc));
   } else {
     errors.push_back(
         RequirementError::forInvalidTypeRequirement(subjectType,
@@ -792,7 +786,8 @@ void swift::rewriting::realizeRequirement(
       inferRequirements(secondType, moduleForInference, dc, result);
     }
 
-    realizeTypeRequirement(dc, firstType, secondType, loc, result, errors);
+    realizeTypeRequirement(dc, firstType, secondType, loc, result, errors,
+                           /*isFromInheritanceClause*/ false);
     break;
   }
 
@@ -845,7 +840,8 @@ void swift::rewriting::realizeInheritedRequirements(
     auto *typeRepr = inheritedTypes.getTypeRepr(index);
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
 
-    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
+    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors,
+                           /*isFromInheritanceClause*/ true);
   }
 
   // Also check for `SynthesizedProtocolAttr`s with additional constraints added
@@ -856,7 +852,8 @@ void swift::rewriting::realizeInheritedRequirements(
     auto inheritedType = attr->getProtocol()->getDeclaredType();
     auto loc = attr->getLocation();
 
-    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
+    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors,
+                           /*isFromInheritanceClause*/ false);
   }
 }
 
@@ -865,7 +862,10 @@ void swift::rewriting::realizeInheritedRequirements(
 ///
 /// This request is invoked by RequirementSignatureRequest for each protocol
 /// in the connected component.
-ArrayRef<StructuralRequirement>
+///
+/// The returned array of StructuralRequirements have already had the
+/// InverseRequirements applied to them.
+std::pair<ArrayRef<StructuralRequirement>, ArrayRef<InverseRequirement>>
 StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
                                         ProtocolDecl *proto) const {
   ASSERT(!proto->hasLazyRequirementSignature());
@@ -924,15 +924,17 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     desugarRequirements(result, inverses, errors);
 
     SmallVector<StructuralRequirement, 2> defaults;
-    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, defaults);
-    applyInverses(ctx, needsDefaultRequirements, inverses, result,
+    SmallVector<Type, 2> expandedGPs;
+    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result,
+                                       defaults, expandedGPs);
+    applyInverses(ctx, expandedGPs, inverses, result,
                   defaults, errors);
     result.append(defaults);
 
     diagnoseRequirementErrors(ctx, errors,
                               AllowConcreteTypePolicy::NestedAssocTypes);
 
-    return ctx.AllocateCopy(result);
+    return std::make_pair(ctx.AllocateCopy(result), ctx.AllocateCopy(inverses));
   }
 
   // Add requirements for each associated type.
@@ -965,7 +967,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     // DependentMemberType X, and the right hand side is the
     // underlying type of the typealias.
     if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(decl)) {
-      if (typeAliasDecl->isGeneric())
+      if (typeAliasDecl->hasGenericParamList())
         continue;
 
       // Ignore the typealias if we have an associated type with the same name
@@ -993,21 +995,27 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   desugarRequirements(result, inverses, errors);
 
   SmallVector<StructuralRequirement, 2> defaults;
+  SmallVector<Type, 2> expandedGPs;
   // We do not expand defaults for invertible protocols themselves.
   // HACK: We don't expand for Sendable either. This shouldn't be needed after
   // Swift 6.0
-  if (!proto->getInvertibleProtocolKind()
-      && !proto->isSpecificProtocol(KnownProtocolKind::Sendable))
-    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, defaults);
+  if (!proto->getInvertibleProtocolKind() &&
+      !proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, result,
+                                       defaults, expandedGPs);
+  } else {
+    // populate with valid subjects for inverses, despite skipping expansion.
+    expandedGPs.assign(needsDefaultRequirements);
+  }
 
-  applyInverses(ctx, needsDefaultRequirements, inverses, result,
+  applyInverses(ctx, expandedGPs, inverses, result,
                 defaults, errors);
   result.append(defaults);
 
   diagnoseRequirementErrors(ctx, errors,
                             AllowConcreteTypePolicy::NestedAssocTypes);
 
-  return ctx.AllocateCopy(result);
+  return std::make_pair(ctx.AllocateCopy(result), ctx.AllocateCopy(inverses));
 }
 
 /// This request primarily emits diagnostics about typealiases and associated
@@ -1049,7 +1057,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   auto isSuitableType = [&](TypeDecl *req) -> bool {
     // Ignore generic types.
     if (auto genReq = dyn_cast<GenericTypeDecl>(req))
-      if (genReq->isGeneric())
+      if (genReq->hasGenericParamList())
         return false;
 
     // Ignore typealiases with UnboundGenericType, since they
@@ -1320,4 +1328,27 @@ ProtocolDependenciesRequest::evaluate(Evaluator &evaluator,
   }
 
   return ctx.AllocateCopy(result);
+}
+
+ArrayRef<InverseRequirement>
+ProtocolInversesRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *proto) const {
+  auto &ctx = proto->getASTContext();
+
+  // If we have a serialized requirement signature, deserialize it and
+  // query it for the inverses.
+  if (proto->hasLazyRequirementSignature()) {
+    SmallVector<Requirement, 2> _ignored;
+    SmallVector<InverseRequirement, 2> result;
+    auto reqSig = proto->getRequirementSignature();
+    reqSig.getRequirementsWithInverses(proto, _ignored, result);
+    return ctx.AllocateCopy(result);
+  }
+
+  // Otherwise, we must avoid building a RequirementSignature, as this query
+  // needs to be safe to ask while building the protocol's RequirementSignature.
+  //
+  // So, use a StructuralRequirementsRequest to get the inverses.
+  return evaluateOrDefault(ctx.evaluator,
+     StructuralRequirementsRequest{proto}, {}).second;
 }

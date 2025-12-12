@@ -92,8 +92,8 @@ fileprivate class ConcurrencyDumper {
     self.process = process
 
     func getMetadata(symbolName: String) -> swift_reflection_ptr_t? {
-      let addr = process.getAddr(symbolName: symbolName)
-      if let ptr = process.read(address: addr, size: MemoryLayout<UInt>.size) {
+      if let addr = process.getAddr(symbolName: symbolName),
+         let ptr = process.read(address: addr, size: MemoryLayout<UInt>.size) {
         return swift_reflection_ptr_t(ptr.load(as: UInt.self))
       }
       return nil

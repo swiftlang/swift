@@ -31,6 +31,10 @@ protocol P2 {
   associatedtype T : P2
 }
 
+protocol P12: P1, P2 {}
+// expected-error@-1 {{cannot build rewrite system for protocol; rule length limit exceeded}}
+// expected-note@-2 {{failed rewrite rule is [P12:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P2] => [P12:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T]}}
+
 func foo<T : P1 & P2>(_: T) {}
 // expected-error@-1 {{cannot build rewrite system for generic signature; rule length limit exceeded}}
 // expected-note@-2 {{failed rewrite rule is τ_0_0.[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P2] => τ_0_0.[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T]}}

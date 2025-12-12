@@ -140,6 +140,9 @@ namespace swift {
   bool diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
                                              ForEachStmt *forEach);
 
+  /// Determine if any of the performance hint diagnostics are enabled.
+  bool performanceHintDiagnosticsEnabled(ASTContext &ctx);
+
   class BaseDiagnosticWalker : public ASTWalker {
   protected:
     PreWalkAction walkToDeclPre(Decl *D) override {

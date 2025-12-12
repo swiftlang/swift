@@ -48,6 +48,8 @@ namespace swift {
   class FuncDecl;
   class SourceManager;
   class SourceFile;
+  class ParamDecl;
+  class AnyPattern;
 
   /// Enumeration describing all of possible diagnostics.
   ///
@@ -55,7 +57,7 @@ namespace swift {
   /// this enumeration type that uniquely identifies it.
   enum class DiagID : uint32_t;
 
-  enum class DiagGroupID : uint16_t;
+  enum class DiagGroupID : uint32_t;
 
   /// Describes a diagnostic along with its argument types.
   ///
@@ -216,6 +218,9 @@ namespace swift {
     SourceLoc getLoc() const { return Loc; }
     const class Decl *getDecl() const { return Decl; }
     DiagnosticBehavior getBehaviorLimit() const { return BehaviorLimit; }
+
+    /// Retrieve the stored SourceLoc, or the location of the stored Decl.
+    SourceLoc getLocOrDeclLoc() const;
 
     void setLoc(SourceLoc loc) { Loc = loc; }
     void setIsChildNote(bool isChildNote) { IsChildNote = isChildNote; }
@@ -383,8 +388,8 @@ namespace swift {
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &limitBehaviorUntilSwiftVersion(
-        DiagnosticBehavior limit, unsigned majorVersion);
+    InFlightDiagnostic &limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
+                                                       unsigned majorVersion);
 
     /// Limits the diagnostic behavior to \c limit accordingly if
     /// preconcurrency applies. Otherwise, the behavior limit only applies
@@ -407,7 +412,7 @@ namespace swift {
         return limitBehavior(limit);
       }
 
-      return limitBehaviorUntilSwiftVersion(limit, languageMode);
+      return limitBehaviorUntilLanguageMode(limit, languageMode);
     }
 
     /// Limit the diagnostic behavior to warning until the next future
@@ -419,19 +424,19 @@ namespace swift {
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &warnUntilFutureSwiftVersion();
+    InFlightDiagnostic &warnUntilFutureLanguageMode();
 
-    InFlightDiagnostic &warnUntilFutureSwiftVersionIf(bool shouldLimit) {
+    InFlightDiagnostic &warnUntilFutureLanguageModeIf(bool shouldLimit) {
       if (!shouldLimit)
         return *this;
-      return warnUntilFutureSwiftVersion();
+      return warnUntilFutureLanguageMode();
     }
 
     /// Limit the diagnostic behavior to warning until the specified version.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &warnUntilSwiftVersion(unsigned majorVersion);
+    InFlightDiagnostic &warnUntilLanguageMode(unsigned majorVersion);
 
     /// Limit the diagnostic behavior to warning if the context is a
     /// swiftinterface.
@@ -448,10 +453,10 @@ namespace swift {
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &warnUntilSwiftVersionIf(bool shouldLimit,
+    InFlightDiagnostic &warnUntilLanguageModeIf(bool shouldLimit,
                                                 unsigned majorVersion) {
       if (!shouldLimit) return *this;
-      return warnUntilSwiftVersion(majorVersion);
+      return warnUntilLanguageMode(majorVersion);
     }
 
     /// Wraps this diagnostic in another diagnostic. That is, \p wrapper will be
@@ -616,6 +621,9 @@ namespace swift {
 
     /// Don't emit any warnings
     bool suppressWarnings = false;
+
+    /// Don't emit any notes
+    bool suppressNotes = false;
     
     /// Don't emit any remarks
     bool suppressRemarks = false;
@@ -625,6 +633,14 @@ namespace swift {
     /// escalated to errors.
     llvm::BitVector warningsAsErrors;
 
+    /// Track which diagnostic group (`DiagGroupID`) warnings should be ignored.
+    llvm::BitVector ignoredDiagnosticGroups;
+
+    /// For compiler-internal purposes only, track which diagnostics should
+    /// be ignored completely. For example, this is used by LLDB to
+    /// suppress certain errors in expression evaluation.
+    llvm::BitVector compilerIgnoredDiagnostics;
+
     /// Whether a fatal error has occurred
     bool fatalErrorOccurred = false;
 
@@ -633,9 +649,6 @@ namespace swift {
 
     /// Track the previous emitted Behavior, useful for notes
     DiagnosticBehavior previousBehavior = DiagnosticBehavior::Unspecified;
-
-    /// Track which diagnostics should be ignored.
-    llvm::BitVector ignoredDiagnostics;
 
     friend class DiagnosticStateRAII;
 
@@ -663,6 +676,10 @@ namespace swift {
     void setSuppressWarnings(bool val) { suppressWarnings = val; }
     bool getSuppressWarnings() const { return suppressWarnings; }
     
+    /// Whether to skip emitting notes
+    void setSuppressNotes(bool val) { suppressNotes = val; }
+    bool getSuppressNotes() const { return suppressNotes; }
+
     /// Whether to skip emitting remarks
     void setSuppressRemarks(bool val) { suppressRemarks = val; }
     bool getSuppressRemarks() const { return suppressRemarks; }
@@ -696,24 +713,36 @@ namespace swift {
       fatalErrorOccurred = false;
     }
 
-    /// Set whether a diagnostic should be ignored.
-    void setIgnoredDiagnostic(DiagID id, bool ignored) {
-      ignoredDiagnostics[(unsigned)id] = ignored;
+    /// Set whether a diagnostic group should be ignored.
+    void setIgnoredDiagnosticGroup(DiagGroupID id, bool ignored) {
+      ignoredDiagnosticGroups[(unsigned)id] = ignored;
     }
 
-    bool isIgnoredDiagnostic(DiagID id) const {
-      return ignoredDiagnostics[(unsigned)id];
+    /// Query whether a specific diagnostic group is ignored.
+    bool isIgnoredDiagnosticGroup(DiagGroupID id) const {
+      return ignoredDiagnosticGroups[(unsigned)id];
     }
+
+    /// Set a specific diagnostic to be ignored by the compiler.
+    void compilerInternalIgnoreDiagnostic(DiagID id) {
+      compilerIgnoredDiagnostics[(unsigned)id] = true;
+    }
+
+    /// Query whether a specific diagnostic group and *all*
+    /// of its subgroups are ignored.
+    bool isIgnoredDiagnosticGroupTree(DiagGroupID id) const;
 
     void swap(DiagnosticState &other) {
-      std::swap(showDiagnosticsAfterFatalError, other.showDiagnosticsAfterFatalError);
+      std::swap(showDiagnosticsAfterFatalError,
+                other.showDiagnosticsAfterFatalError);
       std::swap(suppressWarnings, other.suppressWarnings);
+      std::swap(suppressNotes, other.suppressNotes);
       std::swap(suppressRemarks, other.suppressRemarks);
       std::swap(warningsAsErrors, other.warningsAsErrors);
       std::swap(fatalErrorOccurred, other.fatalErrorOccurred);
       std::swap(anyErrorOccurred, other.anyErrorOccurred);
       std::swap(previousBehavior, other.previousBehavior);
-      std::swap(ignoredDiagnostics, other.ignoredDiagnostics);
+      std::swap(ignoredDiagnosticGroups, other.ignoredDiagnosticGroups);
     }
 
   private:
@@ -858,7 +887,7 @@ namespace swift {
     version::Version languageVersion;
 
     /// The stats reporter used to keep track of Swift 6 errors
-    /// diagnosed via \c warnUntilSwiftVersion(6).
+    /// diagnosed via \c warnUntilLanguageMode(6).
     UnifiedStatsReporter *statsReporter = nullptr;
 
     /// Whether we are actively pretty-printing a declaration as part of
@@ -904,6 +933,12 @@ namespace swift {
       return state.getSuppressWarnings();
     }
 
+    /// Whether to skip emitting notes
+    void setSuppressNotes(bool val) { state.setSuppressNotes(val); }
+    bool getSuppressNotes() const {
+      return state.getSuppressNotes();
+    }
+
     /// Whether to skip emitting remarks
     void setSuppressRemarks(bool val) { state.setSuppressRemarks(val); }
     bool getSuppressRemarks() const {
@@ -947,12 +982,16 @@ namespace swift {
       localization = diag::LocalizationProducer::producerFor(locale, path);
     }
 
-    void ignoreDiagnostic(DiagID id) {
-      state.setIgnoredDiagnostic(id, true);
+    bool isIgnoredDiagnosticGroup(DiagGroupID id) const {
+      return state.isIgnoredDiagnosticGroup(id);
+    }
+    
+    bool isIgnoredDiagnosticGroupTree(DiagGroupID id) const {
+      return state.isIgnoredDiagnosticGroupTree(id);
     }
 
-    bool isIgnoredDiagnostic(DiagID id) const {
-      return state.isIgnoredDiagnostic(id);
+    void ignoreDiagnostic(DiagID id) {
+      state.compilerInternalIgnoreDiagnostic(id);
     }
 
     void resetHadAnyError() {
@@ -1458,6 +1497,13 @@ namespace swift {
 
     /// Retrieve the underlying engine which will receive the diagnostics.
     DiagnosticEngine &getUnderlyingDiags() const { return UnderlyingEngine; }
+
+    /// Iterates over each captured diagnostic, running a lambda with it.
+    void forEach(llvm::function_ref<void(const Diagnostic &)> body) const;
+
+    /// Filters the queued diagnostics, dropping any where the predicate
+    /// returns \c false.
+    void filter(llvm::function_ref<bool(const Diagnostic &)> predicate);
 
     /// Clear this queue and erase all diagnostics recorded.
     void clear() {

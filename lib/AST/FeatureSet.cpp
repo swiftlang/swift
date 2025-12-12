@@ -83,7 +83,6 @@ UNINTERESTING_FEATURE(FlowSensitiveConcurrencyCaptures)
 UNINTERESTING_FEATURE(CodeItemMacros)
 UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
-UNINTERESTING_FEATURE(SymbolLinkageMarkers)
 UNINTERESTING_FEATURE(DeferredCodeGen)
 UNINTERESTING_FEATURE(LazyImmediate)
 UNINTERESTING_FEATURE(MoveOnlyClasses)
@@ -110,23 +109,27 @@ UNINTERESTING_FEATURE(ImplicitSome)
 UNINTERESTING_FEATURE(ParserASTGen)
 UNINTERESTING_FEATURE(BuiltinMacros)
 UNINTERESTING_FEATURE(GenerateBindingsForThrowingFunctionsInCXX)
+UNINTERESTING_FEATURE(ExcludePrivateFromMemberwiseInit)
 UNINTERESTING_FEATURE(ReferenceBindings)
 UNINTERESTING_FEATURE(BuiltinModule)
 UNINTERESTING_FEATURE(RegionBasedIsolation)
 UNINTERESTING_FEATURE(PlaygroundExtendedCallbacks)
 UNINTERESTING_FEATURE(ThenStatements)
 UNINTERESTING_FEATURE(DoExpressions)
+UNINTERESTING_FEATURE(ForExpressions)
 UNINTERESTING_FEATURE(ImplicitLastExprResults)
 UNINTERESTING_FEATURE(RawLayout)
 UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
+UNINTERESTING_FEATURE(SuppressedAssociatedTypesWithDefaults)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 UNINTERESTING_FEATURE(ImportMacroAliases)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
+UNINTERESTING_FEATURE(EmbeddedExistentials)
 
 // TODO: Return true for inlinable function bodies with module selectors in them
 UNINTERESTING_FEATURE(ModuleSelector)
@@ -143,37 +146,46 @@ UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(SendingArgsAndResults)
+UNINTERESTING_FEATURE(CheckImplementationOnly)
+UNINTERESTING_FEATURE(CheckImplementationOnlyStrict)
+UNINTERESTING_FEATURE(EnforceSPIOperatorGroup)
 
-static bool findUnderscoredLifetimeAttr(Decl *decl) {
-  auto hasUnderscoredLifetimeAttr = [](Decl *decl) {
+static bool findLifetimeAttr(Decl *decl, bool findUnderscored) {
+  auto hasLifetimeAttr = [&](Decl *decl) {
     if (!decl->getAttrs().hasAttribute<LifetimeAttr>()) {
       return false;
     }
     // Since we ban mixing @lifetime and @_lifetime on the same decl, checking
     // any one LifetimeAttr on the decl is sufficient.
     // FIXME: Implement the ban.
-    return decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
+    if (findUnderscored) {
+      return decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
+    }
+    return !decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
   };
 
   switch (decl->getKind()) {
   case DeclKind::Var: {
     auto *var = cast<VarDecl>(decl);
-    return llvm::any_of(var->getAllAccessors(), hasUnderscoredLifetimeAttr);
+    return llvm::any_of(var->getAllAccessors(), hasLifetimeAttr);
   }
   default:
-    return hasUnderscoredLifetimeAttr(decl);
+    return hasLifetimeAttr(decl);
   }
 }
 
 static bool usesFeatureLifetimeDependence(Decl *decl) {
-  if (decl->getAttrs().hasAttribute<LifetimeAttr>()) {
-    if (findUnderscoredLifetimeAttr(decl)) {
-      // Experimental feature Lifetimes will guard the decl.
-      return false;
-    }
+  if (findLifetimeAttr(decl, /*findUnderscored*/ false)) {
     return true;
   }
 
+  // Guard inferred lifetime dependencies with LifetimeDependence if it was
+  // enabled.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::LifetimeDependence)) {
+    return false;
+  }
+
+  // Check for inferred lifetime dependencies
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
     return afd->getInterfaceType()
       ->getAs<AnyFunctionType>()
@@ -186,7 +198,25 @@ static bool usesFeatureLifetimeDependence(Decl *decl) {
 }
 
 static bool usesFeatureLifetimes(Decl *decl) {
-  return findUnderscoredLifetimeAttr(decl);
+  if (findLifetimeAttr(decl, /*findUnderscored*/ true)) {
+    return true;
+  }
+
+  // Guard inferred lifetime dependencies with Lifetimes if it was enabled.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::Lifetimes)) {
+    return false;
+  }
+
+  // Check for inferred lifetime dependencies
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+    return afd->getInterfaceType()
+        ->getAs<AnyFunctionType>()
+        ->hasLifetimeDependencies();
+  }
+  if (auto *varDecl = dyn_cast<VarDecl>(decl)) {
+    return !varDecl->getTypeInContext()->isEscapable();
+  }
+  return false;
 }
 
 static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
@@ -276,7 +306,6 @@ UNINTERESTING_FEATURE(IsolatedAny2)
 UNINTERESTING_FEATURE(GlobalActorIsolatedTypesUsability)
 UNINTERESTING_FEATURE(ObjCImplementation)
 UNINTERESTING_FEATURE(ObjCImplementationWithResilientStorage)
-UNINTERESTING_FEATURE(CImplementation)
 UNINTERESTING_FEATURE(Sensitive)
 UNINTERESTING_FEATURE(DebugDescriptionMacro)
 UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
@@ -321,17 +350,15 @@ static bool usesFeatureClosureBodyMacro(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureCDecl(Decl *decl) {
-  auto attr = decl->getAttrs().getAttribute<CDeclAttr>();
-  return attr && !attr->Underscored;
+static bool usesFeatureBuiltinConcurrencyStackNesting(Decl *decl) {
+  return false;
 }
 
 UNINTERESTING_FEATURE(StrictMemorySafety)
+UNINTERESTING_FEATURE(LibraryEvolution)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
-UNINTERESTING_FEATURE(SuppressCXXForeignReferenceTypeInitializers)
-UNINTERESTING_FEATURE(WarnUnannotatedReturnOfCxxFrt)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
@@ -438,6 +465,37 @@ UNINTERESTING_FEATURE(AddressOfProperty2)
 UNINTERESTING_FEATURE(ImmutableWeakCaptures)
 // Ignore borrow and mutate accessors until it is used in the standard library.
 UNINTERESTING_FEATURE(BorrowAndMutateAccessors)
+
+static bool usesFeatureInlineAlways(Decl *decl) {
+  if (auto *inlineAttr = decl->getAttrs().getAttribute<InlineAttr>()) {
+    return inlineAttr->getKind() == InlineKind::Always;
+  }
+  return false;
+}
+
+UNINTERESTING_FEATURE(SwiftRuntimeAvailability)
+UNINTERESTING_FEATURE(StandaloneSwiftAvailability)
+
+static bool usesFeatureTildeSendable(Decl *decl) {
+  auto *TD = dyn_cast<TypeDecl>(decl);
+  if (!TD)
+    return false;
+
+  return llvm::any_of(
+      TD->getInherited().getEntries(), [&decl](const auto &entry) {
+        if (!entry.isSuppressed())
+          return false;
+
+        auto T = entry.getType();
+        if (!T)
+          return false;
+
+        auto &C = decl->getASTContext();
+        return C.getProtocol(KnownProtocolKind::Sendable) == T->getAnyNominal();
+      });
+}
+
+UNINTERESTING_FEATURE(AnyAppleOSAvailability)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

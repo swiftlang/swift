@@ -8,9 +8,9 @@ public protocol P {
     static func f() -> Any?
 }
 
-protocol Q: P where B == Never {} // expected-error {{circular reference}}
+protocol Q: P where B == Never {} // expected-error@:10 {{circular reference}}
 
-extension Never: Q, P { // expected-note 2{{through reference here}}
+extension Never: Q, P { // expected-note@:1 {{through reference here}}
    public typealias A = Never
    public static func f() -> Any? { nil }
 }

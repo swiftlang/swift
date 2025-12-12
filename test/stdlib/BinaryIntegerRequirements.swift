@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 4
 
 struct MyInt: FixedWidthInteger { // expected-error {{type 'MyInt' does not conform to protocol 'BinaryInteger'}} expected-note {{add stubs for conformance}}
   typealias IntegerLiteralType = Int

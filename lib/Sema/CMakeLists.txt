@@ -44,6 +44,7 @@ add_swift_host_library(swiftSema STATIC
   MiscDiagnostics.cpp
   OpenedExistentials.cpp
   PCMacro.cpp
+  PerformanceHints.cpp
   PlaygroundTransform.cpp
   PreCheckTarget.cpp
   ResilienceDiagnostics.cpp

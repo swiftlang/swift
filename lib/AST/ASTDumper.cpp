@@ -260,8 +260,14 @@ std::string typeUSR(Type type) {
   if (!type)
     return "";
 
+  if (type->is<ModuleType>()) {
+    // ASTMangler does not support "module types". This can appear, for
+    // example, on the left-hand side of a `DotSyntaxBaseIgnoredExpr` for a
+    // module-qualified free function call: `Swift.print()`.
+    return "";
+  }
   if (type->hasArchetype()) {
-    type = type->mapTypeOutOfContext();
+    type = type->mapTypeOutOfEnvironment();
   }
   if (type->hasLocalArchetype()) {
     type = replaceLocalArchetypesWithExistentials(type);
@@ -279,6 +285,13 @@ std::string typeUSR(Type type) {
 std::string declTypeUSR(const ValueDecl *D) {
   if (!D)
     return "";
+
+  if (isa<ModuleDecl>(D)) {
+    // ASTMangler does not support "module types". This can appear, for
+    // example, on the left-hand side of a `DotSyntaxBaseIgnoredExpr` for a
+    // module-qualified free function call: `Swift.print()`.
+    return "";
+  }
 
   std::string usr;
   llvm::raw_string_ostream os(usr);
@@ -581,12 +594,23 @@ static StringRef getDumpString(ExternKind kind) {
 }
 static StringRef getDumpString(InlineKind kind) {
   switch (kind) {
+  case InlineKind::AlwaysUnderscored:
+    return "__always";
   case InlineKind::Always:
     return "always";
   case InlineKind::Never:
     return "never";
   }
   llvm_unreachable("unhandled InlineKind");
+}
+static StringRef getDumpString(ExportKind kind) {
+  switch (kind) {
+  case ExportKind::Interface:
+    return "interface";
+  case ExportKind::Implementation:
+    return "implementation";
+  }
+  llvm_unreachable("unhandled ExportKind");
 }
 static StringRef getDumpString(MacroRole role) {
   return getMacroRoleString(role);
@@ -678,12 +702,22 @@ static StringRef getDumpString(StringRef s) {
 static unsigned getDumpString(unsigned value) {
   return value;
 }
-static size_t getDumpString(size_t value) {
-  return value;
-}
-static void *getDumpString(void *value) { return value; }
+static size_t getDumpString(size_t value) { return value; }
 
 static StringRef getDumpString(Identifier ident) { return ident.str(); }
+
+// If you are reading this comment because a compiler error directed you
+// here, it's probably because you have tried to pass a pointer directly
+// into a function like `printField`. Please do not do this -- it makes
+// the output nondeterministic. For the default S-expression output this
+// is not typically an issue (as it is used mainly for debugging), but
+// this is particularly problematic for the JSON format since build
+// systems may want to cache those outputs based on the content hash.
+//
+// Please call `printPointerField` instead. The output format will be
+// the same for the default formatter, but the JSON formatter will
+// replace those pointers with unique deterministic identifiers.
+static void *getDumpString(void *value) = delete;
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.
@@ -811,6 +845,10 @@ namespace {
     virtual void printSourceRange(const SourceRange R, const ASTContext *Ctx,
                                   Label label) = 0;
 
+    /// Prints the given pointer to an output stream, transforming the pointer
+    /// if necessary to make it safe for the output format.
+    virtual void printPointerToStream(void *pointer, llvm::raw_ostream &OS) = 0;
+
     /// Indicates whether the output format is meant to be parsable. Parsable
     /// output should use structure rather than stringification to convey
     /// detailed information, and generally provides more information than the
@@ -904,6 +942,12 @@ namespace {
       }, label, RangeColor);
     }
 
+    void printPointerToStream(void *pointer, llvm::raw_ostream &OS) override {
+      // The default S-expression format leaves the pointer as-is, since this
+      // is useful when dumping AST nodes in the debugger.
+      OS << pointer;
+    }
+
     bool isParsable() const override { return false; }
   };
 
@@ -912,8 +956,12 @@ namespace {
     llvm::json::OStream OS;
     std::vector<bool> InObjectStack;
 
+    llvm::DenseMap<void *, int> DeterministicPointerIDs;
+    int NextPointerID;
+
   public:
-    JSONWriter(raw_ostream &os, unsigned indent = 0) : OS(os, indent) {}
+    JSONWriter(raw_ostream &os, unsigned indent = 0)
+        : OS(os, indent), NextPointerID(1) {}
 
     void printRecArbitrary(std::function<void(Label)> body,
                            Label label) override {
@@ -1012,6 +1060,21 @@ namespace {
 
       OS.objectEnd();
       OS.attributeEnd();
+    }
+
+    void printPointerToStream(void *pointer, llvm::raw_ostream &OS) override {
+      // JSON output may be used by build systems that want deterministic
+      // output for caching purposes. Generate a unique ID the first time
+      // we see a new pointer.
+      int pointerID;
+      if (auto it = DeterministicPointerIDs.find(pointer);
+          it != DeterministicPointerIDs.end()) {
+        pointerID = it->second;
+      } else {
+        pointerID = NextPointerID++;
+        DeterministicPointerIDs[pointer] = pointerID;
+      }
+      OS << "replaced-pointer-" << pointerID;
     }
 
     bool isParsable() const override { return true; }
@@ -1421,7 +1484,11 @@ namespace {
         printFlag(value.isLocalCapture(), "is_local_capture");
         printFlag(value.isDynamicSelfMetadata(), "is_dynamic_self_metadata");
         if (auto *D = value.getDecl()) {
-          printRec(D, Label::always("decl"));
+          // We print the decl ref, not the full decl, to avoid infinite
+          // recursion when a function captures itself (and also because
+          // those decls are already printed elsewhere, so we don't need to
+          // print what could be a very large amount of information twice).
+          printDeclRefField(D, Label::always("decl"));
         }
         if (auto *E = value.getExpr()) {
           printRec(E, Label::always("expr"));
@@ -1491,6 +1558,18 @@ namespace {
                     TerminalColor color = FieldLabelColor) {
       printFieldRaw([&](raw_ostream &OS) { OS << getDumpString(value); },
                     label, color);
+    }
+
+    /// Print a field that is a bare pointer as a short keyword-style value.
+    /// For parsable output formats that need to be deterministic, each
+    /// pointer will be replaced by a unique ID. The same pointer will be
+    /// mapped to the same ID, so such nodes can still be related to each
+    /// other across the tree.
+    void printPointerField(void *value, Label label,
+                           TerminalColor color = FieldLabelColor) {
+      printFieldRaw(
+          [&](raw_ostream &OS) { Writer.printPointerToStream(value, OS); },
+          label, color);
     }
 
     /// Print a field with a long value that will be automatically quoted and
@@ -1666,8 +1745,8 @@ namespace {
 
     template <typename T>
     void printDeclContext(const T *D) {
-      printField(static_cast<void *>(D->getDeclContext()),
-                 Label::always("decl_context"));
+      printPointerField(static_cast<void *>(D->getDeclContext()),
+                        Label::always("decl_context"));
     }
 
     /// Prints a field containing the name or the USR (based on parsability of
@@ -1834,10 +1913,8 @@ namespace {
       printFoot();
     }
     void visitAnyPattern(AnyPattern *P, Label label) {
-      if (P->isAsyncLet()) {
-        printCommon(P, "async_let ", label);
-      }
       printCommon(P, "pattern_any", label);
+      printFlag(P->isAsyncLet(), "async_let", DeclModifierColor);
       printFoot();
     }
     void visitTypedPattern(TypedPattern *P, Label label) {
@@ -2702,8 +2779,8 @@ namespace {
                   printHead("pattern_entry", FieldLabelColor, label);
 
                   if (PBD->getInitContext(idx))
-                    printField(PBD->getInitContext(idx),
-                               Label::always("init_context"));
+                    printPointerField(PBD->getInitContext(idx),
+                                      Label::always("init_context"));
 
                   printRec(PBD->getPattern(idx), Label::optional("pattern"));
                   if (PBD->getOriginalInit(idx)) {
@@ -4156,8 +4233,7 @@ public:
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E, Label label) {
     printCommon(E, "opaque_value_expr", label);
-    printNameRaw([&](raw_ostream &OS) { OS << (void*)E; },
-                 Label::optional("identity"));
+    printPointerField(static_cast<void *>(E), Label::optional("identity"));
     printFoot();
   }
 
@@ -4352,9 +4428,6 @@ public:
     if (ExpTyR && ExpTyR != TyR) {
       printRec(ExpTyR, Label::optional("type_repr_for_expansion"));
     }
-    if (auto *SE = E->getSemanticExpr()) {
-      printRec(SE, Label::always("semantic_expr"));
-    }
     printFoot();
   }
   void visitLazyInitializerExpr(LazyInitializerExpr *E, Label label) {
@@ -4494,6 +4567,12 @@ public:
   void visitSingleValueStmtExpr(SingleValueStmtExpr *E, Label label) {
     printCommon(E, "single_value_stmt_expr", label);
     printDeclContext(E);
+    if (auto preamble = E->getForExpressionPreamble()) {
+      printRec(preamble->ForAccumulatorDecl,
+               Label::optional("for_preamble_accumulator_decl"));
+      printRec(preamble->ForAccumulatorBinding,
+               Label::optional("for_preamble_accumulator_binding"));
+    }
     printRec(E->getStmt(), &E->getDeclContext()->getASTContext(),
              Label::optional("stmt"));
     printFoot();
@@ -5016,7 +5095,7 @@ public:
   TRIVIAL_ATTR_PRINTER(NoLocks, no_locks)
   TRIVIAL_ATTR_PRINTER(NoMetadata, no_metadata)
   TRIVIAL_ATTR_PRINTER(NoObjCBridging, no_objc_bridging)
-  TRIVIAL_ATTR_PRINTER(ManualOwnership, manual_ownership)
+  TRIVIAL_ATTR_PRINTER(NoManualOwnership, no_manual_ownership)
   TRIVIAL_ATTR_PRINTER(NoRuntime, no_runtime)
   TRIVIAL_ATTR_PRINTER(NonEphemeral, non_ephemeral)
   TRIVIAL_ATTR_PRINTER(NonEscapable, non_escapable)
@@ -5060,6 +5139,7 @@ public:
   TRIVIAL_ATTR_PRINTER(WeakLinked, weak_linked)
   TRIVIAL_ATTR_PRINTER(Nonexhaustive, nonexhaustive)
   TRIVIAL_ATTR_PRINTER(Concurrent, concurrent)
+  TRIVIAL_ATTR_PRINTER(UnsafeSelfDependentResult, unsafe_self_dependent_result)
 
 #undef TRIVIAL_ATTR_PRINTER
 
@@ -5154,7 +5234,7 @@ public:
   void visitCustomAttr(CustomAttr *Attr, Label label) {
     printCommon(Attr, "custom_attr", label);
 
-    printField(
+    printPointerField(
         static_cast<void *>(static_cast<DeclContext *>(Attr->getInitContext())),
         Label::always("init_context"));
 
@@ -5163,12 +5243,8 @@ public:
     } else if (isTypeChecked()) {
       // If the type is null, it might be a macro reference. Try that if we're
       // dumping the fully type-checked AST.
-      auto macroRef =
-          evaluateOrDefault(const_cast<ASTContext *>(Ctx)->evaluator,
-                            ResolveMacroRequest{Attr, DC}, ConcreteDeclRef());
-      if (macroRef) {
+      if (auto macroRef = Attr->getResolvedMacro())
         printDeclRefField(macroRef, Label::always("macro"));
-      }
     }
     if (!Writer.isParsable()) {
       // The type has the semantic information we want for parsable outputs, so
@@ -5249,6 +5325,11 @@ public:
   void visitInlineAttr(InlineAttr *Attr, Label label) {
     printCommon(Attr, "inline_attr", label);
     printField(Attr->getKind(), Label::always("kind"));
+    printFoot();
+  }
+  void visitExportAttr(ExportAttr *Attr, Label label) {
+    printCommon(Attr, "export_attr", label);
+    printField(Attr->exportKind, Label::always("kind"));
     printFoot();
   }
   void visitLifetimeAttr(LifetimeAttr *Attr, Label label) {
@@ -6060,8 +6141,6 @@ namespace {
       printFoot();
     }
 
-    TRIVIAL_TYPE_PRINTER(Unresolved, unresolved)
-
     void visitPlaceholderType(PlaceholderType *T, Label label) {
       printCommon("placeholder_type", label);
       auto originator = T->getOriginator();
@@ -6078,6 +6157,8 @@ namespace {
         printRec(DMT, Label::always("dependent_member_type"));
       } else if (isa<TypeRepr *>(originator)) {
         printFlag("type_repr");
+      } else if (isa<Pattern *>(originator)) {
+        printFlag("pattern");
       } else {
         assert(false && "unknown originator");
       }
@@ -6109,6 +6190,7 @@ namespace {
     TRIVIAL_TYPE_PRINTER(BuiltinRawUnsafeContinuation, builtin_raw_unsafe_continuation)
     TRIVIAL_TYPE_PRINTER(BuiltinNativeObject, builtin_native_object)
     TRIVIAL_TYPE_PRINTER(BuiltinBridgeObject, builtin_bridge_object)
+    TRIVIAL_TYPE_PRINTER(BuiltinImplicitActor, builtin_implicit_isolated_actor)
     TRIVIAL_TYPE_PRINTER(BuiltinUnsafeValueBuffer, builtin_unsafe_value_buffer)
     TRIVIAL_TYPE_PRINTER(SILToken, sil_token)
 
@@ -6317,7 +6399,7 @@ namespace {
                               Label label) {
       printCommon(className, label);
 
-      printField(static_cast<void *>(T), Label::always("address"));
+      printPointerField(static_cast<void *>(T), Label::always("address"));
       printFlag(T->requiresClass(), "class");
       if (auto layout = T->getLayoutConstraint()) {
         printFieldRaw([&](raw_ostream &OS) {
@@ -6751,7 +6833,7 @@ void GenericEnvironment::dump(raw_ostream &os) const {
   os << "Generic environment:\n";
   for (auto gp : getGenericParams()) {
     gp->dump(os);
-    mapTypeIntoContext(gp)->dump(os);
+    mapTypeIntoEnvironment(gp)->dump(os);
   }
   os << "Generic parameters:\n";
   for (auto paramTy : getGenericParams())

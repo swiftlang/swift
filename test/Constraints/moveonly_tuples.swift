@@ -23,3 +23,7 @@ func inferredTuples<T>(x: Int, y: borrowing Butt, z: T) {
     _ = b
     _ = c
 }
+
+// Avoid spurious diagnostic with the tuple here
+func bogus<T>(_: T, _: (T, T)) where T == DoesNotExist {}
+// expected-error@-1 {{cannot find type 'DoesNotExist' in scope}}

@@ -6,8 +6,8 @@
 // RUN: %target-swift-frontend -dump-source-file-imports -emit-module -plugin-path %swift-plugin-dir -o %t/ClangIncludesExplicit.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers %t/test.swift 2>&1 | %FileCheck %s --check-prefix DUMP
 // RUN: %target-swift-frontend -dump-source-file-imports -emit-module -plugin-path %swift-plugin-dir -o %t/ClangIncludesExplicit.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers %t/test.swift -cxx-interoperability-mode=default 2>&1 | %FileCheck %s --check-prefix DUMP --check-prefix DUMP-CXX
 
-// RUN: %target-swift-ide-test -print-module -module-print-hidden -module-to-print=A1 -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s --check-prefix CHECK-A1 --implicit-check-not=import --match-full-lines
-// RUN: %target-swift-ide-test -print-module -module-print-hidden -module-to-print=A2 -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s --check-prefix CHECK-A2 --implicit-check-not=import --match-full-lines
+// RUN: %target-swift-ide-test -print-module -module-print-hidden -module-to-print=A1 -plugin-path %swift-plugin-dir -I %t/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s --check-prefix CHECK-A1 --implicit-check-not=import --match-full-lines
+// RUN: %target-swift-ide-test -print-module -module-print-hidden -module-to-print=A2 -plugin-path %swift-plugin-dir -I %t/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s --check-prefix CHECK-A2 --implicit-check-not=import --match-full-lines
 
 //--- test.swift
 import A1

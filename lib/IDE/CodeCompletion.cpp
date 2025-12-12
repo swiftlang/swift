@@ -188,7 +188,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
         CurDeclContext,
         /*ProduceDiagnostics=*/false);
     if (!ty->hasError()) {
-      ParsedTypeLoc.setType(CurDeclContext->mapTypeIntoContext(ty));
+      ParsedTypeLoc.setType(CurDeclContext->mapTypeIntoEnvironment(ty));
       return true;
     }
 
@@ -883,7 +883,7 @@ static void addKeywordsAfterReturn(CodeCompletionResultSink &Sink, DeclContext *
       // Note that `TypeContext` must stay alive for the duration of
       // `~CodeCodeCompletionResultBuilder()`.
       ExpectedTypeContext TypeContext;
-      TypeContext.setPossibleTypes({DC->mapTypeIntoContext(resultType)});
+      TypeContext.setPossibleTypes({DC->mapTypeIntoEnvironment(resultType)});
 
       CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Literal,
                                           SemanticContextKind::None);
@@ -1455,18 +1455,17 @@ void CodeCompletionCallbacksImpl::typeCheckWithLookup(
     /// The attribute might not be attached to the AST if there is no var
     /// decl it could be attached to. Type check it standalone.
 
+    auto &ctx = CurDeclContext->getASTContext();
+
     // First try to check it as an attached macro.
-    (void)evaluateOrDefault(
-        CurDeclContext->getASTContext().evaluator,
-        ResolveMacroRequest{AttrWithCompletion, CurDeclContext},
-        ConcreteDeclRef());
+    (void)AttrWithCompletion->getResolvedMacro();
 
     // If that fails, type check as a call to the attribute's type. This is
     // how, e.g., property wrappers are modelled.
     if (!Lookup.gotCallback()) {
-      ASTNode Call = CallExpr::create(
-          CurDeclContext->getASTContext(), AttrWithCompletion->getTypeExpr(),
-          AttrWithCompletion->getArgs(), /*implicit=*/true);
+      ASTNode Call =
+          CallExpr::create(ctx, AttrWithCompletion->getTypeExpr(),
+                           AttrWithCompletion->getArgs(), /*implicit=*/true);
       swift::typeCheckASTNodeAtLoc(
           TypeCheckASTNodeAtLocContext::node(CurDeclContext, Call),
           CompletionLoc);

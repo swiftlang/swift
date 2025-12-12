@@ -1992,13 +1992,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ "${SWIFT_STDLIB_CONCURRENCY_TRACING}" ]] ; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSWIFT_STDLIB_CONCURRENCY_TRACING:BOOL=$(true_false "${SWIFT_STDLIB_CONCURRENCY_TRACING}")
-                    )
-                fi
-
                 if [[ "${SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES}" ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
@@ -2124,6 +2117,33 @@ for host in "${ALL_HOSTS[@]}"; do
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}/Sources/FoundationNetworking"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}/Sources/FoundationXML"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}/lib"
+                fi
+
+                if [[ ! "${SKIP_BUILD_LIBXML2}" ]]; then
+                  # Note: This is wrong when cross-compiling. LLDB is part of
+                  # the toolchain while the built libxml2 is built for the
+                  # runtime environment for use in FoundationXML.
+                  # Build-Script does not separate the toolchain and runtime
+                  # build, so this is already broken.
+                  BASE_INSTALL_DIR="$(get_host_install_destdir ${host})"
+                  LIBXML2_HEADERS="${BASE_INSTALL_DIR}/usr/include/libxml2"
+                  LIBXML2_LIBRARY="${BASE_INSTALL_DIR}/usr/lib/libxml2.a"
+
+                  if [[ -z "${DRY_RUN}" && ! -d "${LIBXML2_HEADERS}" ]]; then
+                      echo "Error: '${LIBXML2_HEADERS}' does not exist" 1>&2
+                      exit 1
+                  fi
+
+                  if [[ -z "${DRY_RUN}" && ! -e "${LIBXML2_LIBRARY}" ]]; then
+                      echo "Error: '${LIBXML2_LIBRARY}' does not exist" 1>&2
+                      exit 1
+                  fi
+
+                  cmake_options+=(
+                    -DLIBXML2_INCLUDE_DIR:PATH="${LIBXML2_HEADERS}"
+                    -DLIBXML2_LIBRARY:PATH="${LIBXML2_LIBRARY}"
+                    -DLIBXML2_DEFINITIONS="-DLIBXML_STATIC"
+                  )
                 fi
 
                 # Watchpoint testing is currently disabled: see rdar://38566150.
@@ -3181,7 +3201,7 @@ function build_and_test_installable_package() {
               call tar -c -z -f "${package_for_host}" "${TOOLCHAIN_PREFIX/#\/}"
         else
             # BSD tar doesn't support --owner/--group.
-            if [[ "$(uname -s)" == "Darwin" || "$(uname -s)" == "FreeBSD" ]] ; then
+            if [[ "$(uname -s)" == "Darwin" || "$(uname -s)" == "FreeBSD" || "$(uname -s)" == "OpenBSD" ]] ; then
                 with_pushd "${host_install_destdir}" \
                     tar -c -z -f "${package_for_host}" "${host_install_prefix/#\/}"
             else

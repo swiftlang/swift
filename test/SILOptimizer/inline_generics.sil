@@ -66,7 +66,7 @@ bb0(%0 : $T, %1 : $@callee_owned (@owned P) -> Bool):
 } // end sil function 'thunk2'
 
 
-sil [always_inline] @alwaysInlineGenericCallee : $@convention(thin) <T> (@in T) -> @out T {
+sil [heuristic_always_inline] @alwaysInlineGenericCallee : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
   copy_addr [take] %1 to [init] %0 : $*T
   %4 = tuple ()
@@ -81,7 +81,7 @@ bb0(%0 : $*T, %1 : $*T):
 } // end sil function 'transparentInlineGenericCallee'
 
 
-// Check that [always_inline] and [transparent] functions are inlined even if
+// Check that [heuristic_always_inline] and [transparent] functions are inlined even if
 // inlining of generics is disabled. Regular generic functions should not be
 // inlined.
 // DISABLED-GENERIC-INLINING-CHECK-LABEL: sil @testComplexInliningOfGenerics
@@ -100,7 +100,7 @@ bb0(%0 : $*T, %1 : $*T):
 sil @testComplexInliningOfGenerics : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
 
-  // Call an [always_inline] function.
+  // Call an [heuristic_always_inline] function.
   %3 = function_ref @alwaysInlineGenericCallee : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
   %4 = alloc_stack $T
   copy_addr %1 to [init] %4 : $*T
@@ -169,7 +169,7 @@ bb0(%0 : $MyNumber):
 
 sil @dootherstuff : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> ()
 
-sil shared [signature_optimized_thunk] [always_inline] @doStuff : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> () {
+sil shared [signature_optimized_thunk] [heuristic_always_inline] @doStuff : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> () {
 bb0(%0 : $*τ_0_0):
   %2 = function_ref @dootherstuff : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> ()
   %3 = apply %2<τ_0_0>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : OtherProto> (@in_guaranteed τ_0_0) -> ()

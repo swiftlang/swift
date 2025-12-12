@@ -101,7 +101,7 @@ extension SuspendingClock: Clock {
   public func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
-    if #available(StdlibDeploymentTarget 6.2, *) {
+    if #available(StdlibDeploymentTarget 6.3, *) {
       try await Task._sleep(until: deadline,
                             tolerance: tolerance,
                             clock: self)
@@ -191,7 +191,7 @@ extension SuspendingClock.Instant: InstantProtocol {
 }
 
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-@available(StdlibDeploymentTarget 6.2, *)
+@available(StdlibDeploymentTarget 6.3, *)
 extension SuspendingClock {
 
   public func run(_ job: consuming ExecutorJob,

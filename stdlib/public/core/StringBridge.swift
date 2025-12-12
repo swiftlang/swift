@@ -624,7 +624,7 @@ extension String {
     _connectOrphanedFoundationSubclassesIfNeeded()
 
     if _guts.isSmall {
-      return unsafe _guts.asSmall.withUTF8 { bufPtr in
+      return _guts.asSmall.withUTF8 { bufPtr in
         // Smol ASCII a) may bridge to tagged pointers, b) can't contain a BOM
         if _guts.isSmallASCII, let result = unsafe _createCFString(
           bufPtr.baseAddress._unsafelyUnwrappedUnchecked,

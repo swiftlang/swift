@@ -910,7 +910,9 @@ ManglingError Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
   Buffer << 'B';
   StringRef text = node->getText();
 
-  if (text == BUILTIN_TYPE_NAME_BRIDGEOBJECT) {
+  if (text == BUILTIN_TYPE_NAME_IMPLICITACTOR) {
+    Buffer << 'A';
+  } else if (text == BUILTIN_TYPE_NAME_BRIDGEOBJECT) {
     Buffer << 'b';
   } else if (text == BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER) {
     Buffer << 'B';
@@ -1516,6 +1518,9 @@ ManglingError Remangler::mangleFunctionSignatureSpecialization(Node *node,
   Buffer << "Tf";
   bool returnValMangled = false;
   for (NodePointer Child : *node) {
+    if (Child->getKind() == Node::Kind::RepresentationChanged) {
+      returnValMangled = true;
+    }
     if (Child->getKind() == Node::Kind::FunctionSignatureSpecializationReturn) {
       Buffer << '_';
       returnValMangled = true;
@@ -1601,6 +1606,9 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
       break;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Buffer << 'c';
+      break;
+    case FunctionSigSpecializationParamKind::ClosurePropPreviousArg:
+      Buffer << 'C' << node->getChild(idx++)->getIndex();
       break;
     case FunctionSigSpecializationParamKind::BoxToValue:
       Buffer << 'i';
@@ -2221,14 +2229,18 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
         Buffer << 'z';
         LLVM_FALLTHROUGH;
       case Node::Kind::ImplResult: {
-        char ConvCh = llvm::StringSwitch<char>(Child->getFirstChild()->getText())
-                        .Case("@out", 'r')
-                        .Case("@owned", 'o')
-                        .Case("@unowned", 'd')
-                        .Case("@unowned_inner_pointer", 'u')
-                        .Case("@autoreleased", 'a')
-                        .Case("@pack_out", 'k')
-                        .Default(0);
+        char ConvCh =
+            llvm::StringSwitch<char>(Child->getFirstChild()->getText())
+                .Case("@out", 'r')
+                .Case("@owned", 'o')
+                .Case("@unowned", 'd')
+                .Case("@unowned_inner_pointer", 'u')
+                .Case("@autoreleased", 'a')
+                .Case("@pack_out", 'k')
+                .Case("@guaranteed_address", 'l')
+                .Case("@guaranteed", 'g')
+                .Case("@inout", 'm')
+                .Default(0);
         if (!ConvCh) {
           return MANGLING_ERROR(ManglingError::InvalidImplParameterConvention,
                                Child->getFirstChild());
@@ -3181,6 +3193,11 @@ ManglingError Remangler::mangleIsSerialized(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleAsyncRemoved(Node *node, unsigned depth) {
   Buffer << 'a';
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleRepresentationChanged(Node *node, unsigned depth) {
+  Buffer << 'r';
   return ManglingError::Success;
 }
 

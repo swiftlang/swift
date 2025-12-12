@@ -531,10 +531,6 @@ enum class CxxEscapability { Escapable, NonEscapable, Unknown };
 struct EscapabilityLookupDescriptor final {
   const clang::Type *type;
   ClangImporter::Implementation *impl;
-  // Only explicitly ~Escapable annotated types are considered ~Escapable.
-  // This is for backward compatibility, so we continue to import aggregates
-  // containing pointers as Escapable types.
-  bool annotationOnly = true;
 
   friend llvm::hash_code hash_value(const EscapabilityLookupDescriptor &desc) {
     return llvm::hash_combine(desc.type);
@@ -542,7 +538,7 @@ struct EscapabilityLookupDescriptor final {
 
   friend bool operator==(const EscapabilityLookupDescriptor &lhs,
                          const EscapabilityLookupDescriptor &rhs) {
-    return lhs.type == rhs.type && lhs.annotationOnly == rhs.annotationOnly;
+    return lhs.type == rhs.type;
   }
 
   friend bool operator!=(const EscapabilityLookupDescriptor &lhs,
@@ -575,14 +571,7 @@ SourceLoc extractNearestSourceLoc(EscapabilityLookupDescriptor desc);
 // When a reference type is copied, the pointer’s value is copied rather than
 // the object’s storage. This means reference types can be imported as
 // copyable to Swift, even when they are non-copyable in C++.
-enum class CxxValueSemanticsKind {
-  Copyable,
-  MoveOnly,
-  // A record that is either not copyable/movable or not destructible.
-  MissingLifetimeOperation,
-  // A record that has no copy and no move operations
-  UnavailableConstructors,
-};
+enum class CxxValueSemanticsKind { Unknown, Copyable, MoveOnly };
 
 struct CxxValueSemanticsDescriptor final {
   const clang::Type *type;
@@ -623,37 +612,37 @@ private:
 void simple_display(llvm::raw_ostream &out, CxxValueSemanticsDescriptor desc);
 SourceLoc extractNearestSourceLoc(CxxValueSemanticsDescriptor desc);
 
-struct CxxDeclExplicitSafetyDescriptor final {
+struct ClangDeclExplicitSafetyDescriptor final {
   const clang::Decl *decl;
   bool isClass;
 
-  CxxDeclExplicitSafetyDescriptor(const clang::Decl *decl, bool isClass)
+  ClangDeclExplicitSafetyDescriptor(const clang::Decl *decl, bool isClass)
       : decl(decl), isClass(isClass) {}
 
   friend llvm::hash_code
-  hash_value(const CxxDeclExplicitSafetyDescriptor &desc) {
+  hash_value(const ClangDeclExplicitSafetyDescriptor &desc) {
     return llvm::hash_combine(desc.decl, desc.isClass);
   }
 
-  friend bool operator==(const CxxDeclExplicitSafetyDescriptor &lhs,
-                         const CxxDeclExplicitSafetyDescriptor &rhs) {
+  friend bool operator==(const ClangDeclExplicitSafetyDescriptor &lhs,
+                         const ClangDeclExplicitSafetyDescriptor &rhs) {
     return lhs.decl == rhs.decl && lhs.isClass == rhs.isClass;
   }
 
-  friend bool operator!=(const CxxDeclExplicitSafetyDescriptor &lhs,
-                         const CxxDeclExplicitSafetyDescriptor &rhs) {
+  friend bool operator!=(const ClangDeclExplicitSafetyDescriptor &lhs,
+                         const ClangDeclExplicitSafetyDescriptor &rhs) {
     return !(lhs == rhs);
   }
 };
 
 void simple_display(llvm::raw_ostream &out,
-                    CxxDeclExplicitSafetyDescriptor desc);
-SourceLoc extractNearestSourceLoc(CxxDeclExplicitSafetyDescriptor desc);
+                    ClangDeclExplicitSafetyDescriptor desc);
+SourceLoc extractNearestSourceLoc(ClangDeclExplicitSafetyDescriptor desc);
 
 /// Determine the safety of the given Clang declaration.
 class ClangDeclExplicitSafety
     : public SimpleRequest<ClangDeclExplicitSafety,
-                           ExplicitSafety(CxxDeclExplicitSafetyDescriptor),
+                           ExplicitSafety(ClangDeclExplicitSafetyDescriptor),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -667,7 +656,7 @@ private:
 
   // Evaluation.
   ExplicitSafety evaluate(Evaluator &evaluator,
-                          CxxDeclExplicitSafetyDescriptor desc) const;
+                          ClangDeclExplicitSafetyDescriptor desc) const;
 };
 
 #define SWIFT_TYPEID_ZONE ClangImporter

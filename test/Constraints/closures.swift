@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 func myMap<T1, T2>(_ array: [T1], _ fn: (T1) -> T2) -> [T2] {}
 
@@ -1362,7 +1362,7 @@ do {
     }
   }
 
-  test { // expected-error {{invalid conversion from throwing function of type '(Int) throws -> Void' to non-throwing function type '(Int) -> Void'}}
+  test { // expected-error {{invalid conversion from throwing function of type '(Int) throws -> _' to non-throwing function type '(Int) -> Void'}}
     try $0.missing // expected-error {{value of type 'Int' has no member 'missing'}}
   }
 }

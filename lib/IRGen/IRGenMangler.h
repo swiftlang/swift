@@ -685,7 +685,8 @@ public:
   std::string mangleSymbolNameForMangledMetadataAccessorString(
                                            const char *kind,
                                            CanGenericSignature genericSig,
-                                           CanType type);
+                                           CanType type,
+                                           MangledTypeRefRole role);
 
   std::string mangleSymbolNameForMangledConformanceAccessorString(
                                            const char *kind,

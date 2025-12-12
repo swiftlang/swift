@@ -274,32 +274,21 @@ BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(BridgedArrayRef bridge
 }
 
 BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
-  BridgedArrayRef bridgedClosureArgs, BridgedFunction applySiteCallee
+  BridgedArrayRef closureArgManglings, BridgedFunction applySiteCallee
 ) const {
-
-  struct ClosureArgElement {
-    SwiftInt argIdx;
-    BridgeValueExistential argValue;
-  };
-
   auto pass = Demangle::SpecializationPass::ClosureSpecializer;
   auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
   Mangle::FunctionSignatureSpecializationMangler mangler(applySiteCallee.getFunction()->getASTContext(),
       pass, serializedKind, applySiteCallee.getFunction());
 
-  auto closureArgs = bridgedClosureArgs.unbridged<ClosureArgElement>();
+  auto closureArgs = closureArgManglings.unbridged<ClosureArgMangling>();
 
-  for (ClosureArgElement argElmt : closureArgs) {
-    auto closureArg = argElmt.argValue.value.getSILValue();
-    auto closureArgIndex = argElmt.argIdx;
-
-    if (auto *PAI = dyn_cast<PartialApplyInst>(closureArg)) {
-      mangler.setArgumentClosureProp(closureArgIndex,
-                                     const_cast<PartialApplyInst *>(PAI));
+  for (ClosureArgMangling argElmt : closureArgs) {
+    auto closureArgIndex = (unsigned)argElmt.argIdx;
+    if (SILInstruction *inst = argElmt.inst.unbridged()) {
+      mangler.setArgumentClosureProp(closureArgIndex, inst);
     } else {
-      auto *TTTFI = cast<ThinToThickFunctionInst>(closureArg);
-      mangler.setArgumentClosureProp(closureArgIndex,
-                                     const_cast<ThinToThickFunctionInst *>(TTTFI));
+      mangler.setArgumentClosurePropPreviousArg(closureArgIndex, argElmt.otherArgIdx);
     }
   }
 
@@ -344,6 +333,35 @@ BridgedOwnedString BridgedPassContext::mangleWithBoxToStackPromotedArgs(
   return BridgedOwnedString(mangler.mangle());
 }
 
+BridgedOwnedString BridgedPassContext::mangleWithExplodedPackArgs(
+    BridgedArrayRef bridgedPackArgs,
+    BridgedFunction applySiteCallee
+  ) const {
+  auto pass = Demangle::SpecializationPass::PackSpecialization;
+
+  auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
+  Mangle::FunctionSignatureSpecializationMangler mangler(
+      applySiteCallee.getFunction()->getASTContext(),
+      pass, serializedKind, applySiteCallee.getFunction());
+
+  for (SwiftInt i : bridgedPackArgs.unbridged<SwiftInt>()) {
+    mangler.setArgumentSROA((unsigned)i);
+  }
+
+  return BridgedOwnedString(mangler.mangle());
+}
+
+BridgedOwnedString BridgedPassContext::mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const {
+  auto pass = Demangle::SpecializationPass::EmbeddedWitnessCallSpecialization;
+
+  Mangle::FunctionSignatureSpecializationMangler mangler(
+      applySiteCallee.getFunction()->getASTContext(),
+      pass, IsNotSerialized, applySiteCallee.getFunction());
+
+  mangler.setChangedRepresentation();
+  return BridgedOwnedString(mangler.mangle());
+}
+
 void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
   switch (StackNesting::fixNesting(function.getFunction())) {
     case StackNesting::Changes::None:
@@ -383,8 +401,10 @@ BridgedFunction BridgedPassContext::
 createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
                                      const BridgedParameterInfo * _Nullable specializedBridgedParams,
                                      SwiftInt paramCount,
+                                     const BridgedResultInfo * _Nullable specializedBridgedResults,
+                                     SwiftInt resultCount,
                                      BridgedFunction bridgedOriginal,
-                                     bool makeThin,
+                                     BridgedASTType::FunctionTypeRepresentation representation,
                                      bool makeBare,
                                      bool preserveGenericSignature) const {
   auto *original = bridgedOriginal.getFunction();
@@ -395,19 +415,25 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
     specializedParams.push_back(specializedBridgedParams[idx].unbridged());
   }
 
+  // If no results list is passed, use the original function's results.
+  llvm::SmallVector<SILResultInfo> specializedResults;
+  if (specializedBridgedResults != nullptr) {
+    for (unsigned idx = 0; idx < resultCount; ++idx) {
+      specializedResults.push_back(specializedBridgedResults[idx].unbridged());
+    }
+  }
+
   // The specialized function is always a thin function. This is important
   // because we may add additional parameters after the Self parameter of
   // witness methods. In this case the new function is not a method anymore.
-  auto extInfo = originalType->getExtInfo();
-  if (makeThin)
-    extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+  auto extInfo = originalType->getExtInfo().withRepresentation((SILFunctionTypeRepresentation)representation);
 
   auto ClonedTy = SILFunctionType::get(
       preserveGenericSignature ? originalType->getInvocationGenericSignature() : GenericSignature(),
       extInfo,
       originalType->getCoroutineKind(),
       originalType->getCalleeConvention(), specializedParams,
-      originalType->getYields(), originalType->getResults(),
+      originalType->getYields(), specializedBridgedResults ? specializedResults : originalType->getResults(),
       originalType->getOptionalErrorResult(),
       preserveGenericSignature ? originalType->getPatternSubstitutions() : SubstitutionMap(),
       preserveGenericSignature ? originalType->getInvocationSubstitutions() : SubstitutionMap(),
@@ -518,6 +544,13 @@ bool BridgedFunction::isConvertPointerToPointerArgument() const {
     auto *conversionDecl =
       declRef.getASTContext().getConvertPointerToPointerArgument();
     return declRef.getFuncDecl() == conversionDecl;
+  }
+  return false;
+}
+
+bool BridgedFunction::isAddressor() const {
+  if (auto declRef = dyn_cast_or_null<AccessorDecl>(getFunction()->getDeclRef().getDecl())) {
+    return declRef->isAnyAddressor();
   }
   return false;
 }

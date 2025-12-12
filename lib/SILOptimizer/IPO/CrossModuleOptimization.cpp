@@ -921,7 +921,7 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
                                        const FunctionFlags &canSerializeFlags) {
   // Put callees onto the worklist if they should be serialized as well.
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(inst)) {
-    SILFunction *callee = FRI->getReferencedFunctionOrNull();
+    SILFunction *callee = FRI->getInitiallyReferencedFunction();
     assert(callee);
     if (!callee->isDefinition() || callee->isAvailableExternally())
       return;
@@ -1034,7 +1034,7 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
     // immutable at this point.
     auto &ctx = decl->getASTContext();
     auto *attr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-    decl->getAttrs().add(attr);
+    decl->addAttribute(attr);
 
     if (everything) {
       // The following does _not_ apply to the Package CMO as

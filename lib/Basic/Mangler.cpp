@@ -32,19 +32,6 @@ llvm::cl::opt<bool> PrintSwiftManglingStats(
 
 namespace {
 
-struct SizeStatEntry {
-  int sizeDiff;
-  std::string Old;
-  std::string New;
-};
-
-static std::vector<SizeStatEntry> SizeStats;
-
-static int numSmaller = 0;
-static int numEqual = 0;
-static int numLarger = 0;
-static int totalOldSize = 0;
-static int totalNewSize = 0;
 static int mergedSubsts = 0;
 static int numLargeSubsts = 0;
 
@@ -74,24 +61,6 @@ void Mangle::printManglingStats() {
   if (!PrintSwiftManglingStats)
     return;
 
-  std::sort(SizeStats.begin(), SizeStats.end(),
-    [](const SizeStatEntry &LHS, const SizeStatEntry &RHS) {
-      return LHS.sizeDiff < RHS.sizeDiff;
-    });
-
-  llvm::outs() << "Mangling size stats:\n"
-                  "  num smaller: " << numSmaller << "\n"
-                  "  num larger:  " << numLarger << "\n"
-                  "  num equal:   " << numEqual << "\n"
-                  "  total old size: " << totalOldSize << "\n"
-                  "  total new size: " << totalNewSize << "\n"
-                  "  new - old size: " << (totalNewSize - totalOldSize) << "\n"
-                  "List or larger:\n";
-  for (const SizeStatEntry &E : SizeStats) {
-    llvm::outs() << "  delta " << E.sizeDiff << ": " << E.Old << " - " << E.New
-                 << '\n';
-  }
-  
   llvm::outs() << "Mangling operator stats:\n";
 
   using MapEntry = llvm::StringMapEntry<OpStatEntry>;

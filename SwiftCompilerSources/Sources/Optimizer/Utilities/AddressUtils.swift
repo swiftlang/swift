@@ -139,7 +139,12 @@ extension AddressUseVisitor {
       let svi = operand.instruction as! SingleValueInstruction
       return loadedAddressUse(of: operand, intoValue: svi)
 
-    case is YieldInst:
+    case is YieldInst,
+    // Return should only occur in a borrow or inout accessor, in which case the
+    // returned address should be structurally used as if it were a projected
+    // use in the caller, even though there is no code here in the callee to
+    // formally end the access.
+         is ReturnInst:
       return yieldedAddressUse(of: operand)
 
     case let sdai as SourceDestAddrInstruction
@@ -279,7 +284,7 @@ extension AccessBase {
     default:
       return nil
     }
-    return AddressInitializationWalker.findSingleInitializer(ofAddress: baseAddr, context: context)
+    return AddressInitializationWalker.findSingleInitializer(ofAddress: baseAddr, requireFullyAssigned: .value, context)
   }
 }
 
@@ -311,6 +316,8 @@ extension AccessBase {
 // modification of memory.
 struct AddressInitializationWalker: AddressDefUseWalker, AddressUseVisitor {
   let baseAddress: Value
+  let requireFullyAssigned: IsFullyAssigned
+  let onRead: WalkResult
   let context: any Context
 
   var walkDownCache = WalkerCache<SmallProjectionPath>()
@@ -318,18 +325,22 @@ struct AddressInitializationWalker: AddressDefUseWalker, AddressUseVisitor {
   var isProjected = false
   var initializer: AccessBase.Initializer?
 
-  static func findSingleInitializer(ofAddress baseAddr: Value, context: some Context)
+  static func findSingleInitializer(ofAddress baseAddr: Value, requireFullyAssigned: IsFullyAssigned,
+                                    allowRead: Bool = true, _ context: some Context)
     -> AccessBase.Initializer? {
 
-    var walker = AddressInitializationWalker(baseAddress: baseAddr, context)
+    var walker = AddressInitializationWalker(baseAddress: baseAddr, requireFullyAssigned, allowRead: allowRead, context)
     if walker.walkDownUses(ofAddress: baseAddr, path: SmallProjectionPath()) == .abortWalk {
       return nil
     }
     return walker.initializer
   }
 
-  private init(baseAddress: Value, _ context: some Context) {
+  private init(baseAddress: Value, _ requireFullyAssigned: IsFullyAssigned, allowRead: Bool, _ context: some Context) {
+    assert(requireFullyAssigned != .no)
     self.baseAddress = baseAddress
+    self.requireFullyAssigned = requireFullyAssigned
+    self.onRead = allowRead ? .continueWalk : .abortWalk
     self.context = context
     if let arg = baseAddress as? FunctionArgument {
       assert(!arg.convention.isIndirectIn, "@in arguments cannot be initialized")
@@ -387,12 +398,26 @@ extension AddressInitializationWalker {
     // FIXME: check mayWriteToMemory but ignore non-stores. Currently,
     // stores should all be checked my isAddressInitialization, but
     // this is not robust.
-    return .continueWalk
+    return onRead
   }
 
   mutating func appliedAddressUse(of operand: Operand, by apply: FullApplySite)
     -> WalkResult {
-    if operand.isAddressInitialization {
+    switch apply.fullyAssigns(operand: operand) {
+    case .no:
+      if onRead == .abortWalk {
+        return .abortWalk
+      }
+      break
+    case .lifetime:
+      if onRead == .abortWalk {
+        return .abortWalk
+      }
+      if requireFullyAssigned == .value  {
+        break
+      }
+      fallthrough
+    case .value:
       return setInitializer(instruction: operand.instruction)
     }
     guard let convention = apply.convention(of: operand) else {
@@ -403,26 +428,26 @@ extension AddressInitializationWalker {
 
   mutating func loadedAddressUse(of operand: Operand, intoValue value: Value)
     -> WalkResult {
-    return .continueWalk
+    return onRead
   }
 
   mutating func loadedAddressUse(of operand: Operand, intoAddress address: Operand)
     -> WalkResult {
-    return .continueWalk
+    return onRead
   }
 
   mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
     // An inout yield is a partial write. Initialization via coroutine is not supported, so we assume a prior
     // initialization must dominate the yield.
-    return .continueWalk
+    return onRead
   }
 
   mutating func dependentAddressUse(of operand: Operand, dependentValue value: Value) -> WalkResult {
-    return .continueWalk
+    return onRead
   }
 
   mutating func dependentAddressUse(of operand: Operand, dependentAddress address: Value) -> WalkResult {
-    return .continueWalk
+    return onRead
   }
 
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
@@ -629,7 +654,7 @@ extension AddressOwnershipLiveRange {
     var reachableUses = Stack<LocalVariableAccess>(context)
     defer { reachableUses.deinitialize() }
 
-    localReachability.gatherKnownLifetimeUses(from: assignment, in: &reachableUses)
+    localReachability.gatherKnownLivenessUses(from: assignment, in: &reachableUses)
 
     let assignmentInst = assignment.instruction ?? allocation.parentFunction.entryBlock.instructions.first!
     var range = InstructionRange(begin: assignmentInst, context)

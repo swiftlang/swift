@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
+#include "swift/AST/AttrKind.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/Version.h"
@@ -298,11 +299,6 @@ public:
   /// \see ModuleDecl::isImplicitDynamicEnabled
   bool EnableImplicitDynamic = false;
 
-  /// Enables the "fully resilient" resilience strategy.
-  ///
-  /// \see ResilienceStrategy::Resilient
-  bool EnableLibraryEvolution = false;
-
   /// If set, this module is part of a mixed Objective-C/Swift framework, and
   /// the Objective-C half should implicitly be visible to the Swift sources.
   bool ImportUnderlyingModule = false;
@@ -330,6 +326,10 @@ public:
   /// Indicates that the frontend should print the target triple and then
   /// exit.
   bool PrintTargetInfo = false;
+
+  /// Indicates that the frontend should print the static build configuration
+  /// information as JSON.
+  bool PrintBuildConfig = false;
 
   /// Indicates that the frontend should print the supported features and then
   /// exit.
@@ -501,6 +501,10 @@ public:
   /// Indicates which declarations should be exposed in the generated clang
   /// header.
   std::optional<ClangHeaderExposeBehavior> ClangHeaderExposedDecls;
+
+  // Include declarations that are at least as visible as the acces specified
+  // by -emit-clang-header-min-access
+  std::optional<AccessLevel> ClangHeaderMinAccess;
 
   struct ClangHeaderExposedImportedModule {
     std::string moduleName;

@@ -95,10 +95,6 @@ Type typeCheckParameterDefault(Expr *&, DeclContext *, Type, bool, bool);
 
 } // end namespace swift
 
-/// Allocate memory within the given constraint system.
-void *operator new(size_t bytes, swift::constraints::ConstraintSystem& cs,
-                   size_t alignment = 8);
-
 namespace swift {
 
 /// Specify how we handle the binding of underconstrained (free) type variables
@@ -236,36 +232,23 @@ public:
 
 
 class ExpressionTimer {
-public:
-  using AnchorType = llvm::PointerUnion<Expr *, ConstraintLocator *>;
-
-private:
-  AnchorType Anchor;
-  ASTContext &Context;
+  ConstraintSystem &CS;
   llvm::TimeRecord StartTime;
 
   /// The number of seconds from creation until
   /// this timer is considered expired.
   unsigned ThresholdInSecs;
 
-  bool PrintDebugTiming;
   bool PrintWarning;
 
 public:
   const static unsigned NoLimit = (unsigned) -1;
 
-  ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
-                  unsigned thresholdInSecs);
+  ExpressionTimer(ConstraintSystem &CS, unsigned thresholdInSecs);
 
   ~ExpressionTimer();
 
-  AnchorType getAnchor() const { return Anchor; }
-
-  SourceRange getAffectedRange() const;
-
-  unsigned getWarnLimit() const {
-    return Context.TypeCheckerOpts.WarnLongExpressionTypeChecking;
-  }
+  unsigned getWarnLimit() const;
   llvm::TimeRecord startedAt() const { return StartTime; }
 
   /// Return the elapsed process time (including fractional seconds)
@@ -951,7 +934,7 @@ public:
     if (!interfaceFnTy) {
       // If the interface type isn't a function, then just return the resolved
       // parameter type.
-      return getParamType(lookThroughAutoclosure)->mapTypeOutOfContext();
+      return getParamType(lookThroughAutoclosure)->mapTypeOutOfEnvironment();
     }
     return getParamTypeImpl(interfaceFnTy, lookThroughAutoclosure);
   }
@@ -1014,6 +997,11 @@ enum ScoreKind: unsigned int {
   SK_EmptyExistentialConversion,
   /// A key path application subscript.
   SK_KeyPathSubscript,
+  /// A pointer conversion where the destination type is a generic parameter.
+  /// This should eventually be removed in favor of outright banning pointer
+  /// conversions for generic parameters. As such we consider it more impactful
+  /// than \c SK_ValueToPointerConversion.
+  SK_GenericParamPointerConversion,
   /// A conversion from a string, array, or inout to a pointer.
   SK_ValueToPointerConversion,
   /// A closure/function conversion to an autoclosure parameter.
@@ -1190,6 +1178,9 @@ struct Score {
 
     case SK_KeyPathSubscript:
       return "key path subscript";
+
+    case SK_GenericParamPointerConversion:
+      return "pointer conversion to generic parameter";
 
     case SK_ValueToPointerConversion:
       return "value-to-pointer conversion";
@@ -1677,7 +1668,11 @@ public:
   /// \param wantInterfaceType If true, maps the resulting type out of context,
   /// and replaces type variables for opened generic parameters with the
   /// generic parameter types. Should only be used for diagnostic logic.
-  Type simplifyType(Type type, bool wantInterfaceType = false) const;
+  /// \param forCompletion If true, will produce archetypes instead of
+  /// ErrorTypes for generic parameter originators, which is what completion
+  /// currently expects for the code completion token.
+  Type simplifyType(Type type, bool wantInterfaceType = false,
+                    bool forCompletion = false) const;
 
   // To aid code completion, we need to attempt to convert type placeholders
   // back into underlying generic parameters if possible, since type
@@ -2055,6 +2050,9 @@ struct MemberLookupResult {
     /// 'accesses' attributes of the init accessor and therefore canno
     /// t be referenced in its body.
     UR_UnavailableWithinInitAccessor,
+
+    /// The module selector in the `DeclNameRef` does not match this candidate.
+    UR_WrongModule
   };
 
   /// This is a list of considered (but rejected) candidates, along with a
@@ -2119,17 +2117,11 @@ public:
 
   virtual void addLocalDeclToTypeCheck(Decl *D) = 0;
 
+  [[nodiscard]]
   virtual std::optional<SyntacticElementTarget>
   rewriteTarget(SyntacticElementTarget target) = 0;
 
   virtual ~SyntacticElementTargetRewriter() = default;
-};
-
-enum class ConstraintSystemPhase {
-  ConstraintGeneration,
-  Solving,
-  Diagnostics,
-  Finalization
 };
 
 /// Retrieve the closure type from the constraint system.
@@ -2150,7 +2142,9 @@ struct ClosureIsolatedByPreconcurrency {
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
 class ConstraintSystem {
+private:
   ASTContext &Context;
+  SourceRange CurrentRange;
 
 public:
   DeclContext *DC;
@@ -2192,9 +2186,6 @@ private:
   /// A constraint that has failed along the current solver path.
   /// Do not set directly, call \c recordFailedConstraint instead.
   Constraint *failedConstraint = nullptr;
-
-  /// Current phase of the constraint system lifetime.
-  ConstraintSystemPhase Phase = ConstraintSystemPhase::ConstraintGeneration;
 
   /// The set of expressions for which we have generated constraints.
   llvm::SetVector<Expr *> InputExprs;
@@ -2672,41 +2663,6 @@ public:
   /// Retrieve the first constraint that has failed along the solver's path, or
   /// \c nullptr if no constraint has failed.
   Constraint *getFailedConstraint() const { return failedConstraint; }
-
-  ConstraintSystemPhase getPhase() const { return Phase; }
-
-  /// Move constraint system to a new phase of its lifetime.
-  void setPhase(ConstraintSystemPhase newPhase) {
-    if (Phase == newPhase)
-      return;
-
-#ifndef NDEBUG
-    switch (Phase) {
-    case ConstraintSystemPhase::ConstraintGeneration:
-      assert(newPhase == ConstraintSystemPhase::Solving);
-      break;
-
-    case ConstraintSystemPhase::Solving:
-      // We can come back to constraint generation phase while
-      // processing result builder body.
-      assert(newPhase == ConstraintSystemPhase::ConstraintGeneration ||
-             newPhase == ConstraintSystemPhase::Diagnostics ||
-             newPhase == ConstraintSystemPhase::Finalization);
-      break;
-
-    case ConstraintSystemPhase::Diagnostics:
-      assert(newPhase == ConstraintSystemPhase::Solving ||
-             newPhase == ConstraintSystemPhase::Finalization);
-      break;
-
-    case ConstraintSystemPhase::Finalization:
-      assert(newPhase == ConstraintSystemPhase::Diagnostics);
-      break;
-    }
-#endif
-
-    Phase = newPhase;
-  }
 
   /// Check whether constraint system is in valid state e.g.
   /// has left-over active/inactive constraints which should
@@ -3422,12 +3378,6 @@ public:
   ConstraintLocator *
   getConstraintLocator(const ConstraintLocatorBuilder &builder);
 
-  /// Compute a constraint locator for an implicit value-to-value
-  /// conversion rooted at the given location.
-  ConstraintLocator *
-  getImplicitValueConversionLocator(ConstraintLocatorBuilder root,
-                                    ConversionRestrictionKind restriction);
-
   /// Lookup and return parent associated with given expression.
   Expr *getParentExpr(Expr *expr) {
     if (auto result = getExprDepthAndParent(expr))
@@ -3915,7 +3865,7 @@ public:
     // Add this constraint to the constraint graph.
     CG.addConstraint(constraint);
 
-    if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
+    if (isDebugMode() && solverState) {
       auto &log = llvm::errs();
       log.indent(solverState->getCurrentIndent() + 4) << "(added constraint: ";
       constraint->print(log, &getASTContext().SourceMgr,
@@ -3936,7 +3886,7 @@ public:
     if (solverState)
       recordChange(SolverTrail::Change::RetiredConstraint(where, constraint));
 
-    if (isDebugMode() && getPhase() == ConstraintSystemPhase::Solving) {
+    if (isDebugMode() && solverState) {
       auto &log = llvm::errs();
       log.indent(solverState->getCurrentIndent() + 4)
           << "(removed constraint: ";
@@ -4002,21 +3952,17 @@ public:
   isRepresentativeFor(TypeVariableType *typeVar,
                       ConstraintLocator::PathElementKind kind) const;
 
-  /// Gets the VarDecl associated with resolvedOverload, and the type of the
-  /// projection if the decl has an associated property wrapper with a projectedValue.
-  std::optional<std::pair<VarDecl *, Type>>
-  getPropertyWrapperProjectionInfo(SelectedOverload resolvedOverload);
+  /// Gets the the type of the projection if the decl has an associated property
+  /// wrapper with a projectedValue.
+  Type getPropertyWrapperProjectionType(SelectedOverload resolvedOverload);
 
-  /// Gets the VarDecl associated with resolvedOverload, and the type of the
-  /// backing storage if the decl has an associated property wrapper.
-  std::optional<std::pair<VarDecl *, Type>>
-  getPropertyWrapperInformation(SelectedOverload resolvedOverload);
-
-  /// Gets the VarDecl, and the type of the type property that it wraps if
-  /// resolved overload has a decl which is the backing storage for a
+  /// Gets the type of the backing storage if the decl has an associated
   /// property wrapper.
-  std::optional<std::pair<VarDecl *, Type>>
-  getWrappedPropertyInformation(SelectedOverload resolvedOverload);
+  Type getPropertyWrapperBackingType(SelectedOverload resolvedOverload);
+
+  /// Gets the type of a wrapped property if resolved overload has
+  /// a decl which is the backing storage for a property wrapper.
+  Type getWrappedPropertyType(SelectedOverload resolvedOverload);
 
   /// Merge the equivalence sets of the two type variables.
   ///
@@ -4872,7 +4818,8 @@ public:
   /// Build and allocate a prepared overload in the solver arena.
   PreparedOverload *prepareOverload(OverloadChoice choice,
                                     DeclContext *useDC,
-                                    ConstraintLocator *locator);
+                                    ConstraintLocator *locator,
+                                    bool forDiagnostics);
 
   /// Populate the prepared overload with all type variables and constraints
   /// that are to be introduced into the constraint system when this choice
@@ -5319,7 +5266,7 @@ public:
 
   /// Determine whether given type variable with its set of bindings is viable
   /// to be attempted on the next step of the solver.
-  std::optional<BindingSet> determineBestBindings(
+  const BindingSet *determineBestBindings(
       llvm::function_ref<void(const BindingSet &)> onCandidate);
 
   /// Get bindings for the given type variable based on current
@@ -5422,6 +5369,9 @@ private:
   /// \returns The selected conjunction.
   Constraint *selectConjunction();
 
+  void diagnoseTooComplex(SourceLoc fallbackLoc,
+                          SolutionResult &result);
+
   /// Solve the system of constraints generated from provided expression.
   ///
   /// \param target The target to generate constraints from.
@@ -5519,6 +5469,8 @@ private:
   compareSolutions(ConstraintSystem &cs, ArrayRef<Solution> solutions,
                    const SolutionDiff &diff, unsigned idx1, unsigned idx2);
 
+  void startExpressionTimer();
+
 public:
   /// Increase the score of the given kind for the current (partial) solution
   /// along the current solver path.
@@ -5556,7 +5508,6 @@ public:
   std::optional<unsigned> findBestSolution(SmallVectorImpl<Solution> &solutions,
                                            bool minimize);
 
-public:
   /// Apply a given solution to the target, producing a fully
   /// type-checked target or \c None if an error occurred.
   ///
@@ -5609,7 +5560,14 @@ public:
   /// resolved before any others.
   void optimizeConstraints(Expr *e);
 
-  void startExpressionTimer(ExpressionTimer::AnchorType anchor);
+  /// Set the current sub-expression (of a multi-statement closure, etc) for
+  /// the purposes of diagnosing "reasonable time" errors.
+  void startExpression(ASTNode node);
+
+  /// The source range of the target being type checked.
+  SourceRange getCurrentSourceRange() const {
+    return CurrentRange;
+  }
 
   /// Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
@@ -5622,53 +5580,7 @@ public:
     return range.isValid() ? range : std::optional<SourceRange>();
   }
 
-  bool isTooComplex(size_t solutionMemory) {
-    if (isAlreadyTooComplex.first)
-      return true;
-
-    auto CancellationFlag = getASTContext().CancellationFlag;
-    if (CancellationFlag && CancellationFlag->load(std::memory_order_relaxed))
-      return true;
-
-    auto markTooComplex = [&](SourceRange range, StringRef reason) {
-      if (isDebugMode()) {
-        if (solverState)
-          llvm::errs().indent(solverState->getCurrentIndent());
-        llvm::errs() << "(too complex: " << reason << ")\n";
-      }
-      isAlreadyTooComplex = {true, range};
-      return true;
-    };
-
-    auto used = getASTContext().getSolverMemory() + solutionMemory;
-    MaxMemory = std::max(used, MaxMemory);
-    auto threshold = getASTContext().TypeCheckerOpts.SolverMemoryThreshold;
-    if (MaxMemory > threshold) {
-      // No particular location for OoM problems.
-      return markTooComplex(SourceRange(), "exceeded memory limit");
-    }
-
-    if (Timer && Timer->isExpired()) {
-      // Disable warnings about expressions that go over the warning
-      // threshold since we're arbitrarily ending evaluation and
-      // emitting an error.
-      Timer->disableWarning();
-
-      return markTooComplex(Timer->getAffectedRange(), "exceeded time limit");
-    }
-
-    auto &opts = getASTContext().TypeCheckerOpts;
-
-    // Bail out once we've looked at a really large number of choices.
-    if (opts.SolverScopeThreshold && NumSolverScopes > opts.SolverScopeThreshold)
-      return markTooComplex(SourceRange(), "exceeded scope limit");
-
-    // Bail out once we've taken a really large number of steps.
-    if (opts.SolverTrailThreshold && NumTrailSteps > opts.SolverTrailThreshold)
-      return markTooComplex(SourceRange(), "exceeded trail limit");
-
-    return false;
-  }
+  bool isTooComplex(size_t solutionMemory);
 
   bool isTooComplex(ArrayRef<Solution> solutions) {
     if (isAlreadyTooComplex.first)
@@ -6284,7 +6196,7 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
 public:
   using Element = TypeVariableBinding;
 
-  TypeVarBindingProducer(BindingSet &bindings);
+  TypeVarBindingProducer(const BindingSet &bindings);
 
   /// Retrieve a set of bindings available in the current state.
   ArrayRef<Binding> getCurrentBindings() const { return Bindings; }
@@ -6524,10 +6436,6 @@ public:
     return TypeVars.getArrayRef();
   }
 };
-
-/// Determine whether given type is a known one
-/// for a key path `{Any, Partial, Writable, ReferenceWritable}KeyPath`.
-bool isKnownKeyPathType(Type type);
 
 /// Determine whether the given type is a PartialKeyPath and
 /// AnyKeyPath or existential type thererof, for example,

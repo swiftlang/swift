@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -verify-additional-prefix targeted-and-ni- -strict-concurrency=targeted -verify-additional-prefix targeted- -emit-sil -o /dev/null %s
-// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -strict-concurrency=complete -verify-additional-prefix tns-ni- -verify-additional-prefix tns- -emit-sil -o /dev/null %s -swift-version 5 -verify-additional-prefix targeted-and-ni-
-// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -strict-concurrency=complete -verify-additional-prefix tns-ni-ns- -verify-additional-prefix tns- -emit-sil -o /dev/null %s -enable-upcoming-feature NonisolatedNonsendingByDefault -swift-version 5 -DNONISOLATEDNONSENDING
+// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -verify-ignore-unrelated -verify-additional-prefix targeted-and-ni- -strict-concurrency=targeted -verify-additional-prefix targeted- -emit-sil -o /dev/null %s
+// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -verify-ignore-unrelated -strict-concurrency=complete -verify-additional-prefix tns-ni- -verify-additional-prefix tns- -emit-sil -o /dev/null %s -swift-version 5 -verify-additional-prefix targeted-and-ni-
+// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -verify-ignore-unrelated -strict-concurrency=complete -verify-additional-prefix tns-ni-ns- -verify-additional-prefix tns- -emit-sil -o /dev/null %s -enable-upcoming-feature NonisolatedNonsendingByDefault -swift-version 5 -DNONISOLATEDNONSENDING
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -463,13 +463,15 @@ func preconcurrencyContext(_: @escaping @Sendable () -> Void) {}
 struct DowngradeForPreconcurrency {
   func capture(completion: @escaping @MainActor () -> Void) {
     preconcurrencyContext {
-      Task {
-        completion()
+        Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+            completion() // expected-tns-note {{closure captures 'completion' which is accessible to code in the current task}}
         // expected-warning@-1 {{capture of 'completion' with non-Sendable type '@MainActor () -> Void' in a '@Sendable' closure}}
         // expected-warning@-2 {{capture of 'completion' with non-Sendable type '@MainActor () -> Void' in an isolated closure}}
         // expected-note@-3 2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
         // expected-warning@-4 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
         // expected-note@-5 {{calls to parameter 'completion' from outside of its actor context are implicitly asynchronous}}
+        // expected-complete-and-tns-warning @-7 {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+        // expected-complete-and-tns-note @-7 {{closure captures 'completion' which is accessible to code in the current task}}
       }
     }
   }

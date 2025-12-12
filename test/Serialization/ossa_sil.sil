@@ -19,6 +19,24 @@ bb0(%0 : @guaranteed $AnyObject):
   return %2 : $X
 }
 
+struct Wrapper {
+  var _k: X
+}
+
+// CHECK-LABEL: sil [serialized] [canonical] [ossa] @return_borrow_test : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed X {
+// CHECK: bb0(%0 : $*Wrapper):
+// CHECK:   %1 = struct_element_addr %0 : $*Wrapper, #Wrapper._k
+// CHECK:   %2 = load_borrow %1 : $*X
+// CHECK:   return_borrow %2 : $X from_scopes (%2 : $X)
+// CHECK: }
+
+sil [serialized] [ossa] @return_borrow_test : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed X {
+bb0(%0 : $*Wrapper):
+  %1 = struct_element_addr %0, #Wrapper._k
+  %2 = load_borrow %1
+  return_borrow %2 from_scopes (%2)
+}
+
 // CHECK-LABEL: sil [serialized] [canonical] [ossa] @reborrowTest :
 // CHECK:       bb1:
 // CHECK-NEXT:    {{%.*}} = begin_borrow %0 : $X

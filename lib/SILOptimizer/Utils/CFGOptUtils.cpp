@@ -519,6 +519,7 @@ bool isSafeNonExitTerminator(TermInst *ti) {
     return true;
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
   case TermKind::ThrowInst:
   case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:

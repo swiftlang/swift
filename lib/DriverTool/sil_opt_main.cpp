@@ -297,10 +297,6 @@ struct SILOptOptions {
                     llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
 
   llvm::cl::opt<bool>
-  EnableSpeculativeDevirtualization = llvm::cl::opt<bool>("enable-spec-devirt",
-                    llvm::cl::desc("Enable Speculative Devirtualization pass."));
-
-  llvm::cl::opt<bool>
   EnableAsyncDemotion = llvm::cl::opt<bool>("enable-async-demotion",
                     llvm::cl::desc("Enables an optimization pass to demote async functions."));
 
@@ -315,12 +311,6 @@ struct SILOptOptions {
   llvm::cl::opt<bool>
   EnableMoveInoutStackProtection = llvm::cl::opt<bool>("enable-move-inout-stack-protector",
                     llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
-
-  llvm::cl::opt<bool> EnableOSSAModules = llvm::cl::opt<bool>(
-      "enable-ossa-modules", llvm::cl::init(true),
-      llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
-                     "this is disabled we do not serialize in OSSA "
-                     "form when optimizing."));
 
   cl::opt<EnforceExclusivityMode>
     EnforceExclusivity = cl::opt<EnforceExclusivityMode>(
@@ -603,6 +593,11 @@ struct SILOptOptions {
       "enable-address-dependencies",
       llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."));
 
+  llvm::cl::opt<bool> DisaleAggressiveReg2Mem = llvm::cl::opt<bool>(
+      "disable-aggressive-reg2mem",
+      llvm::cl::desc("Disable aggressive reg2mem optimizations."),
+      llvm::cl::init(false));
+
   llvm::cl::opt<bool> EnableCalleeAllocatedCoroAbi = llvm::cl::opt<bool>(
       "enable-callee-allocated-coro-abi",
       llvm::cl::desc("Override per-platform settings and use yield_once_2."),
@@ -710,8 +705,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     Invocation.setTargetTriple(options.Target);
   if (!options.ResourceDir.empty())
     Invocation.setRuntimeResourcePath(options.ResourceDir);
-  Invocation.getFrontendOptions().EnableLibraryEvolution
-    = options.EnableLibraryEvolution;
+  if (options.EnableLibraryEvolution)
+    Invocation.getLangOptions().enableFeature(Feature::LibraryEvolution);
   Invocation.getFrontendOptions().StrictImplicitModuleContext
     = options.StrictImplicitModuleContext;
 
@@ -775,8 +770,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       exit(-1);
     }
 
-    if (auto firstVersion = feature->getLanguageVersion()) {
-      if (Invocation.getLangOptions().isSwiftVersionAtLeast(*firstVersion)) {
+    if (auto firstVersion = feature->getLanguageMode()) {
+      if (Invocation.getLangOptions().isLanguageModeAtLeast(*firstVersion)) {
         llvm::errs() << "error: upcoming feature " << QuotedString(featureName)
                      << " is already enabled as of Swift version "
                      << *firstVersion << '\n';
@@ -897,12 +892,10 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EmitVerboseSIL |= options.EmitVerboseSIL;
   SILOpts.EmitSortedSIL |= options.EmitSortedSIL;
 
-  SILOpts.EnableSpeculativeDevirtualization = options.EnableSpeculativeDevirtualization;
   SILOpts.EnableAsyncDemotion = options.EnableAsyncDemotion;
   SILOpts.EnableThrowsPrediction = options.EnableThrowsPrediction;
   SILOpts.EnableNoReturnCold = options.EnableNoReturnCold;
   SILOpts.IgnoreAlwaysInline = options.IgnoreAlwaysInline;
-  SILOpts.EnableOSSAModules = options.EnableOSSAModules;
   SILOpts.EnableSILOpaqueValues = options.EnableSILOpaqueValues;
   SILOpts.OSSACompleteLifetimes = options.EnableOSSACompleteLifetimes;
   SILOpts.OSSAVerifyComplete = options.EnableOSSAVerifyComplete;
@@ -933,6 +926,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       options.EnablePackMetadataStackPromotion;
 
   SILOpts.EnableAddressDependencies = options.EnableAddressDependencies;
+  if (options.DisaleAggressiveReg2Mem)
+    SILOpts.UseAggressiveReg2MemForCodeSize = false;
   if (options.EnableCalleeAllocatedCoroAbi)
     SILOpts.CoroutineAccessorsUseYieldOnce2 = true;
   if (options.DisableCalleeAllocatedCoroAbi)
@@ -1088,7 +1083,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     serializationOpts.OutputPath = OutputFile;
     serializationOpts.SerializeAllSIL = options.EmitSIB;
     serializationOpts.IsSIB = options.EmitSIB;
-    serializationOpts.IsOSSA = SILOpts.EnableOSSAModules;
 
     symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
 

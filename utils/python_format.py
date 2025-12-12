@@ -56,6 +56,7 @@ _KNOWN_SCRIPT_PATHS = [
     _SWIFT_PATH / "utils/symbolicate-linux-fatal",
     _SWIFT_PATH / "utils/update-checkout",
     _SWIFT_PATH / "utils/viewcfg",
+    _SWIFT_PATH / "utils/find_files"
 ]
 
 

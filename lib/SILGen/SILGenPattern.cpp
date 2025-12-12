@@ -1405,7 +1405,10 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
   auto bindValue = value.asBorrowedOperand2(SGF, pattern).getFinalManagedValue();
 
   // Borrow bindings of copyable type should still be no-implicit-copy.
-  if (!bindValue.getType().isMoveOnly()) {
+  //
+  // If we're relying on ManualOwnership for explicit-copies enforcement,
+  // we don't need the MoveOnlyWrapper.
+  if (!bindValue.getType().isMoveOnly() && !SGF.B.hasManualOwnershipAttr()) {
     if (bindValue.getType().isAddress()) {
       bindValue = ManagedValue::forBorrowedAddressRValue(
         SGF.B.createCopyableToMoveOnlyWrapperAddr(pattern, bindValue.getValue()));
@@ -2669,7 +2672,9 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
         for (unsigned i = 0, e = p->getNumElements(); i < e; ++i) {
           SILValue element = SGF.B.createTupleElementAddr(p, baseAddr, i);
           if (element->getType().isLoadable(SGF.F)) {
-            element = SGF.B.createLoad(p, element, LoadOwnershipQualifier::Take);
+            element =
+                SGF.getTypeLowering(element->getType())
+                    .emitLoad(SGF.B, p, element, LoadOwnershipQualifier::Take);
           }
           visit(p->getElement(i).getPattern(),
                 SGF.emitManagedRValueWithCleanup(element));

@@ -179,6 +179,7 @@ public:
       : CompilerPlugin(ExecutablePath),
         LastModificationTime(LastModificationTime),
         disableSandbox(disableSandbox){};
+  ~LoadedExecutablePlugin();
 
   /// The last modification time of 'ExecutablePath' when this object is
   /// created.

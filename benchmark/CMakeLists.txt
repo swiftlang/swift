@@ -109,6 +109,7 @@ set(SWIFT_BENCH_MODULES
     single-source/IndexPathTest
     single-source/InsertCharacter
     single-source/IntegerParsing
+    single-source/IntegerToString
     single-source/Integrate
     single-source/IterateData
     single-source/Join
@@ -139,6 +140,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ObserverUnappliedMethod
     single-source/OpaqueConsumingUsers
     single-source/OpenClose
+    single-source/ParameterPacks
     single-source/Phonebook
     single-source/PointerArithmetics
     single-source/PolymorphicCalls
@@ -181,7 +183,6 @@ set(SWIFT_BENCH_MODULES
     single-source/SortLargeExistentials
     single-source/SortLettersInPlace
     single-source/SortStrings
-    single-source/StackPromo
     single-source/StaticArray
     single-source/StrComplexWalk
     single-source/StrToInt

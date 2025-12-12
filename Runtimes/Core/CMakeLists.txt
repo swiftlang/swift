@@ -21,13 +21,9 @@
 
 # TODO:
 # Platform support:
-#   - Work on/Verify cross-compiling
-#   - Work on/Verify Windows and Linux native builds
+#   - Work on/Verify Linux native builds
 # Embedded
 #   -- -Xfrontend -emit-empty-object-file
-# Catalyst Support
-#   -- Will need shadow invocations to generate swiftmodules for Swift parts
-# Install *.abi.json, swiftdoc, and swiftsourceinfo
 
 cmake_minimum_required(VERSION 3.29)
 # TODO before requiring CMake 4.1 or later
@@ -110,10 +106,11 @@ defaulted_option(SwiftCore_ENABLE_RUNTIME_OS_VERSIONING "Enable runtime OS versi
 defaulted_option(SwiftCore_ENABLE_STATIC_PRINT "Disable full print")
 defaulted_option(SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS "Resolve absolute function pointer as identity")
 defaulted_option(SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment")
-defaulted_option(SwiftCore_ENABLE_STDLIB_TRACING "Enable tracing in the runtime. Assumes the presence of os_log(3) and the os_signpost(3) API.")
 defaulted_option(SwiftCore_ENABLE_CONCURRENCY "Enable Concurrency runtime support")
 defaulted_option(SwiftCore_ENABLE_REMOTE_MIRROR "Enable RemoteMirror runtime support")
+defaulted_option(SwiftCore_ENABLE_DIRECT_RETAIN_RELEASE "Use direct retain release in the runtime/stdlib")
 defaulted_set(SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR STRING "Default Concurrency global executor implementation")
+option(SwiftCore_ENABLE_STDLIB_TRACING "Enable tracing in the runtime. Requires os_log(3) and the os_signpost(3) API." OFF)
 option(SwiftCore_ENABLE_COMMANDLINE_SUPPORT "Enable command line argument support" ON)
 option(SwiftCore_ENABLE_UNICODE_DATA "Include unicode data in Swift runtimes" ON)
 option(SwiftCore_ENABLE_SHORT_MANGLING_LOOKUPS "Build with fast-path context descriptor lookups based on well-known short manglings." ON)
@@ -176,12 +173,11 @@ add_compile_options(
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 # Ensure all symbols are fully resolved on Linux
-add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
+add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   "$<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-swift-version 5>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-library-level api>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-runtime-compatibility-version none>"
   "$<$<COMPILE_LANGUAGE:Swift>:-disable-autolinking-runtime-compatibility-dynamic-replacements>"
@@ -194,13 +190,17 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:-no-link-objc-runtime>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-ossa-modules>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -empty-abi-descriptor>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<AND:$<NOT:$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -disable-objc-interop>"
   "$<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+if(SwiftCore_ENABLE_DIRECT_RETAIN_RELEASE)
+  find_package(SwiftSwiftDirectRuntime REQUIRED)
+  add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-direct-retain-release>")
+endif()
 
 include(ExperimentalFeatures)
 
@@ -212,7 +212,7 @@ add_subdirectory(Demangling)
 add_subdirectory(Threading)
 add_subdirectory(runtime)
 add_subdirectory(stubs)
-add_subdirectory(core)
+add_subdirectory(Core)
 if(SwiftCore_ENABLE_COMMANDLINE_SUPPORT)
   add_subdirectory(CommandLineSupport)
 endif()
