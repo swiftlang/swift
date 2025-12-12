@@ -31,6 +31,41 @@ func checkHasContiguousStorageSubstring(_ x: Substring.UTF8View) {
   expectTrue(hasStorage)
 }
 
+fileprivate func slices(
+  _ s: String,
+  from: Int,
+  to: Int
+) -> (
+  Substring,
+  Substring,
+  Substring
+) {
+  let s1 = s[s.index(s.startIndex, offsetBy: from) ..<
+    s.index(s.startIndex, offsetBy: to)]
+  let s2 = s1[s1.startIndex..<s1.endIndex]
+  let s3 = s2[s1.startIndex..<s1.endIndex]
+  return (s1, s2, s3)
+}
+
+fileprivate func allNotEmpty(
+  _ s: Substring...
+) -> Bool {
+  s.allSatisfy { $0.isEmpty == false }
+}
+
+fileprivate func allEqual(
+  _ s: Substring...
+) -> Bool {
+  for i in 0..<s.count {
+    for j in (i + 1)..<s.count {
+      if s[i] != s[j] {
+        return false
+      }
+    }
+  }
+  return true
+}
+
 SubstringTests.test("Equality") {
   let s = "abcdefg"
   let s1 = s[s.index(s.startIndex, offsetBy: 2) ..<
@@ -280,6 +315,159 @@ SubstringTests.test("Substring.base") {
     expectEqual(str, str[idx...].base)
     expectEqual(str, str[...idx].base)
   }
+}
+
+SubstringTests.test("isTriviallyIdentical(to:) small ascii")
+.skip(.custom(
+  { if #available(StdlibDeploymentTarget 6.4, *) { false } else { true } },
+  reason: "Requires Swift 6.4's standard library"
+))
+.code {
+  guard #available(StdlibDeploymentTarget 6.4, *) else { return }
+
+  let a = "Hello"
+  let b = "Hello"
+
+  precondition(a == b)
+
+  let (a1, a2, a3) = slices(a, from: 2, to: 4)
+  let (b1, b2, b3) = slices(b, from: 2, to: 4)
+
+  precondition(allNotEmpty(a1, a2, a3, b1, b2, b3))
+  precondition(allEqual(a1, a2, a3, b1, b2, b3))
+
+  expectTrue(a1.isTriviallyIdentical(to: a1))
+  expectTrue(a1.isTriviallyIdentical(to: a2))
+  expectTrue(a1.isTriviallyIdentical(to: a3))
+  expectTrue(a1.isTriviallyIdentical(to: b1))
+  expectTrue(a1.isTriviallyIdentical(to: b2))
+  expectTrue(a1.isTriviallyIdentical(to: b3))
+
+  expectTrue(a2.isTriviallyIdentical(to: a1))
+  expectTrue(a2.isTriviallyIdentical(to: a2))
+  expectTrue(a2.isTriviallyIdentical(to: a3))
+  expectTrue(a2.isTriviallyIdentical(to: b1))
+  expectTrue(a2.isTriviallyIdentical(to: b2))
+  expectTrue(a2.isTriviallyIdentical(to: b3))
+
+  expectTrue(a3.isTriviallyIdentical(to: a1))
+  expectTrue(a3.isTriviallyIdentical(to: a2))
+  expectTrue(a3.isTriviallyIdentical(to: a3))
+  expectTrue(a3.isTriviallyIdentical(to: b1))
+  expectTrue(a3.isTriviallyIdentical(to: b2))
+  expectTrue(a3.isTriviallyIdentical(to: b3))
+
+  let c = "Hello"
+
+  precondition(b == c)
+
+  let (c1, c2, c3) = slices(c, from: 1, to: 3)
+
+  expectFalse(a1.isTriviallyIdentical(to: c1))
+  expectFalse(a1.isTriviallyIdentical(to: c2))
+  expectFalse(a1.isTriviallyIdentical(to: c3))
+
+  expectFalse(a2.isTriviallyIdentical(to: c1))
+  expectFalse(a2.isTriviallyIdentical(to: c2))
+  expectFalse(a2.isTriviallyIdentical(to: c3))
+
+  expectFalse(a3.isTriviallyIdentical(to: c1))
+  expectFalse(a3.isTriviallyIdentical(to: c2))
+  expectFalse(a3.isTriviallyIdentical(to: c3))
+}
+
+SubstringTests.test("isTriviallyIdentical(to:) small unicode")
+.skip(.custom(
+  { if #available(StdlibDeploymentTarget 6.4, *) { false } else { true } },
+  reason: "Requires Swift 6.4's standard library"
+))
+.code {
+  guard #available(StdlibDeploymentTarget 6.4, *) else { return }
+
+  let a = "Cafe\u{301}"
+  let b = "Cafe\u{301}"
+  let c = "Café"
+
+  precondition(a == b)
+  precondition(b == c)
+
+  let (a1, a2, a3) = slices(a, from: 2, to: 4)
+  let (b1, b2, b3) = slices(b, from: 2, to: 4)
+  let (c1, c2, c3) = slices(c, from: 2, to: 4)
+
+  precondition(allNotEmpty(a1, a2, a3, b1, b2, b3, c1, c2, c3))
+  precondition(allEqual(a1, a2, a3, b1, b2, b3, c1, c2, c3))
+
+  expectTrue(a1.isTriviallyIdentical(to: a1))
+  expectTrue(a1.isTriviallyIdentical(to: a2))
+  expectTrue(a1.isTriviallyIdentical(to: a3))
+  expectTrue(a1.isTriviallyIdentical(to: b1))
+  expectTrue(a1.isTriviallyIdentical(to: b2))
+  expectTrue(a1.isTriviallyIdentical(to: b3))
+  expectFalse(a1.isTriviallyIdentical(to: c1))
+  expectFalse(a1.isTriviallyIdentical(to: c2))
+  expectFalse(a1.isTriviallyIdentical(to: c3))
+
+  expectTrue(a2.isTriviallyIdentical(to: a1))
+  expectTrue(a2.isTriviallyIdentical(to: a2))
+  expectTrue(a2.isTriviallyIdentical(to: a3))
+  expectTrue(a2.isTriviallyIdentical(to: b1))
+  expectTrue(a2.isTriviallyIdentical(to: b2))
+  expectTrue(a2.isTriviallyIdentical(to: b3))
+  expectFalse(a2.isTriviallyIdentical(to: c1))
+  expectFalse(a2.isTriviallyIdentical(to: c2))
+  expectFalse(a2.isTriviallyIdentical(to: c3))
+
+  expectTrue(a3.isTriviallyIdentical(to: a1))
+  expectTrue(a3.isTriviallyIdentical(to: a2))
+  expectTrue(a3.isTriviallyIdentical(to: a3))
+  expectTrue(a3.isTriviallyIdentical(to: b1))
+  expectTrue(a3.isTriviallyIdentical(to: b2))
+  expectTrue(a3.isTriviallyIdentical(to: b3))
+  expectFalse(a3.isTriviallyIdentical(to: c1))
+  expectFalse(a3.isTriviallyIdentical(to: c2))
+  expectFalse(a3.isTriviallyIdentical(to: c3))
+}
+
+SubstringTests.test("isTriviallyIdentical(to:) large ascii")
+.skip(.custom(
+  { if #available(StdlibDeploymentTarget 6.4, *) { false } else { true } },
+  reason: "Requires Swift 6.4's standard library"
+))
+.code {
+  guard #available(StdlibDeploymentTarget 6.4, *) else { return }
+
+  let a = String(repeating: "foo", count: 1000)
+  let b = String(repeating: "foo", count: 1000)
+
+  precondition(a == b)
+
+  let (a1, a2, a3) = slices(a, from: 2, to: 4)
+  let (b1, b2, b3) = slices(b, from: 2, to: 4)
+
+  precondition(allNotEmpty(a1, a2, a3, b1, b2, b3))
+  precondition(allEqual(a1, a2, a3, b1, b2, b3))
+
+  expectTrue(a1.isTriviallyIdentical(to: a1))
+  expectTrue(a1.isTriviallyIdentical(to: a2))
+  expectTrue(a1.isTriviallyIdentical(to: a3))
+  expectFalse(a1.isTriviallyIdentical(to: b1))
+  expectFalse(a1.isTriviallyIdentical(to: b2))
+  expectFalse(a1.isTriviallyIdentical(to: b3))
+
+  expectTrue(a2.isTriviallyIdentical(to: a1))
+  expectTrue(a2.isTriviallyIdentical(to: a2))
+  expectTrue(a2.isTriviallyIdentical(to: a3))
+  expectFalse(a2.isTriviallyIdentical(to: b1))
+  expectFalse(a2.isTriviallyIdentical(to: b2))
+  expectFalse(a2.isTriviallyIdentical(to: b3))
+
+  expectTrue(a3.isTriviallyIdentical(to: a1))
+  expectTrue(a3.isTriviallyIdentical(to: a2))
+  expectTrue(a3.isTriviallyIdentical(to: a3))
+  expectFalse(a3.isTriviallyIdentical(to: b1))
+  expectFalse(a3.isTriviallyIdentical(to: b2))
+  expectFalse(a3.isTriviallyIdentical(to: b3))
 }
 
 runAllTests()
