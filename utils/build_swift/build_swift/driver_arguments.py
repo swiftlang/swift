@@ -1252,6 +1252,12 @@ def create_argument_parser():
            default=False,
            help='Build and preview standard library documentation with Swift-DocC.'
                 'Note: this builds Swift-DocC to perform the docs build.')
+    option('--stdlib-docs-static-hosting', toggle_true,
+           default=False,
+           help='Build the standard library documentation for static hosting.')
+    option('--stdlib-docs-hosting-base-path', store,
+           default='/',
+           help='The base path for hosting the standard library documentation.')
 
     option('--build-swift-clang-overlays', toggle_true,
            default=True,
