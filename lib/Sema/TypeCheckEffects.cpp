@@ -4715,37 +4715,7 @@ private:
     // Make a note of any initializers that are the synthesized right-hand side
     // for an "if let x".
     for (const auto &condition: stmt->getCond()) {
-      switch (condition.getKind()) {
-      case StmtConditionElement::CK_Availability:
-      case StmtConditionElement::CK_Boolean:
-      case StmtConditionElement::CK_HasSymbol:
-        continue;
-
-      case StmtConditionElement::CK_PatternBinding:
-        break;
-      }
-
-      auto init = condition.getInitializer();
-      if (!init)
-        continue;
-
-      auto pattern = condition.getPattern();
-      if (!pattern)
-        continue;
-
-      auto optPattern = dyn_cast<OptionalSomePattern>(pattern);
-      if (!optPattern)
-        continue;
-
-      auto var = optPattern->getSubPattern()->getSingleVar();
-      if (!var)
-        continue;
-
-      // If the right-hand side has the same location as the variable, it was
-      // synthesized.
-      if (var->getLoc().isValid() &&
-          var->getLoc() == init->getStartLoc() &&
-          init->getStartLoc() == init->getEndLoc())
+      if (auto *init = condition.getSynthesizedShorthandInitOrNull())
         synthesizedIfLetInitializers.insert(init);
     }
   }
