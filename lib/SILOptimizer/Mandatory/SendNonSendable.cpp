@@ -894,7 +894,6 @@ public:
                                   ApplyIsolationCrossing isolationCrossing) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_send_yields_race, name)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
     // Then emit the note with greater context.
@@ -928,7 +927,6 @@ public:
                                   const ValueDecl *callee) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_send_yields_race, name)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
     // Then emit the note with greater context.
@@ -953,7 +951,6 @@ public:
                                                  Identifier name) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_send_yields_race, name)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
     diagnoseNote(
@@ -965,7 +962,6 @@ public:
                                   ApplyIsolationCrossing isolationCrossing) {
     diagnoseError(loc, diag::regionbasedisolation_type_send_yields_race,
                   inferredType)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
     auto calleeIsolationStr =
@@ -989,14 +985,12 @@ public:
   void emitNamedUseofStronglySentValue(SILLocation loc, Identifier name) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_send_yields_race, name)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
     // Then emit the note with greater context.
     diagnoseNote(
         loc, diag::regionbasedisolation_named_value_used_after_explicit_sending,
-        name)
-        .highlight(loc.getSourceRange());
+        name);
 
     // Finally the require points.
     emitRequireInstDiagnostics();
@@ -1005,7 +999,6 @@ public:
   void emitTypedUseOfStronglySentValue(SILLocation loc, Type inferredType) {
     diagnoseError(loc, diag::regionbasedisolation_type_send_yields_race,
                   inferredType)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
     if (auto callee = getSendingCallee()) {
       diagnoseNote(loc,
@@ -1024,7 +1017,6 @@ public:
       ApplyIsolationCrossing isolationCrossing) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_send_yields_race, name)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
     auto descriptiveKindStr =
@@ -1039,8 +1031,7 @@ public:
     diagnoseNote(loc,
                  diag::regionbasedisolation_named_isolated_closure_yields_race,
                  isDisconnected, descriptiveKindStr, name, calleeIsolationStr,
-                 callerIsolationStr)
-        .highlight(loc.getSourceRange());
+                 callerIsolationStr);
     emitRequireInstDiagnostics();
   }
 
@@ -1049,7 +1040,6 @@ public:
       ApplyIsolationCrossing isolationCrossing) {
     diagnoseError(loc, diag::regionbasedisolation_type_send_yields_race,
                   inferredType)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
     auto calleeIsolationStr =
@@ -1125,14 +1115,12 @@ private:
       auto require = requireInsts.pop_back_val();
       switch (require.getKind()) {
       case RequireInst::UseAfterSend:
-        diagnoseNote(*require, diag::regionbasedisolation_maybe_race)
-            .highlight(require->getLoc().getSourceRange());
+        diagnoseNote(*require, diag::regionbasedisolation_maybe_race);
         continue;
       case RequireInst::InOutReinitializationNeeded:
         diagnoseNote(
             *require,
-            diag::regionbasedisolation_inout_sending_must_be_reinitialized)
-            .highlight(require->getLoc().getSourceRange());
+            diag::regionbasedisolation_inout_sending_must_be_reinitialized);
         continue;
       }
       llvm_unreachable("Covered switch isn't covered?!");
@@ -1598,7 +1586,6 @@ public:
                        ApplyIsolationCrossing crossing) {
     diagnoseError(loc, diag::regionbasedisolation_type_send_yields_race,
                   inferredType)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
     auto descriptiveKindStr =
@@ -1635,15 +1622,13 @@ public:
     diagnoseNote(loc,
                  diag::regionbasedisolation_named_isolated_closure_yields_race,
                  isDisconnected, descriptiveKindStr, name, calleeIsolationStr,
-                 callerIsolationStr)
-        .highlight(loc.getSourceRange());
+                 callerIsolationStr);
   }
 
   void emitTypedSendingNeverSendableToSendingParam(SILLocation loc,
                                                    Type inferredType) {
     diagnoseError(loc, diag::regionbasedisolation_type_send_yields_race,
                   inferredType)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
     auto descriptiveKindStr =
@@ -1742,7 +1727,6 @@ public:
       diagnoseError(loc,
                     diag::regionbasedisolation_typed_tns_passed_sending_closure,
                     descriptiveKindStr)
-          .highlight(loc.getSourceRange())
           .limitBehaviorIf(behaviorLimit);
     };
 
@@ -1798,7 +1782,6 @@ public:
 
   void emitNamedOnlyError(SILLocation loc, Identifier name) {
     diagnoseError(loc, diag::regionbasedisolation_named_send_yields_race, name)
-        .highlight(getOperand()->getUser()->getLoc().getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
   }
 
