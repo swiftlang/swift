@@ -9119,13 +9119,13 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
         // Print context to stderr.
         PrintOptions Opts;
-        llvm::errs() << "Requirements:\n";
+        llvm::errs() << "Requirements seen by this invocation:\n";
         for (auto req: requirements) {
           req.print(llvm::errs(), Opts);
           llvm::errs() << "\n";
         }
 
-        llvm::errs() << "Conformances:\n";
+        llvm::errs() << "\nConformances written in the swiftmodule:\n";
         for (auto req: reqConformances) {
           req.print(llvm::errs());
           llvm::errs() << "\n";
