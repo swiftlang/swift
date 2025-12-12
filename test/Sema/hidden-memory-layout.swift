@@ -495,68 +495,68 @@ public struct PublicHiddenStruct {}
 
 public enum PublicEnumUser: ProtocolFromDirect {
 // expected-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
-    case a(StructFromDirect) // expected-error {{cannot use struct 'StructFromDirect' here; 'directs' has been imported as implementation-only}}
+    case a(StructFromDirect) // expected-error {{cannot use struct 'StructFromDirect' in an associated value of a public or '@usableFromInline' enum; 'directs' has been imported as implementation-only}}
 
     case e(ExposedLayoutPublic)
     case c(ExposedLayoutInternal) // expected-error {{enum case in a public enum uses an internal type}}
     case d(ExposedLayoutPrivate) // expected-error {{enum case in a public enum uses a private type}}
     case b(HiddenLayout) // expected-error {{enum case in a public enum uses a private type}}
-    // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' here; 'HiddenLayout' is marked '@_implementationOnly'}}
+    // expected-opt-in-error @-1 {{cannot use struct 'HiddenLayout' in an associated value of a public or '@usableFromInline' enum; 'HiddenLayout' is marked '@_implementationOnly'}}
 
     case ce(ExposedClassPublic)
     case cc(ExposedClassInternal) // expected-error {{enum case in a public enum uses an internal type}}
     case cd(ExposedClassPrivate) // expected-error {{enum case in a public enum uses a private type}}
     case cb(HiddenClass) // expected-error {{enum case in a public enum uses a private type}}
-    // expected-opt-in-error @-1 {{cannot use class 'HiddenClass' here; 'HiddenClass' is marked '@_implementationOnly'}}
+    // expected-opt-in-error @-1 {{cannot use class 'HiddenClass' in an associated value of a public or '@usableFromInline' enum; 'HiddenClass' is marked '@_implementationOnly'}}
 
     case f(ExposedProtocolPublic)
     case g(ExposedProtocolInternal) // expected-error {{enum case in a public enum uses an internal type}}
     case h(ExposedProtocolPrivate) // expected-error {{enum case in a public enum uses a private type}}
-    case i(HiddenProtocol) // expected-opt-in-error {{cannot use protocol 'HiddenProtocol' here; 'HiddenProtocol' is marked '@_implementationOnly'}}
+    case i(HiddenProtocol) // expected-opt-in-error {{cannot use protocol 'HiddenProtocol' in an associated value of a public or '@usableFromInline' enum; 'HiddenProtocol' is marked '@_implementationOnly'}}
     // expected-error @-1 {{enum case in a public enum uses a private type}}
 }
 
 internal enum InternalEnumUser: ProtocolFromDirect {
 // expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
-    case a(StructFromDirect) // expected-opt-in-error {{cannot use struct 'StructFromDirect' here; 'directs' has been imported as implementation-only}}
+    case a(StructFromDirect) // expected-opt-in-error {{cannot use struct 'StructFromDirect' in an associated value of an enum not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 
     case e(ExposedLayoutPublic)
     case c(ExposedLayoutInternal)
     case d(ExposedLayoutPrivate) // expected-error {{enum case in an internal enum uses a private type}}
-    case b(HiddenLayout) // expected-opt-in-error {{cannot use struct 'HiddenLayout' here; 'HiddenLayout' is marked '@_implementationOnly'}}
+    case b(HiddenLayout) // expected-opt-in-error {{cannot use struct 'HiddenLayout' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
     // expected-error @-1 {{enum case in an internal enum uses a private type}}
 
     case ce(ExposedClassPublic)
     case cc(ExposedClassInternal)
     case cd(ExposedClassPrivate) // expected-error {{enum case in an internal enum uses a private type}}
-    case cb(HiddenClass) // expected-opt-in-error {{cannot use class 'HiddenClass' here; 'HiddenClass' is marked '@_implementationOnly'}}
+    case cb(HiddenClass) // expected-opt-in-error {{cannot use class 'HiddenClass' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
     // expected-error @-1 {{enum case in an internal enum uses a private type}}
 
     case f(ExposedProtocolPublic)
     case g(ExposedProtocolInternal)
     case h(ExposedProtocolPrivate) // expected-error {{enum case in an internal enum uses a private type}}
-    case i(HiddenProtocol) // expected-opt-in-error {{cannot use protocol 'HiddenProtocol' here; 'HiddenProtocol' is marked '@_implementationOnly'}}
+    case i(HiddenProtocol) // expected-opt-in-error {{cannot use protocol 'HiddenProtocol' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
     // expected-error @-1 {{enum case in an internal enum uses a private type}}
 }
 
 private enum PrivateEnumUser: ProtocolFromDirect {
 // expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
-    case a(StructFromDirect) // expected-opt-in-error {{cannot use struct 'StructFromDirect' here; 'directs' has been imported as implementation-only}}
+    case a(StructFromDirect) // expected-opt-in-error {{cannot use struct 'StructFromDirect' in an associated value of an enum not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 
     case e(ExposedLayoutPublic)
     case c(ExposedLayoutInternal)
     case d(ExposedLayoutPrivate)
-    case b(HiddenLayout) // expected-opt-in-error {{cannot use struct 'HiddenLayout' here; 'HiddenLayout' is marked '@_implementationOnly'}}
+    case b(HiddenLayout) // expected-opt-in-error {{cannot use struct 'HiddenLayout' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
 
     case ce(ExposedClassPublic)
     case cc(ExposedClassInternal)
     case cd(ExposedClassPrivate)
-    case cb(HiddenClass) // expected-opt-in-error {{cannot use class 'HiddenClass' here; 'HiddenClass' is marked '@_implementationOnly'}}
+    case cb(HiddenClass) // expected-opt-in-error {{cannot use class 'HiddenClass' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
 
     case f(ExposedProtocolPublic)
     case g(ExposedProtocolInternal)
     case h(ExposedProtocolPrivate)
-    case i(HiddenProtocol) // expected-opt-in-error {{cannot use protocol 'HiddenProtocol' here; 'HiddenProtocol' is marked '@_implementationOnly'}}
+    case i(HiddenProtocol) // expected-opt-in-error {{cannot use protocol 'HiddenProtocol' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
 }
 
 internal enum InternalEnumWithRawType : RawTypeFromDirect { // expected-opt-in-error {{cannot use struct 'RawTypeFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}

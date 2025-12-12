@@ -3858,7 +3858,9 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
       "in a conformance on a type not marked '@_implementationOnly'|" \
       "in an '@available' attribute here|" \
       "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context|" \
-      "in a property declaration member of a type not marked '@_implementationOnly'}"
+      "in a property declaration member of a type not marked '@_implementationOnly'|" \
+      "in an associated value of a public or '@usableFromInline' enum|" \
+      "in an associated value of an enum not marked '@_implementationOnly'}"
 
 ERROR(decl_from_hidden_module,none,
       "cannot use %kind0 %" EXPORTABILITY_REASON_SELECT "1; "

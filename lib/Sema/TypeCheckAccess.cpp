@@ -2563,8 +2563,12 @@ public:
   void visitEnumElementDecl(EnumElementDecl *EED) {
     if (!EED->hasAssociatedValues())
       return;
+    ExportabilityReason reason =
+      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
+        ExportabilityReason::ImplicitlyPublicAssociatedValue :
+        ExportabilityReason::AssociatedValue;
     for (auto &P : *EED->getParameterList())
-      checkType(P->getInterfaceType(), P->getTypeRepr(), EED);
+      checkType(P->getInterfaceType(), P->getTypeRepr(), EED, reason);
   }
 
   void visitMacroDecl(MacroDecl *MD) {
