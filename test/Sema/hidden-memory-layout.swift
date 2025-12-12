@@ -10,15 +10,15 @@
 // RUN:    %S/Inputs/implementation-only-imports/directs.swift \
 // RUN:   -swift-version 5
 
-/// Old diags
+/// Default diags
 // RUN: %target-swift-frontend -emit-module -verify -verify-ignore-unrelated %s -I %t \
 // RUN:   -swift-version 5 \
 // RUN:   -verify-additional-prefix not-opt-in-
 
-/// New diags
+/// Opt-in diags
 // RUN: %target-swift-frontend -emit-module -verify -verify-ignore-unrelated %s -I %t \
 // RUN:   -swift-version 5 \
-// RUN:   -verify-additional-prefix opt-in- -DUseImplementationOnly \
+// RUN:   -verify-additional-prefix opt-in- \
 // RUN:   -enable-experimental-feature CheckImplementationOnly
 
 /// Embedded
@@ -34,17 +34,17 @@
 // RUN:   -swift-version 5 -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded
 
-/// Old diags
+/// Default diags
 // RUN: %target-swift-frontend -emit-module -verify -verify-ignore-unrelated %s -I %t \
 // RUN:   -swift-version 5 -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded \
 // RUN:   -verify-additional-prefix not-opt-in-
 
-/// New diags
+/// Opt-in diags
 // RUN: %target-swift-frontend -emit-module -verify -verify-ignore-unrelated %s -I %t \
 // RUN:   -swift-version 5 -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded \
-// RUN:   -verify-additional-prefix opt-in- -DUseImplementationOnly \
+// RUN:   -verify-additional-prefix opt-in- \
 // RUN:   -verify-additional-prefix embedded-opt-in- \
 // RUN:   -enable-experimental-feature CheckImplementationOnly
 
@@ -52,7 +52,7 @@
 // RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %s -I %t \
 // RUN:   -swift-version 5 -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded \
-// RUN:   -verify-additional-prefix opt-in- -DUseImplementationOnly \
+// RUN:   -verify-additional-prefix opt-in- \
 // RUN:   -verify-additional-prefix embedded-opt-in- \
 // RUN:   -enable-experimental-feature CheckImplementationOnlyStrict
 
@@ -95,37 +95,21 @@ private class ExposedClassPrivate {
   init() { fatalError() } // expected-note {{initializer 'init()' is not '@usableFromInline' or public}}
 }
 
-#if UseImplementationOnly
 @_implementationOnly
 private class HiddenClass {
-// expected-opt-in-note @-1 2 {{class 'HiddenClass' is not '@usableFromInline' or public}}
-// expected-opt-in-note @-2 1 {{initializer 'init()' is not '@usableFromInline' or public}}
-// expected-opt-in-note @-3 7 {{class declared here}}
-// expected-opt-in-note @-4 3 {{type declared here}}
+// expected-note @-1 2 {{class 'HiddenClass' is not '@usableFromInline' or public}}
+// expected-note @-2 1 {{initializer 'init()' is not '@usableFromInline' or public}}
+// expected-note @-3 3 {{type declared here}}
+// expected-opt-in-note @-4 7 {{class declared here}}
 }
-#else
-private class HiddenClass {
-// expected-not-opt-in-note @-1 2 {{class 'HiddenClass' is not '@usableFromInline' or public}}
-// expected-not-opt-in-note @-2 1 {{initializer 'init()' is not '@usableFromInline' or public}}
-// expected-not-opt-in-note @-3 3 {{type declared here}}
-}
-#endif
 
-#if UseImplementationOnly
 @_implementationOnly
 private struct HiddenLayout {
-// expected-opt-in-note @-1 2 {{struct 'HiddenLayout' is not '@usableFromInline' or public}}
-// expected-opt-in-note @-2 1 {{initializer 'init()' is not '@usableFromInline' or public}}
+// expected-note @-1 2 {{struct 'HiddenLayout' is not '@usableFromInline' or public}}
+// expected-note @-2 1 {{initializer 'init()' is not '@usableFromInline' or public}}
 // expected-opt-in-note @-3 9 {{struct declared here}}
-// expected-opt-in-note @-4 4 {{type declared here}}
+// expected-note @-4 4 {{type declared here}}
 }
-#else
-private struct HiddenLayout {
-// expected-not-opt-in-note @-1 2 {{struct 'HiddenLayout' is not '@usableFromInline' or public}}
-// expected-not-opt-in-note @-2 1 {{initializer 'init()' is not '@usableFromInline' or public}}
-// expected-not-opt-in-note @-3 4 {{type declared here}}
-}
-#endif
 
 public enum ExposedEnumPublic {
   case A
@@ -140,25 +124,15 @@ private enum ExposedEnumPrivate {
   case B
 }
 
-#if UseImplementationOnly
 @_implementationOnly
 private enum HiddenEnum {
 // expected-opt-in-note @-1 6 {{enum declared here}}
-// expected-opt-in-note @-2 2 {{enum 'HiddenEnum' is not '@usableFromInline' or public}}
-// expected-opt-in-note @-3 2 {{type declared here}}
+// expected-note @-2 2 {{enum 'HiddenEnum' is not '@usableFromInline' or public}}
+// expected-note @-3 2 {{type declared here}}
   case A
-// expected-opt-in-note @-1 {{enum case 'A' is not '@usableFromInline' or public}}
+// expected-note @-1 {{enum case 'A' is not '@usableFromInline' or public}}
   case B
 }
-#else
-private enum HiddenEnum {
-// expected-not-opt-in-note @-1 2 {{enum 'HiddenEnum' is not '@usableFromInline' or public}}
-// expected-not-opt-in-note @-2 2 {{type declared here}}
-  case A
-// expected-not-opt-in-note @-1 {{enum case 'A' is not '@usableFromInline' or public}}
-  case B
-}
-#endif
 
 public protocol ExposedProtocolPublic {
 }
@@ -173,19 +147,12 @@ private protocol ExposedProtocolPrivate {
 // expected-note @-2 4 {{type declared here}}
 }
 
-#if UseImplementationOnly
 @_implementationOnly
 private protocol HiddenProtocol {
-// expected-opt-in-note @-1 {{protocol 'HiddenProtocol' is not '@usableFromInline' or public}}
+// expected-note @-1 {{protocol 'HiddenProtocol' is not '@usableFromInline' or public}}
 // expected-opt-in-note @-2 9 {{protocol declared here}}
-// expected-opt-in-note @-3 4 {{type declared here}}
+// expected-note @-3 4 {{type declared here}}
 }
-#else
-private protocol HiddenProtocol {
-// expected-not-opt-in-note @-1 1 {{protocol 'HiddenProtocol' is not '@usableFromInline' or public}}
-// expected-not-opt-in-note @-2 4 {{type declared here}}
-}
-#endif
 
 @_spi(S) public struct SPIStruct {}
 // expected-note @-1 {{struct declared here}}
@@ -491,7 +458,6 @@ private struct ExposedLayoutPrivateUser: ProtocolFromDirect {
   @_spi(S) public var s: SPIStruct
 }
 
-#if UseImplementationOnly
 @_implementationOnly
 private struct HiddenLayoutUser {
   public var publicField: StructFromDirect
@@ -522,10 +488,8 @@ private struct HiddenLayoutUser {
   private func privateFuncClass(h: HiddenClass) {}
 }
 
-@_implementationOnly // expected-opt-in-error {{'@_implementationOnly' may not be used on public declarations}}
+@_implementationOnly // expected-error {{'@_implementationOnly' may not be used on public declarations}}
 public struct PublicHiddenStruct {}
-
-#endif
 
 /// Enums use sites
 
@@ -600,7 +564,6 @@ internal enum InternalEnumWithRawType : RawTypeFromDirect { // expected-opt-in-e
   case a
 }
 
-#if UseImplementationOnly
 @_implementationOnly
 private enum PrivateHiddenEnumUser: ProtocolFromDirect {
     case a(StructFromDirect)
@@ -621,7 +584,7 @@ private enum PrivateHiddenEnumUser: ProtocolFromDirect {
     case i(HiddenProtocol)
 }
 
-@_implementationOnly // expected-opt-in-error {{'@_implementationOnly' may not be used on public declarations}}
+@_implementationOnly // expected-error {{'@_implementationOnly' may not be used on public declarations}}
 public enum PublicHiddenEnum {}
 
 @_implementationOnly
@@ -629,8 +592,6 @@ internal enum InternalEnumWithRawTypeIO : RawTypeFromDirect {
   typealias RawValue = RawTypeFromDirect
   case a
 }
-
-#endif
 
 /// Classes use sites
 
@@ -782,7 +743,6 @@ private class PrivateClassUser: ProtocolFromDirect {
   private func privateFunc(h: HiddenLayout) {} // expected-embedded-opt-in-error {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
 }
 
-#if UseImplementationOnly
 @_implementationOnly
 internal class HiddenClassUser: ProtocolFromDirect {
   public init() { fatalError() }
@@ -810,9 +770,8 @@ internal class HiddenClassUser: ProtocolFromDirect {
   private var j: HiddenProtocol
 }
 
-@_implementationOnly // expected-opt-in-error {{'@_implementationOnly' may not be used on public declarations}}
+@_implementationOnly // expected-error {{'@_implementationOnly' may not be used on public declarations}}
 public enum PublicHiddenClass {}
-#endif
 
 /// Protocol use sites
 

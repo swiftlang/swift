@@ -3958,9 +3958,6 @@ ERROR(implementation_only_override_import_without_attr,none,
       "override of %kindonly0 imported as implementation-only must be declared "
       "'@_implementationOnly'",
       (const ValueDecl *))
-ERROR(implementation_only_on_types_feature,none,
-      "'@_implementationOnly' on a type requires "
-      "'-enable-experimental-feature CheckImplementationOnly'", ())
 
 ERROR(import_attr_conflict,none,
       "%0 inconsistently imported with %1",
