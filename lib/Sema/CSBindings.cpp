@@ -1180,7 +1180,7 @@ bool BindingSet::operator<(const BindingSet &other) {
   return isPotentiallyIncomplete() < other.isPotentiallyIncomplete();
 }
 
-std::optional<BindingSet> ConstraintSystem::determineBestBindings(
+const BindingSet *ConstraintSystem::determineBestBindings(
     llvm::function_ref<void(const BindingSet &)> onCandidate) {
   // Look for potential type variable bindings.
   BindingSet *bestBindings = nullptr;
@@ -1238,10 +1238,7 @@ std::optional<BindingSet> ConstraintSystem::determineBestBindings(
       bestBindings = &bindings;
   }
 
-  if (!bestBindings)
-    return std::nullopt;
-
-  return std::optional(*bestBindings);
+  return bestBindings;
 }
 
 /// Find the set of type variables that are inferable from the given type.

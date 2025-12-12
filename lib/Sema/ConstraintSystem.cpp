@@ -5323,7 +5323,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   return success(mutability, isSendable);
 }
 
-TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)
+TypeVarBindingProducer::TypeVarBindingProducer(const BindingSet &bindings)
     : BindingProducer(bindings.getConstraintSystem(),
                       bindings.getTypeVariable()->getImpl().getLocator()),
       TypeVar(bindings.getTypeVariable()), CanBeNil(bindings.canBeNil()) {

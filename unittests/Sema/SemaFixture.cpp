@@ -124,8 +124,8 @@ ProtocolType *SemaTest::createProtocol(llvm::StringRef protocolName,
   return ProtocolType::get(PD, parent, Context);
 }
 
-BindingSet SemaTest::inferBindings(ConstraintSystem &cs,
-                                   TypeVariableType *typeVar) {
+const BindingSet &SemaTest::inferBindings(ConstraintSystem &cs,
+                                          TypeVariableType *typeVar) {
   for (auto *typeVar : cs.getTypeVariables()) {
     auto &node = cs.getConstraintGraph()[typeVar];
     node.resetBindingSet();

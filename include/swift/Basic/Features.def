@@ -277,6 +277,7 @@ LANGUAGE_FEATURE(LifetimeDependenceMutableAccessors, 0, "Support mutable accesso
 LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
 SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums")
 LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)")
+LANGUAGE_FEATURE(BuiltinConcurrencyStackNesting, 0, "Concurrency Stack Nesting Builtins")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
