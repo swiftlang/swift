@@ -2,7 +2,9 @@
 #include <functional>
 #include <string>
 #include <type_traits>
+#if __has_include(<ptrauth.h>)
 #include <ptrauth.h>
+#endif
 
 /// Used for std::string conformance to Swift.Hashable
 typedef std::hash<std::string> __swift_interopHashOfString;
@@ -68,10 +70,16 @@ struct __SwiftFunctionWrapper {
   __swift_interop_closure closure;
 
   Result operator()(Args... args) const {
+#if __has_include(<ptrauth.h>)
     return ((LoweredFunction *)ptrauth_auth_and_resign(
         closure.func, ptrauth_key_asia, PtrAuthTypeDiscriminator,
         ptrauth_key_function_pointer, 0))(std::forward<Args>(args)...,
                                           closure.context);
+#else
+    // Android NDK 28 does not define the ptrauth macros.
+    return ((LoweredFunction *)closure.func)(std::forward<Args>(args)...,
+                                             closure.context);
+#endif
   }
 
   // A memberwise constructor is synthesized by Swift.
