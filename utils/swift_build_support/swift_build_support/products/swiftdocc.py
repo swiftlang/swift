@@ -77,18 +77,27 @@ class SwiftDocC(product.Product):
         shell.call(helper_cmd)
 
     def should_build(self, host_target):
+        # Do not build docc on windows
+        if self.is_windows_target(host_target):
+            return False
         return True
 
     def build(self, host_target):
         self.run_build_script_helper('build', host_target)
 
     def should_test(self, host_target):
+        # Do not test docc on windows
+        if self.is_windows_target(host_target):
+            return False
         return self.args.test_swiftdocc
 
     def test(self, host_target):
         self.run_build_script_helper('test', host_target)
 
     def should_install(self, host_target):
+        # Do not install docc on windows
+        if self.is_windows_target(host_target):
+            return False
         return self.args.install_swiftdocc
 
     def install(self, host_target):

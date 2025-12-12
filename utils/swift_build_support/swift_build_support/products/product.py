@@ -261,6 +261,9 @@ class Product(object):
         return self.args.cross_compile_hosts and \
             host_target in self.args.cross_compile_hosts
 
+    def is_windows_target(self, host_target):
+        return host_target.startswith("windows")
+
     def has_cross_compile_hosts(self):
         return self.args.cross_compile_hosts
 
