@@ -1056,3 +1056,14 @@ extension String.UTF16View {
     }
   }
 }
+
+extension String.UTF16View {
+  /// Returns a boolean value indicating whether this UTF16 view
+  /// is trivially identical to `other`.
+  ///
+  /// - Complexity: O(1)
+  @available(StdlibDeploymentTarget 6.4, *)
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._guts.isTriviallyIdentical(to: other._guts)
+  }
+}

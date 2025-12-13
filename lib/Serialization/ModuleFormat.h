@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 974; // remove 'isCallerIsolated' bit from ParamDecl
+const uint16_t SWIFTMODULE_VERSION_MINOR = 977; // remove lazy storage bit
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1730,7 +1730,6 @@ namespace decls_block {
     VarDeclIntroducerField,   // introducer
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
-    BCFixed<1>,   // is this the backing storage for a lazy property?
     BCFixed<1>,   // top level global?
     DeclIDField,  // if this is a lazy property, this is the backing storage
     OpaqueReadOwnershipField,   // opaque read ownership
@@ -1807,6 +1806,26 @@ namespace decls_block {
     // - inlinable body text, if any
   >;
 
+  using OpaqueTypeLayout = BCRecordLayout<
+    OPAQUE_TYPE_DECL,
+    DeclContextIDField, // decl context
+    DeclIDField, // naming decl
+    GenericSignatureIDField, // interface generic signature
+    TypeIDField, // interface type for opaque type
+    GenericSignatureIDField, // generic environment
+    AccessLevelField, // access level
+    BCFixed<1>, // has underlying substitutions?
+    BCFixed<1> // export underlying substitutions?
+    // trailed by generic parameters
+    // trailed by opaque type underlying substitutions (if has underlying substitutions)
+    // trailed by conditional substitutions (if has underlying substitutions)
+  >;
+
+  using UnderlyingSubstitutionLayout = BCRecordLayout<
+    UNDERLYING_SUBSTITUTION,
+    SubstitutionMapIDField // the substitution map
+  >;
+
   using ConditionalSubstitutionConditionLayout = BCRecordLayout<
     CONDITIONAL_SUBSTITUTION_COND,
     BCFixed<1>, // is unavailable?
@@ -1818,20 +1837,6 @@ namespace decls_block {
     SubstitutionMapIDField
     // Trailed by N conditions that include a version and
     // unavailability indicator.
-  >;
-
-  using OpaqueTypeLayout = BCRecordLayout<
-    OPAQUE_TYPE_DECL,
-    DeclContextIDField, // decl context
-    DeclIDField, // naming decl
-    GenericSignatureIDField, // interface generic signature
-    TypeIDField, // interface type for opaque type
-    GenericSignatureIDField, // generic environment
-    SubstitutionMapIDField, // optional substitution map for underlying type
-    AccessLevelField, // access level
-    BCFixed<1> // export underlying type details
-    // trailed by generic parameters
-    // trailed by conditional substitutions
   >;
 
   // TODO: remove the unnecessary FuncDecl components here

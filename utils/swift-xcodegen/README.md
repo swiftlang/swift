@@ -2,7 +2,7 @@
 
 A script for generating an Xcode project for the Swift repo, that sits on top of an existing Ninja build.
 
-This script is primarily focussed on providing a good editor experience for working on the Swift project; it is not designed to produce compiled products or run tests, that should be done with `ninja` and `build-script`. It can however be used to [debug executables produced by the Ninja build](#debugging).
+This script is primarily focussed on providing a good editor experience for working on the Swift project; it is not designed to produce compiled products or run tests, that should be done with `ninja` and `build-script`. It can, however, be used to [debug executables produced by the Ninja build](#debugging).
 
 ## Running
 
@@ -12,11 +12,11 @@ You can run using either `utils/generate-xcode` or the `swift-xcodegen` script i
 ./swift-xcodegen <build dir>
 ```
 
-where `<build dir>` is the path to the build directory e.g `build/Ninja-RelWithDebInfoAssert`. This will by default create a `Swift.xcodeproj` in the parent directory (next to the `build` directory). Projects for LLVM, LLDB, and Clang may also be created by passing `--llvm`, `--lldb`, and `--clang` respectively. Workspaces of useful combinations will also be created (e.g Swift+LLVM, Clang+LLVM).
+where `<build dir>` is the path to the build directory e.g `build/Ninja-RelWithDebInfoAssert`. This will by default create a `Swift.xcodeproj` in the parent directory (next to the `build` directory). Projects for LLVM, LLDB, and Clang may also be created by passing `--llvm`, `--lldb`, and `--clang`, respectively. Workspaces of useful combinations will also be created (e.g Swift+LLVM, Clang+LLVM).
 
 For the full set of options, see the [Command usage](#command-usage) below.
 
-An `ALL` meta-target is created that depends on all the targets in the given project or workspace. A scheme for this target is automatically generated too (and automatic scheme generation is disabled). You can manually add individual schemes for targets you're interested in. Note however that Clang targets do not currently have dependency information.
+An `ALL` meta-target is created that depends on all the targets in the given project or workspace. A scheme for this target is automatically generated too (and automatic scheme generation is disabled). You can manually add individual schemes for targets you're interested in. Note, however, that Clang targets do not currently have dependency information.
 
 ## Debugging
 
@@ -95,7 +95,6 @@ PROJECT CONFIGURATION:
                           folder references to be used for compatible targets. This allows new
                           source files to be added to a target without needing to regenerate the
                           project. (default: --buildable-folders)
-
   --runtimes-build-dir <runtimes-build-dir>
                           Experimental: The path to a build directory for the new 'Runtimes/'
                           stdlib CMake build. This creates a separate 'SwiftRuntimes' project, along
@@ -107,10 +106,10 @@ PROJECT CONFIGURATION:
 MISC:
   --project-root-dir <project-root-dir>
                           The project root directory, which is the parent directory of the Swift repo.
-                          By default this is inferred from the build directory path.
-  --output-dir <output-dir>
-                          The output directory to write the Xcode project to. Defaults to the project
-                          root directory.
+                          By default, this is inferred from the build directory path.
+  -o, --output-dir <output-dir>
+                          The output directory to write the Xcode project to. Defaults to the
+                          project root directory.
   --log-level <log-level> The log level verbosity (default: info) (values: debug, info, note, warning, error)
   --parallel/--no-parallel
                           Parallelize generation of projects (default: --parallel)

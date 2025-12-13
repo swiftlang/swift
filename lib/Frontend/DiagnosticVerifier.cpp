@@ -20,6 +20,7 @@
 #include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -386,19 +387,23 @@ static void autoApplyFixes(SourceManager &SM, unsigned BufferID,
 bool DiagnosticVerifier::verifyUnknown(
     std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const {
   bool HadError = false;
-  for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
-    if (CapturedDiagnostics[i].Loc.isValid())
+  auto CapturedDiagIter = CapturedDiagnostics.begin();
+  while (CapturedDiagIter != CapturedDiagnostics.end()) {
+    if (CapturedDiagIter->Loc.isValid()) {
+      ++CapturedDiagIter;
       continue;
+    }
 
     HadError = true;
     std::string Message =
         ("unexpected " +
-         getDiagKindString(CapturedDiagnostics[i].Classification) +
-         " produced: " + CapturedDiagnostics[i].Message)
+         getDiagKindString(CapturedDiagIter->Classification) +
+         " produced: " + CapturedDiagIter->Message)
             .str();
 
     auto diag = SM.GetMessage({}, llvm::SourceMgr::DK_Error, Message, {}, {});
     printDiagnostic(diag);
+    CapturedDiagIter = CapturedDiagnostics.erase(CapturedDiagIter);
   }
 
   if (HadError) {
@@ -414,23 +419,35 @@ bool DiagnosticVerifier::verifyUnknown(
 bool DiagnosticVerifier::verifyUnrelated(
     std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const {
   bool HadError = false;
-  for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
-    SourceLoc Loc = CapturedDiagnostics[i].Loc;
-    if (!Loc.isValid())
+  auto CapturedDiagIter = CapturedDiagnostics.begin();
+  while (CapturedDiagIter != CapturedDiagnostics.end()) {
+    SourceLoc Loc = CapturedDiagIter->Loc;
+    if (!Loc.isValid()) {
+      ++CapturedDiagIter;
       // checked by verifyUnknown
       continue;
+    }
 
     HadError = true;
     std::string Message =
         ("unexpected " +
-         getDiagKindString(CapturedDiagnostics[i].Classification) +
-         " produced: " + CapturedDiagnostics[i].Message)
+         getDiagKindString(CapturedDiagIter->Classification) +
+         " produced: " + CapturedDiagIter->Message)
             .str();
 
     auto diag = SM.GetMessage(Loc, llvm::SourceMgr::DK_Error, Message, {}, {});
     printDiagnostic(diag);
 
-    auto FileName = SM.getIdentifierForBuffer(SM.findBufferContainingLoc(Loc));
+    unsigned TopmostBufferID = SM.findBufferContainingLoc(Loc);
+    while (const GeneratedSourceInfo *GSI =
+               SM.getGeneratedSourceInfo(TopmostBufferID)) {
+      SourceLoc ParentLoc = GSI->originalSourceRange.getStart();
+      if (ParentLoc.isInvalid())
+        break;
+      TopmostBufferID = SM.findBufferContainingLoc(ParentLoc);
+      Loc = ParentLoc;
+    }
+    auto FileName = SM.getIdentifierForBuffer(TopmostBufferID);
     auto noteDiag =
         SM.GetMessage(Loc, llvm::SourceMgr::DK_Note,
                       ("file '" + FileName +
@@ -441,6 +458,7 @@ bool DiagnosticVerifier::verifyUnrelated(
                        "ignore diagnostics in this file"),
                       {}, {});
     printDiagnostic(noteDiag);
+    CapturedDiagIter = CapturedDiagnostics.erase(CapturedDiagIter);
   }
 
   return HadError;
@@ -476,7 +494,14 @@ void DiagnosticVerifier::printDiagnostic(const llvm::SMDiagnostic &Diag) const {
   ColoredStream coloredStream{stream};
   raw_ostream &out = UseColor ? coloredStream : stream;
   llvm::SourceMgr &Underlying = SM.getLLVMSourceMgr();
-  Underlying.PrintMessage(out, Diag);
+  if (Diag.getFilename().empty()) {
+    llvm::SMDiagnostic SubstDiag(
+        *Diag.getSourceMgr(), Diag.getLoc(), "<empty-filename>",
+        Diag.getLineNo(), Diag.getColumnNo(), Diag.getKind(), Diag.getMessage(),
+        Diag.getLineContents(), Diag.getRanges(), Diag.getFixIts());
+    Underlying.PrintMessage(out, SubstDiag);
+  } else
+    Underlying.PrintMessage(out, Diag);
 
   SourceLoc Loc = SourceLoc::getFromPointer(Diag.getLoc().getPointer());
   if (Loc.isInvalid())
@@ -1402,9 +1427,9 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
       // Diagnostics attached to generated sources originating in this
       // buffer also count as part of this buffer for this purpose.
-      const GeneratedSourceInfo *GSI =
-          SM.getGeneratedSourceInfo(CapturedDiagIter->SourceBufferID.value());
-      if (!GSI || llvm::find(GSI->ancestors, BufferID) == GSI->ancestors.end()) {
+      unsigned scratch;
+      llvm::ArrayRef<unsigned> ancestors = SM.getAncestors(CapturedDiagIter->SourceBufferID.value(), scratch);
+      if (llvm::find(ancestors, BufferID) == ancestors.end()) {
         ++CapturedDiagIter;
         continue;
       }

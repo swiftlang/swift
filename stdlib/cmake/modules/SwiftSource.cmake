@@ -647,6 +647,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-strict-concurrency=complete")
   endif()
 
+  if (SWIFT_STDLIB_ENABLE_SIL_OPAQUE_VALUES)
+    list(APPEND swift_flags "-Xfrontend" "-enable-sil-opaque-values")
+  endif()
+
   if (SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES)
     list(APPEND swift_flags "-Xfrontend" "-enable-relative-protocol-witness-tables")
     list(APPEND swift_flags "-Xfrontend" "-swift-async-frame-pointer=never")

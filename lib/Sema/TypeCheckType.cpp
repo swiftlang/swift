@@ -591,11 +591,10 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
 
         typeDecl = assocType->getAssociatedTypeAnchor();
       } else if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-        if (isa<ProtocolDecl>(typeDecl->getDeclContext()) &&
-            getStage() == TypeResolutionStage::Structural) {
-          if (aliasDecl && !aliasDecl->hasGenericParamList()) {
-            return adjustAliasType(aliasDecl->getStructuralType());
-          }
+        if (typeDecl->getDeclContext()->getSelfProtocolDecl() &&
+            getStage() == TypeResolutionStage::Structural &&
+            !aliasDecl->hasGenericParamList()) {
+          return adjustAliasType(aliasDecl->getStructuralType());
         }
       }
 
@@ -4255,9 +4254,9 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   unsigned numIsolatedParams = countIsolatedParamsUpTo(repr, 2);
   if (!repr->isWarnedAbout() && numIsolatedParams > 1) {
     diagnose(repr->getLoc(), diag::isolated_parameter_duplicate_type)
-        .warnUntilSwiftVersion(6);
+        .warnUntilLanguageMode(6);
 
-    if (ctx.LangOpts.isSwiftVersionAtLeast(6))
+    if (ctx.isLanguageModeAtLeast(6))
       return ErrorType::get(ctx);
     else
       repr->setWarned();
@@ -4270,7 +4269,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     if (globalActor && !globalActor->hasError() && !globalActorAttr->isInvalid()) {
       if (numIsolatedParams != 0) {
         diagnose(repr->getLoc(), diag::isolated_parameter_global_actor_type)
-            .warnUntilSwiftVersion(6);
+            .warnUntilLanguageMode(6);
         globalActorAttr->setInvalid();
       } else if (isolatedAttr) {
         diagnose(repr->getLoc(), diag::isolated_attr_global_actor_type,
@@ -5412,7 +5411,7 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
     unwrappedType = wrappedOptionalType;
   }
 
-  if (auto dynamicSelfType = dyn_cast<DynamicSelfType>(unwrappedType)) {
+  if (auto *dynamicSelfType = unwrappedType->getAs<DynamicSelfType>()) {
     unwrappedType = dynamicSelfType->getSelfType();
   }
 
@@ -5785,17 +5784,17 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     // Compiler should diagnose both `Int!` and `String!` as invalid,
     // but returning `ErrorType` from here would stop type resolution
     // after `Int!`.
-    if (ctx.isSwiftVersionAtLeast(swiftLangModeForError)) {
+    if (ctx.isLanguageModeAtLeast(swiftLangModeForError)) {
       repr->setInvalid();
     }
 
     Diag<> diagID = diag::iuo_deprecated_here;
-    if (ctx.isSwiftVersionAtLeast(swiftLangModeForError)) {
+    if (ctx.isLanguageModeAtLeast(swiftLangModeForError)) {
       diagID = diag::iuo_invalid_here;
     }
 
     diagnose(repr->getExclamationLoc(), diagID)
-        .warnUntilSwiftVersion(swiftLangModeForError);
+        .warnUntilLanguageMode(swiftLangModeForError);
 
     // Suggest a regular optional, but not when `T!` is the right-hand side of
     // a cast expression.
@@ -6864,7 +6863,7 @@ private:
     if (Ctx.LangOpts.getFeatureState(feature).isEnabledForMigration()) {
       diag->limitBehavior(DiagnosticBehavior::Warning);
     } else {
-      diag->warnUntilSwiftVersion(feature.getLanguageVersion().value());
+      diag->warnUntilLanguageMode(feature.getLanguageMode().value());
     }
 
     emitInsertAnyFixit(*diag, T);

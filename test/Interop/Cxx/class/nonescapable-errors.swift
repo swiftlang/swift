@@ -118,34 +118,63 @@ struct SWIFT_ESCAPABLE Invalid {
 
 struct SWIFT_NONESCAPABLE NonEscapable {};
 
-template<typename T>
-struct HasAnonUnion {
-    union {
-        int known;
-        T unknown;
-    };
-};
-
-template<typename T>
-struct HasAnonStruct {
-    struct {
-        int known;
-        T unknown;
-    };
-};
-
-template<typename T>
-struct SWIFT_NONESCAPABLE NonEscapableHasAnonUnion {
-    union {
-        int known;
-        T unknown;
-    };
-};
-
-using HasAnonUnionNonEscapable = HasAnonUnion<NonEscapable>;
-using HasAnonStructNonEscapable = HasAnonStruct<NonEscapable>;
-using NonEscapableHasAnonUnionNonEscapable = NonEscapableHasAnonUnion<NonEscapable>;
 using NonEscapableOptional = std::optional<NonEscapable>;
+
+// Infered as non-escapable 
+struct Aggregate {
+  int a;
+  View b;
+  bool c;
+
+  void someMethod() {}
+}; 
+
+// This is a complex record (has user-declared constructors), so we don't infer escapability.
+// By default, it's imported as escapable, which generates an error 
+// because of the non-escapable field 'View'
+struct ComplexRecord {
+  int a;
+  View b;
+  bool c;
+
+  ComplexRecord() : a(1), b(), c(false) {}
+  ComplexRecord(const ComplexRecord &other) = default;
+}; 
+
+Aggregate m1();
+ComplexRecord m2();
+
+struct SWIFT_NONESCAPABLE SWIFT_NONESCAPABLE DoubleNonEscapableAnnotation {};
+struct SWIFT_ESCAPABLE SWIFT_ESCAPABLE DoubleEscapableAnnotation {};
+
+template<typename F, typename S>
+struct SWIFT_ESCAPABLE_IF(F) SWIFT_ESCAPABLE_IF(S) DoubleEscapableIfAnnotation {};
+
+struct SWIFT_ESCAPABLE SWIFT_NONESCAPABLE EscapableNonEscapable {};
+struct SWIFT_ESCAPABLE SWIFT_NONESCAPABLE SWIFT_NONESCAPABLE SWIFT_ESCAPABLE DoubleEscapableNonEscapable {};
+
+template<typename T>
+struct SWIFT_ESCAPABLE_IF(T) SWIFT_ESCAPABLE EscapableIfEscapable {};
+
+template<typename T>
+struct SWIFT_ESCAPABLE_IF(T) SWIFT_NONESCAPABLE NonEscapableIfEscapable {};
+
+struct SWIFT_ESCAPABLE SWIFT_ESCAPABLE_IF(T) NonTemplateEscapableIf {};
+
+DoubleNonEscapableAnnotation n1();
+DoubleEscapableAnnotation n2();
+DoubleEscapableIfAnnotation<Owner, NonEscapable> n3();
+DoubleEscapableIfAnnotation<Owner, DoubleEscapableAnnotation> n4();
+EscapableNonEscapable n5();
+DoubleEscapableNonEscapable n6();
+EscapableIfEscapable<NonEscapable> n7();
+NonEscapableIfEscapable<Owner> n8();
+NonTemplateEscapableIf n9();
+// We infer that MyPair is ~Escapable from `NonEscapable`, but still emit diagnostics for `Missing`
+MyPair<NonEscapable, MyPair<Owner, MyPair2<NonEscapable, DoubleEscapableAnnotation>>> n10();
+// Don't emit the same diagnostic twice
+MyPair<DoubleEscapableAnnotation, DoubleEscapableAnnotation> n11();
+
 
 //--- test.swift
 import Test
@@ -193,10 +222,10 @@ public func noAnnotations() -> View {
     // CHECK-NO-LIFETIMES: nonescapable.h:56:39: error: template parameter 'Missing' does not exist
     i2()
     // CHECK: nonescapable.h:62:33: error: template parameter 'S' expected to be a type parameter
-    // CHECK: nonescapable.h:80:41: error: a function with a ~Escapable result needs a parameter to depend on
-    // CHECK: note: '@_lifetime(immortal)' can be used to indicate that values produced
     // CHECK-NO-LIFETIMES: nonescapable.h:62:33: error: template parameter 'S' expected to be a type parameter
     j1()
+    // CHECK: nonescapable.h:80:41: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK: note: '@_lifetime(immortal)' can be used to indicate that values produced
     // CHECK-NO-LIFETIMES: nonescapable.h:80:41: error: a function cannot return a ~Escapable result
     j2()
     // CHECK: nonescapable.h:81:41: error: a function with a ~Escapable result needs a parameter to depend on
@@ -221,6 +250,54 @@ public func noAnnotations() -> View {
     return View()
 }
 
+public func diagnoseInvalidSwiftAttributes() {
+    n1()
+    // CHECK: nonescapable.h:133:46: error: multiple SWIFT_NONESCAPABLE annotations found on 'DoubleNonEscapableAnnotation'
+    // CHECK: nonescapable.h:150:30: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:133:46: error: multiple SWIFT_NONESCAPABLE annotations found on 'DoubleNonEscapableAnnotation'
+    // CHECK-NO-LIFETIMES: nonescapable.h:150:30: error: a function cannot return a ~Escapable result
+    n2()
+    // CHECK: nonescapable.h:134:40: error: multiple SWIFT_ESCAPABLE annotations found on 'DoubleEscapableAnnotation'
+    // CHECK-NO-LIFETIMES: nonescapable.h:134:40: error: multiple SWIFT_ESCAPABLE annotations found on 'DoubleEscapableAnnotation'
+    n3()
+    // CHECK: nonescapable.h:137:52: error: multiple SWIFT_ESCAPABLE_IF annotations found on 'DoubleEscapableIfAnnotation<Owner, NonEscapable>'
+    // CHECK-NO-LIFETIMES: nonescapable.h:137:52: error: multiple SWIFT_ESCAPABLE_IF annotations found on 'DoubleEscapableIfAnnotation<Owner, NonEscapable>'
+    n4()
+    // CHECK: nonescapable.h:137:52: error: multiple SWIFT_ESCAPABLE_IF annotations found on 'DoubleEscapableIfAnnotation<Owner, DoubleEscapableAnnotation>'
+    // CHECK-NO-LIFETIMES: nonescapable.h:137:52: error: multiple SWIFT_ESCAPABLE_IF annotations found on 'DoubleEscapableIfAnnotation<Owner, DoubleEscapableAnnotation>'
+    n5()
+    // CHECK: nonescapable.h:154:23: warning: the returned type 'EscapableNonEscapable' is annotated as non-escapable; its lifetime dependencies must be annotated [#ClangDeclarationImport]
+    // CHECK: nonescapable.h:154:23: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:154:23: warning: the returned type 'EscapableNonEscapable' is annotated as non-escapable; its lifetime dependencies must be annotated [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:154:23: error: a function cannot return a ~Escapable result
+    n6()
+    // CHECK: nonescapable.h:155:29: warning: the returned type 'DoubleEscapableNonEscapable' is annotated as non-escapable; its lifetime dependencies must be annotated [#ClangDeclarationImport]
+    // CHECK: nonescapable.h:140:78: error: multiple conflicting annotations found on 'DoubleEscapableNonEscapable'
+    // CHECK: nonescapable.h:155:29: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:155:29: warning: the returned type 'DoubleEscapableNonEscapable' is annotated as non-escapable; its lifetime dependencies must be annotated [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:140:78: error: multiple conflicting annotations found on 'DoubleEscapableNonEscapable'
+    // CHECK-NO-LIFETIMES: nonescapable.h:155:29: error: a function cannot return a ~Escapable result
+    n7()
+    // CHECK: nonescapable.h:143:46: error: multiple conflicting annotations found on 'EscapableIfEscapable<NonEscapable>'
+    // CHECK-NO-LIFETIMES: nonescapable.h:143:46: error: multiple conflicting annotations found on 'EscapableIfEscapable<NonEscapable>'
+    n8()
+    // CHECK: nonescapable.h:146:49: error: multiple conflicting annotations found on 'NonEscapableIfEscapable<Owner>'
+    // CHECK-NO-LIFETIMES: nonescapable.h:146:49: error: multiple conflicting annotations found on 'NonEscapableIfEscapable<Owner>'
+    // CHECK: nonescapable.h:157:32: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:157:32: error: a function cannot return a ~Escapable result
+    n9()
+    // CHECK: nonescapable.h:148:24: error: SWIFT_ESCAPABLE_IF is invalid because it is only supported in class templates
+    // CHECK: nonescapable.h:148:46: error: multiple conflicting annotations found on 'NonTemplateEscapableIf'
+    // CHECK-NO-LIFETIMES: nonescapable.h:148:24: error: SWIFT_ESCAPABLE_IF is invalid because it is only supported in class templates
+    // CHECK-NO-LIFETIME: nonescapable.h:148:46: error: multiple conflicting annotations found on 'NonTemplateEscapableIf'
+    n10()
+    // CHECK: nonescapable.h:56:39: error: template parameter 'Missing' does not exist
+    // CHECK: nonescapable.h:160:87: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:56:39: error: template parameter 'Missing' does not exist
+    // CHECK-NO-LIFETIMES: nonescapable.h:160:87: error: a function cannot return a ~Escapable result
+    n11() 
+}
+
 public func test3(_ x: inout View) {
     usedToCrash(&x)
     // CHECK: error: cannot find 'usedToCrash' in scope
@@ -233,18 +310,22 @@ public func test3(_ x: inout View) {
     // CHECK-NO-LIFETIMES: pointer to non-escapable type 'View' cannot be imported
 }
 
-public func anonymousUnions() {
-    _ = HasAnonUnionNonEscapable()
-    // CHECK: error: cannot find 'HasAnonUnionNonEscapable' in scope
-    // CHECK-NO-LIFETIMES: error: cannot find 'HasAnonUnionNonEscapable' in scope
-    _ = HasAnonStructNonEscapable()
-    // CHECK: error: cannot find 'HasAnonStructNonEscapable' in scope
-    // CHECK-NO-LIFETIMES: error: cannot find 'HasAnonStructNonEscapable' in scope
-    _ = NonEscapableHasAnonUnionNonEscapable()
+public func optional() {
     _ = NonEscapableOptional()
     // CHECK: error: cannot infer the lifetime dependence scope on an initializer with a ~Escapable parameter, specify '@_lifetime(borrow {{.*}})' or '@_lifetime(copy {{.*}})'
     // CHECK-NO-LIFETIMES: error: an initializer cannot return a ~Escapable result
     // CHECK-NO-LIFETIMES: error: an initializer cannot return a ~Escapable result
+}
+
+public func inferedEscapability() {
+    m1()
+    // CHECK: nonescapable.h:130:11: error: a function with a ~Escapable result needs a parameter to depend on
+    // CHECK-NO-LIFETIMES: nonescapable.h:130:11: error: a function cannot return a ~Escapable result
+    m2()
+    // CHECK: error: 'm2()' is unavailable: return type is unavailable in Swift
+    // CHECK: note: 'm2()' has been explicitly marked unavailable here
+    // CHECK-NO-LIFETIMES: error: 'm2()' is unavailable: return type is unavailable in Swift
+    // CHECK-NO-LIFETIMES: note: 'm2()' has been explicitly marked unavailable here
 }
 
     // CHECK-NOT: error

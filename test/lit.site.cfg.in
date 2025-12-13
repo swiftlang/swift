@@ -52,6 +52,7 @@ config.cmake_c_compiler = r'''@CMAKE_C_COMPILER@'''
 config.cmake_cxx_compiler = r'''@CMAKE_CXX_COMPILER@'''
 config.c_flags = r'''@CMAKE_C_FLAGS@'''
 config.exe_linker_flags = r'''@CMAKE_EXE_LINKER_FLAGS@'''
+config.shared_linker_flags = r'''@CMAKE_SHARED_LINKER_FLAGS@'''
 
 # --- Darwin ---
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"

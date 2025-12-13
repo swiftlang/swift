@@ -214,11 +214,6 @@ bool TypeVariableType::Implementation::isTernary() const {
   return locator && locator->directlyAt<TernaryExpr>();
 }
 
-void *operator new(size_t bytes, ConstraintSystem& cs,
-                   size_t alignment) {
-  return cs.getAllocator().Allocate(bytes, alignment);
-}
-
 bool constraints::computeTupleShuffle(TupleType *fromTuple,
                                       TupleType *toTuple,
                                       SmallVectorImpl<unsigned> &sources) {
@@ -695,10 +690,10 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       // In Swift 6.2 and below we incorrectly missed checking this rule for
       // methods, downgrade to a warning until the next language mode.
       auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-      if (!anchor->hasCurriedSelf() || ctx.isSwiftVersionAtLeast(futureVersion))
+      if (!anchor->hasCurriedSelf() || ctx.isLanguageModeAtLeast(futureVersion))
         return Type();
 
-      diag.warnUntilFutureSwiftVersion();
+      diag.warnUntilFutureLanguageMode();
     }
   }
 

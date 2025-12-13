@@ -25,6 +25,7 @@
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/DenseMap.h"
@@ -316,6 +317,12 @@ public:
                                    bool allowTaskDealloc = true,
                                    bool useTaskDeallocThrough = false,
                                    bool forCalleeCoroutineFrame = false);
+
+  StackAddress emitDynamicStackAllocation(SILType type,
+                                          StackAllocationIsNested_t isNested,
+                                          const llvm::Twine &name = "");
+  void emitDynamicStackDeallocation(StackAddress address,
+                                    StackAllocationIsNested_t isNested);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
@@ -625,6 +632,9 @@ public:
   void emitNativeStrongRetain(llvm::Value *value, Atomicity atomicity);
   void emitNativeStrongRelease(llvm::Value *value, Atomicity atomicity);
   void emitNativeSetDeallocating(llvm::Value *value);
+
+  // Routines to deal with box (embedded) runtime calls.
+  void emitReleaseBox(llvm::Value *value);
 
   // Routines for the ObjC reference-counting style.
   void emitObjCStrongRetain(llvm::Value *value);

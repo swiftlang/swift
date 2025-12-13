@@ -95,7 +95,6 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ArgumentAttribute:
   case ConstraintLocator::UnresolvedMemberChainResult:
   case ConstraintLocator::PlaceholderType:
-  case ConstraintLocator::ImplicitConversion:
   case ConstraintLocator::ImplicitDynamicMemberSubscript:
   case ConstraintLocator::SyntacticElement:
   case ConstraintLocator::PackType:
@@ -460,12 +459,6 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   case ConstraintLocator::ConstraintLocator::ImplicitDynamicMemberSubscript:
     out << "implicit dynamic member subscript";
     break;
-
-  case ConstraintLocator::ConstraintLocator::ImplicitConversion: {
-    auto convElt = elt.castTo<LocatorPathElt::ImplicitConversion>();
-    out << "implicit conversion " << getName(convElt.getConversionKind());
-    break;
-  }
 
   case ConstraintLocator::ConstraintLocator::PackType: {
     auto packElt = elt.castTo<LocatorPathElt::PackType>();

@@ -882,6 +882,14 @@ public:
     return isTaskAlloc;
   }
 
+  static bool isCallToMalloc(llvm::Value *val) {
+    auto *call = dyn_cast<llvm::CallInst>(val);
+    if (!call)
+      return false;
+    auto *callee = call->getCalledFunction();
+    return callee && callee->getName() == "malloc";
+  }
+
   static bool isTaskAlloc(llvm::Value *Storage) {
     while (Storage) {
       if (auto *LdInst = dyn_cast<llvm::LoadInst>(Storage))
@@ -1899,6 +1907,8 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f,
   // being in the external file or via annotations.
   if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Address)
     CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
+  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::MemTagStack)
+    CurFn->addFnAttr(llvm::Attribute::SanitizeMemTag);
   if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread) {
     auto declContext = f->getDeclContext();
     if (isa_and_nonnull<DestructorDecl>(declContext)) {
@@ -3585,13 +3595,12 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
 }
 
 static std::unique_ptr<CallEmission> getCallEmissionForLoweredValue(
-    IRGenSILFunction &IGF, CanSILFunctionType origCalleeType,
-    CanSILFunctionType substCalleeType, const LoweredValue &lv,
-    llvm::Value *selfValue, SubstitutionMap substitutions,
-    WitnessMetadata *witnessMetadata) {
-  Callee callee = lv.getCallee(IGF, selfValue,
-                               CalleeInfo(origCalleeType, substCalleeType,
-                                          substitutions));
+    IRGenSILFunction &IGF, const LoweredValue &lv, CalleeInfo &&info,
+    llvm::Value *selfValue, WitnessMetadata *witnessMetadata) {
+  auto origCalleeType = info.OrigFnType;
+  auto substCalleeType = info.SubstFnType;
+
+  Callee callee = lv.getCallee(IGF, selfValue, std::move(info));
 
   switch (origCalleeType->getRepresentation()) {
   case SILFunctionType::Representation::WitnessMethod: {
@@ -3883,11 +3892,12 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   GenericContextScope scope(IGM,
                             origCalleeType->getInvocationGenericSignature());
 
+  CalleeInfo info(origCalleeType, substCalleeType, site.getSubstitutionMap());
+
   Explosion llArgs;
   WitnessMetadata witnessMetadata;
   auto emission = getCallEmissionForLoweredValue(
-      *this, origCalleeType, substCalleeType, calleeLV, selfValue,
-      site.getSubstitutionMap(), &witnessMetadata);
+      *this, calleeLV, std::move(info), selfValue, &witnessMetadata);
 
   if (site.hasIndirectSILResults()) {
     emission->setIndirectReturnAddress(getLoweredAddress(site.getIndirectSILResults()[0]));
@@ -6518,7 +6528,8 @@ void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
 
   // At this point addr must be an alloca or an undef.
   assert(isa<llvm::AllocaInst>(addr) || isa<llvm::UndefValue>(addr) ||
-         isa<llvm::IntrinsicInst>(addr) || isCallToSwiftTaskAlloc(addr));
+         isa<llvm::IntrinsicInst>(addr) || isCallToSwiftTaskAlloc(addr) ||
+         isCallToMalloc(addr));
 
   auto Indirection = DirectValue;
   if (InCoroContext(*CurSILFn, *i))
@@ -6575,7 +6586,8 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   DebugTypeInfo DbgTy;
   emitDebugInfoBeforeAllocStack(i, type, DbgTy);
 
-  auto stackAddr = type.allocateStack(*this, i->getElementType(), dbgname);
+  auto stackAddr = type.allocateStack(*this, i->getElementType(), dbgname,
+                                      i->isStackAllocationNested());
   setLoweredStackAddress(i, stackAddr);
   Address addr = stackAddr.getAddress();
 
@@ -6668,23 +6680,27 @@ void IRGenSILFunction::visitDeallocStackInst(swift::DeallocStackInst *i) {
   if (auto *closure = dyn_cast<PartialApplyInst>(i->getOperand())) {
     assert(closure->isOnStack());
     auto stackAddr = LoweredPartialApplyAllocations[i->getOperand()];
-    emitDeallocateDynamicAlloca(stackAddr);
+    emitDeallocateDynamicAlloca(stackAddr, closure->isStackAllocationNested());
     return;
   }
   if (isaResultOf<BeginApplyInst>(i->getOperand())) {
     auto *mvi = getAsResultOf<BeginApplyInst>(i->getOperand());
     auto *bai = cast<BeginApplyInst>(mvi->getParent());
+    // FIXME: [non_nested]
     const auto &coroutine = getLoweredCoroutine(bai->getTokenResult());
     emitDeallocYieldOnce2CoroutineFrame(*this,
                                         coroutine.getCalleeAllocatedFrame());
     return;
   }
 
-  auto allocatedType = i->getOperand()->getType();
-  const TypeInfo &allocatedTI = getTypeInfo(allocatedType);
-  StackAddress stackAddr = getLoweredStackAddress(i->getOperand());
+  auto *asi = cast<AllocStackInst>(i->getOperand());
 
-  allocatedTI.deallocateStack(*this, stackAddr, allocatedType);
+  auto allocatedType = asi->getType();
+  const TypeInfo &allocatedTI = getTypeInfo(allocatedType);
+  StackAddress stackAddr = getLoweredStackAddress(asi);
+  auto isNested = asi->isStackAllocationNested();
+
+  allocatedTI.deallocateStack(*this, stackAddr, allocatedType, isNested);
 }
 
 void IRGenSILFunction::visitDeallocStackRefInst(DeallocStackRefInst *i) {

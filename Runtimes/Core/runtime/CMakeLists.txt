@@ -72,6 +72,14 @@ if(SwiftCore_ENABLE_FILESYSTEM_SUPPORT AND (NOT SwiftCore_ARCH_SUBDIR OR NOT Swi
   message(SEND_ERROR "Filesystem support requires setting `SwiftCore_ARCH_SUBDIR` and `SwiftCore_PLATFORM_SUBDIR`")
 endif()
 
+if(SwiftCore_ENABLE_STDLIB_TRACING)
+  check_symbol_exists("os_signpost_interval_begin" "os/signpost.h" SwiftCore_HAS_OS_SIGNPOST)
+  check_symbol_exists("os_log" "os/log.h" SwiftCore_HAS_OS_LOG)
+  if(NOT SwiftCore_HAS_OS_LOG OR NOT SwiftCore_HAS_OS_SIGNPOST)
+    message(SEND_ERROR "Tracing requires 'os_signpost' and 'os_log' APIs")
+  endif()
+endif()
+
 # TODO: Probably worth considering putting half of these in a RuntimeConfig.h.in
 #       file rather than pushing them through macro flags.
 target_compile_definitions(swiftRuntime

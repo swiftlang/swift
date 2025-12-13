@@ -63,6 +63,12 @@ public:
   uint64_t defaultDefinitionTypeData = 0;
 };
 
+class LazyOpaqueTypeData : public LazyContextData {
+public:
+  /// The context data used for loading the underlying type substitution map.
+  uint64_t underlyingSubsData = 0;
+};
+
 /// Context data for protocols.
 class LazyProtocolData : public LazyIterableDeclContextData {
 public:
@@ -138,6 +144,10 @@ public:
   // Returns the target parameter of the `@_specialize` attribute or null.
   virtual ValueDecl *loadTargetFunctionDecl(const AbstractSpecializeAttr *attr,
                                             uint64_t contextData) = 0;
+
+  /// Loads the underlying type substitution map of an opaque result declaration.
+  virtual void
+  finishOpaqueTypeDecl(OpaqueTypeDecl *opaqueDecl, uint64_t contextData) = 0;
 };
 
 /// A class that can lazily load conformances from a serialized format.

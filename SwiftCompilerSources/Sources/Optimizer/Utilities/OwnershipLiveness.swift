@@ -626,9 +626,13 @@ extension InteriorUseWalker: OwnershipUseVisitor {
     if value.type.isTrivial(in: function) {
       return .continueWalk
     }
-    guard value.type.isEscapable(in: function) else {
+    guard value.mayEscape else {
       // Non-escapable dependent values can be lifetime-extended by copying, which is not handled by
-      // InteriorUseWalker. LifetimeDependenceDefUseWalker does this.
+      // InteriorUseWalker. LifetimeDependenceDefUseWalker does this. Alternatively, we could continue to `walkDownUses`
+      // but later recognize a copy of a `mayEscape` value to be a pointer escape at that point.
+      //
+      // This includes partial_apply [on_stack] which can currently be copied. Although a better solution would be to
+      // make copying an on-stack closure illegal SIL.
       return pointerEscapingUse(of: operand)
     }
     if useVisitor(operand) == .abortWalk {

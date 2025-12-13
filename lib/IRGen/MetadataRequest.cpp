@@ -886,6 +886,17 @@ bool irgen::isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
     return false;
   }
 
+  if (IGM.isEmbeddedWithExistentials() &&
+      (isa<StructType>(type) || isa<BoundGenericStructType>(type) ||
+       isa<EnumType>(type) || isa<BoundGenericEnumType>(type))) {
+    if (type->hasArchetype()) {
+      llvm::errs() << "Cannot get metadata of generic class for type "
+                   << type << "\n";
+      llvm::report_fatal_error("cannot get metadata for type with archetype");
+    }
+    return true;
+  }
+
   // Prespecialized struct/enum metadata gets no dedicated accessor yet and so
   // cannot do the work of registering the generic arguments which are classes
   // with the ObjC runtime.  Concretely, the following cannot be prespecialized
@@ -1252,6 +1263,10 @@ static MetadataResponse emitFixedArrayMetadataRef(IRGenFunction &IGF,
 static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
                                                  CanTupleType type,
                                                  DynamicMetadataRequest request) {
+  if (IGF.IGM.isEmbeddedWithExistentials()) {
+    return MetadataResponse::forComplete(IGF.IGM.getAddrOfTypeMetadata(type));
+  }
+
   if (type->containsPackExpansionType())
     return emitDynamicTupleTypeMetadataRef(IGF, type, request);
 
@@ -1553,6 +1568,9 @@ static CanPackType getInducedPackType(AnyFunctionType::CanParamArrayRef params,
 static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
                                                     CanFunctionType type,
                                                     DynamicMetadataRequest request) {
+  if (IGF.IGM.isEmbeddedWithExistentials()) {
+    return MetadataResponse::forComplete(IGF.IGM.getAddrOfTypeMetadata(type));
+  }
   auto result =
     IGF.emitAbstractTypeMetadataRef(type->getResult()->getCanonicalType());
 
@@ -3372,7 +3390,9 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
 MetadataResponse
 IRGenFunction::emitTypeMetadataRef(CanType type,
                                    DynamicMetadataRequest request) {
-  if (type->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+  auto &langOpts = type->getASTContext().LangOpts;
+  if (langOpts.hasFeature(Feature::Embedded) &&
+      !langOpts.hasFeature(Feature::EmbeddedExistentials) &&
       !isMetadataAllowedInEmbedded(type)) {
     llvm::errs() << "Metadata pointer requested in embedded Swift for type "
                  << type << "\n";
@@ -3392,7 +3412,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   if (type->hasArchetype() ||
       !shouldTypeMetadataAccessUseAccessor(IGM, type) ||
       isa<PackType>(type) ||
-      type->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      langOpts.hasFeature(Feature::Embedded)) {
     return emitDirectTypeMetadataRef(*this, type, request);
   }
 
@@ -3664,7 +3684,7 @@ namespace {
       //
       // TODO: If a nominal type is in the same source file as we're currently
       // emitting, we would be able to see its value witness table.
-      if (IGF.IGM.IsWellKnownBuiltinOrStructralType(t))
+      if (IGF.IGM.isWellKnownBuiltinOrStructuralType(t))
         return emitFromValueWitnessTable(t);
 
       // If the type is a singleton aggregate, the field's layout is equivalent

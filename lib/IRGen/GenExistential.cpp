@@ -2314,7 +2314,21 @@ Address irgen::emitAllocateBoxedOpaqueExistentialBuffer(
     if (fixedTI->getFixedPacking(IGF.IGM) == FixedPacking::OffsetZero) {
       return valueTI.getAddressForPointer(IGF.Builder.CreateBitCast(
           existentialBuffer.getAddress(), IGF.IGM.PtrTy));
+    } else if (IGF.IGM.isEmbeddedWithExistentials()) {
+      llvm::Value *box, *address;
+      auto *metadata = existLayout.loadMetadataRef(IGF, existentialContainer);
+      IGF.emitAllocBoxCall(metadata, box, address);
+      llvm::Value *addressInBox =
+        IGF.Builder.CreateBitCast(address, IGF.IGM.OpaquePtrTy);
+      IGF.Builder.CreateStore(
+              box, Address(IGF.Builder.CreateBitCast(
+                               existentialBuffer.getAddress(), IGF.IGM.PtrTy),
+                           IGF.IGM.RefCountedPtrTy,
+                           existLayout.getAlignment(IGF.IGM)));
+
+      return valueTI.getAddressForPointer(addressInBox);
     }
+
     // Otherwise, allocate a box with enough storage.
     Address addr = emitAllocateExistentialBoxInBuffer(
         IGF, valueType, existentialBuffer, genericEnv, "exist.box.addr",
@@ -2883,7 +2897,10 @@ static llvm::Function *getDestroyBoxedOpaqueExistentialBufferFunction(
               Builder.CreateBitCast(buffer.getAddress(), IGM.PtrTy);
           auto *reference = Builder.CreateLoad(Address(
               referenceAddr, IGM.RefCountedPtrTy, buffer.getAlignment()));
-          IGF.emitNativeStrongRelease(reference, IGF.getDefaultAtomicity());
+          if (IGF.IGM.isEmbeddedWithExistentials()) {
+            IGF.emitReleaseBox(reference);
+          } else
+            IGF.emitNativeStrongRelease(reference, IGF.getDefaultAtomicity());
 
           Builder.CreateRetVoid();
         }

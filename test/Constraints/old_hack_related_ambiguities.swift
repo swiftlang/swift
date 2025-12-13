@@ -414,3 +414,61 @@ do {
     }
   }
 }
+
+do {
+  struct S {
+    func test() -> Int { 42 }
+    static func test(_: S...) {}
+
+    func doubleApply() {}
+    static func doubleApply(_: S) -> () -> Int { { 42 } }
+  }
+
+  func test(s: S) {
+    let res1 = S.test(s)
+    // expected-warning@-1 {{constant 'res1' inferred to have type '()', which may be unexpected}}
+    // expected-note@-2 {{add an explicit type annotation to silence this warning}}
+    _ = res1
+
+    let useInstance = S.test(s)()
+    let _: Int = useInstance
+
+    let res2 = {
+      S.test(s)
+    }
+    let _: () -> Void = res2
+
+    let _ = { () async -> Void in
+      _ = 42
+      return S.test(s)
+    }
+
+    let res3 = S.doubleApply(s)
+    let _: () -> Int = res3
+
+    let res4 = S.doubleApply(s)()
+    let _: Int = res4
+
+    let res5 = { S.doubleApply(s)() }
+    let _: () -> Int = res5
+
+    let res6 = {
+      _ = 42
+      return S.doubleApply(s)
+    }
+    let _: () -> Int = res6()
+  }
+
+  func testAsyncContext(s: S) async {
+    let res1 = S.test(s)
+    // expected-warning@-1 {{constant 'res1' inferred to have type '()', which may be unexpected}}
+    // expected-note@-2 {{add an explicit type annotation to silence this warning}}
+    _ = res1
+
+    let res2 = S.doubleApply(s)
+    let _: () -> Int = res2
+
+    let res3 = S.doubleApply(s)()
+    let _: Int = res3
+  }
+}

@@ -147,6 +147,8 @@ struct PotentialBinding {
     return {placeholderTy, AllowedBindingKind::Exact,
             PointerUnion<Constraint *, ConstraintLocator *>()};
   }
+
+  void print(llvm::raw_ostream &out, const PrintOptions &PO) const;
 };
 
 struct LiteralRequirement {
@@ -383,6 +385,10 @@ public:
   BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
              const PotentialBindings &info);
 
+  BindingSet(BindingSet &&other) = default;
+
+  BindingSet(const BindingSet &other) = delete;
+
   ConstraintSystem &getConstraintSystem() const { return CS; }
 
   TypeVariableType *getTypeVariable() const { return TypeVar; }
@@ -469,10 +475,6 @@ public:
   /// checking.
   bool isViable(PotentialBinding &binding, bool isTransitive);
 
-  explicit operator bool() const {
-    return hasViableBindings() || isDirectHole();
-  }
-
   /// Determine whether this set has any "viable" (or non-hole) bindings.
   ///
   /// A viable binding could be - a direct or transitive binding
@@ -484,6 +486,12 @@ public:
   bool hasViableBindings() const {
     return !Bindings.empty() || getNumViableLiteralBindings() > 0 ||
            !Defaults.empty();
+  }
+
+  /// Determine whether this set can be chosen as the next binding set
+  /// to attempt.
+  bool isViable() const {
+    return hasViableBindings() || isDirectHole();
   }
 
   ArrayRef<Constraint *> getConformanceRequirements() const {
@@ -544,6 +552,8 @@ public:
   /// Check if this binding is favored over a conjunction.
   bool favoredOverConjunction(Constraint *conjunction) const;
 
+  void inferTransitiveKeyPathBindings();
+
   /// Detect `subtype` relationship between two type variables and
   /// attempt to infer supertype bindings transitively e.g.
   ///
@@ -553,19 +563,30 @@ public:
   ///
   /// \param inferredBindings The set of all bindings inferred for type
   /// variables in the workset.
-  void inferTransitiveBindings();
+  void inferTransitiveSupertypeBindings();
+
+  void inferTransitiveUnresolvedMemberRefBindings();
 
   /// Detect subtype, conversion or equivalence relationship
   /// between two type variables and attempt to propagate protocol
   /// requirements down the subtype or equivalence chain.
   void inferTransitiveProtocolRequirements();
 
-  /// Finalize binding computation for this type variable by
-  /// inferring bindings from context e.g. transitive bindings.
+  /// Check whether the given binding set covers any of the literal protocols
+  /// associated with this type variable. The idea is that if a type variable
+  /// has a binding like Int and also it has a conformance requirement to
+  /// ExpressibleByIntegerLitral, we can avoid attempting the default type of
+  /// that literal literal if we already attempted Int.
+  void determineLiteralCoverage();
+
+  /// Finalize binding computation for key path type variables.
   ///
   /// \returns true if finalization successful (which makes binding set viable),
   /// and false otherwise.
-  bool finalize(bool transitive);
+  bool finalizeKeyPathBindings();
+
+  /// Handle diagnostics of unresolved member chains.
+  void finalizeUnresolvedMemberChainResult();
 
   static BindingScore formBindingScore(const BindingSet &b);
 
@@ -589,10 +610,6 @@ private:
   void addLiteralRequirement(Constraint *literal);
 
   void addDefault(Constraint *constraint);
-
-  /// Check whether the given binding set covers any of the
-  /// literal protocols associated with this type variable.
-  void determineLiteralCoverage();
 
   StringRef getLiteralBindingKind(LiteralBindingKind K) const {
 #define ENTRY(Kind, String)                                                    \

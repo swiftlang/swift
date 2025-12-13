@@ -1113,17 +1113,20 @@ void ModuleDependencyScanner::performParallelClangModuleLookup(
   };
 
   // Enque asynchronous lookup tasks
+  llvm::StringSet<> queriedIdentifiers;
   for (const auto &unresolvedImports : unresolvedImportsMap)
     for (const auto &unresolvedImportInfo : unresolvedImports.second)
-      ScanningThreadPool.async(
-          scanForClangModuleDependency,
-          getModuleImportIdentifier(unresolvedImportInfo.importIdentifier));
+      if (queriedIdentifiers.insert(unresolvedImportInfo.importIdentifier).second)
+        ScanningThreadPool.async(
+            scanForClangModuleDependency,
+            getModuleImportIdentifier(unresolvedImportInfo.importIdentifier));
 
   for (const auto &unresolvedImports : unresolvedOptionalImportsMap)
     for (const auto &unresolvedImportInfo : unresolvedImports.second)
-      ScanningThreadPool.async(
-          scanForClangModuleDependency,
-          getModuleImportIdentifier(unresolvedImportInfo.importIdentifier));
+      if (queriedIdentifiers.insert(unresolvedImportInfo.importIdentifier).second)
+        ScanningThreadPool.async(
+            scanForClangModuleDependency,
+            getModuleImportIdentifier(unresolvedImportInfo.importIdentifier));
 
   ScanningThreadPool.wait();
 }

@@ -7,11 +7,11 @@
 // RUN:   %t/test.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas -scanner-prefix-map-paths %t /^test -scanner-output-dir %t.noremap
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader > %t/header.cmd
-// RUN: %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules /^test/objc.h -O -o %t/objc.pch 2>&1 | %FileCheck %s -check-prefix BRIDGE
+// RUN: %target-swift-frontend-plain @%t/header.cmd -disable-implicit-swift-modules /^test/objc.h -O -o %t/objc.pch 2>&1 | %FileCheck %s -check-prefix BRIDGE
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
-// RUN:   %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules /^test/objc.h -O -o %t/objc.pch > %t/keys.json
+// RUN:   %target-swift-frontend-plain @%t/header.cmd -disable-implicit-swift-modules /^test/objc.h -O -o %t/objc.pch > %t/keys.json
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action render-diags %t/keys.json -- \
-// RUN:    %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules /^test/objc.h -O -o %t/objc.pch -cache-replay-prefix-map /^test %t 2>&1 \
+// RUN:    %target-swift-frontend-plain @%t/header.cmd -disable-implicit-swift-modules /^test/objc.h -O -o %t/objc.pch -cache-replay-prefix-map /^test %t 2>&1 \
 // RUN:    | %FileCheck %s -check-prefix BRIDGE -check-prefix BRIDGE-REMAP
 
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json > %t/key
@@ -26,12 +26,14 @@
 // RUN: echo "\"-bridging-header-pch-key\"" >> %t/MyApp.cmd
 // RUN: echo "\"@%t/key\"" >> %t/MyApp.cmd
 
-// RUN: %target-swift-frontend -cache-compile-job -module-name Test -O -cas-path %t/cas @%t/MyApp.cmd \
+// RUN: %target-swift-frontend-plain -cache-compile-job -module-name Test -O -cas-path %t/cas @%t/MyApp.cmd \
 // RUN:   -emit-module -o %t/test.swiftmodule /^test/test.swift 2>&1 | %FileCheck %s
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- %target-swift-frontend -cache-compile-job -module-name Test \
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN:   %target-swift-frontend-plain -cache-compile-job -module-name Test \
 // RUN:   -O -cas-path %t/cas @%t/MyApp.cmd \
 // RUN:   -emit-module -o %t/test.swiftmodule /^test/test.swift > %t/cache_key.json
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action render-diags %t/cache_key.json -- %target-swift-frontend -cache-compile-job -module-name Test \
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action render-diags %t/cache_key.json -- \
+// RUN:   %target-swift-frontend-plain -cache-compile-job -module-name Test \
 // RUN:   -O -cas-path %t/cas @%t/MyApp.cmd \
 // RUN:   -emit-module -o %t/test.swiftmodule /^test/test.swift -cache-replay-prefix-map /^test %t 2>&1 | %FileCheck %s --check-prefix REMAP
 

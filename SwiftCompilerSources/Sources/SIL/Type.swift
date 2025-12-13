@@ -232,6 +232,10 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     }
     return false
   }
+
+  public func mapOutOfEnvironment(in function: Function) -> Type {
+    rawType.mapOutOfEnvironment().canonical.loweredType(in: function)
+  }
 }
 
 extension Type: Equatable {
@@ -284,8 +288,10 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
 }
 
 public struct EnumCase {
+  public let enumElementDecl : EnumElementDecl
   public let payload: Type?
   public let index: Int
+  public var name: StringRef { enumElementDecl.name }
 }
 
 public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
@@ -306,8 +312,25 @@ public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
         caseIterator = caseIterator.getNext()
         caseIndex += 1
       }
-      return EnumCase(payload: enumType.bridged.getEnumCasePayload(caseIterator, function.bridged).typeOrNil,
+      return EnumCase(enumElementDecl: enumType.bridged.getEnumElementDecl(caseIterator).getAs(EnumElementDecl.self),
+                      payload: enumType.bridged.getEnumCasePayload(caseIterator, function.bridged).typeOrNil,
                       index: caseIndex)
+    }
+    return nil
+  }
+
+  // Note: this has O(n) complexity where n is number of enum cases
+  public subscript(_ index: Int) -> EnumCase? {
+    var iterator = enumType.bridged.getFirstEnumCaseIterator()
+    var currentIndex = 0
+    while currentIndex != index && !enumType.bridged.isEndCaseIterator(iterator) {
+      iterator = iterator.getNext()
+      currentIndex += 1
+    }
+    if currentIndex == index && !enumType.bridged.isEndCaseIterator(iterator) {
+      return EnumCase(enumElementDecl: enumType.bridged.getEnumElementDecl(iterator).getAs(EnumElementDecl.self),
+                      payload: enumType.bridged.getEnumCasePayload(iterator, function.bridged).typeOrNil,
+                      index: index)
     }
     return nil
   }
@@ -321,6 +344,10 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 
   public subscript(_ index: Int) -> Type {
     type.bridged.getTupleElementType(index).type
+  }
+
+  public func label(at index: Int) -> Identifier {
+    type.bridged.getTupleElementLabel(index)
   }
 }
 

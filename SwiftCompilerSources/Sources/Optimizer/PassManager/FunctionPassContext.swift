@@ -164,16 +164,21 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
+  func mangle(withChangedRepresentation original: Function) -> String {
+    String(taking: bridgedPassContext.mangleWithChangedRepresentation(original.bridged))
+  }
+
   func createSpecializedFunctionDeclaration(
     from original: Function, withName specializedFunctionName: String,
     withParams specializedParameters: [ParameterInfo],
     withResults specializedResults: [ResultInfo]? = nil,
-    makeThin: Bool = false,
+    withRepresentation: FunctionTypeRepresentation? = nil,
     makeBare: Bool = false,
     preserveGenericSignature: Bool = true
   ) -> Function {
     return specializedFunctionName._withBridgedStringRef { nameRef in
       let bridgedParamInfos = specializedParameters.map { $0._bridged }
+      let repr = withRepresentation ?? original.loweredFunctionType.functionTypeRepresentation
 
       return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
 
@@ -183,7 +188,7 @@ struct FunctionPassContext : MutatingContext {
             return bridgedPassContext.createSpecializedFunctionDeclaration(
               nameRef, paramBuf.baseAddress, paramBuf.count,
               resultBuf.baseAddress, resultBuf.count,
-              original.bridged, makeThin, makeBare,
+              original.bridged, repr.bridged, makeBare,
               preserveGenericSignature
             ).function
           }
@@ -191,7 +196,7 @@ struct FunctionPassContext : MutatingContext {
           return bridgedPassContext.createSpecializedFunctionDeclaration(
             nameRef, paramBuf.baseAddress, paramBuf.count,
             nil, 0,
-            original.bridged, makeThin, makeBare,
+            original.bridged, repr.bridged, makeBare,
             preserveGenericSignature
           ).function
         }

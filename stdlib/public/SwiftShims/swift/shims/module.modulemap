@@ -20,7 +20,6 @@ module SwiftShims {
   header "System.h"
   header "Target.h"
   header "ThreadLocalStorage.h"
-  header "UnicodeData.h"
   header "Visibility.h"
   export *
 }

@@ -337,8 +337,8 @@ public import ClangSubmoduleUnused.ClangSubmoduleUnsuedSubmodule // expected-war
 public import ClangTopModule.ClangTopModuleSubmodule
 
 public func clangUser(a: ClangSimpleType) {} // expected-remark {{struct 'ClangSimpleType' is imported via 'ClangSimple'}}
-public func clangUser(a: ClangSubmoduleSubmoduleType) {} // expected-remark {{struct 'ClangSubmoduleSubmoduleType' is imported via 'ClangSubmoduleSubmodule'}}
-public func clangUser(a: ClangTopModuleType) {} // expected-remark {{struct 'ClangTopModuleType' is imported via 'ClangTopModuleSubmodule'}}
+public func clangUser(a: ClangSubmoduleSubmoduleType) {} // expected-remark {{struct 'ClangSubmoduleSubmoduleType' is imported via 'ClangSubmodule'}}
+public func clangUser(a: ClangTopModuleType) {} // expected-remark {{struct 'ClangTopModuleType' is imported via 'ClangTopModule'}}
 
 //--- ClientOfClangReexportedSubmodules.swift
 public import ClangReexportedSubmodulePublic.ClangReexportedSubmodulePublicSub

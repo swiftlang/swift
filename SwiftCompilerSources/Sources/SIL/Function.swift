@@ -26,6 +26,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return Location(bridged: bridged.getLocation())
   }
 
+  public var declRef: DeclRef { DeclRef(bridged: bridged.getDeclRef()) }
+
+  public var sourceFile: SourceFile? { declRef.sourceFile }
+
   final public var description: String {
     return String(taking: bridged.getDebugDescription())
   }
@@ -88,6 +92,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public func mapTypeIntoEnvironment(_ type: AST.`Type`) -> AST.`Type` {
     return AST.`Type`(bridged: bridged.mapTypeIntoEnvironment(type.bridged))
+  }
+
+  public func mapTypeIntoEnvironment(_ type: Type) -> Type {
+    return Type(bridged: bridged.mapTypeIntoEnvironment(type.bridged))
   }
 
   /// Returns true if the function is a definition and not only an external declaration.

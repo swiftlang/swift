@@ -2413,7 +2413,8 @@ bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
   SILType substitutedType =
       funcTy.substGenericArgs(m, subs, TypeExpansionContext::minimal());
 
-  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), cm->getMember(), m);
+  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), cm->getMember(),
+                           /*convertIndirectToDirect=*/ true, m);
   reInfo.createSubstitutedAndSpecializedTypes();
   CanSILFunctionType finalFuncTy = reInfo.getSpecializedType();
   SILType finalSILTy = SILType::getPrimitiveObjectType(finalFuncTy);
@@ -2465,7 +2466,8 @@ bool swift::specializeWitnessMethodInst(WitnessMethodInst *wm) {
   SILType substitutedType =
       funcTy.substGenericArgs(m, subs, TypeExpansionContext::minimal());
 
-  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), wm->getMember(), m);
+  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), wm->getMember(),
+                           /*convertIndirectToDirect=*/ false, m);
   reInfo.createSubstitutedAndSpecializedTypes();
   CanSILFunctionType finalFuncTy = reInfo.getSpecializedType();
   SILType finalSILTy = SILType::getPrimitiveObjectType(finalFuncTy);

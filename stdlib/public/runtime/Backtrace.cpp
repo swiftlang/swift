@@ -221,6 +221,16 @@ char swiftBacktraceOutputPath[SWIFT_BACKTRACE_OUTPUT_PATH_SIZE] __attribute__((s
 
 void _swift_backtraceSetupEnvironment();
 
+bool isStderrATty()
+{
+#ifndef _WIN32
+  return isatty(STDERR_FILENO);
+#else
+  DWORD dwMode;
+  return GetConsoleMode(GetStdHandle(STD_ERROR_HANDLE), &dwMode);
+#endif
+}
+
 bool isStdoutATty()
 {
 #ifndef _WIN32
@@ -412,10 +422,6 @@ BacktraceInitializer::BacktraceInitializer() {
       (isStdoutATty() && isStdinATty()) ? OnOffTty::On : OnOffTty::Off;
   }
 
-  if (_swift_backtraceSettings.color == OnOffTty::TTY)
-    _swift_backtraceSettings.color =
-      isStdoutATty() ? OnOffTty::On : OnOffTty::Off;
-
   if (_swift_backtraceSettings.preset == Preset::Auto) {
     if (_swift_backtraceSettings.interactive == OnOffTty::On)
       _swift_backtraceSettings.preset = Preset::Friendly;
@@ -452,6 +458,16 @@ BacktraceInitializer::BacktraceInitializer() {
       _swift_backtraceSettings.outputTo = OutputTo::Stdout;
     else
       _swift_backtraceSettings.outputTo = OutputTo::Stderr;
+  }
+
+  if (_swift_backtraceSettings.color == OnOffTty::TTY) {
+    bool outputToIsTty;
+    if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
+      outputToIsTty = isStderrATty();
+    else
+      outputToIsTty = isStdoutATty();
+    _swift_backtraceSettings.color =
+      outputToIsTty ? OnOffTty::On : OnOffTty::Off;
   }
 
   if (_swift_backtraceSettings.enabled == OnOffTty::On) {

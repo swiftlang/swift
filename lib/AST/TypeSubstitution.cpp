@@ -1123,7 +1123,7 @@ ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
 ProtocolConformanceRef ReplaceOpaqueTypesWithUnderlyingTypes::
 operator()(InFlightSubstitution &IFS, Type maybeOpaqueType,
            ProtocolDecl *protocol) const {
-  auto archetype = dyn_cast<OpaqueTypeArchetypeType>(maybeOpaqueType);
+  auto *archetype = maybeOpaqueType->getAs<OpaqueTypeArchetypeType>();
   if (!archetype)
     return ProtocolConformanceRef::forAbstract(maybeOpaqueType, protocol);
 
@@ -1194,7 +1194,7 @@ Type ReplaceExistentialArchetypesWithConcreteTypes::operator()(
 
 ProtocolConformanceRef ReplaceExistentialArchetypesWithConcreteTypes::operator()(
     InFlightSubstitution &IFS, Type origType, ProtocolDecl *proto) const {
-  auto existentialArchetype = dyn_cast<ExistentialArchetypeType>(origType);
+  auto *existentialArchetype = origType->getAs<ExistentialArchetypeType>();
   if (!existentialArchetype ||
       existentialArchetype->getGenericEnvironment() != env)
     return ProtocolConformanceRef::forAbstract(origType.subst(IFS), proto);

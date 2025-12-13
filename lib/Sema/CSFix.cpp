@@ -295,7 +295,8 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
     // Passing a static member reference as an argument needs to be downgraded
     // to a warning until future major mode to maintain source compatibility for
     // code with non-Sendable metatypes.
-    if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(7)) {
+    if (!cs.getASTContext().isLanguageModeAtLeast(
+            version::Version::getFutureMajorLanguageVersion())) {
       auto *argLoc = cs.getConstraintLocator(locator);
       if (auto *argument = getAsExpr(simplifyLocatorToAnchor(argLoc))) {
         if (auto overload = cs.findSelectedOverloadFor(
@@ -330,7 +331,7 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
   }
 
   // Otherwise, warn until Swift 6.
-  if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(6))
+  if (!cs.getASTContext().isLanguageModeAtLeast(6))
     return FixBehavior::DowngradeToWarning;
 
   return FixBehavior::Error;
@@ -939,7 +940,11 @@ DefineMemberBasedOnUse::diagnoseForAmbiguity(CommonFixesArray commonFixes) const
     const auto *solution = solutionAndFix.first;
     const auto *fix = solutionAndFix.second->getAs<DefineMemberBasedOnUse>();
 
-    auto baseType = solution->simplifyType(fix->BaseType);
+    // Ignore differences in optionality since we can look through an optional
+    // to resolve an implicit member `.foo`.
+    auto baseType = solution->simplifyType(fix->BaseType)
+                        ->getMetatypeInstanceType()
+                        ->lookThroughAllOptionalTypes();
     if (!concreteBaseType)
       concreteBaseType = baseType;
 
@@ -1997,7 +2002,7 @@ bool AllowSendingMismatch::diagnose(const Solution &solution,
 AllowSendingMismatch *AllowSendingMismatch::create(ConstraintSystem &cs,
                                                    Type srcType, Type dstType,
                                                    ConstraintLocator *locator) {
-  auto fixBehavior = cs.getASTContext().LangOpts.isSwiftVersionAtLeast(6)
+  auto fixBehavior = cs.getASTContext().isLanguageModeAtLeast(6)
                          ? FixBehavior::Error
                          : FixBehavior::DowngradeToWarning;
   return new (cs.getAllocator())
@@ -2779,7 +2784,7 @@ bool AllowFunctionSpecialization::diagnose(const Solution &solution,
 AllowFunctionSpecialization *
 AllowFunctionSpecialization::create(ConstraintSystem &cs, ValueDecl *decl,
                                     ConstraintLocator *locator) {
-  auto fixBehavior = cs.getASTContext().isSwiftVersionAtLeast(6)
+  auto fixBehavior = cs.getASTContext().isLanguageModeAtLeast(6)
                          ? FixBehavior::Error
                          : FixBehavior::DowngradeToWarning;
   return new (cs.getAllocator())

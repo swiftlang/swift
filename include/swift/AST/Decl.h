@@ -81,6 +81,7 @@ namespace swift {
   class DiagnosticEngine;
   class DynamicSelfType;
   class Type;
+  enum class ExportedLevel;
   class Expr;
   struct ExternalSourceLocs;
   class CaptureListExpr;
@@ -271,6 +272,15 @@ static_assert(uint8_t(SelfAccessKind::LastSelfAccessKind) <
                   (NumSelfAccessKindBits << 1),
               "Self Access Kind is too small to fit in SelfAccess kind bits. "
               "Please expand ");
+
+enum class MemberwiseInitKind {
+  /// The regular memberwise initializer.
+  Regular,
+  /// A compatibility memberwise initializer that includes all private
+  /// initialized variables. This only exists for migration purposes, and will
+  /// be removed in a future language mode.
+  Compatibility
+};
 
 enum class UsingSpecifier : uint8_t {
   MainActor,
@@ -759,6 +769,11 @@ protected:
     /// True if \c isAvailableDuringLowering() is false for any cases. Lazily
     /// computed along with HasAssociatedValues.
     HasAnyUnavailableDuringLoweringValues : 1
+  );
+
+  SWIFT_INLINE_BITFIELD(OpaqueTypeDecl, GenericTypeDecl, 1,
+    /// Whether we have lazily-loaded underlying substitutions.
+    HasLazyUnderlyingSubstitutions : 1
   );
 
   SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
@@ -3646,7 +3661,8 @@ private:
   OpaqueTypeDecl(ValueDecl *NamingDecl, GenericParamList *GenericParams,
                  DeclContext *DC,
                  GenericSignature OpaqueInterfaceGenericSignature,
-                 ArrayRef<TypeRepr *> OpaqueReturnTypeReprs);
+                 ArrayRef<TypeRepr *> OpaqueReturnTypeReprs,
+                 bool hasLazyUnderlyingSubstitutions);
 
   unsigned getNumOpaqueReturnTypeReprs() const {
     return NamingDeclAndHasOpaqueReturnTypeRepr.getInt()
@@ -3658,12 +3674,20 @@ private:
     return getNumOpaqueReturnTypeReprs();
   }
 
+  void loadLazyUnderlyingSubstitutions();
+
 public:
-  static OpaqueTypeDecl *get(
+  static OpaqueTypeDecl *create(
       ValueDecl *NamingDecl, GenericParamList *GenericParams,
       DeclContext *DC,
       GenericSignature OpaqueInterfaceGenericSignature,
       ArrayRef<TypeRepr *> OpaqueReturnTypeReprs);
+
+  static OpaqueTypeDecl *createDeserialized(
+      GenericParamList *GenericParams,
+      DeclContext *DC,
+      GenericSignature OpaqueInterfaceGenericSignature,
+      LazyMemberLoader *lazyLoader, uint64_t underlyingSubsData);
 
   ValueDecl *getNamingDecl() const {
     return NamingDeclAndHasOpaqueReturnTypeRepr.getPointer();
@@ -3720,19 +3744,19 @@ public:
       bool typeCheckFunctionBodies=true) const;
 
   void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
-    assert(!UniqueUnderlyingType.has_value() && "resetting underlying type?!");
+    ASSERT(!Bits.OpaqueTypeDecl.HasLazyUnderlyingSubstitutions);
+    ASSERT(!UniqueUnderlyingType.has_value() && "resetting underlying type?!");
     UniqueUnderlyingType = subs;
   }
 
   bool hasConditionallyAvailableSubstitutions() const {
+    const_cast<OpaqueTypeDecl *>(this)->loadLazyUnderlyingSubstitutions();
+
     return ConditionallyAvailableTypes.has_value();
   }
 
   ArrayRef<ConditionallyAvailableSubstitutions *>
-  getConditionallyAvailableSubstitutions() const {
-    assert(ConditionallyAvailableTypes);
-    return ConditionallyAvailableTypes.value();
-  }
+  getConditionallyAvailableSubstitutions() const;
 
   void setConditionallyAvailableSubstitutions(
       ArrayRef<ConditionallyAvailableSubstitutions *> substitutions);
@@ -4619,9 +4643,10 @@ public:
   ArrayRef<VarDecl *> getInitAccessorProperties() const;
 
   /// Return a collection of all properties that will be part of the memberwise
-  ///  initializer.
-  ArrayRef<VarDecl *> getMemberwiseInitProperties() const;
-  
+  /// initializer.
+  ArrayRef<VarDecl *>
+  getMemberwiseInitProperties(MemberwiseInitKind initKind) const;
+
   /// Establish a mapping between properties that could be iniitalized
   /// via other properties by means of init accessors. This mapping is
   /// one-to-many because we allow intersecting `initializes(...)`.
@@ -4664,11 +4689,11 @@ public:
   }
 
   /// Whether this declaration has a synthesized memberwise initializer.
-  bool hasMemberwiseInitializer() const;
+  bool hasMemberwiseInitializer(MemberwiseInitKind initKind) const;
 
   /// Retrieves the synthesized memberwise initializer for this declaration,
   /// or \c nullptr if it does not have one.
-  ConstructorDecl *getMemberwiseInitializer() const;
+  ConstructorDecl *getMemberwiseInitializer(MemberwiseInitKind initKind) const;
 
   /// Retrieves the effective memberwise initializer for this declaration, or
   /// \c nullptr if it does not have one.
@@ -5578,6 +5603,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class StructuralRequirementsRequest;
   friend class TypeAliasRequirementsRequest;
   friend class ProtocolDependenciesRequest;
+  friend class ProtocolInversesRequest;
   friend class RequirementSignatureRequest;
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
@@ -5810,6 +5836,11 @@ public:
   /// requirements. Almost everywhere else should use getRequirementSignature()
   /// instead.
   ArrayRef<StructuralRequirement> getStructuralRequirements() const;
+
+  /// Retrieves the original inverse requirements written in source.
+  ///
+  /// The structural requirements already have had these applied to them.
+  ArrayRef<InverseRequirement> getInverseRequirements() const;
 
   /// Retrieve same-type requirements implied by protocol typealiases with the
   /// same name as associated types, and diagnose cases that are better expressed
@@ -6735,10 +6766,7 @@ public:
   ///
   /// From the standpoint of access control and exportability checking, this
   /// var will behave as if it was public, even if it is internal or private.
-  ///
-  /// If \p applyImplicit, consider implicitly exposed layouts as well.
-  /// This applies to non-resilient modules.
-  bool isLayoutExposedToClients(bool applyImplicit = false) const;
+  ExportedLevel isLayoutExposedToClients() const;
 
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
@@ -6763,9 +6791,14 @@ public:
   bool isLazyStorageProperty() const {
     return Bits.VarDecl.IsLazyStorageProperty;
   }
-  void setLazyStorageProperty(bool IsLazyStorage) {
-    Bits.VarDecl.IsLazyStorageProperty = IsLazyStorage;
-  }
+
+  /// Mark this VarDecl as backing storage for a the lazy variable `VD`.
+  void setLazyStorageFor(VarDecl *VD);
+
+  /// For a backing storage variable for either a property wrapper or `lazy`
+  /// variable, retrieves the original declared variable. Otherwise returns
+  /// \c nullptr.
+  VarDecl *getOriginalVarForBackingStorage() const;
 
   /// Retrieve the backing storage property for a lazy property.
   VarDecl *getLazyStorageProperty() const;
@@ -6944,7 +6977,9 @@ public:
   /// actual declared property (which may or may not be considered "stored"
   /// as the moment) to the backing storage property. Otherwise, the stored
   /// backing property will be treated as the member-initialized property.
-  bool isMemberwiseInitialized(bool preferDeclaredProperties) const;
+  bool isMemberwiseInitialized(
+      MemberwiseInitKind initKind, bool preferDeclaredProperties,
+      std::optional<AccessLevel> minAccess = std::nullopt) const;
 
   /// Return the range of semantics attributes attached to this VarDecl.
   auto getSemanticsAttrs() const
@@ -7705,6 +7740,7 @@ public:
   enum class SILSynthesizeKind {
     None,
     MemberwiseInitializer,
+    CompatibilityMemberwiseInitializer,
     DistributedActorFactory
 
     // This enum currently needs to fit in a 2-bit bitfield.
@@ -8029,6 +8065,11 @@ public:
   /// type-checked.
   BraceStmt *getMacroExpandedBody() const;
 
+  /// Whether the body of the function has been expanded from a body macro.
+  bool isBodyMacroExpanded() const {
+    return getBodyExpandedStatus() == BodyExpandedStatus::Expanded;
+  }
+
   /// Retrieve the type-checked body of the given function, or \c nullptr if
   /// there's no body available.
   BraceStmt *getTypecheckedBody() const;
@@ -8077,11 +8118,19 @@ public:
 
   /// Note that this is a memberwise initializer and thus the body will be
   /// generated by SILGen.
-  void setIsMemberwiseInitializer() {
+  void setIsMemberwiseInitializer(MemberwiseInitKind initKind) {
     assert(getBodyKind() == BodyKind::None);
     assert(isa<ConstructorDecl>(this));
     setBodyKind(BodyKind::SILSynthesize);
-    setSILSynthesizeKind(SILSynthesizeKind::MemberwiseInitializer);
+    switch (initKind) {
+    case MemberwiseInitKind::Regular:
+      setSILSynthesizeKind(SILSynthesizeKind::MemberwiseInitializer);
+      break;
+    case MemberwiseInitKind::Compatibility:
+      setSILSynthesizeKind(
+          SILSynthesizeKind::CompatibilityMemberwiseInitializer);
+      break;
+    }
   }
 
   /// Mark that the body should be filled in to be a factory method for creating
@@ -8117,9 +8166,20 @@ public:
   /// typechecking.
   bool isBodySkipped() const;
 
-  bool isMemberwiseInitializer() const {
-    return getBodyKind() == BodyKind::SILSynthesize
-        && getSILSynthesizeKind() == SILSynthesizeKind::MemberwiseInitializer;
+  /// Checks whether this is a memberwise initializer decl, and if so the kind,
+  /// otherwise \c std::nullopt.
+  std::optional<MemberwiseInitKind> isMemberwiseInitializer() const {
+    if (getBodyKind() != BodyKind::SILSynthesize)
+      return std::nullopt;
+
+    switch (getSILSynthesizeKind()) {
+    case SILSynthesizeKind::MemberwiseInitializer:
+      return MemberwiseInitKind::Regular;
+    case SILSynthesizeKind::CompatibilityMemberwiseInitializer:
+      return MemberwiseInitKind::Compatibility;
+    default:
+      return std::nullopt;
+    }
   }
 
   /// Determines whether this function represents a distributed actor
@@ -10172,6 +10232,23 @@ getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article,
                              std::optional<bool> underscored = std::nullopt);
 StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind, bool article,
                                        bool underscored);
+
+inline void simple_display(llvm::raw_ostream &out,
+                           MemberwiseInitKind initKind) {
+  switch (initKind) {
+  case MemberwiseInitKind::Regular:
+    out << "regular";
+    break;
+  case MemberwiseInitKind::Compatibility:
+    out << "compatibility";
+    break;
+  }
+}
+
+/// Retrieve a textual representation for a particular kind of memberwise
+/// initializer in a given nominal decl.
+void printMemberwiseInit(NominalTypeDecl *nominal, MemberwiseInitKind initKind,
+                         llvm::raw_ostream &out);
 
 void simple_display(llvm::raw_ostream &out,
                     OptionSet<NominalTypeDecl::LookupDirectFlags> options);

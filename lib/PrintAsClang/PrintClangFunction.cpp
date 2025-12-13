@@ -1895,13 +1895,27 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
     PrimitiveTypeMapping &typeMapping,
     SwiftToClangInteropContext &interopContext, DeclAndTypePrinter &declPrinter,
     const ModuleDecl *emittedModule, Type ty) {
+  auto [it, inserted] = declPrinter.typeRepresentations.try_emplace(ty);
+  // If we already seen the type but do not have a representation yet assume
+  // representable for now. This can happen for recursive types like:
+  //
+  //    public enum E {
+  //      case foo([E?])
+  //    }
+  //
+  // We make a decision about these types when the function that first
+  // encountered them returns.
+  if (!inserted)
+    return it->second ? (*it->second) : ClangRepresentation::representable;
   CFunctionSignatureTypePrinterModifierDelegate delegate;
   CFunctionSignatureTypePrinter typePrinter(
       llvm::nulls(), llvm::nulls(), typeMapping, OutputLanguageMode::Cxx,
       interopContext, delegate, emittedModule, declPrinter,
       FunctionSignatureTypeUse::TypeReference);
-  return typePrinter.visit(ty, OptionalTypeKind::OTK_None,
-                           /*isInOutParam=*/false);
+  auto result = typePrinter.visit(ty, OptionalTypeKind::OTK_None,
+                                  /*isInOutParam=*/false);
+  declPrinter.typeRepresentations[ty] = result;
+  return result;
 }
 
 void DeclAndTypeClangFunctionPrinter::printTypeName(

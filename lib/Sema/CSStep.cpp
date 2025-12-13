@@ -263,7 +263,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   SmallString<64> potentialBindings;
   llvm::raw_svector_ostream bos(potentialBindings);
 
-  auto bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
+  const auto *bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
     if (CS.isDebugMode() && bindings.hasViableBindings()) {
       bos.indent(CS.solverState->getCurrentIndent() + 2);
       bos << "(";
@@ -823,9 +823,13 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   // (expression) gets a fresh time slice to get solved. This
   // is important for closures with large number of statements
   // in them.
-  if (CS.Timer) {
+  if (CS.Timer)
     CS.Timer.reset();
-    CS.startExpressionTimer(element.getLocator());
+
+  {
+    auto *locator = element.getLocator();
+    auto anchor = simplifyLocatorToAnchor(locator);
+    CS.startExpression(anchor ? anchor : locator->getAnchor());
   }
 
   auto success = element.attempt(CS);

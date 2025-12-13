@@ -882,6 +882,18 @@ extension Substring.UTF8View {
 #endif // !(os(watchOS) && _pointerBitWidth(_32))
 }
 
+extension Substring.UTF8View {
+  /// Returns a boolean value indicating whether this UTF8 view
+  /// is trivially identical to `other`.
+  ///
+  /// - Complexity: O(1)
+  @available(StdlibDeploymentTarget 6.4, *)
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._base.isTriviallyIdentical(to: other._base)
+    && self._bounds == other._bounds
+  }
+}
+
 extension Substring {
   @inlinable
   public var utf8: UTF8View {
@@ -1034,6 +1046,18 @@ extension Substring.UTF16View: BidirectionalCollection {
   public subscript(r: Range<Index>) -> Substring.UTF16View {
     let r = _wholeGuts.validateSubscalarRange(r, in: _bounds)
     return Substring.UTF16View(_slice.base, _bounds: r)
+  }
+}
+
+extension Substring.UTF16View {
+  /// Returns a boolean value indicating whether this UTF16 view
+  /// is trivially identical to `other`.
+  ///
+  /// - Complexity: O(1)
+  @available(StdlibDeploymentTarget 6.4, *)
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._base.isTriviallyIdentical(to: other._base)
+    && self._bounds == other._bounds
   }
 }
 
@@ -1281,6 +1305,18 @@ extension Substring.UnicodeScalarView: RangeReplaceableCollection {
   }
 }
 
+extension Substring.UnicodeScalarView {
+  /// Returns a boolean value indicating whether this unicode scalar view
+  /// is trivially identical to `other`.
+  ///
+  /// - Complexity: O(1)
+  @available(StdlibDeploymentTarget 6.4, *)
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._slice._base.isTriviallyIdentical(to: other._slice._base)
+    && self._bounds == other._bounds
+  }
+}
+
 extension Substring: RangeReplaceableCollection {
   @_specialize(where S == String)
   @_specialize(where S == Substring)
@@ -1383,5 +1419,45 @@ extension Substring {
   public subscript(r: Range<Index>) -> Substring {
     let r = _wholeGuts.validateScalarRange(r, in: _bounds)
     return Substring(_unchecked: Slice(base: base, bounds: r))
+  }
+}
+
+extension Substring {
+  /// Returns a boolean value indicating whether this substring is identical to
+  /// `other`.
+  ///
+  /// Two substring values are identical if there is no way to distinguish
+  /// between them.
+  /// 
+  /// For any values `a`, `b`, and `c`:
+  ///
+  /// - `a.isTriviallyIdentical(to: a)` is always `true`. (Reflexivity)
+  /// - `a.isTriviallyIdentical(to: b)` implies `b.isTriviallyIdentical(to: a)`.
+  /// (Symmetry)
+  /// - If `a.isTriviallyIdentical(to: b)` and `b.isTriviallyIdentical(to: c)`
+  /// are both `true`, then `a.isTriviallyIdentical(to: c)` is also `true`.
+  /// (Transitivity)
+  /// - `a.isTriviallyIdentical(b)` implies `a == b`. `a == b` does not imply `a.isTriviallyIdentical(b)`
+  ///
+  /// Values produced by copying the same value, with no intervening mutations,
+  /// will compare identical:
+  ///
+  /// ```swift
+  /// let d = c
+  /// print(c.isTriviallyIdentical(to: d))
+  /// // Prints true
+  /// ```
+  ///
+  /// Comparing substrings this way includes comparing (normally) hidden
+  /// implementation details such as the memory location of any underlying
+  /// substring storage object. Therefore, identical substrings are guaranteed
+  /// to compare equal with `==`, but not all equal substrings are considered
+  /// identical.
+  ///
+  /// - Complexity: O(1)
+  @available(StdlibDeploymentTarget 6.4, *)
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._wholeGuts.isTriviallyIdentical(to: other._wholeGuts) &&
+    self._offsetRange == other._offsetRange
   }
 }

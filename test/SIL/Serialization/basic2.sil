@@ -13,6 +13,17 @@ class Klass {}
 sil @getC : $@convention(thin) () -> (@owned C)
 sil @getKlass : $@convention(thin) () -> (@owned Klass)
 
+// CHECK-LABEL: sil [ossa] @alloc_stack_nonnested : $@convention(thin) () -> () {
+// CHECK: alloc_stack [non_nested] $Klass
+// CHECK: } // end sil function 'alloc_stack_nonnested'
+sil [ossa] @alloc_stack_nonnested : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [non_nested] $Klass
+  dealloc_stack %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @ignored_use_test : $@convention(thin) (@guaranteed Klass) -> () {
 // CHECK: ignored_use %0 : $Klass
 // CHECK: } // end sil function 'ignored_use_test'

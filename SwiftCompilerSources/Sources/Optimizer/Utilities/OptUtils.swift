@@ -241,6 +241,47 @@ extension FullApplySite {
   }
 }
 
+extension ApplySite {
+  func replace(withCallTo callee: Function, arguments newArguments: [Value], _ context: some MutatingContext) {
+    let builder = Builder(before: self, context)
+    let calleeRef = builder.createFunctionRef(callee)
+
+    switch self {
+    case let applyInst as ApplyInst:
+      let newApply = builder.createApply(function: calleeRef,
+                                         applyInst.substitutionMap,
+                                         arguments: newArguments,
+                                         isNonThrowing: applyInst.isNonThrowing)
+      applyInst.replace(with: newApply, context)
+
+    case let partialAp as PartialApplyInst:
+      let newApply = builder.createPartialApply(function: calleeRef,
+                                                substitutionMap: partialAp.substitutionMap,
+                                                capturedArguments: newArguments,
+                                                calleeConvention: partialAp.calleeConvention,
+                                                hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
+                                                isOnStack: partialAp.isOnStack)
+      partialAp.replace(with: newApply, context)
+
+    case let tryApply as TryApplyInst:
+      builder.createTryApply(function: calleeRef,
+                             tryApply.substitutionMap,
+                             arguments: newArguments,
+                             normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock)
+      context.erase(instruction: tryApply)
+
+    case let beginApply as BeginApplyInst:
+      let newApply = builder.createBeginApply(function: calleeRef,
+                                              beginApply.substitutionMap,
+                                              arguments: newArguments)
+      beginApply.replace(with: newApply, context)
+
+    default:
+      fatalError("unknown apply")
+    }
+  }
+}
+
 extension Builder {
   static func insert(after inst: Instruction, _ context: some MutatingContext, insertFunc: (Builder) -> ()) {
     Builder.insert(after: inst, location: inst.location, context, insertFunc: insertFunc)
@@ -1001,6 +1042,23 @@ func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalTy
   }
 }
 
+func isCastSupportedInEmbeddedSwift(from sourceType: Type,
+                                    to destType: Type ) -> Bool {
+  if !sourceType.isExistential {
+    return false
+  }
+  if destType.hasArchetype {
+    return false
+  }
+
+  if !destType.isStruct && !destType.isClass && !destType.isEnum &&
+      !destType.isTuple && !destType.isLoweredFunction {
+    return false
+  }
+
+  return true
+}
+
 extension CheckedCastAddrBranchInst {
   var dynamicCastResult: Bool? {
     switch classifyDynamicCastBridged(bridged) {
@@ -1009,6 +1067,18 @@ extension CheckedCastAddrBranchInst {
       case .willFail:    return false
       default: fatalError("unknown result from classifyDynamicCastBridged")
     }
+  }
+
+  var supportedInEmbeddedSwift: Bool {
+    return isCastSupportedInEmbeddedSwift(from: source.type,
+                                          to: destination.type)
+  }
+}
+
+extension UnconditionalCheckedCastAddrInst {
+  var supportedInEmbeddedSwift: Bool {
+    return isCastSupportedInEmbeddedSwift(from: source.type,
+                                          to: destination.type)
   }
 }
 

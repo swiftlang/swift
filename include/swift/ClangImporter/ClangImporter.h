@@ -620,6 +620,15 @@ public:
 
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
 
+  bool needsClosureConstructor(
+      const clang::CXXRecordDecl *recordDecl) const override;
+
+  bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const override;
+  bool isDeconstructedSwiftClosure(const clang::Type *type) const override;
+
+  const clang::FunctionType *extractCXXFunctionType(
+      const clang::CXXRecordDecl *functionalTypeDecl) const override;
+
   FuncDecl *getAvailabilityDomainPredicate(const clang::VarDecl *var) override;
 
   bool isAnnotatedWith(const clang::CXXMethodDecl *method, StringRef attr);
@@ -736,6 +745,12 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
 /// This mapping is conservative: the resulting Swift access should be at _most_
 /// as permissive as the input C++ access.
 AccessLevel convertClangAccess(clang::AccessSpecifier access);
+
+/// Lookup and return the copy constructor of \a decl
+///
+/// Returns nullptr if \a decl doesn't have a valid copy constructor
+const clang::CXXConstructorDecl *
+findCopyConstructor(const clang::CXXRecordDecl *decl);
 
 /// Read file IDs from 'private_fileid' Swift attributes on a Clang decl.
 ///
