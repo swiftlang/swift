@@ -7,9 +7,6 @@
 // Float16 is only available in watchOS 7.0 or newer
 // UNSUPPORTED: OS=watchos
 
-// TODO: Figure out why this test breaks on wasm32
-// UNSUPPORTED: CPU=wasm32
-
 // Cannot test with old OS stdlib, because that used libc strtof
 // for parsing, which results in incorrect results.
 // UNSUPPORTED: use_os_stdlib
@@ -105,7 +102,9 @@ tests.test("NaNs") {
   expectRoundTrip(Float16.nan)
   expectRoundTrip(-Float16.nan)
   expectRoundTrip(Float16(nan:73, signaling:false))
+#if !arch(wasm32)
   expectRoundTrip(Float16(nan:73, signaling:true))
+#endif
   expectParse("nan", Float16.nan)
   expectParse("NAN", Float16.nan)
   expectParse("NaN", Float16.nan)
