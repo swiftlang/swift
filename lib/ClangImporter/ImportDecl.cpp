@@ -3722,6 +3722,11 @@ namespace {
                                clang::OverloadedOperatorKind cxxOperatorKind) {
       if (cxxOperatorKind == clang::OverloadedOperatorKind::OO_None)
         return true;
+      // If this operator was renamed via swift_name attribute, the imported
+      // Swift function already has the specified name. Do not apply any special
+      // handling to it.
+      if (importedName.hasCustomName())
+        return true;
 
       auto dc = func->getDeclContext();
       auto typeDecl = dc->getSelfNominalTypeDecl();
