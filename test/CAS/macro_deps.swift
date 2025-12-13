@@ -12,7 +12,7 @@
 // RUN: %target-swift-frontend -emit-module -module-cache-path %t/clang-module-cache %t/test.swift -module-name Test -o %t/include/Test.swiftmodule -I %t/include \
 // RUN:   -O -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -swift-version 5 -external-plugin-path %t#%swift-plugin-server
 
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-name MyApp -module-cache-path %t/clang-module-cache -O \
+// RUN: %target-swift-frontend-plain -scan-dependencies -module-load-mode prefer-serialized -module-name MyApp -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -I %t/include \
 // RUN:   %t/main.swift -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -external-plugin-path %t#%swift-plugin-server
 
@@ -39,7 +39,7 @@
 // PLUGIN_SEARCH-NOT: -external-plugin-path
 // RESOLVED-COUNT-2: -load-resolved-plugin
 
-// RUN: %target-swift-frontend -diagnostic-style=swift \
+// RUN: %target-swift-frontend-plain -diagnostic-style=swift \
 // RUN:   -emit-module -o %t/Test.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -module-name MyApp -O \
 // RUN:   -external-plugin-path %t#%swift-plugin-server \

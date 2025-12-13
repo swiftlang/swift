@@ -18,7 +18,7 @@
 // RUN: llvm-cas --cas %t/cas --make-blob --data %t/B-map.json > %t/B-map.casid
 
 // RUN: echo %t/B.swift > %t/inputs.FileList
-// RUN: %target-swift-frontend -emit-module -o %t/B.swiftmodule -g \
+// RUN: %target-swift-frontend-plain -emit-module -o %t/B.swiftmodule -g \
 // RUN:   -cache-compile-job -cas-path %t/cas -swift-version 6 \
 // RUN:   -module-name B -swift-module-file=A=@%t/A.casid \
 // RUN:   -explicit-swift-module-map-file @%t/B-map.casid \
@@ -35,7 +35,7 @@
 
 // RUN: rm %t/A.swiftmodule %t/A.swift
 // RUN: echo %s > %t/inputs.FileList
-// RUN: %target-swift-frontend -emit-module -o %t/Main.swiftmodule -g \
+// RUN: %target-swift-frontend-plain -emit-module -o %t/Main.swiftmodule -g \
 // RUN:   -cache-compile-job -cas-path %t/cas -swift-version 6 \
 // RUN:   -module-name Main -swift-module-file=B=@%t/B.casid \
 // RUN:   -explicit-swift-module-map-file @%t/map.casid \
