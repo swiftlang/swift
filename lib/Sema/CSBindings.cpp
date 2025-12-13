@@ -1070,7 +1070,7 @@ void BindingSet::addLiteralRequirement(Constraint *constraint) {
     defaultType = TypeChecker::getDefaultType(protocol, CS.DC);
   }
 
-  LiteralRequirement literal(constraint, defaultType, isDirect);
+  LiteralRequirement literal(protocol, constraint, defaultType, isDirect);
   Literals.insert({protocol, std::move(literal)});
 }
 

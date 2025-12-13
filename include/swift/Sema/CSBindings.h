@@ -152,6 +152,8 @@ struct PotentialBinding {
 };
 
 struct LiteralRequirement {
+  /// The literal protocol.
+  ProtocolDecl *Protocol;
   /// The source of the literal requirement.
   Constraint *Source;
   /// The default type associated with this literal (if any).
@@ -164,12 +166,14 @@ struct LiteralRequirement {
   /// this points to the source of the binding.
   mutable Constraint *CoveredBy = nullptr;
 
-  LiteralRequirement(Constraint *source, Type defaultTy, bool isDirect)
-      : Source(source), DefaultType(defaultTy), IsDirectRequirement(isDirect) {}
+  LiteralRequirement(ProtocolDecl *protocol, Constraint *source,
+                     Type defaultTy, bool isDirect)
+      : Protocol(protocol), Source(source), DefaultType(defaultTy),
+        IsDirectRequirement(isDirect) {}
 
   Constraint *getSource() const { return Source; }
 
-  ProtocolDecl *getProtocol() const { return Source->getProtocol(); }
+  ProtocolDecl *getProtocol() const { return Protocol; }
 
   bool isCovered() const { return bool(CoveredBy); }
 
