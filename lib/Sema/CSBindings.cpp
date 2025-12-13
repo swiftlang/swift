@@ -55,16 +55,8 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
   for (const auto &binding : info.Bindings)
     addBinding(binding, /*isTransitive=*/false);
 
-  for (auto *constraint : info.Constraints) {
-    switch (constraint->getKind()) {
-    case ConstraintKind::LiteralConformsTo:
-      addLiteralRequirement(constraint);
-      break;
-
-    default:
-      break;
-    }
-  }
+  for (const auto &literal : info.Literals)
+    Literals.push_back(literal);
 
   for (auto *constraint : info.Defaults) {
     // Do these in a separate pass.
@@ -653,8 +645,19 @@ void BindingSet::inferTransitiveSupertypeBindings() {
     // If one of the literal arguments doesn't propagate its
     // `ExpressibleByStringLiteral` conformance, we'd end up picking
     // `T` with only one type `Any?` which is incorrect.
-    for (const auto &literal : bindings.Literals)
-      addLiteralRequirement(literal.getSource());
+    for (auto literal : bindings.Literals) {
+      auto *protocol = literal.getProtocol();
+
+      bool found = llvm::any_of(Literals,
+          [&](const auto &literal) -> bool {
+            return literal.getProtocol() == protocol;
+          });
+      if (found)
+        continue;
+
+      literal.setDirectRequirement(false);
+      Literals.push_back(literal);
+    }
 
     // Infer transitive defaults.
     for (auto *def : bindings.Defaults) {
@@ -1055,7 +1058,9 @@ void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
   }
 }
 
-void BindingSet::addLiteralRequirement(Constraint *constraint) {
+void PotentialBindings::inferFromLiteral(ConstraintSystem &CS,
+                                         TypeVariableType *TypeVar,
+                                         Constraint *constraint) {
   auto *protocol = constraint->getProtocol();
 
   for (const auto &literal : Literals) {
@@ -2088,8 +2093,11 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::PackElementOf:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
-  case ConstraintKind::LiteralConformsTo:
     // Constraints from which we can't do anything.
+    break;
+
+  case ConstraintKind::LiteralConformsTo:
+    inferFromLiteral(CS, TypeVar, constraint);
     break;
 
   case ConstraintKind::Defaultable:
@@ -2218,6 +2226,20 @@ void PotentialBindings::retract(ConstraintSystem &CS,
                         return false;
                       }),
       Bindings.end());
+
+  Literals.erase(
+      llvm::remove_if(Literals,
+                      [&](const LiteralRequirement &literal) {
+                        if (literal.getSource() == constraint) {
+                          if (recordingChanges) {
+                            CS.recordChange(SolverTrail::Change::RetractedLiteral(
+                                TypeVar, constraint));
+                          }
+                          return true;
+                        }
+                        return false;
+                      }),
+      Literals.end());
 
 #define CALLBACK(ChangeKind)                                                   \
   [&](Constraint *other) {                                                     \

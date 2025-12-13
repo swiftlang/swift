@@ -179,6 +179,10 @@ struct LiteralRequirement {
 
   bool isDirectRequirement() const { return IsDirectRequirement; }
 
+  void setDirectRequirement(bool isDirectRequirement) {
+    IsDirectRequirement = isDirectRequirement;
+  }
+
   bool hasDefaultType() const { return bool(DefaultType); }
 
   Type getDefaultType() const {
@@ -248,6 +252,10 @@ struct PotentialBindings {
   /// The set of protocol conformance requirements imposed on this type variable.
   llvm::SmallVector<Constraint *, 4> Protocols;
 
+  /// The set of unique literal protocol requirements placed on this
+  /// type variable.
+  llvm::SmallVector<LiteralRequirement, 2> Literals;
+
   /// The set of fallback constraints imposed on this type variable.
   llvm::SmallVector<Constraint *, 2> Defaults;
 
@@ -270,7 +278,10 @@ struct PotentialBindings {
     return Protocols;
   }
 
-private:
+  void inferFromLiteral(ConstraintSystem &CS,
+                        TypeVariableType *TypeVar,
+                        Constraint *literal);
+
   /// Attempt to infer a new binding and other useful information
   /// (i.e. whether bindings should be delayed) from the given
   /// relational constraint.
@@ -279,7 +290,6 @@ private:
       TypeVariableType *TypeVar,
       Constraint *constraint);
 
-public:
   void infer(ConstraintSystem &CS,
              TypeVariableType *TypeVar,
              Constraint *constraint);
@@ -620,8 +630,6 @@ private:
   /// acquired through transitive inference and requires validity
   /// checking.
   void addBinding(PotentialBinding binding, bool isTransitive);
-
-  void addLiteralRequirement(Constraint *literal);
 
   void addDefault(Constraint *constraint);
 
