@@ -5577,4 +5577,24 @@ bb0(%0 : @guaranteed $String):
   return %1
 }
 
+// CHECK-LABEL: sil [ossa] @dont_sink_mark_dependence_out_of_memory_lifetime :
+// CHECK:         mark_dependence
+// CHECK:       bb1:
+// CHECK:       } // end sil function 'dont_sink_mark_dependence_out_of_memory_lifetime'
+sil [ossa] @dont_sink_mark_dependence_out_of_memory_lifetime : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack $Klass
+  store %1 to [init] %2
+  %4 = mark_dependence %0 on %2
+  destroy_addr %2
+  br bb1
+
+bb1:
+  destroy_value %4
+  dealloc_stack %2
+  %9 = tuple ()
+  return %9
+}
+
+
 
