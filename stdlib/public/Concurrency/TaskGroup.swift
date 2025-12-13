@@ -46,11 +46,43 @@ import Swift
 ///
 /// - SeeAlso: ``TaskGroup``
 @available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+nonisolated(nonsending) public func withTaskGroup<ChildTaskResult, GroupResult>(
+  of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
+  returning returnType: GroupResult.Type = GroupResult.self,
+  body: nonisolated(nonsending) (inout TaskGroup<ChildTaskResult>) async -> GroupResult
+) async -> GroupResult {
+  #if compiler(>=5.5) && $BuiltinTaskGroupWithArgument
+
+  let _group = Builtin.createTaskGroup(ChildTaskResult.self)
+  var group = TaskGroup<ChildTaskResult>(group: _group)
+
+  // Run the withTaskGroup body.
+  let result = await body(&group)
+
+  await group.awaitAllRemainingTasksNonsending()
+
+  Builtin.destroyTaskGroup(_group)
+  return result
+
+  #else
+  fatalError("Swift compiler is incompatible with this SDK version")
+  #endif
+}
+
+// Overload with isolated parameter for ABI compatibility.
+@available(SwiftStdlib 5.1, *)
 #if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
 #endif
 @inlinable
-public func withTaskGroup<ChildTaskResult, GroupResult>(
+@abi(func withTaskGroup<ChildTaskResult, GroupResult>(
+  of childTaskResultType: ChildTaskResult.Type,
+  returning returnType: GroupResult.Type,
+  isolation: isolated (any Actor)?,
+  body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
+) async -> GroupResult)
+func _isolatedParameter_withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
   isolation: isolated (any Actor)? = #isolation,
@@ -176,7 +208,51 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 @backDeployed(before: SwiftStdlib 6.0)
 #endif
 @inlinable
-public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
+nonisolated(nonsending) public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
+  of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
+  returning returnType: GroupResult.Type = GroupResult.self,
+  body: nonisolated(nonsending) (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
+) async rethrows -> GroupResult {
+  #if compiler(>=5.5) && $BuiltinTaskGroupWithArgument
+
+  let _group = Builtin.createTaskGroup(ChildTaskResult.self)
+  var group = ThrowingTaskGroup<ChildTaskResult, Error>(group: _group)
+
+  do {
+    // Run the withTaskGroup body.
+    let result = try await body(&group)
+
+    await group.awaitAllRemainingTasksNonsending()
+    Builtin.destroyTaskGroup(_group)
+
+    return result
+  } catch {
+    group.cancelAll()
+
+    await group.awaitAllRemainingTasksNonsending()
+    Builtin.destroyTaskGroup(_group)
+
+    throw error
+  }
+
+  #else
+  fatalError("Swift compiler is incompatible with this SDK version")
+  #endif
+}
+
+// Overload with isolated parameter for ABI compatibility.
+@available(SwiftStdlib 5.1, *)
+#if !hasFeature(Embedded)
+@backDeployed(before: SwiftStdlib 6.0)
+#endif
+@inlinable
+@abi(func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
+  of childTaskResultType: ChildTaskResult.Type,
+  returning returnType: GroupResult.Type,
+  isolation: isolated (any Actor)?,
+  body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
+) async rethrows -> GroupResult)
+func _isolatedParameter_withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
   isolation: isolated (any Actor)? = #isolation,
@@ -424,37 +500,48 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///
   /// - Returns: The value returned by the next child task that completes.
   @available(SwiftStdlib 5.1, *)
-  #if !hasFeature(Embedded)
-  @backDeployed(before: SwiftStdlib 6.0)
-  #endif
-  public mutating func next(isolation: isolated (any Actor)? = #isolation) async -> ChildTaskResult? {
+  @_alwaysEmitIntoClient
+  nonisolated(nonsending) public mutating func next() async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
     // and as such, it is impossible to spawn a throwing child task.
     return try! await _taskGroupWaitNext(group: _group) // !-safe cannot throw, we're a non-throwing TaskGroup
   }
 
   @available(SwiftStdlib 5.1, *)
-  @_disfavoredOverload
-  public mutating func next() async -> ChildTaskResult? {
+  #if !hasFeature(Embedded)
+  @backDeployed(before: SwiftStdlib 6.0)
+  #endif
+  @abi(mutating func next(isolation: isolated (any Actor)?) async -> ChildTaskResult?)
+  public mutating func _isolatedParam_next(isolation: isolated (any Actor)? = #isolation) async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
     // and as such, it is impossible to spawn a throwing child task.
     return try! await _taskGroupWaitNext(group: _group) // !-safe cannot throw, we're a non-throwing TaskGroup
   }
+
+  // FIXME: How are we to keep bin compat if this triggers invalid redeclaration with the 'nonisolated(nonsending)' version?
+//  @available(SwiftStdlib 5.1, *)
+//  @_disfavoredOverload
+//  @abi(mutating func next() async -> ChildTaskResult?)
+//  public mutating func _noParam_next() async -> ChildTaskResult? {
+//    print("[group] \(#function)")
+//    // try!-safe because this function only exists for Failure == Never,
+//    // and as such, it is impossible to spawn a throwing child task.
+//    return try! await _taskGroupWaitNext(group: _group) // !-safe cannot throw, we're a non-throwing TaskGroup
+//  }
 
   /// Await all of the pending tasks added this group.
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
-  #if !hasFeature(Embedded)
-  @backDeployed(before: SwiftStdlib 6.0)
-  #endif
-  internal mutating func awaitAllRemainingTasks(isolation: isolated (any Actor)? = #isolation) async {
-    while let _ = await next(isolation: isolation) {}
+  @_alwaysEmitIntoClient
+  nonisolated(nonsending) internal mutating func awaitAllRemainingTasksNonsending() async {
+    while let _ = await next() {}
   }
 
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
-  internal mutating func awaitAllRemainingTasks() async {
-    while let _ = await next(isolation: nil) {}
+  @available(*, deprecated, message: "Prefer nonsending(nonisolated) version in order to avoid un-necessary task enqueues.")
+  internal mutating func awaitAllRemainingTasks(isolation: isolated (any Actor)? = #isolation) async {
+    while let _ = await _isolatedParam_next(isolation: nil) {}
   }
 
   /// Wait for all of the group's remaining tasks to complete.
@@ -587,9 +674,23 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// Await all the remaining tasks on this group.
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
+  @_alwaysEmitIntoClient
+  nonisolated(nonsending) internal mutating func awaitAllRemainingTasksNonsending() async {
+    while true {
+      do {
+        guard let _ = try await next() else {
+          return
+        }
+      } catch {}
+    }
+  }
+
+  @usableFromInline
+  @available(SwiftStdlib 5.1, *)
   #if !hasFeature(Embedded)
   @backDeployed(before: SwiftStdlib 6.0)
   #endif
+  @available(*, deprecated, message: "Prefer nonsending(nonisolated) version in order to avoid un-necessary task enqueues.")
   internal mutating func awaitAllRemainingTasks(isolation: isolated (any Actor)? = #isolation) async {
     while true {
       do {
@@ -737,7 +838,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
   @_silgen_name("$sScg10nextResults0B0Oyxq_GSgyYaKF")
   @usableFromInline
-  mutating func nextResultForABI() async throws -> Result<ChildTaskResult, Failure>? {
+  mutating func __abi_nextResult() async throws -> Result<ChildTaskResult, Failure>? {
     do {
       guard let success: ChildTaskResult = try await _taskGroupWaitNext(group: _group) else {
         return nil
@@ -785,7 +886,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - SeeAlso: `next()`
   @_alwaysEmitIntoClient
   public mutating func nextResult(isolation: isolated (any Actor)? = #isolation) async -> Result<ChildTaskResult, Failure>? {
-    return try! await nextResultForABI()
+    return try! await __abi_nextResult()
   }
 
   /// A Boolean value that indicates whether the group has any remaining tasks.
@@ -922,7 +1023,8 @@ extension TaskGroup: AsyncSequence {
     @available(SwiftStdlib 6.0, *)
     public mutating func next(isolation actor: isolated (any Actor)?) async -> Element? {
       guard !finished else { return nil }
-      guard let element = await group.next(isolation: actor) else {
+      // guard let element = await group.next(isolation: actor) else {
+      guard let element = await group.next() else {
         finished = true
         return nil
       }
@@ -1052,7 +1154,7 @@ extension ThrowingTaskGroup: AsyncSequence {
         throw error as! Failure
       }
     }
-    
+
     public mutating func cancel() {
       finished = true
       group.cancelAll()
