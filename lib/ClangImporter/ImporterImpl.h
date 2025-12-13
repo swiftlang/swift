@@ -970,11 +970,8 @@ public:
   ClangModuleUnit *getClangModuleForDecl(const clang::Decl *D,
                                          bool allowForwardDeclaration = false);
 
-  /// Returns the module \p MI comes from, or \c None if \p MI does not have
-  /// a valid associated module.
-  ///
-  /// The returned module may be null (but not \c None) if \p MI comes from
-  /// an imported header.
+  /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
+  /// have a valid owning module.
   const clang::Module *getClangOwningModule(ClangNode Node) const;
 
   /// Whether NSUInteger can be imported as Int in certain contexts. If false,
