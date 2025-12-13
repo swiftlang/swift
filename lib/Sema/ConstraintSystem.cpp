@@ -5323,10 +5323,12 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   return success(mutability, isSendable);
 }
 
-TypeVarBindingProducer::TypeVarBindingProducer(const BindingSet &bindings)
-    : BindingProducer(bindings.getConstraintSystem(),
-                      bindings.getTypeVariable()->getImpl().getLocator()),
-      TypeVar(bindings.getTypeVariable()), CanBeNil(bindings.canBeNil()) {
+TypeVarBindingProducer::TypeVarBindingProducer(
+    ConstraintSystem &cs,
+    TypeVariableType *typeVar,
+    const BindingSet &bindings)
+    : BindingProducer(cs, typeVar->getImpl().getLocator()),
+      TypeVar(typeVar), CanBeNil(bindings.canBeNil()) {
   if (bindings.isDirectHole()) {
     auto *locator = getLocator();
     // If this type variable is associated with a code completion token

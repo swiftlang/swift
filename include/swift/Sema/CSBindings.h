@@ -410,8 +410,6 @@ public:
 
   BindingSet(const BindingSet &other) = delete;
 
-  ConstraintSystem &getConstraintSystem() const { return CS; }
-
   TypeVariableType *getTypeVariable() const { return TypeVar; }
 
   /// Check whether this binding set belongs to a type variable

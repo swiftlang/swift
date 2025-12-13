@@ -352,7 +352,7 @@ TEST_F(SemaTest, TestNoDoubleVoidClosureResultInference) {
 
   auto verifyInference = [&](TypeVariableType *typeVar, unsigned numExpected) {
     auto bindings = cs.getBindingsFor(typeVar);
-    TypeVarBindingProducer producer(bindings);
+    TypeVarBindingProducer producer(cs, typeVar, bindings);
 
     llvm::SmallPtrSet<Type, 2> inferredTypes;
 
@@ -425,7 +425,7 @@ TEST_F(SemaTest, TestSupertypeInferenceWithDefaults) {
                    cs.getConstraintLocator({}));
 
   auto bindings = cs.getBindingsFor(genericArg);
-  TypeVarBindingProducer producer(bindings);
+  TypeVarBindingProducer producer(cs, genericArg, bindings);
 
   llvm::SmallVector<Type, 4> inferredTypes;
   while (auto binding = producer()) {
