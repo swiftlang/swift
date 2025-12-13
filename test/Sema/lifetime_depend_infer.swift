@@ -1,7 +1,9 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:   -enable-experimental-feature Lifetimes
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -enable-experimental-feature SuppressedAssociatedTypes
 
 // REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 // Coverage testing for LifetimeDependence inferrence logic. The tests are sorted and grouped according to
 // docs/ReferenceGuides/LifetimeAnnotation.md. To find the cases that cover the default lifetime
@@ -20,6 +22,129 @@ struct NEImmortal: ~Escapable {
 }
 
 struct MutNE: ~Copyable & ~Escapable {}
+
+// =============================================================================
+// Same-type default rule
+// =============================================================================
+
+func sameTypeParam(ne: NE) -> NE { ne }
+
+func sameTypeConsumingParam(ne: consuming NE) -> NE { ne }
+
+func sameTypeBorrowingParam(ne: borrowing NE) -> NE { ne }
+
+func sameTypeInoutParam(ne: inout NE) -> NE { ne } // expected-error{{cannot infer the lifetime dependence scope on a function with a ~Escapable parameter, specify '@_lifetime(borrow ne)' or '@_lifetime(copy ne)'}}
+
+func sameTypeParam_sameTypeParam(ne1: NE, ne2: NE) -> NE { ne1 }
+
+func sameTypeParam_otherTypeParam(ne: NE, c: C) -> NE { ne }
+
+func sameTypeParam_sameTypeInoutParam(ne: NE, mutNE: inout NE) -> NE { ne }
+
+struct NonEscapable<T>: ~Escapable {
+  @_lifetime(immortal)
+  init() {}
+
+  init(ne: Self) {}
+
+  init(c: C) {} // expected-error{{cannot borrow the lifetime of 'c', which has consuming ownership on an initializer}}
+
+  init(ne: Self, c: C) {}
+
+  init<U>(ne: Self, u: U) {}
+
+  init<U>(neNominal: NonEscapable<T>, u: U) {}
+
+  init<U>(other: NonEscapable<U>) {} // expected-error{{cannot infer the lifetime dependence scope on an initializer with a ~Escapable parameter, specify '@_lifetime(borrow other)' or '@_lifetime(copy other)'}}
+
+  func sameTypeSelf_noParam() -> Self { self }
+
+  consuming func sameTypeConsumingSelf_noParam() -> Self { self }
+
+  borrowing func sameTypeBorrowingSelf_noParam() -> Self { self }
+
+  mutating func sameTypeMutatingSelf() -> Self { self } // expected-error{{a mutating method with a ~Escapable result requires '@_lifetime(...)'}}
+
+  func sameTypeSelf_sameTypeParam(ne: Self) -> Self { self }
+
+  func sameTypeSelf_otherTypeParam(c: C) -> Self { self }
+
+  func sameTypeSelf_sameTypeInoutParam(mutNE: inout Self) -> Self { self }
+
+  func sameArchetypeSelf<U>(u: U) -> Self { self }
+
+  func sameNominalTypeSelf_genericParam<U>(u: U) -> NonEscapable<T> { self }
+
+  func otherNominalTypeSelf_genericParam<U>(u: U) -> NonEscapable<U> { NonEscapable<U>() } // expected-error{{a method with a ~Escapable result requires '@_lifetime(...)'}}
+}
+
+protocol NonEscapableProtocol: ~Escapable {
+  @_lifetime(immortal)
+  static func create() -> Self
+
+  init(ne: Self)
+
+  init<U>(ne: Self, u: U)
+
+  init(ne: some NonEscapableProtocol, c: C) // expected-error{{an initializer with a ~Escapable result requires '@_lifetime(...)'}}
+
+  init(neProtocol: any NonEscapableProtocol, c: C) // expected-error{{an initializer with a ~Escapable result requires '@_lifetime(...)'}}
+
+  func sameArchetypeSelf() -> Self
+
+  mutating func sameArchetypeMutatingSelf() -> Self // expected-error{{a mutating method with a ~Escapable result requires '@_lifetime(...)'}}
+}
+
+extension NonEscapableProtocol where Self: ~Escapable {
+  func sameArchetypeSelf() -> Self {
+    Self.create()
+  }
+}
+
+func sameGenericTypeParam<T: ~Escapable>(ne: T) -> T {
+  ne
+}
+
+func otherGenericTypeParam<T: ~Escapable,
+                           U: NonEscapableProtocol & ~Escapable>(
+  ne: T, utype: U.Type) -> U { // expected-error{{a function with a ~Escapable result requires '@_lifetime(...)'}}
+  U.create()
+}
+
+protocol P_NE {
+  associatedtype T: ~Escapable
+}
+
+protocol Q_NE {
+  associatedtype U: NonEscapableProtocol & ~Escapable
+}
+
+struct AssociatedNE<P: P_NE, Q: Q_NE> {
+  func otherAssociatedTypeParam(a: P.T, b: P.T) -> Q.U { // expected-error{{a method with a ~Escapable result requires '@_lifetime(...)'}}
+    Q.U.create()
+  }
+}
+
+extension AssociatedNE where P.T == Q.U {
+  /* OK: @_lifetime(copy a) is valid and default */
+  func sameAssociatedTypeParam(a: P.T) -> Q.U {
+    // Note: the same-type rule is satisfied in this context, but the declaration of 'otherAssociatedTypeParam'
+    // is itself invalid.
+    otherAssociatedTypeParam(a: a, b: a)
+  }
+}
+
+protocol QQ_NE {
+  associatedtype U: NonEscapableProtocol & ~Escapable
+}
+
+struct AssociatedQ<Q: Q_NE, QQ: QQ_NE> {}
+
+extension AssociatedQ where Q == QQ {
+  static func sameAssociatedTypeParam(a: Q.U) -> QQ.U {
+    QQ.U.create()
+  }
+}
 
 // =============================================================================
 // Single parameter default rule for functions
@@ -71,22 +196,22 @@ func twoParamsBorrow_NEResult(c: borrowing C, _: Int) -> NEImmortal { NEImmortal
 
 func twoParamsInout_NEResult(c: inout C, _: Int) -> NEImmortal { NEImmortal() } // expected-error{{a function with a ~Escapable result requires '@_lifetime(...)'}}
 
-func neParam_NEResult(ne: NE) -> NE { ne } // expected-error{{cannot infer the lifetime dependence scope on a function with a ~Escapable parameter, specify '@_lifetime(borrow ne)' or '@_lifetime(copy ne)'}}
+func neParam_NEResult(ne: NE) -> NE { ne }
 
 @_lifetime(ne) // expected-error{{cannot infer the lifetime dependence scope on a function with a ~Escapable parameter, specify '@_lifetime(borrow ne)' or '@_lifetime(copy ne)'}}
 func neParamLifetime_NEResult(ne: NE) -> NE { ne }
 
-func neParamBorrow_NEResult(ne: borrowing NE) -> NE { ne } // expected-error{{cannot infer the lifetime dependence scope on a function with a ~Escapable parameter, specify '@_lifetime(borrow ne)' or '@_lifetime(copy ne)'}}
+func neParamBorrow_NEResult(ne: borrowing NE) -> NE { ne }
 
 @_lifetime(ne) // expected-error{{cannot infer the lifetime dependence scope on a function with a ~Escapable parameter, specify '@_lifetime(borrow ne)' or '@_lifetime(copy ne)'}}
 func neParamBorrowLifetime_NEResult(ne: borrowing NE) -> NE { ne }
 
-func neParamConsume_NEResult(ne: consuming NE) -> NE { ne } // expected-error{{cannot infer the lifetime dependence scope on a function with a ~Escapable parameter, specify '@_lifetime(borrow ne)' or '@_lifetime(copy ne)'}}
+func neParamConsume_NEResult(ne: consuming NE) -> NE { ne }
 
 @_lifetime(ne) // expected-error{{cannot infer the lifetime dependence scope on a function with a ~Escapable parameter, specify '@_lifetime(borrow ne)' or '@_lifetime(copy ne)'}}
 func neParamConsumeLifetime_NEResult(ne: consuming NE) -> NE { ne }
 
-func neParam_IntParam_NEResult(ne: NE, _:Int) -> NE { ne } // expected-error{{a function with a ~Escapable result requires '@_lifetime(...)'}}
+func neParam_IntParam_NEResult(ne: NE, _:Int) -> NE { ne }
 
 func inoutParam_inoutParam_NEResult(a: inout C, b: inout C) -> NEImmortal { NEImmortal() }
 // expected-error@-1{{a function with a ~Escapable result requires '@_lifetime(...)'}}
@@ -201,50 +326,50 @@ struct EscapableTrivialSelf {
   mutating func mutating_oneParamBorrow_NEResult(_: Int) -> NEImmortal { NEImmortal() }
 }
 
-struct NonEscapableSelf: ~Escapable {
-  func noParam_NEResult() -> NonEscapableSelf { self } // expected-error{{cannot infer the lifetime dependence scope on a method with a ~Escapable parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
+extension NonEscapable /* where Self: ~Escapable */ {
+  func noParam_NEResult() -> NonEscapable { self }
 
   @_lifetime(self) // expected-error{{cannot infer the lifetime dependence scope on a method with a ~Escapable parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
-  func noParamLifetime_NEResult() -> NonEscapableSelf { self }
+  func noParamLifetime_NEResult() -> NonEscapable { self }
 
   @_lifetime(copy self) // OK
-  func noParamCopy_NEResult_NEResult() -> NonEscapableSelf { self }
+  func noParamCopy_NEResult_NEResult() -> NonEscapable { self }
 
   @_lifetime(borrow self) // OK
-  func noParamBorrow_NEResult() -> NonEscapableSelf { self }
+  func noParamBorrow_NEResult() -> NonEscapable { self }
 
-  mutating func mutating_noParam_NEResult() -> NonEscapableSelf { self } // expected-error{{a mutating method with a ~Escapable result requires '@_lifetime(...)'}}
+  mutating func mutating_noParam_NEResult() -> NonEscapable { self } // expected-error{{a mutating method with a ~Escapable result requires '@_lifetime(...)'}}
 
   @_lifetime(self) // expected-error{{cannot infer the lifetime dependence scope on a mutating method with a ~Escapable parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
-  mutating func mutating_noParamLifetime_NEResult() -> NonEscapableSelf { self }
+  mutating func mutating_noParamLifetime_NEResult() -> NonEscapable { self }
 
   @_lifetime(copy self) // OK
-  mutating func mutating_noParamCopy_NEResult() -> NonEscapableSelf { self }
+  mutating func mutating_noParamCopy_NEResult() -> NonEscapable { self }
 
   @_lifetime(&self) // OK
-  mutating func mutating_noParamBorrow_NEResult() -> NonEscapableSelf { self }
+  mutating func mutating_noParamBorrow_NEResult() -> NonEscapable { self }
 
-  func oneParam_NEResult(_: Int) -> NonEscapableSelf { self } // expected-error{{a method with a ~Escapable result requires '@_lifetime(...)'}}
+  func oneParam_NEResult(_: Int) -> NonEscapable { self }
 
   @_lifetime(self) // expected-error{{cannot infer the lifetime dependence scope on a method with a ~Escapable parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
-  func oneParamLifetime_NEResult(_: Int) -> NonEscapableSelf { self }
+  func oneParamLifetime_NEResult(_: Int) -> NonEscapable { self }
 
   @_lifetime(copy self) // OK
-  func oneParamCopy_NEResult(_: Int) -> NonEscapableSelf { self }
+  func oneParamCopy_NEResult(_: Int) -> NonEscapable { self }
 
   @_lifetime(borrow self) // OK
-  func oneParamBorrow_NEResult(_: Int) -> NonEscapableSelf { self }
+  func oneParamBorrow_NEResult(_: Int) -> NonEscapable { self }
 
-  mutating func mutating_oneParam_NEResult(_: Int) -> NonEscapableSelf { self } // expected-error{{a mutating method with a ~Escapable result requires '@_lifetime(...)'}}
+  mutating func mutating_oneParam_NEResult(_: Int) -> NonEscapable { self } // expected-error{{a mutating method with a ~Escapable result requires '@_lifetime(...)'}}
 
   @_lifetime(self) // expected-error{{cannot infer the lifetime dependence scope on a mutating method with a ~Escapable parameter, specify '@_lifetime(borrow self)' or '@_lifetime(copy self)'}}
-  mutating func mutating_oneParamLifetime_NEResult(_: Int) -> NonEscapableSelf { self }
+  mutating func mutating_oneParamLifetime_NEResult(_: Int) -> NonEscapable { self }
 
   @_lifetime(copy self) // OK
-  mutating func mutating_oneParamCopy_NEResult(_: Int) -> NonEscapableSelf { self }
+  mutating func mutating_oneParamCopy_NEResult(_: Int) -> NonEscapable { self }
 
   @_lifetime(&self) // OK
-  mutating func mutating_oneParamBorrow_NEResult(_: Int) -> NonEscapableSelf { self }
+  mutating func mutating_oneParamBorrow_NEResult(_: Int) -> NonEscapable { self }
 
   mutating func mutating_inoutParam_NEResult(a: inout NE) -> NEImmortal { NEImmortal() } // expected-error{{a mutating method with a ~Escapable result requires '@_lifetime(...)'}}
 }
@@ -262,6 +387,7 @@ func inoutNEParam_NEParam_void(_: inout NE, _: NE) {} // OK
 /* DEFAULT: @_lifetime(0: copy 0) */
 /* DEFAULT: @_lifetime(1: copy 1) */
 func inoutParam_inoutNEParam_void(_: inout NE, _: inout NE) {} // OK
+
 
 func inoutNEParam_NEResult(ne: inout NE) -> NE { ne } // expected-error{{cannot infer the lifetime dependence scope on a function with a ~Escapable parameter, specify '@_lifetime(borrow ne)' or '@_lifetime(copy ne)'}}
 

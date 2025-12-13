@@ -1,8 +1,12 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature Lifetimes -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -primary-file %s \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
+// RUN:  | %FileCheck %s
 //
 // -primary-file is required to synthesize accessors.
 
 // REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 // Check that all the DEFAULT cases in Sema/lifetime_depend_infer_defaults.swift generate the correct function
 // signature. Checking the SILGen output seems like the easiest way.
@@ -17,6 +21,144 @@ struct NEImmortal: ~Escapable {
 }
 
 struct MutNE: ~Copyable & ~Escapable {}
+
+// =============================================================================
+// Same-type default rule
+// =============================================================================
+
+/* DEFAULT: @_lifetime(copy ne) */
+// CHECK: @$s30lifetime_depend_infer_defaults13sameTypeParam2neAA2NEVAE_tF : $@convention(thin) (@guaranteed NE) -> @lifetime(copy 0) @owned NE
+func sameTypeParam(ne: NE) -> NE { ne }
+
+/* DEFAULT: @_lifetime(copy ne) */
+// CHECK: @$s30lifetime_depend_infer_defaults22sameTypeConsumingParam2neAA2NEVAEn_tF : $@convention(thin) (@owned NE) -> @lifetime(copy 0) @owned NE
+func sameTypeConsumingParam(ne: consuming NE) -> NE { ne }
+
+/* DEFAULT: @_lifetime(copy ne) */
+// CHECK: @$s30lifetime_depend_infer_defaults22sameTypeBorrowingParam2neAA2NEVAE_tF : $@convention(thin) (@guaranteed NE) -> @lifetime(copy 0) @owned NE
+func sameTypeBorrowingParam(ne: borrowing NE) -> NE { ne }
+
+/* DEFAULT: @_lifetime(copy ne, copy ne2) */
+// CHECK: @$s30lifetime_depend_infer_defaults014sameTypeParam_efG03ne13ne2AA2NEVAF_AFtF : $@convention(thin) (@guaranteed NE, @guaranteed NE) -> @lifetime(copy 0, copy 1) @owned NE
+func sameTypeParam_sameTypeParam(ne1: NE, ne2: NE) -> NE { ne1 }
+
+/* DEFAULT: @_lifetime(copy ne) */
+// CHECK: @$s30lifetime_depend_infer_defaults019sameTypeParam_otherfG02ne1cAA2NEVAF_AA1CCtF : $@convention(thin) (@guaranteed NE, @guaranteed C) -> @lifetime(copy 0) @owned NE
+func sameTypeParam_otherTypeParam(ne: NE, c: C) -> NE { ne }
+
+/* DEFAULT: @_lifetime(copy ne) */
+// CHECK: @$s30lifetime_depend_infer_defaults014sameTypeParam_ef5InoutG02ne5mutNEAA0K0VAF_AFztF : $@convention(thin) (@guaranteed NE, @lifetime(copy 1) @inout NE) -> @lifetime(copy 0) @owned NE
+func sameTypeParam_sameTypeInoutParam(ne: NE, mutNE: inout NE) -> NE { ne }
+
+struct NonEscapable<T>: ~Escapable {
+  @_lifetime(immortal)
+  init() {}
+
+  /* DEFAULT: @_lifetime(copy ne) */
+  // CHECK: @$s30lifetime_depend_infer_defaults12NonEscapableV2neACyxGAE_tcfC : $@convention(method) <T> (@owned NonEscapable<T>, @thin NonEscapable<T>.Type) -> @lifetime(copy 0) @owned NonEscapable<T>
+  init(ne: Self) {}
+
+  /* DEFAULT: @_lifetime(copy ne) */
+  // CHECK: @$s30lifetime_depend_infer_defaults12NonEscapableV2ne1cACyxGAF_AA1CCtcfC : $@convention(method) <T> (@owned NonEscapable<T>, @owned C, @thin NonEscapable<T>.Type) -> @lifetime(copy 0) @owned NonEscapable<T>
+  init(ne: Self, c: C) {}
+
+  /* DEFAULT: @_lifetime(copy ne) */
+  // CHECK: @$s30lifetime_depend_infer_defaults12NonEscapableV2ne1uACyxGAF_qd__tclufC : $@convention(method) <T><U> (@owned NonEscapable<T>, @in U, @thin NonEscapable<T>.Type) -> @lifetime(copy 0) @owned NonEscapable<T>
+  init<U>(ne: Self, u: U) {}
+
+  /* DEFAULT: @_lifetime(copy neNominal) */
+  // CHECK: @$s30lifetime_depend_infer_defaults12NonEscapableV9neNominal1uACyxGAF_qd__tclufC : $@convention(method) <T><U> (@owned NonEscapable<T>, @in U, @thin NonEscapable<T>.Type) -> @lifetime(copy 0) @owned NonEscapable<T>
+  init<U>(neNominal: NonEscapable<T>, u: U) {}
+
+  /* DEFAULT: @_lifetime(copy self) */
+  // CHECK: @$s30lifetime_depend_infer_defaults12NonEscapableV20sameTypeSelf_noParamACyxGyF : $@convention(method) <T> (@guaranteed NonEscapable<T>) -> @lifetime(copy 0) @owned NonEscapable<T>
+  func sameTypeSelf_noParam() -> Self { self }
+
+  /* DEFAULT: @_lifetime(copy self) */
+  // CHECK: @$s30lifetime_depend_infer_defaults12NonEscapableV29sameTypeConsumingSelf_noParamACyxGyF : $@convention(method) <T> (@owned NonEscapable<T>) -> @lifetime(copy 0) @owned NonEscapable<T>
+  consuming func sameTypeConsumingSelf_noParam() -> Self { self }
+
+  /* DEFAULT: @_lifetime(copy self) */
+  // CHECK: @$s30lifetime_depend_infer_defaults12NonEscapableV29sameTypeBorrowingSelf_noParamACyxGyF : $@convention(method) <T> (@guaranteed NonEscapable<T>) -> @lifetime(copy 0) @owned NonEscapable<T>
+  borrowing func sameTypeBorrowingSelf_noParam() -> Self { self }
+
+  /* DEFAULT: @_lifetime(copy self, copy ne) */
+  // CHECK: @$s30lifetime_depend_infer_defaults12NonEscapableV013sameTypeSelf_gH5Param2neACyxGAF_tF : $@convention(method) <T> (@guaranteed NonEscapable<T>, @guaranteed NonEscapable<T>) -> @lifetime(copy 0, copy 1) @owned NonEscapable<T>
+  func sameTypeSelf_sameTypeParam(ne: Self) -> Self { self }
+
+  /* DEFAULT: @_lifetime(copy self) */
+  // CHECK: @$s30lifetime_depend_infer_defaults12NonEscapableV018sameTypeSelf_otherH5Param1cACyxGAA1CC_tF : $@convention(method) <T> (@guaranteed C, @guaranteed NonEscapable<T>) -> @lifetime(copy 1) @owned NonEscapable<T>
+  func sameTypeSelf_otherTypeParam(c: C) -> Self { self }
+
+  /* DEFAULT: @_lifetime(copy self) */
+  // CHECK: @$s30lifetime_depend_infer_defaults12NonEscapableV013sameTypeSelf_gH10InoutParam5mutNEACyxGAFz_tF : $@convention(method) <T> (@lifetime(copy 0) @inout NonEscapable<T>, @guaranteed NonEscapable<T>) -> @lifetime(copy 1) @owned NonEscapable<T>
+  func sameTypeSelf_sameTypeInoutParam(mutNE: inout Self) -> Self { self }
+
+  /* DEFAULT: @_lifetime(copy self) */
+  // CHECK: @$s30lifetime_depend_infer_defaults12NonEscapableV17sameArchetypeSelf1uACyxGqd___tlF : $@convention(method) <T><U> (@in_guaranteed U, @guaranteed NonEscapable<T>) -> @lifetime(copy 1) @owned NonEscapable<T>
+  func sameArchetypeSelf<U>(u: U) -> Self { self }
+
+  /* DEFAULT: @_lifetime(copy self) */
+  // CHECK: @$s30lifetime_depend_infer_defaults12NonEscapableV32sameNominalTypeSelf_genericParam1uACyxGqd___tlF : $@convention(method) <T><U> (@in_guaranteed U, @guaranteed NonEscapable<T>) -> @lifetime(copy 1) @owned NonEscapable<T>
+  func sameNominalTypeSelf_genericParam<U>(u: U) -> NonEscapable<T> { self }
+}
+
+protocol NonEscapableProtocol: ~Escapable {
+  @_lifetime(immortal)
+  static func create() -> Self
+
+  init(ne: Self)
+
+  init<U>(ne: Self, u: U)
+
+  func sameArchetypeSelf() -> Self
+}
+
+extension NonEscapableProtocol where Self: ~Escapable {
+  /* DEFAULT: @_lifetime(copy self) */
+  // CHECK: @$s30lifetime_depend_infer_defaults20NonEscapableProtocolPAARi0_zrlE17sameArchetypeSelfxyF : $@convention(method) <Self where Self : NonEscapableProtocol, Self : ~Escapable> (@in_guaranteed Self) -> @lifetime(copy 0) @out Self
+  func sameArchetypeSelf() -> Self {
+    Self.create()
+  }
+}
+
+/* DEFAULT: @_lifetime(copy ne) */
+// CHECK: @$s30lifetime_depend_infer_defaults20sameGenericTypeParam2nexx_tRi0_zlF : $@convention(thin) <T where T : ~Escapable> (@in_guaranteed T) -> @lifetime(copy 0) @out T
+func sameGenericTypeParam<T: ~Escapable>(ne: T) -> T {
+  ne
+}
+
+protocol P_NE {
+  associatedtype T: ~Escapable
+}
+
+protocol Q_NE {
+  associatedtype U: NonEscapableProtocol & ~Escapable
+}
+
+struct AssociatedNE<P: P_NE, Q: Q_NE> {}
+
+extension AssociatedNE where P.T == Q.U {
+  /* DEFAULT: @_lifetime(copy a) */
+  // CHECK: @$s30lifetime_depend_infer_defaults12AssociatedNEVAA1UQy_1TRtzrlE04sameE9TypeParam1aA2G_tF : $@convention(method) <P, Q where P : P_NE, Q : Q_NE, P.T == Q.U> (@in_guaranteed P.T, AssociatedNE<P, Q>) -> @lifetime(copy 0) @out P.T
+  func sameAssociatedTypeParam(a: P.T) -> Q.U {
+    Q.U.create()
+  }
+}
+
+protocol QQ_NE {
+  associatedtype U: NonEscapableProtocol & ~Escapable
+}
+
+struct AssociatedQ<Q: Q_NE, QQ: QQ_NE> {}
+
+extension AssociatedQ where Q == QQ {
+  /* DEFAULT: @_lifetime(copy a) */
+  // CHECK: @$s30lifetime_depend_infer_defaults11AssociatedQVA2A5QQ_NERzq_RszrlE04sameE9TypeParam1a1UAaDPQzAI_tFZ : $@convention(method) <Q, QQ where Q : QQ_NE, Q : Q_NE, Q == QQ> (@in_guaranteed Q.U, @thin AssociatedQ<Q, Q>.Type) -> @lifetime(copy 0) @out Q.U
+  static func sameAssociatedTypeParam(a: Q.U) -> QQ.U {
+    QQ.U.create()
+  }
+}
 
 // =============================================================================
 // Single parameter default rule for functions
@@ -112,7 +254,8 @@ struct EscapableTrivialSelf {
 func inoutNEParam_void(ne: inout NE) {} // OK
 
 /* DEFAULT: @_lifetime(0: copy 0) */
-// CHECK: @$s30lifetime_depend_infer_defaults013inoutNEParam_F5_voidyyAA2NEVz_ADtF : $@convention(thin) (@lifetime(copy 0) @inout NE, @guaranteed NE) -> ()
+// CHECK: @$s30lifetime_depend_infer_defaults013inoutNEParam_F5_voidyyAA2NEVz_ADtF : $@convention(thin) (@lifetime(copy
+// 0, copy 1) @inout NE, @guaranteed NE) -> ()
 func inoutNEParam_NEParam_void(_: inout NE, _: NE) {} // OK
 
 /* DEFAULT: @_lifetime(0: copy 0) */

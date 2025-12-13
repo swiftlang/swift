@@ -13,18 +13,18 @@
 struct EmptyNonEscapable: ~Escapable {} // OK - no dependence
 
 // Don't allow non-Escapable return values.
-func neReturn(span: RawSpan) -> RawSpan { span } // expected-error{{cannot infer the lifetime dependence scope on a function with a ~Escapable parameter, specify '@_lifetime(borrow span)' or '@_lifetime(copy span)'}}
+func neReturn(span: RawSpan) -> RawSpan { span }
 
 func neInout(span: inout RawSpan) {} // OK - inferred
 
 struct S {
-  func neReturn(span: RawSpan) -> RawSpan { span } // expected-error{{a method with a ~Escapable result requires '@_lifetime(...)}}
+  func neReturn(span: RawSpan) -> RawSpan { span }
 
   func neInout(span: inout RawSpan) {} // OK - inferred
 }
 
 class C {
-  func neReturn(span: RawSpan) -> RawSpan { span } // expected-error{{a method with a ~Escapable result requires '@_lifetime(...)'}}
+  func neReturn(span: RawSpan) -> RawSpan { span }
 
   func neInout(span: inout RawSpan) {} // OK - inferred
 }
