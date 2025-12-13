@@ -26,7 +26,8 @@ internal import Glibc
 internal import Musl
 #endif
 
-internal func hex<T: FixedWidthInteger>(_ value: T,
+@_spi(Utils)
+public func hex<T: FixedWidthInteger>(_ value: T,
                                         prefix shouldPrefix: Bool = true,
                                         width: Int = MemoryLayout<T>.size * 2)
   -> String {
@@ -38,7 +39,8 @@ internal func hex<T: FixedWidthInteger>(_ value: T,
   return "\(prefix)\(padding)\(digits)"
 }
 
-internal func hex(_ bytes: some Sequence<UInt8>) -> String {
+@_spi(Utils)
+public func hex(_ bytes: some Sequence<UInt8>) -> String {
   return bytes.map{ hex($0, prefix: false) }.joined(separator: "")
 }
 
@@ -94,6 +96,38 @@ public func stripWhitespace<S: StringProtocol>(_ s: S)
   }
   let lastNonWhitespace = s.lastIndex(where: { !$0.isWhitespace })!
   return s[firstNonWhitespace...lastNonWhitespace]
+}
+
+/// Escape a JSON string
+@_spi(Utils)
+public func escapeJSON(_ s: String) -> String {
+  var result = ""
+  let utf8View = s.utf8
+  var chunk = utf8View.startIndex
+  var pos = chunk
+  let end = utf8View.endIndex
+
+  result.reserveCapacity(utf8View.count)
+
+  while pos != end {
+    let scalar = utf8View[pos]
+    switch scalar {
+      case 0x22, 0x5c, 0x00...0x1f:
+        result += s[chunk..<pos]
+        result += "\\"
+        result += String(Unicode.Scalar(scalar))
+        pos = utf8View.index(after: pos)
+        chunk = pos
+      default:
+        pos = utf8View.index(after: pos)
+    }
+  }
+
+  if chunk != end {
+    result += s[chunk..<pos]
+  }
+
+  return result
 }
 
 /// Strip any Optional from a value.

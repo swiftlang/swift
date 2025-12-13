@@ -985,6 +985,42 @@ extension arm_gprs {
   #endif
 }
 
+@_spi(Contexts) extension ARM64Context {
+    public static var registerDumpOrder: [String] {
+        get {
+            let r = (Register.x0 ..< Register.x29).map { "\($0)" }
+            return r + ["fp","lr","sp","pc"]
+        }
+    }
+}
+
+@_spi(Contexts) extension ARMContext {
+    public static var registerDumpOrder: [String] {
+        get {
+            let r = (Register.r0 ... Register.r10).map { "\($0)" }
+            return r + ["fp","ip","sp","lr","pc"]
+        }
+    }
+}
+
+@_spi(Contexts) extension I386Context {
+    public static var registerDumpOrder: [String] {
+        get {
+            let r = (Register.eax ... Register.edi).map { "\($0)" }
+            return r + ["eip","eflags","es","cs","ss","ds","fs","gs"]
+        }
+    }
+}
+
+@_spi(Contexts) extension X86_64Context {
+    public static var registerDumpOrder: [String] {
+        get {
+            let r = (Register.rax ... Register.r15).map { "\($0)" }
+            return r + ["rip","rflags","cs","fs","gs"]
+        }
+    }
+}
+
 // .. Darwin specifics .........................................................
 
 #if (os(macOS) || os(iOS) || os(watchOS) || os(tvOS))
