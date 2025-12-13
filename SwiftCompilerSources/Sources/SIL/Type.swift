@@ -103,6 +103,10 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     bridged.isAddressableForDeps(function.bridged)
   }
 
+  public func isFixedABI(in function: Function) -> Bool {
+    bridged.isFixedABI(function.bridged)
+  }
+
   /// If this is a raw layout type, returns the substituted like-type.
   public var rawLayoutSubstitutedLikeType: AST.`Type`? {
     .init(bridgedOrNil: bridged.getRawLayoutSubstitutedLikeType())

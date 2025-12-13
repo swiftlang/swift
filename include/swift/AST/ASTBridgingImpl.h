@@ -268,6 +268,10 @@ bool BridgedDeclObj::ProtocolDecl_isMarkerProtocol() const {
   return getAs<swift::ProtocolDecl>()->isMarkerProtocol();
 }
 
+bool BridgedDeclObj::ProtocolDecl_isInvertible() const {
+  return getAs<swift::ProtocolDecl>()->getInvertibleProtocolKind() != std::nullopt;
+}
+
 bool BridgedDeclObj::AbstractFunction_isOverridden() const {
   return getAs<swift::AbstractFunctionDecl>()->isOverridden();
 }

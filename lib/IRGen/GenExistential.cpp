@@ -2033,6 +2033,40 @@ void irgen::emitExistentialMetatypeContainer(IRGenFunction &IGF,
                               });
 }
 
+/// Emit an existential metatype container from a metatype value as an
+/// explosion of llvm::Constant values (suitable for static initialization).
+void irgen::emitExistentialMetatypeContainer(
+    IRGenModule &IGM, Explosion &out, SILType outType, llvm::Constant *metatype,
+    SILType metatypeType, ArrayRef<ProtocolConformanceRef> conformances) {
+  assert(outType.is<ExistentialMetatypeType>());
+  auto &destTI = IGM.getTypeInfo(outType).as<ExistentialMetatypeTypeInfo>();
+  out.add(metatype);
+
+  auto srcType = metatypeType.castTo<MetatypeType>().getInstanceType();
+  auto destType = outType.castTo<ExistentialMetatypeType>().getInstanceType();
+  while (auto destMetatypeType = dyn_cast<ExistentialMetatypeType>(destType)) {
+    destType = destMetatypeType.getInstanceType();
+    srcType = cast<AnyMetatypeType>(srcType).getInstanceType();
+  }
+
+  // Emit the witness table pointers as constants.
+  for (auto protocol : destTI.getStoredProtocols()) {
+    // Find the corresponding conformance
+    ProtocolConformanceRef conformance;
+    for (auto conf : conformances) {
+      if (conf.getProtocol() == protocol) {
+        conformance = conf;
+        break;
+      }
+    }
+    assert(conformance.isConcrete() && "missing conformance");
+
+    // Emit witness table constant
+    auto table = IGM.getAddrOfWitnessTable(conformance.getConcrete());
+    out.add(table);
+  }
+}
+
 void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address buffer,
                                             SILType type, Explosion &out) {
   assert(type.isExistentialType());

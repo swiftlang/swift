@@ -503,6 +503,27 @@ extension Instruction {
       }
     case let gvi as GlobalValueInst:
       return context.canMakeStaticObjectReadOnly(objectType: gvi.type)
+
+    // Metatypes (and upcasts of them to existentials) can be used as static initializers for SE-0492, as long as they
+    // do not require an accessor to reference the metadata (i.e. are not generic, not resilient and not a class).
+    // See also irgen::isCanonicalCompleteTypeMetadataStaticallyAddressable.
+    case let mti as MetatypeInst:
+      let silType = mti.type.loweredInstanceTypeOfMetatype(in: parentFunction)
+      let instanceType = mti.type.canonicalType.instanceTypeOfMetatype
+      if !mti.type.isGenericAtAnyLevel,
+        !instanceType.isClass,
+        let nominal = instanceType.nominal,
+        !nominal.isGenericAtAnyLevel,
+        silType.isFixedABI(in: mti.parentFunction) {
+        return true
+      }
+      return false
+    case let iemi as InitExistentialMetatypeInst:
+      let isAnyConformanceResilient = iemi.conformances.contains { 
+        !$0.protocol.isInvertible && $0.isResilientConformance(currentModule: context.currentModuleContext)
+      }
+      return !iemi.type.isGenericAtAnyLevel && !isAnyConformanceResilient
+
     case is StructInst,
          is TupleInst,
          is EnumInst,
