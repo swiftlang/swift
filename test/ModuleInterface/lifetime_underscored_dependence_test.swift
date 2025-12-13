@@ -2,7 +2,6 @@
 
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature Lifetimes \
-// RUN:     -enable-experimental-feature Lifetimes \
 // RUN:     -o %t/lifetime_underscored_dependence.swiftmodule \
 // RUN:     -emit-module-interface-path %t/lifetime_underscored_dependence.swiftinterface \
 // RUN:     %S/Inputs/lifetime_underscored_dependence.swift
@@ -105,8 +104,22 @@ import lifetime_underscored_dependence
 // CHECK:}
 // CHECK:#endif
 
-// Check that an implicitly dependent variable accessor is guarded by LifetimeDependence.
-//
 // CHECK: extension lifetime_underscored_dependence.Container {
-// CHECK-NEXT: #if compiler(>=5.3) && $LifetimeDependence
+// CHECK-NEXT: #if compiler(>=5.3) && $Lifetimes
 // CHECK-NEXT:   public var storage: lifetime_underscored_dependence.BufferView {
+
+// CHECK: public struct RigidArray : ~Swift.Copyable {
+// CHECK:   @usableFromInline
+// CHECK:   internal let _ptr: Swift.UnsafeRawBufferPointer
+// CHECK:   #if compiler(>=5.3) && $Lifetimes
+// CHECK:   public var span: Swift.RawSpan {
+// CHECK:     @_lifetime(borrow self)
+// CHECK:     get
+// CHECK:   }
+// CHECK:   #else
+// CHECK:   public var span: Swift.RawSpan {
+// CHECK:     @lifetime(borrow self)
+// CHECK:     get
+// CHECK:   }
+// CHECK:   #endif
+// CHECK: }
