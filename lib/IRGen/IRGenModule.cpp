@@ -1743,7 +1743,7 @@ void IRGenModule::addLinkLibraries() {
         LinkLibrary{"objc", LibraryKind::Library, /*static=*/false});
 
   if (TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
-      getOptions().EnableSwiftDirectRuntime)
+      getOptions().EnableSwiftDirectRetainRelease)
     registerLinkLibrary(LinkLibrary{"swiftSwiftDirectRuntime",
                                     LibraryKind::Library, /*static=*/true});
 
