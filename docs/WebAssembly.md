@@ -73,7 +73,7 @@ for WebAssembly is built and tested using the following command (exclude `--scca
 
 ```bash
 ./utils/build-script --sccache --build-wasm-stdlib --wasmkit --install-llvm --install-swift --swiftpm --install-swiftpm \
-  --libcxx --install-libcxx --llbuild --install-llbuild --swift-testing --install-swift-testing \
+  --llbuild --install-llbuild --swift-testing --install-swift-testing \
   --swift-testing-macros --install-swift-testing-macros --build-embedded-stdlib --build-embedded-stdlib-cross-compiling \
   '--llvm-install-components=llvm-ar;llvm-nm;llvm-ranlib;llvm-cov;llvm-profdata;llvm-objdump;llvm-objcopy;llvm-symbolizer;IndexStore;clang;clang-resource-headers;builtins;runtimes;clangd;libclang;dsymutil;LTO;clang-features-file;lld'
 ```
