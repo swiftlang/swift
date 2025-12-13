@@ -6086,6 +6086,11 @@ GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
 /// outer substitutions.
 GenericEnvironment *GenericEnvironment::forOpaqueType(
     OpaqueTypeDecl *opaque, SubstitutionMap subs) {
+  // Don't preserve sugar if we have type variables, because this leads to
+  // excessive solver arena memory usage.
+  if (subs.getRecursiveProperties().hasTypeVariable())
+    subs = subs.getCanonical();
+
   auto &ctx = opaque->getASTContext();
 
   auto properties = ArchetypeType::archetypeProperties(
