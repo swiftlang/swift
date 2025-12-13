@@ -5610,6 +5610,31 @@ public:
     }
     printFoot();
   }
+                         
+  void visitWarnAttr(WarnAttr *Attr, Label label) {
+    printCommon(Attr, "warn", label);
+    auto &diagGroupInfo = getDiagGroupInfoByID(Attr->DiagnosticGroupID);
+    printFieldRaw([&](raw_ostream &out) { out << diagGroupInfo.name; },
+                  Label::always("diagGroupID:"));
+    switch (Attr->DiagnosticBehavior) {
+    case WarningGroupBehavior::None:
+    case WarningGroupBehavior::AsWarning:
+      printFieldRaw([&](raw_ostream &out) { out << "warning"; },
+                    Label::always("as:"));
+      break;
+    case WarningGroupBehavior::AsError:
+      printFieldRaw([&](raw_ostream &out) { out << "error"; },
+                    Label::always("as:"));
+      break;
+    case WarningGroupBehavior::Ignored:
+        printFieldRaw([&](raw_ostream &out) { out << "ignored"; },
+                      Label::always("as:"));
+        break;
+    }
+    if (Attr->Reason)
+      printFieldQuoted(Attr->Reason, Label::always("reason:"));
+    printFoot();
+  }
 };
 
 } // end anonymous namespace

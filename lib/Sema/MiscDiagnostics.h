@@ -141,7 +141,7 @@ namespace swift {
                                              ForEachStmt *forEach);
 
   /// Determine if any of the performance hint diagnostics are enabled.
-  bool performanceHintDiagnosticsEnabled(ASTContext &ctx);
+  bool performanceHintDiagnosticsEnabled(ASTContext &ctx, SourceFile *sf);
 
   class BaseDiagnosticWalker : public ASTWalker {
   protected:

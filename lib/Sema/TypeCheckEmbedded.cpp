@@ -49,9 +49,10 @@ swift::shouldDiagnoseEmbeddedLimitations(const DeclContext *dc, SourceLoc loc,
 
   // Check if the Embedded restriction diagnostics, which are ignored by
   // default, have been enabled. If it's still ignored, we won't diagnose
-  // anything. limitations.
+  // anything.
   auto &diags = dc->getASTContext().Diags;
-  if (diags.isIgnoredDiagnosticGroup(DiagGroupID::EmbeddedRestrictions))
+  if (!diags.isDiagnosticGroupEnabled(
+          dc->getParentSourceFile(), DiagGroupID::EmbeddedRestrictions))
     return std::nullopt;
 
 #if SWIFT_BUILD_SWIFT_SYNTAX

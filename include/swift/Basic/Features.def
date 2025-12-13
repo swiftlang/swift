@@ -573,6 +573,9 @@ EXPERIMENTAL_FEATURE(CheckImplementationOnlyStrict, false)
 /// Check that use sites have the required @_spi import for operators.
 EXPERIMENTAL_FEATURE(EnforceSPIOperatorGroup, true)
 
+/// Enable source-level warning control with `@warn`
+EXPERIMENTAL_FEATURE(SourceWarningControl, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
