@@ -1755,9 +1755,8 @@ void IRGenModule::addLinkLibraries() {
     bool hasStaticCxxStdlib = false;
     if (const auto *M = Context.getModuleByName(CXX_MODULE_NAME))
       hasStaticCxx = M->isStaticLibrary();
-    if (Context.LangOpts.Target.getOS() == llvm::Triple::Win32)
-      if (const auto *M = Context.getModuleByName("CxxStdlib"))
-        hasStaticCxxStdlib = M->isStaticLibrary();
+    if (const auto *M = Context.getModuleByName("CxxStdlib"))
+      hasStaticCxxStdlib = M->isStaticLibrary();
     dependencies::registerCxxInteropLibraries(Context.LangOpts.Target,
                                               getSwiftModule()->getName().str(),
                                               hasStaticCxx,
