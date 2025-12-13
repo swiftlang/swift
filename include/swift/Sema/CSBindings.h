@@ -382,7 +382,7 @@ public:
   /// Note that ordering is important when it comes to bindings, we'd
   /// like to add any "direct" default types first to attempt them
   /// before transitive ones.
-  llvm::SmallMapVector<ProtocolDecl *, LiteralRequirement, 2> Literals;
+  llvm::SmallVector<LiteralRequirement, 2> Literals;
 
   llvm::SmallVector<Constraint *, 2> Defaults;
 
@@ -465,7 +465,7 @@ public:
     // Literal requirements always result in a subtype/supertype
     // relationship to a concrete type.
     if (llvm::any_of(Literals, [](const auto &literal) {
-          return literal.second.viableAsBinding();
+          return literal.viableAsBinding();
         }))
       return false;
 

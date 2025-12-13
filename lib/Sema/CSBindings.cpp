@@ -86,9 +86,12 @@ bool BindingSet::forGenericParameter() const {
 }
 
 bool BindingSet::canBeNil() const {
-  auto &ctx = CS.getASTContext();
-  return Literals.count(
-      ctx.getProtocol(KnownProtocolKind::ExpressibleByNilLiteral));
+  for (const auto &literal : Literals) {
+    if (literal.getProtocol()->isSpecificProtocol(
+        KnownProtocolKind::ExpressibleByNilLiteral))
+      return true;
+  }
+  return false;
 }
 
 bool BindingSet::isDirectHole() const {
@@ -652,7 +655,7 @@ void BindingSet::inferTransitiveSupertypeBindings() {
     // `ExpressibleByStringLiteral` conformance, we'd end up picking
     // `T` with only one type `Any?` which is incorrect.
     for (const auto &literal : bindings.Literals)
-      addLiteralRequirement(literal.second.getSource());
+      addLiteralRequirement(literal.getSource());
 
     // Infer transitive defaults.
     for (auto *def : bindings.Defaults) {
@@ -1002,9 +1005,7 @@ void BindingSet::determineLiteralCoverage() {
 
   bool allowsNil = canBeNil();
 
-  for (auto &entry : Literals) {
-    auto &literal = entry.second;
-
+  for (auto &literal : Literals) {
     if (!literal.viableAsBinding())
       continue;
 
@@ -1032,34 +1033,36 @@ void BindingSet::determineLiteralCoverage() {
 }
 
 void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
-  for (const auto &pair : Literals) {
-    auto *protocol = pair.first;
+  decltype(Literals)::iterator intLiteral = Literals.end();
+  decltype(Literals)::iterator floatLiteral = Literals.end();
+
+  for (auto iter = Literals.begin(); iter != Literals.end(); ++iter) {
+    auto *protocol = iter->getProtocol();
 
     if (protocol->isSpecificProtocol(
             KnownProtocolKind::ExpressibleByIntegerLiteral)) {
-      auto *floatLiteral = CS.getASTContext().getProtocol(
-          KnownProtocolKind::ExpressibleByFloatLiteral);
-      if (Literals.count(floatLiteral)) {
-        Literals.erase(protocol);
-        return;
-      }
+      intLiteral = iter;
     }
 
     if (protocol->isSpecificProtocol(
             KnownProtocolKind::ExpressibleByFloatLiteral)) {
-      auto *intLiteral = CS.getASTContext().getProtocol(
-          KnownProtocolKind::ExpressibleByIntegerLiteral);
-      Literals.erase(intLiteral);
-      return;
+      floatLiteral = iter;
     }
+  }
+
+  if (intLiteral != Literals.end() &&
+      floatLiteral != Literals.end()) {
+    Literals.erase(intLiteral);
   }
 }
 
 void BindingSet::addLiteralRequirement(Constraint *constraint) {
   auto *protocol = constraint->getProtocol();
 
-  if (Literals.count(protocol) > 0)
-    return;
+  for (const auto &literal : Literals) {
+    if (literal.getProtocol() == protocol)
+      return;
+  }
 
   bool isDirect = isDirectRequirement(CS, TypeVar, constraint);
 
@@ -1070,8 +1073,7 @@ void BindingSet::addLiteralRequirement(Constraint *constraint) {
     defaultType = TypeChecker::getDefaultType(protocol, CS.DC);
   }
 
-  LiteralRequirement literal(protocol, constraint, defaultType, isDirect);
-  Literals.insert({protocol, std::move(literal)});
+  Literals.emplace_back(protocol, constraint, defaultType, isDirect);
 }
 
 bool BindingSet::operator==(const BindingSet &other) {
@@ -1081,7 +1083,7 @@ bool BindingSet::operator==(const BindingSet &other) {
   if (Bindings.size() != other.Bindings.size())
     return false;
 
-  for (auto i : indices(Bindings)) {
+  for (unsigned i : indices(Bindings)) {
     const auto &x = Bindings[i];
     const auto &y = other.Bindings[i];
 
@@ -1093,13 +1095,9 @@ bool BindingSet::operator==(const BindingSet &other) {
   if (Literals.size() != other.Literals.size())
     return false;
 
-  for (auto pair : Literals) {
-    auto found = other.Literals.find(pair.first);
-    if (found == other.Literals.end())
-      return false;
-
-    const auto &x = pair.second;
-    const auto &y = found->second;
+  for (unsigned i : indices(Literals)) {
+    auto &x = Literals[i];
+    auto &y = other.Literals[i];
 
     if (x.Source != y.Source ||
         x.DefaultType.getPointer() != y.DefaultType.getPointer() ||
@@ -2324,15 +2322,12 @@ void PotentialBindings::dump(ConstraintSystem &cs, TypeVariableType *typeVar,
 
 void BindingSet::forEachLiteralRequirement(
     llvm::function_ref<void(KnownProtocolKind)> callback) const {
-  for (const auto &literal : Literals) {
-    auto *protocol = literal.first;
-    const auto &info = literal.second;
-
+  for (const auto &info : Literals) {
     // Only uncovered defaultable literal protocols participate.
     if (!info.viableAsBinding())
       continue;
     
-    if (auto protocolKind = protocol->getKnownProtocolKind())
+    if (auto protocolKind = info.getProtocol()->getKnownProtocolKind())
       callback(*protocolKind);
   }
 }
@@ -2363,7 +2358,7 @@ LiteralBindingKind BindingSet::getLiteralForScore() const {
 
 unsigned BindingSet::getNumViableLiteralBindings() const {
   return llvm::count_if(Literals, [&](const auto &literal) {
-    return literal.second.viableAsBinding();
+    return literal.viableAsBinding();
   });
 }
 
@@ -2501,10 +2496,10 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   }
   for (const auto &literal : Literals) {
     potentialBindings.push_back(PrintableBinding::literalDefaultType(
-        literal.second.hasDefaultType()
-        ? literal.second.getDefaultType()
+        literal.hasDefaultType()
+        ? literal.getDefaultType()
         : Type(),
-        literal.second.viableAsBinding()));
+        literal.viableAsBinding()));
   }
   if (potentialBindings.empty()) {
     out << "<none>";

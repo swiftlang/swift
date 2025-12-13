@@ -42,7 +42,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
 
     ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
 
-    const auto &literal = bindings.Literals.front().second;
+    const auto &literal = bindings.Literals.front();
 
     ASSERT_TRUE(literal.hasDefaultType());
     ASSERT_TRUE(literal.getDefaultType()->isEqual(intTy));
@@ -65,7 +65,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
 
     ASSERT_TRUE(bindings.Bindings[0].BindingType->isEqual(intTy));
 
-    const auto &literal = bindings.Literals.front().second;
+    const auto &literal = bindings.Literals.front();
     ASSERT_TRUE(literal.isCovered());
     ASSERT_TRUE(literal.isDirectRequirement());
     ASSERT_TRUE(literal.getDefaultType()->isEqual(intTy));
@@ -99,7 +99,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
 
     ASSERT_TRUE(bindings.Bindings[0].BindingType->isEqual(floatTy));
 
-    const auto &literal = bindings.Literals.front().second;
+    const auto &literal = bindings.Literals.front();
     ASSERT_TRUE(literal.isCovered());
     ASSERT_TRUE(literal.isDirectRequirement());
     ASSERT_FALSE(literal.getDefaultType()->isEqual(floatTy));
@@ -140,7 +140,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
     // Inferred literal requirement through `$T_float` as well.
     ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
 
-    const auto &literal = bindings.Literals.front().second;
+    const auto &literal = bindings.Literals.front();
 
     ASSERT_TRUE(literal.isCovered());
     ASSERT_FALSE(literal.isDirectRequirement());

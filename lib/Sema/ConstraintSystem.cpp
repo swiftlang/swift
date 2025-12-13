@@ -5397,9 +5397,7 @@ TypeVarBindingProducer::TypeVarBindingProducer(const BindingSet &bindings)
   }
 
   // Infer defaults based on "uncovered" literal protocol requirements.
-  for (const auto &info : bindings.Literals) {
-    const auto &literal = info.second;
-
+  for (const auto &literal : bindings.Literals) {
     if (!literal.viableAsBinding())
       continue;
 

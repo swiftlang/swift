@@ -2566,8 +2566,8 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
     conversionType = bindings.Bindings[0].BindingType;
   } else {
     for (const auto &literal : bindings.Literals) {
-      if (literal.second.viableAsBinding()) {
-        conversionType = literal.second.getDefaultType();
+      if (literal.viableAsBinding()) {
+        conversionType = literal.getDefaultType();
         break;
       }
     }
