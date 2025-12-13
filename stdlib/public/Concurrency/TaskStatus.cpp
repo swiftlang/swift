@@ -312,6 +312,90 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
   }
 }
 
+// For when we are trying to remove a record but can only do
+// so if a certain condition of the active task status is true
+SWIFT_CC(swift)
+bool swift::removeStatusRecordIf(AsyncTask *task, TaskStatusRecord *record,
+    ActiveTaskStatus &oldStatus,
+    llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus &)> fn,
+    llvm::function_ref<bool(ActiveTaskStatus)> condition) {
+
+  SWIFT_TASK_DEBUG_LOG("remove status record = %p, from task = %p",
+                       record, task);
+
+  bool didRemove = false;
+  while (true) {
+    // If the record is locked, then either we wait for the lock or we own the
+    // lock. Either way, acquire the status record lock and perform the removal.
+    // If the record to be removed is not the innermost record, then we need to
+    // acquire the lock to safely remove it.
+    if (oldStatus.isStatusRecordLocked() ||
+        oldStatus.getInnermostRecord() != record) {
+      withStatusRecordLock(
+          task, oldStatus,
+          [&](ActiveTaskStatus lockedStatus) {
+            // Now that we have locked the status, evaluate the condition
+            if (!condition(lockedStatus)) {
+              return;
+            }
+            didRemove = true;
+            // If the record is the innermost (always was, or became that way
+            // while we waited) then we have to remove it in the status change
+            // function, since changing the head of the list requires changing
+            // the status. If it's not the innermost then we can remove it here.
+            if (lockedStatus.getInnermostRecord() != record) {
+              removeNonInnermostStatusRecordLocked(lockedStatus, record);
+            }
+          },
+          [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+            // If the condition allows us to remove
+            // the record, update the ActiveTaskStatus
+            if (didRemove) {
+              // If this record is the innermost record,
+              // set a new status with the record removed.
+              if (newStatus.getInnermostRecord() == record)
+                newStatus = newStatus.withInnermostRecord(record->getParent());
+
+              // Requested status updates
+              if (fn) {
+                fn(oldStatus, newStatus);
+              }
+            }
+          });
+      // Taking the lock never requires a retry
+      break;
+    }
+
+    // Nobody holds the lock, and the record is the
+    // innermost record. Attempt to remove it locklessly.
+    if (!condition(oldStatus)) {
+      // Condition has decided we no longer want to attempt removal
+      break;
+    }
+
+    // Remove the record
+    auto newStatus = oldStatus.withInnermostRecord(record->getParent());
+
+    // Requested status updates
+    if (fn) {
+      fn(oldStatus, newStatus);
+    }
+
+    if (task->_private()._status().compare_exchange_weak(
+            oldStatus, newStatus,
+            /*success*/ std::memory_order_relaxed,
+            /*failure*/ std::memory_order_relaxed)) {
+      newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
+      didRemove = true;
+      break;
+    }
+
+    // We failed to remove the record locklessly. Go back to the top and retry
+    // removing it.
+  }
+  return didRemove;
+}
+
 // For when we are trying to remove a record and also optionally trying to
 // modify some flags in the ActiveTaskStatus at the same time.
 SWIFT_CC(swift)
@@ -935,7 +1019,8 @@ static void swift_task_cancelImpl(AsyncTask *task) {
 /**************************************************************************/
 
 /// Perform any escalation actions required by the given record.
-static void performEscalationAction(TaskStatusRecord *record,
+static void performEscalationAction(AsyncTask *task,
+                                    TaskStatusRecord *record,
                                     JobPriority oldPriority,
                                     JobPriority newPriority) {
   switch (record->getKind()) {
@@ -967,7 +1052,7 @@ static void performEscalationAction(TaskStatusRecord *record,
     auto dependencyRecord = cast<TaskDependencyStatusRecord>(record);
     SWIFT_TASK_DEBUG_LOG("[Dependency] Escalating a task dependency record %p from %#x to %#x",
                     record, oldPriority, newPriority);
-    dependencyRecord->performEscalationAction(oldPriority, newPriority);
+    dependencyRecord->performEscalationAction(task, oldPriority, newPriority);
     return;
   }
 
@@ -1008,7 +1093,7 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
       return oldPriority;
     }
 
-    if (oldStatus.isRunning() || oldStatus.isEnqueued()) {
+    if (oldStatus.isRunning()) {
       // Regardless of whether status record is locked or not, update the
       // priority and RO bit on the task status
       newStatus = oldStatus.withEscalatedPriority(newPriority);
@@ -1048,21 +1133,21 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
   } else if (newStatus.isEnqueued()) {
     //  Task is not running, it's enqueued somewhere waiting to be run
     //
-    // TODO (rokhinip): Add a stealer to escalate the thread request for
-    //  the task. Still mark the task has having been escalated so that the
-    //  thread will self override when it starts draining the task
+    // When tasks are enqueued on any executor, they will have an
+    // EnqueuedOnExecutor TaskDependencyStatusRecord which will have
+    // performEscalationAction called on it below. This will call
+    // swift_executor_escalate which will enqueue a stealer if needed.
     //
-    // TODO (rokhinip): Add a signpost to flag that this is a potential
-    //  priority inversion
+    // Still mark the task has having been escalated so that the
+    // thread will self override when it starts draining the task
     SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is enqueued", task);
-
   }
 
   if (newStatus.getInnermostRecord() == NULL) {
     return newStatus.getStoredPriority();
   }
 
-  SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended from %#x to %#x",
+  SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which has status records from %#x to %#x",
                        task, oldPriority, newPriority);
   // We must have at least one record - the task dependency one.
   assert(newStatus.getInnermostRecord() != NULL);
@@ -1071,7 +1156,7 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     // We know that none of the escalation actions will recursively
     // modify the task status record list by adding or removing task records
     for (auto cur: status.records()) {
-      performEscalationAction(cur, oldPriority, newPriority);
+      performEscalationAction(task, cur, oldPriority, newPriority);
     }
   });
 
@@ -1079,7 +1164,7 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
 }
 
 void TaskDependencyStatusRecord::performEscalationAction(
-    JobPriority oldPriority, JobPriority newPriority) {
+    AsyncTask *task, JobPriority oldPriority, JobPriority newPriority) {
   switch (this->DependencyKind) {
     case WaitingOnTask:
       SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent task %p noted in %p record",
@@ -1102,10 +1187,15 @@ void TaskDependencyStatusRecord::performEscalationAction(
       break;
     case EnqueuedOnExecutor:
       SWIFT_TASK_DEBUG_LOG("[Dependency] Escalate dependent executor %p noted in %p record from %#x to %#x",
-        this->DependentOn.Executor, this, oldPriority, newPriority);
-      swift_executor_escalate(this->DependentOn.Executor, this->WaitingTask, newPriority);
+        (void*)this->DependentOn.Executor.getIdentity(), (void*)this, oldPriority, newPriority);
+      swift_executor_escalate(this->DependentOn.Executor, task, newPriority);
       break;
   }
+}
+
+AsyncTask *&TaskDependencyStatusRecord::getNextWaitingTask() {
+  assert(this->DependencyKind == WaitingOnTask);
+  return this->NextWaitingTask;
 }
 
 #define OVERRIDE_TASK_STATUS COMPATIBILITY_OVERRIDE

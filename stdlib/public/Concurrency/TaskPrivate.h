@@ -221,6 +221,16 @@ SWIFT_CC(swift)
 void removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
      llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn = nullptr);
 
+/// Similar to the above functions, attempt to remove record from
+/// task. If condition returns false, record is considered invalid
+/// and won't be attempted to be removed. It may be called multiple
+/// times to ensure it is checked atomically with the removal.
+SWIFT_CC(swift)
+bool removeStatusRecordIf(AsyncTask *task, TaskStatusRecord *record,
+                          ActiveTaskStatus &status,
+                          llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus &)> fn,
+                          llvm::function_ref<bool(ActiveTaskStatus)> condition);
+
 /// Update the status record by scanning through all records and removing
 /// those which match the condition. This can also be used to inspect
 /// "remaining" records.
@@ -458,16 +468,13 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// whether or not it is running.
     IsRunning = 0x800,
 #endif
-    /// Task is intrusively enqueued somewhere - either in the default executor
-    /// pool, or in an actor. Currently, due to lack of task stealers, this bit
-    /// is cleared when a task starts running on a thread, suspends or is
-    /// completed.
+    /// Task is intrusively enqueued somewhere - either
+    /// in the default executor pool, or in an actor.
     ///
-    /// TODO (rokhinip): Once we have task stealers, this bit refers to the
-    /// enqueued-ness on the specific queue that the task is linked into and
-    /// therefore, can only be cleared when the intrusively linkage is cleaned
-    /// up. The enqueued-ness then becomes orthogonal to the other states of
-    /// running/suspended/completed.
+    /// This bit refers to the enqueued-ness on the specific queue that
+    /// the task is linked into and therefore, can only be cleared when
+    /// the intrusively linkage is cleaned up. The enqueued-ness is
+    /// orthogonal to the other states of running/suspended/completed.
     IsEnqueued = 0x1000,
     /// Task has been completed.  This is purely used to enable an assertion
     /// that the task is completed when we destroy it.
@@ -487,7 +494,19 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// the generic global pool.
     HasTaskExecutorPreference = 0x8000,
 
-    HasActiveTaskCancellationShield = 0x10000,
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    /// The Task's intrusive link or a Stealer may only run if its exclusion
+    /// value is equal to this value. This number increases only when escalating
+    /// a Task while it is dependent on the Dispatch default global executor.
+    ///
+    /// This value is currently set to 8 bits because JobPriority is
+    /// 8 bits so in theory, that is the most number of times a Task
+    /// may be escalated in such a way that this value increases.
+    /// In reality, there are only 5 values of JobPriority so this
+    /// could just use 3 bits (along with PriorityMask) if needed.
+    StealerExclusionShift = 16,
+    StealerExclusionMask = 0xFF0000,
+#endif
   };
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
@@ -705,7 +724,6 @@ public:
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     assert(ExecutionLock == DLOCK_OWNER_NULL);
 #endif
-    assert(!isEnqueued());
     return ActiveTaskStatus(Record,
                             (Flags & ~PriorityMask) | uintptr_t(priority));
   }
@@ -718,6 +736,24 @@ public:
                                | IsEscalated | uintptr_t(priority), ExecutionLock);
 #else
     return ActiveTaskStatus(Record, (Flags & ~PriorityMask) | IsEscalated | uintptr_t(priority));
+#endif
+  }
+
+  uint8_t getStealerExclusionValue() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return (Flags & StealerExclusionMask) >> StealerExclusionShift;
+#else
+    return 0;
+#endif
+  }
+
+  ActiveTaskStatus withStealerExclusionValue(uint8_t value) const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    auto NewFlags = Flags & ~StealerExclusionMask;
+    NewFlags |= (value << StealerExclusionShift);
+    return ActiveTaskStatus(Record, NewFlags, ExecutionLock);
+#else
+    return *this;
 #endif
   }
 
@@ -836,7 +872,10 @@ struct AsyncTask::PrivateStorage {
   /// The top 32 bits of the task ID. The bottom 32 bits are in Job::Id.
   uint32_t Id;
 
-  // Another four bytes of padding here too (on 64-bit)
+#if __SIZEOF_POINTER__ == 8
+  uint8_t LocalStealerExclusionValue = {0};
+#endif
+  // Three bytes of padding (on 64-bit)
 
   /// Base priority of Task - set only at creation time of task.
   /// Current max priority of task is ActiveTaskStatus.
@@ -852,6 +891,11 @@ struct AsyncTask::PrivateStorage {
 
   // The lock used to protect more complicated operations on the task status.
   RecursiveMutex statusLock;
+
+#if __SIZEOF_POINTER__ == 4
+  uint8_t LocalStealerExclusionValue = {0};
+#endif
+  // On 32-bit, there are 7 bytes remaining
 
   // Always create an async task with max priority in ActiveTaskStatus = base
   // priority. It will be updated later if needed.
@@ -894,8 +938,10 @@ struct AsyncTask::PrivateStorage {
       // Remove drainer, enqueued and override bit if any
       auto newStatus = oldStatus.withRunning(false);
       newStatus = newStatus.withoutStoredPriorityEscalation();
-      newStatus = newStatus.withoutEnqueued();
       newStatus = newStatus.withComplete();
+#if !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+      newStatus = newStatus.withoutEnqueued();
+#endif
 
       // This can fail since the task can still get concurrently cancelled or
       // escalated.
@@ -992,100 +1038,395 @@ inline bool AsyncTask::isCancelled(bool ignoreShield = false) const {
                           .isCancelled(ignoreShield);
 }
 
-inline uint32_t AsyncTask::flagAsRunning() {
+/// Remove the enqueued bit in the ActiveTaskStatus atomically.
+/// This must be done when a Task's intrusive link is dequeued
+/// but after reading the local stealer exclusion value.
+/// This should not be done from any concurrent context.
+static inline void taskRemoveEnqueued(AsyncTask *task) {
+  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
+  auto newStatus = oldStatus;
+  do {
+    if (!oldStatus.isEnqueued()) {
+      break;
+    }
+    // This could be an atomic AND rather than a CAS loop
+    newStatus = oldStatus.withoutEnqueued();
+  } while (!task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
+                                                       /* success */ std::memory_order_relaxed,
+                                                       /* failure */ std::memory_order_relaxed));
+}
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+struct ThreadPriorityManager {
   dispatch_thread_override_info_s threadOverrideInfo;
-  threadOverrideInfo = swift_dispatch_thread_get_current_override_qos_floor();
-  qos_class_t overrideFloor = threadOverrideInfo.override_qos_floor;
-  qos_class_t taskBasePriority = (qos_class_t) _private().BasePriority;
+  qos_class_t overrideFloor;
+  qos_class_t taskBasePriority;
+  uint32_t opaquePriority;
+
+  ThreadPriorityManager(AsyncTask const& task) {
+    threadOverrideInfo = swift_dispatch_thread_get_current_override_qos_floor();
+    overrideFloor = threadOverrideInfo.override_qos_floor;
+    taskBasePriority = (qos_class_t) task._private().BasePriority;
+    opaquePriority = 0;
+  }
+  ThreadPriorityManager(ThreadPriorityManager&&) = delete;
+
+  void overrideIfNeeded(JobPriority storedPriority) {
+    // If the base priority is not equal to the current override
+    // floor then dispqatch may need to apply the base priority
+    // to the thread. If the current priority is higher than
+    // the override floor, then dispatch may need to apply a
+    // self-override. In either case, call into dispatch to do this.
+    qos_class_t maxTaskPriority = (qos_class_t)storedPriority;
+    if (threadOverrideInfo.can_override && (taskBasePriority != qos_class_self() || maxTaskPriority > overrideFloor)) {
+      SWIFT_TASK_DEBUG_LOG("[Override] Self-override thread with oq_floor %#x to match task's max priority %#x and base priority %#x",
+                           overrideFloor, maxTaskPriority, taskBasePriority);
+
+      uint32_t previousPriority = swift_dispatch_thread_override_self_with_base(maxTaskPriority, taskBasePriority);
+      // Dispatch will only return a value if the base priority had to
+      // be set which should only happen the first time. Let's make sure
+      // that we don't overwrite it and that our assumption is correct.
+      if (!opaquePriority) {
+        opaquePriority = previousPriority;
+      }
+      overrideFloor = maxTaskPriority;
+      basePriorityCeil = taskBasePriority;
+    }
+  }
+
+  void resetIfNeeded() {
+    // At this point, we may have run the above update code
+    // so we might need to undo setting the base priority
+    if (opaquePriority) {
+      swift_dispatch_thread_reset_override_self(opaquePriority);
+      opaquePriority = 0;
+    }
+  }
+};
+#endif
+
+static inline uint32_t taskFlagAsRunningWithoutDependency(AsyncTask &task, bool removeEnqueued = false) {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  auto threadPriorityManager = ThreadPriorityManager(task);
+#endif
+
+  auto oldStatus = task._private()._status().load(std::memory_order_relaxed);
+  assert(!oldStatus.isRunning());
+  assert(!oldStatus.isComplete());
+  // This function isn't meant to be called if the function has
+  // been enqueued onto an executor since the last suspension
+  assert(!oldStatus.hasTaskDependency());
+
+  SWIFT_TASK_DEBUG_LOG("%p->flagAsRunning() with no task dependency", &task);
+  assert(task._private().dependencyRecord == nullptr);
+
+  while (true) {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    threadPriorityManager.overrideIfNeeded(oldStatus.getStoredPriority());
+#endif
+    // Set self as executor and remove escalation bit if any - the task's
+    // priority escalation has already been reflected on the thread.
+    auto newStatus = oldStatus.withRunning(true);
+    if (removeEnqueued) {
+      newStatus = newStatus.withoutEnqueued();
+    }
+    newStatus = newStatus.withoutStoredPriorityEscalation();
+
+    if (task._private()._status().compare_exchange_weak(oldStatus, newStatus,
+                                                   /* success */ std::memory_order_relaxed,
+                                                   /* failure */ std::memory_order_relaxed)) {
+      newStatus.traceStatusChanged(&task, true, oldStatus.isRunning());
+      adoptTaskVoucher(&task);
+      swift_task_enterThreadLocalContext(
+          (char *)&task._private().ExclusivityAccessSet[0]);
+      break;
+    }
+  }
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  return threadPriorityManager.opaquePriority;
+#else
+  return 0;
+#endif
+}
+
+inline void AsyncTask::flagAsRunningImmediately() {
+  // The intention of this function is to only be called in places where
+  // the thread is already set up for the correct base priority. If the
+  // base priority doesn't need to change, dispatch should return zero
+
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  auto threadPriorityManager = ThreadPriorityManager(*this);
+  // It shouldn't be possible for newer stealers to have been enqueued but we
+  // don't know what the original exclusion value was when this task started
+  // running so we can't double check in an assert that it's still accurate
 #endif
 
   auto oldStatus = _private()._status().load(std::memory_order_relaxed);
+
   assert(!oldStatus.isRunning());
   assert(!oldStatus.isComplete());
 
-  uint32_t dispatchOpaquePriority = 0;
+  // We asserted above that the exclusion value is correct
+  // for oldStatus so the dependency record is correct
   if (!oldStatus.hasTaskDependency()) {
-    SWIFT_TASK_DEBUG_LOG("%p->flagAsRunning() with no task dependency", this);
     assert(_private().dependencyRecord == nullptr);
-
-    while (true) {
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-      // If the base priority is not equal to the current override floor then
-      // dispqatch may need to apply the base priority to the thread. If the
-      // current priority is higher than the override floor, then dispatch may
-      // need to apply a self-override. In either case, call into dispatch to
-      // do this.
-      qos_class_t maxTaskPriority = (qos_class_t) oldStatus.getStoredPriority();
-      if (threadOverrideInfo.can_override && (taskBasePriority != qos_class_self() || maxTaskPriority > overrideFloor)) {
-        SWIFT_TASK_DEBUG_LOG("[Override] Self-override thread with oq_floor %#x to match task %p's max priority %#x and base priority %#x",
-                             overrideFloor, this, maxTaskPriority, taskBasePriority);
-
-        uint32_t newDispatchOpaquePriority = swift_dispatch_thread_override_self_with_base(maxTaskPriority, taskBasePriority);
-        if (!dispatchOpaquePriority) {
-          dispatchOpaquePriority = newDispatchOpaquePriority;
-        }
-        overrideFloor = maxTaskPriority;
-      }
-#endif
-      // Set self as executor and remove escalation bit if any - the task's
-      // priority escalation has already been reflected on the thread.
-      auto newStatus = oldStatus.withRunning(true);
-      newStatus = newStatus.withoutStoredPriorityEscalation();
-      newStatus = newStatus.withoutEnqueued();
-
-      if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
-               /* success */ std::memory_order_relaxed,
-               /* failure */ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(this, true, oldStatus.isRunning());
-        adoptTaskVoucher(this);
-        swift_task_enterThreadLocalContext(
-            (char *)&_private().ExclusivityAccessSet[0]);
-        break;
-      }
-    }
-  } else {
-    auto dependencyRecord = _private().dependencyRecord;
-    assert(dependencyRecord != nullptr);
-    SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsRunning() and remove dependencyRecord %p",
-                    this, dependencyRecord);
-
-    removeStatusRecord(this, dependencyRecord, oldStatus, [&](ActiveTaskStatus unused,
-                       ActiveTaskStatus& newStatus) {
-
-#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-      // If the base priority is not equal to the current override floor then
-      // dispqatch may need to apply the base priority to the thread. If the
-      // current priority is higher than the override floor, then dispatch may
-      // need to apply a self-override. In either case, call into dispatch to
-      // do this.
-      qos_class_t maxTaskPriority = (qos_class_t) oldStatus.getStoredPriority();
-      if (threadOverrideInfo.can_override && (taskBasePriority != qos_class_self() || maxTaskPriority > overrideFloor)) {
-        SWIFT_TASK_DEBUG_LOG("[Override] Self-override thread with oq_floor %#x to match task %p's max priority %#x and base priority %#x",
-                             overrideFloor, this, maxTaskPriority, taskBasePriority);
-
-        uint32_t newDispatchOpaquePriority = swift_dispatch_thread_override_self_with_base(maxTaskPriority, taskBasePriority);
-        if (!dispatchOpaquePriority) {
-          dispatchOpaquePriority = newDispatchOpaquePriority;
-        }
-        overrideFloor = maxTaskPriority;
-      }
-#endif
-      // Set self as executor and remove escalation bit if any - the task's
-      // priority escalation has already been reflected on the thread.
-      newStatus = newStatus.withRunning(true);
-      newStatus = newStatus.withoutStoredPriorityEscalation();
-      newStatus = newStatus.withoutEnqueued();
-      newStatus = newStatus.withoutTaskDependency();
-    });
-    this->destroyTaskDependency(dependencyRecord);
-
-    adoptTaskVoucher(this);
-    swift_task_enterThreadLocalContext(
-        (char *)&_private().ExclusivityAccessSet[0]);
+    [[maybe_unused]]
+    uint32_t opaque = taskFlagAsRunningWithoutDependency(*this, true);
+    // In this function, we should always see zero
+    assert(opaque == 0);
+    return;
   }
-  return dispatchOpaquePriority;
+
+  // In this function, the dependency record will always be
+  // accurate and is always a dependency on something other than an
+  // executor. If it was a dependency on an executor, that would
+  // make our assumptions about not racing with stealers invalid
+  auto dependencyRecord = _private().dependencyRecord;
+  SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsRunning() and remove dependencyRecord %p",
+                       this, dependencyRecord);
+  // We can't directly assert that dependencyRecord->DependencyKind
+  // != EnqueuedOnExecutor but that is the expected condition here
+
+  removeStatusRecord(this, dependencyRecord, oldStatus, [&](ActiveTaskStatus oldStatus,
+                                                             ActiveTaskStatus &newStatus) {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+        threadPriorityManager.overrideIfNeeded(oldStatus.getStoredPriority());
+        assert(threadPriorityManager.opaquePriority == 0);
+#endif
+        // Set self as executor and remove escalation bit if any - the task's
+        // priority escalation has already been reflected on the thread.
+        newStatus = newStatus.withRunning(true);
+        newStatus = newStatus.withoutStoredPriorityEscalation();
+        newStatus = newStatus.withoutTaskDependency();
+      });
+
+  this->destroyTaskDependency(dependencyRecord);
+
+  adoptTaskVoucher(this);
+  swift_task_enterThreadLocalContext(
+      (char *)&_private().ExclusivityAccessSet[0]);
+
+  return;
+}
+
+inline std::pair<bool, uint32_t> AsyncTask::flagAsRunning(uint8_t allowedExclusionValue, bool removeEnqueued) {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  auto threadPriorityManager = ThreadPriorityManager(*this);
+
+  SWIFT_TASK_DEBUG_LOG("%p run by stealer %d, exclusion value %d", this, !removeEnqueued, allowedExclusionValue);
+
+  // Stealers are only enabled with priority escalation
+  auto oldStatus = _private()._status().load(std::memory_order_relaxed);
+  if (oldStatus.getStealerExclusionValue() != allowedExclusionValue) {
+    if (removeEnqueued) taskRemoveEnqueued(this);
+    return {false, 0};
+  }
+#else
+  auto oldStatus = _private()._status().load(std::memory_order_relaxed);
+#endif
+
+  assert(!oldStatus.isRunning());
+  assert(!oldStatus.isComplete());
+
+  // We've already checked that the exclusion value is correct for oldStatus
+  // so whether we have a task dependency is correct. If we do not have
+  // one, then we haven't been enqueued so no newer stealer can exist
+  if (!oldStatus.hasTaskDependency()) {
+    assert(_private().dependencyRecord == nullptr);
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    assert(oldStatus.getStealerExclusionValue() == allowedExclusionValue);
+#endif
+    SWIFT_TASK_DEBUG_LOG("flagAsRunning succeeds for %p with no dependency record", this);
+    return {true, taskFlagAsRunningWithoutDependency(*this, true)};
+  }
+
+  // In this case, we were enqueued so we may
+  // race with a stealer and have to bail out
+
+  // The dependency record could be invalid here. If the exclusion value
+  // is allowed, then it will be valid and there will be no races. Thus,
+  // we can't even assert that the record isn't null here (because this
+  // value isn't atomic, if it was, we could bail out early if it was null).
+  auto dependencyRecord = _private().dependencyRecord;
+  SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsRunning() and remove dependencyRecord %p",
+                  this, dependencyRecord);
+
+  if (!removeStatusRecordIf(this, dependencyRecord, oldStatus, [&](ActiveTaskStatus oldStatus,
+                     ActiveTaskStatus &newStatus) {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+        threadPriorityManager.overrideIfNeeded(oldStatus.getStoredPriority());
+#endif
+    // Set self as executor and remove escalation bit if any - the task's
+    // priority escalation has already been reflected on the thread.
+    newStatus = newStatus.withRunning(true);
+    newStatus = newStatus.withoutStoredPriorityEscalation();
+    newStatus = newStatus.withoutTaskDependency();
+    if (removeEnqueued) {
+      newStatus.withoutEnqueued();
+    }
+  }, [&](ActiveTaskStatus toCheck) {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return toCheck.getStealerExclusionValue() == allowedExclusionValue;
+#else
+    return true;
+#endif
+  })) {
+    // Status record not removed
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    threadPriorityManager.resetIfNeeded();
+#endif
+    if (removeEnqueued) {
+      taskRemoveEnqueued(this);
+    }
+    SWIFT_TASK_DEBUG_LOG("flagAsRunning fails for %p on record removal", this);
+    return {false, 0};
+  }
+
+  // Because we got here, we did not bail out early. Thus, the exclusion
+  // value is allowed meaning that the dependencyRecord that we
+  // obtained is correct and has been removed and may now be destroyed
+  this->destroyTaskDependency(dependencyRecord);
+
+  adoptTaskVoucher(this);
+  swift_task_enterThreadLocalContext(
+      (char *)&_private().ExclusivityAccessSet[0]);
+
+  if (removeEnqueued) {
+    taskRemoveEnqueued(this);
+  }
+  SWIFT_TASK_DEBUG_LOG("flagAsRunning succeeds for %p", this);
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  return {true, threadPriorityManager.opaquePriority};
+#else
+  return {true, 0};
+#endif
+}
+
+/// A Job that acts as a proxy for a Task when the Task itself can't be
+/// enqueued. Holds a reference to the Task and an exclusion value that causes
+/// this Job to do nothing if it doesn't match what's in the Task's Status.
+class AsyncTaskStealer : public Job {
+public:
+  AsyncTask *Task;
+  uint8_t ExclusionValue;
+
+  AsyncTaskStealer(AsyncTask *task, JobPriority priority, uint8_t exclusionValue)
+      : Job({JobKind::TaskStealer, priority}, &process),
+        Task(task),
+        ExclusionValue{exclusionValue} {
+    swift_retain(Task);
+  }
+
+  // Implemented in Actor.cpp to make use of taskInvokeWithExclusionValue
+  SWIFT_CC(swiftasync)
+  static void process(Job *job);
+
+  static bool classof(const Job *job) {
+    return job->Flags.getKind() == JobKind::TaskStealer;
+  }
+};
+
+/// Enqueue this task on the provided executor either directly or with a
+/// stealer. This must be called rather than swift_task_enqueue in case
+/// the Task is already directly enqueued. This may only be called when
+/// TaskStatus is locked or otherwise no concurrent calls may be made
+static inline void
+taskEnqueueDirectOrSteal(AsyncTask *task, SerialExecutorRef newExecutor,
+                         bool updateStealerExclusionValue) {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+  SWIFT_TASK_DEBUG_LOG("Starting enqueue for %p on %p",
+                       (void*)task, (void*)newExecutor.getIdentity());
+  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
+  // This is safe to access because we either have the
+  // status locked or aren't dependent on an executor
+  auto needsStealer = oldStatus.isEnqueued();
+  // Async let tasks allocate within their parent's allocator so they may
+  // not outlive their parent which is possible if a stealer is introduced
+  auto allowsStealer = !task->Flags.task_isAsyncLetTask();
+  // Environment variable override to always use stealers
+  // to debug memory usage by Tasks stuck on low-priority
+  // queues: SWIFT_DEBUG_CONCURRENCY_ALWAYS_USE_STEALERS
+  auto forceStealer = runtime::environment::concurrencyAlwaysUseStealers();
+
+  if (forceStealer && allowsStealer) {
+    needsStealer = true;
+  }
+
+  // needsStealer implies allowsStealer
+  SWIFT_TASK_DEBUG_LOG("needsStealer: %d, allowsStealer: %d",
+                       needsStealer, allowsStealer);
+  assert(!needsStealer || allowsStealer);
+
+  ActiveTaskStatus newStatus = oldStatus;
+  // It shouldn't be possible to race here (i.e. none of the values we are
+  // modifying should be modified elsewhere, only different parts of the
+  // status could be modified)
+  do {
+    newStatus = oldStatus;
+    if (updateStealerExclusionValue) {
+      auto currentStealerExclusionValue = oldStatus.getStealerExclusionValue();
+      auto newStealerExclusionValue = currentStealerExclusionValue;
+      if (__builtin_add_overflow(currentStealerExclusionValue, 1,
+                                 &newStealerExclusionValue)) {
+        assert(false && "Somehow overflowed stealer exclusion value");
+      }
+      SWIFT_TASK_DEBUG_LOG("Updating exclusion value from %d to %d",
+                           currentStealerExclusionValue, newStealerExclusionValue);
+
+      newStatus = newStatus.withStealerExclusionValue(newStealerExclusionValue);
+    }
+
+    if (!oldStatus.isEnqueued()) {
+      newStatus = newStatus.withEnqueued();
+      needsStealer = false;
+    } else {
+      needsStealer = true;
+    }
+
+    SWIFT_TASK_DEBUG_LOG(
+        "Needs to update based on %d || %d. Needs stealer %d. Exclusion value is %d",
+        updateStealerExclusionValue, !oldStatus.isEnqueued(), needsStealer,
+        newStatus.getStealerExclusionValue());
+    // This can always be relaxed because it only needs to be read
+    // either by a thread syncronizing with the status lock or someone
+    // reading the stealer which we will later publish on this thread.
+  } while ((updateStealerExclusionValue || !oldStatus.isEnqueued()) &&
+           !task->_private()._status().compare_exchange_weak(
+               oldStatus, newStatus,
+               /*success*/ std::memory_order_relaxed,
+               /*failure*/ std::memory_order_relaxed));
+
+  SWIFT_TASK_DEBUG_LOG("Update value: %d, needsStealer: %d",
+                       updateStealerExclusionValue, needsStealer);
+
+  if (needsStealer) {
+    // It is safe to read LocalStealerExclusionValue here becuase it can only
+    // be written to by this function which can not be called concurrently.
+    if (!forceStealer &&
+        task->_private().LocalStealerExclusionValue ==
+            newStatus.getStealerExclusionValue() - 1) {
+      // This balances with the release in taskInvokeWithExclusionValue
+      // since enqueuing a stealer means that the direct enqueue
+      // may live after the Task completes. We only add a retain
+      // the first time we add a stealer and decrement it once the
+      // direct enqueue discovers that it was not able to run.
+      swift_retain(task);
+    }
+
+    auto *stealer = swift_cxx_newObject<AsyncTaskStealer>(
+        task, static_cast<JobPriority>(newStatus.getStoredPriority()),
+        newStatus.getStealerExclusionValue());
+    SWIFT_TASK_DEBUG_LOG(
+        "Enqueuing stealer %p at priority %#x with exclusion value %d",
+        (void*)stealer, newStatus.getStoredPriority(), stealer->ExclusionValue);
+    swift_task_enqueue(stealer, newExecutor);
+  } else {
+    task->_private().LocalStealerExclusionValue = newStatus.getStealerExclusionValue();
+    swift_task_enqueue(task, newExecutor);
+  }
+#else
+  swift_task_enqueue(task, newExecutor);
+#endif
 }
 
 /// TODO (rokhinip): We need the handoff of the thread to the next executor to
@@ -1111,7 +1452,6 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
   assert(false && "Should not enqueue any tasks to execute in task-to-thread model");
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
   auto oldStatus = _private()._status().load(std::memory_order_relaxed);
-  assert(!oldStatus.isEnqueued());
 
   if (!oldStatus.isRunning() && oldStatus.hasTaskDependency()) {
     // Task went from suspended --> enqueued and has a previous
@@ -1134,7 +1474,9 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
 
       // Remove escalation bits + set enqueued bit
       newStatus = newStatus.withoutStoredPriorityEscalation();
+#if !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
       newStatus = newStatus.withEnqueued();
+#endif
       assert(newStatus.hasTaskDependency());
     });
   } else {
@@ -1147,7 +1489,7 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
     // TODO: do we need to do tracking for task executors...? I guess no since
     // they can't escalate.
     void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
-    TaskDependencyStatusRecord *dependencyRecord = _private().dependencyRecord = ::new (allocation) TaskDependencyStatusRecord(this, newExecutor);
+    TaskDependencyStatusRecord *dependencyRecord = _private().dependencyRecord = ::new (allocation) TaskDependencyStatusRecord(newExecutor);
     SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsAndEnqueueOnExecutor() with dependencyRecord %p", this,
       dependencyRecord);
 
@@ -1156,8 +1498,10 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
 
       newStatus = newStatus.withRunning(false);
       newStatus = newStatus.withoutStoredPriorityEscalation();
-      newStatus = newStatus.withEnqueued();
       newStatus = newStatus.withTaskDependency();
+#if !SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+      newStatus = newStatus.withEnqueued();
+#endif
 
       return true;
     });
@@ -1185,7 +1529,10 @@ AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
       Flags.task_isFuture(), Flags.task_isGroupChildTask(),
       Flags.task_isAsyncLetTask());
 
-  swift_task_enqueue(this, newExecutor);
+  // Even though we are not in the "enqueue stealer" path, this
+  // may still enqueue a stealer because we may have previously
+  // run from a stealer and the original Task is still enqueued.
+  taskEnqueueDirectOrSteal(this, newExecutor, false);
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
 
@@ -1199,7 +1546,7 @@ void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusReco
   auto oldStatus = _private()._status().load(std::memory_order_relaxed);
   // We can only be suspended if we were previously running. See state
   // transitions listed out in Task.h
-  assert(oldStatus.isRunning() && !oldStatus.isEnqueued());
+  assert(oldStatus.isRunning());
 
   addStatusRecord(this, dependencyStatusRecord, oldStatus, [&](ActiveTaskStatus unused,
                   ActiveTaskStatus &newStatus) {
@@ -1219,6 +1566,7 @@ void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusReco
     // published it in the ActiveTaskStatus since someone else could
     // concurrently made us runnable.
     dependencyStatusRecord->performEscalationAction(
+        this,
         oldStatus.getStoredPriority(),
         newStatus.getStoredPriority());
 
@@ -1248,13 +1596,23 @@ inline void AsyncTask::destroyTaskDependency(TaskDependencyStatusRecord *depende
   _private().dependencyRecord = nullptr;
 }
 
+inline AsyncTask *&AsyncTask::getNextWaitingTask() {
+#ifndef NDEBUG
+  auto status = _private()._status().load(std::memory_order_relaxed);
+  assert(status.hasTaskDependency());
+#endif
+  auto *dependency = _private().dependencyRecord;
+  assert(dependency != nullptr);
+  return dependency->getNextWaitingTask();
+}
+
 // this -> task which is suspending
 // Input task -> task we are waiting on
 inline void AsyncTask::flagAsSuspendedOnTask(AsyncTask *task) {
   assert(_private().dependencyRecord == nullptr);
 
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
-  auto record = ::new (allocation) TaskDependencyStatusRecord(this, task);
+  auto record = ::new (allocation) TaskDependencyStatusRecord(task);
   SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on task %p", allocation, task);
   _private().dependencyRecord = record;
 
@@ -1265,7 +1623,7 @@ inline void AsyncTask::flagAsSuspendedOnContinuation(ContinuationAsyncContext *c
   assert(_private().dependencyRecord == nullptr);
 
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
-  auto record = ::new (allocation) TaskDependencyStatusRecord(this, context);
+  auto record = ::new (allocation) TaskDependencyStatusRecord(context);
   SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on continuation %p", allocation, context);
   _private().dependencyRecord = record;
 
@@ -1276,7 +1634,7 @@ inline void AsyncTask::flagAsSuspendedOnTaskGroup(TaskGroup *taskGroup) {
   assert(_private().dependencyRecord == nullptr);
 
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
-  auto record = ::new (allocation) TaskDependencyStatusRecord(this, taskGroup);
+  auto record = ::new (allocation) TaskDependencyStatusRecord(taskGroup);
   SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on taskGroup %p", allocation, taskGroup);
   _private().dependencyRecord = record;
 

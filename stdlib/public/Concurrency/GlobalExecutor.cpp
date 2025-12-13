@@ -141,14 +141,7 @@ bool swift::swift_executor_isComplexEquality(SerialExecutorRef ref) {
 }
 
 uint64_t swift::swift_task_getJobTaskId(Job *job) {
-  if (auto task = dyn_cast<AsyncTask>(job)) {
-    // TaskID is actually:
-    //   32bits of Job's Id
-    // + 32bits stored in the AsyncTask
-    return task->getTaskId();
-  } else {
-    return job->getJobId();
-  }
+  return job->getJobTaskId();
 }
 
 extern "C" void *swift_job_alloc(SwiftJob *job, size_t size) {

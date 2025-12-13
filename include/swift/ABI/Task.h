@@ -77,9 +77,6 @@ class alignas(2 * alignof(void*)) Job :
 public:
   // Indices into SchedulerPrivate, for use by the runtime.
   enum {
-    /// The next waiting task link, an AsyncTask that is waiting on a future.
-    NextWaitingTaskIndex = 0,
-
     // The Dispatch object header is one pointer and two ints, which is
     // equivalent to three pointers on 32-bit and two pointers 64-bit. Set the
     // indexes accordingly so that DispatchLinkageIndex points to where Dispatch
@@ -182,6 +179,10 @@ public:
   void runSimpleInFullyEstablishedContext() {
     return RunJob(this); // 'return' forces tail call
   }
+
+  /// Gets the 32-bit Job ID from the job or the 64-bit
+  /// Task ID if this is an AsyncTask or AsyncTaskStealer
+  uint64_t getJobTaskId() const;
 };
 
 // The compiler will eventually assume these.
@@ -385,7 +386,7 @@ public:
 
   /// Set the task's ID field to the next task ID.
   void setTaskId();
-  uint64_t getTaskId();
+  uint64_t getTaskId() const;
 
   /// Get the task's resume function, for logging purposes only. This will
   /// attempt to see through the various adapters that are sometimes used, and
@@ -430,21 +431,53 @@ public:
   /// Generally this should be done immediately after updating
   /// ActiveTask.
   ///
-  /// When Dispatch is used for the default executor:
-  /// * If the return value is non-zero, it must be passed
-  ///   to swift_dispatch_thread_reset_override_self
-  ///   before returning to the executor.
-  /// * If the return value is zero, it may be ignored or passed to
-  ///   the aforementioned function (which will ignore values of zero).
-  /// The current implementation will always return zero
-  /// if you call flagAsRunning again before calling
-  /// swift_dispatch_thread_reset_override_self with the
-  /// initial value. This supports suspending and immediately
-  /// resuming a Task without returning up the callstack.
+  /// This function returns two values. The first, boolean, value
+  /// reports if the Task was successfully marked as running. The second
+  /// is an opaque value used to later reset some properties of the
+  /// thread. There are two cases described below for their meaning.
   ///
-  /// For all other default executors, flagAsRunning
-  /// will return zero which may be ignored.
-  uint32_t flagAsRunning();
+  /// When Dispatch is used as the default
+  /// executor and priority escalation is enabled:
+  /// * If the opaque value is non-zero, it must be passed
+  ///   to swift_dispatch_thread_reset_override_self.
+  ///   before returning to the executor.
+  /// * If the opaque value is zero, it may be ignored or passed to
+  ///   the aforementioned function (which will ignore values of zero).
+  /// * This function is failable. If this function returns
+  ///   false, no more setup of the environment should be done
+  ///   and runInFullyEstablishedContext must not be called.
+  /// * If this function is being called directly from swift_task_run (i.e.
+  ///   not indirect through an AsyncTaskStealer), then removeEnqueued must
+  ///   be true since the Task must be marked as no longer enqueued on either
+  ///   the success or failure path to allow enqueuing the Task directly
+  ///   again. If this function is being called from an AsyncTaskStealer
+  ///   (we did not dequeue the Task directly), then this argument must
+  ///   be false so that the Task's enqueued status is not changed.
+  /// * If this function is called via an AsyncTaskStealer, the
+  ///   allowedExclusionValue must be the one encoded in the stealer.
+  /// * Otherwise, when this function is called from
+  ///   the Task directly, allowedExclusionValue must be
+  ///   the value encoded in the Task's private data.
+  /// * The exclusion value allows both the Task's intrusive link
+  ///   and one or more AsyncTaskStealers to be enqueued at the same
+  ///   time, with different exclusion values, and all but the one
+  ///   most recently enqueued will have this function return false.
+  ///
+  /// For all other default executors, or
+  /// when priority escalation is not enabled:
+  /// * This function will always return true.
+  /// * allowedExclusionValue is ignored (and is expected to always be zero).
+  /// * The opaque return value will always be zero and may be ignored.
+  std::pair<bool, uint32_t> flagAsRunning(uint8_t allowedExclusionValue, bool removeEnqueued);
+
+  /// This variant of flagAsRunning may be called if you are resumming
+  /// immediately after suspending. That is, you are on the same thread,
+  /// you have not enqueued onto any executor, and you have not called
+  /// swift_dispatch_thread_reset_override_self or done any other
+  /// cleanup work. This is intended for situations such as awaiting
+  /// where you may mark yourself as suspended but find out during
+  /// atomic state update that you may actually resume immediately.
+  void flagAsRunningImmediately();
 
   /// Flag that this task is now suspended with information about what it is
   /// waiting on.
@@ -469,7 +502,7 @@ public:
   /// Check whether this task has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.
   ///
-  /// \param ignoreShield if cancellation shield should be ignored. 
+  /// \param ignoreShield if cancellation shield should be ignored.
   ///        Cancellation shields prevent the observation of the isCancelled flag while active.
   bool isCancelled(bool ignoreShield) const;
 
@@ -537,7 +570,7 @@ public:
   // ==== Cancellation Shields -------------------------------------------------
 
   /// Install a cancellation shield in this task.
-  /// Returns true if the shield was installed, and false if there was already 
+  /// Returns true if the shield was installed, and false if there was already
   /// one active and this action didn't change anything.
   bool cancellationShieldPush();
 
@@ -807,12 +840,10 @@ public:
   }
 
 private:
-  /// Access the next waiting task, which establishes a singly linked list of
-  /// tasks that are waiting on a future.
-  AsyncTask *&getNextWaitingTask() {
-    return reinterpret_cast<AsyncTask *&>(
-        SchedulerPrivate[NextWaitingTaskIndex]);
-  }
+  /// Access the next waiting task, which establishes a singly linked
+  /// list of tasks that are waiting on a future. This function
+  /// assumes that this Task is suspended waiting on a another Task.
+  AsyncTask *&getNextWaitingTask();
 };
 
 // The compiler will eventually assume these.
