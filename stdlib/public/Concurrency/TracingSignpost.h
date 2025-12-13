@@ -130,21 +130,17 @@ inline void actor_deallocate(HeapObject *actor) {
 }
 
 inline void actor_enqueue(HeapObject *actor, Job *job) {
-  if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
-    ENSURE_LOGS();
-    auto id = os_signpost_id_make_with_pointer(ActorLog, actor);
-    os_signpost_event_emit(ActorLog, id, SWIFT_LOG_ACTOR_ENQUEUE_NAME,
-                           "actor=%p task=%" PRId64, actor, task->getTaskId());
-  }
+  ENSURE_LOGS();
+  auto id = os_signpost_id_make_with_pointer(ActorLog, actor);
+  os_signpost_event_emit(ActorLog, id, SWIFT_LOG_ACTOR_ENQUEUE_NAME,
+                         "actor=%p task=%" PRId64, actor, job->getJobTaskId());
 }
 
 inline void actor_dequeue(HeapObject *actor, Job *job) {
-  if (AsyncTask *task = dyn_cast_or_null<AsyncTask>(job)) {
-    ENSURE_LOGS();
-    auto id = os_signpost_id_make_with_pointer(ActorLog, actor);
-    os_signpost_event_emit(ActorLog, id, SWIFT_LOG_ACTOR_DEQUEUE_NAME,
-                           "actor=%p task=%" PRId64, actor, task->getTaskId());
-  }
+  ENSURE_LOGS();
+  auto id = os_signpost_id_make_with_pointer(ActorLog, actor);
+  os_signpost_event_emit(ActorLog, id, SWIFT_LOG_ACTOR_DEQUEUE_NAME,
+                         "actor=%p task=%" PRId64, actor, job->getJobTaskId());
 }
 
 inline void actor_state_changed(HeapObject *actor, Job *firstJob, uint8_t state,
@@ -297,32 +293,26 @@ inline void task_continuation_resume(ContinuationAsyncContext *context,
 }
 
 inline void job_enqueue_global(Job *job) {
-  if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
-    ENSURE_LOGS();
-    auto id = os_signpost_id_make_with_pointer(TaskLog, job);
-    os_signpost_event_emit(TaskLog, id, SWIFT_LOG_JOB_ENQUEUE_GLOBAL_NAME,
-                           "task=%" PRId64, task->getTaskId());
-  }
+  ENSURE_LOGS();
+  auto id = os_signpost_id_make_with_pointer(TaskLog, job);
+  os_signpost_event_emit(TaskLog, id, SWIFT_LOG_JOB_ENQUEUE_GLOBAL_NAME,
+                         "task=%" PRId64, job->getJobTaskId());
 }
 
 inline void job_enqueue_global_with_delay(unsigned long long delay, Job *job) {
-  if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
-    ENSURE_LOGS();
-    auto id = os_signpost_id_make_with_pointer(TaskLog, job);
-    os_signpost_event_emit(
-        TaskLog, id, SWIFT_LOG_JOB_ENQUEUE_GLOBAL_WITH_DELAY_NAME,
-        "task=%" PRId64 " delay=%llu", task->getTaskId(), delay);
-  }
+  ENSURE_LOGS();
+  auto id = os_signpost_id_make_with_pointer(TaskLog, job);
+  os_signpost_event_emit(
+      TaskLog, id, SWIFT_LOG_JOB_ENQUEUE_GLOBAL_WITH_DELAY_NAME,
+      "task=%" PRId64 " delay=%llu", job->getJobTaskId(), delay);
 }
 
 inline void job_enqueue_main_executor(Job *job) {
-  if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
-    ENSURE_LOGS();
-    auto id = os_signpost_id_make_with_pointer(TaskLog, job);
-    os_signpost_event_emit(TaskLog, id,
-                           SWIFT_LOG_JOB_ENQUEUE_MAIN_EXECUTOR_NAME,
-                           "task=%" PRId64, task->getTaskId());
-  }
+  ENSURE_LOGS();
+  auto id = os_signpost_id_make_with_pointer(TaskLog, job);
+  os_signpost_event_emit(TaskLog, id,
+                         SWIFT_LOG_JOB_ENQUEUE_MAIN_EXECUTOR_NAME,
+                         "task=%" PRId64, job->getJobTaskId());
 }
 
 inline job_run_info job_run_begin(Job *job) {
@@ -330,15 +320,12 @@ inline job_run_info job_run_begin(Job *job) {
     return job_run_info{ 0, OS_SIGNPOST_ID_INVALID };
   };
 
-  if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
-    ENSURE_LOGS(invalidInfo());
-    auto handle = os_signpost_id_generate(TaskLog);
-    auto taskId = task->getTaskId();
-    os_signpost_interval_begin(TaskLog, handle, SWIFT_LOG_JOB_RUN_NAME,
-                               "task=%" PRId64, taskId);
-    return { taskId, handle };
-  }
-  return invalidInfo();
+  ENSURE_LOGS(invalidInfo());
+  auto handle = os_signpost_id_generate(TaskLog);
+  auto taskId = job->getJobTaskId();
+  os_signpost_interval_begin(TaskLog, handle, SWIFT_LOG_JOB_RUN_NAME,
+                             "task=%" PRId64, taskId);
+  return { taskId, handle };
 }
 
 inline void job_run_end(job_run_info info) {

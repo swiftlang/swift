@@ -1152,6 +1152,7 @@ Added: _swift_retain_preservemost
 
 // New debug environment variable for the concurrency runtime.
 Added: _concurrencyEnableTaskSlabAllocator
+Added: _concurrencyAlwaysUseStealers
 
 // SE-0489 Better debugDescription for EncodingError and DecodingError
 Added: _$ss13DecodingErrorO16debugDescriptionSSvg

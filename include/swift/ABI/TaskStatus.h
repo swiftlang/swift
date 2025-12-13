@@ -409,35 +409,33 @@ class TaskDependencyStatusRecord : public TaskStatusRecord {
     EnqueuedOnExecutor,
   } DependencyKind;
 
-  // The task that has this task status record - ie a backpointer from the
-  // record to the task with the record. This is not its own +1, we rely on the
-  // fact that since this status record is linked into a task, the task is
-  // already alive and maintained by someone and we can safely borrow the
-  // reference.
-  AsyncTask *WaitingTask;
+  // When the dependency kind is waiting on Task, this pointer contains
+  // the next link in the wait queue of the Task it is waiting on. This
+  // pointer should only be used through the wait queue's functions.
+  AsyncTask *NextWaitingTask;
 
 public:
-  TaskDependencyStatusRecord(AsyncTask *waitingTask, AsyncTask *task) :
+  TaskDependencyStatusRecord(AsyncTask *task) :
     TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
-        DependencyKind(WaitingOnTask), WaitingTask(waitingTask) {
+        DependencyKind(WaitingOnTask) {
       DependentOn.Task = task;
   }
 
-  TaskDependencyStatusRecord(AsyncTask *waitingTask, ContinuationAsyncContext *context) :
+  TaskDependencyStatusRecord(ContinuationAsyncContext *context) :
     TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
-        DependencyKind(WaitingOnContinuation), WaitingTask(waitingTask) {
+        DependencyKind(WaitingOnContinuation) {
       DependentOn.Continuation = context;
   }
 
-  TaskDependencyStatusRecord(AsyncTask *waitingTask, TaskGroup *taskGroup) :
+  TaskDependencyStatusRecord(TaskGroup *taskGroup) :
     TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
-        DependencyKind(WaitingOnTaskGroup), WaitingTask(waitingTask){
+        DependencyKind(WaitingOnTaskGroup) {
       DependentOn.TaskGroup = taskGroup;
   }
 
-  TaskDependencyStatusRecord(AsyncTask *waitingTask, SerialExecutorRef executor) :
+  TaskDependencyStatusRecord(SerialExecutorRef executor) :
     TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
-        DependencyKind(EnqueuedOnExecutor), WaitingTask(waitingTask) {
+        DependencyKind(EnqueuedOnExecutor) {
       DependentOn.Executor = executor;
   }
 
@@ -451,7 +449,10 @@ public:
   }
 
   void performEscalationAction(
-      JobPriority oldPriority, JobPriority newPriority);
+      AsyncTask *task, JobPriority oldPriority, JobPriority newPriority);
+
+  // Assumes that this record is of kind WaitingOnTask
+  AsyncTask *&getNextWaitingTask();
 };
 
 } // end namespace swift
