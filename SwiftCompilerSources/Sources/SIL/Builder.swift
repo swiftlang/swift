@@ -573,8 +573,8 @@ public struct Builder {
     return notifyNew(enumInst.getAs(EnumInst.self))
   }
 
-  static let optionalNoneCaseIndex = 0
-  static let optionalSomeCaseIndex = 1
+  public static let optionalNoneCaseIndex = 0
+  public static let optionalSomeCaseIndex = 1
 
   public func createOptionalNone(type: Type) -> EnumInst {
     return createEnum(caseIndex: Self.optionalNoneCaseIndex, payload: nil, enumType: type)
