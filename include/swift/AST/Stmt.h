@@ -725,6 +725,10 @@ public:
   bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false,
                    bool requireLoadExpr = false) const;
 
+  /// Returns the synthesized RHS for a shorthand if let (eg. `if let x`), or
+  /// null if this element does not represent a shorthand if let.
+  Expr *getSynthesizedShorthandInitOrNull() const;
+
   SourceLoc getStartLoc() const;
   SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const;

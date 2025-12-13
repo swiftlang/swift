@@ -969,6 +969,10 @@ class AsyncConverter : private SourceEntityWalker {
   SmallString<0> Buffer;
   llvm::raw_svector_ostream OS;
 
+  // Any initializer expressions in a shorthand if that we need to skip (as it
+  // points to the same identifier as the declaration itself).
+  llvm::DenseSet<const Expr *> shorthandIfInits;
+
   // Decls where any force unwrap or optional chain of that decl should be
   // elided, e.g for a previously optional closure parameter that has become a
   // non-optional local.

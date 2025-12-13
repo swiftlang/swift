@@ -424,6 +424,11 @@ bool AsyncConverter::walkToDeclPost(Decl *D) {
 #define PLACEHOLDER_START "<#"
 #define PLACEHOLDER_END "#>"
 bool AsyncConverter::walkToExprPre(Expr *E) {
+  // We've already added any shorthand if declaration, don't add its
+  // synthesized initializer as well.
+  if (shorthandIfInits.contains(E))
+    return true;
+
   // TODO: Handle Result.get as well
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *D = DRE->getDecl()) {
@@ -530,6 +535,15 @@ bool AsyncConverter::walkToExprPost(Expr *E) {
 #undef PLACEHOLDER_END
 
 bool AsyncConverter::walkToStmtPre(Stmt *S) {
+  // Keep track of any shorthand initializer expressions
+  if (auto *labeledConditional = dyn_cast<LabeledConditionalStmt>(S)) {
+    for (const auto &condition : labeledConditional->getCond()) {
+      if (auto *init = condition.getSynthesizedShorthandInitOrNull()) {
+        shorthandIfInits.insert(init);
+      }
+    }
+  }
+
   // CaseStmt has an implicit BraceStmt inside it, which *should* start a new
   // scope, so don't check isImplicit here.
   if (startsNewScope(S)) {
