@@ -647,11 +647,11 @@ void BindingSet::inferTransitiveSupertypeBindings() {
       addLiteralRequirement(literal.second.getSource());
 
     // Infer transitive defaults.
-    for (const auto &def : bindings.Defaults) {
-      if (def.getSecond()->getKind() == ConstraintKind::FallbackType)
+    for (auto *def : bindings.Defaults) {
+      if (def->getKind() == ConstraintKind::FallbackType)
         continue;
 
-      addDefault(def.second);
+      addDefault(def);
     }
 
     // TODO: We shouldn't need this in the future.
@@ -838,11 +838,13 @@ bool BindingSet::finalizeKeyPathBindings() {
               (keyPath->getParsedRoot() ||
                (fixedRootTy && !fixedRootTy->isTypeVariableOrMember()))) {
             auto fallback = llvm::find_if(Defaults, [](const auto &entry) {
-              return entry.second->getKind() == ConstraintKind::FallbackType;
+              return entry->getKind() == ConstraintKind::FallbackType;
             });
             assert(fallback != Defaults.end());
             updatedBindings.insert(
-                {fallback->first, AllowedBindingKind::Exact, fallback->second});
+                {(*fallback)->getSecondType(),
+                 AllowedBindingKind::Exact,
+                 *fallback});
           } else {
             updatedBindings.insert(PotentialBinding::forHole(
                 TypeVar, CS.getConstraintLocator(
@@ -1106,10 +1108,10 @@ bool BindingSet::operator==(const BindingSet &other) {
   if (Defaults.size() != other.Defaults.size())
     return false;
 
-  for (auto pair : Defaults) {
-    auto found = other.Defaults.find(pair.first);
-    if (found == other.Defaults.end() ||
-        pair.second != found->second)
+  for (auto i : indices(Defaults)) {
+    auto *x = Defaults[i];
+    auto *y = other.Defaults[i];
+    if (x != y)
       return false;
   }
 
@@ -1271,8 +1273,12 @@ findInferableTypeVars(Type type,
 }
 
 void BindingSet::addDefault(Constraint *constraint) {
-  auto defaultTy = constraint->getSecondType();
-  Defaults.insert({defaultTy->getCanonicalType(), constraint});
+  if (CONDITIONAL_ASSERT_enabled()) {
+    for (auto *other : Defaults) {
+      ASSERT(other != constraint);
+    }
+  }
+  Defaults.push_back(constraint);
 }
 
 bool LiteralRequirement::isCoveredBy(Type type, ConstraintSystem &CS) const {
@@ -2507,8 +2513,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     out << " [defaults: ";
     interleave(
         Defaults,
-        [&](const auto &entry) {
-          auto *constraint = entry.second;
+        [&](Constraint *constraint) {
           auto defaultBinding =
               PrintableBinding::exact(constraint->getSecondType());
           defaultBinding.print(out, PO);

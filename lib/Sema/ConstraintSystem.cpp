@@ -5384,8 +5384,7 @@ TypeVarBindingProducer::TypeVarBindingProducer(const BindingSet &bindings)
     if (viableBindings.size() == 1) {
       addBinding(viableBindings.front());
     } else {
-      for (const auto &entry : bindings.Defaults) {
-        auto *constraint = entry.second;
+      for (auto *constraint : bindings.Defaults) {
         Bindings.push_back(getDefaultBinding(constraint));
       }
     }
@@ -5423,8 +5422,7 @@ TypeVarBindingProducer::TypeVarBindingProducer(const BindingSet &bindings)
   {
     bool noBindings = Bindings.empty();
 
-    for (const auto &entry : bindings.Defaults) {
-      auto *constraint = entry.second;
+    for (auto *constraint : bindings.Defaults) {
       if (noBindings) {
         // If there are no direct or transitive bindings to attempt
         // let's add defaults to the list right away.

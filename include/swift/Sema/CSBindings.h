@@ -380,7 +380,7 @@ public:
   /// before transitive ones.
   llvm::SmallMapVector<ProtocolDecl *, LiteralRequirement, 2> Literals;
 
-  llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
+  llvm::SmallVector<Constraint *, 2> Defaults;
 
   /// The set of transitive protocol requirements inferred through
   /// subtype/conversion/equivalence relations with other type variables.
@@ -505,8 +505,8 @@ public:
       return 1;
 
     auto numDefaultable = llvm::count_if(
-        Defaults, [](const std::pair<CanType, Constraint *> &entry) {
-          return entry.second->getKind() == ConstraintKind::Defaultable;
+        Defaults, [](Constraint *constraint) {
+          return constraint->getKind() == ConstraintKind::Defaultable;
         });
 
     // Short-circuit unviable checks if there are no defaultable bindings.
@@ -518,10 +518,12 @@ public:
     auto unviable =
         llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
           auto type = binding.BindingType->getCanonicalType();
-          auto def = Defaults.find(type);
-          return def != Defaults.end()
-                     ? def->second->getKind() == ConstraintKind::Defaultable
-                     : false;
+          for (auto *constraint : Defaults) {
+            if (constraint->getSecondType()->isEqual(type)) {
+              return constraint->getKind() == ConstraintKind::Defaultable;
+            }
+          }
+          return false;
         });
 
     assert(numDefaultable >= unviable);
