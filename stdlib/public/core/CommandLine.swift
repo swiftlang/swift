@@ -138,7 +138,6 @@ extension CommandLine {
   ///   disk while it is running. If the current executable file is moved, the
   ///   value of this property is not updated to its new path.
   @_unavailableInEmbedded
-  @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   public static var executablePath: String { // NOTE: can't be AEIC and stored!
     // _NSGetExecutablePath() returns non-zero if the provided buffer is too
