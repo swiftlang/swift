@@ -1553,6 +1553,9 @@ void swift::insertDeallocOfCapturedArguments(
     if (!argValue) {
       continue;
     }
+    if (isa<SILUndef>(argValue)) {
+      continue;
+    }
 
     SmallVector<SILBasicBlock *, 4> boundary;
     auto *asi = cast<AllocStackInst>(argValue);
