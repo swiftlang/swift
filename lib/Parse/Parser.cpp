@@ -341,21 +341,15 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserStateBase *SIL,
                PersistentParserState *PersistentState)
     : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState) {}
 
-Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
-               SILParserStateBase *SIL,
-               PersistentParserState *PersistentState)
-    : Parser(
-          std::unique_ptr<Lexer>(new Lexer(
-              SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
-              BufferID, LexerDiags,
-              sourceFileKindToLexerMode(SF.Kind),
-              SF.Kind == SourceFileKind::Main
-                  ? HashbangMode::Allowed
-                  : HashbangMode::Disallowed,
-              SF.getASTContext().LangOpts.AttachCommentsToDecls
-                  ? CommentRetentionMode::AttachToNextToken
-                  : CommentRetentionMode::None)),
-          SF, SIL, PersistentState) {}
+Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine *LexerDiags,
+               SILParserStateBase *SIL, PersistentParserState *PersistentState)
+    : Parser(std::unique_ptr<Lexer>(new Lexer(
+                 SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
+                 BufferID, LexerDiags, sourceFileKindToLexerMode(SF.Kind),
+                 SF.Kind == SourceFileKind::Main ? HashbangMode::Allowed
+                                                 : HashbangMode::Disallowed,
+                 CommentRetentionMode::AttachToNextToken)),
+             SF, SIL, PersistentState) {}
 
 namespace {
 
@@ -1243,12 +1237,10 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
     : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(), "input")) {
 
   std::unique_ptr<Lexer> Lex;
-  Lex.reset(new Lexer(Impl.LangOpts, SM,
-                      BufferID, &Impl.Diags,
-                      LexerMode::Swift,
-                      HashbangMode::Allowed,
-                      CommentRetentionMode::None,
-                      Offset, EndOffset));
+  Lex.reset(new Lexer(Impl.LangOpts, SM, BufferID, &Impl.Diags,
+                      LexerMode::Swift, HashbangMode::Allowed,
+                      CommentRetentionMode::AttachToNextToken, Offset,
+                      EndOffset));
   Impl.TheParser.reset(new Parser(std::move(Lex), *Impl.SF, /*SIL=*/nullptr,
                                   /*PersistentState=*/nullptr));
 }

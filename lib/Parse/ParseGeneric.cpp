@@ -56,7 +56,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
 
     // Parse attributes.
     DeclAttributes attributes;
-    if (Tok.hasComment())
+    if (Tok.hasComment() && shouldAttachCommentToDecl())
       attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
     parseDeclAttributeList(attributes);
 
