@@ -1865,6 +1865,13 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
       std::make_pair(AccessScope::getPublic(), false));
 
   bool isSetter = false;
+  if (match.Witness->isAccessibleFrom(requiredAccessLevel.getDeclContext(),
+                                      true) &&
+      !match.Witness->isAccessibleFrom(requiredAccessLevel.getDeclContext(),
+                                       false)) {
+    return RequirementCheck(CheckKind::AccessStrict, requiredAccessLevel,
+                            isSetter);
+  }
   if (checkWitnessAccess(DC, requirement, match.Witness, &isSetter))
     return RequirementCheck(requiredAccessLevel, isSetter);
 
@@ -4414,7 +4421,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     switch (check.getKind()) {
     case CheckKind::Success:
       break;
-
+    case CheckKind::AccessStrict:
     case CheckKind::Access: {
       // Swift 4.2 relaxed some rules for protocol witness matching.
       //
@@ -4446,14 +4453,15 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         auto diagKind = protoForcesAccess
                           ? diag::witness_not_accessible_proto
                           : diag::witness_not_accessible_type;
+        if (check.getKind() == CheckKind::AccessStrict)
+          diagKind = diag::witness_not_accessible_strict_check;
         bool isSetter = check.isForSetterAccess();
 
         auto &diags = DC->getASTContext().Diags;
         diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
                        diagKind, getProtocolRequirementKind(requirement),
                        witness, isSetter, requiredAccess,
-                       protoAccessScope.accessLevelForDiagnostics(),
-                       proto);
+                       protoAccessScope.accessLevelForDiagnostics(), proto);
 
         auto *decl = dyn_cast<AbstractFunctionDecl>(witness);
         if (decl && decl->isSynthesized())

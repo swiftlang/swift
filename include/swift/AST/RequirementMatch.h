@@ -218,6 +218,9 @@ enum class CheckKind : unsigned {
   /// The witness is less accessible than the requirement.
   Access,
 
+  /// Strict check for access holes making swiftinterface not usable
+  AccessStrict,
+
   /// The witness needs to be @usableFromInline.
   UsableFromInline,
 
@@ -266,7 +269,12 @@ public:
   }
 
   RequirementCheck(AccessScope requiredAccessScope, bool forSetter)
-      : Kind(CheckKind::Access), Access{requiredAccessScope, forSetter} {}
+      : RequirementCheck(CheckKind::Access, requiredAccessScope, forSetter) {}
+
+  // Exists specifically for AccessStrict
+  RequirementCheck(CheckKind accessKind, AccessScope requiredAccessScope,
+                   bool forSetter)
+      : Kind(accessKind), Access{requiredAccessScope, forSetter} {}
 
   RequirementCheck(AvailabilityConstraint constraint,
                    AvailabilityContext requiredContext)
@@ -291,7 +299,7 @@ public:
   /// The required access scope for checks that failed due to the witness being
   /// less accessible than the requirement.
   AccessScope getRequiredAccessScope() const {
-    ASSERT(Kind == CheckKind::Access);
+    ASSERT(Kind == CheckKind::Access || Kind == CheckKind::AccessStrict);
     return Access.requiredScope;
   }
 
