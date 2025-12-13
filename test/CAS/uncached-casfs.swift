@@ -9,9 +9,9 @@
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd -b %t/header.cmd
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader > %t/header.cmd
-// RUN: %target-swift-frontend @%t/header.cmd %t/base/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch
+// RUN: %target-swift-frontend-plain @%t/header.cmd %t/base/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
-// RUN:   %target-swift-frontend @%t/header.cmd %t/base/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch > %t/keys.json
+// RUN:   %target-swift-frontend-plain @%t/header.cmd %t/base/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch > %t/keys.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json > %t/key
 
 // RUN: echo "\"-disable-implicit-string-processing-module-import\"" >> %t/MyApp.cmd
@@ -25,7 +25,7 @@
 
 // RUN: sed -e "s@VFS_DIR@%{/t:regex_replacement}/base@g" -e "s@EXTERNAL_DIR@%{/t:regex_replacement}/modified@g" %t/base.yaml > %t/overlay.yaml
 
-// RUN: %target-swift-frontend %t/base/test.swift %t/base/foo.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
+// RUN: %target-swift-frontend-plain %t/base/test.swift %t/base/foo.swift -O -emit-module -emit-module-path %t/Test.swiftmodule -c \
 // RUN:  -module-name Test -o %t/test.o -cas-path %t/cas @%t/MyApp.cmd -vfsoverlay %t/overlay.yaml -module-import-from-cas
 
 

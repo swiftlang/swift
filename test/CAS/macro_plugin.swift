@@ -15,7 +15,7 @@
 // RUN:   %S/../Macros/Inputs/syntax_macro_definitions.swift \
 // RUN:   -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-name MyApp -module-cache-path %t/clang-module-cache -O \
+// RUN: %target-swift-frontend-plain -scan-dependencies -module-load-mode prefer-serialized -module-name MyApp -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %s -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -load-plugin-library %t/plugins/%target-library-name(MacroDefinition)
 
@@ -25,7 +25,7 @@
 // FS: MacroDefinition
 
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -typecheck -verify -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -module-name MyApp -O \
 // RUN:   -load-plugin-library %t/plugins/%target-library-name(MacroDefinition) \
