@@ -2706,6 +2706,15 @@ public:
       if (!PBD->isInitialized(i))
         continue;
 
+      if (PBD->isInitializerSubsumed(i)) {
+        auto *var = PBD->getSingleVar();
+        // The initializer of a property wrapped variable gets transferred
+        // the synthesized backing storage property, let have it contextualized
+        // there.
+        if (var && var->hasAttachedPropertyWrapper())
+          continue;
+      }
+
       if (!PBD->isInitializerChecked(i)) {
         TypeCheckExprOptions options;
 
