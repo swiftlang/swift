@@ -18,7 +18,10 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/CXXInheritance.h"
+#include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Overload.h"
@@ -62,23 +65,22 @@ static CxxStdType identifyCxxStdTypeByName(StringRef name) {
 
 static const clang::TypeDecl *
 lookupCxxTypeMember(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
-                    StringRef name) {
+                    StringRef name, bool mustBeComplete = false) {
   auto R = clang::LookupResult(Sema, &Sema.PP.getIdentifierTable().get(name),
                                clang::SourceLocation(),
                                clang::Sema::LookupMemberName);
   R.suppressDiagnostics();
-
   auto *Ctx = static_cast<const clang::DeclContext *>(Rec);
   Sema.LookupQualifiedName(R, const_cast<clang::DeclContext *>(Ctx));
 
-  if (R.isSingleResult()) {
+  if (auto *td = R.getAsSingle<clang::TypeDecl>()) {
     if (auto *paths = R.getBasePaths();
-        paths && R.getBasePaths()->front().Access != clang::AS_public)
+        paths && paths->front().Access != clang::AS_public)
       return nullptr;
-
-    for (auto *nd : R)
-      if (auto *td = dyn_cast<clang::TypeDecl>(nd))
-        return td;
+    if (mustBeComplete &&
+        !Sema.isCompleteType({}, td->getASTContext().getTypeDeclType(td)))
+      return nullptr;
+    return td;
   }
   return nullptr;
 }
@@ -993,59 +995,66 @@ static void conformToCxxSet(ClangImporter::Implementation &impl,
                             bool isUniqueSet) {
   PrettyStackTraceDecl trace("conforming to CxxSet", decl);
   ASTContext &ctx = decl->getASTContext();
+  clang::Sema &clangSema = impl.getClangSema();
 
-  auto valueType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("value_type"));
-  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("size_type"));
-  if (!valueType || !sizeType)
+  // Look up the type members we need from Clang
+  //
+  // N.B. we don't actually need const_iterator for multiset, but it should be
+  // there. If it's not there for any reason, we should probably bail out.
+
+  auto *size_type = lookupCxxTypeMember(clangSema, clangDecl, "size_type",
+                                        /*mustBeComplete=*/true);
+  auto *value_type = lookupCxxTypeMember(clangSema, clangDecl, "value_type",
+                                         /*mustBeComplete=*/true);
+  auto *iterator = lookupCxxTypeMember(clangSema, clangDecl, "iterator",
+                                           /*mustBeComplete=*/true);
+  auto *const_iterator =
+      lookupCxxTypeMember(clangSema, clangDecl, "const_iterator",
+                          /*mustBeComplete=*/true);
+  if (!size_type || !value_type || !iterator || !const_iterator)
     return;
 
-  auto insert = getInsertFunc(decl, valueType);
-  if (!insert)
+  // We've looked up everything we need from Clang for the conformance.
+  // Now, use ClangImporter to convert those to types in Swift.
+
+  auto *Size = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(size_type, impl.CurrentVersion));
+  auto *Value = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(value_type, impl.CurrentVersion));
+  if (!Size || !Value)
     return;
+
+  // These are not needed for multiset, i.e., when isUniqueSet = false
+  TypeAliasDecl *RawMutableIterator, *RawIterator;
+  if (isUniqueSet) {
+    RawMutableIterator = dyn_cast_or_null<TypeAliasDecl>(
+        impl.importDecl(iterator, impl.CurrentVersion));
+    RawIterator = dyn_cast_or_null<TypeAliasDecl>(
+        impl.importDecl(const_iterator, impl.CurrentVersion));
+    if (!RawMutableIterator || !RawIterator)
+      return;
+  }
+
+  // We have our Swift types, synthesize type aliases and conformances
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
-                               valueType->getUnderlyingType());
+                               Value->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.Id_ArrayLiteralElement,
-                               valueType->getUnderlyingType());
+                               Value->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
-                               sizeType->getUnderlyingType());
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("InsertionResult"),
-                               insert->getResultInterfaceType());
+                               Size->getUnderlyingType());
+  // The type checker can infer this from the return type of insert()
+  // impl.addSynthesizedTypealias(decl, ctx.getIdentifier("InsertionResult"),
+  //                              InsertionResult);
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSet});
 
-  ProtocolDecl *cxxInputIteratorProto =
-      ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
-  if (!cxxInputIteratorProto)
-    return;
-
-  auto rawIteratorType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("const_iterator"));
-  auto rawMutableIteratorType =
-      lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-          decl, ctx.getIdentifier("iterator"));
-  if (!rawIteratorType || !rawMutableIteratorType)
-    return;
-
-  auto rawIteratorTy = rawIteratorType->getUnderlyingType();
-  auto rawMutableIteratorTy = rawMutableIteratorType->getUnderlyingType();
-
-  if (!checkConformance(rawIteratorTy, cxxInputIteratorProto) ||
-      !checkConformance(rawMutableIteratorTy, cxxInputIteratorProto))
-    return;
-
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
-                               rawIteratorTy);
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
-                               rawMutableIteratorTy);
-
-  // Synthesize conformance to CxxUniqueSet if the caller asked for it
-  // (if decl is std::set or std::unordered_set, but not std::multiset)
-  if (!isUniqueSet)
-    return;
-
-  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxUniqueSet});
+  if (isUniqueSet) {
+    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
+                                 RawIterator->getUnderlyingType());
+    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
+                                 RawMutableIterator->getUnderlyingType());
+    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxUniqueSet});
+  }
 }
 
 static void conformToCxxPair(ClangImporter::Implementation &impl,
