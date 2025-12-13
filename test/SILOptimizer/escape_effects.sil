@@ -414,3 +414,12 @@ bb0(%0 : $*Wrapper):
   %2 = struct_element_addr %0, #Wrapper._k
   return %2
 }
+
+sil [ossa] @call_mutate_accessor : $@convention(thin) (@inout Wrapper, @owned Klass) -> () {
+bb0(%0 : $*Wrapper, %1 : @owned $Klass):
+  %func = function_ref @mutate_accessor : $@convention(thin) (@inout Wrapper) -> @inout Klass
+  %addr = apply %func(%0) : $@convention(thin) (@inout Wrapper) -> @inout Klass
+  store %1 to [assign] %addr
+  %r = tuple ()
+  return %r
+}

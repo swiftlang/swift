@@ -280,8 +280,8 @@ ERROR(lookup_outputs_dont_match,none,
 // MARK: Accessor diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(accessor_not_supported_in_decl,none,
-      "%0 is supported only on a struct or enum", (StringRef))      
+ERROR(borrow_mutate_accessor_not_supported_in_decl, none,
+      "%0 is supported only on a struct", (StringRef))      
 
 //------------------------------------------------------------------------------
 // MARK: bridged diagnostics

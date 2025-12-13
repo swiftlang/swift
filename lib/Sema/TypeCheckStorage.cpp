@@ -4324,16 +4324,22 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   if (borrow || mutate) {
     if (auto *extDecl = dyn_cast<ExtensionDecl>(DC)) {
       auto extNominal = extDecl->getExtendedNominal();
-      if (!isa<StructDecl>(extNominal) && !isa<EnumDecl>(extNominal)) {
+      if (!isa<StructDecl>(extNominal)) {
         if (borrow) {
           storage->getASTContext().Diags.diagnose(
-              borrow->getLoc(), diag::accessor_not_supported_in_decl,
-              "a borrow accessor");
+              borrow->getLoc(),
+              diag::borrow_mutate_accessor_not_supported_in_decl,
+              getAccessorNameForDiagnostic(borrow->getAccessorKind(),
+                                           /*article*/ true,
+                                           /*underscored*/ false));
         }
         if (mutate) {
           storage->getASTContext().Diags.diagnose(
-              mutate->getLoc(), diag::accessor_not_supported_in_decl,
-              "a mutate accessor");
+              mutate->getLoc(),
+              diag::borrow_mutate_accessor_not_supported_in_decl,
+              getAccessorNameForDiagnostic(mutate->getAccessorKind(),
+                                           /*article*/ true,
+                                           /*underscored*/ false));
         }
       }
     }
