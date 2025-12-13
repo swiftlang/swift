@@ -574,6 +574,11 @@ public:
   /// requirements down the subtype or equivalence chain.
   void inferTransitiveProtocolRequirements();
 
+  /// Try to coalesce integer and floating point literal protocols
+  /// if they appear together because the only possible default type that
+  /// could satisfy both requirements is `Double`.
+  void coalesceIntegerAndFloatLiteralRequirements();
+
   /// Check whether the given binding set covers any of the literal protocols
   /// associated with this type variable. The idea is that if a type variable
   /// has a binding like Int and also it has a conformance requirement to

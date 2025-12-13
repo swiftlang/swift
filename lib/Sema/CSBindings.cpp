@@ -1031,19 +1031,18 @@ void BindingSet::determineLiteralCoverage() {
   }
 }
 
-void BindingSet::addLiteralRequirement(Constraint *constraint) {
-  auto *protocol = constraint->getProtocol();
+void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
+  for (const auto &pair : Literals) {
+    auto *protocol = pair.first;
 
-  // Let's try to coalesce integer and floating point literal protocols
-  // if they appear together because the only possible default type that
-  // could satisfy both requirements is `Double`.
-  {
     if (protocol->isSpecificProtocol(
             KnownProtocolKind::ExpressibleByIntegerLiteral)) {
       auto *floatLiteral = CS.getASTContext().getProtocol(
           KnownProtocolKind::ExpressibleByFloatLiteral);
-      if (Literals.count(floatLiteral))
+      if (Literals.count(floatLiteral)) {
+        Literals.erase(protocol);
         return;
+      }
     }
 
     if (protocol->isSpecificProtocol(
@@ -1051,8 +1050,13 @@ void BindingSet::addLiteralRequirement(Constraint *constraint) {
       auto *intLiteral = CS.getASTContext().getProtocol(
           KnownProtocolKind::ExpressibleByIntegerLiteral);
       Literals.erase(intLiteral);
+      return;
     }
   }
+}
+
+void BindingSet::addLiteralRequirement(Constraint *constraint) {
+  auto *protocol = constraint->getProtocol();
 
   if (Literals.count(protocol) > 0)
     return;
@@ -1234,6 +1238,9 @@ const BindingSet *ConstraintSystem::determineBestBindings(
     if (!bestBindings || bindings < *bestBindings)
       bestBindings = &bindings;
   }
+
+  if (bestBindings)
+    bestBindings->coalesceIntegerAndFloatLiteralRequirements();
 
   return bestBindings;
 }
@@ -1672,6 +1679,7 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
   (void) bindings.finalizeKeyPathBindings();
   bindings.finalizeUnresolvedMemberChainResult();
   bindings.determineLiteralCoverage();
+  bindings.coalesceIntegerAndFloatLiteralRequirements();
 
   return bindings;
 }
