@@ -631,7 +631,6 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
                         [mainModuleName](StringRef Name) {
                           return mainModuleName == Name;
                         }))
-        if (ScanASTContext.LangOpts.Target.getOS() == llvm::Triple::Win32)
           mainDependencies.addModuleImport(ScanASTContext.Id_CxxStdlib.str(),
                                            /* isExported */ false,
                                            AccessLevel::Public,
