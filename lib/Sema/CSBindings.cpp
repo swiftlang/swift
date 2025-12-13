@@ -43,7 +43,7 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
     : CS(CS), TypeVar(TypeVar), Info(info) {
 
   for (const auto &binding : info.Bindings)
-    addBinding(binding, /*isTransitive=*/false);
+    introduceBinding(binding, /*isTransitive=*/false);
 
   for (auto *constraint : info.Constraints) {
     switch (constraint->getKind()) {
@@ -596,7 +596,7 @@ void BindingSet::inferTransitiveKeyPathBindings() {
 
                 // Copy the bindings over to the root.
                 for (const auto &binding : bindings.Bindings)
-                  addBinding(binding, /*isTransitive=*/true);
+                  introduceBinding(binding, /*isTransitive=*/true);
 
                 // Make a note that the key path root is transitively adjacent
                 // to contextual root type variable and all of its variables.
@@ -606,7 +606,7 @@ void BindingSet::inferTransitiveKeyPathBindings() {
                                     bindings.AdjacentVars.end());
               }
             } else {
-              addBinding(
+              introduceBinding(
                   binding.withSameSource(inferredRootTy, AllowedBindingKind::Exact),
                   /*isTransitive=*/true);
             }
@@ -679,7 +679,7 @@ void BindingSet::inferTransitiveSupertypeBindings() {
       if (ConstraintSystem::typeVarOccursInType(TypeVar, type))
         continue;
 
-      addBinding(binding.withSameSource(type, AllowedBindingKind::Supertypes),
+      introduceBinding(binding.withSameSource(type, AllowedBindingKind::Supertypes),
                  /*isTransitive=*/true);
     }
   }
@@ -713,7 +713,7 @@ void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
                   continue;
             }
 
-            addBinding({protocolTy, AllowedBindingKind::Exact, constraint},
+            introduceBinding({protocolTy, AllowedBindingKind::Exact, constraint},
                        /*isTransitive=*/false);
           }
         }
@@ -889,7 +889,22 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
   }
 }
 
-void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
+void BindingSet::addBinding(const PotentialBinding &&binding) {
+   SmallPtrSet<TypeVariableType *, 4> referencedVars;
+   binding.BindingType->getTypeVariables(referencedVars);
+
+   addBinding(std::move(binding), referencedVars);
+}
+
+void BindingSet::addBinding(const PotentialBinding &&binding,
+                            SmallPtrSetImpl<TypeVariableType *> &referencedVars) {
+  for (auto *adjacentVar : referencedVars)
+    AdjacentVars.insert(adjacentVar);
+
+  (void)Bindings.insert(binding);
+}
+
+void BindingSet::introduceBinding(PotentialBinding binding, bool isTransitive) {
   if (Bindings.count(binding))
     return;
 
@@ -944,6 +959,57 @@ void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
     }
   }
 
+  // If the type variable prefers subtypes, diasambiguate a situation
+  // when this type variable is simultaneously a supertype of `@Sendable`
+  // function type and a subtype of a non-Sendable one by using a supertype
+  // binding because it constitutes a "subtype" in this case.
+  //
+  // For example:
+  //
+  // @Sendable () -> Void conv $T
+  // $T argument conv () -> Void
+  //
+  // Either of the types could also be wrapped in a number of optionals. Even if
+  // there is an optionality mismatch, let's still prefer a supertype binding
+  // because that would be easier to diagnose.
+  //
+  // In particular, this is helpful with ternary operators where the context is
+  // non-Sendable, but one or both sides are.
+  if (TypeVar->getImpl().prefersSubtypeBinding()) {
+    if (auto *funcType = binding.BindingType->lookThroughAllOptionalTypes()
+                             ->getAs<FunctionType>()) {
+      if (binding.Kind == AllowedBindingKind::Supertypes &&
+          funcType->isSendable()) {
+        // Note that we are removing the bindings but leaving AdjacentVars
+        // intact to make sure that this doesn't affect assessment of the
+        // binding set i.e. \c involvesTypeVariables.
+        Bindings.remove_if([](const PotentialBinding &existing) {
+          if (existing.Kind != AllowedBindingKind::Subtypes)
+            return false;
+
+          auto *existingFn = existing.BindingType->lookThroughAllOptionalTypes()
+                                 ->getAs<FunctionType>();
+          return existingFn && !existingFn->isSendable();
+        });
+      }
+
+      // If there are existing `@Sendable` supertype bindings, we can skip this
+      // one.
+      if (binding.Kind == AllowedBindingKind::Subtypes &&
+          !funcType->isSendable()) {
+        if (llvm::any_of(Bindings, [](const PotentialBinding &existing) {
+              if (existing.Kind != AllowedBindingKind::Supertypes)
+                return false;
+              auto *existingFn =
+                  existing.BindingType->lookThroughAllOptionalTypes()
+                      ->getAs<FunctionType>();
+              return existingFn && existingFn->isSendable();
+            }))
+          return;
+      }
+    }
+  }
+
   // If this is a non-defaulted supertype binding,
   // check whether we can combine it with another
   // supertype binding by computing the 'join' of the types.
@@ -976,7 +1042,7 @@ void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
     }
 
     for (const auto &binding : joined)
-      (void)Bindings.insert(binding);
+      addBinding(std::move(binding));
 
     // If new binding has been joined with at least one of existing
     // bindings, there is no reason to include it into the set.
@@ -984,10 +1050,7 @@ void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
       return;
   }
 
-  for (auto *adjacentVar : referencedTypeVars)
-    AdjacentVars.insert(adjacentVar);
-
-  (void)Bindings.insert(std::move(binding));
+  addBinding(std::move(binding), referencedTypeVars);
 }
 
 void BindingSet::determineLiteralCoverage() {
