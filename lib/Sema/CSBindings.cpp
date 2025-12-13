@@ -38,6 +38,16 @@ void ConstraintGraphNode::initBindingSet() {
   Set.emplace(CG.getConstraintSystem(), TypeVar, Potential);
 }
 
+static bool isDirectRequirement(ConstraintSystem &cs,
+                                TypeVariableType *typeVar,
+                                Constraint *constraint) {
+  if (auto *other = constraint->getFirstType()->getAs<TypeVariableType>()) {
+    return typeVar == cs.getRepresentative(other);
+  }
+
+  return false;
+}
+
 BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
                        const PotentialBindings &info)
     : CS(CS), TypeVar(TypeVar), Info(info) {
@@ -54,10 +64,8 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
     case ConstraintKind::Defaultable:
     case ConstraintKind::FallbackType:
       // Do these in a separate pass.
-      if (CS.getFixedTypeRecursive(constraint->getFirstType(), true)
-              ->getAs<TypeVariableType>() == TypeVar) {
+      if (isDirectRequirement(CS, TypeVar, constraint))
         addDefault(constraint);
-      }
       break;
 
     default:
@@ -1049,16 +1057,7 @@ void BindingSet::addLiteralRequirement(Constraint *constraint) {
   if (Literals.count(protocol) > 0)
     return;
 
-  auto isDirectRequirement = [&](Constraint *constraint) -> bool {
-    if (auto *typeVar = constraint->getFirstType()->getAs<TypeVariableType>()) {
-      auto *repr = CS.getRepresentative(typeVar);
-      return repr == TypeVar;
-    }
-
-    return false;
-  };
-
-  bool isDirect = isDirectRequirement(constraint);
+  bool isDirect = isDirectRequirement(CS, TypeVar, constraint);
 
   Type defaultType;
   // `ExpressibleByNilLiteral` doesn't have a default type.
