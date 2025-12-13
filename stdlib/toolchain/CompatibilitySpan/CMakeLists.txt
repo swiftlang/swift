@@ -2,6 +2,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND DEFINED SWIFT_STDLIB_LIBRARY_BUILD_TY
 
   set(library_name "swiftCompatibilitySpan")
 
+  # The correct fix would be to add this to the following to the invocation of add_swift_target_library
+  # DEPLOYMENT_VERSION_MACCATALYST ${COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_MACCATALYST}
+  # but the underlying logic takes the deployment version from the cache instead
+  # so for now we override those values locally
+  set(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX "10.14.4")
+  set(SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST "13.1")
+
   add_swift_target_library("${library_name}" ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
     FakeStdlib.swift
     ../../public/core/Span/MutableRawSpan.swift
@@ -12,8 +19,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND DEFINED SWIFT_STDLIB_LIBRARY_BUILD_TY
     ../../public/core/Span/Span.swift
 
     TARGET_SDKS ${SWIFT_APPLE_PLATFORMS}
-
-    LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
     SWIFT_COMPILE_FLAGS
       ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
@@ -28,7 +33,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND DEFINED SWIFT_STDLIB_LIBRARY_BUILD_TY
     DEPLOYMENT_VERSION_TVOS "12.2"
     DEPLOYMENT_VERSION_WATCHOS "5.2"
     DEPLOYMENT_VERSION_XROS "1.0"
-    DEPLOYMENT_VERSION_MACCATALYST "13.1"
 
     MACCATALYST_BUILD_FLAVOR "zippered"
 
