@@ -61,16 +61,15 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
       addLiteralRequirement(constraint);
       break;
 
-    case ConstraintKind::Defaultable:
-    case ConstraintKind::FallbackType:
-      // Do these in a separate pass.
-      if (isDirectRequirement(CS, TypeVar, constraint))
-        addDefault(constraint);
-      break;
-
     default:
       break;
     }
+  }
+
+  for (auto *constraint : info.Defaults) {
+    // Do these in a separate pass.
+    if (isDirectRequirement(CS, TypeVar, constraint))
+      addDefault(constraint);
   }
 
   for (auto &entry : info.AdjacentVars)
@@ -2090,9 +2089,12 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
   case ConstraintKind::LiteralConformsTo:
+    // Constraints from which we can't do anything.
+    break;
+
   case ConstraintKind::Defaultable:
   case ConstraintKind::FallbackType:
-    // Constraints from which we can't do anything.
+    Defaults.push_back(constraint);
     break;
 
   // For now let's avoid inferring protocol requirements from
@@ -2236,6 +2238,10 @@ void PotentialBindings::retract(ConstraintSystem &CS,
   Protocols.erase(
       llvm::remove_if(Protocols, CALLBACK(RetractedProtocol)),
       Protocols.end());
+
+  Defaults.erase(
+      llvm::remove_if(Defaults, CALLBACK(RetractedDefault)),
+      Defaults.end());
 
 #define PAIR_CALLBACK(ChangeKind)                                              \
   [&](std::pair<TypeVariableType *, Constraint *> pair) {                      \

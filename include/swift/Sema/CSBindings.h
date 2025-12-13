@@ -248,6 +248,9 @@ struct PotentialBindings {
   /// The set of protocol conformance requirements imposed on this type variable.
   llvm::SmallVector<Constraint *, 4> Protocols;
 
+  /// The set of fallback constraints imposed on this type variable.
+  llvm::SmallVector<Constraint *, 2> Defaults;
+
   ASTNode AssociatedCodeCompletionToken = ASTNode();
 
   /// Add a potential binding to the list of bindings,
