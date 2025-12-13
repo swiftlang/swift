@@ -501,6 +501,8 @@ public struct PartialRangeUpTo<Bound: Comparable> {
   public init(_ upperBound: Bound) { self.upperBound = upperBound }
 }
 
+extension PartialRangeUpTo: BitwiseCopyable where Bound: BitwiseCopyable {}
+
 extension PartialRangeUpTo: RangeExpression {
   @_transparent
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
@@ -558,6 +560,8 @@ public struct PartialRangeThrough<Bound: Comparable> {
   @inlinable // trivial-implementation
   public init(_ upperBound: Bound) { self.upperBound = upperBound }
 }
+
+extension PartialRangeThrough: BitwiseCopyable where Bound: BitwiseCopyable {}
 
 extension PartialRangeThrough: RangeExpression {
   @_transparent
@@ -676,6 +680,8 @@ public struct PartialRangeFrom<Bound: Comparable> {
   public init(_ lowerBound: Bound) { self.lowerBound = lowerBound }
 }
 
+extension PartialRangeFrom: BitwiseCopyable where Bound: BitwiseCopyable {}
+
 extension PartialRangeFrom: RangeExpression {
   @_transparent
   public func relative<C: Collection>(
@@ -722,6 +728,9 @@ extension PartialRangeFrom: Sequence
     return Iterator(_current: lowerBound) 
   }
 }
+
+extension PartialRangeFrom.Iterator: BitwiseCopyable
+  where Bound: BitwiseCopyable {}
 
 @_unavailableInEmbedded
 extension PartialRangeFrom: Decodable where Bound: Decodable {
@@ -1108,6 +1117,8 @@ extension Range {
     lowerBound <= other.lowerBound && upperBound > other.upperBound
   }
 }
+
+extension Range: BitwiseCopyable where Bound: BitwiseCopyable {}
 
 // Note: this is not for compatibility only, it is considered a useful
 // shorthand. TODO: Add documentation
