@@ -241,6 +241,9 @@ struct PotentialBindings {
   llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> SupertypeOf;
   llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
 
+  /// The set of protocol conformance requirements imposed on this type variable.
+  llvm::SmallVector<Constraint *, 4> Protocols;
+
   ASTNode AssociatedCodeCompletionToken = ASTNode();
 
   /// Add a potential binding to the list of bindings,
@@ -254,6 +257,10 @@ struct PotentialBindings {
           return subtype.first == typeVar &&
                  subtype.second->getKind() == ConstraintKind::Subtype;
         });
+  }
+
+  ArrayRef<Constraint *> getConformanceRequirements() const {
+    return Protocols;
   }
 
 private:
@@ -364,9 +371,6 @@ class BindingSet {
 
 public:
   swift::SmallSetVector<PotentialBinding, 4> Bindings;
-
-  /// The set of protocol conformance requirements placed on this type variable.
-  llvm::SmallVector<Constraint *, 4> Protocols;
 
   /// The set of unique literal protocol requirements placed on this
   /// type variable or inferred transitively through subtype chains.
@@ -492,10 +496,6 @@ public:
   /// to attempt.
   bool isViable() const {
     return hasViableBindings() || isDirectHole();
-  }
-
-  ArrayRef<Constraint *> getConformanceRequirements() const {
-    return Protocols;
   }
 
   unsigned getNumViableLiteralBindings() const;

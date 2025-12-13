@@ -197,7 +197,9 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
                                                      CTP_Initialization)));
 
     auto &bindings = inferBindings(cs, typeVar);
-    ASSERT_TRUE(bindings.getConformanceRequirements().empty());
+    ASSERT_TRUE(cs.getConstraintGraph()[typeVar]
+                  .getPotentialBindings().getConformanceRequirements().empty());
+
     ASSERT_TRUE(bool(bindings.TransitiveProtocols));
     verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
                                    {protocolTy1});
@@ -218,8 +220,10 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
     cs.addConstraint(ConstraintKind::Conversion, typeVar, GPT1,
                      cs.getConstraintLocator({}));
 
+    ASSERT_TRUE(cs.getConstraintGraph()[typeVar]
+                  .getPotentialBindings().getConformanceRequirements().empty());
+
     auto &bindings = inferBindings(cs, typeVar);
-    ASSERT_TRUE(bindings.getConformanceRequirements().empty());
     ASSERT_TRUE(bool(bindings.TransitiveProtocols));
     verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
                                    {protocolTy1, protocolTy2});

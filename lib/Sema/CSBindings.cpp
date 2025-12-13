@@ -47,12 +47,6 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
 
   for (auto *constraint : info.Constraints) {
     switch (constraint->getKind()) {
-    case ConstraintKind::NonisolatedConformsTo:
-    case ConstraintKind::ConformsTo:
-      if (constraint->getSecondType()->is<ProtocolType>())
-        Protocols.push_back(constraint);
-      break;
-
     case ConstraintKind::LiteralConformsTo:
       addLiteralRequirement(constraint);
       break;
@@ -435,6 +429,8 @@ void BindingSet::inferTransitiveProtocolRequirements() {
     }
 
     auto &bindings = node.getBindingSet();
+    auto conformanceReqs =
+        node.getPotentialBindings().getConformanceRequirements();
 
     // If current variable already has transitive protocol
     // conformances inferred, there is no need to look deeper
@@ -443,8 +439,8 @@ void BindingSet::inferTransitiveProtocolRequirements() {
       TypeVariableType *parent = nullptr;
       std::tie(parent, currentVar) = workList.pop_back_val();
       assert(parent);
-      propagateProtocolsTo(parent, bindings.getConformanceRequirements(),
-                           *bindings.TransitiveProtocols);
+      propagateProtocolsTo(parent, conformanceReqs,
+                            *bindings.TransitiveProtocols);
       continue;
     }
 
@@ -485,14 +481,16 @@ void BindingSet::inferTransitiveProtocolRequirements() {
       if (!node.hasBindingSet())
         continue;
 
-      const auto &bindings = node.getBindingSet();
+      auto conformanceReqs =
+          node.getPotentialBindings().getConformanceRequirements();
 
       llvm::SmallPtrSet<Constraint *, 2> placeholder;
       // Add any direct protocols from members of the
       // equivalence class, so they could be propagated
       // to all of the members.
-      propagateProtocolsTo(currentVar, bindings.getConformanceRequirements(),
-                           placeholder);
+      propagateProtocolsTo(currentVar, conformanceReqs, placeholder);
+
+      const auto &bindings = node.getBindingSet();
 
       // Since type variables are equal, current type variable
       // becomes a subtype to any supertype found in the current
@@ -512,8 +510,7 @@ void BindingSet::inferTransitiveProtocolRequirements() {
     // are transitive to its parent, propagate them down the subtype/equivalence
     // chain.
     if (parent) {
-      propagateProtocolsTo(parent, bindings.getConformanceRequirements(),
-                           protocols[currentVar]);
+      propagateProtocolsTo(parent, conformanceReqs, protocols[currentVar]);
     }
 
     auto &inferredProtocols = protocols[currentVar];
@@ -526,9 +523,8 @@ void BindingSet::inferTransitiveProtocolRequirements() {
     // - all of the transitive protocols inferred through
     //   the members of the equivalence class.
     {
-      auto directRequirements = bindings.getConformanceRequirements();
-      protocolsForEquivalence.insert(directRequirements.begin(),
-                                     directRequirements.end());
+      protocolsForEquivalence.insert(conformanceReqs.begin(),
+                                     conformanceReqs.end());
 
       protocolsForEquivalence.insert(inferredProtocols.begin(),
                                      inferredProtocols.end());
@@ -2063,6 +2059,12 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     break;
   }
 
+  case ConstraintKind::NonisolatedConformsTo:
+  case ConstraintKind::ConformsTo:
+    if (constraint->getSecondType()->is<ProtocolType>())
+      Protocols.push_back(constraint);
+    break;
+
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::EscapableFunctionOf:
@@ -2076,8 +2078,6 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::PackElementOf:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
-  case ConstraintKind::NonisolatedConformsTo:
-  case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::Defaultable:
   case ConstraintKind::FallbackType:
@@ -2206,21 +2206,27 @@ void PotentialBindings::retract(ConstraintSystem &CS,
                       }),
       Bindings.end());
 
+#define CALLBACK(ChangeKind)                                                   \
+  [&](Constraint *other) {                                                     \
+    if (other == constraint) {                                                 \
+      if (recordingChanges) {                                                  \
+        CS.recordChange(SolverTrail::Change::ChangeKind(                       \
+            TypeVar, constraint));                                             \
+      }                                                                        \
+      return true;                                                             \
+    }                                                                          \
+    return false;                                                              \
+  }
+
   DelayedBy.erase(
-      llvm::remove_if(DelayedBy,
-                      [&](Constraint *existing) {
-                        if (existing == constraint) {
-                          if (recordingChanges) {
-                            CS.recordChange(SolverTrail::Change::RetractedDelayedBy(
-                                TypeVar, constraint));
-                          }
-                          return true;
-                        }
-                        return false;
-                      }),
+      llvm::remove_if(DelayedBy, CALLBACK(RetractedDelayedBy)),
       DelayedBy.end());
 
-#define CALLBACK(ChangeKind)                                                   \
+  Protocols.erase(
+      llvm::remove_if(Protocols, CALLBACK(RetractedProtocol)),
+      Protocols.end());
+
+#define PAIR_CALLBACK(ChangeKind)                                              \
   [&](std::pair<TypeVariableType *, Constraint *> pair) {                      \
     if (pair.second == constraint) {                                           \
       if (recordingChanges) {                                                  \
@@ -2233,19 +2239,19 @@ void PotentialBindings::retract(ConstraintSystem &CS,
   }
 
   AdjacentVars.erase(
-    llvm::remove_if(AdjacentVars, CALLBACK(RetractedAdjacentVar)),
+    llvm::remove_if(AdjacentVars, PAIR_CALLBACK(RetractedAdjacentVar)),
     AdjacentVars.end());
 
   SubtypeOf.erase(
-    llvm::remove_if(SubtypeOf, CALLBACK(RetractedSubtypeOf)),
+    llvm::remove_if(SubtypeOf, PAIR_CALLBACK(RetractedSubtypeOf)),
     SubtypeOf.end());
 
   SupertypeOf.erase(
-    llvm::remove_if(SupertypeOf, CALLBACK(RetractedSupertypeOf)),
+    llvm::remove_if(SupertypeOf, PAIR_CALLBACK(RetractedSupertypeOf)),
     SupertypeOf.end());
 
   EquivalentTo.erase(
-    llvm::remove_if(EquivalentTo, CALLBACK(RetractedEquivalentTo)),
+    llvm::remove_if(EquivalentTo, PAIR_CALLBACK(RetractedEquivalentTo)),
     EquivalentTo.end());
 
 #undef CALLBACK
