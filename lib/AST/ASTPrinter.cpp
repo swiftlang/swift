@@ -5633,6 +5633,16 @@ void PrintAST::visitTypeValueExpr(TypeValueExpr *expr) {
   expr->getType()->print(Printer, Options);
 }
 
+void PrintAST::visitOpaqueExpr(OpaqueExpr *expr) {
+  // FIXME: unsure about this, maybe do nothing?
+  visit(expr->getOriginalExpr());
+}
+
+void PrintAST::visitOpaqueStmt(OpaqueStmt *stmt) {
+  // FIXME: unsure about this, maybe do nothing?
+  printBraceStmt(stmt->getUnderlyingStmt());
+}
+
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   printBraceStmt(stmt);
 }
@@ -5810,7 +5820,7 @@ void PrintAST::visitForEachStmt(ForEachStmt *stmt) {
   printPattern(stmt->getPattern());
   Printer << " " << tok::kw_in << " ";
   // FIXME: print container
-  if (auto *seq = stmt->getTypeCheckedSequence()) {
+  if (auto *seq = stmt->getParsedSequence()) {
     // Look through the call to '.makeIterator()'
     
     if (auto *CE = dyn_cast<CallExpr>(seq)) {

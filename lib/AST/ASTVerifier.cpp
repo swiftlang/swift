@@ -802,11 +802,6 @@ public:
         ForEachPatternSequences.insert(expansion);
       }
 
-      if (!S->getElementExpr())
-        return true;
-
-      assert(!OpaqueValues.count(S->getElementExpr()));
-      OpaqueValues[S->getElementExpr()] = 0;
       return true;
     }
 
@@ -819,12 +814,6 @@ public:
         // Clean up for real.
         cleanup(expansion);
       }
-
-      if (!S->getElementExpr())
-        return;
-
-      assert(OpaqueValues.count(S->getElementExpr()));
-      OpaqueValues.erase(S->getElementExpr());
     }
 
     bool shouldVerify(InterpolatedStringLiteralExpr *expr) {
