@@ -1153,69 +1153,115 @@ static void conformToCxxDictionary(ClangImporter::Implementation &impl,
                                    const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("conforming to CxxDictionary", decl);
   ASTContext &ctx = decl->getASTContext();
+  clang::ASTContext &clangCtx = impl.getClangASTContext();
+  clang::Sema &clangSema = impl.getClangSema();
 
-  auto keyType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("key_type"));
-  auto valueType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("mapped_type"));
-  auto iterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("const_iterator"));
-  auto mutableIterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("iterator"));
-  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("size_type"));
-  auto keyValuePairType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("value_type"));
-  if (!keyType || !valueType || !iterType || !mutableIterType || !sizeType ||
-      !keyValuePairType)
+  auto *key_type = lookupCxxTypeMember(clangSema, clangDecl, "key_type", true);
+  auto *mapped_type =
+      lookupCxxTypeMember(clangSema, clangDecl, "mapped_type", true);
+  auto *value_type =
+      lookupCxxTypeMember(clangSema, clangDecl, "value_type", true);
+  auto *size_type =
+      lookupCxxTypeMember(clangSema, clangDecl, "size_type", true);
+  auto *iterator = lookupCxxTypeMember(clangSema, clangDecl, "iterator", true);
+  auto *const_iterator =
+      lookupCxxTypeMember(clangSema, clangDecl, "const_iterator", true);
+  if (!key_type || !mapped_type || !value_type || !size_type || !iterator ||
+      !const_iterator)
     return;
 
-  auto insert = getInsertFunc(decl, keyValuePairType);
+  const clang::CXXMethodDecl *insert = nullptr;
+  {
+    // CxxDictionary requires the InsertionResult associated type, which is the
+    // return type of std::map (and co.)'s insert function. But there is no
+    // equivalent typedef in C++ we can use directly, so we need get it by
+    // converting the return type of this overload of the insert function:
+    //
+    //    insert_return_type insert(const value_type &value);
+    //
+    // See also: extended monologuing in conformToCxxSet().
+    auto R = clang::LookupResult(
+        clangSema, &clangSema.PP.getIdentifierTable().get("insert"),
+        clang::SourceLocation(), clang::Sema::LookupMemberName);
+    R.suppressDiagnostics();
+    auto *Ctx = static_cast<const clang::DeclContext *>(clangDecl);
+    clangSema.LookupQualifiedName(R, const_cast<clang::DeclContext *>(Ctx));
+    switch (R.getResultKind()) {
+    case clang::LookupResultKind::Found:
+    case clang::LookupResultKind::FoundOverloaded:
+      break;
+    default:
+      return;
+    }
+
+    for (auto *nd : R) {
+      if (auto *insertOverload = dyn_cast<clang::CXXMethodDecl>(nd)) {
+        if (insertOverload->param_size() != 1)
+          continue;
+        auto *paramTy = (*insertOverload->param_begin())
+                            ->getType()
+                            ->getAs<clang::ReferenceType>();
+        if (!paramTy)
+          continue;
+        if (paramTy->getPointeeType()->getCanonicalTypeUnqualified() !=
+            clangCtx.getTypeDeclType(value_type)->getCanonicalTypeUnqualified())
+          continue;
+        if (!paramTy->getPointeeType().isConstQualified())
+          continue;
+        insert = insertOverload; // Found the insert() we're looking for
+        break;
+      }
+    }
+  }
   if (!insert)
     return;
 
-  ProtocolDecl *cxxInputIteratorProto =
-      ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
-  ProtocolDecl *cxxMutableInputIteratorProto =
-      ctx.getProtocol(KnownProtocolKind::UnsafeCxxMutableInputIterator);
-  if (!cxxInputIteratorProto || !cxxMutableInputIteratorProto)
+  auto *Size = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(size_type, impl.CurrentVersion));
+  auto *Key = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(key_type, impl.CurrentVersion));
+  auto *Value = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(mapped_type, impl.CurrentVersion));
+  auto *Element = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(value_type, impl.CurrentVersion));
+  auto *RawIterator = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(const_iterator, impl.CurrentVersion));
+  auto *RawMutableIterator = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(iterator, impl.CurrentVersion));
+  if (!Size || !Key || !Value || !Element || !RawIterator ||
+      !RawMutableIterator)
     return;
 
-  auto rawIteratorTy = iterType->getUnderlyingType();
-  auto rawMutableIteratorTy = mutableIterType->getUnderlyingType();
-
-  // Check if RawIterator conforms to UnsafeCxxInputIterator.
-  if (!checkConformance(rawIteratorTy, cxxInputIteratorProto))
+  auto *Insert =
+      dyn_cast_or_null<FuncDecl>(impl.importDecl(insert, impl.CurrentVersion));
+  if (!Insert)
     return;
 
-  // Check if RawMutableIterator conforms to UnsafeCxxMutableInputIterator.
-  if (!checkConformance(rawMutableIteratorTy, cxxMutableInputIteratorProto))
-    return;
+  impl.addSynthesizedTypealias(decl, ctx.Id_Key, Key->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.Id_Value, Value->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.Id_Element,
+                               Element->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
+                               RawIterator->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
+                               RawMutableIterator->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
+                               Size->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("InsertionResult"),
+                               Insert->getResultInterfaceType());
+  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxDictionary});
 
   // Make the original subscript that returns a non-optional value unavailable.
   // CxxDictionary adds another subscript that returns an optional value,
   // similarly to Swift.Dictionary.
+  //
+  // NOTE: this relies on the SubscriptDecl member being imported eagerly.
   for (auto member : decl->getCurrentMembersWithoutLoading()) {
     if (auto subscript = dyn_cast<SubscriptDecl>(member)) {
       impl.markUnavailable(subscript,
                            "use subscript with optional return value");
     }
   }
-
-  impl.addSynthesizedTypealias(decl, ctx.Id_Key, keyType->getUnderlyingType());
-  impl.addSynthesizedTypealias(decl, ctx.Id_Value,
-                               valueType->getUnderlyingType());
-  impl.addSynthesizedTypealias(decl, ctx.Id_Element,
-                               keyValuePairType->getUnderlyingType());
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
-                               rawIteratorTy);
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
-                               rawMutableIteratorTy);
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
-                               sizeType->getUnderlyingType());
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("InsertionResult"),
-                               insert->getResultInterfaceType());
-  impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxDictionary});
 }
 
 static void conformToCxxVector(ClangImporter::Implementation &impl,
