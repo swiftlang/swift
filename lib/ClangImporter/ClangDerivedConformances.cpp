@@ -1300,9 +1300,10 @@ void swift::deriveAutomaticCxxConformances(
     return;
   case CxxStdType::set:
   case CxxStdType::unordered_set:
+    conformToCxxSet(Impl, result, clangDecl, /*isUniqueSet=*/true);
+    return;
   case CxxStdType::multiset:
-    conformToCxxSet(Impl, result, clangDecl,
-                    /*isUniqueSet=*/ty != CxxStdType::multiset);
+    conformToCxxSet(Impl, result, clangDecl, /*isUniqueSet=*/false);
     return;
   case CxxStdType::pair:
     conformToCxxPair(Impl, result, clangDecl);
