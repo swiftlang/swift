@@ -237,6 +237,8 @@ public:
   void collectVisibleTopLevelModuleNames(
       SmallVectorImpl<Identifier> &names) const override;
 
+  void addExplicitModulePath(StringRef name, std::string path) override;
+
   ~ExplicitCASModuleLoader();
 };
 
