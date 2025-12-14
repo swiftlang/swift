@@ -1223,35 +1223,33 @@ static void conformToCxxVector(ClangImporter::Implementation &impl,
                                const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("conforming to CxxVector", decl);
   ASTContext &ctx = decl->getASTContext();
+  clang::Sema &clangSema = impl.getClangSema();
 
-  auto valueType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("value_type"));
-  auto iterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("const_iterator"));
-  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("size_type"));
-  if (!valueType || !iterType || !sizeType)
-    return;
+  auto *value_type = lookupCxxTypeMember(clangSema, clangDecl, "value_type",
+                                         /*mustBeComplete=*/true);
+  auto *size_type = lookupCxxTypeMember(clangSema, clangDecl, "size_type",
+                                        /*mustBeComplete=*/true);
+  auto *const_iterator =
+      lookupCxxTypeMember(clangSema, clangDecl, "const_iterator",
+                          /*mustBeComplete=*/true);
 
-  ProtocolDecl *cxxRandomAccessIteratorProto =
-      ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator);
-  if (!cxxRandomAccessIteratorProto)
-    return;
-
-  auto rawIteratorTy = iterType->getUnderlyingType();
-
-  // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
-  if (!checkConformance(rawIteratorTy, cxxRandomAccessIteratorProto))
+  auto *Element = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(value_type, impl.CurrentVersion));
+  auto *Size = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(size_type, impl.CurrentVersion));
+  auto *RawIterator = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(const_iterator, impl.CurrentVersion));
+  if (!Element || !Size || !RawIterator)
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
-                               valueType->getUnderlyingType());
+                               Element->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.Id_ArrayLiteralElement,
-                               valueType->getUnderlyingType());
+                               Element->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
-                               sizeType->getUnderlyingType());
+                               Size->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
-                               rawIteratorTy);
+                               RawIterator->getUnderlyingType());
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxVector});
 }
 
