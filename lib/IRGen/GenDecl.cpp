@@ -2967,7 +2967,12 @@ llvm::Constant *IRGenModule::getGlobalInitValue(SILGlobalVariable *var,
   if (SILInstruction *initInst = var->getStaticInitializerValue()) {
     Explosion initExp = emitConstantValue(*this,
                                   cast<SingleValueInstruction>(initInst));
-    return getConstantValue(std::move(initExp), /*paddingBytes=*/ 0);
+    llvm::Constant *initVal = getConstantValue(std::move(initExp), /*paddingBytes=*/ 0);
+    llvm::errs() << "getGlobalInitValue:\n";
+    var->dump();
+    initVal->dump();
+    llvm::errs() << "\n";
+    return initVal;
   }
   return nullptr;
 }
