@@ -1125,18 +1125,26 @@ static void conformToCxxPair(ClangImporter::Implementation &impl,
                              const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("conforming to CxxPair", decl);
   ASTContext &ctx = decl->getASTContext();
+  clang::Sema &clangSema = impl.getClangSema();
 
-  auto firstType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("first_type"));
-  auto secondType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("second_type"));
-  if (!firstType || !secondType)
+  auto *first_type = lookupCxxTypeMember(clangSema, clangDecl, "first_type",
+                                         /*mustBeComplete=*/true);
+  auto *second_type = lookupCxxTypeMember(clangSema, clangDecl, "second_type",
+                                          /*mustBeComplete=*/true);
+  if (!first_type || !second_type)
+    return;
+
+  auto *First = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(first_type, impl.CurrentVersion));
+  auto *Second = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(second_type, impl.CurrentVersion));
+  if (!First || !Second)
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("First"),
-                               firstType->getUnderlyingType());
+                               First->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Second"),
-                               secondType->getUnderlyingType());
+                               Second->getUnderlyingType());
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxPair});
 }
 
