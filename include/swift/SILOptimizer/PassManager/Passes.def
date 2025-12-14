@@ -81,8 +81,6 @@ PASS(ComputeSideEffects, "compute-side-effects",
      "Computes function side effects")
 PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
      "Diagnose Infinitely-Recursive Code")
-PASS(TestInstructionIteration, "test-instruction-iteration",
-     "Tests instruction iteration")
 PASS(InitializeStaticGlobals, "initialize-static-globals",
      "Initializes static global variables")
 PASS(MandatoryRedundantLoadElimination, "mandatory-redundant-load-elimination",
@@ -116,8 +114,6 @@ PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(LetPropertyLowering, "let-property-lowering",
      "Lowers accesses to let properties of classes")
-PASS(SILPrinter, "sil-printer",
-     "Test pass which prints the SIL of a function")
 PASS(FunctionStackProtection, "function-stack-protection",
      "Decides which functions need stack protectors")
 PASS(Simplification, "simplification",
