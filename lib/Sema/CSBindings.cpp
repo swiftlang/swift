@@ -616,6 +616,18 @@ void BindingSet::inferTransitiveKeyPathBindings() {
 }
 
 void BindingSet::inferTransitiveSupertypeBindings() {
+  llvm::SmallDenseSet<ProtocolDecl *> seenLiterals;
+  for (const auto &literal : Literals) {
+    bool inserted = seenLiterals.insert(literal.getProtocol()).second;
+    ASSERT(inserted);
+  }
+
+  llvm::SmallDenseSet<Constraint *> seenDefaults;
+  for (auto *constraint : Defaults) {
+    bool inserted = seenDefaults.insert(constraint).second;
+    ASSERT(inserted);
+  }
+
   for (const auto &entry : Info.SupertypeOf) {
     auto &node = CS.getConstraintGraph()[entry.first];
     if (!node.hasBindingSet())
@@ -648,11 +660,7 @@ void BindingSet::inferTransitiveSupertypeBindings() {
     for (auto literal : bindings.Literals) {
       auto *protocol = literal.getProtocol();
 
-      bool found = llvm::any_of(Literals,
-          [&](const auto &literal) -> bool {
-            return literal.getProtocol() == protocol;
-          });
-      if (found)
+      if (!seenLiterals.insert(protocol).second)
         continue;
 
       literal.setDirectRequirement(false);
@@ -662,6 +670,9 @@ void BindingSet::inferTransitiveSupertypeBindings() {
     // Infer transitive defaults.
     for (auto *def : bindings.Defaults) {
       if (def->getKind() == ConstraintKind::FallbackType)
+        continue;
+
+      if (!seenDefaults.insert(def).second)
         continue;
 
       addDefault(def);
