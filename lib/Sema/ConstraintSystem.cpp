@@ -5323,10 +5323,12 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   return success(mutability, isSendable);
 }
 
-TypeVarBindingProducer::TypeVarBindingProducer(const BindingSet &bindings)
-    : BindingProducer(bindings.getConstraintSystem(),
-                      bindings.getTypeVariable()->getImpl().getLocator()),
-      TypeVar(bindings.getTypeVariable()), CanBeNil(bindings.canBeNil()) {
+TypeVarBindingProducer::TypeVarBindingProducer(
+    ConstraintSystem &cs,
+    TypeVariableType *typeVar,
+    const BindingSet &bindings)
+    : BindingProducer(cs, typeVar->getImpl().getLocator()),
+      TypeVar(typeVar), CanBeNil(bindings.canBeNil()) {
   if (bindings.isDirectHole()) {
     auto *locator = getLocator();
     // If this type variable is associated with a code completion token
@@ -5384,8 +5386,7 @@ TypeVarBindingProducer::TypeVarBindingProducer(const BindingSet &bindings)
     if (viableBindings.size() == 1) {
       addBinding(viableBindings.front());
     } else {
-      for (const auto &entry : bindings.Defaults) {
-        auto *constraint = entry.second;
+      for (auto *constraint : bindings.Defaults) {
         Bindings.push_back(getDefaultBinding(constraint));
       }
     }
@@ -5398,9 +5399,7 @@ TypeVarBindingProducer::TypeVarBindingProducer(const BindingSet &bindings)
   }
 
   // Infer defaults based on "uncovered" literal protocol requirements.
-  for (const auto &info : bindings.Literals) {
-    const auto &literal = info.second;
-
+  for (const auto &literal : bindings.Literals) {
     if (!literal.viableAsBinding())
       continue;
 
@@ -5423,8 +5422,7 @@ TypeVarBindingProducer::TypeVarBindingProducer(const BindingSet &bindings)
   {
     bool noBindings = Bindings.empty();
 
-    for (const auto &entry : bindings.Defaults) {
-      auto *constraint = entry.second;
+    for (auto *constraint : bindings.Defaults) {
       if (noBindings) {
         // If there are no direct or transitive bindings to attempt
         // let's add defaults to the list right away.

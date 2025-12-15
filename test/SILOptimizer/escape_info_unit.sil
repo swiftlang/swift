@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -dump-escape-info -module-name=test -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner -module-name=test -o /dev/null | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -127,6 +127,7 @@ sil @nonexclusive2 : $@convention(thin) (@owned Z) -> @owned Z {
 // CHECK: End function test_simple
 sil [ossa] @test_simple : $@convention(thin) (@inout X) -> @owned X {
 bb0(%0 : $*X):
+  specify_test "escape_info"
   %1 = alloc_ref $X
   %2 = alloc_ref $Y
   %3 = alloc_ref $X
@@ -143,6 +144,7 @@ bb0(%0 : $*X):
 // CHECK: End function test_value_projection
 sil @test_value_projection : $@convention(thin) () -> @owned X {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $X
   %1 = alloc_ref $X
   %2 = alloc_ref $Y
@@ -166,6 +168,7 @@ bb0:
 // CHECK: End function test_addr_projection
 sil @test_addr_projection : $@convention(thin) () -> @owned X {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $X
   %1 = alloc_ref $X
   %2 = alloc_ref $Y
@@ -189,6 +192,7 @@ bb0:
 // CHECK: End function test_follow_stores
 sil @test_follow_stores : $@convention(thin) (Y) -> () {
 bb0(%0 : $Y):
+  specify_test "escape_info"
   %1 = alloc_ref $X
   %2 = alloc_ref $Z
   %3 = ref_element_addr %2 : $Z, #Z.y
@@ -207,6 +211,7 @@ bb0(%0 : $Y):
 // CHECK: End function dont_follow_stores
 sil @dont_follow_stores : $@convention(thin) (Y) -> Y {
 bb0(%0 : $Y):
+  specify_test "escape_info"
   %1 = alloc_ref $Y
   %2 = alloc_ref $Z
   %3 = ref_element_addr %2 : $Z, #Z.y
@@ -229,6 +234,7 @@ bb3:
 // CHECK: End function walkup_multiple_struct_tuple_operands
 sil @walkup_multiple_struct_tuple_operands : $@convention(thin) (LinkedNode) -> () {
 bb0(%0 : $LinkedNode):
+  specify_test "escape_info"
   %1 = alloc_ref $X
   %2 = alloc_ref $LinkedNode
   %3 = alloc_ref $LinkedNode
@@ -273,6 +279,7 @@ bb8:
 // CHECK: End function callee_may_store_to_non_escaping_argument
 sil @callee_may_store_to_non_escaping_argument : $@convention(thin) (Y) -> () {
 bb0(%0 : $Y):
+  specify_test "escape_info"
   %1 = alloc_ref $X
   %2 = alloc_ref $Z
   %3 = function_ref @not_escaping_argument : $@convention(thin) (@guaranteed Z) -> ()
@@ -292,6 +299,7 @@ bb0(%0 : $Y):
 // CHECK: End function callee_may_store_to_forwarded_argument
 sil @callee_may_store_to_forwarded_argument : $@convention(thin) (Y) -> () {
 bb0(%0 : $Y):
+  specify_test "escape_info"
   %1 = alloc_ref $X
   %2 = alloc_ref $Z
   %3 = function_ref @exclusive_arg_to_return : $@convention(thin) (@owned Z) -> @owned Z
@@ -311,6 +319,7 @@ bb0(%0 : $Y):
 // CHECK: End function callee_may_not_store_to_forwarded_argument
 sil @callee_may_not_store_to_forwarded_argument : $@convention(thin) (Y) -> () {
 bb0(%0 : $Y):
+  specify_test "escape_info"
   %1 = alloc_ref $X
   %2 = alloc_ref $Z
   %3 = function_ref @nonexclusive_arg_to_return : $@convention(thin) (@owned Z) -> @owned Z
@@ -329,6 +338,7 @@ bb0(%0 : $Y):
 // CHECK: End function callee_may_load
 sil @callee_may_load : $@convention(thin) (Y) -> () {
 bb0(%0 : $Y):
+  specify_test "escape_info"
   %1 = alloc_ref $X
   %2 = alloc_stack $Y
   store %0 to %2 : $*Y
@@ -350,6 +360,7 @@ bb0(%0 : $Y):
 // CHECK: End function test_phiterms_merge_down
 sil @test_phiterms_merge_down : $@convention(thin) () -> @owned X {
 bb0:
+  specify_test "escape_info"
   cond_br undef, bb1, bb2
 bb1:
   %0 = alloc_ref $X
@@ -369,6 +380,7 @@ bb3(%5 : $X, %6 : $Y):
 // CHECK: End function test_phiterms_merge_up
 sil @test_phiterms_merge_up : $@convention(thin) (@inout X, @inout X, @inout X) -> () {
 bb0(%0 : $*X, %1 : $*X, %2 : $*X):
+  specify_test "escape_info"
   %3 = alloc_ref $LinkedNode
   %4 = alloc_ref $X
   %5 = ref_element_addr %3 : $LinkedNode, #LinkedNode.next
@@ -405,6 +417,7 @@ bb3(%9 : $LinkedNode):
 // CHECK: End function test_cycle
 sil @test_cycle : $@convention(thin) () -> @owned X {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $LinkedNode
   %1 = alloc_ref $X
   br bb1(%0 : $LinkedNode)
@@ -431,6 +444,7 @@ bb3:
 // CHECK: End function test_switch_enum_walk_down
 sil @test_switch_enum_walk_down : $@convention(thin) () -> @out Z {
 bb0(%0 : $*Z):
+  specify_test "escape_info"
   %1 = alloc_ref $Z
   %2 = alloc_ref $Z
   cond_br undef, bb1, bb2
@@ -465,6 +479,7 @@ bb6:
 // CHECK: End function test_switch_enum_walk_up
 sil @test_switch_enum_walk_up : $@convention(thin) (@guaranteed Z) -> () {
 bb0(%0 : $Z):
+  specify_test "escape_info"
   %1 = alloc_ref $Y
   %2 = alloc_ref $Y
   cond_br undef, bb1, bb2
@@ -502,6 +517,7 @@ bb6:
 // CHECK: End function test_enum_data_walk_down
 sil @test_enum_data_walk_down : $@convention(thin) () -> @out Z {
 bb0(%0 : $*Z):
+  specify_test "escape_info"
   %1 = alloc_ref $Z
   %2 = alloc_ref $Z
   cond_br undef, bb1, bb2
@@ -528,6 +544,7 @@ bb3(%7 : $E):
 // CHECK: End function test_enum_data_walk_up
 sil @test_enum_data_walk_up : $@convention(thin) (@guaranteed Z) -> () {
 bb0(%0 : $Z):
+  specify_test "escape_info"
   %1 = alloc_ref $Y
   %2 = alloc_ref $Y
   cond_br undef, bb1, bb2
@@ -560,6 +577,7 @@ bb3(%9 : $E):
 // CHECK: End function test_enum_addr
 sil @test_enum_addr : $@convention(thin) () -> @out Z {
 bb0(%0 : $*Z):
+  specify_test "escape_info"
   %1 = alloc_ref $Z
   %2 = alloc_ref $Z
   %3 = alloc_stack $E
@@ -592,6 +610,7 @@ bb3:
 // CHECK: End function test_mark_dependence_not_escaping
 sil @test_mark_dependence_not_escaping : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Z
   %1 = ref_element_addr %0 : $Z, #Z.y
   %2 = mark_dependence %1 : $*Y on %0 : $Z
@@ -607,6 +626,7 @@ bb0:
 // CHECK: End function test_mark_dependence_escaping
 sil @test_mark_dependence_escaping : $@convention(thin) () -> Z {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Z
   %1 = ref_element_addr %0 : $Z, #Z.y
   %2 = mark_dependence %1 : $*Y on %0 : $Z
@@ -622,6 +642,7 @@ bb0:
 // CHECK: End function test_cast_and_existentials_walk_down
 sil @test_cast_and_existentials_walk_down : $@convention(thin) () -> ClassP {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Derived
   %1 = alloc_ref $Derived
 
@@ -651,6 +672,7 @@ bb0:
 // CHECK: End function test_cast_walk_up
 sil @test_cast_walk_up : $@convention(thin) (@guaranteed DerivedZ) -> () {
 bb0(%0 : $DerivedZ):
+  specify_test "escape_info"
   %1 = alloc_ref $Y
   %2 = alloc_ref $Y
 
@@ -681,6 +703,7 @@ bb0(%0 : $DerivedZ):
 // CHECK: End function test_address_pointer_casts
 sil @test_address_pointer_casts : $@convention(thin) () -> Y {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Z
   %1 = alloc_ref $Y
   %2 = alloc_ref $Y
@@ -701,6 +724,7 @@ bb0:
 // CHECK: End function test_escaping_address_to_pointer
 sil @test_escaping_address_to_pointer : $@convention(thin) () -> PointerStr {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Z
   %1 = alloc_ref $Y
   %2 = ref_element_addr %0 : $Z, #Z.y
@@ -716,6 +740,7 @@ bb0:
 // CHECK: End function test_copy_addr
 sil [ossa] @test_copy_addr : $@convention(thin) (@in_guaranteed X) -> @out X {
 bb0(%0 : $*X, %1 : $*X):
+  specify_test "escape_info"
   %2 = alloc_ref $X
 
   %4 = alloc_stack $X
@@ -742,6 +767,7 @@ bb3:
 // CHECK: End function test_weak
 sil @test_weak : $@convention(thin) () -> Optional<Y> {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $WZ
   %1 = alloc_ref $Y
   %2 = enum $Optional<Y>, #Optional.some!enumelt, %1 : $Y
@@ -757,6 +783,7 @@ bb0:
 // CHECK: End function test_unowned
 sil @test_unowned : $@convention(thin) () -> Y {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $WZ
   %1 = alloc_ref $Y
   %2 = ref_element_addr %0 : $WZ, #WZ.u
@@ -770,6 +797,7 @@ bb0:
 // CHECK: End function test_bridge_object
 sil @test_bridge_object : $@convention(thin) (Z) -> (Builtin.Int1, Builtin.Int1) {
 bb0(%0 : $Z):
+  specify_test "escape_info"
   %1 = alloc_ref $Y
   %2 = integer_literal $Builtin.Word, 1
   %3 = ref_to_bridge_object %1 : $Y, %2 : $Builtin.Word
@@ -788,6 +816,7 @@ bb0(%0 : $Z):
 // CHECK: End function test_ossa
 sil [ossa] @test_ossa : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %1 = alloc_ref $Z
   %2 = copy_value %1 : $Z
@@ -809,6 +838,7 @@ bb0:
 // CHECK: End function test_load_borrow
 sil [ossa] @test_load_borrow : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %1 = alloc_ref $Y
   %2 = alloc_stack $Y
@@ -835,6 +865,7 @@ bb0:
 // CHECK: End function call_unknown
 sil [ossa] @call_unknown : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $X
   %1 = alloc_ref $Y
   %2 = function_ref @not_escaping_second_argument : $@convention(thin) (@owned X, @owned Y) -> ()
@@ -849,6 +880,7 @@ bb0:
 // CHECK: End function call_arg_to_return
 sil [ossa] @call_arg_to_return : $@convention(thin) () -> @owned X {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $X
   %1 = alloc_ref $X
   %2 = function_ref @arg_to_return : $@convention(thin) (@owned X) -> @owned Str
@@ -870,6 +902,7 @@ sil @$s4test1FCfD : $@convention(method) (@owned F) -> () {
 // CHECK: End function destructure_struct_walkup
 sil [ossa] @destructure_struct_walkup : $@convention(thin) (@owned F, @owned F) -> () {
 bb0(%0 : @owned $F, %1 : @owned $F):
+  specify_test "escape_info"
   %2 = alloc_ref $Y
   %3 = alloc_ref $Y
   %4 = struct $TwoF (%0 : $F, %1 : $F)
@@ -894,6 +927,7 @@ bb0(%0 : @owned $F, %1 : @owned $F):
 // CHECK: End function destructure_struct_walkdown
 sil [ossa] @destructure_struct_walkdown : $@convention(thin) () -> @owned F {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $F
   %1 = alloc_ref $F
   %2 = struct $TwoF (%0 : $F, %1 : $F)
@@ -909,6 +943,7 @@ bb0:
 // CHECK: End function destructure_tuple_walkup
 sil [ossa] @destructure_tuple_walkup : $@convention(thin) (@owned F, @owned F) -> () {
 bb0(%0 : @owned $F, %1 : @owned $F):
+  specify_test "escape_info"
   %2 = alloc_ref $Y
   %3 = alloc_ref $Y
   %4 = tuple (%0 : $F, %1 : $F)
@@ -933,6 +968,7 @@ bb0(%0 : @owned $F, %1 : @owned $F):
 // CHECK: End function destructure_tuple_walkdown
 sil [ossa] @destructure_tuple_walkdown : $@convention(thin) () -> @owned F {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $F
   %1 = alloc_ref $F
   %2 = tuple (%0 : $F, %1 : $F)
@@ -947,6 +983,7 @@ bb0:
 // CHECK: End function call_arg_to_arg
 sil [ossa] @call_arg_to_arg : $@convention(thin) () -> @owned X {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $X
   %1 = alloc_ref $X
   %2 = function_ref @arg_to_arg : $@convention(thin) (@owned X) -> @out Str
@@ -971,6 +1008,7 @@ bb0:
 // CHECK: End function call_content_of_arg_to_arg
 sil [ossa] @call_content_of_arg_to_arg : $@convention(thin) () -> @owned Y {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Z
   %1 = alloc_ref $Y
   %2 = begin_borrow %0 : $Z
@@ -998,6 +1036,7 @@ bb0:
 // CHECK: End function escape_via_copy_addr_destructor
 sil [ossa] @escape_via_copy_addr_destructor : $@convention(thin) (@in_guaranteed Z) -> () {
 bb0(%0 : $*Z):
+  specify_test "escape_info"
   %1 = alloc_ref $Z
   %2 = alloc_ref $Y
   %3 = begin_borrow %1 : $Z
@@ -1020,6 +1059,7 @@ bb0(%0 : $*Z):
 // CHECK: End function escape_via_store_assign_destructor
 sil [ossa] @escape_via_store_assign_destructor : $@convention(thin) (@owned Z) -> () {
 bb0(%0 : @owned $Z):
+  specify_test "escape_info"
   %1 = alloc_ref $Z
   %2 = alloc_ref $Y
   %3 = begin_borrow %1 : $Z
@@ -1066,6 +1106,7 @@ sil @take_escaping_closure : $@convention(thin) (@owned @callee_guaranteed (@gua
 // CHECK: End function callClosure1
 sil [ossa] @callClosure1 : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %1 = alloc_ref $Y
   %2 = function_ref @closure1 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
@@ -1083,6 +1124,7 @@ bb0:
 // CHECK: End function callClosure2
 sil [ossa] @callClosure2 : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %1 = alloc_ref $Y
   %2 = function_ref @closure2 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
@@ -1100,6 +1142,7 @@ bb0:
 // CHECK: End function noescape_via_closure
 sil @noescape_via_closure : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Z
   %1 = alloc_ref $Y
   %2 = ref_element_addr %0 : $Z, #Z.y
@@ -1116,6 +1159,7 @@ bb0:
 // CHECK: End function callClosureWithEscapesToEffect1
 sil [ossa] @callClosureWithEscapesToEffect1 : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %1 = alloc_ref $X
   %2 = function_ref @closure4 : $@convention(thin) (@guaranteed X, @guaranteed Y) -> ()
@@ -1133,6 +1177,7 @@ bb0:
 // CHECK: End function callClosureWithEscapesToEffect2
 sil [ossa] @callClosureWithEscapesToEffect2 : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %1 = alloc_ref $X
   %2 = function_ref @closure5 : $@convention(thin) (@guaranteed Y, @guaranteed X) -> ()
@@ -1150,6 +1195,7 @@ bb0:
 // CHECK: End function escape_via_destroy_of_closure
 sil @escape_via_destroy_of_closure : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Z
   %1 = alloc_ref $Y
   %2 = ref_element_addr %0 : $Z, #Z.y
@@ -1166,6 +1212,7 @@ bb0:
 // CHECK: End function escapingClosure
 sil [ossa] @escapingClosure : $@convention(thin) () -> @owned @callee_guaranteed (@guaranteed Y) -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %1 = function_ref @closure1 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
   %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
@@ -1178,6 +1225,7 @@ bb0:
 // CHECK: End function test_box
 sil @test_box : $@convention(thin) () -> Z {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Z
   %1 = alloc_ref $Z
   %2 = alloc_box ${ var Z, var Z }
@@ -1195,6 +1243,7 @@ bb0:
 // CHECK: End function exclusive_arg_and_load
 sil @exclusive_arg_and_load : $@convention(thin) (Y) -> () {
 bb0(%0 : $Y):
+  specify_test "escape_info"
   %1 = alloc_stack $Z
   %2 = alloc_ref $Z
   store %2 to %1 : $*Z
@@ -1215,6 +1264,7 @@ bb0(%0 : $Y):
 // CHECK: End function nonexclusive_arg_and_load
 sil @nonexclusive_arg_and_load : $@convention(thin) (Y) -> () {
 bb0(%0 : $Y):
+  specify_test "escape_info"
   %1 = alloc_stack $Z
   %2 = alloc_ref $Z
   store %2 to %1 : $*Z
@@ -1243,6 +1293,7 @@ sil @$s4test8DerivedZCfD : $@convention(method) (@owned DerivedZ) -> () {
 // CHECK: End function known_type
 sil @known_type : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %1 = alloc_ref $Y
   %2 = alloc_ref $Z
@@ -1264,6 +1315,7 @@ bb0:
 // CHECK: End function propagate_types_through_phi_args
 sil @propagate_types_through_phi_args : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %1 = alloc_ref $Y
   cond_br undef, bb1, bb2
@@ -1293,6 +1345,7 @@ bb3(%9 : $Z, %10 : $Z):
 // CHECK: End function no_known_type_of_loaded_ref
 sil @no_known_type_of_loaded_ref : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $X
   %1 = alloc_ref $Y
   %2 = alloc_ref $Z
@@ -1315,6 +1368,7 @@ bb0:
 // CHECK: End function known_type_through_callee
 sil @known_type_through_callee : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %1 = alloc_ref $Y
   %2 = alloc_ref $Z
@@ -1339,6 +1393,7 @@ bb0:
 // CHECK: End function test_destroyArray
 sil @test_destroyArray : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %1 = alloc_ref $Z
   %2 = ref_element_addr %1 : $Z, #Z.y
@@ -1359,6 +1414,8 @@ bb0:
 // CHECK:  -    :   %1 = alloc_ref $Z
 // CHECK: End function test_debug_value
 sil @test_debug_value : $@convention(thin) () -> () {
+bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %1 = alloc_ref $Z
   %2 = ref_element_addr %1 : $Z, #Z.y
@@ -1375,6 +1432,7 @@ sil @test_debug_value : $@convention(thin) () -> () {
 // CHECK: End function test_walk_up_partial_apply_argument
 sil @test_walk_up_partial_apply_argument : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %2 = function_ref @closure6 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> @owned Y
   %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> @owned Y
@@ -1393,6 +1451,7 @@ bb0:
 // CHECK: End function test_escaping_closure
 sil @test_escaping_closure : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %1 = function_ref @closure1 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
   %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
@@ -1407,6 +1466,7 @@ bb0:
 // CHECK: End function test_noescape_partial_apply_and_convert_function
 sil @test_noescape_partial_apply_and_convert_function : $@convention(thin) () -> () {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Y
   %1 = function_ref @closure1 : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
   %2 = partial_apply [callee_guaranteed] [on_stack] %1(%0) : $@convention(thin) (@guaranteed Y, @guaranteed Y) -> ()
@@ -1423,6 +1483,7 @@ bb0:
 // CHECK: End function test_mismatching_existential_types
 sil @test_mismatching_existential_types : $@convention(thin) (@guaranteed F) -> () {
 bb0(%0 : $F):
+  specify_test "escape_info"
   %1 = alloc_ref $Y
 
   %2 = alloc_stack $any P
@@ -1451,6 +1512,7 @@ bb0(%0 : $F):
 // CHECK: End function test_unchecked_ref_cast
 sil @test_unchecked_ref_cast : $@convention(thin) () -> @owned X {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Derived
   %1 = alloc_ref $Derived
   %2 = unchecked_ref_cast %0 : $Derived to $X
@@ -1464,6 +1526,7 @@ bb0:
 // CHECK: End function test_unchecked_ref_cast_from_optional_to_non_optional
 sil @test_unchecked_ref_cast_from_optional_to_non_optional : $@convention(thin) () -> @owned X {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Derived
   %1 = enum $Optional<Derived>, #Optional.some!enumelt, %0 : $Derived
   %2 = alloc_ref $Derived
@@ -1477,6 +1540,7 @@ bb0:
 // CHECK-NEXT: End function test_unchecked_ref_cast_from_optional_to_non_optional_2
 sil @test_unchecked_ref_cast_from_optional_to_non_optional_2 : $@convention(thin) () -> @owned X {
 bb0:
+  specify_test "escape_info"
   %0 = enum $Optional<Derived>, #Optional.none!enumelt
   %1 = enum $Optional<Derived>, #Optional.none!enumelt
   %2 = unchecked_ref_cast %0 : $Optional<Derived> to $X
@@ -1490,6 +1554,7 @@ bb0:
 // CHECK: End function test_unchecked_ref_cast_from_non_optional_to_optional
 sil @test_unchecked_ref_cast_from_non_optional_to_optional : $@convention(thin) () -> @owned Optional<X> {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_ref $Derived
   %1 = alloc_ref $Derived
   %2 = unchecked_ref_cast %0 : $Derived to $Optional<X>
@@ -1502,6 +1567,7 @@ bb0:
 // CHECK: End function test_unchecked_addr_cast
 sil @test_unchecked_addr_cast : $@convention(thin) () -> @owned Builtin.RawPointer {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_stack $X
   %1 = alloc_ref $X
   store %1 to %0 : $*X
@@ -1516,6 +1582,7 @@ bb0:
 // CHECK:       End function test_vector_base_addr_escaping
 sil @test_vector_base_addr_escaping : $@convention(thin) () -> @owned X {
 bb0:
+  specify_test "escape_info"
   %0 = alloc_stack $Builtin.FixedArray<10, X>
   %1 = alloc_ref $X
   %2 = vector_base_addr %0

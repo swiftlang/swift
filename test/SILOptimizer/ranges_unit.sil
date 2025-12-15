@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -dump-ranges -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner -o /dev/null | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -21,6 +21,7 @@ sil_stage canonical
 // CHECK-NEXT: End function basic_test
 sil @basic_test : $@convention(thin) () -> () {
 bb0:
+  specify_test "ranges"
   %0 = string_literal utf8 "outside"
   br bb1
 bb1:
@@ -66,6 +67,7 @@ bb6:
 // CHECK-NEXT: End function loops
 sil @loops : $@convention(thin) () -> () {
 bb0:
+  specify_test "ranges"
   %0 = string_literal utf8 "outside"
   br bb1
 bb1:
@@ -104,6 +106,7 @@ bb7:
 // CHECK-NEXT: End function minimal
 sil @minimal : $@convention(thin) () -> () {
 bb0:
+  specify_test "ranges"
   %0 = string_literal utf8 "begin"
   %1 = string_literal utf8 "end"
   %r = tuple()
@@ -117,6 +120,7 @@ bb0:
 // CHECK:      End function invalid
 sil @invalid : $@convention(thin) () -> () {
 bb0:
+  specify_test "ranges"
   cond_br undef, bb1, bb2
 bb1:
   %1 = string_literal utf8 "begin"

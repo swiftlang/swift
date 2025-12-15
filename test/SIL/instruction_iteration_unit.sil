@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -sil-print-types %s -test-instruction-iteration -o %t/out.sil | %FileCheck --check-prefix=LOG %s
+// RUN: %target-sil-opt -sil-print-types %s -test-runner -o %t/out.sil | %FileCheck --check-prefix=LOG %s
 // RUN: %FileCheck %s < %t/out.sil
 
 // Use this testfile to check if the `swift-frontend -sil-opt` option works.
-// RUN: %swift_frontend_plain -sil-opt -sil-print-types %s -test-instruction-iteration -o %t/out.sil | %FileCheck --check-prefix=LOG %s
+// RUN: %swift_frontend_plain -sil-opt -sil-print-types %s -test-runner -o %t/out.sil | %FileCheck --check-prefix=LOG %s
 // RUN: %FileCheck %s < %t/out.sil
 
 // REQUIRES: swift_in_compiler
@@ -28,6 +28,7 @@ import Builtin
 // CHECK-NEXT:  } // end sil function 'delete_current_forward'
 sil @delete_current_forward : $@convention(thin) () -> () {
 bb0:
+  specify_test "instruction_iteration"
   %0 = tuple ()
   %1 = string_literal utf8 "delete_strings"
   %2 = integer_literal $Builtin.Int64, 3 
@@ -49,6 +50,7 @@ bb0:
 // CHECK-NEXT:  } // end sil function 'delete_next_forward'
 sil @delete_next_forward : $@convention(thin) () -> () {
 bb0:
+  specify_test "instruction_iteration"
   %0 = tuple ()
   %1 = string_literal utf8 "delete_ints"
   %2 = integer_literal $Builtin.Int64, 3 
@@ -69,6 +71,7 @@ bb0:
 // CHECK-NEXT:  } // end sil function 'delete_current_and_next_forward'
 sil @delete_current_and_next_forward : $@convention(thin) () -> () {
 bb0:
+  specify_test "instruction_iteration"
   %0 = tuple ()
   %1 = string_literal utf8 "delete_strings"
   %2 = string_literal utf8 ""
@@ -91,6 +94,7 @@ bb0:
 // CHECK:       } // end sil function 'delete_until_end_forward'
 sil @delete_until_end_forward : $@convention(thin) () -> () {
 bb0:
+  specify_test "instruction_iteration"
   %0 = tuple ()
   %1 = string_literal utf8 "delete_branches"
   %2 = string_literal utf8 "delete_strings"
@@ -117,6 +121,7 @@ bb1:
 // CHECK-NEXT:  } // end sil function 'delete_current_backward'
 sil @delete_current_backward : $@convention(thin) () -> () {
 bb0:
+  specify_test "instruction_iteration"
   %0 = tuple ()
   %1 = integer_literal $Builtin.Int64, 3 
   %2 = string_literal utf8 "delete_strings"
@@ -138,6 +143,7 @@ bb0:
 // CHECK-NEXT:  } // end sil function 'delete_next_backward'
 sil @delete_next_backward : $@convention(thin) () -> () {
 bb0:
+  specify_test "instruction_iteration"
   %0 = tuple ()
   %1 = integer_literal $Builtin.Int64, 3 
   %2 = string_literal utf8 "delete_ints"
@@ -158,6 +164,7 @@ bb0:
 // CHECK-NEXT:  } // end sil function 'delete_current_and_next_backward'
 sil @delete_current_and_next_backward : $@convention(thin) () -> () {
 bb0:
+  specify_test "instruction_iteration"
   %0 = tuple ()
   %1 = string_literal utf8 ""
   %2 = string_literal utf8 "delete_strings"
@@ -178,6 +185,7 @@ bb0:
 // CHECK-NEXT:  } // end sil function 'delete_until_end_backward'
 sil @delete_until_end_backward : $@convention(thin) () -> () {
 bb0:
+  specify_test "instruction_iteration"
   %0 = string_literal utf8 ""
   %1 = string_literal utf8 ""
   %2 = string_literal utf8 "delete_strings"
@@ -204,6 +212,7 @@ bb0:
 // CHECK-NEXT:  } // end sil function 'split_block_forward'
 sil @split_block_forward : $@convention(thin) () -> () {
 bb0:
+  specify_test "instruction_iteration"
   %0 = tuple ()
   %1 = string_literal utf8 "split_block"
   %2 = integer_literal $Builtin.Int64, 3 
@@ -229,6 +238,7 @@ bb0:
 // CHECK-NEXT:  } // end sil function 'split_block_backward'
 sil @split_block_backward : $@convention(thin) () -> () {
 bb0:
+  specify_test "instruction_iteration"
   %0 = tuple ()
   %1 = string_literal utf8 "split_block"
   %2 = integer_literal $Builtin.Int64, 3 
@@ -248,6 +258,7 @@ sil @use2 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer) -> ()
 // LOG:       End function print_uses:
 sil @print_uses : $@convention(thin) () -> () {
 bb0:
+  specify_test "instruction_iteration"
   %0 = string_literal utf8 "print_uses"
   %1 = function_ref @use1 : $@convention(thin) (Builtin.RawPointer) -> ()
   %2 = apply %1(%0) : $@convention(thin) (Builtin.RawPointer) -> ()
@@ -265,6 +276,7 @@ bb0:
 // LOG:       End function delete_first_user:
 sil @delete_first_user : $@convention(thin) () -> () {
 bb0:
+  specify_test "instruction_iteration"
   %0 = string_literal utf8 "delete_first_user"
   %1 = function_ref @use1 : $@convention(thin) (Builtin.RawPointer) -> ()
   %2 = apply %1(%0) : $@convention(thin) (Builtin.RawPointer) -> ()
@@ -283,6 +295,7 @@ bb0:
 // LOG:       End function delete_second_user:
 sil @delete_second_user : $@convention(thin) () -> () {
 bb0:
+  specify_test "instruction_iteration"
   %0 = string_literal utf8 "delete_second_user"
   %1 = function_ref @use1 : $@convention(thin) (Builtin.RawPointer) -> ()
   %2 = apply %1(%0) : $@convention(thin) (Builtin.RawPointer) -> ()

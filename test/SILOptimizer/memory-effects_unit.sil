@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -dump-mem-behavior -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
@@ -46,6 +46,7 @@ sil @store_to_int : $@convention(thin) (Int32, @inout Int32) -> () {
 [%1: write v**]
 [global: ]
 bb0(%0 : $Int32, %1 : $*Int32):
+  specify_test "memory_effects"
   store %0 to %1  : $*Int32
   %r = tuple ()
   return %r : $()
@@ -55,6 +56,7 @@ sil @store_to_x_a : $@convention(thin) (Int32, @guaranteed X) -> () {
 [%1: noescape **, write **]
 [global: ]
 bb0(%0 : $Int32, %1 : $X):
+  specify_test "memory_effects"
   %2 = ref_element_addr %1 : $X, #X.a
   store %0 to %2  : $*Int32
   %r = tuple ()
@@ -63,6 +65,7 @@ bb0(%0 : $Int32, %1 : $X):
 
 sil @only_retain : $@convention(thin) (@guaranteed X) -> () {
 bb0(%0 : $X):
+  specify_test "memory_effects"
   strong_retain %0 : $X
 
   %r = tuple ()
@@ -73,6 +76,7 @@ sil @read_from_raw_pointer : $@convention(thin) (Builtin.RawPointer) -> UInt8 {
 [%0: read v**]
 [global: ]
 bb0(%0 : $Builtin.RawPointer):
+  specify_test "memory_effects"
   %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*UInt8
   %2 = load %1 : $*UInt8
   return %2 : $UInt8
@@ -89,6 +93,7 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK-NEXT:  r=0,w=0
 sil @call_unknown_func : $@convention(thin) (Int32, @in Int32, @in Int32) -> () {
 bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
+  specify_test "memory_effects"
   %3 = function_ref @unknown_func : $@convention(thin) (Int32, @in_guaranteed Int32) -> ()
   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in_guaranteed Int32) -> ()
 
@@ -107,6 +112,7 @@ bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
 // CHECK-NEXT:  r=0,w=0
 sil @call_store_to_int_not_aliased : $@convention(thin) (Int32, @inout Int32, @in Int32) -> () {
 bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
+  specify_test "memory_effects"
   %3 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> ()
   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
 
@@ -125,6 +131,7 @@ bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
 // CHECK-NEXT:  r=0,w=1
 sil @call_store_to_int_aliased : $@convention(thin) (Int32, @guaranteed X, @guaranteed X) -> () {
 bb0(%0 : $Int32, %1 : $X, %2 : $X):
+  specify_test "memory_effects"
   %3 = ref_element_addr %1 : $X, #X.a
   %4 = ref_element_addr %2 : $X, #X.a
   %5 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> ()
@@ -142,6 +149,7 @@ bb0(%0 : $Int32, %1 : $X, %2 : $X):
 
 sil @alias_class_member : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
+  specify_test "memory_effects"
   %1 = alloc_ref $X
   %2 = ref_element_addr %1 : $X, #X.a
   fix_lifetime %2 : $*Int32
@@ -158,6 +166,7 @@ bb0(%0 : $Int32):
 // CHECK-NEXT:  r=0,w=1
 sil @alias_unknown_class_member : $@convention(thin) (Int32, @guaranteed X, @guaranteed X) -> () {
 bb0(%0 : $Int32, %1 : $X, %2 : $X):
+  specify_test "memory_effects"
   %3 = ref_element_addr %1 : $X, #X.a
   fix_lifetime %3 : $*Int32
   %5 = function_ref @store_to_x_a : $@convention(thin) (Int32, @guaranteed X) -> ()
@@ -173,6 +182,7 @@ bb0(%0 : $Int32, %1 : $X, %2 : $X):
 // CHECK-NEXT:  r=0,w=0
 sil @no_alias_to_unknown_class : $@convention(thin) (Int32, @guaranteed X) -> () {
 bb0(%0 : $Int32, %1 : $X):
+  specify_test "memory_effects"
   %2 = alloc_ref $X
   %3 = ref_element_addr %2 : $X, #X.a
   fix_lifetime %3 : $*Int32
@@ -184,6 +194,7 @@ bb0(%0 : $Int32, %1 : $X):
 
 sil @call_only_retain : $@convention(thin) (@guaranteed X, @guaranteed X) -> () {
 bb0(%0 : $X, %1 : $X):
+  specify_test "memory_effects"
   %2 = function_ref @only_retain : $@convention(thin) (@guaranteed X) -> ()
   %3 = apply %2(%0) : $@convention(thin) (@guaranteed X) -> ()
 
@@ -198,6 +209,7 @@ bb0(%0 : $X, %1 : $X):
 // CHECK-NEXT:  r=0,w=0
 sil @allocstack_apply_no_side_effect : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
+  specify_test "memory_effects"
   %1 = alloc_stack $Int32
   %2 = function_ref @nouser_func : $@convention(thin) () -> ()
   %3 = apply %2() : $@convention(thin) () -> ()
@@ -213,6 +225,7 @@ bb0(%0 : $Int32):
 // CHECK-NEXT:  r=0,w=1
 sil @allocstack_apply_side_effect : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
+  specify_test "memory_effects"
   %1 = alloc_stack $Int32
   // function_ref store_to_int
   %2 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> ()
@@ -229,6 +242,7 @@ bb0(%0 : $Int32):
 // CHECK-NEXT:  r=0,w=0
 sil @allocstack_apply_no_escaping : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
+  specify_test "memory_effects"
   %1 = alloc_stack $Int32
   %2 = function_ref @nouser_func : $@convention(thin) () -> ()
   %3 = apply %2() : $@convention(thin) () -> ()
@@ -246,6 +260,7 @@ bb0(%0 : $Int32):
 // CHECK-NEXT: r=1,w=0
 sil @allocstack_apply_read_only : $@convention(thin) (X) -> () {
 bb0(%0 : $X):
+  specify_test "memory_effects"
   %1 = alloc_stack $X
   store %0 to %1 : $*X
   %3 = function_ref @load_from_in : $@convention(thin) (@in_guaranteed X) -> ()
@@ -266,6 +281,7 @@ bb0(%0 : $X):
 // CHECK-NEXT:     r=0,w=0
 sil @allocstack_and_copyaddr : $@convention(thin) (@in Int32) -> Int32 {
 bb0(%0 : $*Int32):
+  specify_test "memory_effects"
   %1 = alloc_stack $Int32
   copy_addr %0 to %1 : $*Int32
   %3 = function_ref @single_indirect_arg : $@convention(thin) (@in_guaranteed Int32) -> Int32
@@ -285,6 +301,7 @@ bb0(%0 : $*Int32):
 // CHECK-NEXT:     r=0,w=0
 sil @inout_and_copyaddr : $@convention(thin) (@in Int32, @inout Int32) -> Int32 {
 bb0(%0 : $*Int32, %1 : $*Int32):
+  specify_test "memory_effects"
   copy_addr %0 to %1 : $*Int32
   %3 = function_ref @single_indirect_arg : $@convention(thin) (@in_guaranteed Int32) -> Int32
   %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed Int32) -> Int32
@@ -302,6 +319,7 @@ bb0(%0 : $*Int32, %1 : $*Int32):
 // CHECK-NEXT:     r=1,w=1
 sil @escaping_allocstack_and_copyaddr : $@convention(thin) (@in Int32) -> Int32 {
 bb0(%0 : $*Int32):
+  specify_test "memory_effects"
   %1 = alloc_stack $Int32
   copy_addr %0 to %1 : $*Int32
   %3 = address_to_pointer %1 : $*Int32 to $Builtin.RawPointer
@@ -318,6 +336,7 @@ bb0(%0 : $*Int32):
 // CHECK-NEXT:     r=1,w=0
 sil @escaping_allocstack_to_known_function : $@convention(thin) (UInt8) -> UInt8 {
 bb0(%0 : $UInt8):
+  specify_test "memory_effects"
   %1 = alloc_stack $UInt8
   store %0 to %1 : $*UInt8
   %3 = address_to_pointer %1 : $*UInt8 to $Builtin.RawPointer
@@ -338,6 +357,7 @@ bb0(%0 : $UInt8):
 // CHECK-NEXT:     r=0,w=0
 sil @tryapply_allocstack_and_copyaddr : $@convention(thin) (@in Int32) -> Int32 {
 bb0(%0 : $*Int32):
+  specify_test "memory_effects"
   %1 = alloc_stack $Int32
   copy_addr %0 to %1 : $*Int32
   %3 = function_ref @single_indirect_arg_and_error : $@convention(thin) (@in Int32) -> (Int32, @error Error)
@@ -376,6 +396,7 @@ bb2(%8 : $Error):
 // CHECK-NEXT:     r=0,w=0
 sil @beginapply_allocstack_and_copyaddr : $@convention(thin) (@in Int32) -> Int32 {
 bb0(%0 : $*Int32):
+  specify_test "memory_effects"
   %1 = alloc_stack $Int32
   copy_addr %0 to %1 : $*Int32
   %3 = function_ref @single_indirect_arg_coroutine : $@yield_once @convention(thin) (@in Int32) -> @yields Int32
@@ -397,6 +418,7 @@ bb2:
 // CHECK-NEXT:     r=0,w=1
 sil @test_indirect_yield : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
+  specify_test "memory_effects"
   %1 = alloc_stack $Int32
   store %0 to %1 : $*Int32
   %3 = function_ref @indirect_yield_coroutine : $@yield_once @convention(thin) (@inout Int32) -> @yields @inout Int32
@@ -431,6 +453,7 @@ bb0(%0 : $Int32):
 // CHECK-NEXT:     r=1,w=1
 sil [ossa] @read_none_end_apply : $@convention(thin) (@in Int32) -> () {
 bb0(%0 : $*Int32):
+  specify_test "memory_effects"
   %3 = function_ref @read_none_coroutine : $@yield_once @convention(thin) () -> @yields @inout Int32
   (%4, %5) = begin_apply %3() : $@yield_once @convention(thin) () -> @yields @inout Int32
   cond_br undef, bb1, bb2
@@ -450,6 +473,7 @@ bb2:
 // CHECK-NEXT:    r=1,w=1
 sil @refelementaddr_and_reference : $@convention(thin) (@guaranteed X) -> Int32 {
 bb0(%0 : $X):
+  specify_test "memory_effects"
   %1 = ref_element_addr %0 : $X, #X.a
   %2 = function_ref @single_reference : $@convention(thin) (@guaranteed X) -> Int32
   %3 = apply %2(%0) : $@convention(thin) (@guaranteed X) -> Int32
@@ -463,6 +487,7 @@ bb0(%0 : $X):
 // CHECK-NEXT:    r=0,w=0
 sil @apply_and_begin_access : $@convention(thin) (@in Int32) -> Int32 {
 bb0(%0 : $*Int32):
+  specify_test "memory_effects"
   %1 = alloc_stack $Int32
   %2 = begin_access [read] [static] %0 : $*Int32
   copy_addr %2 to %1 : $*Int32
@@ -475,6 +500,7 @@ bb0(%0 : $*Int32):
 
 sil @load_from_in : $@convention(thin) (@in_guaranteed X) -> () {
 bb0(%0 : $*X):
+  specify_test "memory_effects"
   %1 = load %0 : $*X
   %2 = tuple ()
   return %2 : $()
@@ -500,6 +526,7 @@ struct TwoInts {
 // CHECK-NEXT:   r=0,w=1
 sil @combination_of_read_and_write_effects : $@convention(thin) () -> () {
 bb0:
+  specify_test "memory_effects"
   %0 = alloc_stack $TwoInts
   %1 = struct_element_addr %0 : $*TwoInts, #TwoInts.i1
   %2 = struct_element_addr %0 : $*TwoInts, #TwoInts.i2
@@ -525,6 +552,7 @@ bb0:
 // CHECK-NEXT:     r=0,w=0
 sil @non_overlapping_struct_fields : $@convention(thin) (@in TwoInts) -> Int32 {
 bb0(%0 : $*TwoInts):
+  specify_test "memory_effects"
   %1 = struct_element_addr %0 : $*TwoInts, #TwoInts.i1
   %2 = struct_element_addr %0 : $*TwoInts, #TwoInts.i2
   %3 = function_ref @single_indirect_arg : $@convention(thin) (@in_guaranteed Int32) -> Int32
@@ -537,6 +565,7 @@ sil @copy_ints : $@convention(thin) (@inout Int32, @inout Int32) -> () {
 [%1: write v**]
 [global: ]
 bb0(%0 : $*Int32, %1 : $*Int32):
+  specify_test "memory_effects"
   %2 = load %0 : $*Int32
   store %2 to %1 : $*Int32
   %r = tuple()
@@ -552,6 +581,7 @@ sil @test_in_guaranteed_only_fun_is_ro_callee : $@convention(thin) (@in_guarante
 // CHECK-NEXT:  r=1,w=0
 sil @test_in_guaranteed_only_fun_is_ro_entry : $@convention(thin) (@in Int) -> () {
 bb0(%0 : $*Int):
+  specify_test "memory_effects"
   %f_callee = function_ref @test_in_guaranteed_only_fun_is_ro_callee : $@convention(thin) (@in_guaranteed Int) -> ()
   %r1 = apply %f_callee(%0) : $@convention(thin) (@in_guaranteed Int) -> ()
 
@@ -581,6 +611,7 @@ bb0(%0 : $*Int):
 // CHECK-NEXT:   r=1,w=1
 sil [ossa] @testLetSideEffects : $@convention(thin) (@owned Parent, @inout Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : @owned $Parent, %1 : $*Builtin.Int32):
+  specify_test "memory_effects"
   %borrow1 = begin_borrow %0 : $Parent
   %childAdr = ref_element_addr %borrow1 : $Parent, #Parent.child
   %child = load_borrow %childAdr : $*C
@@ -645,6 +676,7 @@ bb0(%0 : @owned $Parent, %1 : $*Builtin.Int32):
 // CHECK-NEXT:  r=1,w=1
 sil [ossa] @testReadWriteAccess : $@convention(thin) (@inout Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $*Builtin.Int32):
+  specify_test "memory_effects"
   %read = begin_access [read] [static] %0 : $*Builtin.Int32
   %val = load [trivial] %read : $*Builtin.Int32
   end_access %read : $*Builtin.Int32
@@ -666,6 +698,7 @@ bb0(%0 : $*Builtin.Int32):
 // CHECK-NEXT:   r=1,w=1
 sil [ossa] @testDeinitAccess : $@convention(thin) (@in Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
+  specify_test "memory_effects"
   %1 = begin_access [deinit] [static] %0 : $*Builtin.Int32
   end_access %1 : $*Builtin.Int32
   %r = tuple ()
@@ -683,6 +716,7 @@ bb0(%0 : $*Builtin.Int32):
 // CHECK-NEXT:  r=0,w=1
 sil [ossa] @testInitAccess : $@convention(thin) (Builtin.Int32) -> @out Builtin.Int32 {
 bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
+  specify_test "memory_effects"
   %init = begin_access [init] [static] %0 : $*Builtin.Int32
   store %1 to [trivial] %init : $*Builtin.Int32
   end_access %init : $*Builtin.Int32
@@ -706,6 +740,7 @@ bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
 // CHECK-NEXT:   r=1,w=1
 sil [ossa] @testReadAccessOfClassProperty : $@convention(thin) (@guaranteed X) -> Int32 {
 bb0(%0 : @guaranteed $X):
+  specify_test "memory_effects"
   %1 = ref_element_addr %0 : $X, #X.a
   %2 = begin_access [read] [dynamic] %1 : $*Int32
   %3 = load [trivial] %2 : $*Int32
@@ -731,6 +766,7 @@ bb0(%0 : @guaranteed $X):
 // CHECK-NEXT:   r=1,w=1
 sil [ossa] @testModifyAccessOfClassProperty : $@convention(thin) (@guaranteed X, Int32) -> () {
 bb0(%0 : @guaranteed $X, %1 : $Int32):
+  specify_test "memory_effects"
   %2 = ref_element_addr %0 : $X, #X.a
   %3 = begin_access [modify] [dynamic] %2 : $*Int32
   store %1 to [trivial] %3 : $*Int32
@@ -749,6 +785,7 @@ bb0(%0 : @guaranteed $X, %1 : $Int32):
 // CHECK-NEXT:   r=1,w=0
 sil [ossa] @testImmutableRefWithGuaranteedParam : $@convention(thin) (@guaranteed X) -> Int32 {
 bb0(%0 : @guaranteed $X):
+  specify_test "memory_effects"
   %1 = ref_element_addr [immutable] %0 : $X, #X.a
   %3 = load [trivial] %1 : $*Int32
   %5 = function_ref @nouser_func : $@convention(thin) () -> ()
@@ -763,6 +800,7 @@ bb0(%0 : @guaranteed $X):
 // CHECK-NEXT:   r=1,w=0
 sil @testNonOSSAImmutableRefWithGuaranteedParam : $@convention(thin) (@guaranteed X) -> Int32 {
 bb0(%0 : $X):
+  specify_test "memory_effects"
   %1 = ref_element_addr [immutable] %0 : $X, #X.a
   %3 = load %1 : $*Int32
   %5 = function_ref @nouser_func : $@convention(thin) () -> ()
@@ -780,6 +818,7 @@ bb0(%0 : $X):
 // CHECK-NEXT:   r=1,w=1
 sil [ossa] @testImmutableRefWithBorrow : $@convention(thin) (@owned X) -> Int32 {
 bb0(%0 : @owned $X):
+  specify_test "memory_effects"
   %1 = begin_borrow %0 : $X
   %2 = ref_element_addr [immutable] %1 : $X, #X.a
   %3 = load [trivial] %2 : $*Int32
@@ -814,6 +853,7 @@ bb0(%0 : @owned $X):
 // CHECK-NEXT:   r=1,w=1
 sil [ossa] @testImmutableRefWithControlFlow : $@convention(thin) (@owned X) -> Int32 {
 bb0(%0 : @owned $X):
+  specify_test "memory_effects"
   %1 = function_ref @nouser_func : $@convention(thin) () -> ()
   %2 = apply %1() : $@convention(thin) () -> ()
   %3 = begin_borrow %0 : $X
@@ -844,6 +884,7 @@ bb4:
 // CHECK-NEXT:   r=0,w=0
 sil @dontCrashWithOptionalNone : $@convention(thin) () -> () {
 bb0:
+  specify_test "memory_effects"
   %26 = enum $Optional<X>, #Optional.none!enumelt
   switch_enum %26 : $Optional<X>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
 bb1:
@@ -870,6 +911,7 @@ bb3:
 // CHECK-NEXT:   r=0,w=0
 sil [ossa] @testLoadTake : $@convention(thin) (@in C, @in_guaranteed C) -> @owned C {
 bb0(%0 : $*C, %1 : $*C):
+  specify_test "memory_effects"
   %2 = load [take] %0 : $*C
   return %2 : $C
 }
@@ -884,6 +926,7 @@ sil_global hidden @globalCVar : $C
 // CHECK-NEXT:   r=1,w=0
 sil hidden @testGlobalLet : $@convention(thin) () -> () {
 bb0:
+  specify_test "memory_effects"
   %0 = global_addr @globalC : $*C
   %1 = load %0 : $*C
   %2 = function_ref @nouser_func : $@convention(thin) () -> ()
@@ -901,6 +944,7 @@ bb0:
 // CHECK-NEXT:   r=1,w=1
 sil hidden [global_init_once_fn] @testInitGlobalLet : $@convention(thin) () -> () {
 bb0:
+  specify_test "memory_effects"
   %0 = global_addr @globalC : $*C
   %1 = function_ref @init_C : $@convention(thin) () -> @out C
   %2 = apply %1(%0) : $@convention(thin) () -> @out C
@@ -916,6 +960,7 @@ bb0:
 // CHECK-NEXT:   r=1,w=1
 sil [global_init_once_fn] @main : $@convention(thin) () -> () {
 bb0:
+  specify_test "memory_effects"
   %0 = global_addr @globalC : $*C
   %1 = function_ref @init_C : $@convention(thin) () -> @out C
   %2 = apply %1(%0) : $@convention(thin) () -> @out C
@@ -931,6 +976,7 @@ bb0:
 // CHECK-NEXT:   r=1,w=1
 sil hidden @testGlobalVar : $@convention(thin) () -> () {
 bb0:
+  specify_test "memory_effects"
   %0 = global_addr @globalCVar : $*C
   %1 = load %0 : $*C
   %2 = function_ref @nouser_func : $@convention(thin) () -> ()
@@ -941,6 +987,7 @@ bb0:
 
 sil [global_init] @addressor_of_globalC : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
+  specify_test "memory_effects"
   %0 = global_addr @globalC : $*C
   %1 = address_to_pointer %0 : $*C to $Builtin.RawPointer
   return %1 : $Builtin.RawPointer
@@ -948,6 +995,7 @@ bb0:
 
 sil [global_init] @addressor_of_globalCVar : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
+  specify_test "memory_effects"
   %0 = global_addr @globalCVar : $*C
   %1 = address_to_pointer %0 : $*C to $Builtin.RawPointer
   return %1 : $Builtin.RawPointer
@@ -960,6 +1008,7 @@ bb0:
 // CHECK-NEXT:   r=1,w=0
 sil @testGlobalViaAddressorLet : $@convention(thin) () -> () {
 bb0:
+  specify_test "memory_effects"
   %0 = function_ref @addressor_of_globalC : $@convention(thin) () -> Builtin.RawPointer
   %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*C
@@ -979,6 +1028,7 @@ bb0:
 // CHECK-NEXT:   r=1,w=1
 sil @testGlobalViaAddressorVar : $@convention(thin) () -> () {
 bb0:
+  specify_test "memory_effects"
   %0 = function_ref @addressor_of_globalCVar : $@convention(thin) () -> Builtin.RawPointer
   %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*C
@@ -1000,6 +1050,7 @@ bb0:
 // CHECK-NEXT:   r=0,w=0
 sil @testGlobalAliasing : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
+  specify_test "memory_effects"
   %1 = function_ref @addressor_of_globalCVar : $@convention(thin) () -> Builtin.RawPointer
   %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
   %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*C
@@ -1026,6 +1077,7 @@ bb0(%0 : $C):
 // CHECK-NEXT:   r=0,w=0
 sil hidden @testDeinitInstVsNonAddressValue : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
+  specify_test "memory_effects"
   %1 = global_addr @globalC : $*C
   %2 = load %1 : $*C
   %3 = ref_element_addr %2 : $C, #C.prop
@@ -1052,6 +1104,7 @@ struct Int64Wrapper {
 // CHECK-NEXT: r=1,w=1
 sil @testNestedAccessWithInterposedProjection : $@convention(thin) (@inout Int64Wrapper) -> () {
 bb0(%0 : $*Int64Wrapper):
+  specify_test "memory_effects"
   %1 = begin_access [modify] [static] %0 : $*Int64Wrapper
   %2 = struct_element_addr %1 : $*Int64Wrapper, #Int64Wrapper.val
   %3 = begin_access [read] [static] %2 : $*Int64
@@ -1078,6 +1131,7 @@ bb0(%0 : $*Int64Wrapper):
 // CHECK-NEXT:   r=0,w=0
 sil @test_copy_addr_initialize : $@convention(thin) (@inout C, @inout C) -> @out C {
 bb0(%0 : $*C, %1 : $*C, %2: $*C):
+  specify_test "memory_effects"
   copy_addr %1 to [init] %0 : $*C
   %6 = tuple ()
   return %6 : $()
@@ -1098,6 +1152,7 @@ bb0(%0 : $*C, %1 : $*C, %2: $*C):
 // CHECK-NEXT:   r=0,w=0
 sil @test_copy_addr_assign : $@convention(thin) (@inout C, @inout C, @inout C) -> () {
 bb0(%0 : $*C, %1 : $*C, %2: $*C):
+  specify_test "memory_effects"
   copy_addr %1 to %0 : $*C
   %6 = tuple ()
   return %6 : $()
@@ -1118,6 +1173,7 @@ bb0(%0 : $*C, %1 : $*C, %2: $*C):
 // CHECK-NEXT:   r=0,w=0
 sil @test_copy_addr_take : $@convention(thin) (@in C, @inout C) -> @out C {
 bb0(%0 : $*C, %1 : $*C, %2: $*C):
+  specify_test "memory_effects"
   copy_addr [take] %1 to [init] %0 : $*C
   %6 = tuple ()
   return %6 : $()
@@ -1134,6 +1190,7 @@ bb0(%0 : $*C, %1 : $*C, %2: $*C):
 // CHECK-NEXT:   r=0,w=0
 sil [ossa] @test_destroy_value : $@convention(thin) (@in C) -> () {
 bb0 (%0 : $*C):
+  specify_test "memory_effects"
   %1 = load [copy] %0 : $*C
   destroy_value %1 : $C
   destroy_addr %0 : $*C
@@ -1148,6 +1205,7 @@ bb0 (%0 : $*C):
 // CHECK-NEXT:   r=1,w=1
 sil [ossa] @test_destroy_value_with_effects : $@convention(thin) (@owned X) -> () {
 bb0 (%0 : @owned $X):
+  specify_test "memory_effects"
   %1 = begin_borrow %0 : $X
   %2 = ref_element_addr %1 : $X, #X.x
   fix_lifetime %2 : $*X
@@ -1163,6 +1221,7 @@ bb0 (%0 : @owned $X):
 // CHECK-NEXT:    r=0,w=0
 sil [ossa] @test_deadend_destroy_value : $@convention(thin) (@owned X) -> () {
 bb0 (%0 : @owned $X):
+  specify_test "memory_effects"
   %1 = begin_borrow %0 : $X
   %2 = ref_element_addr %1 : $X, #X.x
   fix_lifetime %2 : $*X
@@ -1178,6 +1237,7 @@ bb0 (%0 : @owned $X):
 // CHECK-NEXT:   r=0,w=0
 sil [ossa] @test_copy_value : $@convention(thin) (@in C) -> () {
 bb0 (%0 : $*C):
+  specify_test "memory_effects"
   %1 = load [copy] %0 : $*C
   %2 = copy_value %1 : $C
   destroy_value %1 : $C
@@ -1203,6 +1263,7 @@ sil @do_store : $@convention(thin) (@guaranteed Parent) -> () {
 // CHECK-NEXT:    r=1,w=1
 sil @test_double_class_indirection : $@convention(thin) (Builtin.Int32) -> () {
 bb0(%0 : $Builtin.Int32):
+  specify_test "memory_effects"
   %1 = alloc_ref $Parent
   %2 = alloc_ref $C
   %3 = ref_element_addr %1 : $Parent, #Parent.child
@@ -1231,6 +1292,7 @@ sil @g_init : $@convention(c) () -> ()
 // CHECK-NEXT:    r=0,w=0
 sil @test_builtin_once : $@convention(thin) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
+  specify_test "memory_effects"
   %1 = global_addr @gi : $*Int
   %2 = alloc_stack $Int
   %3 = function_ref @g_init : $@convention(c) () -> ()
@@ -1256,6 +1318,7 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK-NEXT:    r=0,w=0
 sil @test_debug_value : $@convention(thin) () -> () {
 bb0:
+  specify_test "memory_effects"
   %0 = alloc_stack $Int
   %1 = alloc_stack $Int
   debug_value %0 : $*Int, let, name "x"
@@ -1273,6 +1336,7 @@ bb0:
 // CHECK-NEXT:     r=0,w=0
 sil [ossa] @test_debug_step : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
+  specify_test "memory_effects"
   debug_step
   %99 = tuple ()
   return %99 : $()
@@ -1297,6 +1361,7 @@ bb0(%0 : $*Int):
 // CHECK-NEXT:    r=1,w=1
 sil [ossa] @test_store_assign : $@convention(thin) (@inout C, @inout C, @owned C) -> () {
 bb0(%0 : $*C, %1 : $*C, %2 : @owned $C):
+  specify_test "memory_effects"
   %3 = global_addr @globalC : $*C
   %4 = global_addr @globalCVar : $*C
   store %2 to [assign] %0 : $*C
@@ -1315,6 +1380,7 @@ bb0(%0 : $*C, %1 : $*C, %2 : @owned $C):
 // CHECK-NEXT:    r=0,w=1
 sil @test_builtin_zeroInitializer : $@convention(thin) () -> () {
 bb0:
+  specify_test "memory_effects"
   %0 = alloc_stack $C
   %1 = alloc_stack $C
   %2 = builtin "zeroInitializer"(%1 : $*C) : $()
@@ -1338,6 +1404,7 @@ bb0:
 // CHECK-NEXT:    r=0,w=1
 sil @test_builtin_zeroInitializer_atomicload : $@convention(thin) () -> Builtin.Int64 {
 bb0:
+  specify_test "memory_effects"
   %0 = alloc_stack $C
   %1 = alloc_stack $C
   %2 = builtin "zeroInitializer"(%1 : $*C) : $()
@@ -1362,6 +1429,7 @@ bb0:
 // CHECK-NEXT:    r=0,w=1
 sil @test_builtin_zeroInitializer_atomicstore : $@convention(thin) () -> () {
 bb0:
+  specify_test "memory_effects"
   %0 = alloc_stack $C
   %1 = alloc_stack $C
   %2 = builtin "zeroInitializer"(%1 : $*C) : $()
@@ -1388,6 +1456,7 @@ bb0:
 // CHECK-NEXT:    r=0,w=1
 sil @test_builtin_zeroInitializer_atomicrmw : $@convention(thin) () -> (Builtin.Int64, Builtin.Int64) {
 bb0:
+  specify_test "memory_effects"
   %0 = alloc_stack $C
   %1 = alloc_stack $C
   %2 = builtin "zeroInitializer"(%1 : $*C) : $()
@@ -1415,6 +1484,7 @@ bb0:
 // CHECK-NEXT:    r=0,w=1
 sil @test_builtin_zeroInitializer_cmpxchg : $@convention(thin) () -> (Builtin.Int64, Builtin.Int1) {
 bb0:
+  specify_test "memory_effects"
   %0 = alloc_stack $C
   %1 = alloc_stack $C
   %2 = builtin "zeroInitializer"(%1 : $*C) : $()
@@ -1440,6 +1510,7 @@ bb0:
 // CHECK-NEXT:    r=0,w=1
 sil @test_builtin_zeroInitializer_fence : $@convention(thin) () -> () {
 bb0:
+  specify_test "memory_effects"
   %0 = alloc_stack $C
   %1 = alloc_stack $C
   %2 = builtin "zeroInitializer"(%1 : $*C) : $()
@@ -1471,6 +1542,7 @@ bb0:
 // CHECK-NEXT:    r=0,w=1
 sil @builtin_initializer_and_class : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
+  specify_test "memory_effects"
   %1 = ref_element_addr %0, #C.prop
   %2 = alloc_stack $Int32
   %3 = builtin "zeroInitializer"(%2 : $*Int32) : $()
@@ -1487,6 +1559,7 @@ bb0(%0 : $C):
 // CHECK-NEXT:    r=1,w=1
 sil @test_stored_pointer : $@convention(thin) () -> () {
 bb0:
+  specify_test "memory_effects"
   %0 = alloc_stack $Int
   %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
   %2 = alloc_stack $Builtin.RawPointer
@@ -1514,6 +1587,7 @@ bb0:
 // CHECK-NEXT:   r=1,w=1
 sil [ossa] @test_store_borrow : $@convention(thin) (@guaranteed X) -> () {
 bb0(%0 :  @guaranteed $X):
+  specify_test "memory_effects"
   %1 = alloc_stack $X
   %2 = store_borrow %0 to %1 : $*X
   end_borrow %2 : $*X
@@ -1537,6 +1611,7 @@ bb0(%0 :  @guaranteed $X):
 // CHECK-NEXT:   r=1,w=1
 sil [ossa] @test_end_borrow1 : $@convention(thin) (@owned X) -> @owned X {
 bb0(%0 : @owned $X):
+  specify_test "memory_effects"
   %1 = begin_borrow %0 : $X
   %2 = alloc_stack $X
   dealloc_stack %2 : $*X
@@ -1554,6 +1629,7 @@ bb0(%0 : @owned $X):
 // CHECK-NEXT:   r=0,w=0
 sil [ossa] @test_end_borrow2 : $@convention(thin) (@guaranteed X) -> Int32 {
 bb0(%0 : @guaranteed $X):
+  specify_test "memory_effects"
   %1 = ref_element_addr %0 : $X, #X.x
   %2 = load [copy] %1 : $*X
   %3 = begin_borrow %2 : $X
@@ -1591,6 +1667,7 @@ bb0(%0 : @guaranteed $X):
 // CHECK-NEXT:   r=0,w=0
 sil [ossa] @test_end_borrow3 : $@convention(thin) (@guaranteed X, @owned X) -> @owned (X, X) {
 bb0(%0 : @guaranteed $X, %1 : @owned $X):
+  specify_test "memory_effects"
   %2 = begin_borrow %1 : $X
   %3 = ref_element_addr %2 : $X, #X.x
   %4 = ref_element_addr %0 : $X, #X.x
@@ -1630,6 +1707,7 @@ bb0(%0 : @guaranteed $X, %1 : @owned $X):
 // CHECK-NEXT:   r=0,w=0
 sil [ossa] @test_end_borrow4 : $@convention(thin) (@guaranteed X, @in_guaranteed X) -> @owned X {
 bb0(%0 : @guaranteed $X, %1 : $*X):
+  specify_test "memory_effects"
   %2 = begin_borrow %0 : $X
   %3 = load_borrow %1 : $*X
   %4 = ref_element_addr %3 : $X, #X.x
@@ -1649,6 +1727,7 @@ bb0(%0 : @guaranteed $X, %1 : $*X):
 // CHECK-NEXT:   r=1,w=1
 sil [ossa] @test_end_borrow5 : $@convention(thin) (@guaranteed X) -> () {
 bb0(%0 : @guaranteed $X):
+  specify_test "memory_effects"
   %1 = ref_element_addr [immutable] %0 : $X, #X.x
   %2 = load_borrow %1 : $*X
   %3 = unconditional_checked_cast %2 : $X to Derived
@@ -1686,6 +1765,7 @@ bb0(%0 : @guaranteed $X):
 // CHECK-NEXT:   r=1,w=1
 sil [ossa] @test_load_borrow : $@convention(thin) (@inout X) -> () {
 bb0(%0 : $*X):
+  specify_test "memory_effects"
   %1 = load_borrow %0 : $*X
   %2 = alloc_stack $X
   dealloc_stack %2 : $*X
@@ -1712,6 +1792,7 @@ bb0(%0 : $*X):
 // CHECK-NEXT:   r=1,w=1
 sil [ossa] @test_immutable_end_borrow : $@convention(thin) (@owned X) -> @owned X {
 bb0(%0 : @owned $X):
+  specify_test "memory_effects"
   %1 = begin_borrow %0 : $X
   %2 = alloc_stack $X
   dealloc_stack %2 : $*X
@@ -1732,6 +1813,7 @@ sil @indirect_X : $@convention(thin) (@in_guaranteed X) -> ()
 // CHECK-NEXT:   r=1,w=1
 sil [ossa] @test_escaping_partial_apply : $@convention(thin) (@in X) -> () {
 bb0(%0 :  $*X):
+  specify_test "memory_effects"
   %1 = function_ref @indirect_X : $@convention(thin) (@in_guaranteed X) -> ()
   %2 = partial_apply %1(%0) : $@convention(thin) (@in_guaranteed X) -> ()
   destroy_value %2 : $@callee_owned () -> () 
@@ -1750,6 +1832,7 @@ bb0(%0 :  $*X):
 // CHECK-NEXT:   r=0,w=0
 sil [ossa] @test_non_escaping_partial_apply : $@convention(thin) (@in X) -> () {
 bb0(%0 :  $*X):
+  specify_test "memory_effects"
   %1 = function_ref @indirect_X : $@convention(thin) (@in_guaranteed X) -> ()
   %2 = partial_apply [on_stack] %1(%0) : $@convention(thin) (@in_guaranteed X) -> ()
   destroy_value %2 : $@noescape @callee_owned () -> () 
@@ -1769,6 +1852,7 @@ bb0(%0 :  $*X):
 // CHECK-NEXT:    r=0,w=0
 sil [ossa] @test_non_escaping_applied : $@convention(thin) (@in X) -> () {
 bb0(%0 :  $*X):
+  specify_test "memory_effects"
   %1 = function_ref @indirect_X : $@convention(thin) (@in_guaranteed X) -> ()
   %2 = partial_apply [on_stack] %1(%0) : $@convention(thin) (@in_guaranteed X) -> ()
   %3 = apply %2() : $@noescape @callee_owned () -> ()
@@ -1791,6 +1875,7 @@ sil @closure2 : $@convention(thin) (Int, @inout_aliasable Int) -> ()
 // CHECK-NEXT:    r=1,w=1
 sil @closure_with_inout : $@convention(thin) (@inout Int) -> () {
 bb0(%0 : $*Int):
+  specify_test "memory_effects"
   %1 = function_ref @closure : $@convention(thin) (@inout_aliasable Int) -> ()
   %2 = partial_apply [callee_guaranteed] [on_stack] %1(%0) : $@convention(thin) (@inout_aliasable Int) -> ()
   %3 = apply %2() : $@noescape @callee_guaranteed () -> ()
@@ -1814,6 +1899,7 @@ bb0(%0 : $*Int):
 // CHECK-NEXT:    r=1,w=1
 sil @two_closures_with_inout : $@convention(thin) (@inout Int, Int) -> () {
 bb0(%0 : $*Int, %1 : $Int):
+  specify_test "memory_effects"
   %2 = function_ref @closure2 : $@convention(thin) (Int, @inout_aliasable Int) -> ()
   %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (Int, @inout_aliasable Int) -> ()
   %4 = partial_apply [callee_guaranteed] [on_stack] %3(%1) : $@noescape @callee_guaranteed (Int) -> ()
@@ -1840,6 +1926,7 @@ sil @call_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed
 // CHECK-NEXT:    r=1,w=1
 sil @pass_closure_to_function : $@convention(thin) (@inout Int) -> () {
 bb0(%0 : $*Int):
+  specify_test "memory_effects"
   %4 = function_ref @closure : $@convention(thin) (@inout_aliasable Int) -> ()
   %5 = partial_apply [callee_guaranteed] [on_stack] %4(%0) : $@convention(thin) (@inout_aliasable Int) -> ()
   %6 = function_ref @call_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
@@ -1860,6 +1947,7 @@ bb0(%0 : $*Int):
 // CHECK-NEXT:   r=0,w=0
 sil [ossa] @test_is_unique : $@convention(thin) (@in X, @in X) -> () {
 bb0(%0 :  $*X, %1 :  $*X):
+  specify_test "memory_effects"
   %2 = is_unique %0 : $*X
   destroy_addr %0 : $*X
   destroy_addr %1 : $*X
@@ -1882,6 +1970,7 @@ bb0(%0 :  $*X, %1 :  $*X):
 // CHECK-NEXT:   r=1,w=0
 sil [ossa] @test_unchecked_addr_cast : $@convention(thin) (@in_guaranteed X) -> @owned C {
 bb0(%0 :  $*X):
+  specify_test "memory_effects"
   %1 = unchecked_addr_cast %0 : $*X to $*C
   %2 = load [copy] %1 : $*C
   %3 = is_unique %1 : $*C
@@ -1897,6 +1986,7 @@ bb0(%0 :  $*X):
 // CHECK-NEXT:   r=1,w=1
 sil @test_release_of_class_with_let : $@convention(thin) (@owned CL) -> () {
 bb0(%0 : $CL):
+  specify_test "memory_effects"
   %1 = ref_element_addr [immutable] %0, #CL.x
   strong_release %0
   %3 = tuple ()
@@ -1910,6 +2000,7 @@ bb0(%0 : $CL):
 // CHECK-NEXT:    r=1,w=1
 sil @test_consume_of_class_with_let : $@convention(thin) (@owned CL) -> () {
 bb0(%0 : $CL):
+  specify_test "memory_effects"
   %1 = ref_element_addr [immutable] %0, #CL.x
   %4 = function_ref @consume : $@convention(thin) (@owned CL) -> ()
   apply %4(%0) : $@convention(thin) (@owned CL) -> ()
@@ -1924,6 +2015,7 @@ bb0(%0 : $CL):
 // CHECK-NEXT:    r=1,w=1
 sil [ossa] @test_ossa_consume_of_class_with_let : $@convention(thin) (@owned CL) -> () {
 bb0(%0 : @owned $CL):
+  specify_test "memory_effects"
   %1 = begin_borrow %0
   %2 = ref_element_addr [immutable] %1, #CL.x
   end_borrow %1
@@ -1956,6 +2048,7 @@ bb0(%0 : @owned $CL):
 // CHECK-NEXT:    r=0,w=0
 sil [ossa] @test_mark_dependence : $@convention(thin) (@in_guaranteed C, @in_guaranteed C, @owned C) -> @owned C {
 bb0(%0 : $*C, %1 : $*C, %2 : @owned $C):
+  specify_test "memory_effects"
   %3 = mark_dependence %1 on %2
   %4 = mark_dependence %2 on %0
   %5 = mark_dependence %1 on %0
@@ -1981,6 +2074,7 @@ bb0(%0 : $*C, %1 : $*C, %2 : @owned $C):
 // CHECK-NEXT:  r=1,w=1
 sil [ossa] @test_mark_dependence_addr : $@convention(thin) (@in_guaranteed C, @inout C, @guaranteed C) -> () {
 bb0(%0 : $*C, %1 : $*C, %2 : @guaranteed $C):
+  specify_test "memory_effects"
   mark_dependence_addr %1 on %2
   mark_dependence_addr %1 on %0
   %99 = tuple ()
@@ -1996,6 +2090,7 @@ sil @returns_tuple : $@convention(thin) () -> (Int64, @out UInt64)
 // CHECK-NEXT:     r=0,w=1
 sil [ossa] @aliasing_apply_with_direct_and_indirect_result : $@convention(thin) () -> @out UInt64 {
 bb0(%0 : $*UInt64):
+  specify_test "memory_effects"
   %1 = function_ref @returns_tuple : $@convention(thin) () -> (Int64, @out UInt64)
   %2 = apply %1(%0) : $@convention(thin) () -> (Int64, @out UInt64)
   %99 = tuple ()

@@ -152,6 +152,8 @@ struct PotentialBinding {
 };
 
 struct LiteralRequirement {
+  /// The literal protocol.
+  ProtocolDecl *Protocol;
   /// The source of the literal requirement.
   Constraint *Source;
   /// The default type associated with this literal (if any).
@@ -164,16 +166,22 @@ struct LiteralRequirement {
   /// this points to the source of the binding.
   mutable Constraint *CoveredBy = nullptr;
 
-  LiteralRequirement(Constraint *source, Type defaultTy, bool isDirect)
-      : Source(source), DefaultType(defaultTy), IsDirectRequirement(isDirect) {}
+  LiteralRequirement(ProtocolDecl *protocol, Constraint *source,
+                     Type defaultTy, bool isDirect)
+      : Protocol(protocol), Source(source), DefaultType(defaultTy),
+        IsDirectRequirement(isDirect) {}
 
   Constraint *getSource() const { return Source; }
 
-  ProtocolDecl *getProtocol() const { return Source->getProtocol(); }
+  ProtocolDecl *getProtocol() const { return Protocol; }
 
   bool isCovered() const { return bool(CoveredBy); }
 
   bool isDirectRequirement() const { return IsDirectRequirement; }
+
+  void setDirectRequirement(bool isDirectRequirement) {
+    IsDirectRequirement = isDirectRequirement;
+  }
 
   bool hasDefaultType() const { return bool(DefaultType); }
 
@@ -241,6 +249,16 @@ struct PotentialBindings {
   llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> SupertypeOf;
   llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
 
+  /// The set of protocol conformance requirements imposed on this type variable.
+  llvm::SmallVector<Constraint *, 4> Protocols;
+
+  /// The set of unique literal protocol requirements placed on this
+  /// type variable.
+  llvm::SmallVector<LiteralRequirement, 2> Literals;
+
+  /// The set of fallback constraints imposed on this type variable.
+  llvm::SmallVector<Constraint *, 2> Defaults;
+
   ASTNode AssociatedCodeCompletionToken = ASTNode();
 
   /// Add a potential binding to the list of bindings,
@@ -256,7 +274,14 @@ struct PotentialBindings {
         });
   }
 
-private:
+  ArrayRef<Constraint *> getConformanceRequirements() const {
+    return Protocols;
+  }
+
+  void inferFromLiteral(ConstraintSystem &CS,
+                        TypeVariableType *TypeVar,
+                        Constraint *literal);
+
   /// Attempt to infer a new binding and other useful information
   /// (i.e. whether bindings should be delayed) from the given
   /// relational constraint.
@@ -265,7 +290,6 @@ private:
       TypeVariableType *TypeVar,
       Constraint *constraint);
 
-public:
   void infer(ConstraintSystem &CS,
              TypeVariableType *TypeVar,
              Constraint *constraint);
@@ -365,18 +389,15 @@ class BindingSet {
 public:
   swift::SmallSetVector<PotentialBinding, 4> Bindings;
 
-  /// The set of protocol conformance requirements placed on this type variable.
-  llvm::SmallVector<Constraint *, 4> Protocols;
-
   /// The set of unique literal protocol requirements placed on this
   /// type variable or inferred transitively through subtype chains.
   ///
   /// Note that ordering is important when it comes to bindings, we'd
   /// like to add any "direct" default types first to attempt them
   /// before transitive ones.
-  llvm::SmallMapVector<ProtocolDecl *, LiteralRequirement, 2> Literals;
+  llvm::SmallVector<LiteralRequirement, 2> Literals;
 
-  llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
+  llvm::SmallVector<Constraint *, 2> Defaults;
 
   /// The set of transitive protocol requirements inferred through
   /// subtype/conversion/equivalence relations with other type variables.
@@ -388,8 +409,6 @@ public:
   BindingSet(BindingSet &&other) = default;
 
   BindingSet(const BindingSet &other) = delete;
-
-  ConstraintSystem &getConstraintSystem() const { return CS; }
 
   TypeVariableType *getTypeVariable() const { return TypeVar; }
 
@@ -457,7 +476,7 @@ public:
     // Literal requirements always result in a subtype/supertype
     // relationship to a concrete type.
     if (llvm::any_of(Literals, [](const auto &literal) {
-          return literal.second.viableAsBinding();
+          return literal.viableAsBinding();
         }))
       return false;
 
@@ -494,10 +513,6 @@ public:
     return hasViableBindings() || isDirectHole();
   }
 
-  ArrayRef<Constraint *> getConformanceRequirements() const {
-    return Protocols;
-  }
-
   unsigned getNumViableLiteralBindings() const;
 
   unsigned getNumViableDefaultableBindings() const {
@@ -505,8 +520,8 @@ public:
       return 1;
 
     auto numDefaultable = llvm::count_if(
-        Defaults, [](const std::pair<CanType, Constraint *> &entry) {
-          return entry.second->getKind() == ConstraintKind::Defaultable;
+        Defaults, [](Constraint *constraint) {
+          return constraint->getKind() == ConstraintKind::Defaultable;
         });
 
     // Short-circuit unviable checks if there are no defaultable bindings.
@@ -518,10 +533,12 @@ public:
     auto unviable =
         llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
           auto type = binding.BindingType->getCanonicalType();
-          auto def = Defaults.find(type);
-          return def != Defaults.end()
-                     ? def->second->getKind() == ConstraintKind::Defaultable
-                     : false;
+          for (auto *constraint : Defaults) {
+            if (constraint->getSecondType()->isEqual(type)) {
+              return constraint->getKind() == ConstraintKind::Defaultable;
+            }
+          }
+          return false;
         });
 
     assert(numDefaultable >= unviable);
@@ -572,6 +589,11 @@ public:
   /// requirements down the subtype or equivalence chain.
   void inferTransitiveProtocolRequirements();
 
+  /// Try to coalesce integer and floating point literal protocols
+  /// if they appear together because the only possible default type that
+  /// could satisfy both requirements is `Double`.
+  void coalesceIntegerAndFloatLiteralRequirements();
+
   /// Check whether the given binding set covers any of the literal protocols
   /// associated with this type variable. The idea is that if a type variable
   /// has a binding like Int and also it has a conformance requirement to
@@ -606,8 +628,6 @@ private:
   /// acquired through transitive inference and requires validity
   /// checking.
   void addBinding(PotentialBinding binding, bool isTransitive);
-
-  void addLiteralRequirement(Constraint *literal);
 
   void addDefault(Constraint *constraint);
 

@@ -38,6 +38,16 @@ void ConstraintGraphNode::initBindingSet() {
   Set.emplace(CG.getConstraintSystem(), TypeVar, Potential);
 }
 
+static bool isDirectRequirement(ConstraintSystem &cs,
+                                TypeVariableType *typeVar,
+                                Constraint *constraint) {
+  if (auto *other = constraint->getFirstType()->getAs<TypeVariableType>()) {
+    return typeVar == cs.getRepresentative(other);
+  }
+
+  return false;
+}
+
 BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
                        const PotentialBindings &info)
     : CS(CS), TypeVar(TypeVar), Info(info) {
@@ -45,30 +55,13 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
   for (const auto &binding : info.Bindings)
     addBinding(binding, /*isTransitive=*/false);
 
-  for (auto *constraint : info.Constraints) {
-    switch (constraint->getKind()) {
-    case ConstraintKind::NonisolatedConformsTo:
-    case ConstraintKind::ConformsTo:
-      if (constraint->getSecondType()->is<ProtocolType>())
-        Protocols.push_back(constraint);
-      break;
+  for (const auto &literal : info.Literals)
+    Literals.push_back(literal);
 
-    case ConstraintKind::LiteralConformsTo:
-      addLiteralRequirement(constraint);
-      break;
-
-    case ConstraintKind::Defaultable:
-    case ConstraintKind::FallbackType:
-      // Do these in a separate pass.
-      if (CS.getFixedTypeRecursive(constraint->getFirstType(), true)
-              ->getAs<TypeVariableType>() == TypeVar) {
-        addDefault(constraint);
-      }
-      break;
-
-    default:
-      break;
-    }
+  for (auto *constraint : info.Defaults) {
+    // Do these in a separate pass.
+    if (isDirectRequirement(CS, TypeVar, constraint))
+      addDefault(constraint);
   }
 
   for (auto &entry : info.AdjacentVars)
@@ -84,9 +77,12 @@ bool BindingSet::forGenericParameter() const {
 }
 
 bool BindingSet::canBeNil() const {
-  auto &ctx = CS.getASTContext();
-  return Literals.count(
-      ctx.getProtocol(KnownProtocolKind::ExpressibleByNilLiteral));
+  for (const auto &literal : Literals) {
+    if (literal.getProtocol()->isSpecificProtocol(
+        KnownProtocolKind::ExpressibleByNilLiteral))
+      return true;
+  }
+  return false;
 }
 
 bool BindingSet::isDirectHole() const {
@@ -435,6 +431,8 @@ void BindingSet::inferTransitiveProtocolRequirements() {
     }
 
     auto &bindings = node.getBindingSet();
+    auto conformanceReqs =
+        node.getPotentialBindings().getConformanceRequirements();
 
     // If current variable already has transitive protocol
     // conformances inferred, there is no need to look deeper
@@ -443,8 +441,8 @@ void BindingSet::inferTransitiveProtocolRequirements() {
       TypeVariableType *parent = nullptr;
       std::tie(parent, currentVar) = workList.pop_back_val();
       assert(parent);
-      propagateProtocolsTo(parent, bindings.getConformanceRequirements(),
-                           *bindings.TransitiveProtocols);
+      propagateProtocolsTo(parent, conformanceReqs,
+                            *bindings.TransitiveProtocols);
       continue;
     }
 
@@ -485,14 +483,16 @@ void BindingSet::inferTransitiveProtocolRequirements() {
       if (!node.hasBindingSet())
         continue;
 
-      const auto &bindings = node.getBindingSet();
+      auto conformanceReqs =
+          node.getPotentialBindings().getConformanceRequirements();
 
       llvm::SmallPtrSet<Constraint *, 2> placeholder;
       // Add any direct protocols from members of the
       // equivalence class, so they could be propagated
       // to all of the members.
-      propagateProtocolsTo(currentVar, bindings.getConformanceRequirements(),
-                           placeholder);
+      propagateProtocolsTo(currentVar, conformanceReqs, placeholder);
+
+      const auto &bindings = node.getBindingSet();
 
       // Since type variables are equal, current type variable
       // becomes a subtype to any supertype found in the current
@@ -512,8 +512,7 @@ void BindingSet::inferTransitiveProtocolRequirements() {
     // are transitive to its parent, propagate them down the subtype/equivalence
     // chain.
     if (parent) {
-      propagateProtocolsTo(parent, bindings.getConformanceRequirements(),
-                           protocols[currentVar]);
+      propagateProtocolsTo(parent, conformanceReqs, protocols[currentVar]);
     }
 
     auto &inferredProtocols = protocols[currentVar];
@@ -526,9 +525,8 @@ void BindingSet::inferTransitiveProtocolRequirements() {
     // - all of the transitive protocols inferred through
     //   the members of the equivalence class.
     {
-      auto directRequirements = bindings.getConformanceRequirements();
-      protocolsForEquivalence.insert(directRequirements.begin(),
-                                     directRequirements.end());
+      protocolsForEquivalence.insert(conformanceReqs.begin(),
+                                     conformanceReqs.end());
 
       protocolsForEquivalence.insert(inferredProtocols.begin(),
                                      inferredProtocols.end());
@@ -618,6 +616,18 @@ void BindingSet::inferTransitiveKeyPathBindings() {
 }
 
 void BindingSet::inferTransitiveSupertypeBindings() {
+  llvm::SmallDenseSet<ProtocolDecl *> seenLiterals;
+  for (const auto &literal : Literals) {
+    bool inserted = seenLiterals.insert(literal.getProtocol()).second;
+    ASSERT(inserted);
+  }
+
+  llvm::SmallDenseSet<Constraint *> seenDefaults;
+  for (auto *constraint : Defaults) {
+    bool inserted = seenDefaults.insert(constraint).second;
+    ASSERT(inserted);
+  }
+
   for (const auto &entry : Info.SupertypeOf) {
     auto &node = CS.getConstraintGraph()[entry.first];
     if (!node.hasBindingSet())
@@ -647,15 +657,25 @@ void BindingSet::inferTransitiveSupertypeBindings() {
     // If one of the literal arguments doesn't propagate its
     // `ExpressibleByStringLiteral` conformance, we'd end up picking
     // `T` with only one type `Any?` which is incorrect.
-    for (const auto &literal : bindings.Literals)
-      addLiteralRequirement(literal.second.getSource());
+    for (auto literal : bindings.Literals) {
+      auto *protocol = literal.getProtocol();
 
-    // Infer transitive defaults.
-    for (const auto &def : bindings.Defaults) {
-      if (def.getSecond()->getKind() == ConstraintKind::FallbackType)
+      if (!seenLiterals.insert(protocol).second)
         continue;
 
-      addDefault(def.second);
+      literal.setDirectRequirement(false);
+      Literals.push_back(literal);
+    }
+
+    // Infer transitive defaults.
+    for (auto *def : bindings.Defaults) {
+      if (def->getKind() == ConstraintKind::FallbackType)
+        continue;
+
+      if (!seenDefaults.insert(def).second)
+        continue;
+
+      addDefault(def);
     }
 
     // TODO: We shouldn't need this in the future.
@@ -842,11 +862,13 @@ bool BindingSet::finalizeKeyPathBindings() {
               (keyPath->getParsedRoot() ||
                (fixedRootTy && !fixedRootTy->isTypeVariableOrMember()))) {
             auto fallback = llvm::find_if(Defaults, [](const auto &entry) {
-              return entry.second->getKind() == ConstraintKind::FallbackType;
+              return entry->getKind() == ConstraintKind::FallbackType;
             });
             assert(fallback != Defaults.end());
             updatedBindings.insert(
-                {fallback->first, AllowedBindingKind::Exact, fallback->second});
+                {(*fallback)->getSecondType(),
+                 AllowedBindingKind::Exact,
+                 *fallback});
           } else {
             updatedBindings.insert(PotentialBinding::forHole(
                 TypeVar, CS.getConstraintLocator(
@@ -996,9 +1018,7 @@ void BindingSet::determineLiteralCoverage() {
 
   bool allowsNil = canBeNil();
 
-  for (auto &entry : Literals) {
-    auto &literal = entry.second;
-
+  for (auto &literal : Literals) {
     if (!literal.viableAsBinding())
       continue;
 
@@ -1025,42 +1045,41 @@ void BindingSet::determineLiteralCoverage() {
   }
 }
 
-void BindingSet::addLiteralRequirement(Constraint *constraint) {
-  auto *protocol = constraint->getProtocol();
+void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
+  decltype(Literals)::iterator intLiteral = Literals.end();
+  decltype(Literals)::iterator floatLiteral = Literals.end();
 
-  // Let's try to coalesce integer and floating point literal protocols
-  // if they appear together because the only possible default type that
-  // could satisfy both requirements is `Double`.
-  {
+  for (auto iter = Literals.begin(); iter != Literals.end(); ++iter) {
+    auto *protocol = iter->getProtocol();
+
     if (protocol->isSpecificProtocol(
             KnownProtocolKind::ExpressibleByIntegerLiteral)) {
-      auto *floatLiteral = CS.getASTContext().getProtocol(
-          KnownProtocolKind::ExpressibleByFloatLiteral);
-      if (Literals.count(floatLiteral))
-        return;
+      intLiteral = iter;
     }
 
     if (protocol->isSpecificProtocol(
             KnownProtocolKind::ExpressibleByFloatLiteral)) {
-      auto *intLiteral = CS.getASTContext().getProtocol(
-          KnownProtocolKind::ExpressibleByIntegerLiteral);
-      Literals.erase(intLiteral);
+      floatLiteral = iter;
     }
   }
 
-  if (Literals.count(protocol) > 0)
-    return;
+  if (intLiteral != Literals.end() &&
+      floatLiteral != Literals.end()) {
+    Literals.erase(intLiteral);
+  }
+}
 
-  auto isDirectRequirement = [&](Constraint *constraint) -> bool {
-    if (auto *typeVar = constraint->getFirstType()->getAs<TypeVariableType>()) {
-      auto *repr = CS.getRepresentative(typeVar);
-      return repr == TypeVar;
-    }
+void PotentialBindings::inferFromLiteral(ConstraintSystem &CS,
+                                         TypeVariableType *TypeVar,
+                                         Constraint *constraint) {
+  auto *protocol = constraint->getProtocol();
 
-    return false;
-  };
+  for (const auto &literal : Literals) {
+    if (literal.getProtocol() == protocol)
+      return;
+  }
 
-  bool isDirect = isDirectRequirement(constraint);
+  bool isDirect = isDirectRequirement(CS, TypeVar, constraint);
 
   Type defaultType;
   // `ExpressibleByNilLiteral` doesn't have a default type.
@@ -1069,8 +1088,7 @@ void BindingSet::addLiteralRequirement(Constraint *constraint) {
     defaultType = TypeChecker::getDefaultType(protocol, CS.DC);
   }
 
-  LiteralRequirement literal(constraint, defaultType, isDirect);
-  Literals.insert({protocol, std::move(literal)});
+  Literals.emplace_back(protocol, constraint, defaultType, isDirect);
 }
 
 bool BindingSet::operator==(const BindingSet &other) {
@@ -1080,7 +1098,7 @@ bool BindingSet::operator==(const BindingSet &other) {
   if (Bindings.size() != other.Bindings.size())
     return false;
 
-  for (auto i : indices(Bindings)) {
+  for (unsigned i : indices(Bindings)) {
     const auto &x = Bindings[i];
     const auto &y = other.Bindings[i];
 
@@ -1092,13 +1110,9 @@ bool BindingSet::operator==(const BindingSet &other) {
   if (Literals.size() != other.Literals.size())
     return false;
 
-  for (auto pair : Literals) {
-    auto found = other.Literals.find(pair.first);
-    if (found == other.Literals.end())
-      return false;
-
-    const auto &x = pair.second;
-    const auto &y = found->second;
+  for (unsigned i : indices(Literals)) {
+    auto &x = Literals[i];
+    auto &y = other.Literals[i];
 
     if (x.Source != y.Source ||
         x.DefaultType.getPointer() != y.DefaultType.getPointer() ||
@@ -1110,10 +1124,10 @@ bool BindingSet::operator==(const BindingSet &other) {
   if (Defaults.size() != other.Defaults.size())
     return false;
 
-  for (auto pair : Defaults) {
-    auto found = other.Defaults.find(pair.first);
-    if (found == other.Defaults.end() ||
-        pair.second != found->second)
+  for (auto i : indices(Defaults)) {
+    auto *x = Defaults[i];
+    auto *y = other.Defaults[i];
+    if (x != y)
       return false;
   }
 
@@ -1238,6 +1252,9 @@ const BindingSet *ConstraintSystem::determineBestBindings(
       bestBindings = &bindings;
   }
 
+  if (bestBindings)
+    bestBindings->coalesceIntegerAndFloatLiteralRequirements();
+
   return bestBindings;
 }
 
@@ -1275,8 +1292,12 @@ findInferableTypeVars(Type type,
 }
 
 void BindingSet::addDefault(Constraint *constraint) {
-  auto defaultTy = constraint->getSecondType();
-  Defaults.insert({defaultTy->getCanonicalType(), constraint});
+  if (CONDITIONAL_ASSERT_enabled()) {
+    for (auto *other : Defaults) {
+      ASSERT(other != constraint);
+    }
+  }
+  Defaults.push_back(constraint);
 }
 
 bool LiteralRequirement::isCoveredBy(Type type, ConstraintSystem &CS) const {
@@ -1671,6 +1692,7 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
   (void) bindings.finalizeKeyPathBindings();
   bindings.finalizeUnresolvedMemberChainResult();
   bindings.determineLiteralCoverage();
+  bindings.coalesceIntegerAndFloatLiteralRequirements();
 
   return bindings;
 }
@@ -2063,6 +2085,12 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     break;
   }
 
+  case ConstraintKind::NonisolatedConformsTo:
+  case ConstraintKind::ConformsTo:
+    if (constraint->getSecondType()->is<ProtocolType>())
+      Protocols.push_back(constraint);
+    break;
+
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::EscapableFunctionOf:
@@ -2076,12 +2104,16 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::PackElementOf:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
-  case ConstraintKind::NonisolatedConformsTo:
-  case ConstraintKind::ConformsTo:
+    // Constraints from which we can't do anything.
+    break;
+
   case ConstraintKind::LiteralConformsTo:
+    inferFromLiteral(CS, TypeVar, constraint);
+    break;
+
   case ConstraintKind::Defaultable:
   case ConstraintKind::FallbackType:
-    // Constraints from which we can't do anything.
+    Defaults.push_back(constraint);
     break;
 
   // For now let's avoid inferring protocol requirements from
@@ -2206,21 +2238,45 @@ void PotentialBindings::retract(ConstraintSystem &CS,
                       }),
       Bindings.end());
 
-  DelayedBy.erase(
-      llvm::remove_if(DelayedBy,
-                      [&](Constraint *existing) {
-                        if (existing == constraint) {
+  Literals.erase(
+      llvm::remove_if(Literals,
+                      [&](const LiteralRequirement &literal) {
+                        if (literal.getSource() == constraint) {
                           if (recordingChanges) {
-                            CS.recordChange(SolverTrail::Change::RetractedDelayedBy(
+                            CS.recordChange(SolverTrail::Change::RetractedLiteral(
                                 TypeVar, constraint));
                           }
                           return true;
                         }
                         return false;
                       }),
-      DelayedBy.end());
+      Literals.end());
 
 #define CALLBACK(ChangeKind)                                                   \
+  [&](Constraint *other) {                                                     \
+    if (other == constraint) {                                                 \
+      if (recordingChanges) {                                                  \
+        CS.recordChange(SolverTrail::Change::ChangeKind(                       \
+            TypeVar, constraint));                                             \
+      }                                                                        \
+      return true;                                                             \
+    }                                                                          \
+    return false;                                                              \
+  }
+
+  DelayedBy.erase(
+      llvm::remove_if(DelayedBy, CALLBACK(RetractedDelayedBy)),
+      DelayedBy.end());
+
+  Protocols.erase(
+      llvm::remove_if(Protocols, CALLBACK(RetractedProtocol)),
+      Protocols.end());
+
+  Defaults.erase(
+      llvm::remove_if(Defaults, CALLBACK(RetractedDefault)),
+      Defaults.end());
+
+#define PAIR_CALLBACK(ChangeKind)                                              \
   [&](std::pair<TypeVariableType *, Constraint *> pair) {                      \
     if (pair.second == constraint) {                                           \
       if (recordingChanges) {                                                  \
@@ -2233,19 +2289,19 @@ void PotentialBindings::retract(ConstraintSystem &CS,
   }
 
   AdjacentVars.erase(
-    llvm::remove_if(AdjacentVars, CALLBACK(RetractedAdjacentVar)),
+    llvm::remove_if(AdjacentVars, PAIR_CALLBACK(RetractedAdjacentVar)),
     AdjacentVars.end());
 
   SubtypeOf.erase(
-    llvm::remove_if(SubtypeOf, CALLBACK(RetractedSubtypeOf)),
+    llvm::remove_if(SubtypeOf, PAIR_CALLBACK(RetractedSubtypeOf)),
     SubtypeOf.end());
 
   SupertypeOf.erase(
-    llvm::remove_if(SupertypeOf, CALLBACK(RetractedSupertypeOf)),
+    llvm::remove_if(SupertypeOf, PAIR_CALLBACK(RetractedSupertypeOf)),
     SupertypeOf.end());
 
   EquivalentTo.erase(
-    llvm::remove_if(EquivalentTo, CALLBACK(RetractedEquivalentTo)),
+    llvm::remove_if(EquivalentTo, PAIR_CALLBACK(RetractedEquivalentTo)),
     EquivalentTo.end());
 
 #undef CALLBACK
@@ -2305,15 +2361,12 @@ void PotentialBindings::dump(ConstraintSystem &cs, TypeVariableType *typeVar,
 
 void BindingSet::forEachLiteralRequirement(
     llvm::function_ref<void(KnownProtocolKind)> callback) const {
-  for (const auto &literal : Literals) {
-    auto *protocol = literal.first;
-    const auto &info = literal.second;
-
+  for (const auto &info : Literals) {
     // Only uncovered defaultable literal protocols participate.
     if (!info.viableAsBinding())
       continue;
     
-    if (auto protocolKind = protocol->getKnownProtocolKind())
+    if (auto protocolKind = info.getProtocol()->getKnownProtocolKind())
       callback(*protocolKind);
   }
 }
@@ -2344,7 +2397,7 @@ LiteralBindingKind BindingSet::getLiteralForScore() const {
 
 unsigned BindingSet::getNumViableLiteralBindings() const {
   return llvm::count_if(Literals, [&](const auto &literal) {
-    return literal.second.viableAsBinding();
+    return literal.viableAsBinding();
   });
 }
 
@@ -2482,10 +2535,10 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   }
   for (const auto &literal : Literals) {
     potentialBindings.push_back(PrintableBinding::literalDefaultType(
-        literal.second.hasDefaultType()
-        ? literal.second.getDefaultType()
+        literal.hasDefaultType()
+        ? literal.getDefaultType()
         : Type(),
-        literal.second.viableAsBinding()));
+        literal.viableAsBinding()));
   }
   if (potentialBindings.empty()) {
     out << "<none>";
@@ -2501,8 +2554,7 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     out << " [defaults: ";
     interleave(
         Defaults,
-        [&](const auto &entry) {
-          auto *constraint = entry.second;
+        [&](Constraint *constraint) {
           auto defaultBinding =
               PrintableBinding::exact(constraint->getSecondType());
           defaultBinding.print(out, PO);
