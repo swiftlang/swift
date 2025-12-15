@@ -17,6 +17,7 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -28,6 +29,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
@@ -35,6 +37,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Config.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "swift/Parse/Lexer.h" // bad dependency
@@ -148,17 +151,11 @@ static constexpr const char *const fixItStrings[] = {
 
 DiagnosticState::DiagnosticState() {
   // Initialize ignored diagnostic groups to defaults
-  ignoredDiagnosticGroups.resize(DiagGroupsCount);
-  // Ensure that for each `DefaultIgnoreWarnings` group,
-  // we propagate this behavior to its child groups.
   for (const auto &groupInfo : diagnosticGroupsInfo)
     if (groupInfo.defaultIgnoreWarnings)
       getDiagGroupInfoByID(groupInfo.id).traverseDepthFirst([&](auto group) {
-        ignoredDiagnosticGroups[(unsigned)group.id] = true;
+        addWarningGroupControl(group.id, WarningGroupBehavior::Ignored);
       });
-
-  // Initialize warningsAsErrors to default
-  warningsAsErrors.resize(DiagGroupsCount);
 
   // Initialize compilerIgnoredDiagnostics
   compilerIgnoredDiagnostics.resize(NumDiagIDs);
@@ -167,7 +164,10 @@ DiagnosticState::DiagnosticState() {
 bool DiagnosticState::isIgnoredDiagnosticGroupTree(DiagGroupID id) const {
   bool anyEnabled = false;
   getDiagGroupInfoByID(id).traverseDepthFirst([&](auto group) {
-    anyEnabled |= !isIgnoredDiagnosticGroup(group.id);
+    anyEnabled |=
+        !warningGroupBehaviorMap.contains(group.id) ||
+        warningGroupBehaviorMap.find(group.id)->second.getBehavior() !=
+            WarningGroupBehavior::Ignored;
   });
   return !anyEnabled;
 }
@@ -585,40 +585,41 @@ bool DiagnosticEngine::finishProcessing() {
   return hadError;
 }
 
-void DiagnosticEngine::setWarningsAsErrorsRules(
-    const std::vector<WarningAsErrorRule> &rules) {
-  std::vector<std::string> unknownGroups;
+bool DiagnosticEngine::isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID groupID) const {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  if (!sf || !sf->getExportedSourceFile())
+    return !state.isIgnoredDiagnosticGroupTree(groupID);
+  auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
+  return swift_ASTGen_isWarningGroupEnabledInFile(
+         sf->getExportedSourceFile(),
+         BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
+         StringRef(getDiagGroupInfoByID(groupID).name));
+#else
+  // Fallback to checking only the command-line configuration
+  return !state.isIgnoredDiagnosticGroupTree(groupID);
+#endif
+}
+
+void DiagnosticState::setWarningGroupControlRules(
+    const llvm::SmallVector<WarningGroupBehaviorRule, 4> &rules) {
   for (const auto &rule : rules) {
-    bool isEnabled = [&] {
-      switch (rule.getAction()) {
-      case WarningAsErrorRule::Action::Enable:
-        return true;
-      case WarningAsErrorRule::Action::Disable:
-        return false;
-      }
-    }();
-    auto target = rule.getTarget();
-    if (auto group = std::get_if<WarningAsErrorRule::TargetGroup>(&target)) {
-      auto name = std::string_view(group->name);
-      // Validate the group name and set the new behavior for each diagnostic
-      // associated with the group and all its subgroups.
-      if (auto groupID = getDiagGroupIDByName(name);
-          groupID && *groupID != DiagGroupID::no_group) {
-        getDiagGroupInfoByID(*groupID).traverseDepthFirst([&](auto group) {
-          state.setWarningsAsErrorsForDiagGroupID(group.id, isEnabled);
-          state.setIgnoredDiagnosticGroup(group.id, false);
-        });
-      } else {
-        unknownGroups.push_back(std::string(name));
-      }
-    } else if (std::holds_alternative<WarningAsErrorRule::TargetAll>(target)) {
-      state.setAllWarningsAsErrors(isEnabled);
+    if (rule.hasGroup()) {
+      getDiagGroupInfoByID(rule.getGroup()).traverseDepthFirst([&](auto group) {
+        addWarningGroupControl(group.id, rule.getBehavior());
+      });
     } else {
-      llvm_unreachable("unhandled WarningAsErrorRule::Target");
+      // A global override for all groups of `-warnings-as-errors` or
+      // `-no-warnings-as-errors`.
+      for (const auto &groupInfo : diagnosticGroupsInfo) {
+        // Does not apply to warnings which are default ignored
+        if (warningGroupBehaviorMap.contains(groupInfo.id) &&
+            warningGroupBehaviorMap.find(groupInfo.id)->second.getBehavior() ==
+                WarningGroupBehavior::Ignored)
+          continue;
+
+        addWarningGroupControl(groupInfo.id, rule.getBehavior());
+      }
     }
-  }
-  for (const auto &unknownGroup : unknownGroups) {
-    diagnose(SourceLoc(), diag::unknown_warning_group, unknownGroup);
   }
 }
 
@@ -1318,8 +1319,76 @@ llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
 llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
                                     llvm::cl::init(false));
 
+std::optional<DiagnosticBehavior>
+DiagnosticState::determineUserControlledWarningBehavior(
+    const Diagnostic &diag, SourceManager &sourceMgr) const {
+  auto &diagInfo = storedDiagnosticInfos[(unsigned)diag.getID()];
+  if (diagInfo.kind != DiagnosticKind::Warning)
+    return std::nullopt;
+
+  // Compute a behavior relying strictly on command-line provided
+  // `warningGroupBehaviorMap`.
+  std::optional<DiagnosticBehavior> userControlledBehavior;
+  if (warningGroupBehaviorMap.contains(diag.getGroupID())) {
+    switch (
+        warningGroupBehaviorMap.find(diag.getGroupID())->second.getBehavior()) {
+    case WarningGroupBehavior::AsWarning:
+      userControlledBehavior = DiagnosticBehavior::Warning;
+      break;
+    case WarningGroupBehavior::AsError:
+      userControlledBehavior = DiagnosticBehavior::Error;
+      break;
+    case WarningGroupBehavior::Ignored:
+      userControlledBehavior = DiagnosticBehavior::Ignore;
+      break;
+    case WarningGroupBehavior::None:
+      userControlledBehavior = std::nullopt;
+      break;
+    }
+  } else
+    userControlledBehavior = std::nullopt;
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  // Use the combined global controls (command-line flags such as `-Werror`)
+  // and syntactic controls at the source location of this diagnostic to
+  // compute the configured emission behavior for this diagnostic group.
+  SourceLoc loc = diag.getLocOrDeclLoc();
+  if (loc.isValid()) {
+    auto sourceFiles = sourceMgr.getSourceFilesForBufferID(
+        sourceMgr.findBufferContainingLoc(loc));
+    if (!sourceFiles.empty()) {
+      SourceFile *SF = sourceFiles.front();
+      if (SF && SF->getExportedSourceFile()) {
+        auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
+        WarningGroupBehavior behavior =
+            swift_ASTGen_warningGroupBehaviorAtPosition(
+                SF->getExportedSourceFile(),
+                BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
+                StringRef(getDiagGroupInfoByID(diag.getGroupID()).name), loc);
+        switch (behavior) {
+        case AsError:
+          userControlledBehavior = DiagnosticBehavior::Error;
+          break;
+        case AsWarning:
+          userControlledBehavior = DiagnosticBehavior::Warning;
+          break;
+        case Ignored:
+          userControlledBehavior = DiagnosticBehavior::Ignore;
+          break;
+        case None:
+          break;
+        }
+      }
+    }
+  }
+#endif
+
+  return userControlledBehavior;
+}
+
 DiagnosticBehavior
-DiagnosticState::determineBehavior(const Diagnostic &diag) const {
+DiagnosticState::determineBehavior(const Diagnostic &diag,
+                                   SourceManager &sourceMgr) const {
   // We determine how to handle a diagnostic based on the following rules
   //   1) Map the diagnostic to its "intended" behavior, applying the behavior
   //      limit for this particular emission
@@ -1356,10 +1425,9 @@ DiagnosticState::determineBehavior(const Diagnostic &diag) const {
   //   3) If the user substituted a different behavior for this warning, apply
   //      that change
   if (lvl == DiagnosticBehavior::Warning) {
-    if (isIgnoredDiagnosticGroup(diag.getGroupID()))
-      lvl = DiagnosticBehavior::Ignore;
-    else if (getWarningsAsErrorsForDiagGroupID(diag.getGroupID()))
-      lvl = DiagnosticBehavior::Error;
+    if (auto userControlBehavior =
+            determineUserControlledWarningBehavior(diag, sourceMgr))
+      lvl = *userControlBehavior;
     if (suppressWarnings)
       lvl = DiagnosticBehavior::Ignore;
   }
@@ -1449,7 +1517,7 @@ void DiagnosticEngine::forwardTentativeDiagnosticsTo(
 std::optional<DiagnosticInfo>
 DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
                                               bool includeDiagnosticName) {
-  auto behavior = state.determineBehavior(diagnostic);
+  auto behavior = state.determineBehavior(diagnostic, SourceMgr);
   state.updateFor(behavior);
 
   if (behavior == DiagnosticBehavior::Ignore)
