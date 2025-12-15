@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -mandatory-copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK
+// RUN: %target-sil-opt -sil-print-types -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK
+// RUN: %target-sil-opt -sil-print-types -mandatory-copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK
 
 // REQUIRES: asserts
 
@@ -914,20 +914,21 @@ sil [ossa] @canonicalize_source_of_redundant_move_value : $@convention(thin) () 
 // xCHECK-NOT:     copy_value
 // CHECK-LABEL: } // end sil function 'delete_dead_reborrow_copy'
 sil [ossa] @delete_dead_reborrow_copy : $@convention(thin) (@owned X) -> () {
-bb0(%instance : @owned $X):
-    %lifetime = begin_borrow %instance : $X
-    br bb1(%lifetime : $X)
+bb0(%0 : @owned $X):
+  %1 = begin_borrow %0
+  br bb1(%1)
 
-bb1(%reborrow : @guaranteed $X):
-    %dead_copy = copy_value %reborrow : $X
-    end_borrow %reborrow : $X
-    destroy_value %dead_copy : $X
-    br exit
+bb1(%3 : @reborrow $X):
+  %4 = borrowed %3 from (%0)
+  %5 = copy_value %4
+  end_borrow %4
+  destroy_value %5
+  br bb2
 
-exit:
-    destroy_value %instance : $X
-    %retval = tuple ()
-    return %retval : $()
+bb2:
+  destroy_value %0
+  %10 = tuple ()
+  return %10
 }
 
 // CHECK-LABEL: sil [ossa] @dont_extend_beyond_nonoverlapping_end_access_after_store_in_consuming_block : {{.*}} {

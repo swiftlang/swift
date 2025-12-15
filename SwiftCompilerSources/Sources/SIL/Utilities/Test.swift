@@ -147,6 +147,7 @@ public func registerTests() {
     smallProjectionPathTest,
     getAccessBaseTest,
     accessPathTest,
+    updateBorrowedFromTest,
     borrowIntroducersTest,
     enclosingValuesTest,
     forwardingDefUseTest,

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -sil-print-debuginfo -update-borrowed-from -enable-sil-verify-all %s -condition-forwarding | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-print-debuginfo -enable-sil-verify-all %s -condition-forwarding | %FileCheck %s
 
 import Builtin
 import Swift
@@ -86,27 +86,28 @@ bb0(%0 : $Builtin.Int1, %1 : @guaranteed $Klass):
   cond_br %0, bb1, bb2
 
 bb1:
-  %2 = enum $E, #E.A!enumelt, %1 : $Klass
-  br bb3(%2 : $E)
+  %3 = enum $E, #E.A!enumelt, %1
+  br bb3(%3)
 
 bb2:
-  %3 = enum $E, #E.B!enumelt, %1 : $Klass
-  br bb3(%3 : $E)
+  %5 = enum $E, #E.B!enumelt, %1
+  br bb3(%5)
 
-bb3(%14 : @guaranteed $E):
-  %15 = function_ref @callee : $@convention(thin) () -> ()
-  %16 = apply %15() : $@convention(thin) () -> ()
-  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+bb3(%7 : @guaranteed $E):
+  %8 = borrowed %7 from (%1)
+  %9 = function_ref @callee : $@convention(thin) () -> ()
+  %10 = apply %9() : $@convention(thin) () -> ()
+  switch_enum %8, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
 
-bb4(%17 : @guaranteed $Klass):
+bb4(%12 : @guaranteed $Klass):
   br bb6
 
-bb5(%18 : @guaranteed $Klass):
+bb5(%14 : @guaranteed $Klass):
   br bb6
 
 bb6:
-  %r = tuple ()
-  return %r : $()
+  %16 = tuple ()
+  return %16
 }
 
 // CHECK-LABEL: sil [ossa] @simple_forwarding3 :
@@ -222,31 +223,32 @@ bb6:
 // CHECK-LABEL: } // end sil function 'simple_switch_enum_forwarding2'
 sil [ossa] @simple_switch_enum_forwarding2 : $@convention(thin) (@guaranteed E3) -> () {
 bb0(%0 : @guaranteed $E3):
-  switch_enum %0 : $E3, case #E3.A!enumelt: bb1, default bb2
+  switch_enum %0, case #E3.A!enumelt: bb1, default bb2
 
-bb1(%1 : @guaranteed $Klass):
-  %2 = enum $E, #E.A!enumelt, %1 : $Klass
-  br bb3(%2 : $E)
+bb1(%2 : @guaranteed $Klass):
+  %3 = enum $E, #E.A!enumelt, %2
+  br bb3(%3)
 
-bb2(%defaultenum : @guaranteed $E3):
-  %defaultklass = unchecked_enum_data %defaultenum : $E3, #E3.B!enumelt
-  %3 = enum $E, #E.B!enumelt, %defaultklass : $Klass
-  br bb3(%3 : $E)
+bb2(%5 : @guaranteed $E3):
+  %6 = unchecked_enum_data %5, #E3.B!enumelt
+  %7 = enum $E, #E.B!enumelt, %6
+  br bb3(%7)
 
-bb3(%14 : @guaranteed $E):
-  %15 = function_ref @callee : $@convention(thin) () -> ()
-  %16 = apply %15() : $@convention(thin) () -> ()
-  switch_enum %14 : $E, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
+bb3(%9 : @guaranteed $E):
+  %10 = borrowed %9 from (%0)
+  %11 = function_ref @callee : $@convention(thin) () -> ()
+  %12 = apply %11() : $@convention(thin) () -> ()
+  switch_enum %10, case #E.A!enumelt: bb4, case #E.B!enumelt: bb5
 
-bb4(%4 : @guaranteed $Klass):
+bb4(%14 : @guaranteed $Klass):
   br bb6
 
-bb5(%5 : @guaranteed $Klass):
+bb5(%16 : @guaranteed $Klass):
   br bb6
 
 bb6:
-  %r = tuple ()
-  return %r : $()
+  %18 = tuple ()
+  return %18
 }
 
 
@@ -402,7 +404,7 @@ bb6:
 // CHECK-NOT: switch_enum
 // CHECK-LABEL: } // end sil function 'nontrivialenumarg'
 sil [ossa] @nontrivialenumarg : $@convention(thin) (@guaranteed Klass) -> @owned Optional<Klass> {
-bb0(%0 : @guaranteed  $Klass):
+bb0(%0 : @guaranteed $Klass):
   cond_br undef, bb1, bb2
 
 bb1:
@@ -410,22 +412,24 @@ bb1:
   br bb3(%2)
 
 bb2:
-  %3 = enum $Optional<Klass>, #Optional.some!enumelt, %0
-  br bb3(%3)
+  %4 = enum $Optional<Klass>, #Optional.some!enumelt, %0
+  br bb3(%4)
 
-bb3(%7 : @guaranteed  $Optional<Klass>):
+bb3(%6 : @guaranteed $Optional<Klass>):
+  %7 = borrowed %6 from (%0)
   switch_enum %7, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
 
-bb4(%9 : @guaranteed  $Klass):
-  apply undef(%7) : $@convention(thin) (@guaranteed Optional<Klass>) -> ()
-  %10 = enum $Optional<Klass>, #Optional.some!enumelt, %9
-  br bb6(%10)
+bb4(%9 : @guaranteed $Klass):
+  %10 = apply undef(%7) : $@convention(thin) (@guaranteed Optional<Klass>) -> ()
+  %11 = enum $Optional<Klass>, #Optional.some!enumelt, %9
+  br bb6(%11)
 
 bb5:
-  %12 = enum $Optional<Klass>, #Optional.none!enumelt
-  br bb6(%12)
+  %13 = enum $Optional<Klass>, #Optional.none!enumelt
+  br bb6(%13)
 
-bb6(%14 : @guaranteed  $Optional<Klass>):
-  %15 = copy_value %14
-  return %15
+bb6(%15 : @guaranteed $Optional<Klass>):
+  %16 = borrowed %15 from (%0)
+  %17 = copy_value %16
+  return %17
 }

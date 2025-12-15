@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -compute-side-effects -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -compute-side-effects -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -194,19 +194,20 @@ exit:
 // CHECK:         br
 // CHECK-LABEL: } // end sil function 'hoist_over_terminator_4'
 sil [ossa] @hoist_over_terminator_4 : $@convention(thin) (@owned C) -> () {
-entry(%instance_c : @owned $C):
-    %lifetime_c_0 = begin_borrow %instance_c : $C
-    br work(%lifetime_c_0 : $C)
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0
+  br bb1(%1)
 
-work(%lifetime_c : @guaranteed $C):
-    end_borrow %lifetime_c : $C
-    %foo = tuple ()
-    destroy_value %instance_c : $C
-    br exit
+bb1(%3 : @reborrow $C):
+  %4 = borrowed %3 from (%0)
+  end_borrow %4
+  %6 = tuple ()
+  destroy_value %0
+  br bb2
 
-exit:
-    %retval = tuple ()
-    return %retval : $()
+bb2:
+  %9 = tuple ()
+  return %9
 }
 
 // Don't hoist over phi-use of value.
@@ -567,21 +568,22 @@ exit:
 // br bb2
 // CHECK-LABEL: } // end sil function 'hoist_guaranteedforwardingphi1'
 sil [ossa] @hoist_guaranteedforwardingphi1 : $@convention(thin) (@owned CDCase) -> () {
-bb0(%instance_c : @owned $CDCase):
-  %lifetime_c_0 = begin_borrow %instance_c : $CDCase
-  %ex = struct_extract %lifetime_c_0 : $CDCase, #CDCase.c
-  br bb1(%ex : $C)
+bb0(%0 : @owned $CDCase):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #CDCase.c
+  br bb1(%2)
 
-bb1(%phi1 : @guaranteed $C):
-  %f1 = function_ref @use_C : $@convention(thin) (@guaranteed C) -> ()
-  apply %f1(%phi1) : $@convention(thin) (@guaranteed C) -> ()
+bb1(%4 : @guaranteed $C):
+  %5 = borrowed %4 from (%1)
+  %6 = function_ref @use_C : $@convention(thin) (@guaranteed C) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed C) -> ()
   br bb2
 
 bb2:
-  end_borrow %lifetime_c_0 : $CDCase
-  destroy_value %instance_c : $CDCase
-  %retval = tuple ()
-  return %retval : $()
+  end_borrow %1
+  destroy_value %0
+  %11 = tuple ()
+  return %11
 }
  
 // CHECK-LABEL: sil [ossa] @nohoist_guaranteedforwardingphi2 :
@@ -590,33 +592,35 @@ bb2:
 // CHECK: destroy_value 
 // CHECK-LABEL: } // end sil function 'nohoist_guaranteedforwardingphi2'
 sil [ossa] @nohoist_guaranteedforwardingphi2 : $@convention(thin) (@owned CDCase, @owned CDCase) -> () {
-bb0(%instance_c1 : @owned $CDCase, %instance_c2 : @owned $CDCase):
+bb0(%0 : @owned $CDCase, %1 : @owned $CDCase):
   cond_br undef, bb1, bb2
 
 bb1:
-  destroy_value %instance_c2 : $CDCase
-  %lifetime_c_1 = begin_borrow %instance_c1 : $CDCase
-  %ex1 = struct_extract %lifetime_c_1 : $CDCase, #CDCase.c
-  br bb3(%ex1 : $C, %lifetime_c_1 : $CDCase, %instance_c1 : $CDCase)
+  destroy_value %1
+  %4 = begin_borrow %0
+  %5 = struct_extract %4, #CDCase.c
+  br bb3(%5, %4, %0)
 
 bb2:
-  destroy_value %instance_c1 : $CDCase
-  %lifetime_c_2 = begin_borrow %instance_c2 : $CDCase
-  %ex2 = struct_extract %lifetime_c_2 : $CDCase, #CDCase.c
-  br bb3(%ex2 : $C, %lifetime_c_2 : $CDCase, %instance_c2 : $CDCase)
+  destroy_value %0
+  %8 = begin_borrow %1
+  %9 = struct_extract %8, #CDCase.c
+  br bb3(%9, %8, %1)
 
-bb3(%phi1 : @guaranteed $C, %phi2 : @guaranteed $CDCase, %phi3 : @owned $CDCase):
-  %f1 = function_ref @use_C : $@convention(thin) (@guaranteed C) -> ()
-  apply %f1(%phi1) : $@convention(thin) (@guaranteed C) -> ()
-  %f2 = function_ref @empty : $@convention(thin) () -> ()
-  apply %f2() : $@convention(thin) () -> ()
+bb3(%11 : @guaranteed $C, %12 : @reborrow $CDCase, %13 : @owned $CDCase):
+  %14 = borrowed %12 from (%13)
+  %15 = borrowed %11 from (%12)
+  %16 = function_ref @use_C : $@convention(thin) (@guaranteed C) -> ()
+  %17 = apply %16(%15) : $@convention(thin) (@guaranteed C) -> ()
+  %18 = function_ref @empty : $@convention(thin) () -> ()
+  %19 = apply %18() : $@convention(thin) () -> ()
   br bb4
 
 bb4:
-  end_borrow %phi2 : $CDCase
-  destroy_value %phi3 : $CDCase
-  %retval = tuple ()
-  return %retval : $()
+  end_borrow %14
+  destroy_value %13
+  %23 = tuple ()
+  return %23
 }
 
 // =============================================================================

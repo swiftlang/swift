@@ -146,9 +146,6 @@ private func registerSwiftPasses() {
   registerForSILCombine(ApplyInst.self,             { run(ApplyInst.self, $0) })
   registerForSILCombine(TryApplyInst.self,          { run(TryApplyInst.self, $0) })
   registerForSILCombine(EndCOWMutationAddrInst.self, { run(EndCOWMutationAddrInst.self, $0) })
-
-  // Test passes
-  registerPass(updateBorrowedFromPass, { updateBorrowedFromPass.run($0) })
 }
 
 private func registerSwiftAnalyses() {
