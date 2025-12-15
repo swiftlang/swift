@@ -2380,7 +2380,6 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
     bool IsCanImportLookup, bool IsFramework,
     bool IsTestableDependencyLookup) {
-  llvm_unreachable("Not supported in the Explicit Swift Module Loader.");
   return std::make_error_code(std::errc::not_supported);
 }
 
@@ -2754,7 +2753,6 @@ std::error_code ExplicitCASModuleLoader::findModuleFilesInDirectory(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer,
     bool IsCanImportLookup, bool IsFramework,
     bool IsTestableDependencyLookup) {
-  llvm_unreachable("Not supported in the Explicit Swift Module Loader.");
   return std::make_error_code(std::errc::not_supported);
 }
 
