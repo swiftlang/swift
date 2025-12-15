@@ -3286,6 +3286,7 @@ function(add_swift_target_executable name)
     foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
       set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
       set(VARIANT_NAME "${name}${VARIANT_SUFFIX}")
+
       set(MODULE_VARIANT_SUFFIX "-swiftmodule${VARIANT_SUFFIX}")
       set(MODULE_VARIANT_NAME "${name}${MODULE_VARIANT_SUFFIX}")
 
@@ -3447,6 +3448,7 @@ function(add_swift_target_executable name)
     if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
       set(codesign_arg CODESIGN)
     endif()
+
     precondition(THIN_INPUT_TARGETS)
     _add_swift_lipo_target(SDK
                              ${sdk}
@@ -3465,35 +3467,15 @@ function(add_swift_target_executable name)
 
     precondition(resource_dir_sdk_subdir)
 
-    if(sdk STREQUAL "WINDOWS" AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
-      add_dependencies(${install_in_component} ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH})
-      swift_install_in_component(TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
-                                 RUNTIME
-                                   DESTINATION "bin"
-                                   COMPONENT "${install_in_component}"
-                                 LIBRARY
-                                   DESTINATION "libexec${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
-                                   COMPONENT "${install_in_component}"
-                                 ARCHIVE
-                                   DESTINATION "libexec${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
-                                   COMPONENT "${install_in_component}"
-                                 PERMISSIONS
-                                   OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                                   GROUP_READ GROUP_EXECUTE
-                                   WORLD_READ WORLD_EXECUTE)
-    else()
-      add_dependencies(${install_in_component} ${lipo_target})
-
-      set(install_dest "libexec${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}")
-      swift_install_in_component(FILES "${UNIVERSAL_NAME}"
-                                   DESTINATION ${install_dest}
-                                   COMPONENT "${install_in_component}"
-                                 PERMISSIONS
-                                   OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                                   GROUP_READ GROUP_EXECUTE
-                                   WORLD_READ WORLD_EXECUTE
-                                 "${optional_arg}")
-    endif()
+    set(install_dest "libexec${LLVM_LIBDIR_SUFFIX}/swift/${resource_dir_sdk_subdir}")
+    add_dependencies(${install_in_component} ${lipo_target})
+    swift_install_in_component(FILES ${UNIVERSAL_NAME}
+                                 DESTINATION ${install_dest}
+                                 COMPONENT "${install_in_component}"
+                               PERMISSIONS
+                                 OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                                 GROUP_READ GROUP_EXECUTE
+                                 WORLD_READ WORLD_EXECUTE)
 
     swift_is_installing_component(
       "${install_in_component}"
@@ -3517,8 +3499,8 @@ function(add_swift_target_executable name)
     if(SWIFTEXE_TARGET_BUILD_WITH_STDLIB)
       foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
         set(variant "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-        if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND
-           TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
+        if(TARGET "swift-stdlib${variant}" AND
+           TARGET "swift-test-stdlib${variant}")
           add_dependencies("swift-stdlib${variant}" ${lipo_target})
           add_dependencies("swift-test-stdlib${variant}" ${lipo_target})
         endif()
@@ -3528,8 +3510,10 @@ function(add_swift_target_executable name)
     if(SWIFTEXE_TARGET_BUILD_WITH_LIBEXEC)
       foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
         set(variant "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-        if(TARGET "swift-libexec${variant}")
+        if(TARGET "swift-libexec${variant}" AND
+           TARGET "swift-test-libexec${variant}")
           add_dependencies("swift-libexec${variant}" ${lipo_target})
+          add_dependencies("swift-test-stdlib${variant}" ${lipo_target})
         endif()
       endforeach()
     endif()
