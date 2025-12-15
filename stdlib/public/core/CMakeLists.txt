@@ -45,6 +45,7 @@ split_embedded_sources(
   EMBEDDED BidirectionalCollection.swift
   EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
+  EMBEDDED BorrowingSequence.swift
     NORMAL BridgeObjectiveC.swift
   EMBEDDED BridgeStorage.swift
     NORMAL BridgingBuffer.swift
@@ -333,6 +334,9 @@ endif()
 # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concise-pound-file")
 
+# Temporarily disable availability checking during BorrowingSequence development
+list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-disable-availability-checking")
+
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
@@ -341,6 +345,7 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "ValueGene
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableParameters")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableTypes")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AllowUnsafeAttribute")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "SuppressedAssociatedTypesWithDefaults")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
