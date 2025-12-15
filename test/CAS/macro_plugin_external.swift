@@ -50,7 +50,7 @@
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s --check-prefix=FS-REMAP -DLIB=%target-library-name(MacroDefinition)
 
 /// CASFS is remapped.
-// FS-REMAP: /^test/plugins/[[LIB]]
+// FS-REMAP: /^test{{/|\\}}plugins{{/|\\}}[[LIB]]
 
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps2.json -o %t/MyApp2.cmd
 
@@ -59,7 +59,7 @@
 
 // CMD-REMAP: -resolved-plugin-verification
 // CMD-REMAP-NEXT: -load-resolved-plugin
-// CMD-REMAP-NEXT: /^test/plugins/[[LIB]]#/^bin/swift-plugin-server#MacroDefinition
+// CMD-REMAP-NEXT: /^test{{/|\\}}plugins{{/|\\}}[[LIB]]#/^bin{{/|\\}}swift-plugin-server#MacroDefinition
 
 // RUN: %target-swift-frontend-plain \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
@@ -74,7 +74,7 @@
 /// Encoded PLUGIN_SEARCH_OPTION is remapped.
 // RUN: llvm-bcanalyzer -dump %t/Macro.swiftmodule | %FileCheck %s --check-prefix=MOD -DLIB=%target-library-name(MacroDefinition)
 
-// MOD: <PLUGIN_SEARCH_OPTION abbrevid=7 op0=4/> blob data = '/^test/plugins/[[LIB]]#/^bin/swift-plugin-server#MacroDefinition'
+// MOD: <PLUGIN_SEARCH_OPTION abbrevid=7 op0=4/> blob data = '/^test{{/|\\}}plugins{{/|\\}}[[LIB]]#/^bin{{/|\\}}swift-plugin-server#MacroDefinition'
 
 /// Cache hit has no macro-loading remarks because no macro is actually loaded and the path might not be correct due to different mapping.
 // RUN: %target-swift-frontend-plain \
