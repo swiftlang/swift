@@ -135,29 +135,6 @@ static Decl *lookupDirectSingleWithoutExtensions(NominalTypeDecl *decl,
   return dyn_cast<Decl>(results.front());
 }
 
-static FuncDecl *getInsertFunc(NominalTypeDecl *decl,
-                               TypeAliasDecl *valueType) {
-  ASTContext &ctx = decl->getASTContext();
-
-  auto insertId = ctx.getIdentifier("__insertUnsafe");
-  auto inserts = lookupDirectWithoutExtensions(decl, insertId);
-  FuncDecl *insert = nullptr;
-  for (auto candidate : inserts) {
-    if (auto candidateMethod = dyn_cast<FuncDecl>(candidate)) {
-      auto params = candidateMethod->getParameters();
-      if (params->size() != 1)
-        continue;
-      auto param = params->front();
-      if (param->getTypeInContext()->getCanonicalType() !=
-          valueType->getUnderlyingType()->getCanonicalType())
-        continue;
-      insert = candidateMethod;
-      break;
-    }
-  }
-  return insert;
-}
-
 static ValueDecl *lookupOperator(NominalTypeDecl *decl, Identifier id,
                                  function_ref<bool(ValueDecl *)> isValid) {
   // First look for operator declared as a member.
