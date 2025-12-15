@@ -2496,6 +2496,12 @@ struct ExplicitCASModuleLoader::Implementation {
   // Same as the regular explicit module map but must be loaded from
   // CAS, instead of a file that is not tracked by the dependency.
   void parseSwiftExplicitModuleMap(StringRef ID) {
+    // ModuleLoader can be setup with no explicit module map and explicitly
+    // setup each individual dependencies via `addExplicitModulePath` function.
+    // If the input CASID is empty, just return.
+    if (ID.empty())
+      return;
+
     ExplicitModuleMapParser parser(Allocator);
     llvm::StringMap<ExplicitClangModuleInputInfo> ExplicitClangModuleMap;
     llvm::StringMap<std::string> ModuleAliases;
@@ -2681,47 +2687,15 @@ bool ExplicitCASModuleLoader::findModule(
       Impl.CAS, Impl.Cache, Ctx.Diags, moduleCASID,
       file_types::ID::TY_SwiftModuleFile, moduleInfo.modulePath);
   if (!moduleBuf) {
-    // We cannot read the module content, diagnose.
-    Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
-                       moduleInfo.modulePath);
+    // Cannot load the module. For any real issues like malformed CASID or
+    // module, the error has been diagnosed in
+    // `loadCachedCompileResultFromCacheKey`. The only way to reach here without
+    // error diagnostics is that the module is not found via loader, just return
+    // false in the case so the next loader can try findModule without hitting
+    // an error.
     return false;
   }
 
-  const bool isForwardingModule =
-      !serialization::isSerializedAST(moduleBuf->getBuffer());
-  // If the module is a forwarding module, read the actual content from the path
-  // encoded in the forwarding module as the actual module content.
-  if (isForwardingModule) {
-    auto forwardingModule = ForwardingModule::load(*moduleBuf.get());
-    if (forwardingModule) {
-      // Look through ExplicitModuleMap for paths.
-      // TODO: need to have dependency scanner reports forwarded module as
-      // dependency for this compilation and ingested into CAS.
-      auto moduleOrErr = Impl.loadModuleFromPath(
-          forwardingModule->underlyingModulePath, Ctx.Diags);
-      if (!moduleOrErr) {
-        llvm::consumeError(moduleOrErr.takeError());
-        Ctx.Diags.diagnose(SourceLoc(),
-                           diag::error_opening_explicit_module_file,
-                           moduleInfo.modulePath);
-        return false;
-      }
-      moduleBuf = std::move(*moduleOrErr);
-      if (!moduleBuf) {
-        // We cannot read the module content, diagnose.
-        Ctx.Diags.diagnose(SourceLoc(),
-                           diag::error_opening_explicit_module_file,
-                           moduleInfo.modulePath);
-        return false;
-      }
-    } else {
-      // We cannot read the module content, diagnose.
-      Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
-                         moduleInfo.modulePath);
-      return false;
-    }
-  }
-  assert(moduleBuf);
   // Move the opened module buffer to the caller.
   *ModuleBuffer = std::move(moduleBuf);
 
