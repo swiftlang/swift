@@ -2683,6 +2683,16 @@ function Test-Runtime([Hashtable] $Platform) {
     throw "LIT test utilities not found in $CompilersBinaryCache\bin"
   }
 
+  $PlatformDefines = @{}
+
+  # Only enable backtracing for platforms other than 32-bit Windows;
+  # right now, the Swift compiler doesn't properly support stdcall.
+  if ($Platform.OS -ne [OS]::Windows -or $Platform.Architecture.ShortName -ne "x86") {
+    $PlatformDefines += @{
+      SWIFT_ENABLE_BACKTRACING = "YES";
+    }
+  }
+
   Invoke-IsolatingEnvVars {
     # Filter known issues when testing on Windows
     Load-LitTestOverrides $PSScriptRoot/windows-swift-android-lit-test-overrides.txt
@@ -2694,13 +2704,13 @@ function Test-Runtime([Hashtable] $Platform) {
       -UseBuiltCompilers C,CXX,Swift `
       -SwiftSDK $null `
       -BuildTargets check-swift-validation-only_non_executable `
-      -Defines @{
+      -Defines ($PlatformDefines + @{
         SWIFT_INCLUDE_TESTS = "YES";
         SWIFT_INCLUDE_TEST_BINARIES = "YES";
         SWIFT_BUILD_TEST_SUPPORT_MODULES = "YES";
         SWIFT_NATIVE_LLVM_TOOLS_PATH = Join-Path -Path $CompilersBinaryCache -ChildPath "bin";
         LLVM_LIT_ARGS = "-vv";
-      }
+      })
   }
 }
 

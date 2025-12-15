@@ -10,7 +10,7 @@
 // UNSUPPORTED: asan
 // REQUIRES: executable_test
 // REQUIRES: backtracing
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 func recurse(_ level: Int) {
   if level % 100000 == 0 {
