@@ -4119,6 +4119,7 @@ if (-not $SkipBuild) {
 
             # FIXME(compnerd) how do we select which SDK is meant to be re-distributed?
             Copy-Directory "${SDKROOT}\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", $ProductVersion, "usr"))"
+            Copy-Directory "${SDKROOT}\usr\libexec" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", $ProductVersion, "usr"))"
           }
 
           Install-SDK $WindowsSDKBuilds
