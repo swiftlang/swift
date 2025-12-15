@@ -1282,22 +1282,36 @@ static void conformToCxxSpan(ClangImporter::Implementation &impl,
   clang::ASTContext &clangCtx = impl.getClangASTContext();
   clang::Sema &clangSema = impl.getClangSema();
 
-  auto elementType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("element_type"));
-  auto sizeType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
-      decl, ctx.getIdentifier("size_type"));
-
-  if (!elementType || !sizeType)
+  auto *element_type = lookupCxxTypeMember(clangSema, clangDecl, "element_type",
+                                           /*mustBeComplete=*/true);
+  auto *size_type = lookupCxxTypeMember(clangSema, clangDecl, "size_type",
+                                        /*mustBeComplete=*/true);
+  auto *pointer = lookupCxxTypeMember(clangSema, clangDecl, "pointer",
+                                      /*mustBeComplete=*/true);
+  if (!element_type || !size_type || !pointer)
     return;
 
-  auto pointerTypeDecl = lookupCxxTypeMember(clangSema, clangDecl, "pointer");
-  auto countTypeDecl = lookupCxxTypeMember(clangSema, clangDecl, "size_type");
+  auto pointerType = clangCtx.getTypeDeclType(pointer);
+  auto sizeType = clangCtx.getTypeDeclType(size_type);
 
-  if (!pointerTypeDecl || !countTypeDecl)
+  auto *Element = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(element_type, impl.CurrentVersion));
+  auto *Size = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(size_type, impl.CurrentVersion));
+  if (!Element || !Size)
     return;
+
+  impl.addSynthesizedTypealias(decl, ctx.Id_Element,
+                               Element->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
+                               Size->getUnderlyingType());
+
+  if (pointerType->getPointeeType().isConstQualified())
+    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSpan});
+  else
+    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxMutableSpan});
 
   // create fake variable for pointer (constructor arg 1)
-  clang::QualType pointerType = clangCtx.getTypeDeclType(pointerTypeDecl);
   auto fakePointerVarDecl = clang::VarDecl::Create(
       clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
       clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
@@ -1309,15 +1323,14 @@ static void conformToCxxSpan(ClangImporter::Implementation &impl,
       clang::ExprValueKind::VK_LValue, clang::SourceLocation());
 
   // create fake variable for count (constructor arg 2)
-  auto countType = clangCtx.getTypeDeclType(countTypeDecl);
   auto fakeCountVarDecl = clang::VarDecl::Create(
       clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
       clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
-      countType, clangCtx.getTrivialTypeSourceInfo(countType),
+      sizeType, clangCtx.getTrivialTypeSourceInfo(sizeType),
       clang::StorageClass::SC_None);
 
   auto fakeCount = new (clangCtx) clang::DeclRefExpr(
-      clangCtx, fakeCountVarDecl, false, countType,
+      clangCtx, fakeCountVarDecl, false, sizeType,
       clang::ExprValueKind::VK_LValue, clang::SourceLocation());
 
   // Use clangSema.BuildCxxTypeConstructExpr to create a CXXTypeConstructExpr,
@@ -1350,17 +1363,6 @@ static void conformToCxxSpan(ClangImporter::Implementation &impl,
   importedConstructor->addAttribute(attr);
 
   decl->addMember(importedConstructor);
-
-  impl.addSynthesizedTypealias(decl, ctx.Id_Element,
-                               elementType->getUnderlyingType());
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
-                               sizeType->getUnderlyingType());
-
-  if (pointerType->getPointeeType().isConstQualified()) {
-    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSpan});
-  } else {
-    impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxMutableSpan});
-  }
 }
 
 void swift::deriveAutomaticCxxConformances(
