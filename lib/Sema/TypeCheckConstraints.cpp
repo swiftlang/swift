@@ -835,6 +835,18 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
           : SyntacticElementTarget::forInitialization(
                 initializer, DC, patternType, pattern,
                 /*bindPatternVarsOneWay=*/false);
+  if (PBD) {
+    auto pbdIsTopLevel = isa<TopLevelCodeDecl>(PBD->getDeclContext());
+    for (auto idx : range(PBD->getNumPatternEntries())) {
+      if (auto *P = PBD->getPattern(idx)) {
+        P->forEachVariable([&](VarDecl *VD) {
+          auto varIsTopLevel = isa<TopLevelCodeDecl>(PBD->getDeclContext());
+          ASSERT(pbdIsTopLevel == varIsTopLevel &&
+                 "Must have consistent top-level context");
+        });
+      }
+    }
+  }
 
   // Bindings cannot be type-checked independently from their context in a
   // closure, make sure we don't ever attempt to do this. If we want to be able

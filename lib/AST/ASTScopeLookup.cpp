@@ -353,6 +353,20 @@ ConditionalClauseInitializerScope::getLookupParent() const {
   return parent->getLookupParent();
 }
 
+NullablePtr<const ASTScopeImpl> TopLevelCodeScope::getLookupParent() const {
+  auto parent = getParent().get();
+  if (auto *prev = decl->getPrevious()) {
+    auto *fileScope = cast<ASTSourceFileScope>(parent);
+    auto prevScope = fileScope->findChildContaining(prev->getEndLoc(), getSourceManager());
+    if (auto *prevTopLevel = dyn_cast<TopLevelCodeScope>(prevScope.getPtrOrNull())) {
+      if (!prevTopLevel->getWasExpanded())
+        prevTopLevel->expandAndBeCurrent(const_cast<TopLevelCodeScope *>(this)->getScopeCreator());
+      return prevTopLevel->insertionPoint;
+    }
+  }
+  return parent;
+}
+
 #pragma mark looking in locals or members - locals
 
 bool GenericParamScope::lookupLocalsOrMembers(DeclConsumer consumer) const {

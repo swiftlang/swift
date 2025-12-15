@@ -6203,8 +6203,6 @@ ERROR(global_actor_arg,none,
       (Type))
 ERROR(global_actor_non_final_class,none,
       "non-final class %0 cannot be a global actor", (DeclName))
-ERROR(global_actor_top_level_var,none,
-      "top-level code variables cannot have a global actor", ())
 ERROR(global_actor_access,none,
       "%select{private|fileprivate|internal|package|public|open}0 %kind1 "
       "cannot have %select{private|fileprivate|internal|package|%error|%error}2 "
@@ -7215,14 +7213,6 @@ ERROR(availability_decl_no_potential, none,
 ERROR(availability_decl_no_unavailable, none,
       "%kindonly0 cannot be marked unavailable with '@available'",
       (const Decl *))
-
-ERROR(availability_global_script_no_potential,
-      none, "global variable cannot be marked potentially "
-      "unavailable with '@available' in script mode", ())
-
-ERROR(availability_global_script_no_unavailable,
-      none, "global variable cannot be marked unavailable "
-      "with '@available' in script mode", ())
 
 ERROR(availability_stored_property_no_potential,
       none, "stored properties cannot be marked potentially unavailable with "

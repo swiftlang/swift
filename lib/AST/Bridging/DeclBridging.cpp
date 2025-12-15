@@ -179,7 +179,6 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
       VD->attachParsedAttrs(cAttrs.unbridged());
       VD->setStatic(staticLoc.isValid());
       VD->setIntroducer(introducer);
-      VD->setTopLevelGlobal(isa<TopLevelCodeDecl>(declContext));
     });
 
     entries.emplace_back(pattern, entry.equalLoc, entry.init.unbridged(),

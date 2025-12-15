@@ -2642,10 +2642,14 @@ public:
     }
 
     void verifyChecked(PatternBindingDecl *binding) {
+      auto isTopLevel = isa<TopLevelCodeDecl>(binding->getDeclContext());
       // Look at all of the VarDecls being bound.
       for (auto idx : range(binding->getNumPatternEntries()))
         if (auto *P = binding->getPattern(idx))
           P->forEachVariable([&](VarDecl *VD) {
+            auto varIsTopLevel = isa<TopLevelCodeDecl>(VD->getDeclContext());
+            ASSERT(isTopLevel == varIsTopLevel &&
+                   "Must have consistent top-level context");
             // ParamDecls never get PBD's.
             assert(!isa<ParamDecl>(VD) && "ParamDecl has a PatternBindingDecl?");
           });

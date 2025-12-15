@@ -341,11 +341,6 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range items,
     else if (auto *MED = dyn_cast<MacroExpansionDecl>(D)) {
       if (!onlyOperators)
         MayHaveAuxiliaryDecls.push_back(MED);
-    } else if (auto TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-      if (auto body = TLCD->getBody()){
-        addToUnqualifiedLookupCache(body->getElements(), onlyOperators,
-                                    onlyDerivatives);
-      }
     }
   }
 }

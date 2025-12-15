@@ -140,6 +140,7 @@ class ASTScopeImpl : public ASTAllocated<ASTScopeImpl> {
   friend class GenericTypeOrExtensionWherePortion;
   friend class GenericTypeOrExtensionWherePortion;
   friend class IterableTypeBodyPortion;
+  friend class TopLevelCodeScope;
   friend class ScopeCreator;
   friend class ASTSourceFileScope;
   friend class ABIAttributeScope;
@@ -245,7 +246,7 @@ public:
 #pragma mark - debugging and printing
 
 public:
-  const SourceFile *getSourceFile() const;
+  SourceFile *getSourceFile() const;
   std::string getClassName() const;
 
   /// Print out this scope for debugging/reporting purposes.
@@ -1212,18 +1213,19 @@ public:
 class TopLevelCodeScope final : public ASTScopeImpl {
 public:
   TopLevelCodeDecl *const decl;
-  SourceLoc endLoc;
+  ASTScopeImpl *insertionPoint = nullptr;
 
-  TopLevelCodeScope(TopLevelCodeDecl *e, SourceLoc endLoc)
-      : ASTScopeImpl(ScopeKind::TopLevelCode), decl(e), endLoc(endLoc) {}
+  TopLevelCodeScope(TopLevelCodeDecl *e)
+      : ASTScopeImpl(ScopeKind::TopLevelCode), decl(e) {}
   virtual ~TopLevelCodeScope() {}
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
+  NullablePtr<const ASTScopeImpl> getLookupParent() const override;
+
 private:
-  AnnotatedInsertionPoint
-  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
 public:
   SourceRange

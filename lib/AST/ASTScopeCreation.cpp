@@ -483,9 +483,7 @@ public:
   ASTScopeImpl *visitTopLevelCodeDecl(TopLevelCodeDecl *d,
                                       ASTScopeImpl *p,
                                       ScopeCreator &scopeCreator) {
-    ASTScopeAssert(endLoc.has_value(), "TopLevelCodeDecl in wrong place?");
-    return scopeCreator.constructExpandAndInsert<TopLevelCodeScope>(
-        p, d, *endLoc);
+    return scopeCreator.constructExpandAndInsert<TopLevelCodeScope>(p, d);
   }
 
 #pragma mark special-case creation
@@ -800,10 +798,10 @@ CREATES_NEW_INSERTION_POINT(GuardStmtScope)
 CREATES_NEW_INSERTION_POINT(PatternEntryDeclScope)
 CREATES_NEW_INSERTION_POINT(GenericTypeOrExtensionScope)
 CREATES_NEW_INSERTION_POINT(BraceStmtScope)
-CREATES_NEW_INSERTION_POINT(TopLevelCodeScope)
 CREATES_NEW_INSERTION_POINT(ConditionalClausePatternUseScope)
 CREATES_NEW_INSERTION_POINT(ABIAttributeScope)
 
+NO_NEW_INSERTION_POINT(TopLevelCodeScope)
 NO_NEW_INSERTION_POINT(FunctionBodyScope)
 NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
 NO_NEW_INSERTION_POINT(CustomAttributeScope)
@@ -1015,19 +1013,6 @@ BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
   return {
       insertionPoint,
       "For top-level code decls, need the scope under, say a guard statement."};
-}
-
-AnnotatedInsertionPoint
-TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &
-                                                             scopeCreator) {
-
-  auto *body =
-      scopeCreator
-          .addToScopeTreeAndReturnInsertionPoint(decl->getBody(), this, endLoc);
-
-  return {body, "So next top level code scope and put its decls in its body "
-                "under a guard statement scope (etc) from the last top level "
-                "code scope"};
 }
 
 AnnotatedInsertionPoint
@@ -1292,6 +1277,12 @@ void CustomAttributeScope::
     for (auto arg : *args)
       scopeCreator.addToScopeTree(arg.getExpr(), this);
   }
+}
+
+void TopLevelCodeScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  insertionPoint = scopeCreator.addToScopeTreeAndReturnInsertionPoint(decl->getBody(), this,
+                                                     std::nullopt);
 }
 
 #pragma mark expandScope

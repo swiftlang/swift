@@ -1231,8 +1231,16 @@ bool Decl::preconcurrency() const {
 
   // Variables declared in top-level code are @_predatesConcurrency
   if (const VarDecl *var = dyn_cast<VarDecl>(this)) {
+    auto *DC = var->getDeclContext();
+    auto isTopLevelScriptVar = [&]() {
+      if (!DC->isModuleScopeContext())
+        return false;
+      auto varLoc = var->getLoc(/*SerializedOK*/ false);
+      auto *SF = DC->getParentModule()->getSourceFileContainingLocation(varLoc);
+      return SF && SF->isScriptMode();
+    };
     return !getASTContext().isLanguageModeAtLeast(6) &&
-           var->isTopLevelGlobal() && var->getDeclContext()->isAsyncContext();
+      isTopLevelScriptVar() && DC->isAsyncContext();
   }
 
   return false;
@@ -2965,6 +2973,25 @@ bool PatternBindingDecl::isExplicitlyInitialized(unsigned i) const {
 SourceLoc PatternBindingDecl::getEqualLoc(unsigned i) const {
   const auto &entry = getPatternList()[i];
   return entry.getEqualLoc();
+}
+
+TopLevelCodeDecl *TopLevelCodeDecl::getPrevious() const {
+  if (Previous)
+    return Previous.value();
+
+  auto *SF = getParentSourceFile();
+  ASSERT(SF);
+
+  TopLevelCodeDecl *prev = nullptr;
+  for (auto *D : SF->getTopLevelDecls()) {
+    auto *TLCD = dyn_cast<TopLevelCodeDecl>(D);
+    if (!TLCD)
+      continue;
+
+    TLCD->Previous = prev;
+    prev = TLCD;
+  }
+  return Previous.value();
 }
 
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
@@ -8054,7 +8081,6 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
   Bits.VarDecl.IsDebuggerVar = false;
   Bits.VarDecl.IsLazyStorageProperty = false;
   Bits.VarDecl.IsPropertyWrapperBackingProperty = false;
-  Bits.VarDecl.IsTopLevelGlobal = false;
   Bits.VarDecl.NoAttachedPropertyWrappers = false;
   Bits.VarDecl.NoPropertyWrapperAuxiliaryVariables = false;
   Bits.VarDecl.IsPlaceholderVar = false;
@@ -8192,7 +8218,8 @@ VarDecl::mutability(const DeclContext *UseDC,
   }
 
   if (isa<TopLevelCodeDecl>(UseDC) &&
-      getDeclContext() == UseDC->getParent())
+      isa<TopLevelCodeDecl>(getDeclContext()) &&
+      getDeclContext()->getParent() == UseDC->getParent())
     return StorageMutability::Initializable;
 
   return StorageMutability::Immutable;
@@ -8217,9 +8244,7 @@ bool VarDecl::isLazilyInitializedGlobal() const {
   if (getAttrs().hasAttribute<ExternAttr>())
     return false;
 
-  // Top-level global variables in the main source file and in the REPL are not
-  // lazily initialized.
-  return !isTopLevelGlobal();
+  return true;
 }
 
 Expr *VarDecl::getParentExecutableInitializer() const {

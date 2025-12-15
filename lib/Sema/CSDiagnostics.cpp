@@ -7432,8 +7432,6 @@ bool InOutConversionFailure::diagnoseAsError() {
 
 void InOutConversionFailure::fixItChangeArgumentType() const {
   auto *argExpr = castToExpr(getAnchor());
-  auto *DC = getDC();
-
   if (auto *IOE = dyn_cast<InOutExpr>(argExpr))
     argExpr = IOE->getSubExpr();
 
@@ -7446,16 +7444,7 @@ void InOutConversionFailure::fixItChangeArgumentType() const {
     return;
 
   // Don't emit for non-local variables.
-  // (But in script-mode files, we consider module-scoped
-  // variables in the same file to be local variables.)
-  auto VDC = VD->getDeclContext();
-  bool isLocalVar = VDC->isLocalContext();
-  if (!isLocalVar && VDC->isModuleScopeContext()) {
-    auto argFile = DC->getParentSourceFile();
-    auto varFile = VDC->getParentSourceFile();
-    isLocalVar = (argFile == varFile && argFile->isScriptMode());
-  }
-  if (!isLocalVar)
+  if (!VD->getDeclContext()->isLocalContext())
     return;
 
   auto actualType = getFromType();

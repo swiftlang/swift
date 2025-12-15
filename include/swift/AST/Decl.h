@@ -503,7 +503,7 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1+1,
     /// Encodes whether this is a 'let' binding.
     Introducer : 2,
 
@@ -519,9 +519,6 @@ protected:
 
     /// Whether this is the backing storage for a property wrapper.
     IsPropertyWrapperBackingProperty : 1,
-
-    /// Whether this is a lazily top-level global variable from the main file.
-    IsTopLevelGlobal : 1,
 
     /// Whether this variable has no attached property wrappers.
     NoAttachedPropertyWrappers : 1,
@@ -2879,6 +2876,8 @@ private:
 /// global variables.
 class TopLevelCodeDecl : public DeclContext, public Decl {
   BraceStmt *Body;
+  std::optional<TopLevelCodeDecl *> Previous;
+
   SourceLoc getLocFromSource() const { return getStartLoc(); }
   friend class Decl;
 public:
@@ -2889,6 +2888,8 @@ public:
 
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *b) { Body = b; }
+
+  TopLevelCodeDecl *getPrevious() const;
 
   SourceLoc getStartLoc() const;
   SourceRange getSourceRange() const;
@@ -6815,10 +6816,6 @@ public:
 
   /// Retrieve the backing storage property for a lazy property.
   VarDecl *getLazyStorageProperty() const;
-
-  /// True if this is a top-level global variable from the main source file.
-  bool isTopLevelGlobal() const { return Bits.VarDecl.IsTopLevelGlobal; }
-  void setTopLevelGlobal(bool b) { Bits.VarDecl.IsTopLevelGlobal = b; }
 
   /// True if this is any storage of static duration (global scope or static).
   bool isGlobalStorage() const;
