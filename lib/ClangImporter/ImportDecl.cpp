@@ -2449,6 +2449,64 @@ namespace {
           }
         }
 
+        // Determine whether we should import this member; we should only import
+        // members that are necessary even when they are never referred to.
+        //
+        // Not only is this better for performance, it also avoids unnecessarily
+        // instantiating templates, which can be a bit of a minefield in light
+        // of SFINAE and template meta-programming.
+        bool shouldImport = false;
+
+        // underlyingMember is what we will use to determine whether to import,
+        // looking through any using decls.
+        auto *underlyingMember = nd;
+        while (auto *usd = dyn_cast<clang::UsingShadowDecl>(underlyingMember))
+          underlyingMember = usd->getTargetDecl();
+
+        if (isa<clang::FieldDecl, clang::IndirectFieldDecl>(underlyingMember)) {
+          // Always import fields; these affect layout and thus codegen.
+          shouldImport = true;
+        } else if (isa<clang::FunctionTemplateDecl>(underlyingMember)) {
+          // Import function template decls for now. The way these these are
+          // handled right now, these should be safe from spurious
+          // instantiation, and seem to be necessary for lookups.
+          // FIXME: these shouldn't be necessary to import.
+          shouldImport = true;
+        } else if (auto *fn = dyn_cast<clang::FunctionDecl>(underlyingMember)) {
+          switch (fn->getDeclName().getNameKind()) {
+          case clang::DeclarationName::Identifier:
+            // Always import begin() and end() eagerly, since those are
+            // handled specially, but skip importing other functions.
+            if (fn->getMinRequiredArguments() == 0 &&
+                (fn->getName() == "begin" || fn->getName() == "end")) {
+              shouldImport = true;
+            } else if (auto *md = dyn_cast<clang::CXXMethodDecl>(fn)) {
+              // Lookup doesn't know about these
+              if (CXXMethodBridging(md).classify() !=
+                  CXXMethodBridging::Kind::unknown)
+                shouldImport = true;
+            }
+            break;
+
+          case clang::DeclarationName::CXXOperatorName:
+          case clang::DeclarationName::CXXConversionFunctionName:
+          case clang::DeclarationName::CXXConstructorName:
+            // Always import operators, conversions, and constructors for now.
+            // Some of these are handled in special ways that require them to
+            // be eagerly available, e.g., in VisitCXXRecordDecl() and
+            // conformToCxxConvertibleToBoolIfNeeded().
+            shouldImport = true;
+            break;
+          default:
+            break;
+          }
+        }
+
+        // Members we skip here can be imported on-demand if and when they are
+        // referred to in Swift
+        if (!shouldImport)
+          continue;
+
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
 
         if (!member) {
