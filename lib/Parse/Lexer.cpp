@@ -270,7 +270,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
          "location from the wrong buffer");
 
   Lexer L(LangOpts, SourceMgr, BufferID, getUnderlyingDiags(), LexMode,
-          HashbangMode::Allowed, CommentRetentionMode::None);
+          HashbangMode::Allowed, CommentRetentionMode::AttachToNextToken);
   L.restoreState(State(Loc));
   return L.peekNextToken();
 }
@@ -3035,7 +3035,7 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
   LangOptions FakeLangOptions;
 
   Lexer L(FakeLangOptions, SM, BufferID, nullptr, LexerMode::Swift,
-          HashbangMode::Allowed, CommentRetentionMode::None,
+          HashbangMode::Allowed, CommentRetentionMode::AttachToNextToken,
           BufferStart, BufferEnd);
 
   // Lex tokens until we find the token that contains the source location.
