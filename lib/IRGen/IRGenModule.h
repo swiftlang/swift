@@ -2162,7 +2162,7 @@ struct DenseMapInfo<swift::irgen::IRGenModule::FixedLayoutKey> {
 
   static unsigned getHashValue(const FixedLayoutKey &key) {
     return hash_combine(key.size, key.numExtraInhabitants, key.align,
-                        (bool)key.pod, (bool)key.bitwiseTakable);
+                        (bool)key.pod, key.bitwiseTakable);
   }
   static bool isEqual(const FixedLayoutKey &a, const FixedLayoutKey &b) {
     return a.size == b.size
