@@ -63,8 +63,6 @@ PASS(AllocBoxToStack, "allocbox-to-stack",
      "stack promotion of box objects")
 PASS(CopyToBorrowOptimization, "copy-to-borrow-optimization",
      "Convert load [copy] instructions to load_borrow and remove copies of borrowed values")
-PASS(AliasInfoDumper, "dump-alias-info",
-     "Dump Alias Analysis over all Pairs")
 PASS(AssumeSingleThreaded, "sil-assume-single-threaded",
      "Assume Single-Threaded Environment")
 PASS(BooleanLiteralFolding, "boolean-literal-folding",
@@ -73,16 +71,8 @@ PASS(DestroyHoisting, "destroy-hoisting",
      "Hoist destroy_value instructions")
 PASS(MandatoryDestroyHoisting, "mandatory-destroy-hoisting",
      "Hoist destroy_value instructions for non-lexical values")
-PASS(DeadEndBlockDumper, "dump-deadendblocks",
-     "Tests the DeadEndBlocks utility")
 PASS(EmbeddedWitnessCallSpecialization, "embedded-witness-call-specialization",
      "Mandatory witness method call specialization")
-PASS(EscapeInfoDumper, "dump-escape-info",
-     "Dumps escape information")
-PASS(AddressEscapeInfoDumper, "dump-addr-escape-info",
-     "Dumps address escape information")
-PASS(AccessDumper, "dump-access",
-     "Dump access information")
 PASS(ConstantCapturePropagation, "constant-capture-propagation",
      "Specialize closures with constant captures")
 PASS(ComputeEscapeEffects, "compute-escape-effects",
@@ -91,12 +81,8 @@ PASS(ComputeSideEffects, "compute-side-effects",
      "Computes function side effects")
 PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
      "Diagnose Infinitely-Recursive Code")
-PASS(TestInstructionIteration, "test-instruction-iteration",
-     "Tests instruction iteration")
 PASS(InitializeStaticGlobals, "initialize-static-globals",
      "Initializes static global variables")
-PASS(RangeDumper, "dump-ranges",
-     "Dumps block and instruction ranges")
 PASS(MandatoryRedundantLoadElimination, "mandatory-redundant-load-elimination",
      "Mandatory Redundant Load Elimination")
 PASS(EarlyRedundantLoadElimination, "early-redundant-load-elimination",
@@ -116,8 +102,6 @@ PASS(LifetimeDependenceInsertion,
 PASS(LifetimeDependenceScopeFixup,
      "lifetime-dependence-scope-fixup",
      "Fixup scope for lifetime dependence")
-PASS(MemBehaviorDumper, "dump-mem-behavior",
-     "Print SIL Instruction MemBehavior from Alias Analysis over all Pairs")
 PASS(MergeCondFails, "merge-cond_fails",
      "Merge SIL cond_fail to Eliminate Redundant Overflow Checks")
 PASS(ObjCBridgingOptimization, "objc-bridging-opt",
@@ -130,8 +114,6 @@ PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(LetPropertyLowering, "let-property-lowering",
      "Lowers accesses to let properties of classes")
-PASS(SILPrinter, "sil-printer",
-     "Test pass which prints the SIL of a function")
 PASS(FunctionStackProtection, "function-stack-protection",
      "Decides which functions need stack protectors")
 PASS(Simplification, "simplification",
@@ -148,8 +130,6 @@ PASS(StripObjectHeaders, "strip-object-headers",
     "Sets the bare flag on objects which don't need their headers")
 PASS(StackPromotion, "stack-promotion",
      "Stack Promotion of Class Objects")
-PASS(UpdateBorrowedFrom, "update-borrowed-from",
-     "Test pass for update borrowed-from instructions")
 PASS(MandatoryTempRValueElimination, "mandatory-temp-rvalue-elimination",
      "Mandatory remove short-lived immutable temporary copies")
 PASS(TempRValueElimination, "temp-rvalue-elimination",
@@ -170,7 +150,7 @@ MODULE_PASS(MandatoryAllocBoxToStack, "mandatory-allocbox-to-stack",
      "Mandatory stack promotion of box objects")
 MODULE_PASS(AsyncDemotion, "async-demotion",
      "Convert async functions to be synchronous")
-MODULE_PASS(FunctionUsesDumper, "dump-function-uses",
+MODULE_PASS(FunctionUsesTestPass, "test-function-uses",
      "Dump the results of FunctionUses")
 MODULE_PASS(MandatoryPerformanceOptimizations, "mandatory-performance-optimizations",
      "Performs optimizations for performance-annotated functions")

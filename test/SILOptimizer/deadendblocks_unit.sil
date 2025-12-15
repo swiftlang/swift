@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -dump-deadendblocks -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner -o /dev/null | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -12,6 +12,7 @@ import Swift
 // CHECK:       end function simple_test
 sil @simple_test : $@convention(thin) () -> () {
 bb0:
+  specify_test "deadendblocks"
   cond_br undef, bb1, bb2
 bb1:
   br bb3
@@ -29,6 +30,7 @@ sil @throwing_fun : $@convention(thin) () -> ((), @error any Error)
 // CHECK:       end function test_throw
 sil @test_throw : $@convention(thin) () -> ((), @error any Error) {
 bb0:
+  specify_test "deadendblocks"
   %0 = function_ref @throwing_fun : $@convention(thin) () -> ((), @error any Error)
   try_apply %0() : $@convention(thin) () -> ((), @error any Error), normal bb1, error bb2
 bb1(%2: $()):
@@ -43,6 +45,7 @@ bb2(%3 : $Error):
 // CHECK:       end function test_unwind
 sil @test_unwind : $@yield_once @convention(thin) () -> @yields () {
 bb0:
+  specify_test "deadendblocks"
   %t = tuple ()
   yield %t : $(), resume bb1, unwind bb2
 bb1:
@@ -56,6 +59,7 @@ bb2:
 // CHECK:       end function complex_cfg
 sil @complex_cfg : $@convention(thin) () -> ((), @error any Error) {
 bb0:
+  specify_test "deadendblocks"
   cond_br undef, bb1, bb7
 bb1:
   %0 = function_ref @throwing_fun : $@convention(thin) () -> ((), @error any Error)

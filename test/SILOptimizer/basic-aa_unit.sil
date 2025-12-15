@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -dump-alias-info -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 // REQUIRES: swift_in_compiler
@@ -30,6 +30,7 @@ enum Optional<T> {
 // CHECK-NEXT: MayAlias
 sil @index_addr_inst_with_unknown_index : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  specify_test "aliasing"
   %212 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int
   %214 = index_addr %212 : $*Int, %1 : $Builtin.Word
   %2114 = index_addr %212 : $*Int, %1 : $Builtin.Word
@@ -47,6 +48,7 @@ bb1:
 // CHECK-NEXT: MayAlias
 sil @index_addr_inst_with_same_constant_index : $@convention(thin) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
+  specify_test "aliasing"
   %6 = integer_literal $Builtin.Word, 2
   %212 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int
   %214 = index_addr %212 : $*Int, %6 : $Builtin.Word
@@ -65,6 +67,7 @@ bb1:
 // CHECK-NEXT: NoAlias
 sil @index_addr_inst_with_different_constant_index : $@convention(thin) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
+  specify_test "aliasing"
   %6 = integer_literal $Builtin.Word, 2
   %7 = integer_literal $Builtin.Word, 3
   %212 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int
@@ -92,6 +95,7 @@ bb1:
 // CHECK-NEXT: NoAlias
 sil @address_args_dont_alias_in_first_bb : $@convention(thin) (@in Builtin.NativeObject, @in Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject):
+  specify_test "aliasing"
   fix_lifetime %0 : $*Builtin.NativeObject
   fix_lifetime %1 : $*Builtin.NativeObject
   %2 = tuple()
@@ -105,6 +109,7 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject):
 // CHECK-NEXT: NoAlias
 sil @inout_args_may_not_alias: $@convention(thin) (@inout Builtin.NativeObject, @inout Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject):
+  specify_test "aliasing"
   fix_lifetime %0 : $*Builtin.NativeObject
   fix_lifetime %1 : $*Builtin.NativeObject
   %2 = tuple()
@@ -175,6 +180,8 @@ struct StructLvl1 {
 // CHECK-NEXT:   %6 = tuple_element_addr %4 : $*(Builtin.Int64, Builtin.Int32), 1
 // CHECK-NEXT: MayAlias
 sil @different_alloc_stack_dont_alias : $@convention(thin) () -> () {
+bb0:
+  specify_test "aliasing"
   %0 = alloc_stack $StructLvl1
   %1 = alloc_stack $StructLvl1
 
@@ -235,6 +242,7 @@ sil @different_alloc_stack_dont_alias : $@convention(thin) () -> () {
 // CHECK-NEXT: NoAlias
 sil @args_dont_alias_with_identified_function_locals : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject, @in Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject, %2 : $*Builtin.NativeObject):
+  specify_test "aliasing"
   %3 = alloc_stack $Builtin.NativeObject
   dealloc_stack %3 : $*Builtin.NativeObject
   fix_lifetime %0 : $Builtin.NativeObject
@@ -359,6 +367,7 @@ sil @use_native_object : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: MayAlias
 sil @escapesource_functionlocal_test_escapesource_nonescapinglocal : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  specify_test "aliasing"
   %2 = alloc_stack $Builtin.NativeObject
   %3 = alloc_stack $Builtin.NativeObject
   %4 = function_ref @create_native_object : $@convention(thin) () -> Builtin.NativeObject
@@ -383,6 +392,8 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject):
 // CHECK-NEXT:   %6 = tuple_element_addr %5 : $*(Builtin.Int64, Builtin.Int32), 1
 // CHECK-NEXT: MayAlias
 sil @projections_from_the_same_source_with_the_same_projection_path_mustalias : $@convention(thin) () -> () {
+bb0:
+  specify_test "aliasing"
   %0 = alloc_stack $StructLvl1
   %1 = struct_element_addr %0 : $*StructLvl1, #StructLvl1.sub
   %2 = struct_element_addr %1 : $*StructLvl2, #StructLvl2.tup
@@ -412,6 +423,8 @@ class X { }
 // CHECK-NEXT:   %1 = global_addr @sil_global2 : $*Builtin.Int32
 // CHECK-NEXT: NoAlias
 sil @globals_dont_alias : $@convention(thin) () -> () {
+bb0:
+  specify_test "aliasing"
   %0 = global_addr @sil_global1 : $*Builtin.Int32
   %1 = global_addr @sil_global2 : $*Builtin.Int32
   fix_lifetime %0 : $*Builtin.Int32
@@ -426,6 +439,8 @@ sil @globals_dont_alias : $@convention(thin) () -> () {
 // CHECK-NEXT:   %1 = alloc_ref $X
 // CHECK-NEXT: NoAlias
 sil @globals_and_allocs_dont_alias : $@convention(thin) () -> () {
+bb0:
+  specify_test "aliasing"
   %0 = global_addr @sil_global1 : $*Builtin.Int32
   %1 = alloc_ref $X
   fix_lifetime %0 : $*Builtin.Int32
@@ -451,6 +466,8 @@ sil_global @sil_global3 : $Int32
 // CHECK-NEXT:   %2 = struct_element_addr %1 : $*Int32, #Int32._value
 // CHECK-NEXT: MayAlias
 sil @globals_alias : $@convention(thin) () -> () {
+bb0:
+  specify_test "aliasing"
   %0 = global_addr @sil_global3 : $*Int32
   %1 = global_addr @sil_global3 : $*Int32
   %2 = struct_element_addr %1 : $*Int32, #Int32._value
@@ -473,6 +490,8 @@ class HalfOpenRange {
 // CHECK-NEXT:   %10 = struct_element_addr %7 : $*Int32, #Int32._value
 // CHECK-NEXT: NoAlias
 sil @different_fields : $@convention(thin) () -> () {
+bb0:
+  specify_test "aliasing"
   %0 = integer_literal $Builtin.Int32, 0
   %1 = struct $Int32 (%0 : $Builtin.Int32)
   %2 = integer_literal $Builtin.Int32, 10
@@ -508,6 +527,7 @@ public final class C {
 // CHECK-NEXT: MayAlias
 sil @ref_element_addr_and_object_itself : $@convention(thin) () -> () {
 bb0:
+  specify_test "aliasing"
   %0 = alloc_ref $C
   %1 = ref_element_addr %0 : $C, #C.a
   fix_lifetime %1 : $*Int
@@ -522,6 +542,7 @@ bb0:
 // CHECK-NEXT: NoAlias
 sil @different_fields_of_different_refs : $@convention(thin) (@owned C, @owned C, Int) -> Int {
 bb0(%0 : $C, %1 : $C, %2 : $Int):
+  specify_test "aliasing"
   %6 = ref_element_addr %0 : $C, #C.a
   %8 = ref_element_addr %1 : $C, #C.b
   fix_lifetime %6 : $*Int
@@ -531,6 +552,7 @@ bb0(%0 : $C, %1 : $C, %2 : $Int):
 
 sil @not_escaping: $@convention(thin) (X) -> X {
 bb0(%0 : $X):
+  specify_test "aliasing"
   %1 = alloc_ref $X
   return %1 : $X
 }
@@ -542,6 +564,7 @@ bb0(%0 : $X):
 // CHECK-NEXT: MayAlias
 sil @alloc_stack_and_addr_cast : $@convention(thin) () -> () {
 bb0:
+  specify_test "aliasing"
   %0 = alloc_stack $C
   %1 = unchecked_addr_cast %0 : $*C to $*Optional<C>
   fix_lifetime %1 : $*Optional<C>
@@ -598,6 +621,7 @@ struct StructWithOptional {
 // CHECK-NEXT: NoAlias
 sil @init_enum_data_addr : $@convention(thin) (@in_guaranteed StructWithOptional) -> () {
 bb0(%0 : $*StructWithOptional):
+  specify_test "aliasing"
   %1 = alloc_stack $StructWithOptional
   %2 = struct_element_addr %1 : $*StructWithOptional, #StructWithOptional.i
   %3 = init_enum_data_addr %2 : $*Optional<TwoInts>, #Optional.some!enumelt
@@ -636,6 +660,7 @@ struct S : P {
 // CHECK-NEXT: MayAlias
 sil @init_existential_addr : $@convention(thin) (P) -> () {
 bb0(%0 : $P):
+  specify_test "aliasing"
   %1 = alloc_stack $S
   %2 = alloc_stack $P
   %3 = init_existential_addr %2 : $*P, $S
@@ -655,6 +680,7 @@ bb0(%0 : $P):
 // CHECK-NEXT:  MayAlias
 sil @testCowMutation : $@convention(thin) () -> () {
 bb0:
+  specify_test "aliasing"
   %0 = alloc_ref $X
   (%1, %2) = begin_cow_mutation %0 : $X
   %3 = end_cow_mutation %2 : $X
@@ -675,6 +701,7 @@ class Derived: X {}
 // CHECK-NEXT:  MayAlias
 sil @test_tail_addr_and_upcast : $@convention(thin) () -> () {
 bb0:
+  specify_test "aliasing"
   %0 = alloc_ref $Derived
   %1 = upcast %0 to $X
   %2 = ref_tail_addr %1, $Int32
@@ -696,6 +723,7 @@ class GenericClass<T> {
 // CHECK-NEXT:    MayAlias
 sil [ossa] @test_generic_class : $@convention(thin) <T> (@guaranteed GenericClass<T>, @guaranteed GenericClass<Int>) -> () {
 bb0(%0 : @guaranteed $GenericClass<T>, %1 : @guaranteed $GenericClass<Int>):
+  specify_test "aliasing"
   %2 = ref_element_addr %0 : $GenericClass<T>, #GenericClass.x
   %3 = ref_element_addr %1 : $GenericClass<Int>, #GenericClass.x
 
@@ -713,6 +741,7 @@ bb0(%0 : @guaranteed $GenericClass<T>, %1 : @guaranteed $GenericClass<Int>):
 // CHECK-NEXT:    NoAlias
 sil [ossa] @test_bound_generic_class : $@convention(thin) (@guaranteed GenericClass<Int32>, @guaranteed GenericClass<Int>) -> () {
 bb0(%0 : @guaranteed $GenericClass<Int32>, %1 : @guaranteed $GenericClass<Int>):
+  specify_test "aliasing"
   %2 = ref_element_addr %0 : $GenericClass<Int32>, #GenericClass.x
   %3 = ref_element_addr %1 : $GenericClass<Int>, #GenericClass.x
 
@@ -734,6 +763,7 @@ bb0(%0 : @guaranteed $GenericClass<Int32>, %1 : @guaranteed $GenericClass<Int>):
 // CHECK-NEXT:    MayAlias
 sil [ossa] @test_store_borrow : $@convention(thin) (@guaranteed X) -> () {
 bb0(%0 :  @guaranteed $X):
+  specify_test "aliasing"
   %1 = alloc_stack $X
   %2 = store_borrow %0 to %1 : $*X
   %3 = address_to_pointer %2 : $*X to $Builtin.RawPointer

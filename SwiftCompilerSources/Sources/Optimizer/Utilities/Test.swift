@@ -1,4 +1,4 @@
-//===----------- FunctionTest.swift ---------------------------------------===//
+//===----------- Test.swift -----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,15 +14,15 @@
 //
 // For general documentation on how to write tests see `Test.swift` in the
 // SIL module.
-// To add an optimizer test, use `FunctionTest` instead of `Test` and register
-// it in `registerOptimizerTests`.
+// To add an optimizer test, use `FunctionTest` or `ModuleTest` instead of `Test`
+// and register it in `registerOptimizerTests`.
 //
 //===----------------------------------------------------------------------===//
 
 import SIL
 import OptimizerBridging
 
-/// Like `SIL.Test`,  but provides a `FunctionPass` to the invocation closure.
+/// Like `SIL.Test`,  but provides a `FunctionPassContext` to the invocation closure.
 struct FunctionTest {
   let name: String
   let invocation: FunctionTestInvocation
@@ -30,6 +30,17 @@ struct FunctionTest {
   public init(_ name: String, invocation: @escaping FunctionTestInvocation) {
     self.name = name
     self.invocation = invocation
+  }
+}
+
+/// Like `SIL.Test`,  but provides a `ModulePassContext` to the invocation closure.
+/// This is just a wrapper around a `ModulePass` with the name "test-<testname>".
+/// Therefore, module tests must also be added to `Passes.def`.
+struct ModuleTest {
+  let pass: ModulePass
+
+  public init(_ name: String, invocation: @escaping (ModulePassContext) -> ()) {
+    self.pass = ModulePass(name: "test-" + name, invocation)
   }
 }
 
@@ -52,8 +63,15 @@ public func registerOptimizerTests() {
     localVariableReachingAssignmentsTest,
     rangeOverlapsPathTest,
     variableIntroducerTest,
-    destroyBarrierTest
+    destroyBarrierTest,
+    deadEndBlockTest,
+    escapeInfoTest,
+    addressEscapeInfoTest,
+    aliasingTest,
+    memoryEffectsTest
   )
+
+  registerModuleTest(functionUsesTest, { functionUsesTest.pass.run($0) })
 
   // Finally register the thunk they all call through.
   registerFunctionTestThunk(functionTestThunk)
@@ -67,6 +85,10 @@ private func registerFunctionTest(_ test: FunctionTest) {
   test.name._withBridgedStringRef { ref in
     registerFunctionTest(ref, castToOpaquePointer(fromInvocation: test.invocation))
   }
+}
+
+private func registerModuleTest(_ test: ModuleTest, _ runFn: @escaping (@convention(c) (BridgedContext) -> ())) {
+  registerPass(test.pass, runFn)
 }
 
 /// The function called by the swift::test::FunctionTest which invokes the

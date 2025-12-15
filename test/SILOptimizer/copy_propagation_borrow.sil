@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all -module-name Swift %s | %FileCheck %s
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -copy-propagation -enable-sil-verify-all -module-name Swift %s | %FileCheck %s --check-prefixes=CHECK-NOSCOPES
+// RUN: %target-sil-opt -sil-print-types -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all -module-name Swift %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -copy-propagation -enable-sil-verify-all -module-name Swift %s | %FileCheck %s --check-prefixes=CHECK-NOSCOPES
 //
 // Most CopyPropagation tests are still in copy_propagation_opaque.sil.
 //
@@ -581,20 +581,24 @@ bb0(%0 : @guaranteed $HasObject):
 // CHECK-LABEL: } // end sil function 'testSubReborrowExtension'
 sil [ossa] @testSubReborrowExtension : $@convention(thin) () -> () {
 bb0:
-  %alloc = alloc_ref $C
-  %copy = copy_value %alloc : $C
-  %borrow = begin_borrow %alloc : $C
+  %0 = alloc_ref $C
+  %1 = copy_value %0
+  %2 = begin_borrow %0
   cond_br undef, bb1, bb2
+
 bb1:
-  br bb3(%copy : $C, %borrow: $C)
+  br bb3(%1, %2)
+
 bb2:
-  br bb3(%copy : $C, %borrow: $C)
-bb3(%phi : @owned $C, %borrowphi : @guaranteed $C):
-  end_borrow %borrowphi : $C
-  destroy_value %phi : $C
-  destroy_value %alloc : $C
-  %99 = tuple ()
-  return %99 : $()
+  br bb3(%1, %2)
+
+bb3(%6 : @owned $C, %7 : @reborrow $C):
+  %8 = borrowed %7 from (%0)
+  end_borrow %8
+  destroy_value %6
+  destroy_value %0
+  %12 = tuple ()
+  return %12
 }
 
 // Test a cross-block reborrow and a live nested copy of the reborrow:
@@ -625,25 +629,30 @@ bb3(%phi : @owned $C, %borrowphi : @guaranteed $C):
 // CHECK-LABEL: } // end sil function 'testLiveCopyAfterReborrow'
 sil [ossa] @testLiveCopyAfterReborrow : $@convention(thin) () -> () {
 bb0:
-  %alloc = alloc_ref $C
+  %0 = alloc_ref $C
   cond_br undef, bb1, bb2
+
 bb1:
-  %borrow1 = begin_borrow %alloc : $C
-  br bb3(%borrow1: $C)
+  %2 = begin_borrow %0
+  br bb3(%2)
+
 bb2:
-  %borrow2 = begin_borrow %alloc : $C
-  br bb3(%borrow2: $C)
-bb3(%borrowphi : @guaranteed $C):
-  %innercopy = copy_value %borrowphi : $C
-  end_borrow %borrowphi : $C
-  %outercopy = copy_value %innercopy : $C
-  destroy_value %innercopy : $C
-  %f = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
-  apply %f(%outercopy) : $@convention(thin) (@guaranteed C) -> ()
-  destroy_value %outercopy : $C
-  destroy_value %alloc : $C
-  %99 = tuple ()
-  return %99 : $()
+  %4 = begin_borrow %0
+  br bb3(%4)
+
+bb3(%6 : @reborrow $C):
+  %7 = borrowed %6 from (%0)
+  %8 = copy_value %7
+  end_borrow %7
+  %10 = copy_value %8
+  destroy_value %8
+
+  %12 = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  %13 = apply %12(%10) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %10
+  destroy_value %0
+  %16 = tuple ()
+  return %16
 }
 
 // Test a cross-block reborrow and a dead nested copy of the reborrow:
@@ -672,23 +681,27 @@ bb3(%borrowphi : @guaranteed $C):
 // CHECK-LABEL: } // end sil function 'testDeadCopyAfterReborrow'
 sil [ossa] @testDeadCopyAfterReborrow : $@convention(thin) () -> () {
 bb0:
-  %alloc = alloc_ref $C
+  %0 = alloc_ref $C
   cond_br undef, bb1, bb2
+
 bb1:
-  %borrow1 = begin_borrow %alloc : $C
-  br bb3(%borrow1: $C)
+  %2 = begin_borrow %0
+  br bb3(%2)
+
 bb2:
-  %borrow2 = begin_borrow %alloc : $C
-  br bb3(%borrow2: $C)
-bb3(%borrowphi : @guaranteed $C):
-  %innercopy = copy_value %borrowphi : $C
-  end_borrow %borrowphi : $C
-  %outercopy = copy_value %innercopy : $C
-  destroy_value %innercopy : $C
-  destroy_value %outercopy : $C
-  destroy_value %alloc : $C
-  %99 = tuple ()
-  return %99 : $()
+  %4 = begin_borrow %0
+  br bb3(%4)
+
+bb3(%6 : @reborrow $C):
+  %7 = borrowed %6 from (%0)
+  %8 = copy_value %7
+  end_borrow %7
+  %10 = copy_value %8
+  destroy_value %8
+  destroy_value %10
+  destroy_value %0
+  %14 = tuple ()
+  return %14
 }
 
 // Test a reborrow with a nested borrow with an outside use
@@ -713,29 +726,34 @@ bb3(%borrowphi : @guaranteed $C):
 // CHECK-LABEL: } // end sil function 'testNestedReborrowOutsideUse'
 sil [ossa] @testNestedReborrowOutsideUse : $@convention(thin) () -> () {
 bb0:
-  %alloc = alloc_ref $C
+  %0 = alloc_ref $C
   cond_br undef, bb1, bb2
+
 bb1:
-  %borrow1 = begin_borrow %alloc : $C
-  br bb3(%borrow1: $C)
+  %2 = begin_borrow %0
+  br bb3(%2)
+
 bb2:
-  %borrow2 = begin_borrow %alloc : $C
-  br bb3(%borrow2: $C)
-bb3(%borrowphi : @guaranteed $C):
-  %nestedborrow = begin_borrow %borrowphi : $C
-  %innercopy = copy_value %nestedborrow : $C
-  %f = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
-  apply %f(%nestedborrow) : $@convention(thin) (@guaranteed C) -> ()
-  end_borrow %nestedborrow : $C
-  %middlecopy = copy_value %innercopy : $C
-  end_borrow %borrowphi : $C
-  %outercopy = copy_value %middlecopy : $C
-  destroy_value %innercopy : $C
-  destroy_value %middlecopy : $C
-  destroy_value %outercopy : $C
-  destroy_value %alloc : $C
-  %99 = tuple ()
-  return %99 : $()
+  %4 = begin_borrow %0
+  br bb3(%4)
+
+bb3(%6 : @reborrow $C):
+  %7 = borrowed %6 from (%0)
+  %8 = begin_borrow %7
+  %9 = copy_value %8
+
+  %10 = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  %11 = apply %10(%8) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %8
+  %13 = copy_value %9
+  end_borrow %7
+  %15 = copy_value %13
+  destroy_value %9
+  destroy_value %13
+  destroy_value %15
+  destroy_value %0
+  %20 = tuple ()
+  return %20
 }
 
 // Test a reborrow of an owned-and-copied def that does not dominate
@@ -759,22 +777,26 @@ bb3(%borrowphi : @guaranteed $C):
 sil [ossa] @testOwnedReborrow : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
   cond_br undef, bb1, bb2
+
 bb1:
-  destroy_value %0 : $C
-  %f = function_ref @getOwnedC : $@convention(thin) () -> (@owned C)
-  %owned1 = apply %f() : $@convention(thin) () -> (@owned C)
-  %copy1 = copy_value %owned1 : $C
-  %borrow1 = begin_borrow %copy1 : $C
-  destroy_value %owned1 : $C
-  br bb3(%borrow1 : $C, %copy1 : $C)
+  destroy_value %0
+  %3 = function_ref @getOwnedC : $@convention(thin) () -> @owned C
+  %4 = apply %3() : $@convention(thin) () -> @owned C
+  %5 = copy_value %4
+  %6 = begin_borrow %5
+  destroy_value %4
+  br bb3(%6, %5)
+
 bb2:
-  %borrow2 = begin_borrow %0 : $C
-  br bb3(%borrow2 : $C, %0 : $C)
-bb3(%borrow3 : @guaranteed $C, %copy3 : @owned $C):
-  end_borrow %borrow3 : $C
-  destroy_value %copy3 : $C
-  %result = tuple ()
-  return %result : $()
+  %9 = begin_borrow %0
+  br bb3(%9, %0)
+
+bb3(%11 : @reborrow $C, %12 : @owned $C):
+  %13 = borrowed %11 from (%12)
+  end_borrow %13
+  destroy_value %12
+  %16 = tuple ()
+  return %16
 }
 
 // =============================================================================
@@ -1231,16 +1253,16 @@ bb0(%0 : @guaranteed $C):
 // CHECK-LABEL: } // end sil function 'test_updating_borrowed_from'
 sil [ossa] @test_updating_borrowed_from : $@convention(thin) (@guaranteed HasObject) -> () {
 bb0(%0 : @guaranteed $HasObject):
-  %1 = destructure_struct %0 : $HasObject
-  %2 = copy_value %1 : $C
-  %3 = begin_borrow %2 : $C
-  br bb1(%3 : $C)
+  %1 = destructure_struct %0
+  %2 = copy_value %1
+  %3 = begin_borrow %2
+  br bb1(%3)
 
 bb1(%5 : @reborrow $C):
-  %6 = borrowed %5 : $C from (%2 : $C)
-  end_borrow %6 : $C
-  destroy_value %2 : $C
+  %6 = borrowed %5 from (%2)
+  end_borrow %6
+  destroy_value %2
   %9 = tuple ()
-  return %9 : $()
+  return %9
 }
 

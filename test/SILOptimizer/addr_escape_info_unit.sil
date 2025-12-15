@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -dump-addr-escape-info -o /dev/null \
+// RUN: %target-sil-opt %s -test-runner -o /dev/null \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature AddressableTypes \
 // RUN: | %FileCheck %s
@@ -111,6 +111,7 @@ sil @addressable_noescape_arg : $@convention(thin) (@in_guaranteed Addressable) 
 // CHECK:       End function test_simple
 sil @test_simple : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_stack $Str
   %1 = struct_element_addr %0 : $*Str, #Str.a
   fix_lifetime %1 : $*Int
@@ -163,6 +164,7 @@ bb0:
 // CHECK:      End function test_class
 sil @test_class : $@convention(thin) () -> X {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_ref $X
   %1 = ref_element_addr %0 : $X, #X.s
   %2 = struct_element_addr %1 : $*Str, #Str.a
@@ -188,6 +190,7 @@ sil @return_x : $@convention(thin) (@guaranteed X) -> @owned X
 // CHECK:       End function test_class_argument
 sil @test_class_argument : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_ref $X
   %1 = function_ref @return_x : $@convention(thin) (@guaranteed X) -> @owned X
   %2 = apply %1(%0) : $@convention(thin) (@guaranteed X) -> @owned X
@@ -206,6 +209,7 @@ bb0:
 // CHECK:       End function test_reachable_no_alias
 sil @test_reachable_no_alias : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_ref $XandIntClass
   %1 = ref_element_addr %0 : $XandIntClass, #XandIntClass.x
   %2 = load %1 : $*X
@@ -224,6 +228,7 @@ bb0:
 // CHECK:       End function test_struct_with_class
 sil @test_struct_with_class : $@convention(thin) () -> Container {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_ref $X
   %1 = struct $Container (%0 : $X)
   fix_lifetime %1 : $Container
@@ -242,6 +247,7 @@ bb0:
 // CHECK:       End function ignore_indirect_arg_of_other_call
 sil @ignore_indirect_arg_of_other_call : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_ref $X
   %1 = ref_element_addr %0 : $X, #X.s
   fix_lifetime %1 : $*Str
@@ -261,6 +267,7 @@ bb0:
 // CHECK:       End function dont_ignore_direct_arg_of_other_call
 sil @dont_ignore_direct_arg_of_other_call : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_ref $X
   %1 = ref_element_addr %0 : $X, #X.s
   fix_lifetime %1 : $*Str
@@ -279,6 +286,7 @@ bb0:
 // CHECK:       End function ignore_non_escaping_arg_of_other_call
 sil @ignore_non_escaping_arg_of_other_call : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_ref $X
   %1 = ref_element_addr %0 : $X, #X.s
   fix_lifetime %1 : $*Str
@@ -297,6 +305,7 @@ bb0:
 // CHECK:       End function dont_ignore_non_escaping_arg_of_other_call_if_followstores
 sil @dont_ignore_non_escaping_arg_of_other_call_if_followstores : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_ref $X
   %1 = alloc_stack $X
   store %0 to %1 : $*X
@@ -320,6 +329,7 @@ bb0:
 // CHECK:       End function indirect_argument_escape_to_yield
 sil @indirect_argument_escape_to_yield : $@convention(thin) (@guaranteed X) -> () {
 bb0(%0 : $X):
+  specify_test "address_escape_info"
   %1 = alloc_stack $X
   store %0 to %1 : $*X
   fix_lifetime %1 : $*X
@@ -341,6 +351,7 @@ bb0(%0 : $X):
 // CHECK:       End function ignore_copy_addr_and_release
 sil @ignore_copy_addr_and_release : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_ref $X
   %1 = ref_element_addr %0 : $X, #X.s
   fix_lifetime %1 : $*Str
@@ -360,6 +371,7 @@ bb0:
 // CHECK:       End function non_aliased_addr_arg
 sil @non_aliased_addr_arg : $@convention(thin) (@inout Int) -> () {
 bb0(%0 : $*Int):
+  specify_test "address_escape_info"
   fix_lifetime %0 : $*Int
   %2 = function_ref @no_arguments : $@convention(thin) () -> ()
   %3 = apply %2() : $@convention(thin) () -> ()
@@ -373,6 +385,7 @@ bb0(%0 : $*Int):
 // CHECK:       End function aliased_addr_arg
 sil @aliased_addr_arg : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
+  specify_test "address_escape_info"
   fix_lifetime %0 : $*Int
   %2 = function_ref @no_arguments : $@convention(thin) () -> ()
   %3 = apply %2() : $@convention(thin) () -> ()
@@ -386,6 +399,7 @@ bb0(%0 : $*Int):
 // CHECK:       End function adddr_arg_with_aliased_content
 sil @adddr_arg_with_aliased_content : $@convention(thin) (@inout X) -> () {
 bb0(%0 : $*X):
+  specify_test "address_escape_info"
   %1 = load %0 : $*X
   %2 = ref_element_addr %1 : $X, #X.s
   fix_lifetime %2 : $*Str
@@ -401,6 +415,7 @@ bb0(%0 : $*X):
 // CHECK:       End function pointer_arg
 sil @pointer_arg : $@convention(thin) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
+  specify_test "address_escape_info"
   %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Str
   fix_lifetime %1 : $*Str
   %3 = function_ref @no_arguments : $@convention(thin) () -> ()
@@ -415,6 +430,7 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK:       End function follow_stores_to_arg
 sil @follow_stores_to_arg : $@convention(thin) (@inout Builtin.RawPointer) -> () {
 bb0(%0 : $*Builtin.RawPointer):
+  specify_test "address_escape_info"
   %1 = load %0 : $*Builtin.RawPointer
   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Str
   fix_lifetime %2 : $*Str
@@ -431,6 +447,7 @@ bb0(%0 : $*Builtin.RawPointer):
 // CHECK:       End function partial_apply
 sil @partial_apply : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_stack $Str
   fix_lifetime %0 : $*Str
   %2 = function_ref @closure_with_inout : $@convention(thin) (@inout Str) -> ()
@@ -450,6 +467,7 @@ bb0:
 // CHECK:       End function partial_apply_with_inout
 sil @partial_apply_with_inout : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_stack $Str
   fix_lifetime %0 : $*Str
   %2 = function_ref @closure_with_inout : $@convention(thin) (@inout Str) -> ()
@@ -473,6 +491,7 @@ bb0:
 // CHECK:       End function partial_apply_with_inout_noescape
 sil @partial_apply_with_inout_noescape : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_stack $Str
   fix_lifetime %0 : $*Str
   %2 = function_ref @closure_with_inout : $@convention(thin) (@inout Str) -> ()
@@ -495,6 +514,7 @@ bb0:
 // CHECK:       End function non_escaping_trivial_member
 sil @non_escaping_trivial_member : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
+  specify_test "address_escape_info"
   %1 = alloc_ref $X
   %2 = struct $XandInt(%1 : $X, %0 : $Int)
   %3 = alloc_stack $XandInt
@@ -514,6 +534,7 @@ bb0(%0 : $Int):
 // CHECK:       End function escaping_nontrivial_member
 sil @escaping_nontrivial_member : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
+  specify_test "address_escape_info"
   %1 = alloc_ref $X
   %2 = struct $XandInt(%1 : $X, %0 : $Int)
   %3 = alloc_stack $XandInt
@@ -533,6 +554,7 @@ bb0(%0 : $Int):
 // CHECK:       End function escaping_address_in_nontrivial_member
 sil @escaping_address_in_nontrivial_member : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
+  specify_test "address_escape_info"
   %1 = alloc_ref $X
   %2 = struct $XandInt(%1 : $X, %0 : $Int)
   %3 = alloc_stack $XandInt
@@ -556,6 +578,7 @@ bb0(%0 : $Int):
 // CHECK:      End function bidirectly_forward_property_addr
 sil @bidirectly_forward_property_addr : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_ref $X
   %1 = function_ref @initX : $@convention(method) (@owned X) -> @owned X
   %2 = apply %1(%0) : $@convention(method) (@owned X) -> @owned X
@@ -573,6 +596,7 @@ bb0:
 // CHECK:       End function load_rawpointer
 sil @load_rawpointer : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_stack $Int
   %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
   %2 = alloc_stack $Builtin.RawPointer
@@ -617,6 +641,7 @@ bb0:
 // CHECK:      End function test_addr_alias1
 sil @test_addr_alias1 : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_ref $XandIntClass
   %1 = alloc_ref $X
   %2 = ref_element_addr %0 : $XandIntClass, #XandIntClass.x
@@ -660,6 +685,7 @@ bb0:
 // CHECK:      End function test_addr_alias2
 sil @test_addr_alias2 : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_ref $X
   %1 = ref_element_addr %0 : $X, #X.s
   %2 = struct_element_addr %1 : $*Str, #Str.a
@@ -683,6 +709,7 @@ sil @closure : $@convention(thin) (@inout_aliasable Int64) -> ()
 // CHECK:      End function test_closure_capturing_address
 sil @test_closure_capturing_address : $@convention(thin) () -> Int64 {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_stack $Int64
   %1 = integer_literal $Builtin.Int64, 0
   %2 = struct $Int64 (%1 : $Builtin.Int64)
@@ -736,6 +763,7 @@ bb0:
 // CHECK:      End function test_index_addr
 sil @test_index_addr : $@convention(thin) (Builtin.Word) -> () {
 bb0(%0 : $Builtin.Word):
+  specify_test "address_escape_info"
   %1 = alloc_ref $X
   %2 = ref_tail_addr %1 : $X, $Int
   %3 = integer_literal $Builtin.Word, 2
@@ -761,6 +789,7 @@ bb0(%0 : $Builtin.Word):
 // CHECK:      End function test_existentials
 sil @test_existentials : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
+  specify_test "address_escape_info"
   %1 = alloc_stack $P
   %2 = init_existential_addr %1 : $*P, $Int
   store %0 to %2 : $*Int
@@ -778,6 +807,7 @@ bb0(%0 : $Int):
 // CHECK:      End function test_stored_pointer
 sil @test_stored_pointer : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_stack $Int
   %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
   %2 = alloc_stack $Builtin.RawPointer
@@ -799,6 +829,7 @@ bb0:
 // CHECK:       End function test_unchecked_ref_cast
 sil @test_unchecked_ref_cast : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_ref $D
   %1 = alloc_ref $D
   %2 = unchecked_ref_cast %0 : $D to $X
@@ -819,6 +850,7 @@ bb0:
 // CHECK:       End function test_anyobject_cast
 sil @test_anyobject_cast : $@convention(thin) () -> () {
 bb0:
+  specify_test "address_escape_info"
   %0 = alloc_ref $X
   %1 = init_existential_ref %0 : $X : $X, $AnyObject
   %2 = unchecked_ref_cast %1 : $AnyObject to $X
@@ -835,6 +867,7 @@ bb0:
 // CHECK-NEXT:  End function test_is_unique
 sil [ossa] @test_is_unique : $@convention(thin) (@owned X) -> () {
 bb0(%0 :  @owned $X):
+  specify_test "address_escape_info"
   %1 = alloc_stack $X
   store %0 to [init] %1 : $*X
   fix_lifetime %1 : $*X
@@ -853,6 +886,7 @@ bb0(%0 :  @owned $X):
 // CHECK-NEXT:  End function test_unchecked_addr_cast
 sil [ossa] @test_unchecked_addr_cast : $@convention(thin) (@owned X) -> @owned XandIntClass {
 bb0(%0 :  @owned $X):
+  specify_test "address_escape_info"
   %1 = alloc_stack $X
   store %0 to [init] %1 : $*X
   fix_lifetime %1 : $*X
@@ -881,6 +915,7 @@ bb2(%17 : $Error):
 // CHECK-NEXT:  End function test_store_borrow
 sil [ossa] @test_store_borrow : $@convention(thin) (@guaranteed X) -> () {
 bb0(%0 :  @guaranteed $X):
+  specify_test "address_escape_info"
   %1 = alloc_stack $X
   %2 = store_borrow %0 to %1 : $*X
   fix_lifetime %2 : $*X
@@ -897,6 +932,7 @@ bb0(%0 :  @guaranteed $X):
 // CHECK-NEXT:  End function test_drop_deinit
 sil [ossa] @test_drop_deinit : $@convention(thin) (@owned NonCopyable) -> () {
 bb0(%0 :  @owned $NonCopyable):
+  specify_test "address_escape_info"
   %1 = alloc_stack $NonCopyable
   store %0 to [init] %1
   %3 = drop_deinit %1
@@ -918,6 +954,7 @@ bb0(%0 :  @owned $NonCopyable):
 // CHECK-LABEL: End function noescape_via_independent_addressable
 sil [ossa] @noescape_via_independent_addressable : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
+  specify_test "address_escape_info"
   %1 = alloc_stack $Addressable
   %2 = struct_element_addr %1 : $*Addressable, #Addressable.a
   store %0 to [trivial] %2
@@ -942,6 +979,7 @@ bb0(%0 : $Int):
 // CHECK-LABEL: End function escape_via_dependent_addressable
 sil [ossa] @escape_via_dependent_addressable : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
+  specify_test "address_escape_info"
   %1 = alloc_stack $Addressable
   %2 = struct_element_addr %1 : $*Addressable, #Addressable.a
   store %0 to [trivial] %2
@@ -967,6 +1005,7 @@ bb0(%0 : $Int):
 // CHECK-LABEL: End function escape_via_noescape_addressable
 sil [ossa] @escape_via_noescape_addressable : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
+  specify_test "address_escape_info"
   %1 = alloc_stack $Addressable
   %2 = struct_element_addr %1 : $*Addressable, #Addressable.a
   store %0 to [trivial] %2
@@ -991,6 +1030,7 @@ bb0(%0 : $Int):
 // CHECK-NEXT:  End function escaping_pointer_through_function
 sil [ossa] @escaping_pointer_through_function : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
+  specify_test "address_escape_info"
   %1 = alloc_stack $Int
   fix_lifetime %1
   %3 = address_to_pointer %1 to $Builtin.RawPointer
