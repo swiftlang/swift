@@ -665,8 +665,8 @@ void AsyncConverter::addFuncDecl(const FuncDecl *FD) {
     LeftEndLoc = Lexer::getLocForEndOfToken(
         SM, Params->get(TopHandler.Index - 1)->getEndLoc());
     // Skip to the end of any comments
-    Token Next =
-        Lexer::getTokenAtLocation(SM, LeftEndLoc, CommentRetentionMode::None);
+    Token Next = Lexer::getTokenAtLocation(
+        SM, LeftEndLoc, CommentRetentionMode::AttachToNextToken);
     if (Next.getKind() != tok::NUM_TOKENS)
       LeftEndLoc = Next.getLoc();
     break;

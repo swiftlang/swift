@@ -2559,8 +2559,9 @@ public:
     // insert 'self,'. If it wasn't a valid entry, then we will at least not
     // be introducing any new errors/warnings...
     const auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
-    const auto nextAfterBracket = Lexer::getTokenAtLocation(
-        Ctx.SourceMgr, locAfterBracket, CommentRetentionMode::None);
+    const auto nextAfterBracket =
+        Lexer::getTokenAtLocation(Ctx.SourceMgr, locAfterBracket,
+                                  CommentRetentionMode::AttachToNextToken);
     if (nextAfterBracket.getLoc() != brackets.End)
       diag.fixItInsertAfter(brackets.Start, "self, ");
     else
@@ -2581,8 +2582,8 @@ public:
     // opening brace of the closure, we may need to pad the fix-it
     // with a space.
     const auto nextLoc = closureExpr->getLoc().getAdvancedLoc(1);
-    const auto next = Lexer::getTokenAtLocation(Ctx.SourceMgr, nextLoc,
-                                                CommentRetentionMode::None);
+    const auto next = Lexer::getTokenAtLocation(
+        Ctx.SourceMgr, nextLoc, CommentRetentionMode::AttachToNextToken);
     std::string trailing = next.getLoc() == nextLoc ? " " : "";
 
     diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
