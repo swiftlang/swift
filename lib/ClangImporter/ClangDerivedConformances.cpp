@@ -700,23 +700,18 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
   clang::ASTContext &clangCtx = impl.getClangASTContext();
   clang::Sema &clangSema = impl.getClangSema();
 
-  ProtocolDecl *cxxOptionalProto =
-      ctx.getProtocol(KnownProtocolKind::CxxOptional);
-  // If the Cxx module is missing, or does not include one of the necessary
-  // protocol, bail.
-  if (!cxxOptionalProto)
+  auto *value_type = lookupCxxTypeMember(clangSema, clangDecl, "value_type",
+                                         /*mustBeComplete=*/true);
+  if (!value_type)
     return;
 
-  auto pointeeId = ctx.getIdentifier("pointee");
-  auto pointees = lookupDirectWithoutExtensions(decl, pointeeId);
-  if (pointees.size() != 1)
+  auto *Wrapped = dyn_cast_or_null<TypeAliasDecl>(
+      impl.importDecl(value_type, impl.CurrentVersion));
+  if (!Wrapped)
     return;
-  auto pointee = dyn_cast<VarDecl>(pointees.front());
-  if (!pointee)
-    return;
-  auto pointeeTy = pointee->getInterfaceType();
 
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"), pointeeTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"),
+                               Wrapped->getUnderlyingType());
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxOptional});
 
   // `std::optional` has a C++ constructor that takes the wrapped value as a
@@ -724,11 +719,7 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
   // it isn't directly usable from Swift. Let's explicitly instantiate a
   // constructor with the wrapped value type, and then import it into Swift.
 
-  auto valueTypeDecl = lookupCxxTypeMember(clangSema, clangDecl, "value_type");
-  if (!valueTypeDecl)
-    // `std::optional` without a value_type?!
-    return;
-  auto valueType = clangCtx.getTypeDeclType(valueTypeDecl);
+  auto valueType = clangCtx.getTypeDeclType(value_type);
 
   auto constRefValueType =
       clangCtx.getLValueReferenceType(valueType.withConst());
