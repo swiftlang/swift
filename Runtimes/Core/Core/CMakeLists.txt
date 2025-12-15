@@ -42,6 +42,7 @@ add_library(swiftCore
   BidirectionalCollection.swift
   Bitset.swift
   Bool.swift
+  BorrowingSequence.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   BridgingBuffer.swift

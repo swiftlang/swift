@@ -1016,3 +1016,22 @@ extension Optional: _ObjectiveCBridgeable {
   }
 }
 #endif
+
+extension Optional where Wrapped: ~Copyable {
+  @available(SwiftStdlib 6.3, *)
+  @_transparent
+  public var _span: Span<Wrapped> {
+    @_addressableSelf
+    @lifetime(borrow self)
+    get {
+      guard self != nil else {
+        return Span()
+      }
+
+      let ptr = Builtin.unprotectedAddressOfBorrow(self)
+      return unsafe _overrideLifetime(
+        Span(_unsafeStart: UnsafePointer(ptr), count: 1),
+        borrowing: self)
+    }
+  }
+}
