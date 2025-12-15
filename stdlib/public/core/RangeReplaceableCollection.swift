@@ -453,6 +453,7 @@ extension RangeReplaceableCollection {
   @inlinable
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
+    reserveCapacity(newElements.underestimatedCount)
     for element in newElements {
       append(element)
     }
