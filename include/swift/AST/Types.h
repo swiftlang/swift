@@ -54,6 +54,10 @@ namespace llvm {
 struct fltSemantics;
 } // namespace llvm
 
+namespace clang {
+class FunctionType;
+} // namespace clang
+
 namespace swift {
 
 enum class AllocationArena;
@@ -1111,6 +1115,9 @@ public:
 
   /// Check if this is a ObjCBool type from the Objective-C module.
   bool isObjCBool();
+
+  /// Check if this is a std.string type from C++.
+  bool isCxxString();
 
   /// Check if this is the type Unicode.Scalar from the Swift standard library.
   bool isUnicodeScalar();
@@ -4101,6 +4108,10 @@ public:
     return getLifetimeDependenceFor(getNumParams());
   }
 
+  uint16_t
+  getPointerAuthDiscriminator(ModuleDecl &m,
+                              const clang::FunctionType *clangType = nullptr);
+
   void Profile(llvm::FoldingSetNodeID &ID) {
     std::optional<ExtInfo> info = std::nullopt;
     if (hasExtInfo())
@@ -5949,6 +5960,10 @@ public:
       bool isReabstractionThunk = false,
       CanType origTypeOfAbstraction = CanType());
 
+  /// If \p M is nullptr, the type is not substituted.
+  uint16_t getPointerAuthDiscriminator(SILModule *M);
+
+  uint16_t getCoroutineYieldTypesDiscriminator(SILModule &M);
 
   /// Returns the type of the transpose function for the given parameter
   /// indices, transpose function generic signature (optional), and other

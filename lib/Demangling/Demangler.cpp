@@ -3377,6 +3377,8 @@ NodePointer Demangler::demangleGenericSpecializationWithDroppedArguments() {
 NodePointer Demangler::demangleFunctionSpecialization() {
   NodePointer Spec = demangleSpecAttributes(
         Node::Kind::FunctionSignatureSpecialization);
+  if (Spec && Spec->getFirstChild()->getKind() == Node::Kind::RepresentationChanged)
+    return Spec;
   while (Spec && !nextIf('_')) {
     Spec = addChild(Spec, demangleFuncSpecParam(Node::Kind::FunctionSignatureSpecializationParam));
   }
@@ -3619,6 +3621,7 @@ NodePointer Demangler::addFuncSpecParamNumber(NodePointer Param,
 NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind) {
   bool isSerialized = nextIf('q');
   bool asyncRemoved = nextIf('a');
+  bool representationChanged = nextIf('r');
 
   int PassID = (int)nextChar() - '0';
   if (PassID < 0 || PassID >= MAX_SPECIALIZATION_PASS) {
@@ -3633,6 +3636,10 @@ NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind) {
 
   if (asyncRemoved)
     SpecNd->addChild(createNode(Node::Kind::AsyncRemoved),
+                     *this);
+
+  if (representationChanged)
+    SpecNd->addChild(createNode(Node::Kind::RepresentationChanged),
                      *this);
 
   SpecNd->addChild(createNode(Node::Kind::SpecializationPassID, PassID),

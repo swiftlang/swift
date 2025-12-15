@@ -98,8 +98,10 @@ inline bool isEmbeddedWithoutEmbeddedExitentials(CanType t) {
 // expect for classes (both generic and non-generic), dynamic self, and
 // class-bound existentials.
 inline bool isMetadataAllowedInEmbedded(CanType t) {
+  auto &langOpts = t->getASTContext().LangOpts;
   bool embeddedExistentials =
-    t->getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials);
+    langOpts.hasFeature(Feature::EmbeddedExistentials) &&
+    langOpts.hasFeature(Feature::Embedded);
 
   if (isa<ClassType>(t) || isa<BoundGenericClassType>(t) ||
       isa<DynamicSelfType>(t)) {
@@ -465,6 +467,10 @@ class LinkEntity {
     // These are both type kinds and protocol-conformance kinds.
     // TYPE KINDS: BEGIN {{
 
+    /// A SIL differentiability witness. The pointer is a
+    /// SILDifferentiabilityWitness*.
+    DifferentiabilityWitness,
+
     /// A lazy protocol witness accessor function. The pointer is a
     /// canonical TypeBase*, and the secondary pointer is a
     /// ProtocolConformance*.
@@ -474,10 +480,6 @@ class LinkEntity {
     /// canonical TypeBase*, and the secondary pointer is a
     /// ProtocolConformance*.
     ProtocolWitnessTableLazyCacheVariable,
-
-    /// A SIL differentiability witness. The pointer is a
-    /// SILDifferentiabilityWitness*.
-    DifferentiabilityWitness,
 
     // Everything following this is a type kind.
 
@@ -1860,6 +1862,15 @@ public:
   bool isTypeKind() const { return isTypeKind(getKind()); }
 
   bool isAlwaysSharedLinkage() const;
+
+  /// Partial apply forwarders always need real private linkage,
+  /// to ensure the correct implementation is used in case of
+  /// colliding symbols.
+  bool privateMeansPrivate() const {
+    return getKind() == Kind::PartialApplyForwarder ||
+           getKind() == Kind::PartialApplyForwarderAsyncFunctionPointer ||
+           getKind() == Kind::PartialApplyForwarderCoroFunctionPointer;
+  }
 
   /// Whether the link entity's definitions must be considered non-unique.
   ///

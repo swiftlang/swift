@@ -73,8 +73,8 @@ struct W {
 // CHECK: @"$s9SectionIR8closure3yS2icvp" = {{.*}}constant %swift.function { {{.*}} }, section "mysection"
 // CHECK: @"$s9SectionIR8closure4yycvp" = {{.*}}constant %swift.function { {{.*}} }, section "mysection"
 // CHECK: @"$s9SectionIR8closure5yS2icvp" = {{.*}}constant %swift.function { {{.*}} }, section "mysection"
-// CHECK: @"$s9SectionIR8closure6yS2iXCvp" = {{.*}}constant ptr @"$s9SectionIR8closure6yS2iXCvpfiS2icfU_To", section "mysection"
-// CHECK: @"$s9SectionIR1WV8closure7yS2iXCvpZ" = {{.*}}constant ptr @"$s9SectionIR1WV8closure7yS2iXCvpZfiS2icfU_To", section "mysection"
+// CHECK: @"$s9SectionIR8closure6yS2iXCvp" = {{.*}}constant ptr @"$s9SectionIR8closure6yS2iXCvpfiS2icfU_To{{(.ptrauth)?}}", section "mysection"
+// CHECK: @"$s9SectionIR1WV8closure7yS2iXCvpZ" = {{.*}}constant ptr @"$s9SectionIR1WV8closure7yS2iXCvpZfiS2icfU_To{{(.ptrauth)?}}", section "mysection"
 
 // CHECK: @"$s9SectionIR6tuple1Si_S2iSdSbtvp" = {{.*}}constant <{ %TSi, %TSi, %TSi, {{.*}} }> <{ %TSi <{ {{i64|i32}} 1 }>, %TSi <{ {{i64|i32}} 2 }>, %TSi <{ {{i64|i32}} 3 }>, {{.*}} }>, section "mysection"
 // CHECK: @"$s9SectionIR6tuple2Si_SfSbtvp" = {{.*}}constant <{ %TSi, %TSf, %TSb }> <{ %TSi <{ {{i64|i32}} 42 }>, %TSf <{ float 0x40091EB860000000 }>, %TSb zeroinitializer }>, section "mysection"

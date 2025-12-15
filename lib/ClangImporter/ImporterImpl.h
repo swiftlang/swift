@@ -624,17 +624,6 @@ public:
   void getMangledName(clang::MangleContext *mangler,
                       const clang::NamedDecl *clangDecl, raw_ostream &os);
 
-  /// Whether the C++ interoperability compatibility version is at least
-  /// 'major'.
-  ///
-  /// Use the
-  /// `isCxxInteropCompatVersionAtLeast(version::getUpcomingCxxInteropCompatVersion())`
-  /// check when making a source breaking C++ interop change.
-  bool isCxxInteropCompatVersionAtLeast(unsigned major,
-                                        unsigned minor = 0) const {
-    return SwiftContext.LangOpts.isCxxInteropCompatVersionAtLeast(major, minor);
-  }
-
 private:
   /// The Importer may be configured to load modules of a different OS Version
   /// than the underlying Swift compilation. This is the `TargetOptions`
@@ -716,6 +705,10 @@ public:
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
 
   bool isDefaultArgSafeToImport(const clang::ParmVarDecl *param);
+
+  bool needsClosureConstructor(const clang::CXXRecordDecl *recordDecl) const;
+
+  bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const;
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance);
@@ -1134,6 +1127,12 @@ public:
 
   Type applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
                  llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn);
+
+  /// Determines whether the given Clang declaration has conflicting
+  /// Swift attributes and emits diagnostics for any violations found.
+  ///
+  /// \param decl The Clang record or function declaration to validate.
+  void validateSwiftAttributes(const clang::NamedDecl *decl);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
@@ -1762,6 +1761,11 @@ public:
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
+  void finishOpaqueTypeDecl(OpaqueTypeDecl *decl,
+                            uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
   template <typename DeclTy, typename ...Targs>
   DeclTy *createDeclWithClangNode(ClangNode ClangN, AccessLevel access,
                                   Targs &&... Args) {
@@ -1979,6 +1983,10 @@ bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
+
+/// Checks whether this type is bool or is a C++ enum with a bool underlying
+/// type.
+bool isBoolOrBoolEnumType(Type ty);
 
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);

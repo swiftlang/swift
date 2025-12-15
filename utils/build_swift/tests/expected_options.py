@@ -255,7 +255,7 @@ EXPECTED_DEFAULTS = {
     'llvm_max_parallel_lto_link_jobs':
         defaults.LLVM_MAX_PARALLEL_LTO_LINK_JOBS,
     'llvm_targets_to_build':
-        'X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR',
+        'X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR;BPF',
     'tsan_libdispatch_test': False,
     'long_test': False,
     'lto_type': None,

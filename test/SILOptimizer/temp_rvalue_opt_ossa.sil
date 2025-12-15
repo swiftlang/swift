@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -temp-rvalue-elimination | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-OPT
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -mandatory-temp-rvalue-elimination | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
+
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-temp-rvalue-elimination | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
 
 // REQUIRES: swift_in_compiler
 
@@ -1390,18 +1390,19 @@ bb0(%0 : $*FakeOptional<NonTrivialStruct>):
 sil [ossa] @test_temprvoborrowboundary2 : $@convention(thin) (@in FakeOptional<NonTrivialStruct>) -> () {
 bb0(%0 : $*FakeOptional<NonTrivialStruct>):
   %1 = alloc_stack $NonTrivialStruct
-  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<NonTrivialStruct>, #FakeOptional.some!enumelt
-  copy_addr [take] %2 to [init] %1 : $*NonTrivialStruct
-  %4 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
-  %5 = load_borrow %4 : $*Klass
-  br bb1(%5 : $Klass)
+  %2 = unchecked_take_enum_data_addr %0, #FakeOptional.some!enumelt
+  copy_addr [take] %2 to [init] %1
+  %4 = struct_element_addr %1, #NonTrivialStruct.val
+  %5 = load_borrow %4
+  br bb1(%5)
 
-bb1(%6 : @guaranteed $Klass):
-  end_borrow %6 : $Klass
-  destroy_addr %1 : $*NonTrivialStruct
-  dealloc_stack %1 : $*NonTrivialStruct
-  %res = tuple ()
-  return %res : $()
+bb1(%7 : @reborrow $Klass):
+  %8 = borrowed %7 from ()
+  end_borrow %8
+  destroy_addr %1
+  dealloc_stack %1
+  %12 = tuple ()
+  return %12
 }
 
 // Lexical alloc_stacks can still be eliminated if their sources are guaranteed

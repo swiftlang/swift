@@ -60,4 +60,11 @@ struct PartialTemplate<T*, double> {
 };
 typedef PartialTemplate<int*, double> CompletePartial;
 
+// Some functions that use forward-declared specializations
+void TakesIncompleteSpecialization(BasicTemplate<int>);
+BasicTemplate<int> ReturnsIncompleteSpecialization();
+
+void TakesPtrToIncompleteSpecialization(BasicTemplate<int> *);
+BasicTemplate<int> *ReturnsPtrToIncompleteSpecialization();
+
 #endif

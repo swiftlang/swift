@@ -21,13 +21,15 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticArgument.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/PrintDiagnosticNamesMode.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
-#include "swift/Basic/WarningAsErrorRule.h"
+#include "swift/Basic/WarningGroupBehaviorRule.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
@@ -388,8 +390,8 @@ namespace swift {
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &limitBehaviorUntilSwiftVersion(
-        DiagnosticBehavior limit, unsigned majorVersion);
+    InFlightDiagnostic &limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
+                                                       unsigned majorVersion);
 
     /// Limits the diagnostic behavior to \c limit accordingly if
     /// preconcurrency applies. Otherwise, the behavior limit only applies
@@ -412,7 +414,7 @@ namespace swift {
         return limitBehavior(limit);
       }
 
-      return limitBehaviorUntilSwiftVersion(limit, languageMode);
+      return limitBehaviorUntilLanguageMode(limit, languageMode);
     }
 
     /// Limit the diagnostic behavior to warning until the next future
@@ -424,19 +426,19 @@ namespace swift {
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &warnUntilFutureSwiftVersion();
+    InFlightDiagnostic &warnUntilFutureLanguageMode();
 
-    InFlightDiagnostic &warnUntilFutureSwiftVersionIf(bool shouldLimit) {
+    InFlightDiagnostic &warnUntilFutureLanguageModeIf(bool shouldLimit) {
       if (!shouldLimit)
         return *this;
-      return warnUntilFutureSwiftVersion();
+      return warnUntilFutureLanguageMode();
     }
 
     /// Limit the diagnostic behavior to warning until the specified version.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &warnUntilSwiftVersion(unsigned majorVersion);
+    InFlightDiagnostic &warnUntilLanguageMode(unsigned majorVersion);
 
     /// Limit the diagnostic behavior to warning if the context is a
     /// swiftinterface.
@@ -453,10 +455,10 @@ namespace swift {
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &warnUntilSwiftVersionIf(bool shouldLimit,
+    InFlightDiagnostic &warnUntilLanguageModeIf(bool shouldLimit,
                                                 unsigned majorVersion) {
       if (!shouldLimit) return *this;
-      return warnUntilSwiftVersion(majorVersion);
+      return warnUntilLanguageMode(majorVersion);
     }
 
     /// Wraps this diagnostic in another diagnostic. That is, \p wrapper will be
@@ -612,6 +614,10 @@ namespace swift {
                                          ArrayRef<DiagnosticArgument> Args);
   };
 
+
+  using WarningGroupBehaviorMap =
+      llvm::MapVector<swift::DiagGroupID, WarningGroupBehaviorRule>;
+
   /// Class to track, map, and remap diagnostic severity and fatality
   ///
   class DiagnosticState {
@@ -628,13 +634,13 @@ namespace swift {
     /// Don't emit any remarks
     bool suppressRemarks = false;
 
-    /// A mapping from `DiagGroupID` identifiers to Boolean values indicating
-    /// whether warnings belonging to the respective diagnostic groups should be
-    /// escalated to errors.
-    llvm::BitVector warningsAsErrors;
-
-    /// Track which diagnostic group (`DiagGroupID`) warnings should be ignored.
-    llvm::BitVector ignoredDiagnosticGroups;
+    /// A mapping from `DiagGroupID` identifiers to `WarningGroupBehaviorRule`
+    /// values indicating how warnings belonging to the respective diagnostic groups
+    /// should be emitted. While there is duplication between this data structure
+    /// being a map keyed with `DiagGroupID` and containing a rule object which also
+    /// contains a matching `DiagGroupID`, this significantly simplifies bridging
+    /// values of this map to Swift clients.
+    WarningGroupBehaviorMap warningGroupBehaviorMap;
 
     /// For compiler-internal purposes only, track which diagnostics should
     /// be ignored completely. For example, this is used by LLDB to
@@ -657,7 +663,8 @@ namespace swift {
 
     /// Figure out the Behavior for the given diagnostic, taking current
     /// state such as fatality into account.
-    DiagnosticBehavior determineBehavior(const Diagnostic &diag) const;
+    DiagnosticBehavior determineBehavior(const Diagnostic &diag,
+                                         SourceManager &sourceMgr) const;
 
     /// Updates the diagnostic state for a diagnostic to emit.
     void updateFor(DiagnosticBehavior behavior);
@@ -684,43 +691,35 @@ namespace swift {
     void setSuppressRemarks(bool val) { suppressRemarks = val; }
     bool getSuppressRemarks() const { return suppressRemarks; }
 
-    /// Sets whether warnings belonging to the diagnostic group identified by
-    /// `id` should be escalated to errors.
-    void setWarningsAsErrorsForDiagGroupID(DiagGroupID id, bool value) {
-      warningsAsErrors[(unsigned)id] = value;
+    /// Configure the command-line warning group handling
+    /// rules (`-Werrr`,`-Wwarning`,`-warnings-as-errors`)
+    void setWarningGroupControlRules(
+        const llvm::SmallVector<WarningGroupBehaviorRule, 4> &rules);
+
+    /// Add an individual command-line warning group behavior
+    void addWarningGroupControl(const DiagGroupID &groupID,
+                                WarningGroupBehavior behavior) {
+      warningGroupBehaviorMap.insert_or_assign(
+          groupID, WarningGroupBehaviorRule(behavior, groupID));
     }
 
-    /// Returns a Boolean value indicating whether warnings belonging to the
-    /// diagnostic group identified by `id` should be escalated to errors.
-    bool getWarningsAsErrorsForDiagGroupID(DiagGroupID id) const {
-      return warningsAsErrors[(unsigned)id];
+    const WarningGroupBehaviorMap&
+    getWarningGroupBehaviorControlMap() const {
+      return warningGroupBehaviorMap;
     }
 
-    /// Whether all warnings should be upgraded to errors or not.
-    void setAllWarningsAsErrors(bool value) {
-      // This works as intended because every diagnostic belongs to either a
-      // custom group or the top-level `DiagGroupID::no_group`, which is also
-      // a group.
-      if (value) {
-        warningsAsErrors.set();
-      } else {
-        warningsAsErrors.reset();
-      }
+    const std::vector<const WarningGroupBehaviorRule*>
+    getWarningGroupBehaviorControlRefArray() const {
+      std::vector<const WarningGroupBehaviorRule*> ruleRefArray;
+      ruleRefArray.reserve(warningGroupBehaviorMap.size());
+      for (const auto &rule: warningGroupBehaviorMap)
+        ruleRefArray.push_back(&rule.second);
+      return ruleRefArray;
     }
 
     void resetHadAnyError() {
       anyErrorOccurred = false;
       fatalErrorOccurred = false;
-    }
-
-    /// Set whether a diagnostic group should be ignored.
-    void setIgnoredDiagnosticGroup(DiagGroupID id, bool ignored) {
-      ignoredDiagnosticGroups[(unsigned)id] = ignored;
-    }
-
-    /// Query whether a specific diagnostic group is ignored.
-    bool isIgnoredDiagnosticGroup(DiagGroupID id) const {
-      return ignoredDiagnosticGroups[(unsigned)id];
     }
 
     /// Set a specific diagnostic to be ignored by the compiler.
@@ -738,11 +737,10 @@ namespace swift {
       std::swap(suppressWarnings, other.suppressWarnings);
       std::swap(suppressNotes, other.suppressNotes);
       std::swap(suppressRemarks, other.suppressRemarks);
-      std::swap(warningsAsErrors, other.warningsAsErrors);
+      std::swap(warningGroupBehaviorMap, other.warningGroupBehaviorMap);
       std::swap(fatalErrorOccurred, other.fatalErrorOccurred);
       std::swap(anyErrorOccurred, other.anyErrorOccurred);
       std::swap(previousBehavior, other.previousBehavior);
-      std::swap(ignoredDiagnosticGroups, other.ignoredDiagnosticGroups);
     }
 
   private:
@@ -752,6 +750,13 @@ namespace swift {
 
     DiagnosticState(DiagnosticState &&) = default;
     DiagnosticState &operator=(DiagnosticState &&) = default;
+
+    /// If this diagnostic is a warning belonging to a diagnostic group,
+    /// figure out if there is a source-level (`@warn`) control for this group
+    /// for this diagnostic's source location.
+    std::optional<DiagnosticBehavior>
+    determineUserControlledWarningBehavior(const Diagnostic &diag,
+                                           SourceManager &sourceMgr) const;
   };
 
   /// A lightweight reference to a diagnostic that's been fully applied to
@@ -887,7 +892,7 @@ namespace swift {
     version::Version languageVersion;
 
     /// The stats reporter used to keep track of Swift 6 errors
-    /// diagnosed via \c warnUntilSwiftVersion(6).
+    /// diagnosed via \c warnUntilLanguageMode(6).
     UnifiedStatsReporter *statsReporter = nullptr;
 
     /// Whether we are actively pretty-printing a declaration as part of
@@ -951,7 +956,20 @@ namespace swift {
     /// Rules are applied in order they appear in the vector.
     /// In case the vector contains rules affecting the same diagnostic ID
     /// the last rule wins.
-    void setWarningsAsErrorsRules(const std::vector<WarningAsErrorRule> &rules);
+    void setWarningGroupControlRules(
+        const llvm::SmallVector<WarningGroupBehaviorRule, 4> &rules) {
+      state.setWarningGroupControlRules(rules);
+    }
+
+    const WarningGroupBehaviorMap&
+    getWarningGroupBehaviorControlMap() const {
+      return state.getWarningGroupBehaviorControlMap();
+    }
+
+    const std::vector<const WarningGroupBehaviorRule*>
+    getWarningGroupBehaviorControlRefArray() const {
+      return state.getWarningGroupBehaviorControlRefArray();
+    }
 
     /// Whether to print diagnostic names after their messages
     void setPrintDiagnosticNamesMode(PrintDiagnosticNamesMode val) {
@@ -982,13 +1000,9 @@ namespace swift {
       localization = diag::LocalizationProducer::producerFor(locale, path);
     }
 
-    bool isIgnoredDiagnosticGroup(DiagGroupID id) const {
-      return state.isIgnoredDiagnosticGroup(id);
-    }
-    
-    bool isIgnoredDiagnosticGroupTree(DiagGroupID id) const {
-      return state.isIgnoredDiagnosticGroupTree(id);
-    }
+    /// Whether the specified SourceFile enables a given diagnostic group
+    /// either syntactically, or via command-line flags.
+    bool isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID groupID) const;
 
     void ignoreDiagnostic(DiagID id) {
       state.compilerInternalIgnoreDiagnostic(id);
@@ -1366,7 +1380,8 @@ namespace swift {
           Engine.TentativeDiagnostics.end());
 
       for (auto &diagnostic : diagnostics) {
-        auto behavior = Engine.state.determineBehavior(diagnostic.Diag);
+        auto behavior = Engine.state.determineBehavior(diagnostic.Diag,
+                                                       Engine.SourceMgr);
         if (behavior == DiagnosticBehavior::Fatal ||
             behavior == DiagnosticBehavior::Error)
           return true;

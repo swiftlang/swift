@@ -49,10 +49,20 @@ extension Context {
   public func getBuiltinIntegerType(bitWidth: Int) -> Type { _bridged.getBuiltinIntegerType(bitWidth).type }
 
   public func getTupleType(elements: [Type]) -> AST.`Type` {
+    return getTupleType(elements: elements.map{ $0.rawType })
+  }
+
+  public func getTupleType(elements: [AST.`Type`]) -> AST.`Type` {
     let bridgedElements = elements.map { $0.bridged }
     return bridgedElements.withBridgedArrayRef {
       AST.`Type`(bridged: _bridged.getTupleType($0))
     }
+  }
+
+  public func getTupleType(elements: [(label: Identifier, type: AST.`Type`)]) -> AST.`Type` {
+    return elements.map{$0.type}.withBridgedArrayRef{
+      types in elements.map{$0.label}.withBridgedArrayRef{labels in
+      AST.`Type`(bridged: _bridged.getTupleTypeWithLabels(types, labels))}}
   }
 
   public var swiftArrayDecl: NominalTypeDecl {

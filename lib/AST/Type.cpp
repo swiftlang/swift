@@ -43,6 +43,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
+#include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1300,6 +1301,21 @@ bool TypeBase::isObjCBool() {
 
   auto *module = DC->getParentModule();
   return module->getName().is("ObjectiveC") && NTD->getName().is("ObjCBool");
+}
+
+bool TypeBase::isCxxString() {
+  auto *nominal = getAnyNominal();
+  if (!nominal)
+    return false;
+
+  auto *clangDecl =
+      dyn_cast_or_null<clang::CXXRecordDecl>(nominal->getClangDecl());
+  if (!clangDecl)
+    return false;
+
+  auto &ctx = nominal->getASTContext();
+  return clangDecl->isInStdNamespace() && clangDecl->getIdentifier() &&
+         ctx.Id_basic_string.is(clangDecl->getName());
 }
 
 bool TypeBase::isUnicodeScalar() {
@@ -5277,7 +5293,8 @@ getConcurrencyDiagnosticBehaviorLimitRec(
   // Metatypes that aren't Sendable were introduced in Swift 6.2, so downgrade
   // them to warnings prior to Swift 7.
   if (type->is<AnyMetatypeType>()) {
-    if (!type->getASTContext().LangOpts.isSwiftVersionAtLeast(7))
+    if (!type->getASTContext().isLanguageModeAtLeast(
+            version::Version::getFutureMajorLanguageVersion()))
       return DiagnosticBehavior::Warning;
   }
 

@@ -233,6 +233,9 @@ MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor"))) @protocol Tr
 
 SENDABLE @interface SendableClass : NSObject @end
 
+// expected-expansion@+3:13{{
+//   expected-note@1 5{{conformance of 'NonSendableClass' to 'Sendable' has been explicitly marked unavailable here}}
+// }}
 NONSENDABLE @interface NonSendableClass : NSObject @end // expected-note {{class 'NonSendableClass' does not conform to the 'Sendable' protocol}}
 
 ASSUME_NONSENDABLE_BEGIN

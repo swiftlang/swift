@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -emit-sorted-sil -verify-continue-on-failure -o /dev/null %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-verify-all=false -enable-sil-verify-all=false -emit-sorted-sil -verify-continue-on-failure -o /dev/null %s 2>&1 | %FileCheck '--implicit-check-not=Begin Error' %s
 
 // REQUIRES: asserts
 

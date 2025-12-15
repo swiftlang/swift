@@ -894,12 +894,11 @@ Generate a backtrace for the parent process.
       }
     }
 
+    dump(ndx: target.crashingThreadNdx, thread: crashingThread)
     if args.threads! {
-      for (ndx, thread) in target.threads.enumerated() {
+      for (ndx, thread) in target.threads.enumerated() where ndx != target.crashingThreadNdx {
         dump(ndx: ndx, thread: thread)
       }
-    } else {
-      dump(ndx: target.crashingThreadNdx, thread: crashingThread)
     }
 
     if args.registers! == .crashedOnly {

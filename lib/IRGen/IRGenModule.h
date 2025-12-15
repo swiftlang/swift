@@ -1203,7 +1203,7 @@ public:
 
   ClassMetadataStrategy getClassMetadataStrategy(const ClassDecl *theClass);
 
-  bool IsWellKnownBuiltinOrStructralType(CanType type) const;
+  bool isWellKnownBuiltinOrStructuralType(CanType type) const;
 
 private:
   TypeConverter &Types;
@@ -2060,6 +2060,8 @@ public:
 
   /// Returns true if the given Clang function does not throw exceptions.
   bool isCxxNoThrow(clang::FunctionDecl *fd, bool defaultNoThrow = false);
+
+  bool isEmbeddedWithExistentials() const;
 
 private:
   llvm::Constant *

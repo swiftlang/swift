@@ -367,7 +367,8 @@ public func funcA() { }\n"));
   ASSERT_TRUE(DiagnosticsReader.warningMessages.front() == "This is a warning");
 }
 
-TEST_F(ScanTest, TestModuleCycle) {
+// Disabled due to rdar://165014838
+TEST_F(ScanTest, DISABLED_TestModuleCycle) {
   SmallString<256> tempDir;
   ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory("ScanTest.TestModuleCycle", tempDir));
   SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };

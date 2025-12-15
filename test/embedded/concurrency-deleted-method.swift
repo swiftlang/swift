@@ -1,8 +1,15 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -emit-ir | %FileCheck --check-prefix=CHECK-IR %s
+// RUN: %target-swift-frontend -disable-embedded-existentials -enable-experimental-feature Embedded -parse-as-library -module-name main %s -emit-ir | %FileCheck --check-prefix=CHECK-IR %s
+// RUN: %target-swift-frontend -disable-embedded-existentials -enable-experimental-feature Embedded -parse-as-library -module-name main %s -c -o %t/a.o
+// RUN: %target-clang %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
+// RUN: %target-run %t/a.out | %FileCheck %s
+
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -emit-ir | %FileCheck --check-prefix=EXIST-IR %s
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -c -o %t/a.o
 // RUN: %target-clang %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
+
 
 // REQUIRES: executable_test
 // REQUIRES: swift_in_compiler
@@ -48,3 +55,21 @@ actor MyActor {
 // CHECK-IR: define weak_odr {{swifttailcc|swiftcc}} void @swift_deletedAsyncMethodError(ptr swiftasync %0)
 
 // CHECK: value: 42
+
+// EXIST-IR:      @swift_deletedAsyncMethodErrorTu =
+// EXIST-IR: @"$e4main7MyActorCMf" = {{.*}} <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{
+// EXIST-IR-SAME:  ptr @"$eBoWV",
+// EXIST-IR-SAME:  ptr null,
+// EXIST-IR-SAME:  ptr @"$e4main7MyActorCfD",
+// EXIST-IR-SAME:  ptr null,
+// EXIST-IR-SAME:  ptr @swift_deletedMethodError,
+// EXIST-IR-SAME:  ptr @swift_deletedMethodError,
+// EXIST-IR-SAME:  ptr @swift_deletedMethodError,
+// EXIST-IR-SAME:  ptr @"$e4main7MyActorC3fooyyYaFTu",
+// EXIST-IR-SAME:  ptr @got.swift_deletedAsyncMethodErrorTu,
+// EXIST-IR-SAME:  ptr @"$e4main7MyActorCACycfC" }>
+
+// EXIST-IR-DAG: @"$e4main7MyActorCN" = {{.*}}alias{{.*}} ptr @"$e4main7MyActorCMf", i32 0, i32 1)
+
+
+// EXIST-IR-NOT:  $e4main7MyActorC12thisIsUnusedyyYaF

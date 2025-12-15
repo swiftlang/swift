@@ -8,6 +8,10 @@
 // rdar://77087867
 // UNSUPPORTED: CPU=arm64_32 && OS=watchos
 
+// Float printing and parsing on embedded are new features, not
+// yet fully supported on WASM
+// UNSUPPORTED: CPU=wasm32
+
 // rdar://104232602
 // UNSUPPORTED: CPU=x86_64 && (DARWIN_SIMULATOR=ios || DARWIN_SIMULATOR=watchos || DARWIN_SIMULATOR=tvos)
 

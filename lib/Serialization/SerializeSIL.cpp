@@ -1339,6 +1339,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     attr |= unsigned(ASI->isLexical()) << 1;
     attr |= unsigned(ASI->isFromVarDecl()) << 2;
     attr |= unsigned(ASI->usesMoveableValueDebugInfo()) << 3;
+    attr |= unsigned(ASI->isStackAllocationNested()) << 4;
     writeOneTypeLayout(ASI->getKind(), attr, ASI->getElementType());
     break;
   }

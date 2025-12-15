@@ -87,4 +87,5 @@ install(TARGETS swift_StringProcessing
 emit_swift_interface(swift_StringProcessing)
 install_swift_interface(swift_StringProcessing)
 
+generate_plist(swiftStringProcessing "${CMAKE_PROJECT_VERSION}" swift_StringProcessing)
 embed_manifest(swift_StringProcessing)

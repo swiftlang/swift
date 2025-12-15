@@ -163,11 +163,6 @@ class ImportResolver final : public DeclVisitor<ImportResolver> {
   /// The list of fully bound imports.
   SmallVector<AttributedImport<ImportedModule>, 16> boundImports;
 
-  /// Set of imported top-level clang modules. We normally don't expect
-  /// duplicated imports, but importing multiple submodules of the same clang
-  /// TLM would cause the same TLM to be imported once per submodule.
-  SmallPtrSet<const ModuleDecl*, 16> seenClangTLMs;
-
   /// All imported modules which should be considered when cross-importing.
   /// This is basically the transitive import graph, but with only top-level
   /// modules and without reexports from Objective-C modules.
@@ -347,11 +342,6 @@ void swift::performImportResolutionForClangMacroBuffer(
   SF.ASTStage = SourceFile::ImportsResolved;
 }
 
-static bool isSubmodule(const ModuleDecl* M) {
-  auto clangMod = M->findUnderlyingClangModule();
-  return clangMod && clangMod->Parent;
-}
-
 //===----------------------------------------------------------------------===//
 // MARK: Import handling generally
 //===----------------------------------------------------------------------===//
@@ -419,23 +409,14 @@ void ImportResolver::bindImport(UnboundImport &&I) {
 
   I.validateOptions(topLevelModule, SF);
 
-  auto alreadyImportedTLM = [ID,this](const ModuleDecl *MD) {
-    ASSERT(!isSubmodule(MD));
-    // Scoped imports don't import all symbols from the module, so a scoped
-    // import does not count the module as imported
-    if (ID && isScopedImportKind(ID.get()->getImportKind()))
-      return false;
-    return !seenClangTLMs.insert(MD).second;
-  };
-  if (!M->isNonSwiftModule() || topLevelModule != M || !alreadyImportedTLM(M)) {
+  if (topLevelModule && topLevelModule != M) {
+    // If we have distinct submodule and top-level module, add both.
     addImport(I, M);
-    if (topLevelModule && topLevelModule != M &&
-        !alreadyImportedTLM(topLevelModule.get())) {
-      // If we have distinct submodule and top-level module, add both.
-      // Importing the submodule ensures that it gets loaded, but the decls
-      // are imported to the TLM, so import that for visibility.
-      addImport(I, topLevelModule.get());
-    }
+    addImport(I, topLevelModule.get());
+  }
+  else {
+    // Add only the import itself.
+    addImport(I, M);
   }
 
   crossImport(M, I);
@@ -1653,6 +1634,11 @@ void ImportResolver::findCrossImports(
       llvm::dbgs() << "import " << name << "\n";
     });
   }
+}
+
+static bool isSubmodule(ModuleDecl* M) {
+  auto clangMod = M->findUnderlyingClangModule();
+  return clangMod && clangMod->Parent;
 }
 
 void ImportResolver::addCrossImportableModules(

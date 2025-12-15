@@ -487,6 +487,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::ReadAccessor:
   case Node::Kind::Read2Accessor:
   case Node::Kind::RelatedEntityDeclName:
+  case Node::Kind::RepresentationChanged:
   case Node::Kind::RetroactiveConformance:
   case Node::Kind::Setter:
   case Node::Kind::Shared:
@@ -1331,6 +1332,10 @@ void NodePrinter::printSpecializationPrefix(NodePointer node,
     }
     return;
   }
+  if (node->getFirstChild()->getKind() == Node::Kind::RepresentationChanged) {
+    Printer << "representation changed of ";
+    return;
+  }
   Printer << Description << " <";
   const char *Separator = "";
   int argNum = 0;
@@ -1427,6 +1432,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::AsyncRemoved:
     Printer << "async demotion of ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::RepresentationChanged:
+    Printer << "representation changed of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::CurryThunk:

@@ -1768,6 +1768,13 @@ WARNING(attr_warn_unused_result_removed,none,
         "'warn_unused_result' attribute behavior is now the default", ())
 ERROR(attr_warn_unused_result_expected_rparen,none,
       "expected ')' after 'warn_unused_result' attribute", ())
+      
+// warn
+WARNING(attr_warn_unknown_diagnostic_group_identifier,none,
+        "the diagnostic group identifier '%0' is unknown", (StringRef))
+
+ERROR(attr_warn_expected_known_behavior,none,
+      "expected diagnostic behavior argument '%0' to be either 'error', 'warning' or 'ignored'", (StringRef))
 
 // _specialize
 ERROR(attr_specialize_missing_colon,none,

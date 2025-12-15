@@ -2,7 +2,8 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from update_checkout.update_checkout import UpdateArguments, _is_any_repository_locked
+from update_checkout.update_checkout import UpdateArguments
+from update_checkout.git_command import is_any_repository_locked
 
 FAKE_PATH = Path("/fake_path")
 
@@ -46,7 +47,7 @@ class TestIsAnyRepositoryLocked(unittest.TestCase):
         mock_is_dir.return_value = True
         mock_iterdir.side_effect = iterdir_side_effect
 
-        result = _is_any_repository_locked(pool_args)
+        result = is_any_repository_locked(pool_args)
         self.assertEqual(result, {"repo1"})
 
     @patch("pathlib.Path.exists")
@@ -61,7 +62,7 @@ class TestIsAnyRepositoryLocked(unittest.TestCase):
         mock_is_dir.return_value = False
         mock_iterdir.return_value = []
 
-        result = _is_any_repository_locked(pool_args)
+        result = is_any_repository_locked(pool_args)
         self.assertEqual(result, set())
 
     @patch("pathlib.Path.exists")
@@ -76,7 +77,7 @@ class TestIsAnyRepositoryLocked(unittest.TestCase):
         mock_is_dir.return_value = False
         mock_iterdir.return_value = []
 
-        result = _is_any_repository_locked(pool_args)
+        result = is_any_repository_locked(pool_args)
         self.assertEqual(result, set())
 
     @patch("pathlib.Path.exists")
@@ -95,7 +96,7 @@ class TestIsAnyRepositoryLocked(unittest.TestCase):
             FAKE_PATH.joinpath(x) for x in ("index.lock", "merge.lock", "HEAD")
         ]
 
-        result = _is_any_repository_locked(pool_args)
+        result = is_any_repository_locked(pool_args)
         self.assertEqual(result, {"repo1"})
 
     @patch("pathlib.Path.exists")
@@ -114,5 +115,5 @@ class TestIsAnyRepositoryLocked(unittest.TestCase):
             FAKE_PATH.joinpath(x) for x in ("HEAD", "config", "logs")
         ]
 
-        result = _is_any_repository_locked(pool_args)
+        result = is_any_repository_locked(pool_args)
         self.assertEqual(result, set())

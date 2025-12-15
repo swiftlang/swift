@@ -266,6 +266,10 @@ bool swift::cxx_translation::isObjCxxOnly(const ValueDecl *VD) {
 
 bool swift::cxx_translation::isObjCxxOnly(const clang::Decl *D,
                                           const ASTContext &ctx) {
+  // Check if this is decl can only be referred to from Objective-C.
+  if (isa<clang::ObjCInterfaceDecl>(D))
+    return true;
+
   // By default, we import all modules in Obj-C++ mode, so there is no robust
   // way to tell if something is coming from an Obj-C module. Use the
   // requirements and the language options to check if we should actually

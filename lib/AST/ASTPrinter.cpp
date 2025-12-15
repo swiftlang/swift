@@ -4870,7 +4870,9 @@ void PrintAST::visitMacroExpansionDecl(MacroExpansionDecl *decl) {
 void CustomAttr::printCustomAttr(ASTPrinter &Printer, const PrintOptions &Options) const {
   Printer.callPrintNamePre(PrintNameContext::Attribute);
   Printer << "@";
-  if (auto type = getType())
+  if (auto *init = getSemanticInit(); init && Options.IsForSwiftInterface)
+    init->getType().print(Printer, Options);
+  else if (auto type = getType())
     type.print(Printer, Options);
   else
     getTypeRepr()->print(Printer, Options);
@@ -8248,6 +8250,39 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
   }
 }
 
+static Type stripParameterizedProtocolArgs(Type type) {
+  if (!type)
+    return type;
+
+  // For each ParameterizedProtocolType process each member recursively
+  if (auto *compositionType = type->getAs<ProtocolCompositionType>()) {
+    SmallVector<Type, 4> processedMembers;
+    bool hasChanged = false;
+    for (auto member : compositionType->getMembers()) {
+      Type processedMember = stripParameterizedProtocolArgs(member);
+      if (!processedMember)
+        continue;
+      processedMembers.push_back(processedMember);
+      if (processedMember.getPointer() != member.getPointer())
+        hasChanged = true;
+    }
+    // Rebuild ProtocolCompositionType if at least one member had generic args
+    if (hasChanged) {
+      return ProtocolCompositionType::get(
+          type->getASTContext(), processedMembers,
+          compositionType->getInverses(),
+          compositionType->hasExplicitAnyObject());
+    }
+    return type;
+  }
+
+  // Strip generic arguments of a single ParameterizedProtocolType
+  if (auto *paramProto = type->getAs<ParameterizedProtocolType>()) {
+    return paramProto->getBaseType();
+  }
+  return type;
+}
+
 void
 swift::getInheritedForPrinting(
     const Decl *decl, const PrintOptions &options,
@@ -8317,7 +8352,16 @@ swift::getInheritedForPrinting(
       }
     }
 
-    Results.push_back(inherited.getEntry(i));
+    auto entry = inherited.getEntry(i);
+    if (auto type = entry.getType()) {
+      Type strippedType = stripParameterizedProtocolArgs(type);
+      if (strippedType.getPointer() != type.getPointer()) {
+        entry = InheritedEntry(TypeLoc::withoutLoc(strippedType),
+                               entry.getOptions());
+      }
+    }
+
+    Results.push_back(entry);
   }
 
   // Collect synthesized conformances.

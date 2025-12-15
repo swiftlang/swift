@@ -61,8 +61,7 @@ namespace irgen {
 
   /// Emit "embedded Swift" class metadata (a simple vtable) for the given class
   /// declaration.
-  void emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *theClass,
-                                 const ClassLayout &fragileLayout);
+  void emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *theClass);
 
   /// Emit the constant initializer of the type metadata candidate for
   /// the given foreign class declaration.
@@ -113,6 +112,9 @@ namespace irgen {
 
   /// Emit the metadata associated with a given tuple type.
   void emitLazyTupleMetadata(IRGenModule &IGM, CanType type);
+
+  /// Emit the metadata associated with a given function type.
+  void emitLazyFunctionMetadata(IRGenModule &IGM, CanType funTy);
 
   /// Emit the metadata associated with a given instantiation of a generic
   // class.

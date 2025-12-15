@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILModule.h"
@@ -158,8 +160,25 @@ linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT, StringRef(#CC) == "C_CC");    \
     if (auto *Fn = M.lookUpFunction(name, byAsmName)) return Fn;
 
     SILFunction *Fn =
-        M.getSILLoader()->lookupSILFunction(name, Linkage, byAsmName);
-    if (!Fn) return nullptr;
+        M.getSILLoader()->lookupSILFunction(name, Linkage,byAsmName);
+
+    if (!Fn) {
+      SILFunction *fnWithWrongLinkage =
+          M.getSILLoader()->lookupSILFunction(name, {}, byAsmName);
+
+      if (fnWithWrongLinkage) {
+        auto fnName = Demangle::demangleSymbolAsString(name,
+                        Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+        auto &diags = getModule()->getASTContext().Diags;
+        diags.diagnose(fnWithWrongLinkage->getLocation().getSourceLoc(),
+                       diag::deserialize_function_linkage_mismatch,
+                       fnName, getLinkageString(fnWithWrongLinkage->getLinkage()),
+                       getLinkageString(*Linkage));
+        diags.flushConsumers();
+        exit(1);
+      }
+      return nullptr;
+    }
 
     if (M.linkFunction(Fn, LinkMode))
       invalidateAnalysis(Fn, SILAnalysis::InvalidationKind::Everything);
@@ -206,12 +225,13 @@ linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT, StringRef(#CC) == "C_CC");    \
     }
 
     for (auto *F : Functions) {
-      auto declRef = SILDeclRef(F, SILDeclRef::Kind::Func);
+      auto declRef = SILDeclRef(F, SILDeclRef::Kind::Func,
+                                F->hasOnlyCEntryPoint());
       auto *Fn = linkUsedFunctionByName(declRef.mangle(), /*Linkage*/{},
                                         /*byAsmName=*/false);
 
       // If we have @_cdecl or @_silgen_name, also link the foreign thunk
-      if (Fn->hasCReferences()) {
+      if (Fn->hasCReferences() && !F->hasOnlyCEntryPoint()) {
         auto declRef = SILDeclRef(F, SILDeclRef::Kind::Func, /*isForeign*/true);
         linkUsedFunctionByName(declRef.mangle(), /*Linkage*/{},
                                /*byAsmName=*/false);

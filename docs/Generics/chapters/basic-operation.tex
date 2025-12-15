@@ -636,6 +636,16 @@ See also \SecRef{src:declarations}.
 \item \texttt{getProtocolDependencies()} evaluates the \texttt{ProtocolDependenciesRequest}.
 \end{itemize}
 
+\IndexSource{protocol inverses request}
+\apiref{ProtocolInversesRequest}{class}
+A request evaluator request which enumerates the inverse requirements written on the given protocol and its associated types.
+
+\apiref{ProtocolDecl}{class}
+See also \SecRef{src:declarations}.
+\begin{itemize}
+\item \texttt{getInverseRequirements()} evaluates the \texttt{ProtocolInversesRequest}.
+\end{itemize}
+
 \IndexSource{requirement machine}
 \apiref{rewriting::RequirementMachine}{class}
 A list of rewrite rules and a property map. See also \SecRef{src:symbols terms rules} and \SecRef{property map sourceref}. Entry points for initializing a requirement machine, called by the rewrite context and various requests:

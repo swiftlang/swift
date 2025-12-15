@@ -189,6 +189,11 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
   }
 
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
+
+  // Add +mte target feature when memtag-stack sanitizer is enabled
+  if (Opts.Sanitizers & SanitizerKind::MemTagStack)
+    ClangOpts.Features.push_back("+mte");
+
   return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features, ClangOpts.Triple);
 }
 
@@ -1145,8 +1150,7 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx,
   }
 
   std::string Error;
-  const Target *Target =
-      TargetRegistry::lookupTarget(EffectiveTriple.str(), Error);
+  const Target *Target = TargetRegistry::lookupTarget(EffectiveTriple, Error);
   if (!Target) {
     Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target, EffectiveTriple.str(),
                        Error);

@@ -776,6 +776,10 @@ option(SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE
   "Build the stdlib with -strict-concurrency=complete"
   FALSE)
 
+option(SWIFT_STDLIB_ENABLE_SIL_OPAQUE_VALUES
+  "Build the stdlib with -enable-sil-opaque-values"
+  FALSE)
+
 option(SWIFT_ENABLE_SYNCHRONIZATION
   "Enable build of the Swift Synchronization module"
   FALSE)

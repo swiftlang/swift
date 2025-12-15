@@ -418,6 +418,13 @@ extension _StringGuts {
   }
 }
 
+extension _StringGuts {
+  @inline(__always) // Performance
+  internal func isTriviallyIdentical(to other: Self) -> Bool {
+    self.rawBits == other.rawBits
+  }
+}
+
 #if _runtime(_ObjC)
 extension _StringGuts {
 
