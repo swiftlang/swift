@@ -2723,39 +2723,41 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   // If the "embedded" flag was provided, enable the EmbeddedRestrictions
   // warning group. This group is opt-in in non-Embedded builds.
   if (isEmbedded(Args) && !Args.hasArg(OPT_suppress_warnings) &&
-      !temporarilySuppressEmbeddedRestrictionDiagnostics(Args)) {
-    Opts.WarningsAsErrorsRules.push_back(
-        WarningAsErrorRule(WarningAsErrorRule::Action::Disable,
-                           "EmbeddedRestrictions"));
-  }
+      !temporarilySuppressEmbeddedRestrictionDiagnostics(Args))
+    Opts.WarningGroupControlRules.emplace_back(WarningGroupBehavior::AsWarning,
+                                               DiagGroupID::EmbeddedRestrictions);
 
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.SuppressNotes |= Args.hasArg(OPT_suppress_notes);
   Opts.SuppressRemarks |= Args.hasArg(OPT_suppress_remarks);
   for (const Arg *arg : Args.filtered(OPT_warning_treating_Group)) {
-    Opts.WarningsAsErrorsRules.push_back([&] {
-      switch (arg->getOption().getID()) {
-      case OPT_warnings_as_errors:
-        return WarningAsErrorRule(WarningAsErrorRule::Action::Enable);
-      case OPT_no_warnings_as_errors:
-        return WarningAsErrorRule(WarningAsErrorRule::Action::Disable);
-      case OPT_Werror:
-        return WarningAsErrorRule(WarningAsErrorRule::Action::Enable,
-                                  arg->getValue());
-      case OPT_Wwarning:
-        return WarningAsErrorRule(WarningAsErrorRule::Action::Disable,
-                                  arg->getValue());
-      default:
-        llvm_unreachable("unhandled warning as error option");
-      }
-    }());
+    switch (arg->getOption().getID()) {
+    case OPT_warnings_as_errors:
+      Opts.WarningGroupControlRules.emplace_back(WarningGroupBehavior::AsError);
+      break;
+    case OPT_no_warnings_as_errors:
+      Opts.WarningGroupControlRules.emplace_back(
+          WarningGroupBehavior::AsWarning);
+      break;
+    case OPT_Werror:
+      Opts.WarningGroupControlRules.emplace_back(
+          WarningGroupBehavior::AsError, getDiagGroupIDByName(arg->getValue()));
+      break;
+    case OPT_Wwarning:
+      Opts.WarningGroupControlRules.emplace_back(
+          WarningGroupBehavior::AsWarning,
+          getDiagGroupIDByName(arg->getValue()));
+      break;
+    default:
+      llvm_unreachable("unhandled warning as error option");
+    };
   }
 
   // `-require-explicit-sendable` is an alias to `-Wwarning ExplicitSendable`.
   if (Args.hasArg(OPT_require_explicit_sendable) &&
       !Args.hasArg(OPT_suppress_warnings)) {
-    Opts.WarningsAsErrorsRules.push_back(WarningAsErrorRule(
-        WarningAsErrorRule::Action::Disable, "ExplicitSendable"));
+    Opts.WarningGroupControlRules.emplace_back(
+        WarningGroupBehavior::AsWarning, DiagGroupID::ExplicitSendable);
   }
 
   if (Args.hasArg(OPT_debug_diagnostic_names)) {
@@ -2801,11 +2803,6 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Opts.LocalizationPath = A->getValue();
     }
   }
-  assert(!(Opts.SuppressWarnings &&
-           WarningAsErrorRule::hasConflictsWithSuppressWarnings(
-               Opts.WarningsAsErrorsRules)) &&
-         "conflicting arguments; should have been caught by driver");
-
   return false;
 }
 
@@ -2825,7 +2822,7 @@ static void configureDiagnosticEngine(
   if (Options.SuppressRemarks) {
     Diagnostics.setSuppressRemarks(true);
   }
-  Diagnostics.setWarningsAsErrorsRules(Options.WarningsAsErrorsRules);
+  Diagnostics.setWarningGroupControlRules(Options.WarningGroupControlRules);
   Diagnostics.setPrintDiagnosticNamesMode(Options.PrintDiagnosticNames);
 
   std::string docsPath = Options.DiagnosticDocumentationPath;

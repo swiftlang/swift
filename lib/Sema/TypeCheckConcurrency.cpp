@@ -1377,10 +1377,15 @@ static bool checkSendableInstanceStorage(
 void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
   // Only diagnose when explicitly requested.
   ASTContext &ctx = nominal->getASTContext();
-  if (ctx.Diags.isIgnoredDiagnosticGroupTree(DiagGroupID::ExplicitSendable))
-    return;
 
   if (nominal->getLoc().isInvalid())
+    return;
+
+  auto locBufferID = ctx.SourceMgr.findBufferContainingLoc(nominal->getLoc());
+  auto locBufferSFs = ctx.SourceMgr.getSourceFilesForBufferID(locBufferID);
+  SourceFile *locSF = locBufferSFs.empty() ? nullptr : locBufferSFs.front();
+  if (!ctx.Diags.isDiagnosticGroupEnabled(locSF,
+                                          DiagGroupID::ExplicitSendable))
     return;
 
   // Protocols aren't checked.

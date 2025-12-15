@@ -13,6 +13,7 @@
 import ASTBridging
 import SwiftDiagnostics
 import SwiftIfConfig
+@_spi(ExperimentalLanguageFeatures) import SwiftWarningControl
 @_spi(ExperimentalLanguageFeatures) import SwiftParser
 import SwiftParserDiagnostics
 @_spi(Compiler) import SwiftSyntax
@@ -42,6 +43,11 @@ public struct ExportedSourceFile {
   ///
   /// This is a cached value; access via configuredRegions(astContext:).
   var _configuredRegions: ConfiguredRegions? = nil
+
+  /// Warning group control regions for this source file
+  ///
+  /// This is a cached value; access via warningGroupControlRegionTree(astContext:)
+  var _warningControlRegionTree: WarningControlRegionTree? = nil
 
   /// Configured regions for this source file assuming if it were being treated
   /// as Embedded Swift. This is used only when we are compiling non-Embedded
