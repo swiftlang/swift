@@ -39,6 +39,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       IS_FRAGILE
 
       UnicodeData.cpp
+      UnicodeEmoji.cpp
       UnicodeGrapheme.cpp
       UnicodeNormalization.cpp
       UnicodeScalarProps.cpp

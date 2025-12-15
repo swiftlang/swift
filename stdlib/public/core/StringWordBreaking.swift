@@ -265,11 +265,6 @@ extension Unicode._WordRecognizer {
     }
 
     switch (_prevCategory, nextCategory) {
-    case (.any, .any): // WB999
-      // Fast path: If we know our scalars have no properties then the decision
-      // is trivial and we don't need to crawl to the default statement.
-      return _accept()
-
     case (.newlineCRLF, _), // WB3a
          (_, .newlineCRLF): // WB3b
       if _prevScalar.value == 0xD, nextScalar.value == 0xA { // WB3
@@ -278,8 +273,10 @@ extension Unicode._WordRecognizer {
       }
       return _accept()
 
-    case (.zwj, .extendedPictographic), // WB3c
-         (.wSegSpace, .wSegSpace): // WB3d
+    case (.wSegSpace, .wSegSpace): // WB3d
+      return _reject()
+
+    case (.zwj, _) where nextScalar._isExtendedPictographic: // WB3c
       return _reject()
 
     case (_, .format), // WB4
@@ -362,6 +359,9 @@ extension Unicode._WordRecognizer {
         breakHere = false
       }
       return (setCandidate: false, breakAtCandidate: false, breakHere: breakHere)
+
+    case (.any, .any): // WB999
+      return _accept()
 
     default: // WB999
       return _accept()
@@ -513,9 +513,6 @@ extension Unicode._RandomAccessWordRecognizer {
     }
 
     switch (prevCategory, _nextCategory) {
-    case (.any, .any): // WB999 shortcut
-      return _accept()
-
     case (.newlineCRLF, _), // WB3a
          (_, .newlineCRLF): // WB3b
       if previousScalar.value == 0xD, _nextScalar.value == 0xA { // WB3
@@ -523,10 +520,12 @@ extension Unicode._RandomAccessWordRecognizer {
       }
       return _accept()
 
-    case (.zwj, .extendedPictographic), // WB3c
-         (.wSegSpace, .wSegSpace): // WB3d
+    case (.wSegSpace, .wSegSpace): // WB3d
       newBase = _baseCategory
       newState = _state
+      return _reject()
+
+    case (.zwj, _) where _nextScalar._isExtendedPictographic: // WB3c
       return _reject()
 
     case (.format, _), // WB4
@@ -624,6 +623,9 @@ extension Unicode._RandomAccessWordRecognizer {
       _internalInvariant(!_hasPendingCandidate)
       newState = .initial
       return _reject()
+
+    case (.any, .any): // WB999
+      return _accept()
 
     default:
       if

@@ -192,6 +192,12 @@ extension Unicode {
   }
 }
 
+extension Unicode.Scalar {
+  var _isExtendedPictographic: Bool {
+    _swift_stdlib_isExtendedPictographic(value)
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Utilities
 //===----------------------------------------------------------------------===//
@@ -215,6 +221,7 @@ func _swift_stdlib_getScalarBitArrayIdx(
 //===----------------------------------------------------------------------===//
 // Normalization
 //===----------------------------------------------------------------------===//
+
 @_extern(c)
 func _swift_stdlib_getNormData(_ scalar: UInt32) -> UInt16
 
@@ -297,3 +304,10 @@ func _swift_stdlib_getCaseMapping(
   _ scalar: UInt32,
   _ buffer: UnsafeMutablePointer<UInt32>
 )
+
+//===----------------------------------------------------------------------===//
+// Emoji
+//===----------------------------------------------------------------------===//
+
+@_extern(c)
+func _swift_stdlib_isExtendedPictographic(_ scalar: UInt32) -> Bool
