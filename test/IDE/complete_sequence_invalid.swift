@@ -1,4 +1,4 @@
-// RUN: %batch-code-completion
+// RUN: %batch-code-completion -parse-as-library
 
 // GLOBAL: Decl[GlobalVar]/CurrModule:         invalidDecl[#_#];
 let invalidDecl = INVALID

@@ -1,7 +1,7 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD_INT -swift-version=5 | %FileCheck %s -check-prefix=OVERLOAD_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD_INTLITERAL -swift-version=5 | %FileCheck %s -check-prefix=OVERLOAD_INTLITERAL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD_FLT -swift-version=5 | %FileCheck %s -check-prefix=OVERLOAD_FLT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD_FLTLITERAL -swift-version=5 | %FileCheck %s -check-prefix=OVERLOAD_FLT
+// RUN: %target-swift-ide-test -parse-as-library -code-completion -source-filename %s -code-completion-token=OVERLOAD_INT -swift-version=5 | %FileCheck %s -check-prefix=OVERLOAD_INT
+// RUN: %target-swift-ide-test -parse-as-library -code-completion -source-filename %s -code-completion-token=OVERLOAD_INTLITERAL -swift-version=5 | %FileCheck %s -check-prefix=OVERLOAD_INTLITERAL
+// RUN: %target-swift-ide-test -parse-as-library -code-completion -source-filename %s -code-completion-token=OVERLOAD_FLT -swift-version=5 | %FileCheck %s -check-prefix=OVERLOAD_FLT
+// RUN: %target-swift-ide-test -parse-as-library -code-completion -source-filename %s -code-completion-token=OVERLOAD_FLTLITERAL -swift-version=5 | %FileCheck %s -check-prefix=OVERLOAD_FLT
 
 struct Messenger {
   init() {}

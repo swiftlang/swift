@@ -136,9 +136,9 @@ ProtocolExtensionTestSuite.test("ConstrainedExtension") {
 }
 
 // Existentials
-var runExistP1 = 0
-var existP1_struct = 0
-var existP1_class = 0
+internal var runExistP1 = 0
+internal var existP1_struct = 0
+internal var existP1_class = 0
 
 protocol ExistP1 {
   func existP1()
@@ -250,7 +250,7 @@ ProtocolExtensionTestSuite.test("ExistentialLValue") {
   expectFalse(hasP.p.extValue)
 }
 
-var metatypes: [(Int, Any.Type)] = []
+internal var metatypes: [(Int, Any.Type)] = []
 
 // rdar://problem/20739719
 class Super: Init {

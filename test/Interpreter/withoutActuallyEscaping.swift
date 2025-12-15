@@ -5,7 +5,7 @@ import StdlibUnittest
 
 var WithoutEscapingSuite = TestSuite("WithoutActuallyEscaping")
 
-var sink: Any = ()
+internal var sink: Any = ()
 
 func dontEscape(f: () -> ()) {
   withoutActuallyEscaping(f) {
@@ -17,7 +17,7 @@ func letEscape(f: () -> ()) -> () -> () {
   return withoutActuallyEscaping(f) { return $0 }
 }
 
-var testShouldThrow = false
+internal var testShouldThrow = false
 
 struct MyError : Error {}
 

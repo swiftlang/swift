@@ -130,13 +130,16 @@ func fromAsync() async {
   a[0] = 1  // expected-error{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' can not be mutated from a nonisolated context}}
 }
 
-// expected-minimal-and-targeted-note @+2 {{mutation of this var is only permitted within the actor}}
-// expected-complete-error @+1 {{top-level code variables cannot have a global actor}}
-@SomeGlobalActor var value: Int = 42
+@SomeGlobalActor internal var value: Int = 42
+// expected-note@-1 {{mutation of this var is only permitted within the actor}}
+
+@SomeGlobalActor var anotherValue: Int = 42
+// expected-error@-1 {{local variable 'anotherValue' cannot have a global actor}}
 
 func topLevelSyncFunction(_ number: inout Int) { }
-// expected-minimal-and-targeted-error @+1 {{global actor 'SomeGlobalActor'-isolated var 'value' can not be used 'inout' from a nonisolated context}}
 topLevelSyncFunction(&value)
+// expected-minimal-and-targeted-error@-1 {{global actor 'SomeGlobalActor'-isolated var 'value' can not be used 'inout' from a nonisolated context}}
+// expected-complete-warning@-2 {{global actor 'SomeGlobalActor'-isolated var 'value' can not be used 'inout' from the main actor}}
 
 // Strict checking based on inferred Sendable/async/etc.
 @preconcurrency @SomeGlobalActor class Super { }

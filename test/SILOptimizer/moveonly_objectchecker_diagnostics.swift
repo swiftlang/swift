@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-experimental-feature MoveOnlyClasses %s
+// RUN: %target-swift-emit-sil -parse-as-library -sil-verify-all -verify -enable-experimental-feature MoveOnlyClasses %s
 
 // REQUIRES: swift_feature_MoveOnlyClasses
 

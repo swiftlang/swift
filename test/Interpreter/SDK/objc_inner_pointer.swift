@@ -13,7 +13,7 @@ class Canary: NSObject {
   }
 }
 
-var CanaryAssocObjectHandle: UInt8 = 0
+internal var CanaryAssocObjectHandle: UInt8 = 0
 
 
 // Attach an associated object with a loud deinit so we can see that the

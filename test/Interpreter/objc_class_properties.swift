@@ -208,9 +208,9 @@ ClassProperties.test("namingConflict/protocol") {
   expectNil(type.protoProp)
 }
 
-var global1: Int = 0
+internal var global1: Int = 0
 
-var global2: Int = 0
+internal var global2: Int = 0
 
 class Steak : NSObject {
   @objc override var thickness: Int {

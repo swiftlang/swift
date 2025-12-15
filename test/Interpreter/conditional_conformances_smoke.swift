@@ -7,7 +7,7 @@
 protocol P1 {
   func method1()
 }
-var isp1_count = 0
+internal var isp1_count = 0
 struct IsP1: P1 {
   var id: Int
   init() {

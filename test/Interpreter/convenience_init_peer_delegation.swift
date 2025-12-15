@@ -89,12 +89,12 @@ class Sub: Base {}
 }
 
 // Replace swift_allocObject so that we can keep track of what gets allocated.
-var baseCounter = 0
-var subCounter = 0
+internal var baseCounter = 0
+internal var subCounter = 0
 
 typealias AllocObjectType =
     @convention(c) (UnsafeRawPointer, Int, Int) -> UnsafeMutableRawPointer
-let allocObjectImpl =
+internal let allocObjectImpl =
   dlsym(UnsafeMutableRawPointer(bitPattern: -1), "_swift_allocObject")
     .assumingMemoryBound(to: AllocObjectType.self)
 
@@ -105,7 +105,11 @@ func asUnsafeRawPointer(_ someClass: AnyObject.Type) -> UnsafeRawPointer {
   return UnsafeRawPointer(opaque)
 }
 
-let originalAllocObject = allocObjectImpl.pointee
+internal let originalAllocObject = allocObjectImpl.pointee
+
+// Make sure we initialize the global before referencing it in the hook.
+_ = originalAllocObject
+
 allocObjectImpl.pointee = {
   switch $0 {
   case asUnsafeRawPointer(Base.self):

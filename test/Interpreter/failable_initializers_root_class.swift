@@ -7,7 +7,7 @@ import StdlibUnittest
 
 var FailableInitTestSuite = TestSuite("FailableInit")
 
-var deinitCalled = 0
+internal var deinitCalled = 0
 
 func mustFail<T>(f: () -> T?) {
   if f() != nil {

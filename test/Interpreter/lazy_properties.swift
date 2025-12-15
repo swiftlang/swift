@@ -5,9 +5,9 @@ import StdlibUnittest
 
 var LazyPropertyTestSuite = TestSuite("LazyProperty")
 
-var lazyPropertyInitialized = 0
-var lazyPropertyInitialized2 = 0
-var lazyPropertyInitialized3 = 0
+internal var lazyPropertyInitialized = 0
+internal var lazyPropertyInitialized2 = 0
+internal var lazyPropertyInitialized3 = 0
 
 func lazyInitFunction() -> Int {
   lazyPropertyInitialized += 1

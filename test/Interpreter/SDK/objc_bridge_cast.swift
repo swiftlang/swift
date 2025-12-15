@@ -231,14 +231,14 @@ class Canary: NSObject {
     print("died")
   }
 }
-var CanaryAssocObjectHandle = 0
+internal var CanaryAssocObjectHandle = 0
 
 class ImmortalCanary: NSObject {
   deinit {
     print("oh noes")
   }
 }
-var ImmortalCanaryAssocObjectHandle = 0
+internal var ImmortalCanaryAssocObjectHandle = 0
 
 func testValueToObjectBridgingInSwitch() {
   autoreleasepool {

@@ -208,26 +208,25 @@ struct MyGlobalActor {
   static let shared = TestActor()
 }
 
-@MyGlobalActor var number: Int = 0
-// expected-note @-1 {{var declared here}}
-// expected-note @-2 {{var declared here}}
-// expected-note @-3 {{mutation of this var is only permitted within the actor}}
-// expected-complete-error @-4 {{top-level code variables cannot have a global actor}}
-// expected-complete-note @-5 4{{mutation of this var is only permitted within the actor}}
+internal var number: Int = 0
+// expected-complete-note@-1 2{{var declared here}}
+// expected-complete-note@-2 {{mutation of this var is only permitted within the actor}}
+// expected-complete-note@-3 4{{mutation of this var is only permitted within the actor}}
 
+@MyGlobalActor var anotherNumber: Int = 0
+// expected-error @-1 {{local variable 'anotherNumber' cannot have a global actor}}
 
 if #available(SwiftStdlib 5.1, *) {
   let _ = Task.detached { await { (_ foo: inout Int) async in foo += 1 }(&number) }
-  // expected-error @-1 {{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
-  // expected-minimal-error @-2 {{global actor 'MyGlobalActor'-isolated var 'number' can not be used 'inout' from a nonisolated context}}
-  // expected-complete-warning @-3 {{main actor-isolated var 'number' can not be used 'inout' from a nonisolated context}}
+  // expected-complete-error@-1 {{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
+  // expected-complete-warning@-2 {{main actor-isolated var 'number' can not be used 'inout' from a nonisolated context}}
 }
 
 // attempt to pass global state owned by the global actor to another async function
 @available(SwiftStdlib 5.1, *)
 @MyGlobalActor func sneaky() async { await modifyAsynchronously(&number) }
-// expected-error @-1 {{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
-// expected-complete-error @-2 {{main actor-isolated var 'number' can not be used 'inout' from global actor 'MyGlobalActor'}}
+// expected-complete-error@-1 {{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
+// expected-complete-error@-2 {{main actor-isolated var 'number' can not be used 'inout' from global actor 'MyGlobalActor'}}
 
 
 // It's okay to pass actor state inout to synchronous functions!

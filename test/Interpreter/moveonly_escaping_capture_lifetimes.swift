@@ -8,7 +8,7 @@ struct MO: ~Copyable {
     deinit { print("dying \(x)") }
 }
 
-var f: () -> () = {}
+internal var f: () -> () = {}
 
 func foo(x: consuming MO) {
     var counter = 42

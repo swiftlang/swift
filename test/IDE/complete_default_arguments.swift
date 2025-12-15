@@ -134,7 +134,7 @@ func testDefaultArgs10() {
 
 }
 
-let globalVar = 1
+internal let globalVar = 1
 func testDefaultArgInit1(x = #^DEFAULT_ARG_INIT_1^#) { }
 func testDefaultArgInit2(_: Int = #^DEFAULT_ARG_INIT_2^#) { }
 func testDefaultArgInit3(_ x: Int = #^DEFAULT_ARG_INIT_3^#) { }

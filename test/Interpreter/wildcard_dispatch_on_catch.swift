@@ -16,7 +16,7 @@ public func someFunc(_ str: String) throws -> String {
   return str
 }
 
-let testData: [String] = [
+internal let testData: [String] = [
   "ABC",
   "DEF",
   ]

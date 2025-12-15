@@ -39,7 +39,7 @@ extension R {
   }
 }
 
-var globalVar = 8
+internal var globalVar = 8
 
 class Base<T> : R {
   var x: T

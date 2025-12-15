@@ -27,7 +27,7 @@ extension OuterType.InnerType: InnerProto {
     }
 }
 
-var innerthing:InnerProto = OuterType.InnerType()
+internal var innerthing:InnerProto = OuterType.InnerType()
 
 @inline(never)
 func getInnerThing() -> InnerProto {

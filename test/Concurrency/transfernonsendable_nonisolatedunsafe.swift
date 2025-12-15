@@ -361,8 +361,8 @@ func testAccessStaticGlobals() async {
   // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 }
 
-nonisolated(unsafe) let globalNonIsolatedUnsafeLetObject = NonSendableKlass()
-nonisolated(unsafe) var globalNonIsolatedUnsafeVarObject = NonSendableKlass()
+nonisolated(unsafe) internal let globalNonIsolatedUnsafeLetObject = NonSendableKlass()
+nonisolated(unsafe) internal var globalNonIsolatedUnsafeVarObject = NonSendableKlass()
 
 func testPassGlobalToMainActorIsolatedFunction() async {
   await transferToMainDirect(globalNonIsolatedUnsafeLetObject)
@@ -373,7 +373,7 @@ func testPassGlobalToMainActorIsolatedFunction() async {
 
 // We use this to force the modify in testPassGlobalToModify
 nonisolated(unsafe)
-var computedGlobalNonIsolatedUnsafeVarObject : NonSendableKlass {
+internal var computedGlobalNonIsolatedUnsafeVarObject : NonSendableKlass {
   _read {
     yield globalNonIsolatedUnsafeVarObject
   }

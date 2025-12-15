@@ -147,8 +147,8 @@ func tryCastToQ(_ value: any Sendable) -> Bool {
 // CHECK-NEXT: MyClass.f()
 // CHECK-NEXT: Wrapper for MyClass.f()
 print("Testing on the main actor")
-nonisolated let mc = MyClass()
-nonisolated let wrappedMC = Wrapper(wrapped: mc)
+let mc = MyClass()
+let wrappedMC = Wrapper(wrapped: mc)
 precondition(tryCastToP(mc))
 precondition(tryCastToP(wrappedMC))
 

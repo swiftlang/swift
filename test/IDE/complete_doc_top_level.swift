@@ -70,14 +70,14 @@ struct S2: P1 {}
 // TOP-LEVEL-SAME:  xmlcomment=<Function file="{{.*}}" line="15" column="6"><Name>topLevelFunc2()</Name><USR>s:15CompleteDocTest13topLevelFunc2yyF</USR><Declaration>func topLevelFunc2()</Declaration><CommentParts><Abstract><Para>top-level func 2 comment</Para></Abstract></CommentParts></Function>;
 // TOP-LEVEL-SAME:  rawcomment=top-level func 2 comment
 
-// TOP-LEVEL-LABEL: Decl[GlobalVar]/Local:              topLevelVar1[#String#]; name=topLevelVar1;
+// TOP-LEVEL-LABEL: Decl[LocalVar]/Local:              topLevelVar1[#String#]; name=topLevelVar1;
 // TOP-LEVEL-SAME:  briefcomment=top-level var 1 comment;
-// TOP-LEVEL-SAME:  xmlcomment=<Other file="{{.*}}" line="2" column="5"><Name>topLevelVar1</Name><USR>s:15CompleteDocTest12topLevelVar1SSvp</USR><Declaration>var topLevelVar1: String</Declaration><CommentParts><Abstract><Para>top-level var 1 comment</Para></Abstract></CommentParts></Other>;
+// TOP-LEVEL-SAME:  xmlcomment=<Other file="{{.*}}" line="2" column="5"><Name>topLevelVar1</Name><USR>s:15CompleteDocTest12topLevelVar1L_SSvp</USR><Declaration>var topLevelVar1: String</Declaration><CommentParts><Abstract><Para>top-level var 1 comment</Para></Abstract></CommentParts></Other>;
 // TOP-LEVEL-SAME:  rawcomment=top-level var 1 comment
 
-// TOP-LEVEL-LABEL: Decl[GlobalVar]/Local:              topLevelVar2[#Int#]; name=topLevelVar2;
+// TOP-LEVEL-LABEL: Decl[LocalVar]/Local:              topLevelVar2[#Int#]; name=topLevelVar2;
 // TOP-LEVEL-SAME:  briefcomment=top-level var 2 comment;
-// TOP-LEVEL-SAME:  xmlcomment=<Other file="{{.*}}" line="7" column="5"><Name>topLevelVar2</Name><USR>s:15CompleteDocTest12topLevelVar2Sivp</USR><Declaration>var topLevelVar2: Int</Declaration><CommentParts><Abstract><Para>top-level var 2 comment</Para></Abstract><Discussion><Para>the meaning of life</Para></Discussion></CommentParts></Other>;
+// TOP-LEVEL-SAME:  xmlcomment=<Other file="{{.*}}" line="7" column="5"><Name>topLevelVar2</Name><USR>s:15CompleteDocTest12topLevelVar2L0_Sivp</USR><Declaration>var topLevelVar2: Int</Declaration><CommentParts><Abstract><Para>top-level var 2 comment</Para></Abstract><Discussion><Para>the meaning of life</Para></Discussion></CommentParts></Other>;
 // TOP-LEVEL-SAME:  rawcomment=top-level var 2 comment
 // TOP-LEVEL-EMPTY:
 // TOP-LEVEL-NEXT:  the meaning of life

@@ -10,7 +10,7 @@ internal func _myPrecondition(
   }
 }
 
-var deinitCounter = 0
+internal var deinitCounter = 0
 
 struct MyCounter<T>: ~Copyable {
   let expectedCount = 1

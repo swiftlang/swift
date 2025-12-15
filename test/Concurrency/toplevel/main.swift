@@ -12,10 +12,10 @@ func foo() -> Int {
 }
 
 //--- main.swift
-var a = 10 // expected-swift6-note 2{{var declared here}}
+internal var a = 10 // expected-swift6-note 2{{var declared here}}
 
 @MainActor
-var b = 14 // expected-error {{top-level code variables cannot have a global actor}}
+var b = 14 // expected-error {{local variable 'b' cannot have a global actor}}
 
 func nonIsolatedSynchronous() {
   // expected-swift6-note@-1 {{add '@MainActor' to make global function 'nonIsolatedSynchronous()' part of global actor 'MainActor'}}

@@ -1,4 +1,4 @@
-// RUN: %batch-code-completion
+// RUN: %batch-code-completion -parse-as-library
 
 var globalAsyncVar: Int {
   get async {

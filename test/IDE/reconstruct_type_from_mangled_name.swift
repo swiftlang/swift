@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | %FileCheck %s -implicit-check-not="FAILURE"
+// RUN: %target-swift-ide-test -parse-as-library -reconstruct-type -source-filename %s | %FileCheck %s -implicit-check-not="FAILURE"
 
 // This test doesn't test a whole lot now that the more general (but buggy)
 // getDeclFromMangledSymbolName() has been replaced with getTypeDeclForMangling().

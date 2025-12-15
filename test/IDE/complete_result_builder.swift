@@ -1,8 +1,8 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_TOP | %FileCheck %s -check-prefix=IN_CLOSURE_TOP
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_NONTOP | %FileCheck %s -check-prefix=IN_CLOSURE_TOP
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_COLOR_CONTEXT | %FileCheck %s -check-prefix=IN_CLOSURE_COLOR_CONTEXT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_RESULT_BUILDER_DECL -code-completion-comments=true | %FileCheck %s -check-prefix=IN_RESULT_BUILDER_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_RESULT_BUILDER_DECL_PREFIX -code-completion-comments=true | %FileCheck %s -check-prefix=IN_RESULT_BUILDER_DECL_PREFIX
+// RUN: %target-swift-ide-test -parse-as-library -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_TOP | %FileCheck %s -check-prefix=IN_CLOSURE_TOP
+// RUN: %target-swift-ide-test -parse-as-library -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_NONTOP | %FileCheck %s -check-prefix=IN_CLOSURE_TOP
+// RUN: %target-swift-ide-test -parse-as-library -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_COLOR_CONTEXT | %FileCheck %s -check-prefix=IN_CLOSURE_COLOR_CONTEXT
+// RUN: %target-swift-ide-test -parse-as-library -code-completion -source-filename %s -code-completion-token=IN_RESULT_BUILDER_DECL -code-completion-comments=true | %FileCheck %s -check-prefix=IN_RESULT_BUILDER_DECL
+// RUN: %target-swift-ide-test -parse-as-library -code-completion -source-filename %s -code-completion-token=IN_RESULT_BUILDER_DECL_PREFIX -code-completion-comments=true | %FileCheck %s -check-prefix=IN_RESULT_BUILDER_DECL_PREFIX
 
 struct Tagged<Tag, Entity> {
   let tag: Tag

@@ -1,5 +1,6 @@
 // RUN: %batch-code-completion
 
+internal let globalOpt: Int?
 let topLevelOpt: Int?
 
 do {
@@ -7,9 +8,10 @@ do {
   let topLevelLocalNonOpt: Int
 
   if let #^TOPLEVEL_IF_LET?check=TOPLEVEL^#
-// TOPLEVEL: Begin completions, 1 items
-// TOPLEVEL-DAG: Decl[LocalVar]/Local:               topLevelLocalOpt[#Int?#];
-// FIXME: show 'topLevelOpt'
+// TOPLEVEL: Begin completions, 2 items
+// TOPLEVEL-DAG: Decl[LocalVar]/Local: topLevelLocalOpt[#Int?#];
+// TOPLEVEL-DAG: Decl[LocalVar]/Local: topLevelOpt[#Int?#];
+// FIXME: show 'globalOpt'
 }
 
 struct MyStruct<T> {
