@@ -643,8 +643,8 @@ struct PatternBindingWithTwoVars3 { var x = y, y = x }
 
 // https://github.com/apple/swift/issues/51518
 do {
-  let closure1 = { closure2() } // expected-error {{circular reference}} expected-note {{through reference here}}
-  let closure2 = { closure1() } // expected-note {{through reference here}} expected-note {{through reference here}}
+  let closure1 = { closure2() } // expected-error {{use of local variable 'closure2' before its declaration}}
+  let closure2 = { closure1() } // expected-note {{'closure2' declared here}}
 }
 
 func color(with value: Int) -> Int {
