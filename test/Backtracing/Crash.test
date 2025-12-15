@@ -18,7 +18,7 @@
 // UNSUPPORTED: asan
 // REQUIRES: executable_test
 // REQUIRES: backtracing
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 
 // CHECK: *** Program crashed: Bad pointer dereference at 0x{{0+}}4 ***

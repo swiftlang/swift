@@ -2735,9 +2735,18 @@ function Test-Runtime([Hashtable] $Platform) {
   }
 
   $PlatformDefines = @{}
+
   if ($Platform.OS -eq [OS]::Android) {
     $PlatformDefines += @{
       SWIFT_ANDROID_API_LEVEL = "$AndroidAPILevel";
+    }
+  }
+
+  # Only enable backtracing for platforms other than 32-bit Windows;
+  # right now, the Swift compiler doesn't properly support stdcall.
+  if ($Platform.OS -ne [OS]::Windows -or $Platform.Architecture.ShortName -ne "x86") {
+    $PlatformDefines += @{
+      SWIFT_ENABLE_BACKTRACING = "YES";
     }
   }
 
