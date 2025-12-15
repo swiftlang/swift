@@ -540,10 +540,12 @@ class TypeVariableStep final : public BindingStep<TypeVarBindingProducer> {
   bool SawFirstLiteralConstraint = false;
 
 public:
-  TypeVariableStep(const BindingContainer &bindings,
+  TypeVariableStep(ConstraintSystem &cs,
+                   TypeVariableType *typeVar,
+                   const BindingContainer &bindings,
                    SmallVectorImpl<Solution> &solutions)
-      : BindingStep(bindings.getConstraintSystem(), {bindings}, solutions),
-        TypeVar(bindings.getTypeVariable()) {}
+      : BindingStep(cs, {cs, typeVar, bindings}, solutions),
+        TypeVar(typeVar) {}
 
   void setup() override;
 

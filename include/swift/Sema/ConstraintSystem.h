@@ -6196,7 +6196,9 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
 public:
   using Element = TypeVariableBinding;
 
-  TypeVarBindingProducer(const BindingSet &bindings);
+  TypeVarBindingProducer(ConstraintSystem &cs,
+                         TypeVariableType *typeVar,
+                         const BindingSet &bindings);
 
   /// Retrieve a set of bindings available in the current state.
   ArrayRef<Binding> getCurrentBindings() const { return Bindings; }

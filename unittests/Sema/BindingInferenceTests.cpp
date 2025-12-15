@@ -42,7 +42,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
 
     ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
 
-    const auto &literal = bindings.Literals.front().second;
+    const auto &literal = bindings.Literals.front();
 
     ASSERT_TRUE(literal.hasDefaultType());
     ASSERT_TRUE(literal.getDefaultType()->isEqual(intTy));
@@ -65,7 +65,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
 
     ASSERT_TRUE(bindings.Bindings[0].BindingType->isEqual(intTy));
 
-    const auto &literal = bindings.Literals.front().second;
+    const auto &literal = bindings.Literals.front();
     ASSERT_TRUE(literal.isCovered());
     ASSERT_TRUE(literal.isDirectRequirement());
     ASSERT_TRUE(literal.getDefaultType()->isEqual(intTy));
@@ -99,7 +99,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
 
     ASSERT_TRUE(bindings.Bindings[0].BindingType->isEqual(floatTy));
 
-    const auto &literal = bindings.Literals.front().second;
+    const auto &literal = bindings.Literals.front();
     ASSERT_TRUE(literal.isCovered());
     ASSERT_TRUE(literal.isDirectRequirement());
     ASSERT_FALSE(literal.getDefaultType()->isEqual(floatTy));
@@ -140,7 +140,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
     // Inferred literal requirement through `$T_float` as well.
     ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
 
-    const auto &literal = bindings.Literals.front().second;
+    const auto &literal = bindings.Literals.front();
 
     ASSERT_TRUE(literal.isCovered());
     ASSERT_FALSE(literal.isDirectRequirement());
@@ -197,7 +197,9 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
                                                      CTP_Initialization)));
 
     auto &bindings = inferBindings(cs, typeVar);
-    ASSERT_TRUE(bindings.getConformanceRequirements().empty());
+    ASSERT_TRUE(cs.getConstraintGraph()[typeVar]
+                  .getPotentialBindings().getConformanceRequirements().empty());
+
     ASSERT_TRUE(bool(bindings.TransitiveProtocols));
     verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
                                    {protocolTy1});
@@ -218,8 +220,10 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
     cs.addConstraint(ConstraintKind::Conversion, typeVar, GPT1,
                      cs.getConstraintLocator({}));
 
+    ASSERT_TRUE(cs.getConstraintGraph()[typeVar]
+                  .getPotentialBindings().getConformanceRequirements().empty());
+
     auto &bindings = inferBindings(cs, typeVar);
-    ASSERT_TRUE(bindings.getConformanceRequirements().empty());
     ASSERT_TRUE(bool(bindings.TransitiveProtocols));
     verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
                                    {protocolTy1, protocolTy2});
@@ -348,7 +352,7 @@ TEST_F(SemaTest, TestNoDoubleVoidClosureResultInference) {
 
   auto verifyInference = [&](TypeVariableType *typeVar, unsigned numExpected) {
     auto bindings = cs.getBindingsFor(typeVar);
-    TypeVarBindingProducer producer(bindings);
+    TypeVarBindingProducer producer(cs, typeVar, bindings);
 
     llvm::SmallPtrSet<Type, 2> inferredTypes;
 
@@ -421,7 +425,7 @@ TEST_F(SemaTest, TestSupertypeInferenceWithDefaults) {
                    cs.getConstraintLocator({}));
 
   auto bindings = cs.getBindingsFor(genericArg);
-  TypeVarBindingProducer producer(bindings);
+  TypeVarBindingProducer producer(cs, genericArg, bindings);
 
   llvm::SmallVector<Type, 4> inferredTypes;
   while (auto binding = producer()) {
