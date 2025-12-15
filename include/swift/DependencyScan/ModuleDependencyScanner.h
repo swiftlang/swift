@@ -309,7 +309,6 @@ private:
   /// Identify all cross-import overlay module dependencies of the
   /// source module under scan and apply an action for each.
   void resolveCrossImportOverlayDependencies(
-      StringRef mainModuleName,
       llvm::function_ref<void(ModuleDependencyID)> action);
 
   /// Perform Bridging Header Chaining.
