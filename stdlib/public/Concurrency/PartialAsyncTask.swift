@@ -887,7 +887,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 /// - SeeAlso: `withCheckedContinuation(function:_:)`
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 @unsafe
 public nonisolated(nonsending) func withUnsafeContinuation<T>(
   _ fn: (UnsafeContinuation<T, Never>) -> Void
@@ -923,7 +923,7 @@ public nonisolated(nonsending) func withUnsafeContinuation<T>(
 /// - SeeAlso: `withCheckedContinuation(function:_:)`
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 @unsafe
 public nonisolated(nonsending) func withUnsafeThrowingContinuation<T>(
   _ fn: (UnsafeContinuation<T, Error>) -> Void

@@ -200,10 +200,9 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   ///
   /// If the value is a reference type, it will be retained for the duration of
   /// the operation closure.
-  @inlinable
   @discardableResult
   @available(SwiftStdlib 5.1, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public nonisolated(nonsending) func withValue<R>(_ valueDuringOperation: Value,
                            operation: nonisolated(nonsending) () async throws -> R,
                            file: String = #fileID, line: UInt = #line) async rethrows -> R {
@@ -269,9 +268,8 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// to swift_task_de/alloc for the copy as follows:
   /// - withValue contains the compiler-emitted calls swift_task_de/alloc.
   /// - withValueImpl contains the calls to Builtin.taskLocalValuePush/Pop
-  @inlinable
   @discardableResult
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal nonisolated(nonsending)
   func withValueNonisolatedNonsendingImpl<R>(_ valueDuringOperation: __owned Value,
                                              operation: nonisolated(nonsending) () async throws -> R,

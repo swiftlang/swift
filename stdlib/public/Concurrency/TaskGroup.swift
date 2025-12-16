@@ -46,7 +46,7 @@ import Swift
 ///
 /// - SeeAlso: ``TaskGroup``
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 public nonisolated(nonsending) func withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
@@ -206,7 +206,7 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 /// - SeeAlso: ``ThrowingTaskGroup``
 /// - SeeAlso: ``ThrowingDiscardingTaskGroup``
 @available(SwiftStdlib 5.1, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 public nonisolated(nonsending) func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
@@ -499,7 +499,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///
   /// - Returns: The value returned by the next child task that completes.
   @available(SwiftStdlib 5.1, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @abi(mutating func nextNonisolatedNonsending() async -> ChildTaskResult?)
   public nonisolated(nonsending) mutating func next() async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
@@ -528,9 +528,8 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   }
 
   /// Await all of the pending tasks added this group.
-  @usableFromInline
   @available(SwiftStdlib 5.1, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal nonisolated(nonsending) mutating func awaitAllRemainingTasksNonsending() async {
     while let _ = await next() {}
   }
@@ -549,7 +548,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   }
 
   /// Wait for all of the group's remaining tasks to complete.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public nonisolated(nonsending) mutating func waitForAll() async {
     await awaitAllRemainingTasksNonsending()
   }
@@ -676,7 +675,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   }
 
   /// Await all the remaining tasks on this group.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(SwiftStdlib 5.1, *)
   internal nonisolated(nonsending) mutating func awaitAllRemainingTasksNonsending() async {
     while true {
@@ -827,7 +826,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// - SeeAlso: `nextResult()`
   @available(SwiftStdlib 5.1, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   // FIXME: doesn't work to rename and the AEIC conflicts with the existing method: @abi(mutating func nextNonisolatedNonsending() async throws -> ChildTaskResult?)
   @_silgen_name("$sScg6next_XxSgyYaKF") // _X to avoid conflict with existing ABI, even though AEIC does not have ABI
   public nonisolated(nonsending) mutating func next() async throws -> ChildTaskResult? {
@@ -854,7 +853,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   }
 
   @available(SwiftStdlib 5.1, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   mutating nonisolated(nonsending) func nextResultNonisolatedNonsending() async throws -> Result<ChildTaskResult, Failure>? {
     do {
       guard let success: ChildTaskResult = try await _taskGroupWaitNext(group: _group) else {
@@ -1030,7 +1029,7 @@ extension TaskGroup: AsyncSequence {
     /// - Returns: The value returned by the next child task that completes,
     ///   or `nil` if there are no remaining child tasks,
     @_disfavoredOverload
-    @_alwaysEmitIntoClient
+    @export(implementation)
     // FIXME: cannot use @abi(mutating func next() async -> Element?)
     @_silgen_name("$sScG8IteratorV6next_XxSgyYaF") // _X only to avoid name clash with next() even though this func has no ABI
     public nonisolated(nonsending) mutating func next() async -> Element? {
@@ -1149,7 +1148,7 @@ extension ThrowingTaskGroup: AsyncSequence {
     /// - Returns: The value returned by the next child task that completes,
     ///   or `nil` if there are no remaining child tasks,
     @available(SwiftStdlib 5.1, *) // since we're witnessing the next() without isolated parameter
-    @_alwaysEmitIntoClient
+    @export(implementation)
     // FIXME: would want to use @abi here
     @_silgen_name("$sScg8IteratorV6next_XxSgyYaKF") // _X just to avoid name clash with $sScg8IteratorV4nextxSgyYaKF, this does not introduce ABI
     public nonisolated(nonsending) mutating func next() async throws(Failure) -> Element? {
