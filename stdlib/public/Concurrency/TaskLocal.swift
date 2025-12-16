@@ -203,8 +203,26 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @inlinable
   @discardableResult
   @available(SwiftStdlib 5.1, *)
-  @backDeployed(before: SwiftStdlib 6.0)
-  public func withValue<R>(_ valueDuringOperation: Value,
+  @_alwaysEmitIntoClient
+  public nonisolated(nonsending) func withValue<R>(_ valueDuringOperation: Value,
+                           operation: nonisolated(nonsending) () async throws -> R,
+                           file: String = #fileID, line: UInt = #line) async rethrows -> R {
+    return try await withValueNonisolatedNonsendingImpl(
+      valueDuringOperation,
+      operation: operation,
+      file: file, line: line)
+  }
+
+  @inlinable
+  @discardableResult
+  @available(SwiftStdlib 5.1, *)
+  @available(*, deprecated, message: "Replaced by nonisolated(nonsending) version")
+  @abi(func withValue<R>(_ valueDuringOperation: Value,
+        operation: () async throws -> R,
+        isolation: isolated (any Actor)?,
+        file: String, line: UInt) async rethrows -> R
+  )
+  internal func _isolatedParam_withValue<R>(_ valueDuringOperation: Value,
                            operation: () async throws -> R,
                            isolation: isolated (any Actor)? = #isolation,
                            file: String = #fileID, line: UInt = #line) async rethrows -> R {
@@ -251,6 +269,19 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// to swift_task_de/alloc for the copy as follows:
   /// - withValue contains the compiler-emitted calls swift_task_de/alloc.
   /// - withValueImpl contains the calls to Builtin.taskLocalValuePush/Pop
+  @inlinable
+  @discardableResult
+  @_alwaysEmitIntoClient
+  internal nonisolated(nonsending)
+  func withValueNonisolatedNonsendingImpl<R>(_ valueDuringOperation: __owned Value,
+                                             operation: nonisolated(nonsending) () async throws -> R,
+                                             file: String = #fileID, line: UInt = #line) async rethrows -> R {
+    _taskLocalValuePush(key: key, value: consume valueDuringOperation)
+    defer { _taskLocalValuePop() }
+
+    return try await operation()
+  }
+
   @inlinable
   @discardableResult
   @available(SwiftStdlib 5.1, *)

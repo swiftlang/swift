@@ -290,12 +290,31 @@ extension CheckedContinuation {
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@_silgen_name("$ss25withCheckedContinuation_X8function_xSS_yScCyxs5NeverOGXEtYalF") // The `_X` suffix is only here to avoid silgen_name clash with original _unsafeInheritExecutor ABI
+public nonisolated(nonsending) func withCheckedContinuation<T>(
+  function: String = #function,
+  _ body: (CheckedContinuation<T, Never>) -> Void
+) async -> sending T {
+  return await Builtin.withUnsafeContinuation {
+    let unsafeContinuation = unsafe UnsafeContinuation<T, Never>($0)
+    return body(unsafe CheckedContinuation(continuation: unsafeContinuation,
+                                           function: function))
+  }
+}
+
 @inlinable
 @available(SwiftStdlib 5.1, *)
 #if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
 #endif
-public func withCheckedContinuation<T>(
+@abi(func withCheckedContinuation<T>(
+  isolation: isolated (any Actor)?,
+  function: String,
+  _ body: (CheckedContinuation<T, Never>) -> Void
+) async -> sending T)
+public func _isolatedParam_withCheckedContinuation<T>(
   isolation: isolated (any Actor)? = #isolation,
   function: String = #function,
   _ body: (CheckedContinuation<T, Never>) -> Void
@@ -325,7 +344,6 @@ public func _unsafeInheritExecutor_withCheckedContinuation<T>(
   }
 }
 
-
 /// Invokes the passed in closure with a checked continuation for the current task.
 ///
 /// The body of the closure executes synchronously on the calling task, and once it returns
@@ -354,12 +372,36 @@ public func _unsafeInheritExecutor_withCheckedContinuation<T>(
 /// - SeeAlso: `withCheckedContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@_silgen_name("$ss33withCheckedThrowingContinuation_X8function_xSS_yScCyxs5Error_pGXEtYaKlF") // The `_X` suffix is only here to avoid silgen_name clash with original _unsafeInheritExecutor ABI
+public nonisolated(nonsending) func withCheckedThrowingContinuation<T>(
+  function: String = #function,
+  _ body: (CheckedContinuation<T, Error>) -> Void
+) async throws -> sending T {
+  // ABI NOTE: Interestingly enough the 'nonisolated(nonsending)' version of this func has the same ABI
+  // as the initial implementation, that was '@_unsafeInheritExecutor'. So we can remove the "ABI shim"
+  // as the current correct impl and the previous impl are both one and the same.
+  //
+  // We need to keep around the isolated parameter ABI for compatibility though.
+  return try await Builtin.withUnsafeThrowingContinuation {
+    let unsafeContinuation = unsafe UnsafeContinuation<T, Error>($0)
+    return body(unsafe CheckedContinuation(continuation: unsafeContinuation,
+                                           function: function))
+  }
+}
+
 @inlinable
 @available(SwiftStdlib 5.1, *)
 #if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
 #endif
-public func withCheckedThrowingContinuation<T>(
+@abi(func withCheckedThrowingContinuation<T>(
+  isolation: isolated (any Actor)?,
+  function: String,
+  _ body: (CheckedContinuation<T, Error>) -> Void
+) async throws -> sending T)
+func _isolatedParam_withCheckedThrowingContinuation<T>(
   isolation: isolated (any Actor)? = #isolation,
   function: String = #function,
   _ body: (CheckedContinuation<T, Error>) -> Void

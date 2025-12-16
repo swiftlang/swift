@@ -74,10 +74,25 @@ import Swift
 /// Therefore, if a cancellation handler must acquire a lock, other code should
 /// not cancel tasks or resume continuations while holding that lock.
 @available(SwiftStdlib 5.1, *)
-#if !$Embedded
-@backDeployed(before: SwiftStdlib 6.0)
-#endif
-public func withTaskCancellationHandler<T>(
+@_alwaysEmitIntoClient
+public nonisolated(nonsending) func withTaskCancellationHandler<T>(
+  operation: nonisolated(nonsending) () async throws -> T,
+  onCancel handler: @Sendable () -> Void
+) async rethrows -> T {
+  // unconditionally add the cancellation record to the task.
+  // if the task was already cancelled, it will be executed right away.
+  let record = unsafe _taskAddCancellationHandler(handler: handler)
+  defer { unsafe _taskRemoveCancellationHandler(record: record) }
+
+  return try await operation()
+}
+
+// Note: Deprecated version which would still hop if we did not close over an `isolated` parameter
+// with the operation closure. Instead, we should do what the docs of this method promise - and not hop at all,
+// by using the new nonisolated(nonsending)
+@available(SwiftStdlib 5.1, *)
+@_silgen_name("$ss27withTaskCancellationHandler9operation8onCancel9isolationxxyYaKXE_yyYbXEScA_pSgYitYaKlF")
+public func _isolatedParam_withTaskCancellationHandler<T>(
   operation: () async throws -> T,
   onCancel handler: @Sendable () -> Void,
   isolation: isolated (any Actor)? = #isolation
