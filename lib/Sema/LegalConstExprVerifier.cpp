@@ -241,7 +241,8 @@ checkSupportedWithSectionAttribute(const Expr *expr,
               functionConvExpr->getType()->getAs<AnyFunctionType>()) {
         if (targetFnTy->getExtInfo().getRepresentation() ==
             FunctionTypeRepresentation::CFunctionPointer) {
-          expressionsToCheck.push_back(functionConvExpr->getSubExpr());
+          // Do not check the inner expression -- if it converts to
+          // CFunctionPointer successfully, then it's constant foldable.
           continue;
         }
       }
