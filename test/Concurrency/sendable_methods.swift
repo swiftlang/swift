@@ -332,3 +332,20 @@ do {
     static func ff() {}
   }
 }
+
+// Ambiguity between `@Sendable` method and non-Sendable context injected into an Optional.
+do {
+  struct Test {
+    func action() -> Void {}
+
+    func onAction(_: (() -> Void)?) {}
+
+    func test() {
+      onAction(true ? action : nil) // Ok
+    }
+
+    func test(fn1: (@Sendable () -> Void)?, fn2: @escaping () -> Void) {
+      let _: () -> Void = fn1 ?? fn2 // Ok
+    }
+  }
+}
