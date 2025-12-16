@@ -24,6 +24,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclObjC.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
@@ -337,9 +338,9 @@ struct UnaliasedInstantiationVisitor
 struct ForwardDeclaredConcreteTypeVisitor
     : clang::RecursiveASTVisitor<ForwardDeclaredConcreteTypeVisitor> {
   bool hasForwardDeclaredConcreteType = false;
-  clang::Module *Owner;
+  const clang::Module *Owner;
 
-  ForwardDeclaredConcreteTypeVisitor(clang::Module *Owner) : Owner(Owner) {};
+  ForwardDeclaredConcreteTypeVisitor(const clang::Module *Owner) : Owner(Owner) { ASSERT(Owner); };
 
   bool VisitRecordType(clang::RecordType *RT) {
     const clang::RecordDecl *RD = RT->getDecl()->getDefinition();
@@ -393,6 +394,13 @@ static size_t getNumParams(const clang::FunctionDecl* D) {
 }
 } // namespace
 
+static const clang::Decl *getTemplateInstantiation(const clang::FunctionDecl *D) {
+  return D->getTemplateInstantiationPattern();
+}
+static const clang::Decl *getTemplateInstantiation(const clang::ObjCMethodDecl *) {
+  return nullptr;
+}
+
 template<typename T>
 static bool swiftifyImpl(ClangImporter::Implementation &Self,
                          SwiftifyInfoFunctionPrinter &printer,
@@ -406,9 +414,20 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       ClangDecl->getAccess() == clang::AS_private)
     return false;
 
+  if (ClangDecl->isImplicit()) {
+    DLOG("implicit functions lack lifetime and bounds info");
+    return false;
+  }
+
   clang::ASTContext &clangASTContext = Self.getClangASTContext();
 
-  ForwardDeclaredConcreteTypeVisitor CheckForwardDecls(ClangDecl->getOwningModule());
+  const clang::Module *OwningModule = nullptr;
+  if (const auto *Instance = getTemplateInstantiation(ClangDecl)) {
+    OwningModule = Instance->getOwningModule();
+  } else {
+    OwningModule = ClangDecl->getOwningModule();
+  }
+  ForwardDeclaredConcreteTypeVisitor CheckForwardDecls(OwningModule);
 
   // We only attach the macro if it will produce an overload. Any __counted_by
   // will produce an overload, since UnsafeBufferPointer is still an improvement
