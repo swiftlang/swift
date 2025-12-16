@@ -135,7 +135,7 @@
 ///   (`FloatingPoint.nan`) compares as neither less than, greater than, nor
 ///   equal to any normal floating-point value. Exceptional values need not
 ///   take part in the strict total order.
-public protocol Comparable: Equatable, ~Copyable {
+public protocol Comparable: Equatable, ~Copyable, ~Escapable {
   /// Returns a Boolean value indicating whether the value of the first
   /// argument is less than that of the second argument.
   ///
@@ -173,7 +173,7 @@ public protocol Comparable: Equatable, ~Copyable {
   static func > (lhs: borrowing Self, rhs: borrowing Self) -> Bool
 }
 
-extension Comparable where Self: ~Copyable {
+extension Comparable where Self: ~Copyable & ~Escapable {
   /// Returns a Boolean value indicating whether the value of the first argument
   /// is greater than that of the second argument.
   ///
