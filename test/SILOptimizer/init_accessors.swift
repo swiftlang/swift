@@ -335,17 +335,14 @@ struct TestGenericTuple<T, U> {
   //
   // CHECK: bb0([[A_REF:%.*]] : $*T, [[B_REF:%.*]] : $*(T, U), [[A_VALUE:%.*]] : $*T, [[B_VALUE:%.*]] : $*T, [[C_VALUE:%.*]] : $*U, [[METATYPE:%.*]] : $@thin TestGenericTuple<T, U>.Type):
   //
-  // CHECK: [[INIT_VALUE_1:%.*]] = alloc_stack $(T, U)
-  // CHECK-NEXT: [[INIT_VALUE_1_0:%.*]] = tuple_element_addr [[INIT_VALUE_1]] : $*(T, U), 0
-  // CHECK-NEXT: copy_addr [take] [[B_VALUE]] to [init] [[INIT_VALUE_1_0]]
-  // CHECK-NEXT: [[INIT_VALUE_1_1:%.*]] = tuple_element_addr [[INIT_VALUE_1]] : $*(T, U), 1
-  // CHECK-NEXT: copy_addr [take] [[C_VALUE]] to [init] [[INIT_VALUE_1_1]]
-
-  // CHECK-NEXT: [[INIT_VALUE_2:%.*]] = alloc_stack [lexical] [var_decl] $(T, (T, U))
-  // CHECK-NEXT: [[INIT_VALUE_2_0:%.*]] = tuple_element_addr [[INIT_VALUE_2]] : $*(T, (T, U)), 0
-  // CHECK-NEXT: copy_addr [take] [[A_VALUE]] to [init] [[INIT_VALUE_2_0]]
-  // CHECK-NEXT: [[INIT_VALUE_2_1:%.*]] = tuple_element_addr [[INIT_VALUE_2]] : $*(T, (T, U)), 1
-  // CHECK-NEXT: copy_addr [take] [[INIT_VALUE_1]] to [init] [[INIT_VALUE_2_1]]
+  // CHECK:      [[TUPLE:%.*]] = alloc_stack [lexical] [var_decl] $(T, (T, U))
+  // CHECK-NEXT: [[TUPLE_0:%.*]] = tuple_element_addr [[TUPLE]] : $*(T, (T, U)), 0
+  // CHECK-NEXT: [[TUPLE_1:%.*]] = tuple_element_addr [[TUPLE]] : $*(T, (T, U)), 1
+  // CHECK-NEXT: copy_addr [take] [[A_VALUE]] to [init] [[TUPLE_0]]
+  // CHECK-NEXT: [[TUPLE_1_0:%.*]] = tuple_element_addr [[TUPLE_1]] : $*(T, U), 0
+  // CHECK-NEXT: [[TUPLE_1_1:%.*]] = tuple_element_addr [[TUPLE_1]] : $*(T, U), 1
+  // CHECK-NEXT: copy_addr [take] [[B_VALUE]] to [init] [[TUPLE_1_0]]
+  // CHECK-NEXT: copy_addr [take] [[C_VALUE]] to [init] [[TUPLE_1_1]]
 
   var data: (T, (T, U)) {
     @storageRestrictions(initializes: a, b)
