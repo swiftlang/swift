@@ -538,6 +538,16 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
   // Collect all generic params referenced in parameter types and
   // return type.
   auto *funcTy = decl->getInterfaceType()->castTo<GenericFunctionType>();
+
+  // Generic parameters of the outer context are implicitly referenced, but a
+  // subscript's interface type doesn't include the (Self) -> ... part, for
+  // historical reasons.
+  if (isa<SubscriptDecl>(decl)) {
+    collectReferencedGenericParams(
+        decl->getDeclContext()->getSelfInterfaceType(),
+        referencedGenericParams);
+  }
+
   for (const auto &param : funcTy->getParams())
     collectReferencedGenericParams(param.getPlainType(), referencedGenericParams);
   collectReferencedGenericParams(funcTy->getResult(), referencedGenericParams);
