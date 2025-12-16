@@ -353,6 +353,14 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
       return false;
   }
 
+  // Exportability checking for non-library-evolution was introduced late,
+  // downgrade errors to warnings by default.
+  if (where.getExportedLevel() == ExportedLevel::ImplicitlyExported &&
+      originKind != DisallowedOriginKind::ImplementationOnlyMemoryLayout &&
+      !ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
+      !ctx.isLanguageModeAtLeast(7))
+    downgradeToWarning = DowngradeToWarning::Yes;
+
   if (fragileKind.kind == FragileFunctionKind::None) {
     DiagnosticBehavior limit = downgradeToWarning == DowngradeToWarning::Yes
                              ? DiagnosticBehavior::Warning
@@ -365,12 +373,6 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
 
     D->diagnose(diag::kind_declared_here, D->getDescriptiveKind());
   } else {
-    // Only implicitly imported decls should be reported as a warning,
-    // and only for language versions below Swift 6.
-    assert(downgradeToWarning == DowngradeToWarning::No ||
-           originKind == DisallowedOriginKind::MissingImport &&
-           "Only implicitly imported decls should be reported as a warning.");
-
     ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module, D,
                        fragileKind.getSelector(), definingModule->getName(),
                        static_cast<unsigned>(originKind))

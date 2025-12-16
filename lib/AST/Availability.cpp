@@ -1014,8 +1014,6 @@ ExportedLevel swift::isExported(const ValueDecl *VD) {
 
   // Is this a type exposed by default in a non-resilient module?
   if (isa<NominalTypeDecl>(VD) &&
-      VD->getASTContext().LangOpts.hasFeature(
-          Feature::CheckImplementationOnly) &&
       VD->getDeclContext()->getParentModule()->getResilienceStrategy() !=
           ResilienceStrategy::Resilient &&
       !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())

@@ -174,9 +174,9 @@ public struct ExposedLayoutPublic {
   // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
   // expected-note @-2 {{struct 'StructFromDirect' is imported by this file as 'internal' from 'directs'}}
 
-  private var privateField: StructFromDirect
+  private var privateField: StructFromDirect // expected-warning {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 }
 
 private struct ExposedLayoutPrivate {
-  private var privateField: StructFromDirect
+  private var privateField: StructFromDirect // expected-warning {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 }
