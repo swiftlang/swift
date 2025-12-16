@@ -1405,22 +1405,13 @@ performModuleScanImpl(
     }
   }
 
-  auto scanner = ModuleDependencyScanner(
-      service, cache, instance->getInvocation(), instance->getSILOptions(),
-      instance->getASTContext(), *instance->getDependencyTracker(),
-      instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
-      instance->getDiags(),
-      instance->getInvocation().getFrontendOptions().ParallelDependencyScan);
+  auto expectedScannerPtr =
+      ModuleDependencyScanner::create(service, instance, cache);
 
-  auto initError = scanner.initializeWorkerClangScanningTool();
-  if (initError) {
-    llvm::handleAllErrors(
-        std::move(initError), [&](const llvm::StringError &E) {
-          instance->getDiags().diagnose(
-              SourceLoc(), diag::clang_dependency_scan_error, E.getMessage());
-        });
-    return std::make_error_code(std::errc::invalid_argument);
-  }
+  if (!expectedScannerPtr)
+    return expectedScannerPtr.getError();
+
+  auto &scanner = **expectedScannerPtr;
 
   // Identify imports of the main module and add an entry for it
   // to the dependency graph.
@@ -1435,17 +1426,6 @@ performModuleScanImpl(
   auto allModules = scanner.performDependencyScan(mainModuleID);
   if (diagnoseCycle(*instance, cache, mainModuleID))
     return std::make_error_code(std::errc::not_supported);
-
-  auto finError = scanner.finalizeWorkerClangScanningTool();
-  if (finError) {
-    llvm::handleAllErrors(std::move(finError), [&](const llvm::StringError &E) {
-      instance->getDiags().diagnose(
-          SourceLoc(), diag::clang_dependency_scan_error, E.getMessage());
-    });
-    // TODO:it is not expected that the finialization fails. Maybe we should
-    // turn this into an assert.
-    return std::make_error_code(std::errc::not_supported);
-  }
 
   auto topologicallySortedModuleList =
       computeTopologicalSortOfExplicitDependencies(allModules, cache);
@@ -1478,12 +1458,14 @@ static llvm::ErrorOr<swiftscan_import_set_t> performModulePrescanImpl(
     ModuleDependenciesCache &cache,
     DepScanInMemoryDiagnosticCollector *diagnosticCollector) {
   // Setup the scanner
-  auto scanner = ModuleDependencyScanner(
-      service, cache, instance->getInvocation(), instance->getSILOptions(),
-      instance->getASTContext(), *instance->getDependencyTracker(),
-      instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
-      instance->getDiags(),
-      instance->getInvocation().getFrontendOptions().ParallelDependencyScan);
+  auto expectedScannerPtr =
+      ModuleDependencyScanner::create(service, instance, cache);
+
+  if (!expectedScannerPtr)
+    return expectedScannerPtr.getError();
+
+  auto &scanner = **expectedScannerPtr;
+
   // Execute import prescan, and write JSON output to the output stream
   auto mainDependencies =
       scanner.getMainModuleDependencyInfo(instance->getMainModule());
