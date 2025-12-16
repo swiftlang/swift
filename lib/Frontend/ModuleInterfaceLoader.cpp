@@ -2767,6 +2767,22 @@ void ExplicitCASModuleLoader::collectVisibleTopLevelModuleNames(
   }
 }
 
+void ExplicitCASModuleLoader::addExplicitModulePath(StringRef name,
+                                                    std::string path) {
+  // This is used by LLDB to discover the paths to dependencies of binary Swift
+  // modules. Only do this if path exists in CAS, since there are use-cases
+  // where a binary Swift module produced on a different machine is provided and
+  // replacements for its dependencies are provided via the explicit module map.
+  auto ID = Impl.CAS.parseID(path);
+  if (!ID)
+    return llvm::consumeError(ID.takeError());
+  if (!Impl.CAS.getReference(*ID))
+    return;
+
+  ExplicitSwiftModuleInputInfo entry(path, {}, {}, {});
+  Impl.ExplicitModuleMap.try_emplace(name, std::move(entry));
+}
+
 std::unique_ptr<ExplicitCASModuleLoader> ExplicitCASModuleLoader::create(
     ASTContext &ctx, llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &cache,
     DependencyTracker *tracker, ModuleLoadingMode loadMode,
