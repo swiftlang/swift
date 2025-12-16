@@ -77,7 +77,7 @@ func acceptFunction<T, U>(_ f: (T) -> U, _ t: T, _ u: U) {}
 
 func passFunction(_ f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, x, y)
-   acceptFunction(f, y, y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
+   acceptFunction(f, y, y) // expected-error{{conflicting arguments to generic parameter 'T' ('Float' vs. 'Int')}}
 }
 
 func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note {{in call to function 'returnTuple'}}

@@ -24,10 +24,11 @@ func compose(_ x: P, _ y: P, _ z: P) -> Int32 {
   return x.val() + y.val() + z.val()
 }
 
-//CHECK-LABEL: sil [noinline] @$s12sil_combine120test_compose_closures5Int32VyF : $@convention(thin) () -> Int32 {
-//CHECK: [[OEADDR:%.*]] = open_existential_addr immutable_access {{%.*}} : $*any P to $*@opened
-//CHECK: [[ADDRCAST:%.*]] = unchecked_addr_cast [[OEADDR]] : $*@opened
-//CHECK: struct_element_addr [[ADDRCAST]] : $*CP, #CP.v
+// CHECK-LABEL: sil [noinline] @$s12sil_combine120test_compose_closures5Int32VyF : $@convention(thin) () -> Int32 {
+// CHECK: [[RESULT:%.*]] = integer_literal $Builtin.Int32, 6
+// CHECK: [[INT32_RESULT:%.*]] = struct $Int32 ([[RESULT]] : $Builtin.Int32)
+// CHECK: return [[INT32_RESULT]] : $Int32
+// CHECK: } // end sil function '$s12sil_combine120test_compose_closures5Int32VyF'
 @inline(never)
 public func test_compose_closure() -> Int32 {
   let insult = curry(compose)(CP(1))(CP(2))
