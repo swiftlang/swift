@@ -123,7 +123,7 @@ func getGraphemeBreakPropertyData(
     unflattened.append((scalars, gbp))
   }
 
-  return unflattened
+  return flatten(unflattened)
 }
 
 func getInCB(
