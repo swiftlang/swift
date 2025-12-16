@@ -334,6 +334,7 @@ SolverTrail::Change::RetractedBinding(TypeVariableType *typeVar,
   result.Binding.TypeVar = typeVar;
   result.Binding.BindingType = binding.BindingType;
   result.Binding.BindingSource = binding.BindingSource;
+  result.Binding.Originator = binding.Originator;
   result.Options = unsigned(binding.Kind);
 
   return result;
@@ -579,9 +580,8 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
 
   case ChangeKind::RetractedBinding: {
-    PotentialBinding binding(Binding.BindingType,
-                             AllowedBindingKind(Options),
-                             Binding.BindingSource);
+    PotentialBinding binding(Binding.BindingType, AllowedBindingKind(Options),
+                             Binding.BindingSource, Binding.Originator);
 
     auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();
     bindings.Bindings.push_back(binding);
