@@ -31,6 +31,7 @@ if(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP)
 endif()
 
 set(RUNTIME_SOURCES
+  empty.c
   Address.swift
   Backtrace.swift
   Backtrace+Codable.swift
@@ -52,20 +53,21 @@ set(RUNTIME_SOURCES
   ImageMap.swift
   ImageMap+Darwin.swift
   ImageMap+Linux.swift
+  ImageMap+Win32.swift
   ImageSource.swift
   Libc.swift
   LimitSequence.swift
   MemoryReader.swift
   OSReleaseScanner.swift
+  PeCoff.swift
+  PeImageCache.swift
   ProcMapsScanner.swift
   Registers.swift
   Runtime.swift
   RichFrame.swift
   SymbolicatedBacktrace.swift
   Utils.swift
-  Win32Extras.cpp
-
-  get-cpu-context.${SWIFT_ASM_EXT}
+  Win32Unwinder.swift
 )
 
 set(RUNTIME_COMPILE_FLAGS
@@ -83,16 +85,16 @@ set(RUNTIME_COMPILE_FLAGS
 #  "-Xcc;-I${SWIFT_PATH_TO_ZSTD_SOURCE}/lib"
 #  "-Xcc;-I${SWIFT_PATH_TO_LIBLZMA_SOURCE}/src/liblzma/api")
 
-if(SWIFT_ASM_AVAILABLE)
-  list(APPEND RUNTIME_SOURCES get-cpu-context.${SWIFT_ASM_EXT})
-  list(APPEND RUNTIME_COMPILE_FLAGS "-DSWIFT_ASM_AVAILABLE")
-else()
+if(NOT SWIFT_ASM_AVAILABLE)
   message(warning "Assembly language not available on this platform; backtracing will fail.")
+else()
+  list(APPEND RUNTIME_COMPILE_FLAGS "-DSWIFT_ASM_AVAILABLE")
 endif()
 
 set(LLVM_OPTIONAL_SOURCES
   get-cpu-context.S
-  get-cpu-context.asm
+  get-cpu-context-aarch64.asm
+  get-cpu-context-x86_64.asm
 )
 
 # We have to build with a deployment target of at least 10.15, otherwise
@@ -117,7 +119,7 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   SWIFT_MODULE_DEPENDS_OPENBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
-  SWIFT_MODULE_DEPENDS_WINDOWS CRT
+  SWIFT_MODULE_DEPENDS_WINDOWS CRT WinSDK
 
   PRIVATE_LINK_LIBRARIES ${swift_runtime_link_libraries}
 
@@ -126,6 +128,7 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     ${RUNTIME_COMPILE_FLAGS}
+    -g
     -parse-stdlib
 
   LINK_FLAGS
@@ -134,5 +137,34 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   INSTALL_IN_COMPONENT stdlib
   MACCATALYST_BUILD_FLAVOR "zippered"
 
-  TARGET_SDKS OSX LINUX LINUX_STATIC
+  TARGET_SDKS OSX LINUX LINUX_STATIC WINDOWS
 )
+
+# Add the correct assembly file for each SDK; this needs to be done this
+# way because Windows has a different assembler for each architecture, and
+# they don't all support the same syntax, so cannot share a single file.
+foreach(sdk ${SWIFT_SDKS})
+  set(sdk_supported_archs
+    ${SWIFT_SDK_${sdk}_ARCHITECTURES}
+    ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
+  list(REMOVE_DUPLICATES sdk_supported_archs)
+
+  foreach(arch ${sdk_supported_archs})
+    set(target "swiftRuntime-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+    if("${SWIFT_SDK_${sdk}_NAME}" STREQUAL "Windows")
+      message(STATUS "Using get-cpu-context-${arch}.asm for target ${target}")
+      target_sources(${target}
+        PRIVATE get-cpu-context-${arch}.asm)
+      # Turn on /safeseh for 32-bit x86 or we won't be able to link
+      if("${arch}" STREQUAL "i686")
+        target_compile_options(${target} PRIVATE
+          $<$<COMPILE_LANGUAGE:ASM_MASM>:/safeseh>)
+      endif()
+    else()
+      message(STATUS "Using get-cpu-context.S for target ${target}")
+      target_sources(${target}
+        PRIVATE get-cpu-context.S)
+    endif()
+  endforeach()
+
+endforeach()

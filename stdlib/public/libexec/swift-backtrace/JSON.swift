@@ -56,7 +56,7 @@ extension SwiftBacktrace {
 
     write("""
             { \
-            "timestamp": "\(formatISO8601(now))", \
+            "timestamp": "\(now.iso8601)", \
             "kind": "crashReport", \
             "description": "\(escapeJSON(description))", \
             "faultAddress": "\(hex(target.faultAddress))", \
@@ -361,8 +361,7 @@ extension SwiftBacktrace {
         write(" ] ")
     }
 
-    let secs = Double(backtraceDuration.tv_sec)
-      + 1.0e-9 * Double(backtraceDuration.tv_nsec)
+    let secs = Double(duration: backtraceDuration)
 
     write(", \"backtraceTime\": \(secs) ")
 
