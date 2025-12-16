@@ -3603,9 +3603,9 @@ void swift::checkCompletenessOfPrespecializations(SILModule &M) {
     StringRef FunctionName(Sym);
     SILFunction *F = M.lookUpFunction(FunctionName);
     if (!F || F->getLinkage() != SILLinkage::Public) {
-      M.getASTContext().Diags.diagnose(SourceLoc(),
-                                       diag::missing_prespecialization,
-                                       FunctionName);
+//      M.getASTContext().Diags.diagnose(SourceLoc(),
+//                                       diag::missing_prespecialization,
+//                                       FunctionName);
     }
   }
 
