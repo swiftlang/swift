@@ -70,7 +70,7 @@ import Swift
 /// - SeeAlso: ``TaskGroup``
 /// - SeeAlso: ``withThrowingDiscardingTaskGroup(returning:body:)``
 @available(SwiftStdlib 5.9, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 public nonisolated(nonsending) func withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
   body: nonisolated(nonsending) (inout DiscardingTaskGroup) async -> GroupResult
@@ -208,7 +208,7 @@ public struct DiscardingTaskGroup {
   /// Await all the remaining tasks on this group.
   ///
   /// - Throws: The first error that was encountered by this group.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal nonisolated(nonsending) mutating func awaitAllRemainingTasksNonsending() async throws {
     let _: Void? = try await _taskGroupWaitAll(group: _group, bodyError: nil)
   }
@@ -368,7 +368,7 @@ extension DiscardingTaskGroup: Sendable { }
 /// }
 /// ```
 @available(SwiftStdlib 5.9, *)
-@_alwaysEmitIntoClient
+@export(implementation)
 public nonisolated(nonsending) func withThrowingDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
   body: nonisolated(nonsending) (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
@@ -540,7 +540,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   }
 
   /// Await all the remaining tasks on this group.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal nonisolated(nonsending) mutating func awaitAllRemainingTasksNonisolated(bodyError: Error?) async throws {
     let _: Void? = try await _taskGroupWaitAll(group: _group, bodyError: bodyError)
   }
