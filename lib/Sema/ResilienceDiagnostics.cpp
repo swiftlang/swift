@@ -119,7 +119,9 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   }
 
   // Swift 5.0 did not check the underlying types of local typealiases.
-  if (isa<TypeAliasDecl>(DC) && !Context.isLanguageModeAtLeast(6))
+  if (isa<TypeAliasDecl>(DC) &&
+      !Context.LangOpts.hasFeature(Feature::StrictAccessControl) &&
+      !Context.isLanguageModeAtLeast(6))
     downgradeToWarning = DowngradeToWarning::Yes;
 
   auto diagID = diag::resilience_decl_unavailable;
@@ -207,7 +209,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
   }
   D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
 
-  if (originKind == DisallowedOriginKind::MissingImport &&
+  if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl) &&
+      originKind == DisallowedOriginKind::MissingImport &&
       !ctx.isLanguageModeAtLeast(6))
     addMissingImport(loc, D, where);
 
@@ -460,7 +463,8 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
               originKind == DisallowedOriginKind::MissingImport,
           6);
 
-  if (originKind == DisallowedOriginKind::MissingImport &&
+  if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl) &&
+      originKind == DisallowedOriginKind::MissingImport &&
       !ctx.isLanguageModeAtLeast(6))
     addMissingImport(loc, ext, where);
 
