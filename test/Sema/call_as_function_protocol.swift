@@ -15,14 +15,14 @@ protocol P1 {
   func callAsFunction() -> Self
 }
 extension P1 {
-  // expected-note @+1 {{found this candidate}}
+  // expected-note @+1 {{found candidate with type '() -> Self'}}
   func callAsFunction() -> Self {
     return self
   }
 }
 protocol P2 {}
 extension P2 {
-  // expected-note @+1 {{found this candidate}}
+  // expected-note @+1 {{found candidate with type '(Int, Int) -> Int'}}
   func callAsFunction(x: Int, y: Int) -> Int {
     return x + y
   }

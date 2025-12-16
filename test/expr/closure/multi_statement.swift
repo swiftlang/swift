@@ -250,8 +250,8 @@ func test_test_invalid_redeclaration() {
 
 func test_pattern_ambiguity_doesnot_crash_compiler() {
   enum E {
-  case hello(result: Int) // expected-note 2 {{found this candidate}}
-  case hello(status: Int) // expected-note 2 {{found this candidate}}
+  case hello(result: Int) // expected-note 2 {{found candidate with type '(Int) -> E'}}
+  case hello(status: Int) // expected-note 2 {{found candidate with type '(Int) -> E'}}
   }
 
   let _: (E) -> Void = {

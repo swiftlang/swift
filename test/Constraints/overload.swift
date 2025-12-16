@@ -293,9 +293,8 @@ func f63834(int: Int, string: Bool) {} // expected-note 3{{found candidate with 
 func f63834_1(int: Int, string: Bool) {} // expected-note{{candidate '(Int, Bool) -> ()' has 2 parameters, but context '(Int) -> Void' has 1}}
 func f63834_1(int: Int, string: String) {} // expected-note{{candidate '(Int, String) -> ()' has 2 parameters, but context '(Int) -> Void' has 1}}
 
-// FIXME: We can mention candidate type.
-func f63834_2(int: Int, string: Bool) {} // expected-note {{found this candidate}}
-func f63834_2(int: Int, string: String) {} // expected-note {{found this candidate}}
+func f63834_2(int: Int, string: Bool) {} // expected-note {{found candidate with type '(Int, Bool) -> ()'}}
+func f63834_2(int: Int, string: String) {} // expected-note {{found candidate with type '(Int, String) -> ()'}}
 
 // One function argument mismatch
 let _ = f63834(int:string:) as (Int, Int) -> Void // expected-error{{no exact matches in reference to global function 'f63834'}}

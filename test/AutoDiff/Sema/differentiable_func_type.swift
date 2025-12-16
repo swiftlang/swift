@@ -188,7 +188,7 @@ extension Vector: Differentiable where T: Differentiable {
   mutating func move(by offset: TangentVector) { fatalError() }
 }
 
-// expected-note@+1 2 {{found this candidate}}
+// expected-note@+1 2 {{found candidate with type '(@differentiable(reverse) (Vector<Int>) -> Vector<Int>) -> ()'}}
 func inferredConformancesGeneric<T, U>(_: @differentiable(reverse) (Vector<T>) -> Vector<U>) {}
 
 // expected-error @+2 {{parameter type 'Vector<T>' does not conform to 'Differentiable' and satisfy 'Vector<T> == Vector<T>.TangentVector', but the enclosing function type is '@differentiable(_linear)'}}
@@ -223,7 +223,7 @@ extension Linear: Differentiable where T: Differentiable, T == T.TangentVector {
   typealias TangentVector = Self
 }
 
-// expected-note @+1 2 {{found this candidate}}
+// expected-note @+1 2 {{found candidate with type '(@differentiable(reverse) (Linear<Int>) -> Linear<Int>) -> ()'}}
 func inferredConformancesGeneric<T, U>(_: @differentiable(reverse) (Linear<T>) -> Linear<U>) {}
 
 // expected-note  @+2 2 {{where 'T' = 'Int'}}

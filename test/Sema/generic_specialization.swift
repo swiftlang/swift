@@ -77,8 +77,8 @@ do {
   func f(_: Swift<Int>) {}
 }
 
-func overloadedGenericFn<T, U>(_ x: T, _ y: U) {} // expected-note {{found this candidate}}
-func overloadedGenericFn<T, U>(_ x: T, _ y: U, z: Int = 0) {} // expected-note {{found this candidate}}
+func overloadedGenericFn<T, U>(_ x: T, _ y: U) {} // expected-note {{found candidate with type '(_, _) -> ()'}}
+func overloadedGenericFn<T, U>(_ x: T, _ y: U, z: Int = 0) {} // expected-note {{found candidate with type '(_, _, Int) -> ()'}}
 
 // Make sure we don't crash.
 func testSpecializedOverloaded() {

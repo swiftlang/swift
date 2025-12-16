@@ -70,10 +70,10 @@ func foo(_: Any...) {}
 // the that of type(of:) to make sure that latter is
 // picked first.
 
-func bar() -> Int {}    // expected-note {{found this candidate}}
-func bar() -> Float {}  // expected-note {{found this candidate}}
-func bar() -> String {} // expected-note {{found this candidate}}
-func bar() -> UInt {}   // expected-note {{found this candidate}}
+func bar() -> Int {}    // expected-note {{found candidate with type '() -> Int'}}
+func bar() -> Float {}  // expected-note {{found candidate with type '() -> Float'}}
+func bar() -> String {} // expected-note {{found candidate with type '() -> String'}}
+func bar() -> UInt {}   // expected-note {{found candidate with type '() -> UInt'}}
 
 foo(type(of: G.T.self)) // Ok
 let _: Any = type(of: G.T.self) // Ok

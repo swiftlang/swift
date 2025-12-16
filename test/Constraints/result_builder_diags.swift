@@ -141,11 +141,11 @@ func testDiags() {
 struct A { }
 struct B { }
 
-func overloadedTuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) -> A { // expected-note {{found this candidate}}
+func overloadedTuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) -> A { // expected-note {{found candidate with type '<T> (Bool, body: (Bool) -> T) -> A'}}
   return A()
 }
 
-func overloadedTuplify<T>(_ cond: Bool, @TupleBuilderWithoutIf body: (Bool) -> T) -> B { // expected-note {{found this candidate}}
+func overloadedTuplify<T>(_ cond: Bool, @TupleBuilderWithoutIf body: (Bool) -> T) -> B { // expected-note {{found candidate with type '<T> (Bool, body: (Bool) -> T) -> B'}}
   return B()
 }
 

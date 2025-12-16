@@ -329,10 +329,10 @@ protocol DuplicateSuper2 where Self : Concrete, Self : Concrete {}
 // Ambiguous name lookup situation
 protocol Amb where Self : Concrete {}
 // expected-note@-1 {{'Amb' previously declared here}}
-// expected-note@-2 {{found this candidate}}
+// expected-note@-2 {{found candidate 'Amb'}}
 protocol Amb where Self : Concrete {}
 // expected-error@-1 {{invalid redeclaration of 'Amb'}}
-// expected-note@-2 {{found this candidate}}
+// expected-note@-2 {{found candidate 'Amb'}}
 
 extension Amb { // expected-error {{'Amb' is ambiguous for type lookup in this context}}
   func extensionMethodUsesClassTypes() {

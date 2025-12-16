@@ -1005,8 +1005,8 @@ do {
 
 // Ambiguous overload inside a trailing closure
 
-func ambiguousCall() -> Int {} // expected-note {{found this candidate}}
-func ambiguousCall() -> Float {} // expected-note {{found this candidate}}
+func ambiguousCall() -> Int {} // expected-note {{found candidate with type '() -> Int'}}
+func ambiguousCall() -> Float {} // expected-note {{found candidate with type '() -> Float'}}
 
 func takesClosure(fn: () -> ()) {}
 

@@ -56,7 +56,7 @@ enum Color : Int {
     return nil
   }
 
-  var rawValue: Double { // expected-note {{found this candidate}}
+  var rawValue: Double { // expected-note {{found candidate with type 'Double'}}
     return 1.0
   }
 }

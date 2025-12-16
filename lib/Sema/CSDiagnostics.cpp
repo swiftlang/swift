@@ -16,6 +16,7 @@
 
 #include "CSDiagnostics.h"
 #include "MiscDiagnostics.h"
+#include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
@@ -2939,7 +2940,7 @@ bool ContextualFailure::diagnoseAsNote() {
                      toFnType->getNumParams());
     return true;
   }
-
+  
   emitDiagnosticAt(decl, diag::found_candidate_type, getFromType());
   return true;
 }
@@ -4068,7 +4069,9 @@ bool SubscriptMisuseFailure::diagnoseAsError() {
 
 bool SubscriptMisuseFailure::diagnoseAsNote() {
   if (auto overload = getOverloadChoiceIfAvailable(getLocator())) {
-    emitDiagnosticAt(overload->choice.getDecl(), diag::found_candidate);
+    auto decl = overload->choice.getDecl();
+    emitDiagnosticAt(decl, diag::found_candidate_type,
+                     decl->getInterfaceTypeNoSelfParam());
     return true;
   }
   return false;
