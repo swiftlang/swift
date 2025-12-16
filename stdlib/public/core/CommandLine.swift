@@ -24,6 +24,15 @@ private func _copyExecutablePath() -> UnsafeMutablePointer<CChar>
 @_silgen_name("_swift_stdlib_deallocExecutablePath")
 private func _deallocExecutablePath(_ path: UnsafeMutablePointer<CChar>)
 
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+@_extern(c, "_NSGetExecutablePath")
+@usableFromInline
+func _NSGetExecutablePath(
+  _ buf: UnsafeMutablePointer<CChar>,
+  _ bufsize: UnsafeMutablePointer<UInt32>
+) -> CInt
+#endif
+
 /// Command-line arguments for the current process.
 @frozen // namespace
 public enum CommandLine: ~BitwiseCopyable {}
@@ -125,13 +134,6 @@ extension CommandLine {
   }
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-  @_extern(c, "_NSGetExecutablePath")
-  @usableFromInline
-  internal static func _NSGetExecutablePath(
-    _ buf: UnsafeMutablePointer<CChar>,
-    _ bufsize: UnsafeMutablePointer<UInt32>
-  ) -> CInt
-
   /// The path to the current executable.
   ///
   /// - Important: On some systems, it is possible to move an executable file on
