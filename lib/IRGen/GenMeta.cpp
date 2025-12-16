@@ -2973,7 +2973,7 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
 void irgen::emitLazyTypeMetadata(IRGenModule &IGM, NominalTypeDecl *type) {
   // Embedded existentials emit very spares metadata records and don't have type
   // context descriptors.
-  if (!type->getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials))
+  if (!IGM.isEmbeddedWithExistentials())
     eraseExistingTypeContextDescriptor(IGM, type);
 
   if (requiresForeignTypeMetadata(type)) {
@@ -4270,7 +4270,7 @@ namespace {
         auto type = (Target->checkAncestry(AncestryFlags::ObjC)
                     ? IGM.Context.getAnyObjectType()
                     : IGM.Context.TheNativeObjectType);
-        if (IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+        if (IGM.isEmbeddedWithExistentials()) {
           return irgen::emitValueWitnessTable(IGM, type, false, false);
         }
         auto wtable = IGM.getAddrOfValueWitnessTable(type);
@@ -5565,8 +5565,7 @@ static void emitEmbeddedVTable(IRGenModule &IGM, CanType classTy,
   (void)var;
 }
 
-void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
-                                      const ClassLayout &fragileLayout) {
+void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl) {
   PrettyStackTraceDecl stackTraceRAII("emitting metadata for", classDecl);
   assert(!classDecl->isForeign());
   CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
@@ -5578,12 +5577,18 @@ void irgen::emitLazyClassMetadata(IRGenModule &IGM, CanType classTy) {
   // Might already be emitted, skip if that's the case.
   auto entity =
       LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::AddressPoint);
-  if (IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+  auto hasEmbeddedWithExistentials = IGM.isEmbeddedWithExistentials();
+  if (hasEmbeddedWithExistentials) {
     entity = LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::FullMetadata);
   }
   auto *existingVar = cast<llvm::GlobalVariable>(
       IGM.getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo()));
   if (!existingVar->isDeclaration()) {
+    return;
+  }
+
+  if (hasEmbeddedWithExistentials) {
+    emitEmbeddedClassMetadata(IGM, classTy->getClassOrBoundGenericClass());
     return;
   }
 
@@ -6219,8 +6224,7 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
 
   bool isPattern;
   bool canBeConstant;
-  bool hasEmbeddedExistentialFeature =
-    IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials);
+  bool hasEmbeddedExistentialFeature = IGM.isEmbeddedWithExistentials();
   if (structDecl->isGenericContext()) {
     assert(!hasEmbeddedExistentialFeature);
     GenericStructMetadataBuilder builder(IGM, structDecl, init);
@@ -6262,7 +6266,7 @@ void irgen::emitSpecializedGenericStructMetadata(IRGenModule &IGM, CanType type,
   bool isPattern = false;
 
   SpecializedGenericStructMetadataBuilder builder(IGM, type, decl, init);
-  if (IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+  if (IGM.isEmbeddedWithExistentials()) {
     builder.embeddedLayout();
   } else {
     builder.layout();
@@ -6309,7 +6313,7 @@ public:
 };
 } // end anonymous namespace
 void irgen::emitLazyTupleMetadata(IRGenModule &IGM, CanType tupleTy) {
-  assert(IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials));
+  assert(IGM.isEmbeddedWithExistentials());
   assert(isa<TupleType>(tupleTy));
 
   Type ty = tupleTy.getPointer();
@@ -6368,7 +6372,7 @@ public:
 } // end anonymous namespace
 
 void irgen::emitLazyFunctionMetadata(IRGenModule &IGM, CanType funTy) {
-  assert(IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials));
+  assert(IGM.isEmbeddedWithExistentials());
   assert(isa<FunctionType>(funTy));
 
   Type ty = funTy.getPointer();
@@ -6765,8 +6769,7 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
   
   bool isPattern;
   bool canBeConstant;
-  bool hasEmbeddedExistentialFeature =
-    IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials);
+  bool hasEmbeddedExistentialFeature = IGM.isEmbeddedWithExistentials();
   if (theEnum->isGenericContext()) {
     assert(!hasEmbeddedExistentialFeature);
     GenericEnumMetadataBuilder builder(IGM, theEnum, init);
@@ -6807,7 +6810,8 @@ void irgen::emitSpecializedGenericEnumMetadata(IRGenModule &IGM, CanType type,
   init.setPacked(true);
 
   SpecializedGenericEnumMetadataBuilder builder(IGM, type, decl, init);
-  if (IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+
+  if (IGM.isEmbeddedWithExistentials()) {
     builder.embeddedLayout();
   } else {
     builder.layout();
@@ -7196,17 +7200,22 @@ void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {
   auto init = builder.beginStruct();
   init.setPacked(true);
 
+  auto isEmbedded = IGM.isEmbeddedWithExistentials();
+
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     if (classDecl->isForeignReferenceType()) {
+      assert(!isEmbedded && "emitting foregin reference type not supported");
       ForeignReferenceTypeMetadataBuilder builder(IGM, classDecl, init);
       builder.layout();
 
       IGM.defineTypeMetadata(type, /*isPattern=*/false,
                              builder.canBeConstant(),
                              init.finishAndCreateFuture());
-      builder.createMetadataAccessFunction();
+      if (!isEmbedded)
+        builder.createMetadataAccessFunction();
     } else {
       assert(classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType);
+      assert(!isEmbedded && "emitting foregin cf class type not supported");
 
       ForeignClassMetadataBuilder builder(IGM, classDecl, init);
       builder.layout();
@@ -7214,28 +7223,37 @@ void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {
       IGM.defineTypeMetadata(type, /*isPattern=*/false,
                              builder.canBeConstant(),
                              init.finishAndCreateFuture());
-      builder.createMetadataAccessFunction();
+      if (!isEmbedded)
+        builder.createMetadataAccessFunction();
     }
   } else if (auto structDecl = dyn_cast<StructDecl>(decl)) {
     assert(isa<ClangModuleUnit>(structDecl->getModuleScopeContext()));
 
     ForeignStructMetadataBuilder builder(IGM, structDecl, init);
-    builder.layout();
+    if (isEmbedded)
+      builder.embeddedLayout();
+    else
+      builder.layout();
 
     IGM.defineTypeMetadata(type, /*isPattern=*/false,
                            builder.canBeConstant(),
                            init.finishAndCreateFuture());
-    builder.createMetadataAccessFunction();
+    if (!isEmbedded)
+      builder.createMetadataAccessFunction();
   } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
     assert(enumDecl->hasClangNode());
-    
+
     ForeignEnumMetadataBuilder builder(IGM, enumDecl, init);
-    builder.layout();
+    if (isEmbedded)
+      builder.embeddedLayout();
+    else
+      builder.layout();
 
     IGM.defineTypeMetadata(type, /*isPattern=*/false,
                            builder.canBeConstant(),
                            init.finishAndCreateFuture());
-    builder.createMetadataAccessFunction();
+    if (!isEmbedded)
+      builder.createMetadataAccessFunction();
   } else {
     llvm_unreachable("foreign metadata for unexpected type?!");
   }

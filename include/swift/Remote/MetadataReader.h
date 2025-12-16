@@ -2644,6 +2644,26 @@ private:
   }
 
   Demangle::NodePointer
+  buildContextDescriptorManglingForSymbol(llvm::StringRef symbol,
+                                          Demangler &dem) {
+    if (auto demangledSymbol = buildContextManglingForSymbol(symbol, dem)) {
+      // Look through Type nodes since we're building up a mangling here.
+      if (demangledSymbol->getKind() == Demangle::Node::Kind::Type) {
+        demangledSymbol = demangledSymbol->getChild(0);
+      }
+      return demangledSymbol;
+    }
+
+    return nullptr;
+  }
+
+  Demangle::NodePointer
+  buildContextDescriptorManglingForSymbol(const std::string &symbol,
+                                          Demangler &dem) {
+    return buildContextDescriptorManglingForSymbol(dem.copyString(symbol), dem);
+  }
+
+  Demangle::NodePointer
   buildContextDescriptorMangling(const ParentContextDescriptorRef &descriptor,
                                  Demangler &dem, int recursion_limit) {
     if (recursion_limit <= 0) {
@@ -2656,15 +2676,7 @@ private:
     
     // Try to demangle the symbol name to figure out what context it would
     // point to.
-    auto demangledSymbol = buildContextManglingForSymbol(descriptor.getSymbol(),
-                                                         dem);
-    if (!demangledSymbol)
-      return nullptr;
-    // Look through Type notes since we're building up a mangling here.
-    if (demangledSymbol->getKind() == Demangle::Node::Kind::Type){
-      demangledSymbol = demangledSymbol->getChild(0);
-    }
-    return demangledSymbol;
+    return buildContextDescriptorManglingForSymbol(descriptor.getSymbol(), dem);
   }
 
   Demangle::NodePointer
@@ -2672,6 +2684,18 @@ private:
                                  Demangler &dem, int recursion_limit) {
     if (recursion_limit <= 0) {
       return nullptr;
+    }
+
+    // Check if the Reader can provide a symbol for this descriptor, and if it 
+    // can, use that instead.
+    if (auto remoteAbsolutePointer =
+            Reader->resolvePointerAsSymbol(descriptor.getRemoteAddress())) {
+      auto symbol = remoteAbsolutePointer->getSymbol();
+      if (!symbol.empty()) {
+        if (auto demangledSymbol = buildContextDescriptorManglingForSymbol(symbol, dem)) {
+          return demangledSymbol;
+        }
+      }
     }
 
     // Read the parent descriptor.
@@ -2907,7 +2931,7 @@ private:
       RemoteAddress address(descriptor.getRemoteAddress());
       address = Reader->resolveRemoteAddress(address).value_or(address);
       snprintf(addressBuf, sizeof(addressBuf), "$%" PRIx64,
-               (uint64_t)descriptor.getRemoteAddress().getRawAddress());
+               (uint64_t)address.getRawAddress());
       auto anonNode = dem.createNode(Node::Kind::AnonymousContext);
       CharVector addressStr;
       addressStr.append(addressBuf, dem);

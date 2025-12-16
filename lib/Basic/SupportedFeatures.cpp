@@ -44,7 +44,7 @@ static std::vector<DiagGroupID> migratableCategories(Feature feature) {
 
     // Provide unreachable cases for all of the non-migratable features.
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description) case Feature::FeatureName:
-#define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)
+#define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)
 #define MIGRATABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
 #define MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Name)
 #include "swift/Basic/Features.def"
@@ -82,7 +82,8 @@ void printSupportedFeatures(llvm::raw_ostream &out) {
 
   std::array upcoming{
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version) Feature::FeatureName,
+#define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)                  \
+  Feature::FeatureName,
 #include "swift/Basic/Features.def"
   };
 
@@ -113,7 +114,7 @@ void printSupportedFeatures(llvm::raw_ostream &out) {
       });
       out << "]";
     }
-    if (auto version = feature.getLanguageVersion()) {
+    if (auto version = feature.getLanguageMode()) {
       out << ", \"enabled_in\": \"" << *version << "\"";
     }
 

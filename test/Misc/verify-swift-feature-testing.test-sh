@@ -27,6 +27,8 @@ EXCEPTIONAL_FILES = [
     pathlib.Path("test/attr/feature_requirement.swift"),
     # Tests completion with features both enabled and disabled
     pathlib.Path("test/IDE/complete_decl_attribute_feature_requirement.swift"),
+    # Uses the pseudo-feature ApproachableConcurrency
+    pathlib.Path("test/Concurrency/approachable_concurrency.swift"),
 ]
 
 ENABLE_FEATURE_RE = re.compile(

@@ -9,7 +9,7 @@ struct S1 {  // expected-note {{found this candidate}} \
   var c: () -> Void
 }
 
-S1 {}  // expected-error {{ambiguous use of 'init'}}
+S1 {}  // expected-error {{ambiguous use of 'S1'}}
 
 struct S1 {  // expected-note {{found this candidate}} \
              // expected-error {{invalid redeclaration of 'S1'}}

@@ -1444,12 +1444,13 @@ bool Parser::parseDifferentiableAttributeArguments(
   // Parse optional differentiability parameters.
   // Parse differentiability kind (optional).
   if (Tok.is(tok::identifier)) {
-    diffKind = llvm::StringSwitch<DifferentiabilityKind>(Tok.getText())
-        .Case("reverse", DifferentiabilityKind::Reverse)
-        .Cases("wrt", "withRespectTo", DifferentiabilityKind::Normal)
-        .Case("_linear", DifferentiabilityKind::Linear)
-        .Case("_forward", DifferentiabilityKind::Forward)
-        .Default(DifferentiabilityKind::NonDifferentiable);
+    diffKind =
+        llvm::StringSwitch<DifferentiabilityKind>(Tok.getText())
+            .Case("reverse", DifferentiabilityKind::Reverse)
+            .Cases({"wrt", "withRespectTo"}, DifferentiabilityKind::Normal)
+            .Case("_linear", DifferentiabilityKind::Linear)
+            .Case("_forward", DifferentiabilityKind::Forward)
+            .Default(DifferentiabilityKind::NonDifferentiable);
 
     switch (diffKind) {
     // Reject unsupported differentiability kinds.
@@ -3236,6 +3237,99 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::Warn: {
+    if (!consumeIfAttributeLParen()) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+
+    // Parse the diagnostic group identifier
+    StringRef ParsedCategoryIdentifier = Tok.getText();
+    if (!consumeIf(tok::identifier)) {
+      diagnose(Loc, diag::attr_expected_option_identifier, AttrName);
+      return makeParserSuccess();
+    }
+    auto DiagGroupID = getDiagGroupIDByName(ParsedCategoryIdentifier);
+    if (!DiagGroupID) {
+      diagnose(Loc, diag::attr_warn_unknown_diagnostic_group_identifier,
+               ParsedCategoryIdentifier);
+      DiscardAttribute = true;
+    }
+
+    if (!consumeIf(tok::comma)) {
+      diagnose(Tok, diag::attr_expected_comma, "@warn", false);
+      return makeParserSuccess();
+    }
+
+    // Parse the `as: error|warning|ignored` behavior specifier
+    Identifier AsLabel;
+    consumeArgumentLabel(AsLabel, true);
+    if (AsLabel.str() != "as") {
+      diagnose(Loc, diag::attr_expected_label, "as:", AttrName);
+      return makeParserSuccess();
+    }
+    if (!consumeIf(tok::colon)) {
+      diagnose(Loc, diag::attr_expected_colon_after_label, AsLabel.str());
+      return makeParserSuccess();
+    }
+    // Map the behavior identifier to WarnAttr::Behavior
+    StringRef ParsedBehaviorIdentifier = Tok.getText();
+    if (!consumeIf(tok::identifier)) {
+      diagnose(Loc, diag::attr_expected_option_identifier, AttrName);
+      return makeParserSuccess();
+    }
+    auto BehaviorSpecifier =
+        llvm::StringSwitch<std::optional<WarningGroupBehavior>>(
+            ParsedBehaviorIdentifier)
+            .Case("error", WarningGroupBehavior::AsError)
+            .Case("warning", WarningGroupBehavior::AsWarning)
+            .Case("ignored", WarningGroupBehavior::Ignored)
+            .Default(std::nullopt);
+    if (!BehaviorSpecifier) {
+      diagnose(Loc, diag::attr_warn_expected_known_behavior,
+               ParsedBehaviorIdentifier);
+      DiscardAttribute = true;
+    }
+
+    // Parse the optional `reason:` argument
+    std::optional<StringRef> ReasonString = std::nullopt;
+    if (consumeIf(tok::comma)) {
+      Identifier ReasonLabel;
+      consumeArgumentLabel(ReasonLabel, true);
+      if (ReasonLabel.str() != "reason") {
+        diagnose(Loc, diag::attr_expected_label, "reason:", AttrName);
+        return makeParserSuccess();
+      }
+      if (!consumeIf(tok::colon)) {
+        diagnose(Loc, diag::attr_expected_colon_after_label, AsLabel.str());
+        return makeParserSuccess();
+      }
+
+      // Parse out the given reason string literal
+      if (Tok.isNot(tok::string_literal)) {
+        diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+        skipUntilTokenOrEndOfLine(tok::r_paren);
+      } else {
+        ReasonString =
+          getStringLiteralIfNotInterpolated(Loc, ("'" + AttrName + "'").str());
+        consumeToken(tok::string_literal);
+      }
+    }
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) WarnAttr(*DiagGroupID, *BehaviorSpecifier,
+                                            ReasonString, AtLoc, AttrRange,
+                                            /*Implicit=*/false));
+    break;
+  }
+
   case DeclAttrKind::Alignment: {
     if (!consumeIfAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -4131,7 +4225,7 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
     consumeToken();
     if (Version.empty()) {
       // Versions cannot be empty (e.g. "0").
-      diagnose(Range.Start, D).warnUntilSwiftVersion(6);
+      diagnose(Range.Start, D).warnUntilLanguageMode(6);
       return true;
     }
     return false;
@@ -4172,7 +4266,7 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
 
   if (Version.empty()) {
     // Versions cannot be empty (e.g. "0.0").
-    diagnose(Range.Start, D).warnUntilSwiftVersion(6);
+    diagnose(Range.Start, D).warnUntilLanguageMode(6);
     return true;
   }
 
@@ -4210,7 +4304,7 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(SourceLoc atLoc) {
   if (isAtAttributeLParen(/*isCustomAttribute=*/true)) {
     if (getEndOfPreviousLoc() != Tok.getLoc()) {
       diagnose(getEndOfPreviousLoc(), diag::attr_extra_whitespace_before_lparen)
-          .warnUntilSwiftVersion(6);
+          .warnUntilLanguageMode(6);
     }
     // If we have no local context to parse the initial value into, create
     // one for the attribute.
@@ -4269,7 +4363,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
                                         bool isFromClangAttribute) {
   if (AtEndLoc != Tok.getLoc()) {
     diagnose(AtEndLoc, diag::attr_extra_whitespace_after_at)
-        .warnUntilSwiftVersion(6);
+        .warnUntilLanguageMode(6);
   }
 
   bool hasModuleSelector = peekToken().is(tok::colon_colon);
@@ -4332,12 +4426,12 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
 
   // In Swift 5 and above, these become hard errors. In Swift 4.2, emit a
   // warning for compatibility. Otherwise, don't diagnose at all.
-  if (Context.isSwiftVersionAtLeast(5)) {
+  if (Context.isLanguageModeAtLeast(5)) {
     checkInvalidAttrName("_versioned", "usableFromInline",
                          DeclAttrKind::UsableFromInline, diag::attr_renamed);
     checkInvalidAttrName("_inlineable", "inlinable", DeclAttrKind::Inlinable,
                          diag::attr_renamed);
-  } else if (Context.isSwiftVersionAtLeast(4, 2)) {
+  } else if (Context.isLanguageModeAtLeast(4, 2)) {
     checkInvalidAttrName("_versioned", "usableFromInline",
                          DeclAttrKind::UsableFromInline,
                          diag::attr_renamed_warning);
@@ -4688,7 +4782,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                         bool justChecking) {
   if (AtEndLoc != Tok.getLoc()) {
     diagnose(AtEndLoc, diag::attr_extra_whitespace_after_at)
-        .warnUntilSwiftVersion(6);
+        .warnUntilLanguageMode(6);
   }
 
   // If this not an identifier, the attribute is malformed.
@@ -6203,7 +6297,7 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
 
   // Parse attributes.
   DeclAttributes Attributes;
-  if (Tok.hasComment())
+  if (Tok.hasComment() && shouldAttachCommentToDecl())
     Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
   ParserStatus AttrStatus = parseDeclAttributeList(
       Attributes, IfConfigsAreDeclAttrs);

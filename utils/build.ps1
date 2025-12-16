@@ -273,13 +273,13 @@ if ($UseHostToolchain -is [string]) {
 
 $DefaultPinned = @{
   AMD64 = @{
-    PinnedBuild = "https://download.swift.org/development/windows10/swift-DEVELOPMENT-SNAPSHOT-2025-11-03-a/swift-DEVELOPMENT-SNAPSHOT-2025-11-03-a-windows10.exe";
-    PinnedSHA256 = "1B93C9B419070925E5ABCD1A273C510121E9928554876EC0DCA530121D8C93D3";
+    PinnedBuild = "https://download.swift.org/development/windows10/swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a/swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a-windows10.exe";
+    PinnedSHA256 = "E16E5289691D9FBD01075054A066D5BB9BF6DE061970758DD9E8863606763C09";
     PinnedVersion = "0.0.0";
   };
   ARM64 = @{
-    PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2025-11-03-a/swift-DEVELOPMENT-SNAPSHOT-2025-11-03-a-windows10-arm64.exe"
-    PinnedSHA256 = "D3F22B491E91F65996861246262D069BFA150E55DECBCB4AEE9FC6C7FD529F18";
+    PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a/swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a-windows10-arm64.exe"
+    PinnedSHA256 = "39C9013F2CC3FE5186D3F10E30023BED4456F971CFAA0E900779A5F55A9651F1";
     PinnedVersion = "0.0.0";
   };
 }
@@ -2273,7 +2273,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
     LLDB_PYTHON_EXT_SUFFIX = ".pyd";
     LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";
-    LLDB_PYTHON_DLL_RELATIVE_PATH = "../../../../Python-$PythonVersion";
+    LLDB_PYTHON_DLL_RELATIVE_PATH = "../../../../Python-$PythonVersion/usr/bin";
     LLDB_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "lldb-tblgen.exe");
     LLDB_TEST_MAKE = "$BinaryCache\GnuWin32Make-4.4.1\bin\make.exe";
     LLVM_CONFIG_PATH = (Join-Path -Path $BuildTools -ChildPath "llvm-config.exe");
@@ -3626,6 +3626,7 @@ function Build-ArgumentParser([Hashtable] $Platform) {
     -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
     -Platform $Platform `
     -UseBuiltCompilers Swift `
+    -UseMSVCCompilers C `
     -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
@@ -4067,38 +4068,13 @@ function Build-Inspect([Hashtable] $Platform) {
     }
 }
 
-function Build-SymbolKit([hashtable] $Platform) {
-  Build-CMakeProject `
-    -Src $SourceCache\swift-docc-symbolkit `
-    -Bin $(Get-ProjectBinaryCache $Platform SymbolKit) `
-    -BuildTargets default `
-    -Platform $Platform `
-    -UseBuiltCompilers C,Swift `
-    -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
-    -Defines @{
-      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-    }
-}
-
-function Build-DocC([hashtable] $Platform) {
-  Build-CMakeProject `
+function Build-DocC() {
+  Build-SPMProject `
+    -Action Build `
     -Src $SourceCache\swift-docc `
-    -Bin (Get-ProjectBinaryCache $BuildPlatform DocC) `
-    -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
-    -Platform $Platform `
-    -UseBuiltCompilers C,Swift `
-    -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
-    -Defines @{
-      BUILD_SHARED_LIBS = "YES";
-      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-      ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
-      SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
-      SwiftCrypto_DIR = (Get-ProjectCMakeModules $Platform Crypto);
-      SwiftMarkdown_DIR = (Get-ProjectCMakeModules $Platform Markdown);
-      LMDB_DIR = (Get-ProjectCMakeModules $Platform LMDB);
-      SymbolKit_DIR = (Get-ProjectCMakeModules $Platform SymbolKit);
-      "cmark-gfm_DIR" = "$($Platform.ToolchainInstallRoot)\usr\lib\cmake";
-    }
+    -Bin $(Get-ProjectBinaryCache $BuildPlatform DocC) `
+    -Platform $BuildPlatform `
+    --product docc
 }
 
 function Test-PackageManager() {
@@ -4473,8 +4449,7 @@ if (-not $SkipBuild -and $IncludeNoAsserts) {
   Build-NoAssertsToolchain
 }
 
-if (-not $SkipBuild) {
-  Invoke-BuildStep Build-SymbolKit $HostPlatform
+if (-not $SkipBuild -and -not $IsCrossCompiling) {
   Invoke-BuildStep Build-DocC $HostPlatform
 }
 

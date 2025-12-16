@@ -37,6 +37,8 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/InFlightSubstitution.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -1298,7 +1300,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   // FIXME: Much of this was copied from visitOptionalEvaluationExpr.
 
   // Prior to Swift 5, an optional try's subexpression is always wrapped in an additional optional
-  bool shouldWrapInOptional = !(SGF.getASTContext().LangOpts.isSwiftVersionAtLeast(5));
+  bool shouldWrapInOptional = !(SGF.getASTContext().isLanguageModeAtLeast(5));
   
   auto &optTL = SGF.getTypeLowering(E->getType());
 
@@ -2430,8 +2432,20 @@ RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
     return emitUndefRValue(loc, getASTContext().getAnyHashableType());
 
   // Construct the substitution for T: Hashable.
-  auto subMap = SubstitutionMap::getProtocolSubstitutions(
-      conformance.getProtocol(), type, conformance);
+  auto subMap = SubstitutionMap::get(convertFn->getGenericSignature(), type,
+    [&](InFlightSubstitution &ifs,
+        Type ty,
+        ProtocolDecl *proto) -> ProtocolConformanceRef {
+      switch (*proto->getKnownProtocolKind()) {
+      case KnownProtocolKind::Hashable:
+        return conformance;
+      case KnownProtocolKind::Copyable:
+      case KnownProtocolKind::Escapable:
+        return lookupConformance(type, proto);
+      default:
+        llvm_unreachable("no other conformances should be involved");
+      }
+    });
 
   return emitApplyOfLibraryIntrinsic(loc, convertFn, subMap, value, C);
 }

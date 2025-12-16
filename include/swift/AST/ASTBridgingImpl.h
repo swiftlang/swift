@@ -272,6 +272,10 @@ bool BridgedDeclObj::AbstractFunction_isOverridden() const {
   return getAs<swift::AbstractFunctionDecl>()->isOverridden();
 }
 
+bool BridgedDeclObj::Constructor_isInheritable() const {
+  return getAs<swift::ConstructorDecl>()->isInheritable();
+}
+
 bool BridgedDeclObj::Destructor_isIsolated() const {
   auto dd = getAs<swift::DestructorDecl>();
   auto ai = swift::getActorIsolation(dd);

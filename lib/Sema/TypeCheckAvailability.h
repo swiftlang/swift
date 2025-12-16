@@ -17,6 +17,7 @@
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
@@ -69,10 +70,11 @@ enum class DeclAvailabilityFlag : uint8_t {
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 
-// This enum must be kept in sync with
-// diag::decl_from_hidden_module,
-// diag::typealias_desugars_to_type_from_hidden_module, and
-// diag::conformance_from_implementation_only_module.
+// Classification of the kind of declaration visible to clients that is
+// restricting references to some decls.
+//
+// This enum must be kept in sync with diag's `EXPORTABILITY_REASON_SELECT`,
+// and fit in the size of `ExportContext.Reason`.
 enum class ExportabilityReason : unsigned {
   General,
   PropertyWrapper,
@@ -82,6 +84,7 @@ enum class ExportabilityReason : unsigned {
   Inheritance,
   AvailableAttribute,
   PublicVarDecl,
+  ImplicitlyPublicVarDecl,
 };
 
 /// A description of the restrictions on what declarations can be referenced
@@ -115,14 +118,14 @@ class ExportContext {
   FragileFunctionKind FragileKind;
   llvm::SmallVectorImpl<UnsafeUse> *UnsafeUses;
   unsigned SPI : 1;
-  unsigned Exported : 1;
+  unsigned Exported : 2;
   unsigned Implicit : 1;
-  unsigned Reason : 3;
+  unsigned Reason : 4;
 
   ExportContext(DeclContext *DC, AvailabilityContext availability,
                 FragileFunctionKind kind,
                 llvm::SmallVectorImpl<UnsafeUse> *unsafeUses,
-                bool spi, bool exported, bool implicit);
+                bool spi, ExportedLevel exported, bool implicit);
 
 public:
 
@@ -184,9 +187,12 @@ public:
   /// If true, the context is SPI and can reference SPI declarations.
   bool isSPI() const { return SPI; }
 
-  /// If true, the context is exported and cannot reference SPI declarations
-  /// or declarations from `@_implementationOnly` imports.
-  bool isExported() const { return Exported; }
+  /// If true, the context is exported explicitly and cannot reference
+  /// restricted decls.
+  bool isExported() const { return Exported != unsigned(ExportedLevel::None); }
+
+  /// Get the export level of the context.
+  ExportedLevel getExportedLevel() const { return ExportedLevel(Exported); }
 
   /// If true, the context can only reference exported declarations, either
   /// because it is the signature context of an exported declaration, or

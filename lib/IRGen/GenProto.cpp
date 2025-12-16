@@ -1756,7 +1756,7 @@ public:
       else
         typeWitness = Conformance.getTypeWitness(assocType);
 
-      if (IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+      if (IGM.isEmbeddedWithExistentials()) {
         // In Embedded Swift associated type witness point to the metadata.
         llvm::Constant *witnessEntry = IGM.getAddrOfTypeMetadata(
           typeWitness->getCanonicalType());
@@ -4558,7 +4558,7 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
 
   // Im embedded with existentials mode the type metadata is directly referenced
   // by the witness table.
-  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+  if (IGM.isEmbeddedWithExistentials()) {
     auto proto = assocType->getProtocol();
     assert(!IGF.IGM.isResilient(proto, ResilienceExpansion::Maximal));
     assert(!IGF.IGM.IRGen.Opts.UseRelativeProtocolWitnessTables);

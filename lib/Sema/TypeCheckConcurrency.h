@@ -557,7 +557,7 @@ bool diagnoseIfAnyNonSendableTypes(
 
         if (!diagnosed) {
           ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
-              .limitBehaviorUntilSwiftVersion(behavior, 6)
+              .limitBehaviorUntilLanguageMode(behavior, 6)
               .limitBehaviorIf(preconcurrency);
           diagnosed = true;
         }

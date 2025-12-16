@@ -1,3 +1,3 @@
-# Semantic Copies (Experimental Diagnostics)
+# Semantic copies (SemanticCopies)
 
-TODO explain
+Experimental

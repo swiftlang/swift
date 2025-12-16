@@ -3749,7 +3749,7 @@ namespace {
       //
       // The result is that in Swift 5, 'try?' avoids producing nested optionals.
       
-      if (!ctx.LangOpts.isSwiftVersionAtLeast(5)) {
+      if (!ctx.isLanguageModeAtLeast(5)) {
         // Nothing to do for Swift 4 and earlier!
         return simplifyExprType(expr);
       }
@@ -4316,7 +4316,7 @@ namespace {
       // be an optional type, leave any extra optionals on the source in place.
       // Only apply the latter condition in Swift 5 mode to best preserve
       // compatibility with Swift 4.1's casting behaviour.
-      if (isBridgeToAnyObject || (ctx.isSwiftVersionAtLeast(5) &&
+      if (isBridgeToAnyObject || (ctx.isLanguageModeAtLeast(5) &&
                                   destValueType->canDynamicallyBeOptionalType(
                                       /*includeExistential*/ false))) {
         auto destOptionalsCount = destOptionals.size() - destExtraOptionals;
@@ -5795,7 +5795,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
     concatLabels(labels, toLabelStr);
 
     using namespace version;
-    if (ctx.isSwiftVersionAtLeast(Version::getFutureMajorLanguageVersion())) {
+    if (ctx.isLanguageModeAtLeast(Version::getFutureMajorLanguageVersion())) {
       ctx.Diags.diagnose(expr->getLoc(), diag::reordering_tuple_shuffle,
                          fromLabelStr, toLabelStr);
     } else {
@@ -6162,7 +6162,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
     // Both the caller and the allee are in the same module.
     if (dc->getParentModule() == decl->getModuleContext()) {
-      return !dc->getASTContext().isSwiftVersionAtLeast(6);
+      return !dc->getASTContext().isLanguageModeAtLeast(6);
     }
 
     // If we cannot figure out where the callee came from, let's conservatively
@@ -6339,7 +6339,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
         // to be used by value if parameter would return a function
         // type (it just needs to get wrapped into autoclosure expr),
         // otherwise argument must always form a call.
-        return ctx.isSwiftVersionAtLeast(5);
+        return ctx.isLanguageModeAtLeast(5);
       }
 
       return true;
@@ -7093,8 +7093,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // ```
       //
       // See also: https://github.com/apple/swift/issues/49345
-      if (ctx.isSwiftVersionAtLeast(4) &&
-          !ctx.isSwiftVersionAtLeast(5)) {
+      if (ctx.isLanguageModeAtLeast(4) &&
+          !ctx.isLanguageModeAtLeast(5)) {
         auto obj1 = fromType->getOptionalObjectType();
         auto obj2 = toType->getOptionalObjectType();
 

@@ -50,8 +50,8 @@
 // Swift compiler.
 //
 // OPTIONAL_LANGUAGE_FEATURE is the same as LANGUAGE_FEATURE, but describes
-// accepted features that can be enabled independently of language version and
-// are not scheduled to be enabled in some specific language version. Examples
+// accepted features that can be enabled independently of language mode and
+// are not scheduled to be enabled in some specific language mode. Examples
 // of optional language features include strict memory safety checking (SE-0458)
 // and Embedded Swift.
 //===----------------------------------------------------------------------===//
@@ -82,11 +82,11 @@
       defined(UPCOMING_FEATURE)
 #    error ambiguous defines when including Features.def
 #  elif defined(SUPPRESSIBLE_LANGUAGE_FEATURE)
-#    define SUPPRESSIBLE_UPCOMING_FEATURE(FeatureName, SENumber, Version) \
+#    define SUPPRESSIBLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode) \
        SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
 #  else
-#    define SUPPRESSIBLE_UPCOMING_FEATURE(FeatureName, SENumber, Version) \
-       UPCOMING_FEATURE(FeatureName, SENumber, Version)
+#    define SUPPRESSIBLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode) \
+       UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)
 #  endif
 #endif
 
@@ -136,10 +136,10 @@
 // feature is disabled.
 #ifndef MIGRATABLE_UPCOMING_FEATURE
   #if defined(UPCOMING_FEATURE)
-    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
-      UPCOMING_FEATURE(FeatureName, SENumber, Version)
+    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)   \
+      UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)
   #else
-    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
+    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)   \
       LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
   #endif
 #endif
@@ -161,7 +161,7 @@
 #endif
 
 #ifndef UPCOMING_FEATURE
-  #define UPCOMING_FEATURE(FeatureName, SENumber, Version)                     \
+  #define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)                \
     LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
 #endif
 
@@ -277,6 +277,7 @@ LANGUAGE_FEATURE(LifetimeDependenceMutableAccessors, 0, "Support mutable accesso
 LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
 SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums")
 LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)")
+LANGUAGE_FEATURE(BuiltinConcurrencyStackNesting, 0, "Concurrency Stack Nesting Builtins")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -302,6 +303,7 @@ MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
 MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
 MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
 UPCOMING_FEATURE(ImmutableWeakCaptures, 481, 7)
+UPCOMING_FEATURE(StrictAccessControl, 0, 7)
 
 // Optional language features / modes
 
@@ -533,6 +535,10 @@ EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
 /// Enable @_lifetime attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 
+/// Excludes '(file)private' properties with initial values from the memberwise
+/// initializer if there is a more accessible initializable property.
+EXPERIMENTAL_FEATURE(ExcludePrivateFromMemberwiseInit, true)
+
 /// Allow macro based aliases to be imported into Swift
 EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 
@@ -553,7 +559,7 @@ EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TildeSendable, false)
 
 /// Allow use of protocol typed values in Embedded mode (`Any` and friends)
-EXPERIMENTAL_FEATURE(EmbeddedExistentials, false)
+EXPERIMENTAL_FEATURE(EmbeddedExistentials, true)
 
 /// Allow use of the 'anyAppleOS' availability domain.
 EXPERIMENTAL_FEATURE(AnyAppleOSAvailability, true)
@@ -567,6 +573,9 @@ EXPERIMENTAL_FEATURE(CheckImplementationOnlyStrict, false)
 
 /// Check that use sites have the required @_spi import for operators.
 EXPERIMENTAL_FEATURE(EnforceSPIOperatorGroup, true)
+
+/// Enable source-level warning control with `@warn`
+EXPERIMENTAL_FEATURE(SourceWarningControl, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

@@ -100,7 +100,7 @@ add_library(swift_Concurrency
 
 if(SwiftCore_ENABLE_STDLIB_TRACING)
   target_compile_definitions(swift_Concurrency
-    PRIVATE SWIFT_STDLIB_CONCURRENCY_TRACING)
+    PRIVATE SWIFT_STDLIB_TRACING)
   target_sources(swift_Concurrency
     PRIVATE TracingSignpost.cpp)
 endif()

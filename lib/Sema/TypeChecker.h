@@ -1103,6 +1103,11 @@ diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 std::optional<Diagnostic>
 diagnosticIfDeclCannotBeUnavailable(const Decl *D, SemanticAvailableAttr attr);
 
+/// Emit a warning on the first use of a compatibility memberwise initializer
+/// overload in a SourceFile.
+void diagnoseCompatMemberwiseInitIfNeeded(const ConstructorDecl *init,
+                                          SourceLoc loc);
+
 /// Checks whether the required range of versions of the compilation's target
 /// platform are available at the given `SourceRange`. If not, `Diagnose` is
 /// invoked.

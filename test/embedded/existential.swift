@@ -2,11 +2,25 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature EmbeddedExistentials -enable-experimental-feature Embedded -parse-as-library -wmo) | %FileCheck %s --check-prefix=OUTPUT
 // RUN: %target-run-simple-swift(-enable-experimental-feature EmbeddedExistentials -enable-experimental-feature Embedded -parse-as-library -wmo -O) | %FileCheck %s --check-prefix=OUTPUT
 
+// RUN: not %target-swift-frontend -enable-experimental-feature EmbeddedExistentials -parse-as-library -wmo -emit-sil %s 2>&1 | %FileCheck --check-prefix=ERRMSG %s
+
+// EmbeddedExistentials is the default.
+// RUN: %target-run-simple-swift( -enable-experimental-feature Embedded -parse-as-library -wmo) | %FileCheck %s --check-prefix=OUTPUT
+
+// Test -disable-embedded-existentials
+// RUN: not %target-swift-frontend -disable-embedded-existentials -enable-experimental-feature Embedded -parse-as-library -wmo -emit-sil %s 2>&1 | %FileCheck --check-prefix=ERRMSG2 %s
+
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedExistentials
+
+// EmbeddedExistentials requires Embedded
+// ERRMSG: error: EmbeddedExistentials requires enabling embedded Swift.
+
+// Test -disable-embedded-existentials
+// ERRMSG2: error: cannot use a value of protocol type 'Any' in embedded Swift
 
 class CP {
 }

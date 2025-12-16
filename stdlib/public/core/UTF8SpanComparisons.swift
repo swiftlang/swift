@@ -104,6 +104,19 @@ extension UTF8Span {
   }
 }
 
+@available(SwiftStdlib 6.2, *)
+extension UTF8Span {
+  /// Returns a Boolean value indicating whether two instances refer to the same
+  /// memory region, and have the same flags (such as ``isKnownASCII``).
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    unsafe (self._unsafeBaseAddress == other._unsafeBaseAddress) &&
+    (self._countAndFlags == other._countAndFlags)
+  }
+}
+
 // // FIXME: remove
 // @available(SwiftStdlib 6.2, *)
 // extension UTF8Span {

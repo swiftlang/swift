@@ -1048,9 +1048,9 @@ static void determineBestChoicesInContext(
         }
 
         for (const auto &literal : bindingSet.Literals) {
-          if (literal.second.hasDefaultType()) {
+          if (literal.hasDefaultType()) {
             // Add primary default type
-            auto type = restoreOptionality(literal.second.getDefaultType(),
+            auto type = restoreOptionality(literal.getDefaultType(),
                                            optionals.size());
             types.push_back({type,
                              /*fromLiteral=*/true});

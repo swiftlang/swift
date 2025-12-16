@@ -2061,6 +2061,8 @@ public:
   /// Returns true if the given Clang function does not throw exceptions.
   bool isCxxNoThrow(clang::FunctionDecl *fd, bool defaultNoThrow = false);
 
+  bool isEmbeddedWithExistentials() const;
+
 private:
   llvm::Constant *
   getAddrOfSharedContextDescriptor(LinkEntity entity,

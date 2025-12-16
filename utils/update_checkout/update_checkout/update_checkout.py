@@ -15,12 +15,13 @@ import platform
 import re
 import sys
 import traceback
-from typing import Any, Dict, Hashable, Optional, Set, List, Tuple, Union
+from typing import Any, Dict, Hashable, Optional, List, Tuple, Union
 
 from .cli_arguments import CliArguments
-from .git_command import Git, GitException
+from .git_command import Git, GitException, is_any_repository_locked
 from .runner_arguments import AdditionalSwiftSourcesArguments, UpdateArguments
 from .parallel_runner import ParallelRunner
+from .commands import status
 
 
 SCRIPT_FILE = Path(__file__).absolute()
@@ -350,30 +351,44 @@ def get_scheme_map(
     return None
 
 
-def _is_any_repository_locked(pool_args: List[UpdateArguments]) -> Set[str]:
-    """Returns the set of locked repositories.
+def _check_missing_clones(
+    args: CliArguments, config: Dict[str, Any], scheme_map: Dict[str, Any]
+):
+    """
+    Verify that all repositories defined in the scheme map are present in the
+    source root directory. If a repository is missing—and not explicitly skipped—
+    the user is prompted to re-run the script with the `--clone` option.
 
-    A repository is considered to be locked if its .git directory contains a
-    file ending in ".lock".
+    This function also respects per-repository platform restrictions: if the
+    current platform is not listed for a repo, that repo is ignored.
 
     Args:
-        pool_args (List[Any]): List of arguments passed to the
-        `update_single_repository` function.
+        args (CliArguments): Parsed CLI arguments.
+        config (Dict[str, Any]): deserialized `update-checkout-config.json`.
+        scheme_map (Dict[str, str] | None): map of repo names to branches to check out.
 
     Returns:
-        Set[str]: The names of the locked repositories if any.
+        Prints a warning if any required repository is missing.
     """
 
-    repos = [(x.source_root, x.repo_name) for x in pool_args]
-    locked_repositories = set()
-    for source_root, repo_name in repos:
-        dot_git_path = source_root.joinpath(repo_name, ".git")
-        if not dot_git_path.exists() or not dot_git_path.is_dir():
+    directory_contents = {path.name for path in args.source_root.iterdir()}
+    current_platform = platform.system()
+
+    for repo in scheme_map:
+        repo_config = config["repos"].get(repo, {})
+
+        if (
+            "platforms" in repo_config
+            and current_platform not in repo_config["platforms"]
+        ):
             continue
-        for file in dot_git_path.iterdir():
-            if file.suffix == ".lock":
-                locked_repositories.add(repo_name)
-    return locked_repositories
+
+        if repo not in directory_contents and repo not in args.skip_repository_list:
+            print(
+                "You don't have all swift sources. "
+                "Call this script with --clone to get them."
+            )
+            return
 
 
 def _move_llvm_project_to_first_index(
@@ -437,7 +452,7 @@ def update_all_repositories(
         )
         pool_args.append(my_args)
 
-    locked_repositories: set[str] = _is_any_repository_locked(pool_args)
+    locked_repositories = is_any_repository_locked(pool_args)
     if len(locked_repositories) > 0:
         return skipped_repositories, [
             Exception(f"'{repo_name}' is locked by git. Cannot update it.")
@@ -584,6 +599,7 @@ def obtain_all_additional_swift_sources(
 
         new_args = AdditionalSwiftSourcesArguments(
             args=args,
+            source_root=args.source_root,
             repo_name=repo_name,
             repo_info=repo_info,
             repo_branch=repo_branch,
@@ -770,6 +786,9 @@ def skip_list_for_platform(config: Dict[str, Any], all_repos: bool) -> List[str]
 def main() -> int:
     args = CliArguments.parse_args()
 
+    if args.command == "status":
+        return status.StatusCommand(args).run()
+
     if not args.scheme:
         if args.reset_to_remote:
             print(
@@ -855,17 +874,7 @@ def main() -> int:
         dump_repo_hashes(args, config, args.dump_hashes_config)
         return 0
 
-    # Quick check whether somebody is calling update in an empty directory
-    directory_contents = args.source_root.iterdir()
-    if not (
-        "cmark" in directory_contents
-        or "llvm" in directory_contents
-        or "clang" in directory_contents
-    ):
-        print(
-            "You don't have all swift sources. "
-            "Call this script with --clone to get them."
-        )
+    _check_missing_clones(args=args, config=config, scheme_map=scheme_map)
 
     skipped_repositories, update_results = update_all_repositories(
         args, config, scheme_name, scheme_map, cross_repos_pr

@@ -1588,8 +1588,10 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   auto found = HasLazyMetadata.find(type);
   if (found != HasLazyMetadata.end())
     return found->second;
-
-  if (SIL.getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials) &&
+  auto &langOpts = SIL.getASTContext().LangOpts;
+  auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
+    langOpts.hasFeature(Feature::EmbeddedExistentials);
+  if (isEmbeddedWithExistentials &&
       (isa<StructDecl>(type) || isa<EnumDecl>(type))) {
     bool isGeneric = cast<NominalTypeDecl>(type)->isGenericContext();
     HasLazyMetadata[type] = !isGeneric;
@@ -2324,11 +2326,11 @@ void IRGenerator::emitEntryPointInfo() {
   IGM.addUsedGlobal(var);
 }
 
-static IRLinkage
-getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
-             SILLinkage linkage, ForDefinition_t isDefinition,
-             bool isWeakImported, bool isKnownLocal,
-             bool hasNonUniqueDefinition) {
+static IRLinkage getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
+                              SILLinkage linkage, ForDefinition_t isDefinition,
+                              bool isWeakImported, bool isKnownLocal,
+                              bool hasNonUniqueDefinition,
+                              bool privateMeansPrivate) {
 #define RESULT(LINKAGE, VISIBILITY, DLL_STORAGE)                               \
   IRLinkage{llvm::GlobalValue::LINKAGE##Linkage,                               \
             llvm::GlobalValue::VISIBILITY##Visibility,                         \
@@ -2390,12 +2392,15 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
   case SILLinkage::Private: {
     if (info.forcePublicDecls() && !isDefinition)
       return getIRLinkage(name, info, SILLinkage::PublicExternal, isDefinition,
-                          isWeakImported, isKnownLocal, hasNonUniqueDefinition);
+                          isWeakImported, isKnownLocal, hasNonUniqueDefinition,
+                          privateMeansPrivate);
 
-    auto linkage = info.needLinkerToMergeDuplicateSymbols()
-                       ? llvm::GlobalValue::LinkOnceODRLinkage
-                       : llvm::GlobalValue::InternalLinkage;
-    auto visibility = info.shouldAllPrivateDeclsBeVisibleFromOtherFiles()
+    auto linkage =
+        info.needLinkerToMergeDuplicateSymbols() && !privateMeansPrivate
+            ? llvm::GlobalValue::LinkOnceODRLinkage
+            : llvm::GlobalValue::InternalLinkage;
+    auto visibility = info.shouldAllPrivateDeclsBeVisibleFromOtherFiles() &&
+                              !privateMeansPrivate
                           ? llvm::GlobalValue::HiddenVisibility
                           : llvm::GlobalValue::DefaultVisibility;
     return {linkage, visibility, llvm::GlobalValue::DefaultStorageClass};
@@ -2446,8 +2451,8 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
   auto IRL =
       getIRLinkage(global->hasName() ? global->getName() : StringRef(),
                    linkInfo, entity.getLinkage(ForDefinition), ForDefinition,
-                   weakImported, isKnownLocal,
-                   entity.hasNonUniqueDefinition());
+                   weakImported, isKnownLocal, entity.hasNonUniqueDefinition(),
+                   entity.privateMeansPrivate());
   ApplyIRLinkage(IRL).to(global);
 
   LinkInfo link = LinkInfo::get(IGM, entity, ForDefinition);
@@ -2498,10 +2503,10 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   }
 
   bool weakImported = entity.isWeakImported(swiftModule);
-  result.IRL = getIRLinkage(result.Name, linkInfo,
-                            entity.getLinkage(isDefinition), isDefinition,
-                            weakImported, isKnownLocal,
-                            entity.hasNonUniqueDefinition());
+  result.IRL = getIRLinkage(
+      result.Name, linkInfo, entity.getLinkage(isDefinition), isDefinition,
+      weakImported, isKnownLocal, entity.hasNonUniqueDefinition(),
+      entity.privateMeansPrivate());
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -2513,7 +2518,8 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
   result.Name += name;
   result.IRL = getIRLinkage(name, linkInfo, linkage, isDefinition,
                             isWeakImported, linkInfo.Internalize,
-                            /*hasNonUniqueDefinition=*/false);
+                            /*hasNonUniqueDefinition=*/false,
+                            /*privateMeansPrivate=*/false);
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -5308,7 +5314,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
 
     return cast<llvm::GlobalValue>(addr);
   }
-
+  bool hasEmbeddedExistentials = isEmbeddedWithExistentials();
   auto entity =
       (isPrespecialized &&
        !irgen::isCanonicalInitializableTypeMetadataStaticallyAddressable(
@@ -5324,7 +5330,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
     entity = LinkEntity::forTypeMetadata(concreteType,
                                          TypeMetadataAddress::AddressPoint);
-    if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials))
+    if (hasEmbeddedExistentials)
       entity = LinkEntity::forTypeMetadata(concreteType,
                                            TypeMetadataAddress::FullMetadata);
   }
@@ -5350,7 +5356,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   markGlobalAsUsedBasedOnLinkage(*this, link, var);
   
   if (Context.LangOpts.hasFeature(Feature::Embedded) &&
-      !Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+      !hasEmbeddedExistentials) {
     return var;
   }
 
@@ -5361,14 +5367,13 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   if (auto nominal = concreteType->getAnyNominal()) {
     // Keep type metadata around for all types (except @_objcImplementation,
     // since we're using ObjC metadata for that).
-    if (!isObjCImpl &&
-        !Context.LangOpts.hasFeature(Feature::EmbeddedExistentials))
+    if (!isObjCImpl && !hasEmbeddedExistentials)
       addRuntimeResolvableType(nominal);
 
     // Don't define the alias for foreign type metadata, prespecialized
     // generic metadata, or @_objcImplementation classes, since they're not ABI.
-    if (requiresForeignTypeMetadata(nominal) ||
-        (isPrespecialized && !Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) ||
+    if ((requiresForeignTypeMetadata(nominal) && !hasEmbeddedExistentials) ||
+        (isPrespecialized && !hasEmbeddedExistentials) ||
         isObjCImpl)
       return var;
 
@@ -5382,7 +5387,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
     }
   }
 
-  if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+  if (hasEmbeddedExistentials) {
     adjustmentIndex = MetadataAdjustmentIndex::EmbeddedWithExistentials;
   }
 
@@ -5427,7 +5432,8 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
-  if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+  auto hasEmbeddedExistentials = isEmbeddedWithExistentials();
+  if (hasEmbeddedExistentials) {
     adjustmentIndex = 0;
     defaultVarTy = EmbeddedExistentialsMetadataStructTy;
   } else if (concreteType->isAny() || concreteType->isAnyObject() || concreteType->isVoid() || concreteType->is<TupleType>() || concreteType->is<BuiltinType>()) {
@@ -5474,7 +5480,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
       }
     }
 
-    if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+    if (hasEmbeddedExistentials) {
       if ((isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) &&
           nominal->isGenericContext()) {
         IRGen.noteUseOfSpecializedValueMetadata(concreteType);
@@ -5482,7 +5488,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     }
   }
 
-  if (Context.LangOpts.hasFeature(Feature::EmbeddedExistentials) &&
+  if (hasEmbeddedExistentials &&
       (isa<TupleType>(concreteType) ||
        isa<FunctionType>(concreteType))) {
     IRGen.noteUseOfSpecializedValueMetadata(concreteType);

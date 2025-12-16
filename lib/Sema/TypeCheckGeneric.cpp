@@ -375,7 +375,7 @@ static bool checkProtocolSelfRequirementsImpl(
                        secondType.getString())
         // FIXME: This should become an unconditional error since violating
         // this invariant can introduce compiler and run time crashes.
-        .warnUntilFutureSwiftVersionIf(downgrade);
+        .warnUntilFutureLanguageModeIf(downgrade);
     return true;
   }
 
@@ -538,6 +538,16 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
   // Collect all generic params referenced in parameter types and
   // return type.
   auto *funcTy = decl->getInterfaceType()->castTo<GenericFunctionType>();
+
+  // Generic parameters of the outer context are implicitly referenced, but a
+  // subscript's interface type doesn't include the (Self) -> ... part, for
+  // historical reasons.
+  if (isa<SubscriptDecl>(decl)) {
+    collectReferencedGenericParams(
+        decl->getDeclContext()->getSelfInterfaceType(),
+        referencedGenericParams);
+  }
+
   for (const auto &param : funcTy->getParams())
     collectReferencedGenericParams(param.getPlainType(), referencedGenericParams);
   collectReferencedGenericParams(funcTy->getResult(), referencedGenericParams);
@@ -705,9 +715,9 @@ void TypeChecker::checkShadowedGenericParams(GenericContext *dc) {
       if (existingParamDecl->getDeclContext() == dc) {
         genericParamDecl->diagnose(diag::invalid_redecl, genericParamDecl);
       } else {
-        genericParamDecl->diagnose(
-            diag::shadowed_generic_param,
-            genericParamDecl).warnUntilSwiftVersion(6);
+        genericParamDecl
+            ->diagnose(diag::shadowed_generic_param, genericParamDecl)
+            .warnUntilLanguageMode(6);
       }
 
       if (existingParamDecl->getLoc()) {

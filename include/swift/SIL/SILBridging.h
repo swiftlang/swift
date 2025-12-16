@@ -1557,7 +1557,6 @@ struct BridgedContext {
   BRIDGED_INLINE void eraseBlock(BridgedBasicBlock block) const;
   static BRIDGED_INLINE void moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
   static BRIDGED_INLINE void copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
-  static BRIDGED_INLINE void salvageDebugInfo(BridgedInstruction inst);
 
     // SSAUpdater
 
@@ -1632,11 +1631,11 @@ struct BridgedVerifier {
 
   static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
   static void verifierError(BridgedStringRef message,
-                            OptionalBridgedInstruction atInstruction);
+                            BridgedInstruction atInstruction);
   static void verifierError(BridgedStringRef message,
-                            OptionalBridgedArgument atArgument);
+                            BridgedArgument atArgument);
   static void verifierError(BridgedStringRef message,
-                            OptionalBridgedValue atValue);
+                            BridgedValue atValue);
 };
 
 struct BridgedUtilities {

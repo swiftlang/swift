@@ -22,4 +22,5 @@ install(TARGETS swiftRegexBuilder
 emit_swift_interface(swiftRegexBuilder)
 install_swift_interface(swiftRegexBuilder)
 
+generate_plist(swiftRegexBuilder "${CMAKE_PROJECT_VERSION}" swiftRegexBuilder)
 embed_manifest(swiftRegexBuilder)

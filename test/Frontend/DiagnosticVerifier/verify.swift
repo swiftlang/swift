@@ -34,4 +34,3 @@ fn(())    // expected-error {{argument passed to call that takes no arguments}} 
 let x: Array<Int, Int>
 // CHECK: error: unexpected note produced: generic struct 'Array' declared here
 // CHECK: note: file 'Swift.Array' is not parsed for 'expected' statements. Use '-verify-additional-file Swift.Array' to enable, or '-verify-ignore-unrelated' to ignore diagnostics in this file
-// CHECK: note: diagnostic produced elsewhere: generic struct 'Array' declared here

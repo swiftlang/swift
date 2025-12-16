@@ -4002,7 +4002,6 @@ public:
     bool isImplicit, isObjC, isStatic;
     uint8_t rawIntroducer;
     bool isGetterMutating, isSetterMutating;
-    bool isLazyStorageProperty;
     bool isTopLevelGlobal;
     DeclID lazyStorageID;
     unsigned numAccessors, numBackingProperties;
@@ -4018,7 +4017,6 @@ public:
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
                                        isImplicit, isObjC, isStatic, rawIntroducer,
                                        isGetterMutating, isSetterMutating,
-                                       isLazyStorageProperty,
                                        isTopLevelGlobal,
                                        lazyStorageID,
                                        opaqueReadOwnership,
@@ -4169,9 +4167,9 @@ public:
       VarDecl *storage = cast<VarDecl>(lazyStorageDecl.get());
       ctx.evaluator.cacheOutput(
           LazyStoragePropertyRequest{var}, std::move(storage));
+      storage->setLazyStorageFor(var);
     }
 
-    var->setLazyStorageProperty(isLazyStorageProperty);
     var->setTopLevelGlobal(isTopLevelGlobal);
 
     // If there are any backing properties, record them.
@@ -9121,13 +9119,13 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
         // Print context to stderr.
         PrintOptions Opts;
-        llvm::errs() << "Requirements:\n";
+        llvm::errs() << "Requirements seen by this invocation:\n";
         for (auto req: requirements) {
           req.print(llvm::errs(), Opts);
           llvm::errs() << "\n";
         }
 
-        llvm::errs() << "Conformances:\n";
+        llvm::errs() << "\nConformances written in the swiftmodule:\n";
         for (auto req: reqConformances) {
           req.print(llvm::errs());
           llvm::errs() << "\n";
