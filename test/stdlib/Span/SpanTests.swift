@@ -651,68 +651,109 @@ suite.test("Span Sendability")
   send(span)
 }
 
-//@available(SwiftStdlib 6.3, *)
-//extension Sequence where Self: ~Copyable & ~Escapable { // Copyable elements only
-//  func collectViaBorrowing() -> [Element] {
-//    var borrowIterator = makeBorrowingIterator()
-//    var result: [Element] = []
-//    while true {
-//      let span = borrowIterator.nextSpan(maximumCount: .max)
-//      if span.isEmpty { break }
-//      for i in span.indices {
-//        result.append(span[i])
-//      }
-//    }
-//    return result
-//  }
-//}
-//
-//@available(SwiftStdlib 6.3, *)
-//func elementsEqual<S1: Sequence, S2: Sequence>(
-//  _ lhs: borrowing S1,
-//  _ rhs: borrowing S2
-//) -> Bool
-//  where S1.Element: Equatable, S2.Element == S1.Element,
-//        S1: ~Escapable & ~Copyable, S2: ~Escapable & ~Copyable
-//{
-//  var iter1 = lhs.makeBorrowingIterator()
-//  var iter2 = rhs.makeBorrowingIterator()
-//  while true {
-//    var el1 = iter1.nextSpan(maximumCount: .max)
-//
-//    if el1.isEmpty {
-//      // LHS is empty - sequences are equal iff RHS is also empty
-//      let el2 = iter2.nextSpan(maximumCount: 1)
-//      return el2.isEmpty
-//    }
-//
-//    while el1.count > 0 {
-//      let el2 = iter2.nextSpan(maximumCount: el1.count)
-//      if el2.isEmpty { return false }
-//      for i in 0..<el2.count {
-//        if el1[i] != el2[i] { return false }
-//      }
-//      el1 = el1.extracting(droppingFirst: el2.count)
-//    }
-//  }
-//}
-//
-//suite.test("BORROWING")
-//.require(.stdlib_6_3).code {
-//  guard #available(SwiftStdlib 6.3, *) else {
-//    expectTrue(false)
-//    return
-//  }
-//
-//  let array = [1, 2, 3, 4, 5, 6, 7, 8]
-//  let arrayCollected = array.collectViaBorrowing()
-//  expectEqual(array, arrayCollected)
-//
-//  let span = array.span
-//  let spanCollected = span.collectViaBorrowing()
-//  expectTrue(elementsEqual(span, spanCollected))
-//
-//  let inline: [8 of Int] = [1, 2, 3, 4, 5, 6, 7, 8]
-//  let inlineCollected = inline.collectViaBorrowing()
-//  expectTrue(elementsEqual(inline, inlineCollected))
-//}
+@available(SwiftStdlib 6.3, *)
+extension BorrowingSequence where Self: ~Copyable & ~Escapable {
+  func reduce<T: ~Copyable>(
+    _ initial: consuming T,
+    _ nextPartialResult: @escaping (consuming T, borrowing Element) -> T
+  ) -> T {
+    var borrowIterator = makeBorrowingIterator()
+    var result = initial
+    while true {
+      let span = borrowIterator.nextSpan(maximumCount: .max)
+      if span.isEmpty { break }
+      for i in span.indices {
+        result = nextPartialResult(result, span[i])
+      }
+    }
+    return result
+  }
+  
+  func reduce<T: ~Copyable>(
+    into initial: consuming T,
+    _ nextPartialResult: @escaping (inout T, borrowing Element) -> Void
+  ) -> T {
+    var borrowIterator = makeBorrowingIterator()
+    var result = initial
+    while true {
+      let span = borrowIterator.nextSpan(maximumCount: .max)
+      if span.isEmpty { break }
+      for i in span.indices {
+        nextPartialResult(&result, span[i])
+      }
+    }
+    return result
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: Copyable {
+  func collectViaBorrowing() -> [Element] {
+    var borrowIterator = makeBorrowingIterator()
+    var result: [Element] = []
+    while true {
+      let span = borrowIterator.nextSpan(maximumCount: .max)
+      if span.isEmpty { break }
+      for i in span.indices {
+        result.append(span[i])
+      }
+    }
+    return result
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+func elementsEqual<S1: BorrowingSequence, S2: BorrowingSequence>(
+  _ lhs: borrowing S1,
+  _ rhs: borrowing S2
+) -> Bool
+  where S1.Element: Equatable, S2.Element == S1.Element,
+        S1: ~Escapable & ~Copyable, S2: ~Escapable & ~Copyable
+{
+  var iter1 = lhs.makeBorrowingIterator()
+  var iter2 = rhs.makeBorrowingIterator()
+  while true {
+    var el1 = iter1.nextSpan(maximumCount: .max)
+
+    if el1.isEmpty {
+      // LHS is empty - sequences are equal iff RHS is also empty
+      let el2 = iter2.nextSpan(maximumCount: 1)
+      return el2.isEmpty
+    }
+
+    while el1.count > 0 {
+      let el2 = iter2.nextSpan(maximumCount: el1.count)
+      if el2.isEmpty { return false }
+      for i in 0..<el2.count {
+        if el1[i] != el2[i] { return false }
+      }
+      el1 = el1.extracting(droppingFirst: el2.count)
+    }
+  }
+}
+
+suite.test("BORROWING")
+.require(.stdlib_6_3).code {
+  guard #available(SwiftStdlib 6.3, *) else {
+    expectTrue(false)
+    return
+  }
+
+  let array = [1, 2, 3, 4, 5, 6, 7, 8]
+  let arrayCollected = array.collectViaBorrowing()
+  expectEqual(array, arrayCollected)
+  expectNotEqual([1, 2, 3, 4, 5, 6, 7, 8, 9], arrayCollected)
+  expectNotEqual([1, 2, 3, 4, 5, 6, 7], arrayCollected)
+
+  let span = array.span
+  let spanCollected = span.collectViaBorrowing()
+  expectTrue(elementsEqual(span, spanCollected))
+  expectEqual(array.reduce(0, +), span.reduce(0, +))
+  expectEqual(array.reduce(into: 0, +=), span.reduce(into: 0, +=))
+
+  let inline: [8 of Int] = [1, 2, 3, 4, 5, 6, 7, 8]
+  let inlineCollected = inline.collectViaBorrowing()
+  expectTrue(elementsEqual(inline, inlineCollected))
+  
+  
+}
