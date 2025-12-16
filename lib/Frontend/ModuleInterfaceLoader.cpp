@@ -1304,6 +1304,10 @@ ModuleInterfaceLoaderOptions::ModuleInterfaceLoaderOptions(
   }
 }
 
+ModuleInterfaceLoaderOptions &ModuleInterfaceLoader::getOptions() {
+  return InterfaceChecker.Opts;
+}
+
 bool ModuleInterfaceLoader::isCached(StringRef DepPath) {
   return InterfaceChecker.isCached(DepPath);
 }

@@ -558,6 +558,9 @@ public:
                                 IgnoreSwiftSourceInfoFile));
   }
 
+  /// Accessor used by LLDB.
+  ModuleInterfaceLoaderOptions &getOptions();
+
   /// Append visible module names to \p names. Note that names are possibly
   /// duplicated, and not guaranteed to be ordered in any way.
   void collectVisibleTopLevelModuleNames(
