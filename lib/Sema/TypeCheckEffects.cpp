@@ -4590,7 +4590,8 @@ private:
     if (S->getWhere())
       S->getWhere()->walk(*this);
 
-    S->getDesugaredStmt()->walk(*this);
+    if (S->getDesugaredStmt())
+      S->getDesugaredStmt()->walk(*this);
 
     auto classification = getApplyClassifier().classifyForEach(S);
 

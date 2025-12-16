@@ -1459,8 +1459,9 @@ void StmtEmitter::visitBreakStmt(BreakStmt *S) {
 void SILGenFunction::emitBreakOutOf(SILLocation loc, Stmt *target) {
   // Find the target JumpDest based on the target that sema filled into the
   // stmt.
-  if (isa<ForEachStmt>(target))
-    target = dyn_cast<ForEachStmt>(target)->getBreakTarget();
+  if (auto *forEachStmt = dyn_cast<ForEachStmt>(target))
+    if (auto *breakTarget = forEachStmt->getBreakTarget())
+      target = breakTarget;
   for (auto &elt : BreakContinueDestStack) {
     if (target == elt.Target) {
       Cleanups.emitBranchAndCleanups(elt.BreakDest, loc);
@@ -1474,8 +1475,9 @@ void StmtEmitter::visitContinueStmt(ContinueStmt *S) {
   assert(S->getTarget() && "Sema didn't fill in continue target?");
 
   auto* target = S->getTarget();
-  if (isa<ForEachStmt>(target))
-    target = dyn_cast<ForEachStmt>(target)->getContinueTarget();
+  if (auto *forEachStmt = dyn_cast<ForEachStmt>(target))
+    if (auto *continueTarget = forEachStmt->getContinueTarget())
+      target = continueTarget;
 
   // Find the target JumpDest based on the target that sema filled into the
   // stmt.

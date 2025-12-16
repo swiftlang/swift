@@ -140,7 +140,8 @@ namespace {
       if (auto *FES = dyn_cast<ForEachStmt>(S))
       {
         FES->setDeclContext(ParentDC);
-        FES->desugar();
+        if (!isa<PackExpansionExpr>(FES->getParsedSequence()))
+          FES->desugar();
       }
 
       return Action::Continue(S);
