@@ -18,57 +18,72 @@ The `@lifetime` annotation is enforced both in the body of the function and at e
 
 ## Default lifetimes
 
-The Swift 6.2 compiler provided default `@_lifetime` behavior whenever it can do so without ambiguity. Often, despite ambiguity, an "obvious" default exists, but we wanted to introduce defaults slowly after developers have enough experience to inform discussion about them. This document tracks the current state of the implementation as it progresses from the original 6.2 implementation. Corresponding tests are in `test/Sema/lifetime_depend_infer.swift`; searching for "DEFAULT:" highlights the rules defined below...
+The Swift 6.2 compiler provided default `@_lifetime` behavior whenever it can do so without ambiguity. Often, despite ambiguity, an obvious default exists, but we wanted to introduce defaults slowly after developers have enough experience to inform discussion about them. This document tracks the current state of the implementation as it progresses from the original 6.2 implementation. Corresponding tests are in `test/Sema/lifetime_depend_infer.swift`; searching for "DEFAULT:" highlights the rules defined below...
 
-### Single parameter default rule
+### Same-type default lifetime
 
-Given a function or method that returns a non-Escapable result:
+Given a function declaration:
 
-- Default to `@_lifetime(<scope> a)` for a `~Escapable` result on functions with a single parameter `a`.
+`func foo(..., a: A, ...) -> R { ... }`
 
-- Default to `@_lifetime(<scope> self)` for a `~Escapable` result on methods with no parameters.
+Where `R: ~Escapable`, `A == R`, and `a` is not an `inout` parameter, default to `@_lifetime(copy a)`.
+For non-mutating methods, the same rule applies to implicit `Self` parameter.
 
-| Type of parameter | default                        |
-| (`a` or `self`)   | lifetime dependency            |
-| ----------------- | ------------------------------ |
-| `Escapable`       | `@_lifetime(borrow param)`[^1] |
-| `inout Escapable` | `@_lifetime(&param)`[^1]       |
-| `~Escapable`      | none[^2]                       |
-
-[^1]: When the parameter is `BitwiseCopyable`, such as an integer or unsafe pointer, the single parameter default rule applies to function parameters but not to the implicit `self` parameter. Depending on a `BitwiseCopyable` value is a convenience for APIs that construct span-like values from an `UnsafePointer` passed as an argument. This creates a dependency on a local copy of the pointer variable with subtle semantics. User-defined `BitwiseCopyable` structs should generally avoid such subtle lifetime dependencies. If needed, the author of the data type should explicitly opt into them.
-
-[^2]: When the single parameter is also `~Escapable`, the result must depend on it, but the dependency may either be scoped (`borrow` or `&`) or it may be copied (`copy`). `copy` is the obvious choice when the parameter and result are the same type, but it is not always correct. Furthermore, a lifetime dependency can only be copied from a generic type when result as the same generic type. This case is therefore handled by same-type default lifetime (discussed below) rather than as a default `@_lifetime` rule.
-
-Examples:
+This handles the obvious cases in which both the parameter and result are `~Escapable`. For example:
 
 ```swift
-struct A: Escapable {
-  let obj: AnyObject // ~BitwiseCopyable
-}
-struct NE: ~Escapable {...}
-
-/* DEFAULT: @_lifetime(borrow a) */
-func oneParam_NEResult(a: A) -> NE
-
-/* DEFAULT: @_lifetime(&a) */
-func oneInoutParam_NEResult(a: inout A) -> NE
-
-extension A /* Self: Escapable */ {
-  /* DEFAULT: @_lifetime(borrow self) */
-  func noParam_NEResult() -> NE
-
-  /* DEFAULT: @_lifetime(&self) */
-  mutating func mutating_noParam_NEResult() -> NE
+extension Span {
+  /* DEFAULT: @_lifetime(copy self) */
+  func extracting(droppingLast k: Int) -> Self { ... }
 }
 ```
 
-### Implicit initializer and setter defaults
+#### Generic same-type default lifetime
 
-An implicit setter of a `~Escapable` stored property defaults to `@_lifetime(self: copy self, copy newValue)`. This is always correct because the setter simply assigns the stored property to the newValue. Assigning a `~Escapable` variable copies the lifetime dependency.
+The same-type default lifetime rule described above is convenient for nominal types but essential for generic type parameters.
 
-Similarly, an implicit initializer of a non-Escapable struct defaults to `@_lifetime(self: copy arg)` if all of the initializer arguments are `~Escapable`. This is equivalent to assigning each `~Escapable` stored property. If, however, any initializer arguments are `Escapable`, then no default lifetime is provided unless it is the sole argument, in which case the single parameter rule applies.
+Given a generic function declaration:
+
+`func foo<A, R>(..., a: A, ...) -> R { ... }`
+
+The same-type default lifetime rule applies to the types in the function declaration's generic context just as it did for nominal types in the previous example. So, again, if type resolution determines `R: ~Escapable` and `A == R`, then `@_lifetime(copy a)` will be default.
+
+Unlike nominal types, the programmer is not allowed to explicitly declare a lifetime dependency, `@_lifetime(copy
+a)`, unless the argument and result types are equivalent (`A == R`). Copying a lifetime dependency from one value to another requires that both values are non-Escapable. Generic types are conditionally non-Escapable (their lifetime dependencies are type-erased), so type equivalence is the only way to ensure that both values are non-Escapable under the same conditions.
+
+Here we see how same-type lifetime requirement applies to type substitution and associated types:
+
+```swift
+protocol P {
+  associatedtype T: ~Escapable
+}
+
+protocol Q {
+  associatedtype U: ~Escapable
+}
+
+struct S<A: P, B: Q> {
+  /* OK: @_lifetime(copy a) is valid and default */
+  func foo(a: A.T) -> B.U where A.T == B.U
+}
+```
+
+Note that lifetime dependencies are resolved at function declaration time, which determines the function's type. The generic context at the point of function invocation is not considered. For example, the following declaration of `foo` is invalid, because it's argument and results types don't match at the point of declaration, even though the argument and result do have the same type when invoked inside `bar`:
+
+```swift
+struct S<T: ~Escapable, U: ~Escapable> {
+  static func foo(a: T) -> U // ERROR: missing lifetime dependency
+}
+
+/* OK: @_lifetime(copy a) is valid and default */
+func bar<T: ~Escapable>(a: T) -> T {
+  S<T, T>.foo(a: a) // The same-type rule is satisfied in this context, but 'foo's declaration is invalid.
+}
+```
 
 ### `inout` parameter default rule
+
+The following `inout` parameter default rule directly follows from the general same-type default rule above. We descrive it as a separate rule here only because the behavior is important and would otherwise be nonobvious:
 
 - Default to `@_lifetime(a: copy a)` for all `inout` parameters where `a` is  `~Escapable`.
 
@@ -122,63 +137,50 @@ extension NE /* Self: ~Escapable */ {
 }
 ```
 
-## Same-type default lifetime (unimplemented)
+### Single parameter default rule
 
-Given a function declaration:
+Given a function or method that returns a non-Escapable result, if that result's dependency does not have a same-type default:
 
-`func foo(..., a: A, ...) -> R { ... }`
+- Default to `@_lifetime(<scope> a)` for a `~Escapable` result on functions with a single parameter `a`.
 
-Where `R: ~Escapable` and `A == R`, default to `@_lifetime(copy a)`.
-For methods, the same rule applies to implicit `Self` parameter.
+- Default to `@_lifetime(<scope> self)` for a `~Escapable` result on methods with no parameters.
 
-This handles the obvious cases in which both the parameter and result are `~Escapable`. For example:
+| Type of parameter | default                        |
+| (`a` or `self`)   | lifetime dependency            |
+| ----------------- | ------------------------------ |
+| `Escapable`       | `@_lifetime(borrow param)`[^1] |
+| `inout Escapable` | `@_lifetime(&param)`[^1]       |
+| `~Escapable`      | none[^2]                       |
+
+[^1]: When the parameter is `BitwiseCopyable`, such as an integer or unsafe pointer, the single parameter default rule applies to function parameters but not to the implicit `self` parameter. Depending on a `BitwiseCopyable` value is a convenience for APIs that construct span-like values from an `UnsafePointer` passed as an argument. This creates a dependency on a local copy of the pointer variable with subtle semantics. User-defined `BitwiseCopyable` structs should generally avoid such subtle lifetime dependencies. If needed, the author of the data type should explicitly opt into them.
+
+[^2]: When the single parameter is also `~Escapable`, the result must depend on it, but the dependency may either be scoped (`borrow` or `&`) or it may be copied (`copy`). `copy` is the obvious choice when the parameter and result are the same type, but it is not always correct. Furthermore, a lifetime dependency can only be copied from a generic type when result as the same generic type. This case is therefore handled by same-type default lifetime (discussed below) rather than as a default `@_lifetime` rule.
+
+Examples:
 
 ```swift
-extension Span {
-  /* DEFAULT: @_lifetime(copy self) */
-  func extracting(droppingLast k: Int) -> Self { ... }
+struct A: Escapable {
+  let obj: AnyObject // ~BitwiseCopyable
+}
+struct NE: ~Escapable {...}
+
+/* DEFAULT: @_lifetime(borrow a) */
+func oneParam_NEResult(a: A) -> NE
+
+/* DEFAULT: @_lifetime(&a) */
+func oneInoutParam_NEResult(a: inout A) -> NE
+
+extension A /* Self: Escapable */ {
+  /* DEFAULT: @_lifetime(borrow self) */
+  func noParam_NEResult() -> NE
+
+  /* DEFAULT: @_lifetime(&self) */
+  mutating func mutating_noParam_NEResult() -> NE
 }
 ```
 
-### Generic same-type default lifetime (unimplemented)
+### Implicit initializer and setter defaults
 
-The same-type default lifetime rule described above is convenient for nominal types but essential for generic type parameters.
+An implicit setter of a `~Escapable` stored property defaults to `@_lifetime(self: copy self, copy newValue)`. This is always correct because the setter simply assigns the stored property to the newValue. Assigning a `~Escapable` variable copies the lifetime dependency.
 
-Given a generic function declaration:
-
-`func foo<A, R>(..., a: A, ...) -> R { ... }`
-
-The same-type default lifetime rule applies to the types in the function declaration's generic context just as it did for nominal types in the previous example. So, again, if type resolution determines `R: ~Escapable` and `A == R`, then `@_lifetime(copy a)` will be default.
-
-Unlike nominal types, the programmer is not allowed to explicitly declare a lifetime dependency, `@_lifetime(copy
-a)`, unless the argument and result types are equivalent (`A == R`). Copying a lifetime dependency from one value to another requires that both values are non-Escapable. Generic types are conditionally non-Escapable (their lifetime dependencies are type-erased), so type equivalence is the only way to ensure that both values are non-Escapable under the same conditions.
-
-Here we see how same-type lifetime requirement applies to type substitution and associated types:
-
-```swift
-protocol P {
-  associatedtype T: ~Escapable
-}
-
-protocol Q {
-  associatedtype U: ~Escapable
-}
-
-struct S<A: P, B: Q> {
-  /* OK: @_lifetime(copy a) is valid and default */
-  func foo(a: A.T) -> B.U where A.T == B.U
-}
-```
-
-Note that lifetime dependencies are resolved at function declaration time, which determines the function's type. The generic context at the point of function invocation is not considered. For example, the following declaration of `foo` is invalid, because it's argument and results types don't match at the point of declaraion, even though the argument and result do have the same type when invoked inside `bar`:
-
-```swift
-struct S<T: ~Escapable, U: ~Escapable> {
-  static func foo(a: T) -> U // ERROR: missing lifetime dependency
-}
-
-/* OK: @_lifetime(copy a) is valid and default */
-func bar<T: ~Escapable>(a: T) -> T {
-  S<T, T>.foo(a: a) // The same-type rule is satisfied in this context, but 'foo's declaration is invalid.
-}
-```
+Similarly, an implicit initializer of a non-Escapable struct defaults to `@_lifetime(self: copy arg)` if all of the initializer arguments are `~Escapable`. This is equivalent to assigning each `~Escapable` stored property. If, however, any initializer arguments are `Escapable`, then no default lifetime is provided unless it is the sole argument, in which case the single parameter rule applies.
