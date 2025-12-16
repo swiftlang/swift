@@ -3093,7 +3093,7 @@ for host in "${ALL_HOSTS[@]}"; do
             printJSONStartTimestamp dsymutil
             (cd "${host_symroot}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -not -name "*.a" -not -name "*.py" -print | \
-               xargs -t -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path} --verify-dwarf none ${EXTRA_DSYMUTIL_ARGS[@]})
+               xargs -t -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path} --verify-dwarf=none ${EXTRA_DSYMUTIL_ARGS[@]})
             printJSONEndTimestamp dsymutil
 
             # Strip executables, shared libraries and static libraries in
