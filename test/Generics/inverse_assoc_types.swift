@@ -156,10 +156,8 @@ protocol Veggie<A> {
 }
 protocol Carrot: Veggie
   where Self.NeedsCopyable: ~Copyable {} // expected-error {{'Self.NeedsCopyable' required to be 'Copyable' but is marked with '~Copyable'}}
-  // expected-error @-1{{cannot suppress '~Copyable' on generic parameter 'Self.NeedsCopyable' defined in outer scope}}
 
 protocol CarrotCake: Carrot where Self.A: ~Copyable {} // expected-error {{'Self.A' required to be 'Copyable' but is marked with '~Copyable'}}
-// expected-error @-1{{cannot suppress '~Copyable' on generic parameter 'Self.A' defined in outer scope}}
 
 func ex1<Cucumber: ~Copyable, Potato>(_ nc: any Veggie<Cucumber>, c: any Veggie<Potato>) {
   reqC(nc.a()) // expected-error {{global function 'reqC' requires that 'Cucumber' conform to 'Copyable'}}
@@ -171,8 +169,6 @@ protocol Bird {
 }
 
 protocol Eagle: Bird where Self.Song: ~Copyable {}// expected-error {{'Self.Song' required to be 'Copyable' but is marked with '~Copyable'}}
-// expected-error @-1{{cannot suppress '~Copyable' on generic parameter 'Self.Song' defined in outer scope}}
-
 
 protocol Pushable<Element> {
   associatedtype Element: ~Copyable
