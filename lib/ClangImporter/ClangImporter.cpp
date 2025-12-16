@@ -788,8 +788,12 @@ void importer::getNormalInvocationArguments(
 
   // Enable API notes alongside headers/in frameworks.
   invocationArgStrs.push_back("-fapinotes-modules");
-  invocationArgStrs.push_back("-fapinotes-swift-version=" +
-                              languageVersion.asAPINotesVersionString());
+  if (importerOpts.LoadVersionIndependentAPINotes)
+    invocationArgStrs.insert(invocationArgStrs.end(),
+                             {"-fswift-version-independent-apinotes"});
+  else
+    invocationArgStrs.push_back("-fapinotes-swift-version=" +
+                                languageVersion.asAPINotesVersionString());
 
   // Prefer `-sdk` paths.
   if (!searchPathOpts.getSDKPath().empty()) {
@@ -808,10 +812,6 @@ void importer::getNormalInvocationArguments(
     invocationArgStrs.push_back("-iapinotes-modules");
     invocationArgStrs.push_back(path.str().str());
   }
-
-  if (importerOpts.LoadVersionIndependentAPINotes)
-    invocationArgStrs.insert(invocationArgStrs.end(),
-                             {"-fswift-version-independent-apinotes"});
 }
 
 static void
@@ -2546,7 +2546,8 @@ ClangImporter::getWrapperForModule(const clang::Module *mod,
 }
 
 PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
-    : platformKind(targetPlatform(langOpts)) {
+    : platformKind(targetPlatform(langOpts)),
+      currentVersion(ImportNameVersion::fromOptions(langOpts)) {
   switch (platformKind) {
   case PlatformKind::iOS:
   case PlatformKind::iOSApplicationExtension:
@@ -2685,10 +2686,10 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::macOSApplicationExtension:
     // Anything deprecated by macOS 10.14 is unavailable for async import
     // in Swift.
-    if (isAsync && !clangDecl->hasAttr<clang::SwiftAsyncAttr>()) {
+    if (isAsync && !swift::importer::hasSwiftAttr<clang::SwiftAsyncAttr>(
+                       clangDecl, currentVersion))
       return major < 10 ||
           (major == 10 && (!minor.has_value() || minor.value() <= 14));
-    }
 
     // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
     return major < 10 ||
@@ -2700,7 +2701,8 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::tvOSApplicationExtension:
     // Anything deprecated by iOS 12 is unavailable for async import
     // in Swift.
-    if (isAsync && !clangDecl->hasAttr<clang::SwiftAsyncAttr>()) {
+    if (isAsync && !swift::importer::hasSwiftAttr<clang::SwiftAsyncAttr>(
+                       clangDecl, currentVersion)) {
       return major <= 12;
     }
 
@@ -2716,7 +2718,8 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::watchOSApplicationExtension:
     // Anything deprecated by watchOS 5.0 is unavailable for async import
     // in Swift.
-    if (isAsync && !clangDecl->hasAttr<clang::SwiftAsyncAttr>()) {
+    if (isAsync && !swift::importer::hasSwiftAttr<clang::SwiftAsyncAttr>(
+                       clangDecl, currentVersion)) {
       return major <= 5;
     }
 
@@ -3144,7 +3147,8 @@ isPotentiallyConflictingSetter(const clang::ObjCProtocolDecl *proto,
   return false;
 }
 
-bool importer::shouldSuppressDeclImport(const clang::Decl *decl) {
+bool importer::shouldSuppressDeclImport(const clang::Decl *decl,
+                                        ImportNameVersion importVersion) {
   if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(decl)) {
     // First check if we're actually in a Swift class.
     auto dc = decl->getDeclContext();
@@ -3161,7 +3165,8 @@ bool importer::shouldSuppressDeclImport(const clang::Decl *decl) {
       // Suppress the import of this method when the corresponding
       // property is not suppressed.
       return !shouldSuppressDeclImport(
-               objcMethod->findPropertyDecl(/*CheckOverrides=*/false));
+               objcMethod->findPropertyDecl(/*CheckOverrides=*/false),
+               importVersion);
     }
 
     // If the method was declared within a protocol, check that it
@@ -3180,7 +3185,7 @@ bool importer::shouldSuppressDeclImport(const clang::Decl *decl) {
       return true;
 
     // Suppress certain properties; import them as getter/setter pairs instead.
-    if (shouldImportPropertyAsAccessors(objcProperty))
+    if (shouldImportPropertyAsAccessors(objcProperty, importVersion))
       return true;
 
     // Check whether there is a superclass method for the getter that
@@ -3201,7 +3206,8 @@ bool importer::shouldSuppressDeclImport(const clang::Decl *decl) {
         auto getterMethod =
             objcSuperclass->lookupMethod(objcProperty->getGetterName(),
                                          objcProperty->isInstanceProperty());
-        if (getterMethod && !shouldSuppressDeclImport(getterMethod))
+        if (getterMethod && !shouldSuppressDeclImport(getterMethod,
+                                                      importVersion))
           return true;
       }
     }
@@ -4210,7 +4216,7 @@ void ClangModuleUnit::lookupObjCMethods(
     auto owningClangModule = getClangTopLevelOwningModule(objcMethod, clangCtx);
     if (owningClangModule != clangModule) continue;
 
-    if (shouldSuppressDeclImport(objcMethod))
+    if (shouldSuppressDeclImport(objcMethod, owner.CurrentVersion))
       continue;
 
     // If we found a property accessor, import the property.
