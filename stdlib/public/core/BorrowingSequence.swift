@@ -182,3 +182,18 @@ extension RawSpan: BorrowingSequence {
   }
 }
 
+@available(SwiftStdlib 6.3, *)
+extension Array: BorrowingSequence {
+  @lifetime(borrow self)
+  public func makeBorrowingIterator() -> Span<Element> {
+    self.span
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension InlineArray: BorrowingSequence {
+  @lifetime(borrow self)
+  public func makeBorrowingIterator() -> Span<Element> {
+    self.span
+  }
+}
