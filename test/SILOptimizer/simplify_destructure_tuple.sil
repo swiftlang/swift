@@ -153,3 +153,16 @@ bb0(%0 : $(Int, Int)):
   return %3
 }
 
+// CHECK-LABEL: sil [ossa] @guaranteed_to_tuple_extract :
+// CHECK:         %1 = tuple_extract %0 : $(String, Int), 0
+// CHECK:         %2 = tuple_extract %0 : $(String, Int), 1
+// CHECK:       } // end sil function 'guaranteed_to_tuple_extract'
+sil [ossa] @guaranteed_to_tuple_extract : $@convention(thin) (@guaranteed (String, Int)) -> () {
+bb0(%0 : @guaranteed $(String, Int)):
+  (%1, %2) = destructure_tuple %0
+  fix_lifetime %1
+  fix_lifetime %2
+  %r = tuple ()
+  return %r
+}
+
