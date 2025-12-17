@@ -4,7 +4,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-import MemberVariables
+import MemberVariablesNoDiagnostics
 
 var FieldsTestSuite = TestSuite("Generating code with zero sized fields")
 
