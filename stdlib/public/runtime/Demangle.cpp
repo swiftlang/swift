@@ -1042,6 +1042,11 @@ char *swift_demangle(const char *mangledName,
 
 namespace swift {
   namespace runtime {
+
+    static bool isUTF8CodePointContinuationByte(unsigned char byte) {
+      return (byte & 0b11000000) == 0b10000000;
+    }
+
     // Demangle entry point for backtrace and public demangle() Swift API.
     SWIFT_RUNTIME_STDLIB_SPI char *
     _swift_runtime_demangle(const char *mangledName,
@@ -1082,6 +1087,7 @@ namespace swift {
         }
 
         if (outputBuffer == nullptr) {
+          // we allocate the buffer for the result; truncation cannot happen in this case.
           auto totalLength = shouldNullTerminateString ? (result.length() + 1) : result.length();
           outputBuffer = (char *)::malloc(totalLength);
           bufferSize = result.length();
@@ -1091,6 +1097,16 @@ namespace swift {
           shouldNullTerminateString ? (bufferSize - 1) : bufferSize, 
           shouldNullTerminateString ? (result.length() - 1) : result.length()
         );
+
+        // Are we accidentally cutting of an UTF8 codepoint in the middle?
+        // there may be up to 4 continuations of a codepoint so we need to see if we're cutting off in the middle,
+        // and if so, back out until we find the actual non-continuation byte.
+        while (toCopy > 0 && isUTF8CodePointContinuationByte(result.data()[toCopy])) {
+          // we're in the middle of an utf8 scalar, and would overwrite it with a null terminator resulting in a truncated UTF8-scalar.
+          // don't do that, and instead truncate further back
+          toCopy -= 1;
+        }
+
         ::memcpy(outputBuffer, result.data(), toCopy);
         if (shouldNullTerminateString) {
           outputBuffer[toCopy] = '\0';
@@ -1108,4 +1124,3 @@ namespace swift {
     }
   } // namespace runtime
 } // namespace swift
-
