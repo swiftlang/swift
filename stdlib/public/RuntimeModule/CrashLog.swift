@@ -122,6 +122,13 @@ public struct CrashLog<Address: FixedWidthInteger>: Codable {
     }
 
     public struct Thread: Codable {
+        enum CodingKeys: String, CodingKey {
+            case name
+            case crashed
+            case registers
+            case frames
+        }
+
         public var name: String?
         public var crashed: Bool
         public var registers: [String:String]?
@@ -133,6 +140,14 @@ public struct CrashLog<Address: FixedWidthInteger>: Codable {
             self.crashed = crashed
             self.registers = registers
             self.frames = frames
+        }
+
+        public init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            name = try values.decodeIfPresent(String.self, forKey: .name)
+            crashed = try values.decodeIfPresent(Bool.self, forKey: .crashed) ?? false
+            registers = try values.decodeIfPresent([String:String].self, forKey: .registers)
+            frames = try values.decode([Frame].self, forKey: .frames)
         }
     }
 
@@ -412,13 +427,19 @@ extension CrashLog {
         }
     }
 
-    public mutating func symbolicate(allThreads: Bool = false) {
+    public mutating func symbolicate(
+        allThreads: Bool = false,
+        options: Backtrace.SymbolicationOptions = .default) {
+
         let images = imageMap()
 
         func symbolicateThread(_ thread: CrashLog.Thread) -> CrashLog.Thread {
             var thread = thread
             let backtrace: Backtrace = thread.backtrace(architecture: architecture, images: images)
-            if let symbolicatedBacktrace = backtrace.symbolicated(with: images) {
+
+            if let symbolicatedBacktrace = backtrace.symbolicated(
+                with: images, options: options) {
+
                 thread.updateWithBacktrace(symbolicatedBacktrace: symbolicatedBacktrace)
             }
             return thread
