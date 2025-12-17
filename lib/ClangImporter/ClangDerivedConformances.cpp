@@ -72,8 +72,7 @@ lookupCxxTypeMember(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
                                clang::SourceLocation(),
                                clang::Sema::LookupMemberName);
   R.suppressDiagnostics();
-  auto *Ctx = static_cast<const clang::DeclContext *>(Rec);
-  Sema.LookupQualifiedName(R, const_cast<clang::DeclContext *>(Ctx));
+  Sema.LookupQualifiedName(R, const_cast<clang::CXXRecordDecl *>(Rec));
 
   if (auto *td = R.getAsSingle<clang::TypeDecl>()) {
     if (auto *paths = R.getBasePaths();
@@ -1014,8 +1013,8 @@ static void conformToCxxSet(ClangImporter::Implementation &impl,
         clangSema, &clangSema.PP.getIdentifierTable().get("insert"),
         clang::SourceLocation(), clang::Sema::LookupMemberName);
     R.suppressDiagnostics();
-    auto *Ctx = static_cast<const clang::DeclContext *>(clangDecl);
-    clangSema.LookupQualifiedName(R, const_cast<clang::DeclContext *>(Ctx));
+    clangSema.LookupQualifiedName(
+        R, const_cast<clang::CXXRecordDecl *>(clangDecl));
     switch (R.getResultKind()) {
     case clang::LookupResultKind::Found:
     case clang::LookupResultKind::FoundOverloaded:
@@ -1152,8 +1151,8 @@ static void conformToCxxDictionary(ClangImporter::Implementation &impl,
         clangSema, &clangSema.PP.getIdentifierTable().get("insert"),
         clang::SourceLocation(), clang::Sema::LookupMemberName);
     R.suppressDiagnostics();
-    auto *Ctx = static_cast<const clang::DeclContext *>(clangDecl);
-    clangSema.LookupQualifiedName(R, const_cast<clang::DeclContext *>(Ctx));
+    clangSema.LookupQualifiedName(
+        R, const_cast<clang::CXXRecordDecl *>(clangDecl));
     switch (R.getResultKind()) {
     case clang::LookupResultKind::Found:
     case clang::LookupResultKind::FoundOverloaded:
