@@ -260,17 +260,10 @@ extension ${Self}: LosslessStringConvertible {
     // Always fail on 16-bit targets
     return nil
   #else
+    var mutableText = text
     let parsed: ${Self}?
-    if text.base._guts.isFastUTF8 {
-      parsed = unsafe text.base._guts.withFastUTF8 { chars -> ${Self}? in
-        unsafe parse_float${bits}(chars.span.extracting(text._offsetRange))
-      }
-    } else {
-      // Otherwise, make a copy so we have contiguous UTF8...
-      let string = String(text)
-      parsed = unsafe string._guts.withFastUTF8 { chars -> ${Self}? in
-        unsafe parse_float${bits}(chars.span)
-      }
+    parsed = mutableText.withUTF8 { chars -> ${Self}? in
+      unsafe parse_float${bits}(chars.span)
     }
 
     if let parsed {

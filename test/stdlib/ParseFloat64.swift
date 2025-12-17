@@ -9,6 +9,7 @@
 // REQUIRES: swift_feature_Extern
 
 import StdlibUnittest
+import Foundation
 
 let tests = TestSuite("FloatingPointParsing")
 
@@ -329,6 +330,28 @@ tests.test("Substring") {
   let s1 = "1.02.03.0"
   let s1sub = s1[s1.firstIndex(of: "2")!..<s1.firstIndex(of: "3")!]
   let parsed = Float64(s1sub)
+  expectNotNil(parsed)
+  expectEqual(parsed!.bitPattern, (2.0).bitPattern)
+}
+
+tests.test("Bridged - short") {
+  let s1 = "1.02.03.0"
+  let nss1 = NSString(utf8String: s1)!
+  let bridged = String(nss1)
+  let range = bridged.firstIndex(of: "2")!..<bridged.firstIndex(of: "3")!
+  let sub = bridged[range]
+  let parsed = Float64(sub)
+  expectNotNil(parsed)
+  expectEqual(parsed!.bitPattern, (2.0).bitPattern)
+}
+
+tests.test("Bridged - long") {
+  let s1 = "1.02.0000000000000000000000000000000000000000000000000000000000003.04.05.06.07.08.09.010.011.012.013.014.015.0"
+  let nss1 = NSString(utf8String: s1)!
+  let bridged = String(nss1)
+  let range = bridged.firstIndex(of: "2")!..<bridged.firstIndex(of: "3")!
+  let sub = bridged[range]
+  let parsed = Float64(sub)
   expectNotNil(parsed)
   expectEqual(parsed!.bitPattern, (2.0).bitPattern)
 }
