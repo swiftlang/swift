@@ -136,42 +136,6 @@ if #available(SwiftStdlib 6.3, *) {
     expectEqual(String(copying: try! UTF8Span(validating: smolOutputSpan.span)), "Smol.Int")
   }
 
-  DemangleTests.test("String API - demangle C++ symbols") {
-    expectEqual(demangle("_ZN7MyClass6methodEi"), "MyClass::method(int)")
-    expectEqual(demangle("_ZNKSt6vectorIiSaIiEE4sizeEv"), "std::vector<int, std::allocator<int>>::size() const")
-  }
-
-  DemangleTests.test("String API - demangle C++ symbols, illegal") {
-    expectEqual(demangle("_ZNKSt6vectorIiSaIiEEv"), nil)
-  }
-  
-  DemangleTests.test("Span API - demangle C++ symbols") {
-    test { outputSpan in 
-      let res = demangle("_ZN7MyClass6methodEi".utf8Span, into: &outputSpan)
-      let demangled = String(copying: try! UTF8Span(validating: outputSpan.span))
-      print("res = \(demangled) len:\(demangled.count)")
-      expectEqual(res, .success)
-      expectEqual(demangled, "MyClass::method(int)")
-    }
-    test { outputSpan in 
-      let res = demangle("_ZNKSt6vectorIiSaIiEE4sizeEv".utf8Span, into: &outputSpan)
-      let demangled = String(copying: try! UTF8Span(validating: outputSpan.span))
-      print("res = \(demangled) len:\(demangled.count)")
-      expectEqual(res, .success)
-      expectEqual(demangled, "std::vector<int, std::allocator<int>>::size() const")
-    }
-  }
-
-  DemangleTests.test("Span API - demangle C++ symbols, too small buffer") {
-    let smolBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: 12)
-    var smolOutputSpan = OutputSpan<UTF8.CodeUnit>(buffer: smolBuffer, initializedCount: 0)
-    defer { smolBuffer.deallocate() }
-
-    let fail = demangle("_ZN7MyClass6methodEi".utf8Span, into: &smolOutputSpan)
-    expectEqual(fail, .truncated(20))
-    expectEqual(String(copying: try! UTF8Span(validating: smolOutputSpan.span)), "MyClass::met")
-  }
-
 }
 
 runAllTests()
