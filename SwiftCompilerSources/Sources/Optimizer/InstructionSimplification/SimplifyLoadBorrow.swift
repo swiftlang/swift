@@ -36,7 +36,7 @@ extension LoadBorrowInst : Simplifiable, SILCombineSimplifiable {
   }
 
   private func tryCombineWithCopy(_ context: SimplifyContext) {
-    let forwardedValue = lookThroughSingleForwardingUses()
+    let forwardedValue = lookThroughOwnedConvertibaleForwardingChain()
     guard let singleUser = forwardedValue.uses.ignore(usersOfType: EndBorrowInst.self).singleUse?.instruction,
           let copy = singleUser as? CopyValueInst,
           copy.parentBlock == self.parentBlock else {

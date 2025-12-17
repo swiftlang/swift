@@ -29,7 +29,7 @@ extension BeginBorrowInst : OnoneSimplifiable, SILCombineSimplifiable {
 
 private func tryReplaceBorrowWithOwnedOperand(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) {
   // The last value of a (potentially empty) forwarding chain, beginning at the `begin_borrow`.
-  let forwardedValue = beginBorrow.lookThroughSingleForwardingUses()
+  let forwardedValue = beginBorrow.lookThroughOwnedConvertibaleForwardingChain()
   if forwardedValue.allUsesCanBeConvertedToOwned {
     if tryReplaceCopy(of: forwardedValue, withCopiedOperandOf: beginBorrow, context) {
       return
@@ -106,7 +106,8 @@ private func convertAllUsesToOwned(of beginBorrow: BeginBorrowInst, _ context: S
 }
 
 extension Value {
-  /// Returns the last value of a (potentially empty) forwarding chain.
+  /// Returns the last value of a (potentially empty) forwarding chain where all operands can be
+  /// converted to "owned" ownership.
   /// For example, returns %3 for the following def-use chain:
   /// ```
   ///   %1 = struct_extract %self, #someField
@@ -114,14 +115,14 @@ extension Value {
   ///   %3 = struct $S(%2)   // %3 has no forwarding users
   /// ```
   /// Returns self if this value has no uses which are ForwardingInstructions.
-  func lookThroughSingleForwardingUses() -> Value {
+  func lookThroughOwnedConvertibaleForwardingChain() -> Value {
     if let singleUse = uses.ignore(usersOfType: EndBorrowInst.self).singleUse,
        let fwdInst = singleUse.instruction as? (SingleValueInstruction & ForwardingInstruction),
        fwdInst.canConvertToOwned,
        fwdInst.isSingleForwardedOperand(singleUse),
        fwdInst.parentBlock == parentBlock
     {
-      return fwdInst.lookThroughSingleForwardingUses()
+      return fwdInst.lookThroughOwnedConvertibaleForwardingChain()
     }
     return self
   }
@@ -173,10 +174,10 @@ private extension ForwardingInstruction {
 
 /// Replaces a guaranteed value with an owned value.
 ///
-/// If the `guaranteedValue`'s use is a ForwardingInstruction (or forwarding instruction chain),
+/// If the `value`'s use is a ForwardingInstruction (or forwarding instruction chain),
 /// it is converted to an owned version of the forwarding instruction (or instruction chain).
 ///
-/// Returns the last owned value in a forwarding-chain or `ownedValue` if `guaranteedValue` has
+/// Returns the last owned value in a forwarding-chain or `ownedValue` if `value` has
 /// no forwarding uses.
 func replaceGuaranteed(value: Value, withOwnedValue ownedValue: Value, _ context: SimplifyContext) -> Value {
   var result = ownedValue
