@@ -116,7 +116,7 @@ extension Value {
   /// ```
   /// Returns self if this value has no uses which are ForwardingInstructions.
   func lookThroughOwnedConvertibaleForwardingChain() -> Value {
-    if let singleUse = uses.ignore(usersOfType: EndBorrowInst.self).ignoreDebugUses.singleUse,
+    if let singleUse = uses.ignore(usersOfType: EndBorrowInst.self).ignoreDebugUses.ignoreTypeDependence.singleUse,
        let fwdInst = singleUse.instruction as? (SingleValueInstruction & ForwardingInstruction),
        fwdInst.canConvertToOwned,
        fwdInst.isSingleForwardedOperand(singleUse),

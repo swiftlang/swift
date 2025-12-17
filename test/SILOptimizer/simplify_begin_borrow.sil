@@ -488,3 +488,20 @@ bb1(%7 : @reborrow $@callee_guaranteed () -> ()):
   return %r
 }
 
+// CHECK-LABEL: sil [ossa] @convert_to_owned_ignoring_type_dependent_operands :
+// CHECK-NOT:     begin_borrow
+// CHECK-LABEL: } // end sil function 'convert_to_owned_ignoring_type_dependent_operands'
+sil [ossa] @convert_to_owned_ignoring_type_dependent_operands : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %1 = begin_borrow %0
+  %2 = open_existential_ref %1 to $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self
+  %3 = metatype $@thick (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398", AnyObject) Self).Type
+  fix_lifetime %3
+  %4 = unchecked_ref_cast %2 to $B
+  %5 = apply undef(%4) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %1
+  destroy_value %0
+  %6 = tuple ()
+  return %6 : $()
+}
+
