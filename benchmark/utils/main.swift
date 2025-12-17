@@ -78,6 +78,7 @@ import DictionaryBridgeToObjC
 import DictionaryCompactMapValues
 import DictionaryCopy
 import DictionaryGroup
+import DictionaryIdentical
 import DictionaryKeysContains
 import DictionaryLiteralTest
 import DictionaryOfAnyHashableStrings
@@ -182,6 +183,7 @@ import RomanNumbers
 import SIMDRandomMask
 import SIMDReduceInteger
 import SequenceAlgos
+import SetIdentical
 import SetTests
 import SevenBoom
 import Sim2DArray
@@ -283,6 +285,7 @@ register(DictionaryBridgeToObjC.benchmarks)
 register(DictionaryCompactMapValues.benchmarks)
 register(DictionaryCopy.benchmarks)
 register(DictionaryGroup.benchmarks)
+register(DictionaryIdentical.benchmarks)
 register(DictionaryKeysContains.benchmarks)
 register(DictionaryLiteralTest.benchmarks)
 register(DictionaryOfAnyHashableStrings.benchmarks)
@@ -388,6 +391,7 @@ register(RomanNumbers.benchmarks)
 register(SIMDRandomMask.benchmarks)
 register(SIMDReduceInteger.benchmarks)
 register(SequenceAlgos.benchmarks)
+register(SetIdentical.benchmarks)
 register(SetTests.benchmarks)
 register(SevenBoom.benchmarks)
 register(Sim2DArray.benchmarks)

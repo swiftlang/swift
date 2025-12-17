@@ -83,6 +83,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryCompactMapValues
     single-source/DictionaryCopy
     single-source/DictionaryGroup
+    single-source/DictionaryIdentical
     single-source/DictionaryKeysContains
     single-source/DictionaryLiteralTest
     single-source/DictionaryOfAnyHashableStrings
@@ -178,6 +179,7 @@ set(SWIFT_BENCH_MODULES
     # Disabled while layout prespecializations are experimental
     #single-source/SimpleArraySpecialization
     single-source/SequenceAlgos
+    single-source/SetIdentical
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray
