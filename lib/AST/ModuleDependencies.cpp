@@ -717,18 +717,6 @@ ModuleDependenciesCache::findDependency(
   auto known = map.find(moduleName);
   if (known != map.end())
     optionalDep = &(known->second);
-
-  // During a scan, only produce the cached source module info for the current
-  // module under scan.
-  if (optionalDep.has_value()) {
-    auto dep = optionalDep.value();
-    if (dep->getAsSwiftSourceModule() &&
-        moduleName != mainScanModuleName &&
-        moduleName != "MainModuleCrossImportOverlays") {
-      return std::nullopt;
-    }
-  }
-
   return optionalDep;
 }
 
