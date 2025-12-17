@@ -1176,10 +1176,10 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
     backtracer_argv[16] = "preset";
     break;
   case ThreadsToShow::All:
-    backtracer_argv[16] = "all";
+    backtracer_argv[16] = "true";
     break;
   case ThreadsToShow::Crashed:
-    backtracer_argv[16] = "crashed";
+    backtracer_argv[16] = "false";
     break;
   }
 
