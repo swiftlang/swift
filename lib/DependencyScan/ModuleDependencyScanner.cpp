@@ -196,14 +196,15 @@ static std::vector<std::string> inputSpecificClangScannerCommand(
 static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
 getClangScanningFS(std::shared_ptr<llvm::cas::ObjectStore> cas,
                    ASTContext &ctx) {
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFileSystem =
-      llvm::vfs::createPhysicalFileSystem();
-  ClangInvocationFileMapping fileMapping =
-    applyClangInvocationMapping(ctx, nullptr, baseFileSystem, false);
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  // Dependency scanner needs to create its own file system per worker.
+  auto fs = ClangImporter::computeClangImporterFileSystem(
+      ctx, importer->getClangFileMapping(),
+      llvm::vfs::createPhysicalFileSystem(), true);
 
   if (cas)
-    return llvm::cas::createCASProvidingFileSystem(cas, baseFileSystem);
-  return baseFileSystem;
+    return llvm::cas::createCASProvidingFileSystem(cas, fs);
+  return fs;
 }
 
 ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
@@ -2038,10 +2039,16 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
   invocation.getMutCASOpts() = clang::CASOptions();
   invocation.getMutFrontendOpts().CASIncludeTreeID.clear();
 
-  // FIXME: workaround for rdar://105684525: find the -ivfsoverlay option
-  // from clang scanner and pass to swift.
   if (!ScanASTContext.CASOpts.EnableCaching) {
     auto &overlayFiles = invocation.getMutHeaderSearchOpts().VFSOverlayFiles;
+
+    // clang system overlay file is a virtual file that is not an actual file.
+    auto clangSystemOverlayFile =
+        ClangImporter::getClangSystemOverlayFile(ScanASTContext.SearchPathOpts);
+    llvm::erase(overlayFiles, clangSystemOverlayFile);
+
+    // FIXME: workaround for rdar://105684525: find the -ivfsoverlay option
+    // from clang scanner and pass to swift.
     for (auto overlay : overlayFiles) {
       swiftArgs.push_back("-vfsoverlay");
       swiftArgs.push_back(overlay);
