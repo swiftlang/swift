@@ -136,6 +136,35 @@ if #available(SwiftStdlib 6.3, *) {
     expectEqual(String(copying: try! UTF8Span(validating: smolOutputSpan.span)), "Smol.Int")
   }
 
+  DemangleTests.test("Span API - don't cut off an UTF8 codepoint in the middle (length 3)") {
+    let smolBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: 3)
+    var smolOutputSpan = OutputSpan<UTF8.CodeUnit>(buffer: smolBuffer, initializedCount: 0)
+    defer { smolBuffer.deallocate() }
+
+    // Test nil return on successful demangle.
+    let success = demangle("$s4ąą3IntV".utf8Span, into: &smolOutputSpan)
+    expectEqual(success, .truncated(8))
+    // ą is two bytes, so the 3 bytes won't wit the "ąą" but only "ą" and half of the "ą"
+    // therefore, the output must properly truncate to just a single "ą"
+    //
+    // 2 bytes - "ą"
+    // 1 byte - "\0"
+    expectEqual(String(copying: try! UTF8Span(validating: smolOutputSpan.span)), "ą\0")
+  }
+
+  DemangleTests.test("Span API - don't cut off an UTF8 codepoint in the middle (length 4)") {
+    let smolBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: 4)
+    var smolOutputSpan = OutputSpan<UTF8.CodeUnit>(buffer: smolBuffer, initializedCount: 0)
+    defer { smolBuffer.deallocate() }
+
+    // Test nil return on successful demangle.
+    let success = demangle("$s4ąą3IntV".utf8Span, into: &smolOutputSpan)
+    expectEqual(success, .truncated(8))
+    // 2 bytes - "ą"
+    // 2 bytes - "ą"
+    expectEqual(String(copying: try! UTF8Span(validating: smolOutputSpan.span)), "ąą")
+  }
+
 }
 
 runAllTests()
