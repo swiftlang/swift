@@ -11,12 +11,23 @@ let package = Package(
         .target(
             name: "SwiftXcodeGen",
             dependencies: [
+              "Utils",
               .product(name: "ArgumentParser", package: "swift-argument-parser"),
               .product(name: "SwiftOptions", package: "swift-driver"),
             ],
             exclude: [
               "Xcodeproj/README.md",
             ]
+        ),
+        .target(
+          name: "Utils",
+          dependencies: [
+            .product(name: "ArgumentParser", package: "swift-argument-parser"),
+          ],
+          swiftSettings: [
+            // Treat everything as @inlinable
+            .unsafeFlags(["-enable-cmo-everything"]),
+          ]
         ),
         .executableTarget(
           name: "swift-xcodegen",
