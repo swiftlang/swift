@@ -730,11 +730,12 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
 /// from any single source file via direct or indirect imports, then
 /// the cross-import overlay module is not required for compilation.
 static void discoverCrossImportOverlayFiles(
-    StringRef mainModuleName, ModuleDependenciesCache &cache,
-    ASTContext &scanASTContext, llvm::SetVector<Identifier> &newOverlays,
+    ModuleDependenciesCache &cache, ASTContext &scanASTContext,
+    llvm::SetVector<Identifier> &newOverlays,
     std::set<std::pair<std::string, std::string>> &overlayFiles) {
-  auto mainModuleInfo = cache.findKnownDependency(ModuleDependencyID{
-      mainModuleName.str(), ModuleDependencyKind::SwiftSource});
+  auto mainModuleID = ModuleDependencyID{cache.getMainModuleName().str(),
+                                         ModuleDependencyKind::SwiftSource};
+  auto mainModuleInfo = cache.findKnownDependency(mainModuleID);
 
   llvm::StringMap<ModuleDependencyIDSet> perSourceFileDependencies;
   const ModuleDependencyIDSet mainModuleDirectSwiftDepsSet{
@@ -822,12 +823,12 @@ static void discoverCrossImportOverlayFiles(
   // direct imports from a given file, determine the available and required
   // cross-import overlays.
   auto discoverCrossImportOverlayFilesForModuleSet =
-      [&mainModuleName, &cache, &scanASTContext, &newOverlays,
+      [&mainModuleID, &cache, &scanASTContext, &newOverlays,
        &overlayFiles](const ModuleDependencyIDSet &inputDependencies) {
         for (auto moduleID : inputDependencies) {
           auto moduleName = moduleID.ModuleName;
           // Do not look for overlays of main module under scan
-          if (moduleName == mainModuleName)
+          if (moduleName == mainModuleID.ModuleName)
             continue;
 
           auto dependencies =
@@ -841,13 +842,13 @@ static void discoverCrossImportOverlayFiles(
           for (const auto &dependencyId : inputDependencies) {
             auto moduleName = dependencyId.ModuleName;
             // Do not look for overlays of main module under scan
-            if (moduleName == mainModuleName)
+            if (moduleName == mainModuleID.ModuleName)
               continue;
             // check if any explicitly imported modules can serve as a
             // secondary module, and add the overlay names to the
             // dependencies list.
             for (auto overlayName : overlayMap[moduleName]) {
-              if (overlayName.str() != mainModuleName &&
+              if (overlayName.str() != mainModuleID.ModuleName &&
                   std::find_if(inputDependencies.begin(),
                                inputDependencies.end(),
                                [&](ModuleDependencyID Id) {
@@ -891,7 +892,6 @@ ModuleDependencyScanner::performDependencyScan(ModuleDependencyID rootModuleID) 
   // overlays with explicit imports.
   if (ScanCompilerInvocation.getLangOptions().EnableCrossImportOverlays)
     resolveCrossImportOverlayDependencies(
-        rootModuleID.ModuleName,
         [&](ModuleDependencyID id) { allModules.insert(id); });
 
   if (ScanCompilerInvocation.getSearchPathOptions().BridgingHeaderChaining) {
@@ -1283,8 +1283,16 @@ void ModuleDependencyScanner::resolveHeaderDependencies(
 void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
     ArrayRef<ModuleDependencyID> allSwiftModules,
     ModuleDependencyIDSetVector &allDiscoveredDependencies) {
+  std::string batchOverlayQueryModuleName =
+      "_" + DependencyCache.getMainModuleName().str() + "-OverlayDependencies";
+
   ModuleDependencyIDSetVector discoveredSwiftOverlays;
   for (const auto &moduleID : allSwiftModules) {
+    // Do not re-consider the supplied dummy module's Swift overlays,
+    // if it is included in this list then we have already done so.
+    if (moduleID.ModuleName == batchOverlayQueryModuleName)
+      continue;
+
     auto moduleDependencyInfo = DependencyCache.findKnownDependency(moduleID);
     if (!moduleDependencyInfo.getSwiftOverlayDependencies().empty()) {
       allDiscoveredDependencies.insert(
@@ -1299,17 +1307,34 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
     }
   }
 
+  if (discoveredSwiftOverlays.empty())
+    return;
+
+  auto batchOverlayQueryModuleID = ModuleDependencyID{
+      batchOverlayQueryModuleName, ModuleDependencyKind::SwiftSource};
+  auto batchOverlayQueryModuleInfo =
+      ModuleDependencyInfo::forSwiftSourceModule();
   // For each additional Swift overlay dependency, ensure we perform a full scan
   // in case it itself has unresolved module dependencies.
-  for (const auto &overlayDepID : discoveredSwiftOverlays) {
-    ModuleDependencyIDSetVector allNewModules =
-        resolveImportedModuleDependencies(overlayDepID);
-    allDiscoveredDependencies.insert(allNewModules.begin(),
-                                     allNewModules.end());
-  }
+  llvm::for_each(discoveredSwiftOverlays, [&](ModuleDependencyID modID) {
+    batchOverlayQueryModuleInfo.addModuleImport(modID.ModuleName, false,
+                                                AccessLevel::Public);
+  });
+  // Record the dummy main module's direct dependencies. The dummy query module
+  // only directly depend on these newly discovered overlay modules.
+  if (DependencyCache.findDependency(batchOverlayQueryModuleID))
+    DependencyCache.updateDependency(batchOverlayQueryModuleID,
+                                     batchOverlayQueryModuleInfo);
+  else
+    DependencyCache.recordDependency(batchOverlayQueryModuleName,
+                                     batchOverlayQueryModuleInfo);
 
-  allDiscoveredDependencies.insert(discoveredSwiftOverlays.begin(),
-                                   discoveredSwiftOverlays.end());
+  ModuleDependencyIDSetVector allNewModules =
+      resolveImportedModuleDependencies(batchOverlayQueryModuleID);
+  // Remove the dummy module
+  allNewModules.remove(batchOverlayQueryModuleID);
+
+  allDiscoveredDependencies.insert(allNewModules.begin(), allNewModules.end());
 }
 
 void ModuleDependencyScanner::resolveSwiftImportsForModule(
@@ -1664,13 +1689,12 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
 }
 
 void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
-    StringRef mainModuleName,
     llvm::function_ref<void(ModuleDependencyID)> action) {
   // Modules explicitly imported. Only these can be secondary module.
   llvm::SetVector<Identifier> newOverlays;
   std::set<std::pair<std::string, std::string>> overlayFiles;
-  discoverCrossImportOverlayFiles(mainModuleName, DependencyCache,
-                                  ScanASTContext, newOverlays, overlayFiles);
+  discoverCrossImportOverlayFiles(DependencyCache, ScanASTContext, newOverlays,
+                                  overlayFiles);
 
   // No new cross-import overlays are found, return.
   if (newOverlays.empty())
@@ -1678,49 +1702,51 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
 
   // Construct a dummy main to resolve the newly discovered cross import
   // overlays.
-  StringRef dummyMainName = "MainModuleCrossImportOverlays";
-  auto dummyMainID = ModuleDependencyID{dummyMainName.str(),
+  std::string batchCrossImportQueryModuleName =
+      "_" + DependencyCache.getMainModuleName().str() + "-CrossImportOverlays";
+  auto queryModuleID = ModuleDependencyID{batchCrossImportQueryModuleName,
                                         ModuleDependencyKind::SwiftSource};
-  auto actualMainID = ModuleDependencyID{mainModuleName.str(),
+  auto mainModuleID = ModuleDependencyID{DependencyCache.getMainModuleName().str(),
                                          ModuleDependencyKind::SwiftSource};
-  auto dummyMainDependencies = ModuleDependencyInfo::forSwiftSourceModule();
+  auto queryModuleInfo = ModuleDependencyInfo::forSwiftSourceModule();
   llvm::for_each(
       newOverlays, [&](Identifier modName) {
-        dummyMainDependencies.addModuleImport(
+        queryModuleInfo.addModuleImport(
             modName.str(),
             /* isExported */ false,
             // TODO: What is the right access level for a cross-import overlay?
             AccessLevel::Public);
       });
 
-  // Record the dummy main module's direct dependencies. The dummy main module
+  // Record the dummy query module's direct dependencies. The dummy query module
   // only directly depend on these newly discovered overlay modules.
-  if (DependencyCache.findDependency(dummyMainID))
-    DependencyCache.updateDependency(dummyMainID, dummyMainDependencies);
+  if (DependencyCache.findDependency(queryModuleID))
+    DependencyCache.updateDependency(queryModuleID, queryModuleInfo);
   else
-    DependencyCache.recordDependency(dummyMainName, dummyMainDependencies);
+    DependencyCache.recordDependency(batchCrossImportQueryModuleName,
+                                     queryModuleInfo);
 
   ModuleDependencyIDSetVector allModules =
-      resolveImportedModuleDependencies(dummyMainID);
+      resolveImportedModuleDependencies(queryModuleID);
 
   // Update main module's dependencies to include these new overlays.
   DependencyCache.setCrossImportOverlayDependencies(
-      actualMainID, DependencyCache.getAllDependencies(dummyMainID));
+      mainModuleID, DependencyCache.getAllDependencies(queryModuleID));
 
   // Update the command-line on the main module to disable implicit
   // cross-import overlay search.
-  auto mainDep = DependencyCache.findKnownDependency(actualMainID);
-  std::vector<std::string> cmdCopy = mainDep.getCommandline();
+  auto mainModuleInfo = DependencyCache.findKnownDependency(mainModuleID);
+  std::vector<std::string> cmdCopy = mainModuleInfo.getCommandline();
   cmdCopy.push_back("-disable-cross-import-overlay-search");
   for (auto &entry : overlayFiles) {
-    mainDep.addAuxiliaryFile(entry.second);
+    mainModuleInfo.addAuxiliaryFile(entry.second);
     cmdCopy.push_back("-swift-module-cross-import");
     cmdCopy.push_back(entry.first);
     auto overlayPath = remapPath(entry.second);
     cmdCopy.push_back(overlayPath);
   }
-  mainDep.updateCommandLine(cmdCopy);
-  DependencyCache.updateDependency(actualMainID, mainDep);
+  mainModuleInfo.updateCommandLine(cmdCopy);
+  DependencyCache.updateDependency(mainModuleID, mainModuleInfo);
 
   // Report any discovered modules to the clients, which include all overlays
   // and their dependencies.
