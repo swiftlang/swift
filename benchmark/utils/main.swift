@@ -27,7 +27,9 @@ import ArrayOfPOD
 import ArrayOfRef
 import ArrayRemoveAll
 import ArraySetElement
+import ArraySliceTests
 import ArraySubscript
+import ArrayTests
 import AsyncTree
 import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
@@ -53,6 +55,7 @@ import Chars
 import ClassArrayGetter
 import CodableTest
 import Combos
+import ContiguousArrayTests
 import CountAlgo
 import CreateObjects
 // rdar://128520766
@@ -229,7 +232,9 @@ register(ArrayOfPOD.benchmarks)
 register(ArrayOfRef.benchmarks)
 register(ArrayRemoveAll.benchmarks)
 register(ArraySetElement.benchmarks)
+register(ArraySliceTests.benchmarks)
 register(ArraySubscript.benchmarks)
+register(ArrayTests.benchmarks)
 register(AsyncTree.benchmarks)
 register(BinaryFloatingPointConversionFromBinaryInteger.benchmarks)
 register(BinaryFloatingPointProperties.benchmarks)
@@ -254,6 +259,7 @@ register(CharacterRecognizer.benchmarks)
 register(Chars.benchmarks)
 register(CodableTest.benchmarks)
 register(Combos.benchmarks)
+register(ContiguousArrayTests.benchmarks)
 register(CountAlgo.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
