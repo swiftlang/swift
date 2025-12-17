@@ -725,7 +725,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         }
       case .escapingToReturn(let toPath, let exclusive):
         if effect.matches(calleeArgIdx, argPath.projectionPath) {
-          guard let fas = apply as? FullApplySite, let result = fas.singleDirectResult else {
+          guard let fas = apply as? FullApplySite, let result = fas.singleDirectResult, result.type.isObject else {
             return isEscaping
           }
 
