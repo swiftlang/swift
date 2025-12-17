@@ -247,7 +247,7 @@ func bar(_ y: Int) {
 func bar() {}
 
 //--- unparsed.h
-// CHECK-UNPARSED: no files updated: found diagnostics in unparsed files TMP_DIR/unparsed.h
+// CHECK-UNPARSED: no files updated: found diagnostics in unparsed files TMP_DIR{{/|\\}}unparsed.h
 void foo(int len, int *p) __attribute__((swift_attr("@_SwiftifyImport(.countedBy(pointer: .param(2), count: \"len\"))")));
 
 //--- module.modulemap
