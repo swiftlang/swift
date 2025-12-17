@@ -14,30 +14,72 @@ import SIL
 
 extension BeginBorrowInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
-    if borrowedValue.ownership == .owned,
-       // We need to keep lexical lifetimes in place.
-       !isLexical,
-       // The same for borrow-scopes which encapsulated pointer escapes.
-       !findPointerEscapingUse(of: borrowedValue)
-    {
-      tryReplaceBorrowWithOwnedOperand(beginBorrow: self, context)
-    } else {
-      removeBorrowOfThinFunction(beginBorrow: self, context)
+    if isLexical && context.preserveDebugInfo {
+      // We must not remove `begin_borrow [lexical] because this is important for diagnostic passes.
+      return
     }
+
+    switch borrowedValue.ownership {
+    case .owned:
+      if tryReplaceBorrowWithOwnedOperand(beginBorrow: self, context) {
+        return
+      }
+    case .guaranteed:
+      if tryReplaceInnerBorrowScope(beginBorrow: self, context) {
+        return
+      }
+    default:
+      // Note that the operand of `begin_borrow` can have "none" ownership, e.g. in case of
+      // ```
+      //   %1 = enum $NonTrivialEnum, #NonTrivialEnum.trivialCase!enumelt        // ownership = none
+      //   %2 = begin_borrow %1
+      // ```
+      break
+    }
+    removeBorrowOfThinFunction(beginBorrow: self, context)
   }
 }
 
-private func tryReplaceBorrowWithOwnedOperand(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) {
+// See comments of `tryReplaceCopy` and `convertAllUsesToOwned`
+private func tryReplaceBorrowWithOwnedOperand(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) -> Bool {
+  if findPointerEscapingUse(of: beginBorrow.borrowedValue) {
+    return false
+  }
+
   // The last value of a (potentially empty) forwarding chain, beginning at the `begin_borrow`.
   let forwardedValue = beginBorrow.lookThroughOwnedConvertibaleForwardingChain()
-  if forwardedValue.allUsesCanBeConvertedToOwned {
-    if tryReplaceCopy(of: forwardedValue, withCopiedOperandOf: beginBorrow, context) {
-      return
-    }
-    if beginBorrow.borrowedValue.isDestroyed(after: beginBorrow) {
-      convertAllUsesToOwned(of: beginBorrow, context)
-    }
+  guard forwardedValue.allUsesCanBeConvertedToOwned else {
+    return false
   }
+  if tryReplaceCopy(of: forwardedValue, withCopiedOperandOf: beginBorrow, context) {
+    return true
+  }
+  if beginBorrow.borrowedValue.isDestroyed(after: beginBorrow) {
+    convertAllUsesToOwned(of: beginBorrow, context)
+    return true
+  }
+  return false
+}
+
+/// Removes a borrow scope if the borrowed operand is already a guaranteed value.
+/// ```
+///   bb0(%0 : @guaranteed $T):
+///     %1 = begin_borrow %0
+///     // ... uses of %1
+///     end_borrow %1
+/// ```
+/// ->
+/// ```
+///   bb0(%0 : @guaranteed $T):
+///     // ... uses of %0
+/// ```
+private func tryReplaceInnerBorrowScope(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) -> Bool {
+  guard beginBorrow.scopeEndingOperands.allSatisfy({ $0.instruction is EndBorrowInst }) else {
+    return false
+  }
+  beginBorrow.uses.ignore(usersOfType: EndBorrowInst.self).replaceAll(with: beginBorrow.borrowedValue, context)
+  context.erase(instructionIncludingAllUsers: beginBorrow)
+  return true
 }
 
 private func removeBorrowOfThinFunction(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) {
