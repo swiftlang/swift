@@ -41,6 +41,12 @@ public final class Logger: @unchecked Sendable {
     set { stateLock.withLock { _output = newValue } }
   }
 
+  private var _prefixFn: (@Sendable (any LoggableStream, Bool) -> Void)?
+  public var prefixFn: (@Sendable (any LoggableStream, Bool) -> Void)? {
+    get { stateLock.withLock { _prefixFn } }
+    set { stateLock.withLock { _prefixFn = newValue } }
+  }
+
   public init() {}
 }
 
@@ -67,33 +73,39 @@ extension Logger {
     case error
   }
 
-  private func log(_ message: @autoclosure () -> String, level: LogLevel) {
+  private func log(_ message: @autoclosure () -> some Loggable, level: LogLevel) {
     guard level >= logLevel else { return }
     let output = self.output ?? FileHandleStream.stderr
     let useColor = self.useColor && output.supportsColor
     outputLock.withLock {
       level.write(to: output, useColor: useColor)
-      output.write(": \(message())\n")
+      output.write(": ")
+      if let prefixFn {
+        prefixFn(output, useColor)
+        output.write(" ")
+      }
+      message().write(to: output, useColor: useColor)
+      output.write("\n")
     }
   }
 
-  public func debug(_ message: @autoclosure () -> String) {
+  public func debug(_ message: @autoclosure () -> some Loggable) {
     log(message(), level: .debug)
   }
 
-  public func info(_ message: @autoclosure () -> String) {
+  public func info(_ message: @autoclosure () -> some Loggable) {
     log(message(), level: .info)
   }
 
-  public func note(_ message: @autoclosure () -> String) {
+  public func note(_ message: @autoclosure () -> some Loggable) {
     log(message(), level: .note)
   }
 
-  public func warning(_ message: @autoclosure () -> String) {
+  public func warning(_ message: @autoclosure () -> some Loggable) {
     log(message(), level: .warning)
   }
 
-  public func error(_ message: @autoclosure () -> String) {
+  public func error(_ message: @autoclosure () -> some Loggable) {
     hadError = true
     log(message(), level: .error)
   }
@@ -123,10 +135,38 @@ extension Logger.LogLevel: Loggable, CustomStringConvertible {
     }
   }
   public func write(to stream: any LoggableStream, useColor: Bool) {
-    let str = useColor 
+    let str = useColor
       ? "\(fg: ansiColor)\(weight: .bold)\(self)\(fg: .normal)\(weight: .normal)"
       : "\(self)"
     stream.write(str)
+  }
+}
+
+extension String: Loggable {
+  public func write(to stream: any LoggableStream, useColor: Bool) {
+    stream.write(self)
+  }
+
+  public func withColor(_ color: AnsiColor) -> ColoredString {
+    ColoredString(self, color: color)
+  }
+}
+
+public struct ColoredString: Loggable {
+  var str: String
+  var color: AnsiColor
+
+  public init(_ str: String, color: AnsiColor) {
+    self.str = str
+    self.color = color
+  }
+
+  public func write(to stream: any LoggableStream, useColor: Bool) {
+    guard useColor else {
+      stream.write(str)
+      return
+    }
+    stream.write("\(fg: color)\(str)\(fg: .normal)")
   }
 }
 

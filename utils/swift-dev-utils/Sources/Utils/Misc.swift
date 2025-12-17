@@ -155,3 +155,103 @@ public func ~= <T>(keyPath: KeyPath<T, Bool>, subject: T) -> Bool {
 public func ~= <T>(keyPath: KeyPath<T, Bool>, subject: T?) -> Bool {
   return subject?[keyPath: keyPath] == true
 }
+
+extension Sequence where Element: Sendable {
+  public func parallelUnorderedMap<T: Sendable>(
+    @_inheritActorContext _ transform: @escaping @Sendable (Element) async -> T
+  ) async -> [T] {
+    let worklist = TaskWorklist<T>()
+    for elt in self {
+      worklist.addTask {
+        await transform(elt)
+      }
+    }
+    return await worklist.results.all
+  }
+}
+
+extension Task {
+  /// Awaits the value of the result.
+  ///
+  /// If the current task is cancelled, this will cancel the subtask as well.
+  public var valuePropagatingCancellation: Success {
+    get async throws {
+      try await withTaskCancellationHandler {
+        return try await self.value
+      } onCancel: {
+        self.cancel()
+      }
+    }
+  }
+}
+
+extension Task where Failure == Never {
+  /// Awaits the value of the result.
+  ///
+  /// If the current task is cancelled, this will cancel the subtask as well.
+  public var valuePropagatingCancellation: Success {
+    get async {
+      await withTaskCancellationHandler {
+        return await self.value
+      } onCancel: {
+        self.cancel()
+      }
+    }
+  }
+}
+
+extension AsyncSequence {
+  public var all: [Element] {
+    get async throws {
+      var res: [Element] = []
+      for try await elt in self {
+        res.append(elt)
+      }
+      return res
+    }
+  }
+}
+
+extension AsyncSequence where Failure == Never {
+  public var all: [Element] {
+    get async {
+      var res: [Element] = []
+      for await elt in self {
+        res.append(elt)
+      }
+      return res
+    }
+  }
+}
+
+extension RandomAccessCollection where Element: Equatable {
+  public func findRepeatedSlice(minRepeats: Int = 1) -> SubSequence? {
+    guard !isEmpty else { return nil }
+
+    var numRepeats = 0
+    var matchEnd = index(after: startIndex)
+    var cursor = matchEnd
+    while true {
+      let match = startIndex ..< matchEnd
+      let matchLen = distance(from: match.lowerBound, to: match.upperBound)
+      guard let scanEnd = index(
+        cursor, offsetBy: matchLen, limitedBy: endIndex
+      ) else {
+        return nil
+      }
+      let scanRange = cursor ..< scanEnd
+      let scan = self[scanRange]
+      guard self[match].elementsEqual(scan) else {
+        numRepeats = 0
+        formIndex(after: &matchEnd)
+        cursor = matchEnd
+        continue
+      }
+      numRepeats += 1
+      if numRepeats >= minRepeats {
+        return scan
+      }
+      cursor = scanEnd
+    }
+  }
+}

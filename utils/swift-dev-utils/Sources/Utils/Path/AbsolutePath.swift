@@ -65,6 +65,14 @@ public extension AbsolutePath {
       atPath: rawPath, withIntermediateDirectories: withIntermediateDirectories)
   }
 
+  func touch() throws {
+    try parentDir?.makeDir()
+    guard FileManager.default.createFile(atPath: rawPath, contents: nil) else {
+      struct FailedToCreate: Error {}
+      throw FailedToCreate()
+    }
+  }
+
   func remove() {
     try? FileManager.default.removeItem(atPath: rawPath)
   }
@@ -91,6 +99,35 @@ public extension AbsolutePath {
   func write(_ contents: String, as encoding: String.Encoding = .utf8) throws {
     try write(contents.data(using: encoding)!)
   }
+
+  enum FileMode: Sendable {
+    case userUnWritable
+    case userWritable
+    case executable
+
+    public func setMode(_ originalMode: Int16) -> Int16 {
+      switch self {
+      case .userUnWritable:
+        // r-x rwx rwx
+        originalMode & 0o577
+      case .userWritable:
+        // -w- --- ---
+        originalMode | 0o200
+      case .executable:
+        // --x --x --x
+        originalMode | 0o111
+      }
+    }
+  }
+
+  func chmod(_ mode: FileMode) throws {
+    let attrs = try FileManager.default.attributesOfItem(atPath: rawPath)
+    let currentMode = attrs[.posixPermissions] as! Int16
+    let newMode = mode.setMode(currentMode)
+    guard newMode != currentMode else { return }
+    try FileManager.default.setAttributes([.posixPermissions : newMode],
+                                          ofItemAtPath: rawPath)
+  }
 }
 
 extension AbsolutePath: ExpressibleByStringLiteral, ExpressibleByStringInterpolation {
@@ -99,7 +136,7 @@ extension AbsolutePath: ExpressibleByStringLiteral, ExpressibleByStringInterpola
   }
 }
 
-extension AbsolutePath: Decodable {
+extension AbsolutePath: Codable {
   public init(from decoder: any Decoder) throws {
     let storage = FilePath(
       try decoder.singleValueContainer().decode(String.self)
@@ -111,5 +148,9 @@ extension AbsolutePath: Decodable {
       throw NotAbsoluteError(path: storage)
     }
     self.init(storage)
+  }
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawPath)
   }
 }
