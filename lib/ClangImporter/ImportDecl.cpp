@@ -3278,29 +3278,14 @@ namespace {
 
       validatePrivateFileIDAttributes(decl);
 
-      // If this module is declared as a C++ module, try to synthesize
-      // conformances to Swift protocols from the Cxx module.
-      auto clangModule = Impl.getClangOwningModule(result->getClangNode());
-      if (!clangModule || requiresCPlusPlus(clangModule)) {
-        if (auto nominalDecl = dyn_cast<NominalTypeDecl>(result)) {
-          conformToCxxIteratorIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxSequenceIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxConvertibleToBoolIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxSetIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxDictionaryIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxPairIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxOptionalIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxVectorIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxSpanIfNeeded(Impl, nominalDecl, decl);
+      if (auto *nominalResult = dyn_cast<NominalTypeDecl>(result)) {
+        deriveAutomaticCxxConformances(Impl, nominalResult, decl);
 
-          if (Impl.needsClosureConstructor(decl)) {
-            if (auto closureCtor =
-                    synthesizer.makeClosureConstructor(nominalDecl))
-              nominalDecl->addMember(closureCtor);
-          }
+        if (Impl.needsClosureConstructor(decl)) {
+          if (auto *ctor = synthesizer.makeClosureConstructor(nominalResult))
+            nominalResult->addMember(ctor);
         }
       }
-
       return result;
     }
 
