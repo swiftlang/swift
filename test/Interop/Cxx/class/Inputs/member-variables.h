@@ -5,7 +5,7 @@
 #include <type_traits>
 #include <optional>
 
-#if defined(_WIN32) || defined(_WIN64)
+#if defined(_MSC_VER)
 #define NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
 #else
 #define NO_UNIQUE_ADDRESS [[no_unique_address]]
