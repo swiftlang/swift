@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1554,6 +1554,31 @@ extension Dictionary.Keys {
     return Iterator(_variant.makeIterator())
   }
 }
+
+extension Dictionary.Keys {
+  @_alwaysEmitIntoClient
+  public func hash(into hasher: inout Hasher) {
+    var commutativeHash = 0
+    for element in self {
+      // Note that we use a copy of our own hasher here. This makes hash values
+      // dependent on its state, eliminating static collision patterns.
+      var elementHasher = hasher
+      elementHasher.combine(element)
+      commutativeHash ^= elementHasher._finalize()
+    }
+    hasher.combine(commutativeHash)
+  }
+  
+  @_alwaysEmitIntoClient
+  public var hashValue: Int { // Prevent compiler from synthesizing hashValue.
+    var hasher = Hasher()
+    self.hash(into: &hasher)
+    return hasher.finalize()
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension Dictionary.Keys: Hashable {}
 
 extension Dictionary.Values {
   @frozen
