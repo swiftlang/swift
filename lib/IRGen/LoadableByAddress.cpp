@@ -3442,8 +3442,8 @@ private:
   uint16_t numRegisters = 0;
 
 public:
-  static uint16_t MaxNumUses;
-  static uint16_t MaxNumRegisters;
+  static const uint16_t MaxNumUses = 65535;
+  static const uint16_t MaxNumRegisters = 65535;
 
   void addConstructor() {
     sawConstructor = true;
@@ -3504,13 +3504,11 @@ public:
 };
 }
 
-uint16_t Properties::MaxNumUses = 65535;
-uint16_t Properties::MaxNumRegisters = 65535;
-
 namespace {
 class LargeLoadableHeuristic {
   GenericEnvironment *genEnv;
   IRGenModule *irgenModule;
+  SILFunction &fun;
 
   llvm::DenseMap<SILType, Properties> largeTypeProperties;
 
@@ -3522,8 +3520,9 @@ class LargeLoadableHeuristic {
 
 public:
    LargeLoadableHeuristic(IRGenModule *irgenModule, GenericEnvironment *genEnv,
+                          SILFunction &f,
                           bool UseAggressiveHeuristic)
-      : genEnv(genEnv), irgenModule(irgenModule),
+      : genEnv(genEnv), irgenModule(irgenModule), fun(f),
       UseAggressiveHeuristic(UseAggressiveHeuristic) {}
 
    void visit(SILInstruction *i);
@@ -3557,6 +3556,14 @@ private:
       auto cached = entry.getNumRegisters();
       if (cached)
         return cached;
+
+      // Avoid computing an explosion schema for very large types as this can be
+      // very compile time intensive.
+      if (fun.getTypeProperties(ty).isVeryLargeType()) {
+        entry.setAsVeryLargeType();
+        largeTypeProperties[ty] = entry;
+        return entry.getNumRegisters();
+      }
 
       const TypeInfo &TI = irgenModule->getTypeInfoForLowered(canType);
       auto &nativeSchemaOrigParam = TI.nativeParameterValueSchema(*irgenModule);
@@ -3603,6 +3610,9 @@ void LargeLoadableHeuristic::propagate(PostOrderFunctionInfo &po) {
 }
 
 void LargeLoadableHeuristic::visit(SILArgument *arg) {
+  if (arg->getType().isAddress())
+    return;
+
   auto objType = arg->getType().getObjectType();
   if (numRegisters(objType) < NumRegistersLargeType)
     return;
@@ -3651,6 +3661,8 @@ void LargeLoadableHeuristic::visit(SILInstruction *i) {
   for (const auto &opd : i->getAllOperands()) {
     auto opdTy = opd.get()->getType();
     auto objType = opdTy.getObjectType();
+    bool isAddress = opdTy.isAddress();
+
     auto registerCount = numRegisters(objType);
     if (registerCount < NumRegistersLargeType)
       continue;
@@ -3699,10 +3711,12 @@ void LargeLoadableHeuristic::visit(SILInstruction *i) {
     case SILInstructionKind::PartialApplyInst:
     case SILInstructionKind::TryApplyInst:
     case SILInstructionKind::BeginApplyInst:
-      entry.addFunctionUseOrReturn();
+      if (!isAddress)
+        entry.addFunctionUseOrReturn();
       break;
     default:
-      entry.addUse();
+      if (!isAddress)
+        entry.addUse();
       break;
     }
 
@@ -4735,7 +4749,7 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
     // copy_addr peepholes
     bool UseAggressiveHeuristic =
       silMod->getOptions().UseAggressiveReg2MemForCodeSize;
-    LargeLoadableHeuristic heuristic(irgenModule, genEnv,
+    LargeLoadableHeuristic heuristic(irgenModule, genEnv, currF,
                                      UseAggressiveHeuristic);
     Peepholes opts(pm, silMod, irgenModule);
     for (SILBasicBlock &BB : currF) {
