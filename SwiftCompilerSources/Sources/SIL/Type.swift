@@ -92,6 +92,9 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     bridged.isExactSuperclassOf(type.bridged)
   }
 
+  /// True if this type references a "ref" type that has a single pointer representation.
+  public var isHeapObjectReferenceType: Bool { bridged.isHeapObjectReferenceType() }
+
   public func loweredInstanceTypeOfMetatype(in function: Function) -> Type {
     return canonicalType.instanceTypeOfMetatype.loweredType(in: function)
   }

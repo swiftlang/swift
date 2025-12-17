@@ -398,6 +398,10 @@ bool BridgedType::isMarkedAsImmortal() const {
   return unbridged().isMarkedAsImmortal();
 }
 
+bool BridgedType::isHeapObjectReferenceType() const {
+  return unbridged().isHeapObjectReferenceType();
+}
+
 bool BridgedType::isAddressableForDeps(BridgedFunction f) const {
   return unbridged().isAddressableForDeps(*f.getFunction());
 }
