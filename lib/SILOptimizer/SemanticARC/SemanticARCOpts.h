@@ -25,7 +25,6 @@ enum class ARCTransformKind : uint64_t {
   Invalid = 0,
   OwnedToGuaranteedPhi = 0x1,
   LoadCopyToLoadBorrowPeephole = 0x2,
-  RedundantBorrowScopeElimPeephole = 0x4,
   // TODO: Split RedundantCopyValueElimPeephole into more granular categories
   // such as dead live range, guaranteed copy_value opt, etc.
   RedundantCopyValueElimPeephole = 0x8,
@@ -34,7 +33,6 @@ enum class ARCTransformKind : uint64_t {
   RedundantMoveValueElim = 0x40,
 
   AllPeepholes = LoadCopyToLoadBorrowPeephole |
-                 RedundantBorrowScopeElimPeephole |
                  RedundantCopyValueElimPeephole | LifetimeJoiningPeephole |
                  OwnershipConversionElimPeephole,
   All = AllPeepholes | OwnedToGuaranteedPhi | RedundantMoveValueElim,
