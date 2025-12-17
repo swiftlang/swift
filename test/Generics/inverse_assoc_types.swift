@@ -53,7 +53,7 @@ protocol Iterable<Element>: ~Copyable {
 
 struct ReqC<T: Copyable> {}
 
-func reqC<T: Copyable>(_ t: T) {} // expected-note 8{{'where T: Copyable' is implicit here}}
+func reqC<T: Copyable>(_ t: T) {} // expected-note 14{{'where T: Copyable' is implicit here}}
 
 
 protocol ProvideA<A>: ~Copyable {
@@ -130,25 +130,45 @@ func checkExistential(_ s: any Gen) {
   reqC(s.i().e().i().e())
 }
 
+func checkExistential2<R: ~Copyable>(_ s: any Gen<R>) {
+  reqC(s.e()) // expected-error {{global function 'reqC' requires that 'R' conform to 'Copyable'}}
+  reqC(s.e().e()) // expected-error {{value of type 'R' has no member 'e'}}
+
+  reqC(s.i()) // expected-error {{requires that 'T' conform to 'Copyable'}}
+  reqC(s.i().e())
+  reqC(s.i().e().i()) // expected-error {{requires that 'T' conform to 'Copyable'}}
+  reqC(s.i().e().i().e())
+}
+
+// Suppression on the constrained existential only goes far down
+// as possible to suppress on the generic type parameter itself.
+func checkExistential3<R>(_ s: any Gen<R>) where R: Gen, R: ~Copyable, R.E: ~Copyable {
+  reqC(s.e()) // expected-error {{global function 'reqC' requires that 'R' conform to 'Copyable'}}
+  reqC(s.e().e()) // expected-error {{global function 'reqC' requires that 'R.E' conform to 'Copyable'}}
+  reqC(s.e().e().e())
+}
+
 protocol Veggie<A> {
   associatedtype A: ~Copyable
   associatedtype NeedsCopyable
+
+  func a() -> A
 }
 protocol Carrot: Veggie
   where Self.NeedsCopyable: ~Copyable {} // expected-error {{'Self.NeedsCopyable' required to be 'Copyable' but is marked with '~Copyable'}}
-  // expected-error @-1{{cannot suppress '~Copyable' on generic parameter 'Self.NeedsCopyable' defined in outer scope}}
 
 protocol CarrotCake: Carrot where Self.A: ~Copyable {} // expected-error {{'Self.A' required to be 'Copyable' but is marked with '~Copyable'}}
-// expected-error @-1{{cannot suppress '~Copyable' on generic parameter 'Self.A' defined in outer scope}}
 
+func ex1<Cucumber: ~Copyable, Potato>(_ nc: any Veggie<Cucumber>, c: any Veggie<Potato>) {
+  reqC(nc.a()) // expected-error {{global function 'reqC' requires that 'Cucumber' conform to 'Copyable'}}
+  reqC(c.a())
+}
 
 protocol Bird {
   associatedtype Song
 }
 
 protocol Eagle: Bird where Self.Song: ~Copyable {}// expected-error {{'Self.Song' required to be 'Copyable' but is marked with '~Copyable'}}
-// expected-error @-1{{cannot suppress '~Copyable' on generic parameter 'Self.Song' defined in outer scope}}
-
 
 protocol Pushable<Element> {
   associatedtype Element: ~Copyable
