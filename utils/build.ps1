@@ -1223,6 +1223,7 @@ function Get-Dependencies {
       param
       (
           [string]$SourceName,
+          [string]$BinaryCache,
           [string]$DestinationName
       )
       $Source = Join-Path -Path $BinaryCache -ChildPath $SourceName
@@ -1369,12 +1370,14 @@ function Get-Dependencies {
 
     if ($EnableCaching) {
       $SCCache = Get-SCCache
-      $FileExtension = [System.IO.Path]::GetExtension($SCCache.URL)
-      DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion.$FileExtension" $SCCache.SHA256
-      if ($FileExtension -eq "tar.gz") {
-        Expand-TapeArchive sccache-$SCCacheVersion.$FileExtension $BinaryCache sccache-$SCCacheVersion
+      $FileExtension = if ($SCCache.URL -match '/[^/]+(\..+)$') { $Matches[1] } else {
+          throw "Invalid sccache URL"
+      }
+      DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion$FileExtension" $SCCache.SHA256
+      if ($FileExtension -eq ".tar.gz") {
+        Expand-TapeArchive "sccache-$SCCacheVersion$FileExtension" $BinaryCache "sccache-$SCCacheVersion"
       } else {
-        Expand-ZipFile sccache-$SCCacheVersion.$FileExtension $BinaryCache sccache-$SCCacheVersion
+        Expand-ZipFile "sccache-$SCCacheVersion$FileExtension" $BinaryCache "sccache-$SCCacheVersion"
       }
       Write-Success "sccache $SCCacheVersion"
     }
