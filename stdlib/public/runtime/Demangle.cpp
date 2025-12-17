@@ -1054,10 +1054,6 @@ namespace swift {
         return nullptr;
       }
 
-      // Very simple flags parsing, move to something more proper once we support more flags
-      bool shouldNullTerminateString = flags & 1;
-      bool shouldUseSimplifiedUIDemangleOptions = flags & 1;
-
       llvm::StringRef name = llvm::StringRef(mangledName, mangledNameLength);
 
       // You must provide buffer size if you're providing your own output buffer
@@ -1068,13 +1064,17 @@ namespace swift {
       if (Demangle::isSwiftSymbol(name)) {
         // Determine demangling/formatting options:
         auto options = DemangleOptions();
+        // Very simple flags parsing, move to something more proper once we support more flags
+        bool shouldNullTerminateString = flags & 1;
+        bool shouldUseSimplifiedUIDemangleOptions = flags & 1;
+
         if (shouldUseSimplifiedUIDemangleOptions) {
           // simplified display options, for backtraces
           options = DemangleOptions::SimplifiedUIDemangleOptions();
         }
 
         auto result = Demangle::demangleSymbolAsString(name, options);
-        size_t bufferSize;
+        size_t bufferSize = 0;
 
         if (outputBufferSize) {
           bufferSize = *outputBufferSize;
@@ -1097,49 +1097,15 @@ namespace swift {
         }
 
         return outputBuffer;
-    #ifndef _WIN32
-      } else if (name.starts_with("_Z")) {
-        // Try C++; note that we don't want to force callers to use malloc() to
-        // allocate their buffer, which is a requirement for __cxa_demangle
-        // because it may call realloc() on the incoming pointer.  As a result,
-        // we never pass the caller's buffer to __cxa_demangle.
-        size_t resultLen;
-        int status = 0;
-        char *result = abi::__cxa_demangle(mangledName, nullptr, &resultLen, &status);
-
-        if (result) {
-          size_t bufferSize;
-
-          if (outputBufferSize) {
-            bufferSize = *outputBufferSize;
-            if (!outputBuffer) {
-              // cxa_demangle always \0 terminates the strings, however since we're relying on the initialized 
-              // count when forming Spans around the results from this func, we don't need to rely on null-terminated strings.
-              *outputBufferSize = resultLen - 1; 
-              return result;
-            } else {
-              *outputBufferSize = resultLen - 1; // ignore the trailing
-            }
-          }
-
-          size_t toCopy = std::min(bufferSize, resultLen);
-          ::memcpy(outputBuffer, result, toCopy);
-
-          free(result);
-
-          return outputBuffer;
-        }
-    #else
-        // On Windows, the mangling is different.
-        // ###TODO: Call __unDName()
-    #endif
       }
+
+      // We could attempt to demangle C++ symbols here, but we choose not to support this in Runtime.demangle(...)
 
       if (outputBufferSize) {
         *outputBufferSize = 0; // indicate we did not write to buffer
       }
       return nullptr;
     }
-  }
-}
+  } // namespace runtime
+} // namespace swift
 
