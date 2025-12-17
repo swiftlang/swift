@@ -75,9 +75,16 @@ lookupCxxTypeMember(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
   Sema.LookupQualifiedName(R, const_cast<clang::CXXRecordDecl *>(Rec));
 
   if (auto *td = R.getAsSingle<clang::TypeDecl>()) {
-    if (auto *paths = R.getBasePaths();
-        paths && paths->front().Access != clang::AS_public)
-      return nullptr;
+    if (auto *paths = R.getBasePaths()) {
+      // For inherited type member, check access of the single CXXBasePath
+      if (paths->front().Access != clang::AS_public)
+        return nullptr;
+    } else {
+      // For direct (non-inherited) type member, check its access directly
+      if (td->getAccess() != clang::AS_public)
+        return nullptr;
+    }
+
     if (mustBeComplete &&
         !Sema.isCompleteType({}, td->getASTContext().getTypeDeclType(td)))
       return nullptr;
