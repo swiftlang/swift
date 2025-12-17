@@ -1,4 +1,4 @@
-//===--- SimplifyBeginAndLoadBorrow.swift ---------------------------------===//
+//===--- SimplifyBeginBorrow.swift ----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -24,44 +24,6 @@ extension BeginBorrowInst : OnoneSimplifiable, SILCombineSimplifiable {
     } else {
       removeBorrowOfThinFunction(beginBorrow: self, context)
     }
-  }
-}
-
-extension LoadBorrowInst : Simplifiable, SILCombineSimplifiable {
-  func simplify(_ context: SimplifyContext) {
-    if uses.ignoreDebugUses.ignore(usersOfType: EndBorrowInst.self).isEmpty {
-      context.erase(instructionIncludingAllUsers: self)
-      return
-    }
-
-    // If the load_borrow is followed by a copy_value, combine both into a `load [copy]`:
-    // ```
-    //   %1 = load_borrow %0
-    //   %2 = some_forwarding_instruction %1 // zero or more forwarding instructions
-    //   %3 = copy_value %2
-    //   end_borrow %1
-    // ```
-    // ->
-    // ```
-    //   %1 = load [copy] %0
-    //   %3 = some_forwarding_instruction %1 // zero or more forwarding instructions
-    // ```
-    //
-    tryCombineWithCopy(context)
-  }
-
-  private func tryCombineWithCopy(_ context: SimplifyContext) {
-    let forwardedValue = lookThroughSingleForwardingUses()
-    guard let singleUser = forwardedValue.uses.ignore(usersOfType: EndBorrowInst.self).singleUse?.instruction,
-          let copy = singleUser as? CopyValueInst,
-          copy.parentBlock == self.parentBlock else {
-      return
-    }
-    let builder = Builder(before: self, context)
-    let loadCopy = builder.createLoad(fromAddress: address, ownership: .copy)
-    let forwardedOwnedValue = replaceGuaranteed(value: self, withOwnedValue: loadCopy, context)
-    copy.replace(with: forwardedOwnedValue, context)
-    context.erase(instructionIncludingAllUsers: self)
   }
 }
 
@@ -143,7 +105,7 @@ private func convertAllUsesToOwned(of beginBorrow: BeginBorrowInst, _ context: S
   context.erase(instructionIncludingAllUsers: beginBorrow)
 }
 
-private extension Value {
+extension Value {
   /// Returns the last value of a (potentially empty) forwarding chain.
   /// For example, returns %3 for the following def-use chain:
   /// ```
@@ -163,7 +125,9 @@ private extension Value {
     }
     return self
   }
+}
 
+private extension Value {
   var allUsesCanBeConvertedToOwned: Bool {
     let relevantUses = uses.ignore(usersOfType: EndBorrowInst.self)
     return relevantUses.allSatisfy { $0.canAccept(ownership: .owned) }
@@ -214,7 +178,7 @@ private extension ForwardingInstruction {
 ///
 /// Returns the last owned value in a forwarding-chain or `ownedValue` if `guaranteedValue` has
 /// no forwarding uses.
-private func replaceGuaranteed(value: Value, withOwnedValue ownedValue: Value, _ context: SimplifyContext) -> Value {
+func replaceGuaranteed(value: Value, withOwnedValue ownedValue: Value, _ context: SimplifyContext) -> Value {
   var result = ownedValue
   var numForwardingUses = 0
   for use in value.uses {
