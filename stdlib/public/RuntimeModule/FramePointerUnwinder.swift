@@ -21,6 +21,7 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   public typealias Context = C
   public typealias MemoryReader = M
   public typealias Address = Context.Address
+  public typealias Element = RichFrame<Address>
 
   var pc: Address
   var fp: Address

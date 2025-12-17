@@ -42,6 +42,7 @@ add_library(swiftCore
   BidirectionalCollection.swift
   Bitset.swift
   Bool.swift
+  BorrowIteratorProtocol.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   BridgingBuffer.swift
@@ -94,6 +95,7 @@ add_library(swiftCore
   InputStream.swift
   IntegerParsing.swift
   Integers.swift
+  Iterable.swift
   Join.swift
   KeyPath.swift
   KeyValuePairs.swift

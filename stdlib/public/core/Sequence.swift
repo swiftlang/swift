@@ -176,7 +176,7 @@
 ///     // Prints "1..."
 public protocol IteratorProtocol<Element> {
   /// The type of element traversed by the iterator.
-  associatedtype Element
+  associatedtype Element: ~Copyable
 
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
@@ -322,13 +322,18 @@ public protocol IteratorProtocol<Element> {
 /// makes no other requirements about element access, so routines that
 /// traverse a sequence should be considered O(*n*) unless documented
 /// otherwise.
-public protocol Sequence<Element> {
+public protocol Sequence<Element>: ~Copyable, ~Escapable {
   /// A type representing the sequence's elements.
-  associatedtype Element
+  associatedtype Element: ~Copyable
 
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
-  associatedtype Iterator: IteratorProtocol where Iterator.Element == Element
+  associatedtype Iterator: IteratorProtocol<Element>
+    where Iterator.Element == Element
+
+  @available(SwiftStdlib 6.3, *)
+  associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = BorrowingIteratorAdapter<Iterator, Element>
+    where BorrowingIterator.Element == Element
 
   // FIXME: <rdar://problem/34142121>
   // This typealias should be removed as it predates the source compatibility
@@ -345,6 +350,10 @@ public protocol Sequence<Element> {
   /// Returns an iterator over the elements of this sequence.
   __consuming func makeIterator() -> Iterator
 
+  @available(SwiftStdlib 6.3, *)
+  @lifetime(borrow self)
+  func makeBorrowingIterator() -> BorrowingIterator
+  
   /// A value less than or equal to the number of elements in the sequence,
   /// calculated nondestructively.
   ///
@@ -383,7 +392,7 @@ public protocol Sequence<Element> {
   ///    (O(1)) time. If this returns non-`nil`, then it must have better than linear
   ///    (O(*n*)) complexity.
   func _customContainsEquatableElement(
-    _ element: Element
+    _ element: borrowing Element
   ) -> Bool?
 
   /// Create a native array buffer containing the elements of `self`,
@@ -449,6 +458,65 @@ public protocol Sequence<Element> {
   func withContiguousStorageIfAvailable<R>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?
+}
+
+// It would be nicer to just have a single generic parameter, but when I
+// try to generalize `Iterator.Element: ~Copyable` (or `Seq.Element: ~Copyable`
+// when I try that approach), I get the error:
+//
+// Cannot suppress '~Copyable' on generic parameter 'Iterator.Element' defined in outer scope
+@available(SwiftStdlib 6.3, *)
+@frozen
+public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol, Element: ~Copyable>: BorrowingIteratorProtocol & ~Copyable where Iterator.Element == Element
+{
+  @usableFromInline
+  var iterator: Iterator
+  @usableFromInline
+  var curValue: Iterator.Element?
+
+  public typealias Element = Iterator.Element
+
+  @_transparent
+  public init(iterator: Iterator) {
+    self.iterator = iterator
+    curValue = nil
+  }
+
+  @_transparent
+  @lifetime(&self)
+  public mutating func nextSpan(maximumCount: Int) -> Span<Iterator.Element> {
+    curValue = iterator.next()
+    return curValue._span
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension BorrowingIteratorAdapter: Copyable where Iterator.Element: Copyable {}
+
+@available(SwiftStdlib 6.3, *)
+public enum NeverIterator<Element: ~Copyable> {}
+
+@available(SwiftStdlib 6.3, *)
+extension NeverIterator: IteratorProtocol { /* where Element: ~Copyable */
+  public typealias Element = Element
+  public func next() -> Element? {
+    Builtin.unreachable()
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension Sequence where BorrowingIterator == BorrowingIteratorAdapter<Iterator, Self.Element> {
+  @_transparent
+  public func makeBorrowingIterator() -> BorrowingIterator {
+    BorrowingIteratorAdapter(iterator: makeIterator())
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension Sequence where Iterator == NeverIterator<Element>, Self: ~Copyable & ~Escapable {
+  public func makeIterator() -> Iterator {
+    fatalError("Attempt to iterate using a NeverIterator")
+  }
 }
 
 // Provides a default associated type witness for Iterator when the
@@ -663,7 +731,41 @@ extension DropWhileSequence: Sequence {
 // Default implementations for Sequence
 //===----------------------------------------------------------------------===//
 
-extension Sequence {
+extension Sequence where Self: ~Copyable & ~Escapable {
+  @inlinable
+  public var underestimatedCount: Int {
+    return 0
+  }
+  
+  @inlinable
+  @inline(__always)
+  public func _customContainsEquatableElement(
+    _ element: Element
+  ) -> Bool? {
+    return nil
+  }
+  
+  @inlinable
+  @safe
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return nil
+  }
+
+  public __consuming func _copyContents(
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    fatalError("_copyContents on a ~Copyable/~Copyable sequence")
+  }
+  
+  @inlinable
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
+    fatalError("_copyToContiguousArray on a ~Copyable/~Escapable sequence")
+  }
+}
+
+extension Sequence where Element: Copyable {
   /// Returns an array containing the results of mapping the given closure
   /// over the sequence's elements.
   ///
