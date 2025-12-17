@@ -29,19 +29,7 @@ Forces conformances of the attributed protocol to always have their Type Metadat
 
 ## `@_alwaysEmitIntoClient`
 
-Forces the body of a function to be emitted into client code.
-
-Note that this is distinct from `@inline(__always)`; it doesn't force inlining
-at call-sites, it only means that the implementation is compiled into the
-module which uses the code.
-
-This means that `@_alwaysEmitIntoClient` definitions are _not_ part of the
-defining module's ABI, so changing the implementation at a later stage
-does not break ABI.
-
-Most notably, default argument expressions are implicitly
-`@_alwaysEmitIntoClient`, which means that adding a default argument to a
-function which did not have one previously does not break ABI.
+Forces the body of a function to be emitted into client code. This underscored attribute was formalized as `@export(implementation)` as part of [SE-0497](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0497-definition-visibility.md).
 
 ## `@_assemblyVision`
 
