@@ -5123,17 +5123,16 @@ void ClangImporter::Implementation::diagnoseMemberValue(
   forEachLookupTable([&](SwiftLookupTable &table) -> bool {
     for (const auto &entry :
          table.lookup(name.getBaseName(), EffectiveClangContext(container))) {
-      if (clang::NamedDecl *nd = cast<clang::NamedDecl *>(entry)) {
-        // We are only interested in members of a particular context,
-        // skip other contexts.
-        if (nd->getDeclContext() != container)
-          continue;
-
-        diagnoseTargetDirectly(
-            importDiagnosticTargetFromLookupTableEntry(entry));
-      }
       // If the entry is not a NamedDecl, it is a form of macro, which cannot be
-      // a member value.
+      // a member value, so it is safe to cast<clang::NamedDecl *> here.
+      clang::NamedDecl *nd = cast<clang::NamedDecl *>(entry);
+
+      // We are only interested in members of a particular context,
+      // skip other contexts.
+      if (nd->getDeclContext() != container)
+        continue;
+
+      diagnoseTargetDirectly(importDiagnosticTargetFromLookupTableEntry(entry));
     }
     return false;
   });
