@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/Timing
-// RUN: %target-codesign %t/Timing
-// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/Timing 2>&1 || true) | %FileCheck %s
+// RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/Timing.exe
+// RUN: %target-codesign %t/Timing.exe
+// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/Timing.exe > %t/Timing.out 2>&1 || true
+// RUN: %FileCheck %s < %t/Timing.out
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

@@ -343,7 +343,8 @@ extension ImageMap {
           continue
         }
 
-        endOfText = baseAddress + Address(optionalHeader.SizeOfCode)
+        endOfText = baseAddress + Address(optionalHeader.BaseOfCode
+                                          + optionalHeader.SizeOfCode)
 
         // 3 is IMAGE_DIRECTORY_ENTRY_EXCEPTION
         exceptionEntry = optionalHeader.DataDirectory.3
@@ -372,7 +373,8 @@ extension ImageMap {
           continue
         }
 
-        endOfText = baseAddress + Address(optionalHeader.SizeOfCode)
+        endOfText = baseAddress + Address(optionalHeader.BaseOfCode
+                                          + optionalHeader.SizeOfCode)
 
         // 3 is IMAGE_DIRECTORY_ENTRY_EXCEPTION
         exceptionEntry = optionalHeader.DataDirectory.3

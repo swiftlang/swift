@@ -92,6 +92,7 @@ add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
   COMPILE_FLAGS
     ${BACKTRACING_COMPILE_FLAGS}
     -parse-as-library
+    -g -Xlinker /debug
 
   TARGET_SDKS OSX LINUX WINDOWS)
 

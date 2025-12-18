@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/EarlyMessage
-// RUN: %target-codesign %t/EarlyMessage
-// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/EarlyMessage 2>&1 || true) | %FileCheck %s
+// RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/EarlyMessage.exe
+// RUN: %target-codesign %t/EarlyMessage.exe
+// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/EarlyMessage.exe > %t/EarlyMessage.out 2>&1 || true
+// RUN: %FileCheck %s < %t/EarlyMessage.out
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
