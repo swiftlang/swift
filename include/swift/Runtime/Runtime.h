@@ -38,10 +38,15 @@ namespace mangling {
 #endif
 
 SWIFT_RUNTIME_STDLIB_SPI
-char * _swift_runtime_demangle(
-  const char *mangledName,
-  size_t mangledNameLength,
-  char *outputBuffer,
+size_t _swift_runtime_demangle(
+  const char *mangledName, size_t mangledNameLength,
+  char *outputBuffer, size_t *outputBufferSize,
+  size_t flags
+);
+
+SWIFT_RUNTIME_STDLIB_SPI
+char *_swift_runtime_demangle_allocate(
+  const char *mangledName, size_t mangledNameLength,
   size_t *outputBufferSize,
   size_t flags
 );
