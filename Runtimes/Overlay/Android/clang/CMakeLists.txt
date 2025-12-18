@@ -6,7 +6,7 @@ file(CONFIGURE
 ---
 version: 0
 case-sensitive: false
-use-external-names: false
+use-external-names: true
 roots:
   - name: "@CMAKE_ANDROID_NDK@/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include"
     type: directory

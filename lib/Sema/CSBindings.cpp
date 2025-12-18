@@ -53,7 +53,7 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
     : CS(CS), TypeVar(TypeVar), Info(info) {
 
   for (const auto &binding : info.Bindings)
-    addBinding(binding, /*isTransitive=*/false);
+    addBinding(binding);
 
   for (const auto &literal : info.Literals)
     Literals.push_back(literal);
@@ -594,7 +594,7 @@ void BindingSet::inferTransitiveKeyPathBindings() {
 
                 // Copy the bindings over to the root.
                 for (const auto &binding : bindings.Bindings)
-                  addBinding(binding, /*isTransitive=*/true);
+                  addBinding(binding.asTransitiveFrom(contextualRootVar));
 
                 // Make a note that the key path root is transitively adjacent
                 // to contextual root type variable and all of its variables.
@@ -604,9 +604,9 @@ void BindingSet::inferTransitiveKeyPathBindings() {
                                     bindings.AdjacentVars.end());
               }
             } else {
-              addBinding(
-                  binding.withSameSource(inferredRootTy, AllowedBindingKind::Exact),
-                  /*isTransitive=*/true);
+              auto newBinding = binding.withSameSource(
+                  inferredRootTy, AllowedBindingKind::Exact);
+              addBinding(newBinding.asTransitiveFrom(keyPathTy));
             }
           }
         }
@@ -699,8 +699,9 @@ void BindingSet::inferTransitiveSupertypeBindings() {
       if (ConstraintSystem::typeVarOccursInType(TypeVar, type))
         continue;
 
-      addBinding(binding.withSameSource(type, AllowedBindingKind::Supertypes),
-                 /*isTransitive=*/true);
+      auto newBinding =
+          binding.withSameSource(type, AllowedBindingKind::Supertypes);
+      addBinding(newBinding.asTransitiveFrom(entry.first));
     }
   }
 }
@@ -733,8 +734,7 @@ void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
                   continue;
             }
 
-            addBinding({protocolTy, AllowedBindingKind::Exact, constraint},
-                       /*isTransitive=*/false);
+            addBinding({protocolTy, AllowedBindingKind::Exact, constraint});
           }
         }
       }
@@ -849,8 +849,8 @@ bool BindingSet::finalizeKeyPathBindings() {
           // better diagnostics.
           auto keyPathTy = getKeyPathType(ctx, *capability, rootTy,
                                           CS.getKeyPathValueType(keyPath));
-          updatedBindings.insert(
-              {keyPathTy, AllowedBindingKind::Exact, locator});
+          updatedBindings.insert({keyPathTy, AllowedBindingKind::Exact, locator,
+                                  /*originator=*/nullptr});
         } else if (CS.shouldAttemptFixes()) {
           auto fixedRootTy = CS.getFixedType(rootTy);
           // If key path is structurally correct and has a resolved root
@@ -911,11 +911,11 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
   }
 }
 
-void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
+void BindingSet::addBinding(PotentialBinding binding) {
   if (Bindings.count(binding))
     return;
 
-  if (!isViable(binding, isTransitive))
+  if (!isViable(binding))
     return;
 
   SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
@@ -979,14 +979,26 @@ void BindingSet::addBinding(PotentialBinding binding, bool isTransitive) {
     for (auto existingBinding = Bindings.begin();
          existingBinding != Bindings.end();) {
       if (existingBinding->isViableForJoin()) {
-        auto join =
+        auto joinType =
             Type::join(existingBinding->BindingType, binding.BindingType);
 
-        if (join && isAcceptableJoin(*join)) {
+        if (joinType && isAcceptableJoin(*joinType)) {
           // Result of the join has to use new binding because it refers
           // to the constraint that triggered the join that replaced the
           // existing binding.
-          joined.push_back(binding.withType(*join));
+          //
+          // For "join" to be transitive, both bindings have to be as
+          // well, otherwise we consider it a refinement of a direct
+          // binding.
+          auto *origintor =
+              binding.isTransitive() && existingBinding->isTransitive()
+                  ? binding.Originator
+                  : nullptr;
+
+          PotentialBinding join(*joinType, binding.Kind, binding.BindingSource,
+                                origintor);
+
+          joined.push_back(join);
           // Remove existing binding from the set.
           // It has to be re-introduced later, since its type has been changed.
           existingBinding = Bindings.erase(existingBinding);
@@ -1469,7 +1481,7 @@ static bool hasConversions(Type type) {
            type->is<BuiltinType>() || type->is<ArchetypeType>());
 }
 
-bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
+bool BindingSet::isViable(PotentialBinding &binding) {
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
   // case. In the worst case, we'll produce lots of duplicate solutions
@@ -1477,7 +1489,7 @@ bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
   // resolution.
   auto type = binding.BindingType;
 
-  if (isTransitive && !checkTypeOfBinding(TypeVar, type))
+  if (binding.isTransitive() && !checkTypeOfBinding(TypeVar, type))
     return false;
 
   auto *NTD = type->getAnyNominal();

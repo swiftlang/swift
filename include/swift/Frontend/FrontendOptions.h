@@ -399,6 +399,9 @@ public:
   /// The path at which to either serialize or deserialize the dependency scanner cache.
   std::string SerializedDependencyScannerCachePath;
 
+  /// Emit dependency scanning related remarks.
+  bool EmitDependencyScannerRemarks = false;
+
   /// Emit remarks indicating use of the serialized module dependency scanning cache.
   bool EmitDependencyScannerCacheRemarks = false;
 

@@ -8,7 +8,7 @@ file(CONFIGURE
 ---
 version: 0
 case-sensitive: false
-use-external-names: false
+use-external-names: true
 roots:
   - name: "/usr/include"
     type: directory
