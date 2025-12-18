@@ -751,9 +751,10 @@ final class PeCoffImage {
   typealias CallSiteInfo = DwarfReader<PeCoffImage>.CallSiteInfo
 
   func inlineCallSites(
-    at address: Address
+    at relativeAddress: Address
   ) -> ArraySlice<CallSiteInfo> {
     // ###TODO: PDB support
+    let address = relativeAddress + Address(imageBase)
 
     guard let dwarfReader else {
       return [][0..<0]

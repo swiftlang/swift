@@ -1,19 +1,19 @@
+// RUN: echo "PATH is $PATH"
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/Crash
-// RUN: %target-codesign %t/Crash
-// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash.json %target-run %t/Crash 2>&1 || true
-// RUN: %validate-json %t/crash.json | %FileCheck %s
-
+// RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/Crash.exe
+// RUN: %target-codesign %t/Crash.exe
+// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash.json %target-run %t/Crash.exe 2>&1 || true
+// RUN: %validate-json %t/crash.json | %FileCheck --ignore-case %s
 
 // Also check that we generate valid JSON with various different options set.
 
-// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash2.json,threads=crashed %target-run %t/Crash 2>&1 || true
-// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash3.json,registers=all %target-run %t/Crash 2>&1 || true
-// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash4.json,sanitize=yes %target-run %t/Crash 2>&1 || true
-// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash5.json,images=none %target-run %t/Crash 2>&1 || true
-// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash6.json,images=all %target-run %t/Crash 2>&1 || true
-// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash7.json,symbolicate=off %target-run %t/Crash 2>&1 || true
-// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash8.json,demangle=no %target-run %t/Crash 2>&1 || true
+// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash2.json,threads=crashed %target-run %t/Crash.exe 2>&1 || true
+// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash3.json,registers=all %target-run %t/Crash.exe 2>&1 || true
+// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash4.json,sanitize=yes %target-run %t/Crash.exe 2>&1 || true
+// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash5.json,images=none %target-run %t/Crash.exe 2>&1 || true
+// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash6.json,images=all %target-run %t/Crash.exe 2>&1 || true
+// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash7.json,symbolicate=off %target-run %t/Crash.exe 2>&1 || true
+// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash8.json,demangle=no %target-run %t/Crash.exe 2>&1 || true
 // RUN: %validate-json %t/crash2.json
 // RUN: %validate-json %t/crash3.json
 // RUN: %validate-json %t/crash4.json
@@ -72,7 +72,7 @@ struct Crash {
 
 // This is followed by a description and the fault address
 
-// CHECK-NEXT: "description": "Bad pointer dereference",
+// CHECK-NEXT: "description": "{{(Bad pointer dereference|Access violation)}}",
 // CHECK-NEXT: "faultAddress": "0x{{0+}}4",
 
 
@@ -102,9 +102,9 @@ struct Crash {
 // CHECK-NEXT:         "symbol": "{{_?}}$s5Crash6level5yyF",
 // CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
 // CHECK-NEXT:         "description": "level5() + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
+// CHECK-NEXT:         "image": "Crash.exe",
 // CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
+// CHECK-NEXT:           "file": "{{.*[\\/]}}JSON.swift",
 // CHECK-NEXT:           "line": 51,
 // CHECK-NEXT:           "column": 15
 // CHECK-NEXT:         }
@@ -115,9 +115,9 @@ struct Crash {
 // CHECK-NEXT:         "symbol": "{{_?}}$s5Crash6level4yyF",
 // CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
 // CHECK-NEXT:         "description": "level4() + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
+// CHECK-NEXT:         "image": "Crash.exe",
 // CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
+// CHECK-NEXT:           "file": "{{.*[\\/]}}JSON.swift",
 // CHECK-NEXT:           "line": 45,
 // CHECK-NEXT:           "column": 3
 // CHECK-NEXT:         }
@@ -128,9 +128,9 @@ struct Crash {
 // CHECK-NEXT:         "symbol": "{{_?}}$s5Crash6level3yyF",
 // CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
 // CHECK-NEXT:         "description": "level3() + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
+// CHECK-NEXT:         "image": "Crash.exe",
 // CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
+// CHECK-NEXT:           "file": "{{.*[\\/]}}JSON.swift",
 // CHECK-NEXT:           "line": 41,
 // CHECK-NEXT:           "column": 3
 // CHECK-NEXT:         }
@@ -141,9 +141,9 @@ struct Crash {
 // CHECK-NEXT:         "symbol": "{{_?}}$s5Crash6level2yyF",
 // CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
 // CHECK-NEXT:         "description": "level2() + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
+// CHECK-NEXT:         "image": "Crash.exe",
 // CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
+// CHECK-NEXT:           "file": "{{.*[\\/]}}JSON.swift",
 // CHECK-NEXT:           "line": 37,
 // CHECK-NEXT:           "column": 3
 // CHECK-NEXT:         }
@@ -154,9 +154,9 @@ struct Crash {
 // CHECK-NEXT:         "symbol": "{{_?}}$s5Crash6level1yyF",
 // CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
 // CHECK-NEXT:         "description": "level1() + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
+// CHECK-NEXT:         "image": "Crash.exe",
 // CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
+// CHECK-NEXT:           "file": "{{.*[\\/]}}JSON.swift",
 // CHECK-NEXT:           "line": 33,
 // CHECK-NEXT:           "column": 3
 // CHECK-NEXT:         }
@@ -167,9 +167,9 @@ struct Crash {
 // CHECK-NEXT:         "symbol": "{{_?}}$s5CrashAAV4mainyyFZ",
 // CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
 // CHECK-NEXT:         "description": "static Crash.main() + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
+// CHECK-NEXT:         "image": "Crash.exe",
 // CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
+// CHECK-NEXT:           "file": "{{.*[\\/]}}JSON.swift",
 // CHECK-NEXT:           "line": 57,
 // CHECK-NEXT:           "column": 5
 // CHECK-NEXT:         }
@@ -181,9 +181,9 @@ struct Crash {
 // CHECK-NEXT:         "symbol": "{{_?}}$s5CrashAAV5$mainyyFZ",
 // CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
 // CHECK-NEXT:         "description": "static Crash.$main() + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
+// CHECK-NEXT:         "image": "Crash.exe",
 // CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{/*}}<compiler-generated>",
+// CHECK-NEXT:           "file": "{{[\\/]*}}<compiler-generated>",
 // CHECK-NEXT:           "line": 0,
 // CHECK-NEXT:           "column": 0
 // CHECK-NEXT:         }
@@ -195,9 +195,9 @@ struct Crash {
 // CHECK-NEXT:         "symbol": "{{_?main}}",
 // CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
 // CHECK-NEXT:         "description": "main + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
+// CHECK-NEXT:         "image": "Crash.exe",
 // CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
+// CHECK-NEXT:           "file": "{{.*[\\/]}}JSON.swift",
 // CHECK-NEXT:           "line": 0,
 // CHECK-NEXT:           "column": 0
 // CHECK-NEXT:         }
@@ -220,9 +220,9 @@ struct Crash {
 
 // Maybe multiple images before this one
 
-// CHECK:          "name": "Crash",
+// CHECK:          "name": "Crash.exe",
 //                 "buildId": ... is optional
-// CHECK:          "path": "{{.*}}/Crash",
+// CHECK:          "path": "{{.*[\\/]}}Crash.exe",
 // CHECK-NEXT:     "baseAddress": "0x{{[0-9a-f]+}}",
 // CHECK-NEXT:     "endOfText": "0x{{[0-9a-f]+}}"
 // CHECK-NEXT:   }

@@ -323,7 +323,7 @@ extension SwiftBacktrace {
         if args.sanitize ?? false {
           path = sanitizePath(path)
         }
-        write("\"path\": \"\(path)\", ")
+        write("\"path\": \"\(escapeJSON(path))\", ")
       }
 
       write("""

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -parse-as-library -Onone -o %t/BacktraceWithLimit
-// RUN: %target-codesign %t/BacktraceWithLimit
-// RUN: %target-run %t/BacktraceWithLimit | %FileCheck %s
+// RUN: %target-build-swift %s -parse-as-library -Onone -o %t/BacktraceWithLimit.exe
+// RUN: %target-codesign %t/BacktraceWithLimit.exe
+// RUN: %target-run %t/BacktraceWithLimit.exe | %FileCheck %s
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
