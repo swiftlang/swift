@@ -4020,6 +4020,7 @@ ManagedValue ResultPlanner::expandPackExpansion(
   // expansion in the inner pack.
   SGF.emitDynamicPackLoop(Loc, innerFormalPackType, innerComponentIndex,
                           openedEnv,
+                          []() -> SILBasicBlock * { return nullptr; },
                           [&](SILValue indexWithinComponent,
                               SILValue packExpansionIndex,
                               SILValue innerPackIndex) {
@@ -4165,6 +4166,7 @@ ManagedValue TranslateArguments::expandPackExpansion(
   //   index.
   SGF.emitDynamicPackLoop(Loc, innerFormalPackType, innerComponentIndex,
                           openedEnv,
+                          []() -> SILBasicBlock * { return nullptr; },
                           [&](SILValue indexWithinComponent,
                               SILValue packExpansionIndex,
                               SILValue innerPackIndex) {
@@ -4301,6 +4303,7 @@ void ResultPlanner::Operation::emitReabstractTupleIntoPackExpansion(
 
   SGF.emitDynamicPackLoop(loc, innerFormalPackType, innerComponentIndex,
                           openedEnv,
+                          []() -> SILBasicBlock * { return nullptr; },
                           [&](SILValue indexWithinComponent,
                               SILValue packExpansionIndex,
                               SILValue innerPackIndex) {

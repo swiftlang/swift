@@ -212,6 +212,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
     auto formalPackType = CanPackType::get(SGF.getASTContext(), {type});
 
     SGF.emitDynamicPackLoop(loc, formalPackType, /*component*/0, openedEnv,
+                            []() -> SILBasicBlock * { return nullptr; },
                             [&](SILValue indexWithinComponent,
                                 SILValue packExpansionIndex,
                                 SILValue packIndex) {

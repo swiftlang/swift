@@ -524,6 +524,7 @@ public:
     // Loop over the pack, initializing each value with the appropriate
     // element.
     SGF.emitDynamicPackLoop(loc, FormalPackType, ComponentIndex, openedEnv,
+                            []() -> SILBasicBlock * { return nullptr; },
                             [&](SILValue indexWithinComponent,
                                 SILValue expansionIndex,
                                 SILValue packIndex) {
@@ -1313,6 +1314,7 @@ ResultPlanBuilder::buildPackExpansionIntoPack(SILValue packAddr,
   // we can emit a dynamic loop to do that now.
   if (init->canPerformInPlacePackInitialization(openedEnv, eltTy)) {
     SGF.emitDynamicPackLoop(loc, formalPackType, componentIndex, openedEnv,
+                            []() -> SILBasicBlock * { return nullptr; },
                             [&](SILValue indexWithinComponent,
                                 SILValue expansionPackIndex,
                                 SILValue packIndex) {
@@ -1334,6 +1336,7 @@ ResultPlanBuilder::buildPackExpansionIntoPack(SILValue packAddr,
                                     SILType::getPrimitiveObjectType(tupleTy));
 
   SGF.emitDynamicPackLoop(loc, formalPackType, componentIndex, openedEnv,
+                          []() -> SILBasicBlock * { return nullptr; },
                           [&](SILValue indexWithinComponent,
                               SILValue expansionPackIndex,
                               SILValue packIndex) {
