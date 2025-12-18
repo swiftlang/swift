@@ -228,7 +228,7 @@ struct CountedByExpressionValidator
     case clang::BuiltinType::ULong:
     case clang::BuiltinType::LongLong:
     case clang::BuiltinType::ULongLong:
-      DLOG("Ignoring count parameter with non-portable integer literal");
+      DLOG("Ignoring count parameter with non-portable integer literal\n");
       return false;
     default:
       return true;
@@ -330,7 +330,7 @@ struct UnaliasedInstantiationVisitor
   bool
   VisitTemplateSpecializationType(const clang::TemplateSpecializationType *) {
     hasUnaliasedInstantiation = true;
-    DLOG("Signature contains raw template, skipping");
+    DLOG("Signature contains raw template, skipping\n");
     return false;
   }
 };
@@ -340,15 +340,33 @@ struct ForwardDeclaredConcreteTypeVisitor
   bool hasForwardDeclaredConcreteType = false;
   const clang::Module *Owner;
 
-  ForwardDeclaredConcreteTypeVisitor(const clang::Module *Owner) : Owner(Owner) { ASSERT(Owner); };
+  ForwardDeclaredConcreteTypeVisitor(const clang::Module *Owner) : Owner(Owner) {};
 
   bool VisitRecordType(clang::RecordType *RT) {
     const clang::RecordDecl *RD = RT->getDecl()->getDefinition();
     ASSERT(RD && "pointer to concrete type without type definition?");
     const clang::Module *M = RD->getOwningModule();
+
+    if (!Owner && !M) {
+      DLOG("Both decls are in bridging header");
+      return true;
+    }
+
+    if (!Owner) {
+      hasForwardDeclaredConcreteType = true;
+      DLOG("Imported signature contains concrete type not available in bridging header, skipping\n");
+      LLVM_DEBUG(DUMP(RD));
+      return false;
+    }
+    if (!M) {
+      ABORT([RD](auto &out) {
+        out << "Imported signature contains concrete type without an owning clang module:\n";
+        RD->dump(out);
+      });
+    }
     if (!Owner->isModuleVisible(M)) {
       hasForwardDeclaredConcreteType = true;
-      DLOG("Imported signature contains concrete type not available in clang module, skipping");
+      DLOG("Imported signature contains concrete type not available in clang module, skipping\n");
       LLVM_DEBUG(DUMP(RD));
       return false;
     }
@@ -415,7 +433,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     return false;
 
   if (ClangDecl->isImplicit()) {
-    DLOG("implicit functions lack lifetime and bounds info");
+    DLOG("implicit functions lack lifetime and bounds info\n");
     return false;
   }
 
@@ -427,6 +445,8 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
   } else {
     OwningModule = ClangDecl->getOwningModule();
   }
+  bool IsInBridgingHeader = MappedDecl->getModuleContext()->getName().str() == CLANG_HEADER_MODULE_NAME;
+  ASSERT(OwningModule || IsInBridgingHeader);
   ForwardDeclaredConcreteTypeVisitor CheckForwardDecls(OwningModule);
 
   // We only attach the macro if it will produce an overload. Any __counted_by
@@ -620,7 +640,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
 
   MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
   if (!SwiftifyImportDecl) {
-    DLOG("_SwiftifyImport macro not found");
+    DLOG("_SwiftifyImport macro not found\n");
     return;
   }
 
@@ -672,7 +692,7 @@ void ClangImporter::Implementation::swiftifyProtocol(
   MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(
       getKnownSingleDecl(SwiftContext, "_SwiftifyImportProtocol"));
   if (!SwiftifyImportDecl) {
-    DLOG("_SwiftifyImportProtocol macro not found");
+    DLOG("_SwiftifyImportProtocol macro not found\n");
     return;
   }
 
