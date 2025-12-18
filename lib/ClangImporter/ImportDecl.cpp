@@ -2190,6 +2190,39 @@ namespace {
       return true;
     }
 
+    std::pair<CustomRefCountingOperationResult,
+              CustomRefCountingOperationResult>
+    addRefCountOperationsIfRequired(ClassDecl *nominal,
+                                    clang::RecordDecl *clangType) {
+      auto &context = Impl.SwiftContext;
+      auto nonInheritedRefCountingOperations = [&] {
+        auto retainResult = evaluateOrDefault(
+            context.evaluator,
+            CustomRefCountingOperation(
+                {nominal, CustomRefCountingOperationKind::retain}),
+            {});
+        auto releaseResult = evaluateOrDefault(
+            context.evaluator,
+            CustomRefCountingOperation(
+                {nominal, CustomRefCountingOperationKind::release}),
+            {});
+        return std::make_pair(retainResult, releaseResult);
+      };
+      auto clangDecl = dyn_cast<clang::CXXRecordDecl>(clangType);
+      if (!clangDecl)
+        return nonInheritedRefCountingOperations();
+      auto baseClangDecl = dyn_cast_or_null<clang::CXXRecordDecl>(
+          getRefParentOrDiag(clangDecl, context, nullptr));
+      if (!baseClangDecl || baseClangDecl == clangDecl)
+        return nonInheritedRefCountingOperations();
+
+      auto baseSwiftDecl = cast<ClassDecl>(
+          Impl.importDecl(baseClangDecl, getActiveSwiftVersion()));
+
+      return synthesizer.addRefCountOperations(nominal, clangDecl,
+                                               baseSwiftDecl, baseClangDecl);
+    }
+
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
       // Track whether this record contains fields we can't reference in Swift
       // as stored properties.
@@ -2786,7 +2819,11 @@ namespace {
       }
 
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
-        validateForeignReferenceType(decl, classDecl);
+        auto operations = addRefCountOperationsIfRequired(
+            classDecl, const_cast<clang::RecordDecl *>(decl));
+
+        validateForeignReferenceType(decl, classDecl, operations.first,
+                                     operations.second);
 
         auto availability = Impl.SwiftContext.getSwift58Availability();
         if (!availability.isAlwaysAvailable()) {
@@ -2853,8 +2890,10 @@ namespace {
       }
     }
 
-    void validateForeignReferenceType(const clang::RecordDecl *decl,
-                                      ClassDecl *classDecl) {
+    void validateForeignReferenceType(
+        const clang::RecordDecl *decl, ClassDecl *classDecl,
+        CustomRefCountingOperationResult retainOperation,
+        CustomRefCountingOperationResult releaseOperation) {
 
       enum class RetainReleaseOperationKind {
         notAfunction,
@@ -2937,11 +2976,6 @@ namespace {
         return RetainReleaseOperationKind::valid;
       };
 
-      auto retainOperation = evaluateOrDefault(
-          Impl.SwiftContext.evaluator,
-          CustomRefCountingOperation(
-              {classDecl, CustomRefCountingOperationKind::retain}),
-          {});
       if (retainOperation.kind ==
           CustomRefCountingOperationResult::noAttribute) {
         HeaderLoc loc(decl->getLocation());
@@ -3008,11 +3042,6 @@ namespace {
                CustomRefCountingOperationResult::immortal);
       }
 
-      auto releaseOperation = evaluateOrDefault(
-          Impl.SwiftContext.evaluator,
-          CustomRefCountingOperation(
-              {classDecl, CustomRefCountingOperationKind::release}),
-          {});
       if (releaseOperation.kind ==
           CustomRefCountingOperationResult::noAttribute) {
         HeaderLoc loc(decl->getLocation());

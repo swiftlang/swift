@@ -6565,6 +6565,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       auto namedMember = dyn_cast<ValueDecl>(member);
       if (!namedMember || !namedMember->hasName() ||
           namedMember->getName().getBaseName() != name ||
+          clangModuleLoader->isMemberSynthesizedPerType(namedMember) ||
           clangModuleLoader->getOriginalForClonedMember(namedMember))
         continue;
 
@@ -8033,6 +8034,16 @@ ValueDecl *ClangImporter::Implementation::getOriginalForClonedMember(
   return nullptr;
 }
 
+bool ClangImporter::Implementation::isMemberSynthesizedPerType(
+    const ValueDecl *decl) {
+  return membersSynthesizedPerType.contains(decl);
+}
+
+void ClangImporter::Implementation::markMemberSynthesizedPerType(
+    const ValueDecl *decl) {
+  membersSynthesizedPerType.insert(decl);
+}
+
 size_t ClangImporter::Implementation::getImportedBaseMemberDeclArity(
     const ValueDecl *valueDecl) {
   if (auto *func = dyn_cast<FuncDecl>(valueDecl)) {
@@ -8051,6 +8062,10 @@ ClangImporter::importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
 
 ValueDecl *ClangImporter::getOriginalForClonedMember(const ValueDecl *decl) {
   return Impl.getOriginalForClonedMember(decl);
+}
+
+bool ClangImporter::isMemberSynthesizedPerType(const ValueDecl *decl) {
+  return Impl.isMemberSynthesizedPerType(decl);
 }
 
 void ClangImporter::diagnoseTopLevelValue(const DeclName &name) {
@@ -8206,12 +8221,15 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
   auto clangDecl = decl->getClangDecl();
   llvm::SmallVector<ValueDecl *, 1> results;
 
-  if (name.starts_with(".")) {
+  if (name.consume_front(".")) {
     // Look for a member of decl instead of a global.
-    StringRef memberName = name.drop_front(1);
-    if (memberName.empty())
+    if (name.empty())
       return {};
-    auto declName = DeclName(ctx.getIdentifier(memberName));
+    auto declName = DeclName(ctx.getIdentifier(name));
+    auto swiftLookupResults = decl->lookupDirect(declName);
+    if (!swiftLookupResults.empty())
+      return SmallVector<ValueDecl *, 1>(swiftLookupResults.begin(),
+                                         swiftLookupResults.end());
     auto allResults = evaluateOrDefault(
         ctx.evaluator, ClangRecordMemberLookup({decl, declName}), {});
     return SmallVector<ValueDecl *, 1>(allResults.begin(), allResults.end());
@@ -8242,9 +8260,9 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
   return results;
 }
 
-static const clang::RecordDecl *
-getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
-                   ClangImporter::Implementation *importerImpl) {
+const clang::RecordDecl *
+importer::getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
+                             ClangImporter::Implementation *importerImpl) {
   auto refParentDecls = getRefParentDecls(decl, ctx, importerImpl);
   if (refParentDecls.empty())
     return nullptr;
@@ -8257,11 +8275,11 @@ getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
     assert(refParentDecl && "refParentDecl is null inside getRefParentOrDiag");
     for (const auto *attr : refParentDecl->getAttrs()) {
       if (const auto swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
-        const auto &attribute = swiftAttr->getAttribute();
-        if (attribute.starts_with(retainPrefix))
-          uniqueRetainDecls.insert(attribute.drop_front(retainPrefix.size()));
-        else if (attribute.starts_with(releasePrefix))
-          uniqueReleaseDecls.insert(attribute.drop_front(releasePrefix.size()));
+        auto attribute = swiftAttr->getAttribute();
+        if (attribute.consume_front(retainPrefix))
+          uniqueRetainDecls.insert(attribute);
+        else if (attribute.consume_front(releasePrefix))
+          uniqueReleaseDecls.insert(attribute);
       }
     }
   }
@@ -8811,19 +8829,12 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
     Evaluator &evaluator, CustomRefCountingOperationDescriptor desc) const {
   auto swiftDecl = desc.decl;
   auto operation = desc.kind;
-  auto &ctx = swiftDecl->getASTContext();
 
-  std::string operationStr = operation == CustomRefCountingOperationKind::retain
-                                 ? "retain:"
-                                 : "release:";
+  StringRef operationStr = operation == CustomRefCountingOperationKind::retain
+                               ? "retain:"
+                               : "release:";
 
   auto decl = cast<clang::RecordDecl>(swiftDecl->getClangDecl());
-
-  if (!hasImportAsRefAttr(decl)) {
-    if (auto parentRefDecl = getRefParentOrDiag(decl, ctx, nullptr))
-      decl = parentRefDecl;
-  }
-
   if (!decl->hasAttrs())
     return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
 
@@ -8842,10 +8853,8 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   if (retainReleaseAttrs.size() > 1)
     return {CustomRefCountingOperationResult::tooManyAttributes, nullptr, ""};
 
-  auto name = retainReleaseAttrs.front()
-                  ->getAttribute()
-                  .drop_front(StringRef(operationStr).size())
-                  .str();
+  auto name = retainReleaseAttrs.front()->getAttribute().drop_front(
+      operationStr.size());
 
   if (name == "immortal")
     return {CustomRefCountingOperationResult::immortal, nullptr, name};
