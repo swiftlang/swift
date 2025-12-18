@@ -42,21 +42,21 @@ internal import BacktracingImpl.Runtime
 ///            Future versions of Swift may choose to print more (or less) information in the demangled format.
 @available(StdlibDeploymentTarget 6.3, *)
 public func demangle(_ mangledName: String) throws(DemanglingError) -> String {
-  var length: size_t = 0
+  var demangledLength: size_t = 0
 
-  let demangled: UnsafeMutablePointer<CChar>? = _swift_runtime_demangle(
+  let demangled: UnsafeMutablePointer<CChar>? = _swift_runtime_demangle_allocate(
     mangledName, mangledName.utf8.count,
-    nil, &length,
+    &demangledLength,
     /*flags=*/0
   )
 
-  guard length > 0 else {
+  guard demangledLength > 0 else {
     assert(demangled == nil)
     throw .invalidSymbol
   }
   defer { free(demangled) }
 
-  return try UnsafeBufferPointer(start: demangled, count: length)
+  return try UnsafeBufferPointer(start: demangled, count: demangledLength)
     .withMemoryRebound(to: UTF8.CodeUnit.self) { (buffer: UnsafeBufferPointer<UTF8.CodeUnit>) throws(DemanglingError) -> String in
       guard let demangledSpan = try? UTF8Span(validating: buffer.span) else {
         throw DemanglingError.invalidSymbol
@@ -87,39 +87,33 @@ public func demangle(
   _ mangledName: borrowing UTF8Span,
   into output: inout OutputSpan<UTF8.CodeUnit>
 ) throws(DemanglingError) {
-  var demangledLength = output.capacity
-  let outputCapacity = output.capacity
+  var outputCapacity = output.capacity
 
-  let demangledPtr = output.withUnsafeMutableBufferPointer { outputBufferUInt8, outputLength in 
-    outputBufferUInt8.withMemoryRebound(to: Int8.self) { outputBuffer in 
+  let requiredBufferSize = output.withUnsafeMutableBufferPointer { outputBufferUInt8, initializedOutputLength in
+    outputBufferUInt8.withMemoryRebound(to: Int8.self) { outputBuffer in
       mangledName.span.withUnsafeBytes { mangledNamePtr in
-        let res = _swift_runtime_demangle(
+        let requiredBufferSize = _swift_runtime_demangle(
           mangledNamePtr.baseAddress, mangledName.count,
-          outputBuffer.baseAddress, &demangledLength,
+          outputBuffer.baseAddress, &outputCapacity,
           /*flags=*/0)
 
-        // If the demangled string is longer than the Span capacity, we 
-        // demangled only up-to the capacity of the span, and therefore must 
-        // indicate this here. Such situation will return a `.truncated` result.
-        outputLength = min(outputCapacity, demangledLength)
-
-        return res
+        initializedOutputLength = outputCapacity
+        return requiredBufferSize
       }
     }
   }
 
-  guard demangledPtr != nil else {
+  guard requiredBufferSize > 0 else {
     throw DemanglingError.invalidSymbol
   }
 
   // If the buffer size is still equal to the buffer count, the demangle was
   // successful.
-  if demangledLength <= output.capacity {
-    return
+  guard requiredBufferSize <= output.capacity else {
+    throw DemanglingError.truncated(requiredBufferSize: requiredBufferSize)
   }
 
-  // The result was truncated. Return the amount needed to get a full demangle.
-  throw .truncated(requiredBufferSize: demangledLength)
+  return // OK!
 }
 
 /// Error thrown to indicate failure to demangle a Swift symbol.

@@ -187,7 +187,7 @@ if #available(SwiftStdlib 6.3, *) {
       //
       // 2 bytes - "ą"
       // 1 byte - "\0"
-      expectEqual(String(copying: try! UTF8Span(validating: smolOutputSpan.span)), "ą\0")
+      expectEqual(String(copying: try! UTF8Span(validating: smolOutputSpan.span)), "ą")
     } catch {
       expectTrue(false, "Got unexpected error: \(error)")
     }
