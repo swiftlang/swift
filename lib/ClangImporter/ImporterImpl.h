@@ -628,6 +628,11 @@ public:
   void getMangledName(clang::MangleContext *mangler,
                       const clang::NamedDecl *clangDecl, raw_ostream &os);
 
+  /// Writes the Itanium mangled name (even on platforms that do not use Itanium
+  /// mangling, such as Windows) of \p clangDecl to \p os.
+  void getItaniumMangledName(const clang::NamedDecl *clangDecl,
+                             raw_ostream &os);
+
   /// Whether the C++ interoperability compatibility version is at least
   /// 'major'.
   ///
