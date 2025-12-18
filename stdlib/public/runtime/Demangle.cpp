@@ -1054,6 +1054,10 @@ namespace swift {
                             char *outputBuffer,
                             size_t *outputBufferSize,
                             size_t flags) {
+      if (!mangledName) {
+        return nullptr;
+      }
+
       if (flags > 1) {
         // ignore not supported flags
         return nullptr;
@@ -1071,8 +1075,6 @@ namespace swift {
         auto options = DemangleOptions();
         // Very simple flags parsing, move to something more proper once we support more flags
         bool shouldNullTerminateString = flags & 1;
-        bool shouldUseSimplifiedUIDemangleOptions = flags & 1;
-
         if (shouldUseSimplifiedUIDemangleOptions) {
           // simplified display options, for backtraces
           options = DemangleOptions::SimplifiedUIDemangleOptions();
@@ -1092,16 +1094,19 @@ namespace swift {
           outputBuffer = (char *)::malloc(totalLength);
           bufferSize = result.length();
         }
+        assert(bufferSize > 0 && "buffer size at this point must not be null");
 
         size_t toCopy = std::min(
-          shouldNullTerminateString ? (bufferSize - 1) : bufferSize, 
+          shouldNullTerminateString ? (bufferSize - 1) : bufferSize,
           shouldNullTerminateString ? (result.length() - 1) : result.length()
         );
 
         // Are we accidentally cutting of an UTF8 codepoint in the middle?
         // there may be up to 4 continuations of a codepoint so we need to see if we're cutting off in the middle,
         // and if so, back out until we find the actual non-continuation byte.
-        while (toCopy > 0 && isUTF8CodePointContinuationByte(result.data()[toCopy])) {
+        while (toCopy > 0 &&
+               toCopy < result.length() &&
+               isUTF8CodePointContinuationByte(result.data()[toCopy])) {
           // we're in the middle of an utf8 scalar, and would overwrite it with a null terminator resulting in a truncated UTF8-scalar.
           // don't do that, and instead truncate further back
           toCopy -= 1;
