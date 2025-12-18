@@ -362,11 +362,24 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     }
   }
 
+  // Check if this is an implicit DeclRefExpr to a constructor - we should
+  // NOT skip these as they need to be indexed for Self.NestedType() calls.
+  // However, only do this when we're NOT inside a ConstructorRefCallExpr
+  // (tracked by CtorRefs), as that case is already handled and we'd create
+  // duplicate references.
+  bool isImplicitCtorRef = false;
+  if (CtorRefs.empty()) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+      if (isa<ConstructorDecl>(DRE->getDecl()))
+        isImplicitCtorRef = true;
+    }
+  }
+
   if (!isa<InOutExpr>(E) && !isa<LoadExpr>(E) && !isa<OpenExistentialExpr>(E) &&
       !isa<MakeTemporarilyEscapableExpr>(E) &&
       !isa<CollectionUpcastConversionExpr>(E) && !isa<OpaqueValueExpr>(E) &&
       !isa<SubscriptExpr>(E) && !isa<KeyPathExpr>(E) && !isa<LiteralExpr>(E) &&
-      !isa<CollectionExpr>(E) && E->isImplicit())
+      !isa<CollectionExpr>(E) && E->isImplicit() && !isImplicitCtorRef)
     return Action::Continue(E);
 
   if (auto LE = dyn_cast<LiteralExpr>(E)) {

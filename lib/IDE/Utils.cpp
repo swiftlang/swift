@@ -963,7 +963,22 @@ bool swift::ide::isBeingCalled(ArrayRef<Expr *> ExprStack) {
     }
     if (isa<SelfApplyExpr>(AE))
       continue;
-    if (getReferencedDecl(AE->getFn()).second == UnderlyingDecl)
+    Expr *Fn = AE->getFn();
+    // Unwrap AutoClosureExpr and nested CallExpr to get the actual function
+    // expression. This handles cases like Self.NestedType() where the
+    // constructor call is wrapped in an autoclosure containing another call.
+    while (true) {
+      if (auto *ACE = dyn_cast<AutoClosureExpr>(Fn)) {
+        Fn = ACE->getSingleExpressionBody();
+        continue;
+      }
+      if (auto *InnerCall = dyn_cast<CallExpr>(Fn)) {
+        Fn = InnerCall->getFn();
+        continue;
+      }
+      break;
+    }
+    if (getReferencedDecl(Fn).second == UnderlyingDecl)
       return true;
   }
   return false;
