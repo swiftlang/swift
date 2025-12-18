@@ -959,10 +959,8 @@ llvm::StringSet<> ModuleDependenciesCache::getAllVisibleClangModules(
          moduleID.Kind == ModuleDependencyKind::SwiftInterface ||
          moduleID.Kind == ModuleDependencyKind::SwiftBinary);
   llvm::StringSet<> result;
-  if (hasVisibleClangModulesViaHeader(moduleID)) {
-    auto headerVisibleModules = getVisibleClangModulesViaHeader(moduleID);
-    result.insert(headerVisibleModules.begin(), headerVisibleModules.end());
-  }
+  auto headerVisibleModules = getVisibleClangModulesViaHeader(moduleID);
+  result.insert(headerVisibleModules.begin(), headerVisibleModules.end());
   for (const auto &clangDepID :
        findKnownDependency(moduleID).getImportedClangDependencies()) {
     assert(hasVisibleClangModulesFromLookup(clangDepID.ModuleName));
@@ -976,7 +974,6 @@ llvm::StringSet<> ModuleDependenciesCache::getAllVisibleClangModules(
 
 ArrayRef<std::string> ModuleDependenciesCache::getVisibleClangModulesFromLookup(
     StringRef moduleName) const {
-  ASSERT(hasVisibleClangModulesFromLookup(moduleName));
   return clangModulesVisibleFromNamedLookup.at(moduleName);
 }
 
@@ -988,14 +985,14 @@ bool ModuleDependenciesCache::hasVisibleClangModulesFromLookup(
 llvm::ArrayRef<std::string>
 ModuleDependenciesCache::getVisibleClangModulesViaHeader(
     ModuleDependencyID moduleID) const {
-  ASSERT(moduleID.Kind == ModuleDependencyKind::SwiftSource ||
+  assert(moduleID.Kind == ModuleDependencyKind::SwiftSource ||
          moduleID.Kind == ModuleDependencyKind::SwiftInterface ||
          moduleID.Kind == ModuleDependencyKind::SwiftBinary);
   return findKnownDependency(moduleID).getHeaderVisibleClangModules();
 }
 bool ModuleDependenciesCache::hasVisibleClangModulesViaHeader(
     ModuleDependencyID moduleID) const {
-  ASSERT(moduleID.Kind == ModuleDependencyKind::SwiftSource ||
+  assert(moduleID.Kind == ModuleDependencyKind::SwiftSource ||
          moduleID.Kind == ModuleDependencyKind::SwiftInterface ||
          moduleID.Kind == ModuleDependencyKind::SwiftBinary);
   return !getVisibleClangModulesViaHeader(moduleID).empty();
