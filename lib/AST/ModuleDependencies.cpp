@@ -759,6 +759,9 @@ bool ModuleDependenciesCache::hasDependency(StringRef moduleName) const {
 bool ModuleDependenciesCache::hasSwiftDependency(StringRef moduleName) const {
   return findSwiftDependency(moduleName).has_value();
 }
+bool ModuleDependenciesCache::hasClangDependency(StringRef moduleName) const {
+  return findDependency(moduleName, ModuleDependencyKind::Clang).has_value();
+}
 
 int ModuleDependenciesCache::numberOfClangDependencies() const {
   return ModuleDependenciesMap.at(ModuleDependencyKind::Clang).size();
@@ -844,6 +847,16 @@ void ModuleDependenciesCache::recordClangDependency(
   }
 }
 
+void ModuleDependenciesCache::setVisibleClangModulesFromLookup(
+    ModuleDependencyID moduleID,
+    const std::vector<std::string> &visibleModules) {
+  ASSERT(moduleID.Kind == ModuleDependencyKind::Clang);
+  if (visibleModules.empty())
+    return;
+
+  clangModulesVisibleFromNamedLookup[moduleID.ModuleName] = visibleModules;
+}
+
 void ModuleDependenciesCache::updateDependency(
     ModuleDependencyID moduleID, ModuleDependencyInfo dependencyInfo) {
   auto &map = getDependenciesMap(moduleID.Kind);
@@ -854,6 +867,10 @@ void ModuleDependenciesCache::updateDependency(
 void ModuleDependenciesCache::removeDependency(ModuleDependencyID moduleID) {
   auto &map = getDependenciesMap(moduleID.Kind);
   map.erase(moduleID.ModuleName);
+  // If we are removing a Clang module which was queried by-name
+  // in a prior scan, we must re-compute its set of visible modules.
+  if (moduleID.Kind == ModuleDependencyKind::Clang)
+    clangModulesVisibleFromNamedLookup.erase(moduleID.ModuleName);
 }
 
 void ModuleDependenciesCache::setImportedSwiftDependencies(
@@ -936,22 +953,52 @@ ModuleDependencyIDCollectionView ModuleDependenciesCache::getAllDependencies(
       moduleInfo.getImportedClangDependencies());
 }
 
-void ModuleDependenciesCache::addVisibleClangModules(
-    ModuleDependencyID moduleID, const std::vector<std::string> &moduleNames) {
-  if (moduleNames.empty())
-    return;
-  auto dependencyInfo = findKnownDependency(moduleID);
-  auto updatedDependencyInfo = dependencyInfo;
-  updatedDependencyInfo.addVisibleClangModules(moduleNames);
-  updateDependency(moduleID, updatedDependencyInfo);
-}
-
-llvm::StringSet<> &ModuleDependenciesCache::getVisibleClangModules(
+llvm::StringSet<> ModuleDependenciesCache::getAllVisibleClangModules(
     ModuleDependencyID moduleID) const {
   ASSERT(moduleID.Kind == ModuleDependencyKind::SwiftSource ||
          moduleID.Kind == ModuleDependencyKind::SwiftInterface ||
          moduleID.Kind == ModuleDependencyKind::SwiftBinary);
-  return findKnownDependency(moduleID).getVisibleClangModules();
+  llvm::StringSet<> result;
+  if (hasVisibleClangModulesViaHeader(moduleID)) {
+    auto headerVisibleModules = getVisibleClangModulesViaHeader(moduleID);
+    result.insert(headerVisibleModules.begin(), headerVisibleModules.end());
+  }
+  for (const auto &clangDepID :
+       findKnownDependency(moduleID).getImportedClangDependencies()) {
+    assert(hasVisibleClangModulesFromLookup(clangDepID.ModuleName));
+    auto visibleModulesViaImport =
+      getVisibleClangModulesFromLookup(clangDepID.ModuleName);
+    result.insert(visibleModulesViaImport.begin(),
+                  visibleModulesViaImport.end());
+  }
+  return result;
+}
+
+ArrayRef<std::string> ModuleDependenciesCache::getVisibleClangModulesFromLookup(
+    StringRef moduleName) const {
+  ASSERT(hasVisibleClangModulesFromLookup(moduleName));
+  return clangModulesVisibleFromNamedLookup.at(moduleName);
+}
+
+bool ModuleDependenciesCache::hasVisibleClangModulesFromLookup(
+    StringRef moduleName) const {
+  return clangModulesVisibleFromNamedLookup.contains(moduleName);
+}
+
+llvm::ArrayRef<std::string>
+ModuleDependenciesCache::getVisibleClangModulesViaHeader(
+    ModuleDependencyID moduleID) const {
+  ASSERT(moduleID.Kind == ModuleDependencyKind::SwiftSource ||
+         moduleID.Kind == ModuleDependencyKind::SwiftInterface ||
+         moduleID.Kind == ModuleDependencyKind::SwiftBinary);
+  return findKnownDependency(moduleID).getHeaderVisibleClangModules();
+}
+bool ModuleDependenciesCache::hasVisibleClangModulesViaHeader(
+    ModuleDependencyID moduleID) const {
+  ASSERT(moduleID.Kind == ModuleDependencyKind::SwiftSource ||
+         moduleID.Kind == ModuleDependencyKind::SwiftInterface ||
+         moduleID.Kind == ModuleDependencyKind::SwiftBinary);
+  return !getVisibleClangModulesViaHeader(moduleID).empty();
 }
 
 ModuleDependencyIDCollectionView

@@ -937,7 +937,7 @@ ModuleDependencyScanner::performDependencyScan(ModuleDependencyID rootModuleID) 
   // If scanning for an individual Clang module, simply resolve its imports
   if (rootModuleID.Kind == ModuleDependencyKind::Clang) {
     ModuleDependencyIDSetVector discoveredClangModules;
-    resolveAllClangModuleDependencies({}, discoveredClangModules);
+    resolveClangModuleDependencies({}, discoveredClangModules);
     return discoveredClangModules.takeVector();
   }
 
@@ -991,8 +991,8 @@ ModuleDependencyScanner::resolveImportedModuleDependencies(
   // This operation is done by gathering all unresolved import
   // identifiers and querying them in-parallel to the Clang
   // dependency scanner.
-  resolveAllClangModuleDependencies(discoveredSwiftModules.getArrayRef(),
-                                    allModules);
+  resolveClangModuleDependencies(discoveredSwiftModules.getArrayRef(),
+                                 allModules);
 
   // For each discovered Swift module which was built with a
   // bridging header, scan the header for module dependencies.
@@ -1043,13 +1043,22 @@ void ModuleDependencyScanner::resolveSwiftModuleDependencies(
   return;
 }
 
-static void
-gatherUnresolvedImports(ModuleDependenciesCache &cache,
-                        ASTContext &scanASTContext,
-                        ArrayRef<ModuleDependencyID> swiftModuleDependents,
-                        ModuleDependencyIDSetVector &allDiscoveredClangModules,
-                        ImportStatementInfoMap &unresolvedImportsMap,
-                        ImportStatementInfoMap &unresolvedOptionalImportsMap) {
+static void findAllReachableClangModules(ModuleDependencyID moduleID,
+                                         const ModuleDependenciesCache &cache,
+                                         ModuleDependencyIDSetVector &reachableClangModules) {
+  if (!reachableClangModules.insert(moduleID))
+    return;
+  for (const auto &depID : cache.getImportedClangDependencies(moduleID))
+    findAllReachableClangModules(depID, cache, reachableClangModules);
+}
+
+static void gatherUnresolvedImports(
+    ModuleDependenciesCache &cache, ASTContext &scanASTContext,
+    ArrayRef<ModuleDependencyID> swiftModuleDependents,
+    ModuleDependencyIDSetVector &allDiscoveredClangModules,
+    ImportStatementInfoMap &unresolvedImportsMap,
+    ImportStatementInfoMap &unresolvedOptionalImportsMap,
+    ModuleIDToModuleIDSetVectorMap &resolvedClangDependenciesMap) {
   for (const auto &moduleID : swiftModuleDependents) {
     auto moduleDependencyInfo = cache.findKnownDependency(moduleID);
     auto unresolvedImports =
@@ -1061,33 +1070,48 @@ gatherUnresolvedImports(ModuleDependenciesCache &cache,
              .emplace(moduleID, std::vector<ScannerImportStatementInfo>())
              .first->second;
 
-    // If we have already resolved Clang dependencies for this module,
+    // If we have already fully resolved Clang dependencies for this module,
     // then we have the entire dependency sub-graph already computed for
     // it and ready to be added to 'allDiscoveredClangModules' without
     // additional scanning.
     if (!moduleDependencyInfo.getImportedClangDependencies().empty()) {
       auto directClangDeps = cache.getImportedClangDependencies(moduleID);
       ModuleDependencyIDSetVector reachableClangModules;
-      reachableClangModules.insert(directClangDeps.begin(),
-                                   directClangDeps.end());
-      for (unsigned currentModuleIdx = 0;
-           currentModuleIdx < reachableClangModules.size();
-           ++currentModuleIdx) {
-        auto moduleID = reachableClangModules[currentModuleIdx];
-        auto dependencies =
-            cache.findKnownDependency(moduleID).getImportedClangDependencies();
-        reachableClangModules.insert(dependencies.begin(), dependencies.end());
-      }
-      allDiscoveredClangModules.insert(reachableClangModules.begin(),
-                                       reachableClangModules.end());
+      for (const auto &depID : directClangDeps)
+        findAllReachableClangModules(depID, cache, reachableClangModules);
+      allDiscoveredClangModules.insert(
+          reachableClangModules.getArrayRef().begin(),
+          reachableClangModules.getArrayRef().end());
       continue;
     } else {
-      // We need to query the Clang dependency scanner for this module's
-      // non-Swift imports
       llvm::StringSet<> resolvedImportIdentifiers;
+      // Mark all import identifiers which were resolved to Swift dependencies
+      // as resolved
       for (const auto &resolvedDep :
            moduleDependencyInfo.getImportedSwiftDependencies())
         resolvedImportIdentifiers.insert(resolvedDep.ModuleName);
+
+      // Mark all import identifiers which can be fully resolved to a cached
+      // Clang dependency (including visible modules) as resolved
+      auto markCachedClangDependenciesResolved =
+          [&cache, &moduleID, &resolvedImportIdentifiers,
+           &resolvedClangDependenciesMap](
+              ArrayRef<ScannerImportStatementInfo> imports) {
+            for (const auto &import : imports) {
+              auto &importIdentifier = import.importIdentifier;
+              if (!resolvedImportIdentifiers.contains(importIdentifier) &&
+                  cache.hasClangDependency(importIdentifier) &&
+                  cache.hasVisibleClangModulesFromLookup(importIdentifier)) {
+                resolvedImportIdentifiers.insert(importIdentifier);
+                resolvedClangDependenciesMap[moduleID].insert(
+                    {importIdentifier, ModuleDependencyKind::Clang});
+              }
+            }
+          };
+      markCachedClangDependenciesResolved(
+          moduleDependencyInfo.getModuleImports());
+      markCachedClangDependenciesResolved(
+          moduleDependencyInfo.getOptionalModuleImports());
 
       // When querying a *clang* module 'CxxStdlib' we must
       // instead expect a module called 'std'...
@@ -1106,6 +1130,8 @@ gatherUnresolvedImports(ModuleDependenciesCache &cache,
             }
           };
 
+      // We need to query the Clang dependency scanner for all of this module's
+      // unresolved imports
       for (const auto &depImport : moduleDependencyInfo.getModuleImports())
         if (!resolvedImportIdentifiers.contains(depImport.importIdentifier))
           addCanonicalClangModuleImport(depImport, *unresolvedImports);
@@ -1118,10 +1144,8 @@ gatherUnresolvedImports(ModuleDependenciesCache &cache,
 }
 
 void ModuleDependencyScanner::reQueryMissedModulesFromCache(
-    const std::vector<std::pair<ModuleDependencyID, ScannerImportStatementInfo>>
-        &failedToResolveImports,
-    std::unordered_map<ModuleDependencyID, ModuleDependencyIDSetVector>
-        &resolvedClangDependenciesMap) {
+    const std::vector<ModuleIDImportInfoPair> &failedToResolveImports,
+    ModuleIDToModuleIDSetVectorMap &resolvedClangDependenciesMap) {
   // It is possible that a specific import resolution failed because we are
   // attempting to resolve a module which can only be brought in via a
   // modulemap of a different Clang module dependency which is not otherwise
@@ -1155,8 +1179,9 @@ void ModuleDependencyScanner::reQueryMissedModulesFromCache(
     if (optionalCachedModuleInfo) {
       resolvedClangDependenciesMap[unresolvedImport.first].insert(
           unresolvedModuleID);
-      DependencyCache.addVisibleClangModules(
-          unresolvedImport.first, {unresolvedImport.second.importIdentifier});
+      DependencyCache.setVisibleClangModulesFromLookup(
+          unresolvedModuleID,
+          {unresolvedImport.second.importIdentifier});
       ScanDiagnosticReporter.registerNamedClangDependency();
     } else {
       // Failed to resolve module dependency.
@@ -1215,61 +1240,76 @@ void ModuleDependencyScanner::performClangModuleLookup(
   ScanningThreadPool.wait();
 }
 
-void ModuleDependencyScanner::cacheComputedClangModuleLookupResults(
+void ModuleDependencyScanner::processBatchClangModuleQueryResult(
     const BatchClangModuleLookupResult &lookupResult,
     const ImportStatementInfoMap &unresolvedImportsMap,
     const ImportStatementInfoMap &unresolvedOptionalImportsMap,
-    ArrayRef<ModuleDependencyID> swiftModuleDependents,
     ModuleDependencyIDSetVector &allDiscoveredClangModules,
-    std::vector<std::pair<ModuleDependencyID, ScannerImportStatementInfo>>
-        &failedToResolveImports,
-    std::unordered_map<ModuleDependencyID, ModuleDependencyIDSetVector>
-        &resolvedClangDependenciesMap) {
-  for (const auto &moduleID : swiftModuleDependents) {
-    auto recordResolvedClangModuleImport =
-        [this, &lookupResult, &resolvedClangDependenciesMap,
-         &allDiscoveredClangModules, moduleID, &failedToResolveImports](
-            const ScannerImportStatementInfo &moduleImport,
-            bool optionalImport) {
-          auto &moduleIdentifier = moduleImport.importIdentifier;
-          auto dependencyID =
-              ModuleDependencyID{moduleIdentifier, ModuleDependencyKind::Clang};
+    std::vector<ModuleIDImportInfoPair> &failedToResolveImports,
+    ModuleIDToModuleIDSetVectorMap &resolvedClangDependenciesMap) {
 
-          // Add visible Clang modules for this query to the depending
-          // Swift module
-          if (lookupResult.visibleModules.contains(moduleIdentifier))
-            DependencyCache.addVisibleClangModules(
-                moduleID, lookupResult.visibleModules.at(moduleIdentifier));
+  llvm::StringSet<> cachedNamedDependencies;
+  auto recordResolvedClangModuleImport =
+      [this, &lookupResult, &resolvedClangDependenciesMap,
+       &allDiscoveredClangModules, &failedToResolveImports,
+       &cachedNamedDependencies](
+          const ModuleDependencyID &moduleID,
+          const ScannerImportStatementInfo &moduleImport, bool optionalImport) {
+        auto &moduleIdentifier = moduleImport.importIdentifier;
+        auto dependencyID =
+            ModuleDependencyID{moduleIdentifier, ModuleDependencyKind::Clang};
 
-          // Add the resolved dependency ID
+        // A successful named query will have returned a set of visible modules
+        if (lookupResult.visibleModules.contains(moduleIdentifier)) {
+          // If this dependency has already been recorded in the cache,
+          // mark it as resolved for the current dependent and exit.
+          if (!cachedNamedDependencies.insert(moduleIdentifier).second) {
+            resolvedClangDependenciesMap[moduleID].insert(dependencyID);
+            return;
+          }
+
+          ScanDiagnosticReporter.registerNamedClangDependency();
+          DependencyCache.setVisibleClangModulesFromLookup(
+              dependencyID, lookupResult.visibleModules.at(moduleIdentifier));
+          resolvedClangDependenciesMap[moduleID].insert(dependencyID);
+
+          // If this module was not seen before as a transitive dependency
+          // of another lookup, record it into the cache
           if (lookupResult.discoveredDependencyInfos.contains(
                   moduleIdentifier)) {
-            if (!DependencyCache.hasDependency(dependencyID))
-              ScanDiagnosticReporter.registerNamedClangDependency();
-            auto dependencyInfo = lookupResult.discoveredDependencyInfos.at(
-                moduleImport.importIdentifier);
             allDiscoveredClangModules.insert(dependencyID);
             DependencyCache.recordClangDependency(
-                dependencyInfo, ScanASTContext.Diags, [this](auto &clangDep) {
+                lookupResult.discoveredDependencyInfos.at(
+                    moduleImport.importIdentifier),
+                ScanASTContext.Diags, [this](auto &clangDep) {
                   return bridgeClangModuleDependency(clangDep);
                 });
-            resolvedClangDependenciesMap[moduleID].insert(dependencyID);
-          } else if (!optionalImport) {
-            // Otherwise, we failed to resolve this dependency. We will try
-            // again using the cache after all other imports have been
-            // resolved. If that fails too, a scanning failure will be
-            // diagnosed.
-            failedToResolveImports.push_back(
-                std::make_pair(moduleID, moduleImport));
+          } else {
+            // If the query produced a set of visible modules but not
+            // a `ModuleDeps` info for the queried module itself, then
+            // it has to have been included in the set of already-seen
+            // module dependencies from a prior query.
+            assert(DependencyCache.hasDependency(dependencyID));
           }
-        };
+        } else if (!optionalImport) {
+          // Otherwise, we failed to resolve this dependency. We will try
+          // again using the cache after all other imports have been
+          // resolved. If that fails too, a scanning failure will be
+          // diagnosed.
+          failedToResolveImports.push_back(
+              std::make_pair(moduleID, moduleImport));
+        }
+      };
 
-    for (const auto &unresolvedImport : unresolvedImportsMap.at(moduleID))
-      recordResolvedClangModuleImport(unresolvedImport, false);
-    for (const auto &unresolvedImport :
-         unresolvedOptionalImportsMap.at(moduleID))
-      recordResolvedClangModuleImport(unresolvedImport, true);
-  }
+  for (const auto &moduleUnresolvedImports : unresolvedImportsMap)
+    for (const auto &unresolvedImport : moduleUnresolvedImports.second)
+      recordResolvedClangModuleImport(moduleUnresolvedImports.first,
+                                      unresolvedImport, false);
+
+  for (const auto &moduleUnresolvedImports : unresolvedOptionalImportsMap)
+    for (const auto &unresolvedImport : moduleUnresolvedImports.second)
+      recordResolvedClangModuleImport(moduleUnresolvedImports.first,
+                                      unresolvedImport, true);
 
   // Use the computed scan results to record all transitive clang module
   // dependencies
@@ -1286,33 +1326,32 @@ void ModuleDependencyScanner::cacheComputedClangModuleLookupResults(
   }
 }
 
-void ModuleDependencyScanner::resolveAllClangModuleDependencies(
+void ModuleDependencyScanner::resolveClangModuleDependencies(
     ArrayRef<ModuleDependencyID> swiftModuleDependents,
     ModuleDependencyIDSetVector &allDiscoveredClangModules) {
-  // Gather all unresolved imports which must correspond to
+  // Gather all remaining unresolved imports which must correspond to
   // Clang modules (since no Swift module for them was found).
   ImportStatementInfoMap unresolvedImportsMap;
   ImportStatementInfoMap unresolvedOptionalImportsMap;
-  gatherUnresolvedImports(DependencyCache, ScanASTContext, swiftModuleDependents,
-                          allDiscoveredClangModules, unresolvedImportsMap,
-                          unresolvedOptionalImportsMap);
+  ModuleIDToModuleIDSetVectorMap resolvedClangDependenciesMap;
+  gatherUnresolvedImports(DependencyCache, ScanASTContext,
+                          swiftModuleDependents, allDiscoveredClangModules,
+                          unresolvedImportsMap, unresolvedOptionalImportsMap,
+                          resolvedClangDependenciesMap);
 
   // Execute parallel lookup of all unresolved import
   // identifiers as Clang modules.
   BatchClangModuleLookupResult lookupResult;
-  performClangModuleLookup(
-      unresolvedImportsMap, unresolvedOptionalImportsMap, lookupResult);
+  performClangModuleLookup(unresolvedImportsMap, unresolvedOptionalImportsMap,
+                           lookupResult);
 
   // Use the computed scan results to record directly-queried clang module
   // dependencies.
-  std::vector<std::pair<ModuleDependencyID, ScannerImportStatementInfo>>
-      failedToResolveImports;
-  std::unordered_map<ModuleDependencyID, ModuleDependencyIDSetVector>
-      resolvedClangDependenciesMap;
-  cacheComputedClangModuleLookupResults(
+  std::vector<ModuleIDImportInfoPair> failedToResolveImports;
+  processBatchClangModuleQueryResult(
       lookupResult, unresolvedImportsMap, unresolvedOptionalImportsMap,
-      swiftModuleDependents, allDiscoveredClangModules,
-      failedToResolveImports, resolvedClangDependenciesMap);
+      allDiscoveredClangModules, failedToResolveImports,
+      resolvedClangDependenciesMap);
 
   // Re-query some failed-to-resolve Clang imports from cache
   // in chance they were brought in as transitive dependencies.
@@ -1604,7 +1643,7 @@ void ModuleDependencyScanner::resolveHeaderDependenciesForModule(
                 bridgingHeaderCommandLine);
           moduleDependencyInfo.setHeaderSourceFiles(headerFileInputs);
           // Update the set of visible Clang modules
-          moduleDependencyInfo.addVisibleClangModules(
+          moduleDependencyInfo.setHeaderVisibleClangModules(
               headerScanResult->VisibleModules);
           // Update the dependency in the cache
           DependencyCache.updateDependency(moduleID, moduleDependencyInfo);
@@ -1621,7 +1660,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
   PrettyStackTraceStringAction trace(
       "Resolving Swift Overlay dependencies of module", moduleID.ModuleName);
   auto visibleClangDependencies =
-      DependencyCache.getVisibleClangModules(moduleID);
+      DependencyCache.getAllVisibleClangModules(moduleID);
 
   llvm::StringMap<SwiftModuleScannerQueryResult> swiftOverlayLookupResult;
   std::mutex lookupResultLock;
@@ -2027,8 +2066,8 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
           mainModuleDeps.setChainedBridgingHeaderBuffer(
               sourceBuffer->getBufferIdentifier(), sourceBuffer->getBuffer());
         // Update the set of visible Clang modules
-        mainModuleDeps.addVisibleClangModules(headerScanResult->VisibleModules);
-
+        mainModuleDeps.setHeaderVisibleClangModules(
+            headerScanResult->VisibleModules);
         // Update the dependency in the cache
         DependencyCache.updateDependency(rootModuleID, mainModuleDeps);
         return llvm::Error::success();
