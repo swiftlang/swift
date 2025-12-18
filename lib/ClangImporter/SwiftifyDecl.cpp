@@ -20,11 +20,13 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeWalker.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/DeclTemplate.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
@@ -274,11 +276,13 @@ struct CountedByExpressionValidator
 };
 
 
-static bool IsConcretePointerType(Type swiftType) {
+static Type ConcretePointeeType(Type swiftType) {
   Type nonnullType = swiftType->lookThroughSingleOptionalType();
   PointerTypeKind PTK;
-  return nonnullType->getAnyPointerElementType(PTK) &&
-    (PTK == PTK_UnsafePointer || PTK == PTK_UnsafeMutablePointer);
+  Type PointeeTy = nonnullType->getAnyPointerElementType(PTK);
+  if (PointeeTy && (PTK == PTK_UnsafePointer || PTK == PTK_UnsafeMutablePointer))
+    return PointeeTy;
+  return Type();
 }
 
 // Don't try to transform any Swift types that _SwiftifyImport doesn't know how
@@ -315,7 +319,7 @@ static bool SwiftifiableCAT(const clang::ASTContext &ctx,
   return CAT && CountedByExpressionValidator().Visit(CAT->getCountExpr()) &&
     (CAT->isCountInBytes() ?
        SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
-     : IsConcretePointerType(swiftType));
+     : !ConcretePointeeType(swiftType).isNull());
 }
 
 // Searches for template instantiations that are not behind type aliases.
@@ -335,50 +339,81 @@ struct UnaliasedInstantiationVisitor
   }
 };
 
-struct ForwardDeclaredConcreteTypeVisitor
-    : clang::RecursiveASTVisitor<ForwardDeclaredConcreteTypeVisitor> {
+static const clang::Decl *getTemplateInstantiation(const clang::Decl *D) {
+  if (auto FuncD = dyn_cast<clang::FunctionDecl>(D)) {
+    return FuncD->getTemplateInstantiationPattern();
+  }
+  if (auto RecordD = dyn_cast<clang::CXXRecordDecl>(D)) {
+    return RecordD->getTemplateInstantiationPattern();
+  }
+  if (auto EnumD = dyn_cast<clang::EnumDecl>(D)) {
+    return EnumD->getTemplateInstantiationPattern();
+  }
+  if (auto VarD = dyn_cast<clang::VarDecl>(D)) {
+    return VarD->getTemplateInstantiationPattern();
+  }
+  return nullptr;
+}
+
+static clang::Module *getOwningModule(const clang::Decl *ClangDecl) {
+  if (const auto *Instance = getTemplateInstantiation(ClangDecl)) {
+    return Instance->getOwningModule();
+  }
+  return ClangDecl->getOwningModule();
+}
+
+struct ForwardDeclaredConcreteTypeVisitor : public TypeWalker {
   bool hasForwardDeclaredConcreteType = false;
   const clang::Module *Owner;
 
   ForwardDeclaredConcreteTypeVisitor(const clang::Module *Owner) : Owner(Owner) {};
 
-  bool VisitRecordType(clang::RecordType *RT) {
-    const clang::RecordDecl *RD = RT->getDecl()->getDefinition();
-    ASSERT(RD && "pointer to concrete type without type definition?");
-    const clang::Module *M = RD->getOwningModule();
+  Action walkToTypePre(Type ty) override {
+    DLOG("Walking type:\n");
+    LLVM_DEBUG(DUMP(ty));
+    if (Type PointeeTy = ConcretePointeeType(ty)) {
+      auto *Nom = PointeeTy->getAnyNominal();
+      const clang::Decl *ClangDecl = Nom->getClangDecl();
+      if (!ClangDecl) {
+        return Action::Continue;
+      }
 
-    if (!Owner && !M) {
-      DLOG("Both decls are in bridging header");
-      return true;
-    }
+      if (auto RD = dyn_cast<clang::RecordDecl>(ClangDecl)) {
+        const clang::RecordDecl *Def = RD->getDefinition();
+        ASSERT(Def && "pointer to concrete type without type definition?");
+        const clang::Module *M = getOwningModule(ClangDecl);
 
-    if (!Owner) {
-      hasForwardDeclaredConcreteType = true;
-      DLOG("Imported signature contains concrete type not available in bridging header, skipping\n");
-      LLVM_DEBUG(DUMP(RD));
-      return false;
+        if (!Owner && !M) {
+          DLOG("Both decls are in bridging header\n");
+          return Action::Continue;
+        }
+
+        if (!Owner) {
+          hasForwardDeclaredConcreteType = true;
+          DLOG("Imported signature contains concrete type not available in bridging header, skipping\n");
+          LLVM_DEBUG(DUMP(Def));
+          return Action::Stop;
+        }
+        if (!M) {
+          ABORT([Def](auto &out) {
+            out << "Imported signature contains concrete type without an owning clang module:\n";
+            Def->dump(out);
+          });
+        }
+        if (!Owner->isModuleVisible(M)) {
+          hasForwardDeclaredConcreteType = true;
+          DLOG("Imported signature contains concrete type not available in clang module, skipping\n");
+          LLVM_DEBUG(DUMP(Def));
+          return Action::Stop;
+        }
+      }
     }
-    if (!M) {
-      ABORT([RD](auto &out) {
-        out << "Imported signature contains concrete type without an owning clang module:\n";
-        RD->dump(out);
-      });
-    }
-    if (!Owner->isModuleVisible(M)) {
-      hasForwardDeclaredConcreteType = true;
-      DLOG("Imported signature contains concrete type not available in clang module, skipping\n");
-      LLVM_DEBUG(DUMP(RD));
-      return false;
-    }
-    return true;
+    return Action::Continue;
   }
 
   bool IsIncompatibleImport(Type SwiftTy, clang::QualType ClangTy) {
     DLOG_SCOPE("Checking compatibility of type: " << ClangTy << "\n");
-    if (!IsConcretePointerType(SwiftTy)) {
-      return false;
-    }
-    TraverseType(ClangTy);
+    SwiftTy.walk(*this);
     return hasForwardDeclaredConcreteType;
   }
 };
@@ -412,13 +447,6 @@ static size_t getNumParams(const clang::FunctionDecl* D) {
 }
 } // namespace
 
-static const clang::Decl *getTemplateInstantiation(const clang::FunctionDecl *D) {
-  return D->getTemplateInstantiationPattern();
-}
-static const clang::Decl *getTemplateInstantiation(const clang::ObjCMethodDecl *) {
-  return nullptr;
-}
-
 template<typename T>
 static bool swiftifyImpl(ClangImporter::Implementation &Self,
                          SwiftifyInfoFunctionPrinter &printer,
@@ -439,12 +467,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
 
   clang::ASTContext &clangASTContext = Self.getClangASTContext();
 
-  const clang::Module *OwningModule = nullptr;
-  if (const auto *Instance = getTemplateInstantiation(ClangDecl)) {
-    OwningModule = Instance->getOwningModule();
-  } else {
-    OwningModule = ClangDecl->getOwningModule();
-  }
+  const clang::Module *OwningModule = getOwningModule(ClangDecl);
   bool IsInBridgingHeader = MappedDecl->getModuleContext()->getName().str() == CLANG_HEADER_MODULE_NAME;
   ASSERT(OwningModule || IsInBridgingHeader);
   ForwardDeclaredConcreteTypeVisitor CheckForwardDecls(OwningModule);
