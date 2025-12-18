@@ -23,6 +23,10 @@ class SourceManager {
     self.bridgedDiagEngine = BridgedDiagnosticEngine(raw: cxxDiagnosticEngine)
   }
 
+  init(cContext: BridgedASTContext) {
+    self.bridgedDiagEngine = cContext.diags
+  }
+
   /// The bridged diagnostic engine (just the wrapped C++ `DiagnosticEngine`).
   let bridgedDiagEngine: BridgedDiagnosticEngine
 

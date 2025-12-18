@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -verify %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -cxx-interoperability-mode=default -enable-objc-interop -typecheck -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -verify -verify-ignore-unrelated %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -cxx-interoperability-mode=default -enable-objc-interop -typecheck -verify -verify-ignore-unrelated %s
 
 @_exported import macros
 

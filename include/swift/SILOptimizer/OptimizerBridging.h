@@ -187,13 +187,22 @@ struct BridgedPassContext {
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
+
+  struct ClosureArgMangling {
+    SwiftInt argIdx;
+    OptionalBridgedInstruction inst;
+    SwiftInt otherArgIdx;
+  };
+
   BridgedOwnedString mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices, BridgedFunction function) const;
-  BridgedOwnedString mangleWithClosureArgs(BridgedArrayRef closureArgIndices,
-                                                               BridgedFunction applySiteCallee) const;
+  BridgedOwnedString mangleWithClosureArgs(BridgedArrayRef closureArgManglings, BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithConstCaptureArgs(BridgedArrayRef bridgedConstArgs,
                                                 BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithBoxToStackPromotedArgs(BridgedArrayRef bridgedPromotedArgIndices,
                                                       BridgedFunction bridgedOriginalFunction) const;
+  BridgedOwnedString mangleWithExplodedPackArgs(BridgedArrayRef bridgedPackArgs,
+                                                BridgedFunction applySiteCallee) const;
+  BridgedOwnedString mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const;
 
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
@@ -263,8 +272,10 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BridgedFunction createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
                                                         const BridgedParameterInfo * _Nullable specializedBridgedParams,
                                                         SwiftInt paramCount,
+                                                        const BridgedResultInfo *_Nullable specializedBridgedResults,
+                                                        SwiftInt resultCount,
                                                         BridgedFunction bridgedOriginal,
-                                                        bool makeThin,
+                                                        BridgedASTType::FunctionTypeRepresentation representation,
                                                         bool makeBare,
                                                         bool preserveGenericSignature) const;
 

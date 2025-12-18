@@ -472,6 +472,22 @@ static bool visitScopeEndsRequiringInit(
     return true;
   }
 
+  // Check for mutate accessor.
+  if (auto ai =
+          dyn_cast_or_null<ApplyInst>(operand->getDefiningInstruction())) {
+    if (ai->hasInoutResult()) {
+      auto *access =
+          dyn_cast<BeginAccessInst>(getAccessScope(ai->getSelfArgument()));
+      if (access) {
+        assert(access->getAccessKind() == SILAccessKind::Modify);
+        for (auto *inst : access->getEndAccesses()) {
+          visit(inst, ScopeRequiringFinalInit::ModifyMemoryAccess);
+        }
+        return true;
+      }
+      return false;
+    }
+  }
   return false;
 }
 
@@ -1111,6 +1127,14 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding accessor coroutine begin_apply as init!\n");
     return true;
+  }
+
+  if (auto *applyInst = dyn_cast_or_null<ApplyInst>(
+          stripAccessMarkers(operand)->getDefiningInstruction())) {
+    if (applyInst->hasAddressResult()) {
+      LLVM_DEBUG(llvm::dbgs() << "Adding apply as init!\n");
+      return true;
+    }
   }
 
   if (isa<UncheckedTakeEnumDataAddrInst>(stripAccessMarkers(operand))) {
@@ -2408,6 +2432,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
             checkKind == MarkUnresolvedNonCopyableValueInst::CheckKind::
                              NoConsumeOrAssign &&
             !moveChecker.canonicalizer.hasPartialApplyConsumingUse()) {
+          moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
+              markedValue);
+          return true;
+        }
+
+        if (operand->isBorrowAccessorResult()) {
           moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
               markedValue);
           return true;

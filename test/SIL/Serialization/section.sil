@@ -1,0 +1,16 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name borrow
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
+// RUN: %target-sil-opt -sil-print-types %t/tmp.2.sib -module-name asmname -emit-sorted-sil | %FileCheck %s
+
+import Swift
+
+// CHECK: sil_global [section "__DATA,__mysection"] @v1 : $Int
+sil_global [section "__DATA,__mysection"] @v1 : $Int
+
+// CHECK: sil [section "__TEXT,__mysection"] @f : $@convention(thin) () -> ()
+sil [section "__TEXT,__mysection"] @f : $@convention(thin) () -> () {
+  %0 = tuple ()
+  return %0
+}

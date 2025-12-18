@@ -224,7 +224,7 @@ let (tupleNestedFuncSiblingElementA, (tupleNestedFuncSiblingElementB, tupleNeste
 // CHECK-NEXT: RelCont | variable/Swift | tupleNestedFuncSiblingElementC | {{.*}}
 
 func containingFunc(param: Int) {
-    // CHECK: [[@LINE-1]]:6 | function/Swift | containingFunc(param:) | {{.*}} | Def | rel: 0
+    // CHECK: [[@LINE-1]]:6 | function(internal)/Swift | containingFunc(param:) | {{.*}} | Def | rel: 0
     // CHECK: [[@LINE-2]]:21 | param/Swift | param | {{.*}} | Def,RelChild | rel: 1
     // CHECK-NEXT: RelChild | function/Swift | containingFunc(param:) | {{.*}}
 
@@ -332,7 +332,7 @@ struct SomeStruct {
     // CHECK-NEXT: RelCont | instance-property/Swift | wrappedProperty | {{.*}}
     // CHECK: [[@LINE-4]]:6 | constructor/Swift | init(wrappedValue:) | {{.*}} | Ref,Call,Impl,RelCont | rel: 1
     // CHECK-NEXT: RelCont | instance-property/Swift | wrappedProperty | {{.*}}
-    // CHECK: [[@LINE-5]]:9 | instance-property/Swift | wrappedProperty | {{.*}} | Def,RelChild | rel: 1
+    // CHECK: [[@LINE-5]]:9 | instance-property(internal)/Swift | wrappedProperty | {{.*}} | Def,RelChild | rel: 1
     // CHECK: [[@LINE-6]]:26 | struct/Swift | Int | {{.*}} | Ref,RelCont | rel: 1
     // CHECK-NEXT: RelCont | instance-property/Swift | wrappedProperty | {{.*}}
 
@@ -342,15 +342,15 @@ struct SomeStruct {
 }
 
 let voidProperty: () = ()
-// CHECK: [[@LINE-1]]:5 | variable/Swift | voidProperty | {{.*}} | Def | rel: 0
+// CHECK: [[@LINE-1]]:5 | variable(internal)/Swift | voidProperty | {{.*}} | Def | rel: 0
 
 let voidAliasedProperty: Void = ()
-// CHECK: [[@LINE-1]]:5 | variable/Swift | voidAliasedProperty | {{.*}} | Def | rel: 0
+// CHECK: [[@LINE-1]]:5 | variable(internal)/Swift | voidAliasedProperty | {{.*}} | Def | rel: 0
 // CHECK: [[@LINE-2]]:26 | type-alias/Swift | Void | {{.*}} | Ref,RelCont | rel: 1
 // CHECK-NEXT: RelCont | variable/Swift | voidAliasedProperty | {{.*}}
 
 var computedVoidProperty: () { () }
-// CHECK: [[@LINE-1]]:5 | variable/Swift | computedVoidProperty | {{.*}} | Def | rel: 0
+// CHECK: [[@LINE-1]]:5 | variable(internal)/Swift | computedVoidProperty | {{.*}} | Def | rel: 0
 
 func voidFunc() -> () { () }
-// CHECK: [[@LINE-1]]:6 | function/Swift | voidFunc() | {{.*}} | Def | rel: 0
+// CHECK: [[@LINE-1]]:6 | function(internal)/Swift | voidFunc() | {{.*}} | Def | rel: 0

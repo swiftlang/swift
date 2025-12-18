@@ -1,3 +1,5 @@
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 

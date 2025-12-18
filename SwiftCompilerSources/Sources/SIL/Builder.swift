@@ -190,11 +190,40 @@ public struct Builder {
     }
   }
 
-  public func createIntegerLiteral(_ value: Int, type: Type) -> IntegerLiteralInst {
-    let literal = bridged.createIntegerLiteral(type.bridged, value)
+  /// Creates a integer literal instruction with the given integer value and
+  /// type. If an extension is necessary, the value is extended in accordance
+  /// with the signedness of `Value`.
+  public func createIntegerLiteral<Value: FixedWidthInteger>(
+    _ value: Value,
+    type: Type
+  ) -> IntegerLiteralInst {
+    precondition(
+      Value.bitWidth <= Int.bitWidth,
+      "Cannot fit \(Value.bitWidth)-bit integer into \(Int.bitWidth)-bit 'Swift.Int'"
+    )
+    // Extend the value based on its signedness to the bit width of `Int` and
+    // reinterpret it as an `Int`.
+    let extendedValue: Int =
+      if Value.isSigned {
+        Int(value)
+      } else {
+        // NB: This initializer is effectively a generic equivalent
+        // of `Int(bitPattern:)`
+        Int(truncatingIfNeeded: value)
+      }
+
+    let literal = bridged.createIntegerLiteral(type.bridged, extendedValue, Value.isSigned)
     return notifyNew(literal.getAs(IntegerLiteralInst.self))
   }
-    
+
+  /// Creates a `Builtin.Int1` integer literal instruction with a value
+  /// corresponding to the given Boolean.
+  public func createBoolLiteral(_ value: Bool) -> IntegerLiteralInst {
+    let boolType = notificationHandler.getBuiltinIntegerType(1).type
+    let integerValue: UInt = value ? 1 : 0
+    return createIntegerLiteral(integerValue, type: boolType)
+  }
+
   public func createAllocRef(_ type: Type, isObjC: Bool = false, canAllocOnStack: Bool = false, isBare: Bool = false,
                              tailAllocatedTypes: TypeArray, tailAllocatedCounts: [Value]) -> AllocRefInst {
     return tailAllocatedCounts.withBridgedValues { countsRef in
@@ -219,10 +248,31 @@ public struct Builder {
     return notifyNew(allocStack.getAs(AllocStackInst.self))
   }
 
+  public func createAllocPack(_ packType: Type) -> AllocPackInst {
+    let allocPack = bridged.createAllocPack(packType.bridged)
+    return notifyNew(allocPack.getAs(AllocPackInst.self))
+  }
+
+  public func createAllocPackMetadata() -> AllocPackMetadataInst {
+    let allocPackMetadata = bridged.createAllocPackMetadata()
+    return notifyNew(allocPackMetadata.getAs(AllocPackMetadataInst.self))
+  }
+
+  public func createAllocPackMetadata(_ packType: Type) -> AllocPackMetadataInst {
+    let allocPackMetadata = bridged.createAllocPackMetadata(packType.bridged)
+    return notifyNew(allocPackMetadata.getAs(AllocPackMetadataInst.self))
+  }
+
   @discardableResult
   public func createDeallocStack(_ operand: Value) -> DeallocStackInst {
     let dr = bridged.createDeallocStack(operand.bridged)
     return notifyNew(dr.getAs(DeallocStackInst.self))
+  }
+
+  @discardableResult
+  public func createDeallocPack(_ operand: Value) -> DeallocPackInst {
+    let dr = bridged.createDeallocPack(operand.bridged)
+    return notifyNew(dr.getAs(DeallocPackInst.self))
   }
 
   @discardableResult
@@ -258,6 +308,11 @@ public struct Builder {
   public func createUncheckedAddrCast(from value: Value, to type: Type) -> UncheckedAddrCastInst {
     let cast = bridged.createUncheckedAddrCast(value.bridged, type.bridged)
     return notifyNew(cast.getAs(UncheckedAddrCastInst.self))
+  }
+
+  public func createUncheckedValueCast(from value: Value, to type: Type) -> UncheckedValueCastInst {
+    let cast = bridged.createUncheckedValueCast(value.bridged, type.bridged)
+    return notifyNew(cast.getAs(UncheckedValueCastInst.self))
   }
 
   public func createUpcast(from value: Value, to type: Type) -> UpcastInst {
@@ -518,6 +573,17 @@ public struct Builder {
     return notifyNew(enumInst.getAs(EnumInst.self))
   }
 
+  static let optionalNoneCaseIndex = 0
+  static let optionalSomeCaseIndex = 1
+
+  public func createOptionalNone(type: Type) -> EnumInst {
+    return createEnum(caseIndex: Self.optionalNoneCaseIndex, payload: nil, enumType: type)
+  }
+
+  public func createOptionalSome(operand: Value, type: Type) -> EnumInst {
+    return createEnum(caseIndex: Self.optionalSomeCaseIndex, payload: operand, enumType: type)
+  }
+
   public func createThinToThickFunction(thinFunction: Value, resultType: Type) -> ThinToThickFunctionInst {
     let tttf = bridged.createThinToThickFunction(thinFunction.bridged, resultType.bridged)
     return notifyNew(tttf.getAs(ThinToThickFunctionInst.self))
@@ -655,6 +721,11 @@ public struct Builder {
     return notifyNew(store.getAs(StoreInst.self))
   }
 
+  public func createStoreBorrow(source: Value, destination: Value) -> StoreBorrowInst {
+    let storeBorrow = bridged.createStoreBorrow(source.bridged, destination.bridged)
+    return notifyNew(storeBorrow.getAs(StoreBorrowInst.self))
+  }
+
   public func createInitExistentialRef(instance: Value,
                                        existentialType: Type,
                                        formalConcreteType: CanonicalType,
@@ -677,6 +748,22 @@ public struct Builder {
                                                    BridgedConformanceArray(pcArray: $0))
     }
     return notifyNew(initExistential.getAs(InitExistentialMetatypeInst.self))
+  }
+
+  public func createScalarPackIndex(componentIndex: Int, indexedPackType: CanonicalType) -> ScalarPackIndexInst {
+    let scalarPackIndex = bridged.createScalarPackIndex(SwiftInt(componentIndex), indexedPackType.bridged)
+    return notifyNew(scalarPackIndex.getAs(ScalarPackIndexInst.self))
+  }
+
+  public func createPackElementGet(packIndex: Value, pack: Value, elementType: Type) -> PackElementGetInst {
+    let packElementGet = bridged.createPackElementGet(packIndex.bridged, pack.bridged, elementType.bridged)
+    return notifyNew(packElementGet.getAs(PackElementGetInst.self))
+  }
+
+  @discardableResult
+  public func createPackElementSet(elementValue: Value, packIndex: Value, pack: Value) -> PackElementSetInst {
+    let packElementSet = bridged.createPackElementSet(elementValue.bridged, packIndex.bridged, pack.bridged)
+    return notifyNew(packElementSet.getAs(PackElementSetInst.self))
   }
 
   public func createMetatype(
@@ -765,6 +852,9 @@ public struct Builder {
 extension Builder {
   public func emitDestroy(of value: Value) {
     if value.type.isTrivial(in: value.parentFunction) {
+      return
+    }
+    if value.type.isAddress {
       return
     }
     if value.parentFunction.hasOwnership {

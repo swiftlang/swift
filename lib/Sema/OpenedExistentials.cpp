@@ -698,7 +698,7 @@ bool swift::canOpenExistentialAt(ValueDecl *callee, unsigned paramIdx,
 
   // Only allow opening the innermost generic parameters.
   auto genericContext = callee->getAsGenericContext();
-  if (!genericContext || !genericContext->isGeneric())
+  if (!genericContext || !genericContext->hasGenericParamList())
     return false;
 
   auto genericSig = callee->getInnermostDeclContext()
@@ -915,7 +915,7 @@ Type swift::typeEraseOpenedExistentialReference(
 
 Type swift::typeEraseOpenedArchetypesFromEnvironment(
     Type type, GenericEnvironment *env) {
-  assert(env->getKind() == GenericEnvironment::Kind::OpenedExistential);
+  ASSERT(env->getKind() == GenericEnvironment::Kind::Existential);
 
   return typeEraseExistentialSelfReferences(
       type,

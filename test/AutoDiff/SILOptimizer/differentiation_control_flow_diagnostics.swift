@@ -84,23 +84,27 @@ func testTryApply(_ x: Float) -> Float {
   return x
 }
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable(reverse)
-// expected-note @+1 {{when differentiating this function definition}}
 func withoutDerivative<T : Differentiable, R: Differentiable>(
   at x: T, in body: (T) throws -> R
 ) rethrows -> R {
-  // expected-note @+1 {{expression is not differentiable}}
+  // expected-error @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
   try body(x)
 }
 
 // Tests active `try_apply`.
+@differentiable(reverse)
+func testNilCoalescing(_ maybeX: Float?) -> Float {
+  return maybeX ?? 10
+}
+
 // expected-error @+1 {{function is not differentiable}}
 @differentiable(reverse)
 // expected-note @+1 {{when differentiating this function definition}}
-func testNilCoalescing(_ maybeX: Float?) -> Float {
-  // expected-note @+1 {{expression is not differentiable}}
-  return maybeX ?? 10
+func testNilCoalescingActive(_ maybeX: Float?, y: Float) -> Float {
+  // expected-note @+1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}}
+  return maybeX ?? y
 }
 
 // Test unsupported differentiation of active enum values.

@@ -50,8 +50,9 @@ struct GenericArguments {
   /// The values to use to initialize the arguments structure.
   SmallVector<llvm::Value *, 8> Values;
   SmallVector<llvm::Type *, 8> Types;
+  bool hasPacks = false;
 
- void collectTypes(IRGenModule &IGM, NominalTypeDecl *nominal) {
+  void collectTypes(IRGenModule &IGM, NominalTypeDecl *nominal) {
     GenericTypeRequirements requirements(IGM, nominal);
     collectTypes(IGM, requirements);
   }
@@ -59,6 +60,7 @@ struct GenericArguments {
   void collectTypes(IRGenModule &IGM,
                     const GenericTypeRequirements &requirements) {
     for (auto &requirement : requirements.getRequirements()) {
+      hasPacks = hasPacks || requirement.isAnyPack();
       Types.push_back(requirement.getType(IGM));
     }
   }

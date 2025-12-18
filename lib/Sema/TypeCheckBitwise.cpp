@@ -247,7 +247,7 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
     return true;
   }
 
-  if (dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())
+  if (dc->mapTypeIntoEnvironment(nominal->getDeclaredInterfaceType())
           ->isNoncopyable()) {
     // Already separately diagnosed when explicit.
     return true;

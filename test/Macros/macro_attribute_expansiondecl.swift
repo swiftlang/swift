@@ -160,10 +160,19 @@ struct S1 {
 
 // FIXME: Diagnostics could be better.
 struct S2 { // expected-note 4 {{add '@available' attribute to enclosing struct}}
-  // expected-note@+3 6 {{in expansion of macro 'funcFromClosureMacro' here}}
   // expected-error@+2 {{'APIFrom99()' is only available in macOS 99 or newer}}
-  // expected-error@+2 {{'APIFrom99()' is only available in macOS 99 or newer}} expected-note@+2 {{add 'if #available' version check}}
+  // expected-error@+12 {{'APIFrom99()' is only available in macOS 99 or newer}} expected-note@+12 {{add 'if #available' version check}}
   #funcFromClosureMacro(APIFrom99()) {
+    /*
+    expected-note@-2 6 {{in expansion of macro 'funcFromClosureMacro' here}}
+    expected-expansion@-3:3{{
+      expected-note@1:6 2{{add '@available' attribute to enclosing instance method}}
+      expected-error@2:9{{'APIFrom99()' is only available in macOS 99 or newer}}
+      expected-note@2:9{{add 'if #available' version check}}
+      expected-error@14:11{{'APIFrom99()' is only available in macOS 99 or newer}}
+      expected-note@14:11{{add 'if #available' version check}}
+    }}
+    */
     _ = APIFrom99()
     if #available(macOS 999, *) {
       _ = APIFrom99()

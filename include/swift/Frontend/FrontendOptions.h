@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
+#include "swift/AST/AttrKind.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/Version.h"
@@ -66,11 +67,15 @@ public:
 
   bool isOutputFileDirectory() const;
 
-  /// An Objective-C header to import and make implicitly visible.
+  /// A C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
 
-  /// An Objective-C pch to import and make implicitly visible.
+  /// A C pch to import and make implicitly visible.
   std::string ImplicitObjCPCHPath;
+
+  /// Whether the imported C header or precompiled header is considered
+  /// an internal import (vs. the default, a public import).
+  bool ImportHeaderAsInternal = false;
 
   /// The map of aliases and real names of imported or referenced modules.
   llvm::StringMap<std::string> ModuleAliasMap;
@@ -294,11 +299,6 @@ public:
   /// \see ModuleDecl::isImplicitDynamicEnabled
   bool EnableImplicitDynamic = false;
 
-  /// Enables the "fully resilient" resilience strategy.
-  ///
-  /// \see ResilienceStrategy::Resilient
-  bool EnableLibraryEvolution = false;
-
   /// If set, this module is part of a mixed Objective-C/Swift framework, and
   /// the Objective-C half should implicitly be visible to the Swift sources.
   bool ImportUnderlyingModule = false;
@@ -326,6 +326,10 @@ public:
   /// Indicates that the frontend should print the target triple and then
   /// exit.
   bool PrintTargetInfo = false;
+
+  /// Indicates that the frontend should print the static build configuration
+  /// information as JSON.
+  bool PrintBuildConfig = false;
 
   /// Indicates that the frontend should print the supported features and then
   /// exit.
@@ -394,6 +398,9 @@ public:
 
   /// The path at which to either serialize or deserialize the dependency scanner cache.
   std::string SerializedDependencyScannerCachePath;
+
+  /// Emit dependency scanning related remarks.
+  bool EmitDependencyScannerRemarks = false;
 
   /// Emit remarks indicating use of the serialized module dependency scanning cache.
   bool EmitDependencyScannerCacheRemarks = false;
@@ -497,6 +504,10 @@ public:
   /// Indicates which declarations should be exposed in the generated clang
   /// header.
   std::optional<ClangHeaderExposeBehavior> ClangHeaderExposedDecls;
+
+  // Include declarations that are at least as visible as the acces specified
+  // by -emit-clang-header-min-access
+  std::optional<AccessLevel> ClangHeaderMinAccess;
 
   struct ClangHeaderExposedImportedModule {
     std::string moduleName;

@@ -8,14 +8,14 @@
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Lib.private.swiftinterface
 
-// RUN: %target-swift-frontend -typecheck -verify %t/ClientA.swift -I %t
-// RUN: %target-swift-frontend -typecheck -verify %t/ClientB.swift -I %t
-// RUN: %target-swift-frontend -typecheck -verify %t/ClientC.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/ClientA.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/ClientB.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/ClientC.swift -I %t
 
 // RUN: rm %t/Lib.swiftmodule
-// RUN: %target-swift-frontend -typecheck -verify %t/ClientA.swift -I %t
-// RUN: %target-swift-frontend -typecheck -verify %t/ClientB.swift -I %t
-// RUN: %target-swift-frontend -typecheck -verify %t/ClientC.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/ClientA.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/ClientB.swift -I %t
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/ClientC.swift -I %t
 
 // RUN: %target-swift-frontend -emit-module %t/ClientA.swift \
 // RUN:   -module-name ClientA -swift-version 5 -I %t \

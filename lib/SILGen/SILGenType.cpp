@@ -771,7 +771,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // The type of the witness thunk.
   auto reqtSubstTy = cast<AnyFunctionType>(
     reqtOrigTy->substGenericArgs(reqtSubMap)
-              ->mapTypeOutOfContext()
+              ->mapTypeOutOfEnvironment()
               ->getCanonicalType());
 
   // Rewrite the conformance in terms of the requirement environment's Self
@@ -787,7 +787,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   if (conformance.isConcrete()) {
     conformance = reqtSubMap.lookupConformance(M.getASTContext().TheSelfType,
                                                origConformance.getProtocol())
-        .mapConformanceOutOfContext();
+        .mapConformanceOutOfEnvironment();
     ASSERT(!conformance.isAbstract());
 
     manglingConformance = conformance.getConcrete();
@@ -821,7 +821,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   if (auto accessor = dyn_cast<AccessorDecl>(requirement.getDecl())) {
     if (accessor->isCoroutine()) {
       witnessSubsForTypeLowering =
-        witness.getSubstitutions().mapReplacementTypesOutOfContext();
+        witness.getSubstitutions().mapReplacementTypesOutOfEnvironment();
       if (accessor->isRequirementWithSynthesizedDefaultImplementation())
         allowDuplicateThunk = true;
     }
@@ -863,8 +863,13 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // setting on the theory that forcing inlining off should only
   // effect the user's function, not otherwise invisible thunks.
   Inline_t InlineStrategy = InlineDefault;
-  if (witnessRef.isAlwaysInline())
-    InlineStrategy = AlwaysInline;
+  if (witnessRef.isUnderscoredAlwaysInline())
+    InlineStrategy = HeuristicAlwaysInline;
+  // We don't guarantee @inline(always) will inline devirtualized thunks. But we
+  // want to make an best-effort attempt to inline.
+  else if (witnessRef.isAlwaysInline())
+    InlineStrategy = HeuristicAlwaysInline;
+
 
   SILFunction *f = M.lookUpFunction(nameBuffer);
   if (allowDuplicateThunk && f)
@@ -1117,7 +1122,7 @@ public:
     if (!witness)
       return addMissingDefault();
 
-    Type witnessInContext = Proto->mapTypeIntoContext(witness);
+    Type witnessInContext = Proto->mapTypeIntoEnvironment(witness);
     auto entry = SILWitnessTable::AssociatedTypeWitness{
                                           assocType,
                                           witnessInContext->getCanonicalType()};
@@ -1171,6 +1176,8 @@ originalAccessorKindForReplacementKind(AccessorKind kind) {
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
     return std::nullopt;
   }
 }
@@ -1347,7 +1354,7 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
   for (auto result : originalConvention.getDirectSILResults()) {
     auto ty = originalConvention.getSILType(
         result, function->getTypeExpansionContext());
-    ty = function->mapTypeIntoContext(ty);
+    ty = function->mapTypeIntoEnvironment(ty);
     directResultTypes.push_back(ty.getASTType());
   }
   SILType resultTy;

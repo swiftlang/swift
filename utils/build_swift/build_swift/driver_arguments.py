@@ -71,7 +71,7 @@ def _apply_default_arguments(args):
 
     # Set the default build variant.
     if args.build_variant is None:
-        args.build_variant = 'Debug'
+        args.build_variant = 'RelWithDebInfo'
 
     if args.llvm_build_variant is None:
         args.llvm_build_variant = args.build_variant
@@ -950,7 +950,7 @@ def create_argument_parser():
 
     with mutually_exclusive_group():
 
-        set_defaults(build_variant='Debug')
+        set_defaults(build_variant='RelWithDebInfo')
 
         option(['-d', '--debug'], store('build_variant'),
                const='Debug',
@@ -1252,6 +1252,12 @@ def create_argument_parser():
            default=False,
            help='Build and preview standard library documentation with Swift-DocC.'
                 'Note: this builds Swift-DocC to perform the docs build.')
+    option('--stdlib-docs-static-hosting', toggle_true,
+           default=False,
+           help='Build the standard library documentation for static hosting.')
+    option('--stdlib-docs-hosting-base-path', store,
+           default='/',
+           help='The base path for hosting the standard library documentation.')
 
     option('--build-swift-clang-overlays', toggle_true,
            default=True,
@@ -1451,7 +1457,7 @@ def create_argument_parser():
            help='enable building llvm using modules')
 
     option('--llvm-targets-to-build', store,
-           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR',
+           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR;BPF',
            help='LLVM target generators to build')
 
     option('--llvm-ninja-targets', append,

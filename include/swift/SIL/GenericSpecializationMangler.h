@@ -83,7 +83,9 @@ class GenericSpecializationMangler : public SpecializationMangler {
     return Function->getLoweredFunctionType()->getInvocationGenericSignature();
   }
 
-  void appendSubstitutions(GenericSignature sig, SubstitutionMap subs);
+  void appendSubstitutions(GenericSignature calleeSig,
+                           SubstitutionMap calleeSubs,
+                           GenericSignature callerSig);
 
   std::string manglePrespecialized(GenericSignature sig,
                                       SubstitutionMap subs);
@@ -112,7 +114,9 @@ public:
   std::string mangleReabstracted(SubstitutionMap subs, bool alternativeMangling,
                                  const SmallBitVector &paramsRemoved = SmallBitVector());
 
-  std::string mangleForDebugInfo(GenericSignature sig, SubstitutionMap subs,
+  std::string mangleForDebugInfo(GenericSignature calleeSig,
+                                 SubstitutionMap calleeSubs,
+                                 GenericSignature callerSubs,
                                  bool forInlining);
 
   std::string manglePrespecialized(SubstitutionMap subs) {

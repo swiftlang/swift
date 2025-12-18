@@ -56,6 +56,8 @@ function(copy_library_sources name from_prefix to_prefix)
     "${ARG_ROOT}/${from_prefix}/${name}/*.c"
     "${ARG_ROOT}/${from_prefix}/${name}/*.mm"
     "${ARG_ROOT}/${from_prefix}/${name}/*.m"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.S"
+    "${ARG_ROOT}/${from_prefix}/${name}/*.asm"
     "${ARG_ROOT}/${from_prefix}/${name}/*.def"
     "${ARG_ROOT}/${from_prefix}/${name}/*.gyb"
     "${ARG_ROOT}/${from_prefix}/${name}/*.apinotes"
@@ -84,7 +86,6 @@ set(CoreLibs
   CompatibilityOverride
   stubs
   CommandLineSupport
-  core
   SwiftOnoneSupport
   RemoteInspection
   SwiftRemoteMirror
@@ -94,6 +95,10 @@ set(CoreLibs
 foreach(library ${CoreLibs})
   copy_library_sources(${library} "public" "Core")
 endforeach()
+
+# copying Core/core separately, so we can specify the case of the target folder
+# correctly on case sensitive file systems
+copy_library_sources("" "public/core" "Core/Core")
 
 message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Core/Info.plist.in")
 copy_files("" "Core" FILES "Info.plist.in")
@@ -115,6 +120,9 @@ copy_files("" "Supplemental/Synchronization" FILES "Info.plist.in")
 
 message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Volatile/Info.plist.in")
 copy_files("" "Supplemental/Volatile" FILES "Info.plist.in")
+
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Runtime/Info.plist.in")
+copy_files("" "Supplemental/Runtime" FILES "Info.plist.in")
 
 # Platform Overlays
 
@@ -149,6 +157,22 @@ message(STATUS "Android Math[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_
 copy_files(public/Platform Overlay/Android/Math
   FILES
     Math.swift)
+
+# Linux Glibc Overlay
+message(STATUS "Glibc modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Linux/glibc/clang")
+copy_files(public/Platform Overlay/Linux/glibc/clang
+  FILES
+    glibc.modulemap.gyb
+    SwiftGlibc.h.gyb)
+
+message(STATUS "Glibc [${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Linux/glibc")
+copy_files(public/Platform Overlay/Linux/glibc
+  FILES
+    Glibc.swift.gyb
+    POSIXError.swift
+    Platform.swift
+    TiocConstants.swift
+    tgmath.swift.gyb)
 
 # Windows Overlay
 message(STATUS "WinSDK[${StdlibSources}/public/Windows] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/WinSDK")
@@ -185,6 +209,7 @@ copy_library_sources(Distributed "public" "Supplemental")
 copy_library_sources(Observation "public" "Supplemental")
 copy_library_sources(Synchronization "public" "Supplemental")
 copy_library_sources(Volatile "public" "Supplemental")
+copy_library_sources("" "public/RuntimeModule" "Supplemental/Runtime")
 
 copy_library_sources(_RegexParser "Sources" "Supplemental/StringProcessing"
   ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")

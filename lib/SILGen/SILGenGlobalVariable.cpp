@@ -50,7 +50,8 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
     formalLinkage = getDeclLinkage(gDecl);
   auto silLinkage = getSILLinkage(formalLinkage, forDef);
 
-  if (gDecl->getAttrs().hasAttribute<SILGenNameAttr>()) {
+  auto cExternAttr = ExternAttr::find(gDecl->getAttrs(), ExternKind::C);
+  if (gDecl->getAttrs().hasAttribute<SILGenNameAttr>() || cExternAttr) {
     silLinkage = SILLinkage::DefaultForDeclaration;
     if (! gDecl->hasInitialValue()) {
       forDef = NotForDefinition;
@@ -73,6 +74,13 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   auto *silGlobal = SILGlobalVariable::create(
       M, silLinkage, IsNotSerialized, mangledName, silTy, std::nullopt, gDecl);
   silGlobal->setDeclaration(!forDef);
+
+  if (auto sectionAttr = gDecl->getAttrs().getAttribute<SectionAttr>())
+    silGlobal->setSection(sectionAttr->Name);
+
+  if (cExternAttr) {
+    silGlobal->setAsmName(cExternAttr->getCName(gDecl));
+  }
 
   return silGlobal;
 }
@@ -235,6 +243,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
                                              IsNotSerialized,
                                              onceTokenBuffer, onceSILTy);
   onceToken->setDeclaration(false);
+  onceToken->setDeclContext(pd->getDeclContext());
 
   // Emit the initialization code into a function.
   Mangle::ASTMangler FuncMangler(pd->getASTContext());

@@ -62,3 +62,5 @@ void hexLiteral(int * __counted_by(0xfa) p);
 void binaryLiteral(int * __counted_by(0b10) p);
 
 void octalLiteral(int * __counted_by(0777) p);
+
+void variadic(int len, int * __counted_by(len) p, ...);

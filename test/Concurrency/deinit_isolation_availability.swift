@@ -2,6 +2,11 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 %s -strict-concurrency=complete -target %target-swift-6.1-abi-triple
 // RUN: %target-typecheck-verify-swift -swift-version 5 %s -strict-concurrency=complete -target %target-swift-6.1-abi-triple -target-min-inlining-version min -verify-additional-prefix inlining-
 
+// Test -emit-module configurations.
+
+// RUN: %target-swift-frontend -emit-module -verify -swift-version 5 %s -strict-concurrency=complete -target %target-swift-5.1-abi-triple -experimental-skip-non-inlinable-function-bodies -verify-additional-prefix inlining-
+// RUN: %target-swift-frontend -emit-module -verify -swift-version 5 %s -strict-concurrency=complete -target %target-swift-6.1-abi-triple -experimental-skip-non-inlinable-function-bodies -target-min-inlining-version min -verify-additional-prefix inlining-
+
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
 

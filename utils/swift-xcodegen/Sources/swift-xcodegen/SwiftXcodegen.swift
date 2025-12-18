@@ -295,7 +295,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
 
   func runTask<R>(
     _ body: @escaping @Sendable () throws -> R
-  ) async throws -> Task<R, Error> {
+  ) async throws -> Task<R, any Error> {
     let task = Task(operation: body)
     if !self.parallel {
       _ = try await task.value
@@ -307,13 +307,6 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
     guard log.logLevel <= .note else { return }
 
     var notes: [String] = []
-    if projectOpts.useBuildableFolders {
-      notes.append("""
-        - Buildable folders are enabled by default, which requires Xcode 16. You
-          can pass '--no-buildable-folders' to disable this. See the '--help'
-          entry for more info.
-        """)
-    }
 
     if !projectOpts.addStdlibSwift {
       notes.append("""

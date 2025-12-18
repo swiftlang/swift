@@ -72,7 +72,6 @@ import SubE
 // CHECK-SAME: Bridging.h
 
 // CHECK-NEXT: "sourceFiles":
-// CHECK-NEXT: ChainedBridgingHeader.h
 // CHECK-NEXT: Bridging.h
 // CHECK-NEXT: BridgingOther.h
 
@@ -153,7 +152,6 @@ import SubE
 // CHECK: "directDependencies"
 // CHECK-NEXT: {
 // CHECK-DAG:   "clang": "G"
-// CHECK-DAG:   "swift": "Swift"
 // CHECK-DAG:   "swift": "SwiftOnoneSupport"
 // CHECK: ],
 // CHECK-NEXT: "linkLibraries": [
@@ -174,10 +172,6 @@ import SubE
 /// --------Swift module E
 // CHECK: "swift": "E"
 // CHECK-LABEL: modulePath": "{{.*}}{{/|\\}}E-{{.*}}.swiftmodule"
-// CHECK: "directDependencies"
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "Swift"
-
 // CHECK: "moduleInterfacePath"
 // CHECK-SAME: E.swiftinterface
 

@@ -65,6 +65,7 @@ inline SpanOfInt initSpan(int arr[], size_t size) {
 struct DependsOnSelf {
   std::vector<int> v;
   __attribute__((swift_name("get()")))
+  __attribute__((swift_attr("@safe")))
   ConstSpanOfInt get() const [[clang::lifetimebound]] { return ConstSpanOfInt(v.data(), v.size()); }
 };
 
@@ -180,5 +181,21 @@ inline void mutableKeyword(SpanOfInt copy [[clang::noescape]]) {}
 
 inline void spanWithoutTypeAlias(std::span<const int> s [[clang::noescape]]) {}
 inline void mutableSpanWithoutTypeAlias(std::span<int> s [[clang::noescape]]) {}
+
+#define IMMORTAL_FRT                                                           \
+  __attribute__((swift_attr("import_reference")))                              \
+  __attribute__((swift_attr("retain:immortal")))                               \
+  __attribute__((swift_attr("release:immortal")))
+
+struct IMMORTAL_FRT DependsOnSelfFRT {
+  std::vector<int> v;
+  __attribute__((swift_name("get()"))) ConstSpanOfInt get() const
+      [[clang::lifetimebound]] {
+    return ConstSpanOfInt(v.data(), v.size());
+  }
+  SpanOfInt getMutable() [[clang::lifetimebound]] {
+    return SpanOfInt(v.data(), v.size());
+  }
+};
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H

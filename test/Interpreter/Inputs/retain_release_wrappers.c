@@ -10,6 +10,9 @@ void swift_unownedRelease_n(void *, uint32_t);
 void *swift_nonatomic_unownedRetain_n(void *, uint32_t);
 void swift_nonatomic_unownedRelease_n(void *, uint32_t);
 
+void *swift_bridgeObjectRetain(void *);
+void swift_bridgeObjectRelease(void *);
+
 // Wrappers so we can call these from Swift without upsetting the ARC optimizer.
 void *wrapper_swift_retain_n(void *obj, uint32_t n) {
   return swift_retain_n(obj, n);
@@ -43,4 +46,10 @@ void wrapper_swift_nonatomic_unownedRelease_n(void *obj, uint32_t n) {
   swift_nonatomic_unownedRelease_n(obj, n);
 }
 
+void *wrapper_swift_bridgeObjectRetain(void *obj) {
+  return swift_bridgeObjectRetain(obj);
+}
 
+void wrapper_swift_bridgeObjectRelease(void *obj) {
+  swift_bridgeObjectRelease(obj);
+}

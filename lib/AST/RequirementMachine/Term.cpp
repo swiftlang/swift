@@ -39,13 +39,9 @@ struct Term::Storage final
     return Size;
   }
 
-  MutableArrayRef<Symbol> getElements() {
-    return {getTrailingObjects<Symbol>(), Size};
-  }
+  MutableArrayRef<Symbol> getElements() { return getTrailingObjects(Size); }
 
-  ArrayRef<Symbol> getElements() const {
-    return {getTrailingObjects<Symbol>(), Size};
-  }
+  ArrayRef<Symbol> getElements() const { return getTrailingObjects(Size); }
 
   void Profile(llvm::FoldingSetNodeID &id) const;
 };
@@ -70,6 +66,17 @@ std::reverse_iterator<const Symbol *> Term::rend() const {
 
 Symbol Term::back() const {
   return Ptr->getElements().back();
+}
+
+bool Term::hasShape() const {
+  return back().getKind() == Symbol::Kind::Shape;
+}
+
+MutableTerm Term::termWithoutShape() const {
+  if (hasShape())
+    return MutableTerm(begin(), end() - 1);
+  else
+    return MutableTerm(begin(), end());
 }
 
 Symbol Term::operator[](size_t index) const {
@@ -226,6 +233,15 @@ std::optional<int> Term::compare(Term other, RewriteContext &ctx) const {
 std::optional<int> MutableTerm::compare(const MutableTerm &other,
                                         RewriteContext &ctx) const {
   return compareImpl(begin(), end(), other.begin(), other.end(), ctx);
+}
+
+bool MutableTerm::hasShape() const {
+  return back().getKind() == Symbol::Kind::Shape;
+}
+
+void MutableTerm::removeShape() {
+  if (hasShape())
+    Symbols.pop_back();
 }
 
 /// Replace the subterm in the range [from,to) of this term with \p rhs.

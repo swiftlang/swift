@@ -487,7 +487,8 @@ bool SILPassManager::continueWithNextSubpassRun(
 
   unsigned subPass = numSubpassesRun++;
 
-  if (isFunctionSelectedForPrinting(function) && SILPrintEverySubpass) {
+  if (SILPrintEverySubpass && isFunctionSelectedForPrinting(function) &&
+      doPrintBefore(trans, function)) {
     dumpPassInfo("*** SIL function before ", trans, function);
     llvm::dbgs() << "  *** sub-pass " << subPass << " for ";
     if (forTransformee) {
@@ -577,8 +578,6 @@ void SILPassManager::dumpPassInfo(const char *Title, unsigned TransIdx,
 
 bool SILPassManager::isMandatoryFunctionPass(SILFunctionTransform *sft) {
   return isMandatory ||
-         sft->getPassKind() ==
-             PassKind::NonTransparentFunctionOwnershipModelEliminator ||
          sft->getPassKind() == PassKind::OwnershipModelEliminator;
 }
 

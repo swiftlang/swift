@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -typecheck %s -Xfrontend -verify
+// RUN: %target-build-swift -typecheck %s -Xfrontend -verify -Xfrontend -verify-ignore-unrelated
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 

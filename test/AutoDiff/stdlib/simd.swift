@@ -2,6 +2,9 @@
 // REQUIRES: executable_test
 
 // Would fail due to unavailability of swift_autoDiffCreateLinearMapContext.
+/* Temporary disabled until https://github.com/swiftlang/swift/issues/84840 is fixed
+   We cannot use `SIMD` :( */
+// XFAIL: *
 
 import _Differentiation
 import StdlibUnittest

@@ -56,7 +56,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   var b = a.1+a.f
 
   // Tuple expressions with named elements.
-  var i : (y : Int, x : Int) = (x : 42, y : 11) // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated}}
+  var i : (y : Int, x : Int) = (x : 42, y : 11) // expected-warning {{implicit reordering of tuple elements from 'x:y:' to 'y:x:' is deprecated; this will be an error in a future Swift language mode}}
   funcdecl1(123, 444)
   
   // Calls.
@@ -551,7 +551,7 @@ do {
   let qux: () -> Void
 
   f(qux)
-  f(id(qux)) // expected-error {{conflicting arguments to generic parameter 'T' ('() -> Void' vs. '@convention(block) () -> Void')}}
+  f(id(qux))
 
   func forceUnwrap<T>(_: T?) -> T {}
 

@@ -105,12 +105,17 @@ print(ElementType.paper.unknown())
 #if TEST_DIAGNOSTICS
 @addMembersQuotedInit
 struct S2 {
-// expected-note@-2 {{in expansion of macro 'addMembersQuotedInit' on struct 'S2' here}}
   func useSynthesized() {
     S.method()
     print(type(of: getStorage()))
   }
 }
+/*
+expected-expansion@-2:1{{
+  expected-error@14:1{{declaration name 'init()' is not covered by macro 'addMembersQuotedInit'}}
+}}
+expected-note@-11 {{in expansion of macro 'addMembersQuotedInit' on struct 'S2' here}}
+*/
 #endif
 
 @attached(

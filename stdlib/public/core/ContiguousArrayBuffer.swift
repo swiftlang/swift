@@ -141,6 +141,7 @@ internal final class _ContiguousArrayStorage<
 
 #if _runtime(_ObjC)
   
+  @_effects(releasenone)
   internal final override func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {

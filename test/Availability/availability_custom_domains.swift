@@ -568,3 +568,31 @@ class DerivedUnavailable2: BaseAvailableInEnabledDomain { } // expected-error {{
 @available(DisabledDomain, unavailable)
 class DerivedUnavailable3: BaseAvailableInEnabledDomain { }
 
+
+// Protocol conformance availability.
+protocol P { }
+
+struct MyType1 { }
+
+@available(EnabledDomain)
+extension MyType1: P { }
+
+struct MyType2 { }
+
+@available(AlwaysEnabledDomain)
+extension MyType2: P { }
+
+struct MyType3 { }
+
+@available(DisabledDomain)
+extension MyType3: P { }
+
+func acceptP<T: P>(_: T.Type) { }
+
+func testP() { // expected-note 2{{add '@available' attribute to enclosing global function}}
+  acceptP(MyType1.self) // expected-error{{conformance of 'MyType1' to 'P' is only available in EnabledDomain}}
+  // expected-note@-1{{add 'if #available' version check}}
+  acceptP(MyType2.self) // okay
+  acceptP(MyType3.self)  // expected-error{{conformance of 'MyType3' to 'P' is only available in DisabledDomain}}
+  // expected-note@-1{{add 'if #available' version check}}
+}

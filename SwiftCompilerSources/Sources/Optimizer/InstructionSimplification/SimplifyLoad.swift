@@ -75,7 +75,7 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
        index < stringLiteral.value.count {
 
       let builder = Builder(before: self, context)
-      let charLiteral = builder.createIntegerLiteral(Int(stringLiteral.value[index]), type: type)
+      let charLiteral = builder.createIntegerLiteral(stringLiteral.value[index], type: type)
       uses.replaceAll(with: charLiteral, context)
       context.erase(instruction: self)
       return true
@@ -107,7 +107,7 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
     var cloner = Cloner(cloneBefore: self, context)
     defer { cloner.deinitialize() }
 
-    let initVal = cloner.cloneRecursivelyToGlobal(value: globalInitVal)
+    let initVal = cloner.cloneRecursively(globalInitValue: globalInitVal)
 
     uses.replaceAll(with: initVal, context)
     // Also erases a builtin "once" on which the global_addr depends on. This is fine

@@ -863,37 +863,52 @@ CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
 }
 
 llvm::Constant *irgen::getCoroFrameAllocStubFn(IRGenModule &IGM) {
+  // If the coroutine allocation function is always available, call it directly.
+  auto coroAllocPtr = IGM.getCoroFrameAllocFn();
+  auto coroAllocFn = dyn_cast<llvm::Function>(coroAllocPtr);
+  if (coroAllocFn->getLinkage() != llvm::GlobalValue::ExternalWeakLinkage)
+    return coroAllocFn;
+
+  // Otherwise, create a stub function to call it when available, or malloc
+  // when it isn't.
   return IGM.getOrCreateHelperFunction(
-    "__swift_coroFrameAllocStub", IGM.Int8PtrTy,
-    {IGM.SizeTy, IGM.Int64Ty},
-    [&](IRGenFunction &IGF) {
-      auto parameters = IGF.collectParameters();
-      auto *size = parameters.claimNext();
-      auto coroAllocPtr = IGF.IGM.getCoroFrameAllocFn();
-      auto coroAllocFn = dyn_cast<llvm::Function>(coroAllocPtr);
-      coroAllocFn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
-      auto *coroFrameAllocFn = IGF.IGM.getOpaquePtr(coroAllocPtr);
-      auto *nullSwiftCoroFrameAlloc = IGF.Builder.CreateCmp(
-        llvm::CmpInst::Predicate::ICMP_NE, coroFrameAllocFn,
-        llvm::ConstantPointerNull::get(
-            cast<llvm::PointerType>(coroFrameAllocFn->getType())));
-      auto *coroFrameAllocReturn = IGF.createBasicBlock("return-coroFrameAlloc");
-      auto *mallocReturn = IGF.createBasicBlock("return-malloc");
-      IGF.Builder.CreateCondBr(nullSwiftCoroFrameAlloc, coroFrameAllocReturn, mallocReturn);
+      "__swift_coroFrameAllocStub", IGM.Int8PtrTy, {IGM.SizeTy, IGM.Int64Ty},
+      [&](IRGenFunction &IGF) {
+        auto parameters = IGF.collectParameters();
+        auto *size = parameters.claimNext();
+        auto *coroFrameAllocFn = IGF.IGM.getOpaquePtr(coroAllocPtr);
+        auto *nullSwiftCoroFrameAlloc = IGF.Builder.CreateCmp(
+            llvm::CmpInst::Predicate::ICMP_NE, coroFrameAllocFn,
+            llvm::ConstantPointerNull::get(
+                cast<llvm::PointerType>(coroFrameAllocFn->getType())));
+        auto *coroFrameAllocReturn =
+            IGF.createBasicBlock("return-coroFrameAlloc");
+        auto *mallocReturn = IGF.createBasicBlock("return-malloc");
+        IGF.Builder.CreateCondBr(nullSwiftCoroFrameAlloc, coroFrameAllocReturn,
+                                 mallocReturn);
 
-      IGF.Builder.emitBlock(coroFrameAllocReturn);
-      auto *mallocTypeId = parameters.claimNext();
-      auto *coroFrameAllocCall = IGF.Builder.CreateCall(IGF.IGM.getCoroFrameAllocFunctionPointer(), {size, mallocTypeId});
-      IGF.Builder.CreateRet(coroFrameAllocCall);
+        IGF.Builder.emitBlock(coroFrameAllocReturn);
+        auto *mallocTypeId = parameters.claimNext();
+        auto *coroFrameAllocCall = IGF.Builder.CreateCall(
+            IGF.IGM.getCoroFrameAllocFunctionPointer(), {size, mallocTypeId});
+        IGF.Builder.CreateRet(coroFrameAllocCall);
 
-      IGF.Builder.emitBlock(mallocReturn);
-      auto *mallocCall = IGF.Builder.CreateCall(IGF.IGM.getMallocFunctionPointer(), {size});
-      IGF.Builder.CreateRet(mallocCall);
-    },
-    /*setIsNoInline=*/false,
-    /*forPrologue=*/false,
-    /*isPerformanceConstraint=*/false,
-    /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::C);
+        IGF.Builder.emitBlock(mallocReturn);
+        auto *mallocCall =
+            IGF.Builder.CreateCall(IGF.IGM.getMallocFunctionPointer(), {size});
+        IGF.Builder.CreateRet(mallocCall);
+      },
+      /*setIsNoInline=*/false,
+      /*forPrologue=*/false,
+      /*isPerformanceConstraint=*/false,
+      /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::C);
+}
+
+FunctionPointer irgen::getCoroFrameAllocStubFunctionPointer(IRGenModule &IGM) {
+  auto *fn = cast<llvm::Function>(getCoroFrameAllocStubFn(IGM));
+  auto sig = Signature::forFunction(fn);
+  return FunctionPointer::forDirect(FunctionPointerKind::Function, fn, nullptr,
+                                    sig);
 }
 
 static Size getOffsetOfOpaqueIsolationField(IRGenModule &IGM,
@@ -1486,7 +1501,7 @@ public:
     auto prototype = subIGF.IGM.getOpaquePtr(
       subIGF.IGM.getAddrOfContinuationPrototype(
         cast<SILFunctionType>(
-          unsubstType->mapTypeOutOfContext()->getCanonicalType()),
+          unsubstType->mapTypeOutOfEnvironment()->getCanonicalType()),
         origType->getInvocationGenericSignature()));
 
     
@@ -1626,7 +1641,6 @@ public:
 
     /// Get the continuation function pointer
     ///
-    auto sig = Signature::forCoroutineContinuation(subIGF.IGM, origType);
     auto schemaAndEntity =
       getCoroutineResumeFunctionPointerAuth(subIGF.IGM, origType);
     auto pointerAuth = PointerAuthInfo::emit(subIGF, schemaAndEntity.first,

@@ -6,15 +6,19 @@ struct UnicodeScalar {}
 
 enum Never {}
 
+class ArrayBufer {}
+
 // Minimal implementation to support varargs.
-struct Array<T> { }
+struct Array<T> {
+  let buffer: ArrayBufer
+}
 
 func _allocateUninitializedArray<T>(_: Builtin.Word)
   -> (Array<T>, Builtin.RawPointer) {
   Builtin.int_trap()
 }
 
-func _finalizeUninitializedArray<T>(_ a: Array<T>) -> Array<T> {
+func _finalizeUninitializedArray<T>(_ a: __owned Array<T>) -> Array<T> {
   return a
 }
 
@@ -63,7 +67,7 @@ arg_default_tuple(x:i, y:f)
 
 func variadic_arg_1(_ x: Int...) {}
 // CHECK-LABEL: sil hidden [ossa] @$ss14variadic_arg_1{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[X:%[0-9]+]] : $Array<Int>):
+// CHECK: bb0([[X:%[0-9]+]] : @guaranteed $Array<Int>):
 
 variadic_arg_1()
 variadic_arg_1(i)
@@ -72,7 +76,7 @@ variadic_arg_1(i, i, i)
 
 func variadic_arg_2(_ x: Int, _ y: Float...) {}
 // CHECK-LABEL: sil hidden [ossa] @$ss14variadic_arg_2{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Array<Float>):
+// CHECK: bb0([[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : @guaranteed $Array<Float>):
 
 variadic_arg_2(i)
 variadic_arg_2(i, f)
@@ -80,15 +84,15 @@ variadic_arg_2(i, f, f, f)
 
 func variadic_arg_3(_ y: Float..., x: Int) {}
 // CHECK-LABEL: sil hidden [ossa] @$ss14variadic_arg_3{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[Y:%[0-9]+]] : $Array<Float>, [[X:%[0-9]+]] : $Int):
+// CHECK: bb0([[Y:%[0-9]+]] : @guaranteed $Array<Float>, [[X:%[0-9]+]] : $Int):
 
 func variadic_arg_4(_ y: Float..., x: Int...) {}
 // CHECK-LABEL: sil hidden [ossa] @$ss14variadic_arg_4{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[Y:%[0-9]+]] : $Array<Float>, [[X:%[0-9]+]] : $Array<Int>):
+// CHECK: bb0([[Y:%[0-9]+]] : @guaranteed $Array<Float>, [[X:%[0-9]+]] : @guaranteed $Array<Int>):
 
 func variadic_arg_5(a: Int, b: Float..., c: Int, d: Int...) {}
 // CHECK-LABEL: sil hidden [ossa] @$ss14variadic_arg_5{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[A:%[0-9]+]] : $Int, [[B:%[0-9]+]] : $Array<Float>, [[C:%[0-9]+]] : $Int, [[D:%[0-9]+]] : $Array<Int>):
+// CHECK: bb0([[A:%[0-9]+]] : $Int, [[B:%[0-9]+]] : @guaranteed $Array<Float>, [[C:%[0-9]+]] : $Int, [[D:%[0-9]+]] : @guaranteed $Array<Int>):
 
 variadic_arg_3(x: i)
 variadic_arg_3(f, x: i)

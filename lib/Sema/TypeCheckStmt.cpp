@@ -25,6 +25,7 @@
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -152,7 +153,7 @@ namespace {
 
       // Auxiliary decls need to have their contexts adjusted too.
       if (auto *VD = dyn_cast<VarDecl>(D)) {
-        VD->visitAuxiliaryDecls([&](VarDecl *D) {
+        VD->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *D) {
           D->setDeclContext(ParentDC);
         });
       }
@@ -810,6 +811,37 @@ ConcreteDeclRef TypeChecker::getReferencedDeclForHasSymbolCondition(Expr *E) {
   return ConcreteDeclRef();
 }
 
+static bool typeCheckAvailableStmtConditionElement(StmtConditionElement &elt,
+                                                   bool &isFalseable,
+                                                   DeclContext *dc) {
+  auto info = elt.getAvailability();
+  if (info->isInvalid()) {
+    isFalseable = true;
+    return false;
+  }
+
+  auto &diags = dc->getASTContext().Diags;
+  bool isConditionAlwaysTrue = false;
+
+  if (auto query = info->getAvailabilityQuery()) {
+    auto domain = query->getDomain();
+    if (query->isConstant() && domain.isPermanentlyAlwaysEnabled()) {
+      isConditionAlwaysTrue = *query->getConstantResult();
+
+      diags
+        .diagnose(elt.getStartLoc(),
+                  diag::availability_query_useless_always_true, domain,
+                  isConditionAlwaysTrue)
+        .highlight(elt.getSourceRange());
+    }
+  }
+
+  if (!isConditionAlwaysTrue)
+    isFalseable = true;
+
+  return false;
+}
+
 static bool typeCheckHasSymbolStmtConditionElement(StmtConditionElement &elt,
                                                    DeclContext *dc) {
   auto Info = elt.getHasSymbolInfo();
@@ -833,7 +865,6 @@ static bool typeCheckHasSymbolStmtConditionElement(StmtConditionElement &elt,
 static bool typeCheckBooleanStmtConditionElement(StmtConditionElement &elt,
                                                  DeclContext *dc) {
   Expr *E = elt.getBoolean();
-  assert(!E->getType() && "the bool condition is already type checked");
   bool hadError = TypeChecker::typeCheckCondition(E, dc);
   elt.setBoolean(E);
   return hadError;
@@ -874,10 +905,6 @@ typeCheckPatternBindingStmtConditionElement(StmtConditionElement &elt,
   // provide type information.
   auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
   Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-  if (patternType->hasError()) {
-    typeCheckPatternFailed();
-    return true;
-  }
 
   // If the pattern didn't get a type, it's because we ran into some
   // unknown types along the way. We'll need to check the initializer.
@@ -895,8 +922,7 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
                                                 DeclContext *dc) {
   switch (elt.getKind()) {
   case StmtConditionElement::CK_Availability:
-    isFalsable = true;
-    return false;
+    return typeCheckAvailableStmtConditionElement(elt, isFalsable, dc);
   case StmtConditionElement::CK_HasSymbol:
     isFalsable = true;
     return typeCheckHasSymbolStmtConditionElement(elt, dc);
@@ -924,8 +950,9 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
         TypeChecker::typeCheckStmtConditionElement(elt, hadAnyFalsable, dc);
   }
 
-  // If the binding is not refutable, and there *is* an else, reject it as
-  // unreachable.
+  // If none of the statement's conditions can be false, diagnose.
+  // FIXME: Also diagnose if none of the statements conditions can be true.
+  // FIXME: Offer a fix-it to remove the unreachable code.
   if (!hadAnyFalsable && !hadError) {
     auto &diags = dc->getASTContext().Diags;
     Diag<> msg = diag::invalid_diagnostic;
@@ -1014,9 +1041,9 @@ public:
   /// DC - This is the current DeclContext.
   DeclContext *DC;
 
-  /// Skip type checking any elements inside 'BraceStmt', also this is
-  /// propagated to ConstraintSystem.
-  bool LeaveBraceStmtBodyUnchecked = false;
+  /// The BraceStmts that should be type-checked. This should always be `All`,
+  /// unless we're lazy type-checking for e.g completion.
+  BraceStmtChecking BraceChecking = BraceStmtChecking::All;
 
   ASTContext &getASTContext() const { return Ctx; };
 
@@ -1064,12 +1091,14 @@ public:
     auto &eval = getASTContext().evaluator;
     auto *S =
         evaluateOrDefault(eval, PreCheckReturnStmtRequest{RS, DC}, nullptr);
+    if (!S)
+      return nullptr;
 
-    // We do a cast here as it may have been turned into a FailStmt. We should
-    // return that without doing anything else.
-    RS = dyn_cast_or_null<ReturnStmt>(S);
+    // We do a cast here as we may now have a different stmt (e.g a FailStmt, or
+    // a BraceStmt for error cases). If so, recurse into the visitor.
+    RS = dyn_cast<ReturnStmt>(S);
     if (!RS)
-      return S;
+      return visit(S);
 
     auto TheFunc = AnyFunctionRef::fromDeclContext(DC);
     assert(TheFunc && "Should have bailed from pre-check if this is None");
@@ -1085,8 +1114,26 @@ public:
       return RS;
     }
 
+    auto *accessor = TheFunc->getAccessorDecl();
+    auto *exprToCheck = RS->getResult();
+    InOutExpr *inout = nullptr;
+
+    if (accessor && accessor->isMutateAccessor()) {
+      // Check that the returned expression is a &.
+      if ((inout = dyn_cast<InOutExpr>(exprToCheck))) {
+        ResultTy = InOutType::get(ResultTy);
+      } else {
+        getASTContext()
+            .Diags
+            .diagnose(exprToCheck->getLoc(), diag::missing_address_of_return)
+            .highlight(exprToCheck->getSourceRange());
+        inout = new (getASTContext()) InOutExpr(
+            exprToCheck->getStartLoc(), exprToCheck, Type(), /*implicit*/ true);
+      }
+    }
     using namespace constraints;
-    auto target = SyntacticElementTarget::forReturn(RS, ResultTy, DC);
+    auto target =
+        SyntacticElementTarget::forReturn(RS, exprToCheck, ResultTy, DC);
     auto resultTarget = TypeChecker::typeCheckTarget(target);
     if (resultTarget) {
       RS->setResult(resultTarget->getAsExpr());
@@ -1265,7 +1312,7 @@ public:
     if (!diagnosed) {
       auto *nominalDecl = fn->getDeclContext()->getSelfNominalTypeDecl();
       Type nominalType =
-          fn->mapTypeIntoContext(nominalDecl->getDeclaredInterfaceType());
+          fn->mapTypeIntoEnvironment(nominalDecl->getDeclaredInterfaceType());
 
       // must be noncopyable
       if (nominalType->isCopyable()) {
@@ -1278,6 +1325,22 @@ public:
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_no_deinit,
                            nominalType)
+            .fixItRemove(DS->getSourceRange());
+        diagnosed = true;
+      // if the type is public and not frozen, then the method must not be
+      // inlinable.
+      } else if (auto fragileKind = fn->getFragileFunctionKind();
+                 !nominalDecl->getAttrs().hasAttribute<FrozenAttr>()
+                 && fragileKind != FragileFunctionKind{FragileFunctionKind::None}) {
+        ctx.Diags.diagnose(DS->getDiscardLoc(),
+                           // Code in ABI stable SDKs has already used the `@inlinable`
+                           // attribute on functions using `discard self`.
+                           // Phase this in as a warning until those APIs
+                           // can be updated.
+                           fragileKind == FragileFunctionKind{FragileFunctionKind::Inlinable}
+                             ? diag::discard_in_inlinable_method_warning
+                             : diag::discard_in_inlinable_method,
+                           fragileKind.getSelector(), nominalType)
             .fixItRemove(DS->getSourceRange());
         diagnosed = true;
       } else {
@@ -1436,7 +1499,15 @@ public:
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    TypeChecker::typeCheckForEachPreamble(DC, S);
+    // If we're performing IDE inspection, we also want to skip the where
+    // clause if we're leaving the body unchecked.
+    // FIXME: This is a hack to avoid cycles through NamingPatternRequest when
+    // doing lazy type-checking, we ought to fix the request to be granular in
+    // the type-checking work it kicks.
+    bool skipWhere = (BraceChecking != BraceStmtChecking::All) &&
+      Ctx.SourceMgr.hasIDEInspectionTargetBuffer();
+
+    TypeChecker::typeCheckForEachPreamble(DC, S, skipWhere);
 
     // Type-check the body of the loop.
     auto sourceFile = DC->getParentSourceFile();
@@ -1632,10 +1703,11 @@ public:
     // Type-check the subject expression.
     Expr *subjectExpr = switchStmt->getSubjectExpr();
     auto resultTy = TypeChecker::typeCheckExpression(subjectExpr, DC);
+
     auto limitExhaustivityChecks = !resultTy;
-    if (Expr *newSubjectExpr =
-            TypeChecker::coerceToRValue(getASTContext(), subjectExpr))
-      subjectExpr = newSubjectExpr;
+    if (resultTy)
+      subjectExpr = TypeChecker::coerceToRValue(getASTContext(), subjectExpr);
+
     switchStmt->setSubjectExpr(subjectExpr);
     Type subjectType = switchStmt->getSubjectExpr()->getType();
 
@@ -1667,11 +1739,19 @@ public:
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, S);
 
-    // Type-check the 'do' body.  Type failures in here will generally
-    // not cause type failures in the 'catch' clauses.
-    Stmt *newBody = S->getBody();
-    typeCheckStmt(newBody);
-    S->setBody(newBody);
+    {
+      // If we have do-catch body checking enabled, make sure we visit the
+      // BraceStmt.
+      std::optional<llvm::SaveAndRestore<BraceStmtChecking>> braceChecking;
+      if (BraceChecking == BraceStmtChecking::OnlyDoCatchBody)
+        braceChecking.emplace(BraceChecking, BraceStmtChecking::All);
+
+      // Type-check the 'do' body.  Type failures in here will generally
+      // not cause type failures in the 'catch' clauses.
+      Stmt *newBody = S->getBody();
+      typeCheckStmt(newBody);
+      S->setBody(newBody);
+    }
 
     // Do-catch statements always limit exhaustivity checks.
     bool limitExhaustivityChecks = true;
@@ -1707,16 +1787,31 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
   auto &ctx = DC->getASTContext();
   auto fn = AnyFunctionRef::fromDeclContext(DC);
 
+  auto errorResult = [&]() -> Stmt * {
+    // We don't need any recovery if there's no result, just bail.
+    if (!RS->hasResult())
+      return nullptr;
+
+    // If we have a result, make sure it's preserved, insert an implicit brace
+    // with a wrapping error expression. This ensures we can still do semantic
+    // functionality, and avoids downstream crashes where we expect the
+    // expression to have been type-checked.
+    auto *result = RS->getResult();
+    RS->setResult(nullptr);
+    auto *err = new (ctx) ErrorExpr(result->getSourceRange(), Type(), result);
+    return BraceStmt::createImplicit(ctx, {err});
+  };
+
   // Not valid outside of a function.
   if (!fn) {
     ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_invalid_outside_func);
-    return nullptr;
+    return errorResult();
   }
 
   // If the return is in a defer, then it isn't valid either.
   if (isDefer(DC)) {
     ctx.Diags.diagnose(RS->getReturnLoc(), diag::jump_out_of_defer, "return");
-    return nullptr;
+    return errorResult();
   }
 
   // The rest of the checks only concern return statements with results.
@@ -1737,8 +1832,7 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
     if (!nilExpr) {
       ctx.Diags.diagnose(RS->getReturnLoc(), diag::return_init_non_nil)
           .highlight(E->getSourceRange());
-      RS->setResult(nullptr);
-      return RS;
+      return errorResult();
     }
 
     // "return nil" is only permitted in a failable initializer.
@@ -1748,8 +1842,7 @@ Stmt *PreCheckReturnStmtRequest::evaluate(Evaluator &evaluator, ReturnStmt *RS,
       ctx.Diags
           .diagnose(ctor->getLoc(), diag::make_init_failable, ctor)
           .fixItInsertAfter(ctor->getLoc(), "?");
-      RS->setResult(nullptr);
-      return RS;
+      return errorResult();
     }
 
     // Replace the "return nil" with a new 'fail' statement.
@@ -1770,9 +1863,14 @@ static bool isDiscardableType(Type type) {
   if (auto *expansion = type->getAs<PackExpansionType>())
     return isDiscardableType(expansion->getPatternType());
 
-  return (type->hasError() ||
-          type->isUninhabited() ||
-          type->lookThroughAllOptionalTypes()->isVoid());
+  if (type->hasError())
+    return true;
+
+  // Look through optionality and check if the type is either `Void` or
+  // 'structurally uninhabited'. Treat either as discardable.
+  auto nonOptionalType = type->lookThroughAllOptionalTypes();
+  return (nonOptionalType->isStructurallyUninhabited() ||
+          nonOptionalType->isVoid());
 }
 
 static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
@@ -1919,9 +2017,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     }
   }
 
-  // If the result of this expression is of type "Never" or "()"
-  // (the latter potentially wrapped in optionals) then it is
-  // safe to ignore.
+  // If the result of this expression is either "structurally uninhabited" or
+  // `Void`, (potentially wrapped in optionals) then it is safe to ignore.
   if (isDiscardableType(valueE->getType()))
     return;
   
@@ -2117,7 +2214,7 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
 }
 
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
-  if (LeaveBraceStmtBodyUnchecked)
+  if (BraceChecking != BraceStmtChecking::All)
     return BS;
 
   // Diagnose defer statement being last one in block (only if
@@ -2143,12 +2240,12 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 }
 
 void TypeChecker::typeCheckASTNode(ASTNode &node, DeclContext *DC,
-                                   bool LeaveBodyUnchecked) {
+                                   BraceStmtChecking braceChecking) {
   StmtChecker stmtChecker(DC);
   // FIXME: 'ActiveLabeledStmts', etc. in StmtChecker are not
   // populated. Since they don't affect "type checking", it's doesn't cause
   // any issue for now. But it should be populated nonetheless.
-  stmtChecker.LeaveBraceStmtBodyUnchecked = LeaveBodyUnchecked;
+  stmtChecker.BraceChecking = braceChecking;
   stmtChecker.typeCheckASTNode(node);
 }
 
@@ -2694,7 +2791,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
     }
   }
 
-  TypeChecker::typeCheckASTNode(finder.getRef(), DC, /*LeaveBodyUnchecked=*/false);
+  TypeChecker::typeCheckASTNode(finder.getRef(), DC);
   return false;
 }
 
@@ -3196,6 +3293,12 @@ IsSingleValueStmtRequest::evaluate(Evaluator &eval, const Stmt *S,
     SmallVector<Stmt *, 4> scratch;
     return areBranchesValidForSingleValueStmt(ctx, DCS,
                                               DCS->getBranches(scratch));
+  }
+  if (auto *FS = dyn_cast<ForEachStmt>(S)) {
+    if (!ctx.LangOpts.hasFeature(Feature::ForExpressions))
+      return IsSingleValueStmtResult::unhandledStmt();
+
+    return areBranchesValidForSingleValueStmt(ctx, FS, FS->getBody());
   }
   return IsSingleValueStmtResult::unhandledStmt();
 }

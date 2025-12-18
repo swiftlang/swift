@@ -164,6 +164,9 @@ class Evaluator {
   /// is treated as a stack and is used to detect cycles.
   llvm::SetVector<ActiveRequest> activeRequests;
 
+  /// A set of active requests that have been diagnosed for a cycle.
+  llvm::DenseSet<ActiveRequest> diagnosedActiveCycles;
+
   /// A cache that stores the results of requests.
   evaluator::RequestCache cache;
 
@@ -301,6 +304,10 @@ public:
   void clearCache() { cache.clear(); }
 
   /// Is the given request, or an equivalent, currently being evaluated?
+  ///
+  /// WARN: do not rely on this function to avoid request cycles. Doing so can
+  /// lead to bugs that are very difficult to debug, especially when request
+  /// caching is involved.
   template <typename Request>
   bool hasActiveRequest(const Request &request) const {
     return activeRequests.count(ActiveRequest(request));
@@ -344,7 +351,17 @@ private:
 
     recorder.beginRequest<Request>();
 
-    auto result = getRequestFunction<Request>()(request, *this);
+    auto result = [&]() -> typename Request::OutputType {
+      auto reqResult = getRequestFunction<Request>()(request, *this);
+
+      // If we diagnosed a cycle for this request, we want to only use the
+      // default value to ensure we return a consistent result.
+      if (!diagnosedActiveCycles.empty() &&
+          diagnosedActiveCycles.erase(activeReq)) {
+        return defaultValueFn();
+      }
+      return reqResult;
+    }();
 
     recorder.endRequest<Request>(request);
 

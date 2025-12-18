@@ -127,9 +127,11 @@ struct ShouldPrintChecker {
 
 /// Type-printing options which should only be applied to the outermost
 /// type.
-enum class NonRecursivePrintOption: uint32_t {
+enum class NonRecursivePrintOption : uint32_t {
   /// Print `Optional<T>` as `T!`.
   ImplicitlyUnwrappedOptional = 1 << 0,
+  /// Avoid printing `nonisolated(nonsending)` modifier.
+  SkipNonisolatedNonsending = 1 << 1,
 };
 using NonRecursivePrintOptions = OptionSet<NonRecursivePrintOption>;
 
@@ -403,6 +405,12 @@ public:
   /// Suppress @_lifetime attribute and emit @lifetime instead.
   bool SuppressLifetimes = false;
 
+  /// Suppress @inline(always) attribute and emit @inline(__always) instead.
+  bool SuppressInlineAlways = false;
+
+  /// Suppress printing of ~Sendable in inheritance and requirement lists.
+  bool SuppressTildeSendable = false;
+
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
 
@@ -574,6 +582,9 @@ public:
   /// with types sharing a name with a module.
   bool AliasModuleNames = false;
 
+  /// Use module selectors when printing names.
+  bool UseModuleSelectors = false;
+
   /// Name of the modules that have been aliased in AliasModuleNames mode.
   /// Ideally we would use something other than a string to identify a module,
   /// but since one alias can apply to more than one module, strings happen
@@ -694,6 +705,13 @@ public:
     return result;
   }
 
+  /// Print options suitable for debug printing.
+  static PrintOptions forDebugging() {
+    PrintOptions result;
+    result.PrintTypesForDebugging = true;
+    return result;
+  }
+
   /// Retrieve the set of options suitable for diagnostics printing.
   static PrintOptions printForDiagnostics(AccessLevel accessFilter,
                                           bool printFullConvention) {
@@ -756,6 +774,7 @@ public:
   ///
   /// \see swift::emitSwiftInterface
   static PrintOptions printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
+                                              bool useModuleSelectors,
                                               bool preferTypeRepr,
                                               bool printFullConvention,
                                               InterfaceMode interfaceMode,

@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t -enable-library-evolution %S/Inputs/property_wrapper_defs.swift
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -primary-file %s -I %t | %FileCheck %s
+// RUN: %target-swift-emit-silgen -sil-verify-all -Xllvm -sil-print-types -primary-file %s -I %t | %FileCheck %s --check-prefixes CHECK,ADR
+
+// RUN: %target-swift-frontend -emit-module -o %t -enable-library-evolution %S/Inputs/property_wrapper_defs.swift -enable-sil-opaque-values
+// RUN: %target-swift-emit-silgen -sil-verify-all -Xllvm -sil-print-types -primary-file %s -I %t -enable-sil-opaque-values | %FileCheck %s --check-prefixes CHECK,OV
+
 import property_wrapper_defs
 
 @propertyWrapper
@@ -58,18 +62,22 @@ func forceHasMemberwiseInit() {
 
 // variable initialization expression of HasMemberwiseInit._x
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_x33_{{.*}}AA7WrapperVySbGvpfi : $@convention(thin) <T where T : DefaultInit> () -> Wrapper<Bool> {
+// CHECK: bb0:
 // CHECK: integer_literal $Builtin.Int1, 0
 // CHECK-NOT: return
 // CHECK: function_ref @$sSb22_builtinBooleanLiteralSbBi1__tcfC : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
 // CHECK-NOT: return
-// CHECK: function_ref @$s17property_wrappers7WrapperV5valueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0> // user: %9
+// CHECK: function_ref @$s17property_wrappers7WrapperV5valueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
 // CHECK: return {{%.*}} : $Wrapper<Bool>
 
 // variable initialization expression of HasMemberwiseInit.$y
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_y33_{{.*}}23WrapperWithInitialValueVyxGvpfi : $@convention(thin) <T where T : DefaultInit> () -> @out 
-// CHECK: bb0(%0 : $*T):
+// ADR: bb0(%0 : $*T):
+// OV: bb0:
 // CHECK-NOT: return
 // CHECK: witness_method $T, #DefaultInit.init!allocator : <Self where Self : DefaultInit> (Self.Type) -> () -> Self : $@convention(witness_method: DefaultInit) <τ_0_0 where τ_0_0 : DefaultInit> (@thick τ_0_0.Type) -> @out τ_0_0
+// ADR:    return {{%.*}} : $()
+// OV:     return {{%.*}} : $T
 
 // variable initialization expression of HasMemberwiseInit._z
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_z33_{{.*}}23WrapperWithInitialValueVySiGvpfi : $@convention(thin) <T where T : DefaultInit> () -> WrapperWithInitialValue<Int> {
@@ -78,6 +86,7 @@ func forceHasMemberwiseInit() {
 // CHECK: integer_literal $Builtin.IntLiteral, 17
 // CHECK-NOT: return
 // CHECK: function_ref @$s17property_wrappers23WrapperWithInitialValueV07wrappedF0ACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin WrapperWithInitialValue<τ_0_0>.Type) -> @out WrapperWithInitialValue<τ_0_0>
+// CHECK: return {{%.*}} : $WrapperWithInitialValue<Int>
 
 // variable initialization expression of HasMemberwiseInit._p
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_p33_{{.*}}23WrapperWithInitialValueVySbGvpfi : $@convention(thin) <T where T : DefaultInit> () -> Bool {

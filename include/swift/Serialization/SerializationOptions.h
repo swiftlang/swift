@@ -162,8 +162,8 @@ public:
   bool StaticLibrary = false;
   bool HermeticSealAtLink = false;
   bool EmbeddedSwiftModule = false;
-  bool IsOSSA = false;
   bool SkipNonExportableDecls = false;
+  bool SkipImplementationOnlyDecls = false;
   bool ExplicitModuleBuild = false;
   bool EnableSerializationRemarks = false;
   bool IsInterfaceSDKRelative = false;

@@ -38,7 +38,6 @@
 #include "swift/Option/Options.h"
 #include "swift/Parse/ParseVersion.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
@@ -2274,6 +2273,7 @@ private:
   std::string ResourceDir;
   std::string ModuleCachePath;
   bool DisableFailOnError;
+  std::vector<std::string> ClangImporterArgs;
 
 public:
   SwiftAPIDigesterInvocation(const std::string &ExecPath)
@@ -2365,7 +2365,6 @@ public:
     Triple = ParsedArgs.getLastArgValue(OPT_target).str();
     SwiftVersion = ParsedArgs.getLastArgValue(OPT_swift_version).str();
     SystemFrameworkPaths = ParsedArgs.getAllArgValues(OPT_Fsystem);
-    llvm::append_range(SystemFrameworkPaths, ParsedArgs.getAllArgValues(OPT_iframework));
     BaselineFrameworkPaths = ParsedArgs.getAllArgValues(OPT_BF);
     FrameworkPaths = ParsedArgs.getAllArgValues(OPT_F);
     SystemModuleImportPaths = ParsedArgs.getAllArgValues(OPT_Isystem);
@@ -2377,6 +2376,7 @@ public:
         ParsedArgs.getAllArgValues(OPT_use_interface_for_module);
     ResourceDir = ParsedArgs.getLastArgValue(OPT_resource_dir).str();
     ModuleCachePath = ParsedArgs.getLastArgValue(OPT_module_cache_path).str();
+    ClangImporterArgs = ParsedArgs.getAllArgValues(OPT_Xcc);
     DebugMapping = ParsedArgs.hasArg(OPT_debug_mapping);
     DisableFailOnError = ParsedArgs.hasArg(OPT_disable_fail_on_error);
 
@@ -2457,6 +2457,11 @@ public:
     InitInvoke.getLangOptions().EnableObjCInterop =
         InitInvoke.getLangOptions().Target.isOSDarwin();
     InitInvoke.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+
+    // Pass -Xcc arguments to the Clang importer
+    for (const auto &arg : ClangImporterArgs) {
+      InitInvoke.getClangImporterOptions().ExtraArgs.push_back(arg);
+    }
 
     if (!SwiftVersion.empty()) {
       using version::Version;

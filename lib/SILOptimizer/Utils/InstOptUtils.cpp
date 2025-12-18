@@ -179,6 +179,14 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   if (isa<BorrowedFromInst>(inst))
     return false;
 
+  // A dead `destructure_struct` with an owned argument can appear for a non-copyable or
+  // non-escapable struct which has only trivial elements. The instruction is not trivially
+  // dead because it ends the lifetime of its operand.
+  if (isa<DestructureStructInst>(inst) &&
+      inst->getOperand(0)->getOwnershipKind() == OwnershipKind::Owned) {
+    return false;
+  }
+
   // These invalidate enums so "write" memory, but that is not an essential
   // operation so we can remove these if they are trivially dead.
   if (isa<UncheckedTakeEnumDataAddrInst>(inst))
@@ -878,55 +886,6 @@ ProjectBoxInst *swift::getOrCreateProjectBox(AllocBoxInst *abi,
   return builder.createProjectBox(abi->getLoc(), abi, index);
 }
 
-// Peek through trivial Enum initialization, typically for pointless
-// Optionals.
-//
-// Given an UncheckedTakeEnumDataAddrInst, check that there are no
-// other uses of the Enum value and return the address used to initialized the
-// enum's payload:
-//
-//   %stack_adr = alloc_stack
-//   %data_adr  = init_enum_data_addr %stk_adr
-//   %enum_adr  = inject_enum_addr %stack_adr
-//   %copy_src  = unchecked_take_enum_data_addr %enum_adr
-//   dealloc_stack %stack_adr
-//   (No other uses of %stack_adr.)
-InitEnumDataAddrInst *
-swift::findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *utedai) {
-  auto *asi = dyn_cast<AllocStackInst>(utedai->getOperand());
-  if (!asi)
-    return nullptr;
-
-  InjectEnumAddrInst *singleInject = nullptr;
-  InitEnumDataAddrInst *singleInit = nullptr;
-  for (auto use : asi->getUses()) {
-    auto *user = use->getUser();
-    if (user == utedai)
-      continue;
-
-    // If there is a single init_enum_data_addr and a single inject_enum_addr,
-    // those instructions must dominate the unchecked_take_enum_data_addr.
-    // Otherwise the enum wouldn't be initialized on all control flow paths.
-    if (auto *inj = dyn_cast<InjectEnumAddrInst>(user)) {
-      if (singleInject)
-        return nullptr;
-      singleInject = inj;
-      continue;
-    }
-
-    if (auto *init = dyn_cast<InitEnumDataAddrInst>(user)) {
-      if (singleInit)
-        return nullptr;
-      singleInit = init;
-      continue;
-    }
-
-    if (isa<DeallocStackInst>(user) || isa<DebugValueInst>(user))
-      continue;
-  }
-  return singleInit;
-}
-
 //===----------------------------------------------------------------------===//
 //                              Closure Deletion
 //===----------------------------------------------------------------------===//
@@ -1592,6 +1551,9 @@ void swift::insertDeallocOfCapturedArguments(
 
     SILValue argValue = getAddressToDealloc(arg.get());
     if (!argValue) {
+      continue;
+    }
+    if (isa<SILUndef>(argValue)) {
       continue;
     }
 

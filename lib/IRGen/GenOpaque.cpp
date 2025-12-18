@@ -553,19 +553,53 @@ irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
   return call;
 }
 
+StackAddress IRGenFunction::emitDynamicStackAllocation(
+    SILType T, StackAllocationIsNested_t isNested, const llvm::Twine &name) {
+  if (isNested) {
+    return emitDynamicAlloca(T, name);
+  }
+
+  // First malloc the memory.
+  auto mallocFn = IGM.getMallocFunctionPointer();
+  auto *size = emitLoadOfSize(*this, T);
+  auto *call = Builder.CreateCall(mallocFn, {size});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.C_CC);
+
+  // Then create the dynamic alloca to store the malloc pointer into.
+
+  // TODO: Alignment should be platform specific.
+  auto address = Address(call, IGM.Int8Ty, Alignment(16));
+  return StackAddress{address};
+}
+
+void IRGenFunction::emitDynamicStackDeallocation(
+    StackAddress address, StackAllocationIsNested_t isNested) {
+  if (isNested) {
+    return emitDeallocateDynamicAlloca(address);
+  }
+
+  auto *call = Builder.CreateCall(IGM.getFreeFunctionPointer(),
+                                  {address.getAddressPointer()});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.C_CC);
+}
+
 /// Emit a dynamic alloca call to allocate enough memory to hold an object of
 /// type 'T' and an optional llvm.stackrestore point if 'isInEntryBlock' is
 /// false.
 StackAddress IRGenFunction::emitDynamicAlloca(SILType T,
                                               const llvm::Twine &name) {
   llvm::Value *size = emitLoadOfSize(*this, T);
-  return emitDynamicAlloca(IGM.Int8Ty, size, Alignment(16), true, name);
+  return emitDynamicAlloca(IGM.Int8Ty, size, Alignment(16), AllowsTaskAlloc,
+                           /*mallocTypeId=*/nullptr, name);
 }
 
 StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
                                               llvm::Value *arraySize,
                                               Alignment align,
-                                              bool allowTaskAlloc,
+                                              AllowsTaskAlloc_t allowTaskAlloc,
+                                              llvm::Value *mallocTypeId,
                                               const llvm::Twine &name) {
   // Async functions call task alloc.
   if (allowTaskAlloc && isAsync()) {
@@ -600,9 +634,14 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
     auto alignment = llvm::ConstantInt::get(IGM.Int32Ty, align.getValue());
 
     // Allocate memory.  This produces an abstract token.
-    auto allocToken =
-        Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_alloca_alloc,
-                                    {IGM.SizeTy}, {byteCount, alignment});
+    llvm::SmallVector<llvm::Value *, 4> args = {byteCount, alignment};
+    if (mallocTypeId) {
+      args.push_back(mallocTypeId);
+    }
+    auto *allocToken = Builder.CreateIntrinsicCall(
+        mallocTypeId ? llvm::Intrinsic::coro_alloca_alloc_frame
+                     : llvm::Intrinsic::coro_alloca_alloc,
+        {IGM.SizeTy}, args);
 
     // Get the allocation result.
     auto ptr = Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_alloca_get,
@@ -642,7 +681,8 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
 /// location before the dynamic alloca's call.
 void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
                                                 bool allowTaskDealloc,
-                                                bool useTaskDeallocThrough) {
+                                                bool useTaskDeallocThrough,
+                                                bool forCalleeCoroutineFrame) {
   // Async function use taskDealloc.
   if (allowTaskDealloc && isAsync() && address.getAddress().isValid()) {
     if (useTaskDeallocThrough) {
@@ -670,7 +710,10 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
 #endif
       return;
     }
-    Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_alloca_free, allocToken);
+    Builder.CreateIntrinsicCall(forCalleeCoroutineFrame
+                                    ? llvm::Intrinsic::coro_alloca_free_frame
+                                    : llvm::Intrinsic::coro_alloca_free,
+                                allocToken);
     return;
   }
   // Otherwise, call llvm.stackrestore if an address was saved.

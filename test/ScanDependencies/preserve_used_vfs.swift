@@ -131,34 +131,34 @@ func testIndirect() { funcRedirectedIndirect() }
 // CHECK: "-compile-module-from-interface"
 // CHECK: "-ivfsoverlay",
 // CHECK-NEXT: "-Xcc",
-// CHECK-NEXT: "{{.*}}{{/|\\}}preserve_used_vfs.swift.tmp{{/|\\}}overlay.yaml",
+// CHECK-NEXT: "TMP_DIR{{/|\\}}overlay.yaml",
 // CHECK-NEXT: "-Xcc",
 // CHECK-NEXT: "-ivfsoverlay",
 // CHECK-NEXT: "-Xcc",
-// CHECK-NEXT: "{{.*}}{{/|\\}}preserve_used_vfs.swift.tmp{{/|\\}}overlay-2.yaml",
+// CHECK-NEXT: "TMP_DIR{{/|\\}}overlay-2.yaml",
 // CHECK: ],
 
 /// --------Clang module F
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.pcm",
 // CHECK: "commandLine": [
 // CHECK: "-vfsoverlay",
-// CHECK-NEXT: "{{.*}}{{/|\\}}preserve_used_vfs.swift.tmp{{/|\\}}overlay.yaml",
+// CHECK-NEXT: "TMP_DIR{{/|\\}}overlay.yaml",
 // CHECK-NEXT: "-vfsoverlay",
-// CHECK-NEXT: "{{.*}}{{/|\\}}preserve_used_vfs.swift.tmp{{/|\\}}overlay-2.yaml",
+// CHECK-NEXT: "TMP_DIR{{/|\\}}overlay-2.yaml",
 // CHECK: "-ivfsoverlay",
 // CHECK-NEXT: "-Xcc",
-// CHECK-NEXT: "{{.*}}{{/|\\}}preserve_used_vfs.swift.tmp{{/|\\}}overlay.yaml",
+// CHECK-NEXT: "TMP_DIR{{/|\\}}overlay.yaml",
 // CHECK-NEXT: "-Xcc",
 // CHECK-NEXT: "-ivfsoverlay",
 // CHECK-NEXT: "-Xcc",
-// CHECK-NEXT: "{{.*}}{{/|\\}}preserve_used_vfs.swift.tmp{{/|\\}}overlay-2.yaml",
+// CHECK-NEXT: "TMP_DIR{{/|\\}}overlay-2.yaml",
 // CHECK: ]
 
 /// --------Clang module Indirect
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Indirect-{{.*}}.pcm",
 // CHECK-NOT: overlay.yaml
 // CHECK: "-vfsoverlay",
-// CHECK-NEXT: "{{.*}}{{/|\\}}preserve_used_vfs.swift.tmp{{/|\\}}overlay-2.yaml",
+// CHECK-NEXT: "TMP_DIR{{/|\\}}overlay-2.yaml",
 // CHECK: "-ivfsoverlay",
 // CHECK-NEXT: "-Xcc",
-// CHECK-NEXT: "{{.*}}{{/|\\}}preserve_used_vfs.swift.tmp{{/|\\}}overlay-2.yaml",
+// CHECK-NEXT: "TMP_DIR{{/|\\}}overlay-2.yaml",

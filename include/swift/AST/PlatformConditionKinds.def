@@ -49,5 +49,8 @@ PLATFORM_CONDITION_(PtrAuth, "ptrauth")
 /// The active arch target's max atomic bit width.
 PLATFORM_CONDITION_(HasAtomicBitWidth, "hasAtomicBitWidth")
 
+/// The active target's file format (Mach-O, ELF, COFF, WASM)
+PLATFORM_CONDITION(ObjectFileFormat, "objectFormat")
+
 #undef PLATFORM_CONDITION
 #undef PLATFORM_CONDITION_

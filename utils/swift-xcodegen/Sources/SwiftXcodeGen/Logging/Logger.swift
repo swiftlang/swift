@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Foundation
+public import Foundation
+import Synchronization
 
 public final class Logger: @unchecked Sendable {
-  private let stateLock = Lock()
-  private let outputLock = Lock()
+  private let stateLock = Mutex<Void>()
+  private let outputLock = Mutex<Void>()
 
   private var _hadError = false
   public var hadError: Bool {
@@ -34,8 +35,8 @@ public final class Logger: @unchecked Sendable {
     set { stateLock.withLock { _useColor = newValue } }
   }
 
-  private var _output: LoggableStream?
-  public var output: LoggableStream? {
+  private var _output: (any LoggableStream)?
+  public var output: (any LoggableStream)? {
     get { stateLock.withLock { _output } }
     set { stateLock.withLock { _output = newValue } }
   }
@@ -44,7 +45,7 @@ public final class Logger: @unchecked Sendable {
 }
 
 extension Logger {
-  public enum LogLevel: Comparable {
+  public enum LogLevel: Comparable, Sendable {
     /// A message with information that isn't useful to the user, but is
     /// useful when debugging issues.
     case debug
@@ -99,7 +100,7 @@ extension Logger {
 }
 
 public protocol Loggable {
-  func write(to stream: LoggableStream, useColor: Bool)
+  func write(to stream: any LoggableStream, useColor: Bool)
 }
 
 extension Logger.LogLevel: Loggable, CustomStringConvertible {
@@ -121,7 +122,7 @@ extension Logger.LogLevel: Loggable, CustomStringConvertible {
     case .error:   .brightRed
     }
   }
-  public func write(to stream: LoggableStream, useColor: Bool) {
+  public func write(to stream: any LoggableStream, useColor: Bool) {
     let str = useColor 
       ? "\(fg: ansiColor)\(weight: .bold)\(self)\(fg: .normal)\(weight: .normal)"
       : "\(self)"

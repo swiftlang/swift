@@ -177,15 +177,15 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
     // behavior by not considering generic declarations in protocols as
     // overrides at all.
     if (decl->getDeclContext()->getSelfProtocolDecl() &&
-        declCtx->isGeneric())
+        declCtx->hasGenericParamList())
       return false;
 
     auto *parentCtx = parentDecl->getAsGenericContext();
 
-    if (declCtx->isGeneric() != parentCtx->isGeneric())
+    if (declCtx->hasGenericParamList() != parentCtx->hasGenericParamList())
       return false;
 
-    if (declCtx->isGeneric() &&
+    if (declCtx->hasGenericParamList() &&
         (declCtx->getGenericParams()->size() !=
          parentCtx->getGenericParams()->size()))
       return false;
@@ -318,10 +318,10 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
   // If their genericity is different, they aren't compatible.
   if (auto genDecl = decl->getAsGenericContext()) {
     auto genParentDecl = parentDecl->getAsGenericContext();
-    if (genDecl->isGeneric() != genParentDecl->isGeneric())
+    if (genDecl->hasGenericParamList() != genParentDecl->hasGenericParamList())
       return false;
 
-    if (genDecl->isGeneric() &&
+    if (genDecl->hasGenericParamList() &&
         (genDecl->getGenericParams()->size() !=
          genParentDecl->getGenericParams()->size()))
       return false;
@@ -581,7 +581,7 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
             diags
                 .diagnose(decl, diag::override_sendability_mismatch,
                           decl->getName())
-                .limitBehaviorUntilSwiftVersion(limit, 6)
+                .limitBehaviorUntilLanguageMode(limit, 6)
                 .limitBehaviorIf(
                     fromContext.preconcurrencyBehavior(baseDeclClass));
             return false;
@@ -599,7 +599,7 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
       diags
           .diagnose(decl, diag::override_global_actor_isolation_mismatch,
                     decl->getName())
-          .limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning, 6)
+          .limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning, 6)
           .limitBehaviorIf(fromContext.preconcurrencyBehavior(baseDeclClass));
     }
     break;
@@ -1218,7 +1218,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   // is helpful in several cases - just not this one.
   auto dc = decl->getDeclContext();
   auto classDecl = dc->getSelfClassDecl();
-  if (decl->getASTContext().isSwiftVersionAtLeast(5) &&
+  if (decl->getASTContext().isLanguageModeAtLeast(5) &&
       baseDecl->getInterfaceType()->hasDynamicSelfType() &&
       !decl->getInterfaceType()->hasDynamicSelfType() &&
       !classDecl->isSemanticallyFinal()) {
@@ -1388,7 +1388,7 @@ static void invalidateOverrideAttribute(ValueDecl *decl) {
   auto overrideAttr = decl->getAttrs().getAttribute<OverrideAttr>(true);
   if (!overrideAttr) {
     overrideAttr = new (decl->getASTContext()) OverrideAttr(true);
-    decl->getAttrs().add(overrideAttr);
+    decl->addAttribute(overrideAttr);
   }
 
   overrideAttr->setInvalid();
@@ -1600,6 +1600,7 @@ namespace  {
     UNINTERESTING_ATTR(DynamicCallable)
     UNINTERESTING_ATTR(DynamicMemberLookup)
     UNINTERESTING_ATTR(SILGenName)
+    UNINTERESTING_ATTR(Export)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ForbidSerializingReference)
     UNINTERESTING_ATTR(GKInspectable)
@@ -1620,6 +1621,7 @@ namespace  {
     UNINTERESTING_ATTR(NoAllocation)
     UNINTERESTING_ATTR(NoRuntime)
     UNINTERESTING_ATTR(NoExistentials)
+    UNINTERESTING_ATTR(NoManualOwnership)
     UNINTERESTING_ATTR(NoObjCBridging)
     UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
@@ -1753,6 +1755,8 @@ namespace  {
     UNINTERESTING_ATTR(Unsafe)
     UNINTERESTING_ATTR(Safe)
     UNINTERESTING_ATTR(AddressableForDependencies)
+    UNINTERESTING_ATTR(UnsafeSelfDependentResult)
+    UNINTERESTING_ATTR(Warn)
 #undef UNINTERESTING_ATTR
 
     void visitABIAttr(ABIAttr *attr) {
@@ -1923,7 +1927,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
          overrideASD->getAttrs().hasAttribute<LazyAttr>()) &&
         !overrideASD->hasObservers()) {
       bool downgradeToWarning = false;
-      if (!ctx.isSwiftVersionAtLeast(5) &&
+      if (!ctx.isLanguageModeAtLeast(5) &&
           overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
         // Swift 4.0 had a bug where lazy properties were considered
         // computed by the time of this check. Downgrade this diagnostic to
@@ -2083,11 +2087,11 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     if (baseThrownError && baseThrownError->hasTypeParameter()) {
       auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
       baseThrownError = baseThrownError.subst(subs);
-      baseThrownError = overrideFn->mapTypeIntoContext(baseThrownError);
+      baseThrownError = overrideFn->mapTypeIntoEnvironment(baseThrownError);
     }
 
     if (overrideThrownError)
-      overrideThrownError = overrideFn->mapTypeIntoContext(overrideThrownError);
+      overrideThrownError = overrideFn->mapTypeIntoEnvironment(overrideThrownError);
 
     // Check for a subtyping relationship.
     switch (compareThrownErrorsForSubtyping(
@@ -2194,7 +2198,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 
     switch (domain.getKind()) {
     case AvailabilityDomain::Kind::Universal:
-    case AvailabilityDomain::Kind::SwiftLanguage:
+    case AvailabilityDomain::Kind::SwiftLanguageMode:
+    case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
     case AvailabilityDomain::Kind::PackageDescription:
     case AvailabilityDomain::Kind::Platform:
       // FIXME: [availability] Diagnose as an error in a future Swift version.
@@ -2368,6 +2373,8 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     case AccessorKind::Read2:
     case AccessorKind::Modify:
     case AccessorKind::Modify2:
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
       break;
 
     case AccessorKind::WillSet:

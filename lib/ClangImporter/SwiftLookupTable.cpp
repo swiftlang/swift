@@ -1136,7 +1136,8 @@ namespace {
       ids = StoredSingleEntry::forSerializedDecl(
                                  astWriter.getDeclID(decl).getRawValue());
     } else if (auto *macro = mappedEntry.dyn_cast<clang::MacroInfo *>()) {
-      ids = StoredSingleEntry::forSerializedMacro(astWriter.getMacroID(macro));
+      ids = StoredSingleEntry::forSerializedMacro(
+          astWriter.getMacroRef(macro, /*Name=*/nullptr));
     } else {
       auto *moduleMacro = cast<clang::ModuleMacro *>(mappedEntry);
       StoredSingleEntry::SerializationID nameID =
@@ -2034,30 +2035,6 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
             namedMember = def;
         addEntryToLookupTable(table, namedMember, nameImporter);
       }
-      if (auto linkageSpecDecl =
-              dyn_cast<clang::LinkageSpecDecl>(canonicalMember)) {
-        std::function<void(clang::DeclContext *)> addDeclsFromContext =
-            [&](clang::DeclContext *declContext) {
-              for (auto nestedDecl : declContext->decls()) {
-                if (auto namedMember = dyn_cast<clang::NamedDecl>(nestedDecl))
-                  addEntryToLookupTable(table, namedMember, nameImporter);
-                else if (auto nestedLinkageSpecDecl =
-                             dyn_cast<clang::LinkageSpecDecl>(nestedDecl))
-                  addDeclsFromContext(nestedLinkageSpecDecl);
-              }
-            };
-
-        // HACK: libc++ redeclares lgamma_r in one of its headers, and that
-        // declaration hijacks lgamma_r from math.h where it is originally
-        // defined. This causes deserialization issues when loading the Darwin
-        // overlay on Apple platforms, because Swift cannot find lgamma_r in
-        // module _math.
-        bool shouldSkip = canonicalMember->getOwningModule() &&
-                          canonicalMember->getOwningModule()->Name ==
-                              "std_private_random_binomial_distribution";
-        if (!shouldSkip)
-          addDeclsFromContext(linkageSpecDecl);
-      }
     }
   }
   if (auto usingDecl = dyn_cast<clang::UsingDecl>(named)) {
@@ -2202,6 +2179,17 @@ void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
   // Skip anything from an AST file.
   if (decl->isFromASTFile())
     return;
+
+  // Exclude a predefined declaration that's not a definition if its
+  // definition exists in the same module so that the definition will
+  // be associated with the base name, noting predefined declarations
+  // won't be serialized into the pcm and its state including its
+  // definition pointer won't be reconstructed after deserialization,
+  // which would cause a type not found error.
+  if (Writer.isDeclPredefined(decl))
+    if (auto tagDecl = dyn_cast<clang::TagDecl>(decl))
+      if (!tagDecl->isThisDeclarationADefinition() && tagDecl->getDefinition())
+        return;
 
   // Iterate into extern "C" {} type declarations.
   if (auto linkageDecl = dyn_cast<clang::LinkageSpecDecl>(decl)) {

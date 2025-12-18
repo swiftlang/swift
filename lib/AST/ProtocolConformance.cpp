@@ -1248,6 +1248,8 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   // Add protocols for any synthesized protocol attributes.
   for (auto attr : getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    if (attr->isSuppressed())
+      continue;
     addSynthesized(attr->getProtocol());
   }
 
@@ -1267,7 +1269,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
     }
   }
 
-  // Actor classes conform to the actor protocol.
+  // Actor classes conform to the appropriate actor protocol.
   if (auto classDecl = dyn_cast<ClassDecl>(mutableThis)) {
     if (classDecl->isDistributedActor()) {
       addSynthesized(ctx.getProtocol(KnownProtocolKind::DistributedActor));

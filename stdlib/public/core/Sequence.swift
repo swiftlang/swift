@@ -705,6 +705,7 @@ extension Sequence {
     return Array(result)
   }
 
+#if !$Embedded
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
@@ -716,6 +717,7 @@ extension Sequence {
   ) throws -> [T] {
     try map(transform)
   }
+#endif
 
   /// Returns an array containing, in order, the elements of the sequence
   /// that satisfy the given predicate.

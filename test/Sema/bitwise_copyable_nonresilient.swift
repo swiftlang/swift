@@ -9,7 +9,7 @@
 
 // RUN: %target-swift-frontend                           \
 // RUN:     %t/Downstream.swift                          \
-// RUN:     -typecheck -verify                           \
+// RUN:     -typecheck -verify -verify-ignore-unrelated                           \
 // RUN:     -debug-diagnostic-names                      \
 // RUN:     -I %t
 

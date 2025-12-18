@@ -156,6 +156,48 @@ public:
   }
 };
 
+/// Used to deserialize string -> string mappings in on-disk hash tables.
+class SILDeserializer::StringTableInfo {
+public:
+  using internal_key_type = StringRef;
+  using external_key_type = internal_key_type;
+  using data_type = StringRef;
+  using hash_value_type = uint32_t;
+  using offset_type = uint32_t;
+
+  internal_key_type GetInternalKey(external_key_type ID) { return ID; }
+
+  external_key_type GetExternalKey(internal_key_type ID) { return ID; }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    return llvm::djbHash(key, SWIFTMODULE_HASH_SEED);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    offset_type keyLength =
+        llvm::support::endian::readNext<offset_type, llvm::endianness::little,
+                                        llvm::support::unaligned>(data);
+    offset_type dataLength =
+        llvm::support::endian::readNext<offset_type, llvm::endianness::little,
+                                        llvm::support::unaligned>(data);
+
+    return { keyLength, dataLength };
+  }
+
+  internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    return internal_key_type((const char *)data, length);
+  }
+
+  static data_type ReadData(internal_key_type key, const uint8_t *data,
+                            unsigned length) {
+    return data_type((const char *)data, length);
+  }
+};
+
 SILDeserializer::SILDeserializer(
     ModuleFile *MF, SILModule &M,
     DeserializationNotificationHandlerSet *callback)
@@ -195,10 +237,11 @@ SILDeserializer::SILDeserializer(
              kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES ||
              kind == sil_index_block::SIL_DEFAULT_OVERRIDE_TABLE_NAMES ||
              kind == sil_index_block::SIL_PROPERTY_OFFSETS ||
-             kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES)) &&
+             kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES ||
+             kind == sil_index_block::SIL_ASM_NAMES)) &&
            "Expect SIL_FUNC_NAMES, SIL_VTABLE_NAMES, SIL_GLOBALVAR_NAMES, \
           SIL_WITNESS_TABLE_NAMES, SIL_DEFAULT_WITNESS_TABLE_NAMES, \
-          SIL_PROPERTY_OFFSETS, SIL_MOVEONLYDEINIT_NAMES, or SIL_DIFFERENTIABILITY_WITNESS_NAMES.");
+          SIL_PROPERTY_OFFSETS, SIL_MOVEONLYDEINIT_NAMES, SIL_DIFFERENTIABILITY_WITNESS_NAMES, or SIL_ASM_NAMES.");
     (void)prevKind;
 
     if (kind == sil_index_block::SIL_FUNC_NAMES)
@@ -217,10 +260,14 @@ SILDeserializer::SILDeserializer(
       DefaultOverrideTableList = readFuncTable(scratch, blobData);
     else if (kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES)
       DifferentiabilityWitnessList = readFuncTable(scratch, blobData);
-    else if (kind == sil_index_block::SIL_PROPERTY_OFFSETS) {
+    else if (kind == sil_index_block::SIL_ASM_NAMES) {
+      // No matching offset block.
+      AsmNameTable = readStringTable(scratch, blobData);
+      continue;
+    } else if (kind == sil_index_block::SIL_PROPERTY_OFFSETS) {
       // No matching 'names' block for property descriptors needed yet.
       MF->allocateBuffer(Properties, scratch);
-      return;
+      continue;
     }
 
     // Read SIL_FUNC|VTABLE|GLOBALVAR_OFFSETS record.
@@ -285,6 +332,19 @@ SILDeserializer::readFuncTable(ArrayRef<uint64_t> fields, StringRef blobData) {
                                                 base + sizeof(uint32_t), base,
                                                 FuncTableInfo(*MF)));
 }
+
+std::unique_ptr<SILDeserializer::SerializedStringTable>
+SILDeserializer::readStringTable(ArrayRef<uint64_t> fields, StringRef blobData){
+  uint32_t tableOffset;
+  sil_index_block::ListLayout::readRecord(fields, tableOffset);
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+  using OwnedTable = std::unique_ptr<SerializedStringTable>;
+  return OwnedTable(SerializedStringTable::Create(base + tableOffset,
+                                                  base + sizeof(uint32_t), base,
+                                                  StringTableInfo()));
+}
+
 
 /// A high-level overview of how forward references work in serializer and
 /// deserializer:
@@ -625,9 +685,10 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name,
 /// Helper function to find a SILGlobalVariable given its name. It first checks
 /// in the module. If we cannot find it in the module, we attempt to
 /// deserialize it.
-SILGlobalVariable *SILDeserializer::getGlobalForReference(StringRef name) {
+SILGlobalVariable *
+SILDeserializer::getGlobalForReference(StringRef name, bool byAsmName) {
   // Check to see if we have a global by this name already.
-  if (SILGlobalVariable *g = SILMod.lookUpGlobalVariable(name))
+  if (SILGlobalVariable *g = SILMod.lookUpGlobalVariable(name, byAsmName))
     return g;
 
   // Otherwise, look for a global with this name in the module.
@@ -984,7 +1045,9 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     assert(next.Kind == llvm::BitstreamEntry::Record);
 
     scratch.clear();
-    llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(next.ID, scratch);
+    StringRef blobData;
+    llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(next.ID, scratch,
+                                                              &blobData);
     if (!maybeKind)
       return maybeKind.takeError();
     unsigned kind = maybeKind.get();
@@ -1006,6 +1069,21 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
         }
         (void)error;
         assert(!error.first && "effects deserialization error");
+      }
+      continue;
+    }
+
+    if (kind == SIL_EXTRA_STRING) {
+      unsigned stringFlavor;
+      SILExtraStringLayout::readRecord(scratch, stringFlavor);
+
+      switch (static_cast<ExtraStringFlavor>(stringFlavor)) {
+      case ExtraStringFlavor::AsmName:
+        fn->setAsmName(blobData);
+        break;
+      case ExtraStringFlavor::Section:
+        fn->setSection(blobData);
+        break;
       }
       continue;
     }
@@ -1740,9 +1818,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto isLexical = IsLexical_t((Attr >> 1) & 0x1);
     auto isFromVarDecl = IsFromVarDecl_t((Attr >> 2) & 0x1);
     auto wasMoved = UsesMoveableValueDebugInfo_t((Attr >> 3) & 0x1);
-    ResultInst = Builder.createAllocStack(
+    auto isNested = StackAllocationIsNested_t((Attr >> 4) & 0x1);
+    auto ASI = Builder.createAllocStack(
         Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
         std::nullopt, hasDynamicLifetime, isLexical, isFromVarDecl, wasMoved);
+    ASI->setStackAllocationIsNested(isNested);
+    ResultInst = ASI;
     break;
   }
   case SILInstructionKind::AllocPackInst: {
@@ -2762,6 +2843,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createDestructureStruct(Loc, Operand);
     break;
   }
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst: {
+    assert(RecordKind == SIL_ONE_OPERAND);
+    auto Ty = MF->getType(TyID);
+    ResultInst = Builder.createImplicitActorToOpaqueIsolationCast(
+        Loc, getLocalValue(Builder.maybeGetFunction(), ValID,
+                           getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    break;
+  }
   case SILInstructionKind::UncheckedOwnershipConversionInst: {
     auto Ty = MF->getType(TyID);
     auto ResultKind = decodeValueOwnership(Attr);
@@ -2891,6 +2980,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                       getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         CKind, Strict);
     break;
+  }
+  case SILInstructionKind::UncheckedOwnershipInst: {
+    llvm_unreachable("Invalid unchecked_ownership in deserialization");
   }
   case SILInstructionKind::StoreInst: {
     auto Ty = MF->getType(TyID);
@@ -3089,6 +3181,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
       ResultInst = Builder.createBorrowedFrom(
         Loc, OpList[0], ArrayRef(OpList).drop_front());
     }
+    break;
+  }
+  case SILInstructionKind::ReturnBorrowInst: {
+    SmallVector<SILValue, 4> OpList;
+    for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 3) {
+      auto EltTy = MF->getType(ListOfValues[I]);
+      OpList.push_back(getLocalValue(
+          Builder.maybeGetFunction(), ListOfValues[I + 2],
+          getSILType(EltTy, (SILValueCategory)ListOfValues[I + 1], Fn)));
+    }
+    ResultInst = Builder.createReturnBorrow(Loc, OpList[0],
+                                            ArrayRef(OpList).drop_front());
     break;
   }
   case SILInstructionKind::TupleElementAddrInst:
@@ -4002,7 +4106,21 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
 }
 
 SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
-                                                bool declarationOnly) {
+                                                bool declarationOnly,
+                                                bool byAsmName) {
+  // If we're looking up the function by its AsmName, check that table.
+  if (byAsmName) {
+    if (!AsmNameTable)
+      return nullptr;
+
+    auto iter = AsmNameTable->find(name);
+    if (iter == AsmNameTable->end())
+      return nullptr;
+
+    // Now look for this name in the function table.
+    name = *iter;
+  }
+
   if (!FuncTable)
     return nullptr;
   auto iter = FuncTable->find(name);
@@ -4026,11 +4144,26 @@ SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
   return maybeFunc.get();
 }
 
-SILGlobalVariable *SILDeserializer::lookupSILGlobalVariable(StringRef name) {
-  return getGlobalForReference(name);
+SILGlobalVariable *SILDeserializer::lookupSILGlobalVariable(StringRef name,
+                                                            bool byAsmName) {
+  return getGlobalForReference(name, byAsmName);
 }
 
-SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
+SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
+                                                  bool byAsmName) {
+  // If we're looking up the variable by its AsmName, check that table.
+  if (byAsmName) {
+    if (!AsmNameTable)
+      return nullptr;
+
+    auto iter = AsmNameTable->find(Name);
+    if (iter == AsmNameTable->end())
+      return nullptr;
+
+    // Now look for this name in the global variable table.
+    Name = *iter;
+  }
+
   if (!GlobalVarList)
     return nullptr;
 
@@ -4080,8 +4213,10 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   DeclID dID;
   ModuleID parentModuleID;
   unsigned rawLinkage, serializedKind, IsDeclaration, IsLet, IsUsed;
+  unsigned numTrailingRecords;
   SILGlobalVarLayout::readRecord(scratch, rawLinkage, serializedKind,
-                                 IsDeclaration, IsLet, IsUsed, TyID, dID,
+                                 IsDeclaration, IsLet, IsUsed,
+                                 numTrailingRecords, TyID, dID,
                                  parentModuleID);
   if (TyID == 0) {
     LLVM_DEBUG(llvm::dbgs() << "SILGlobalVariable typeID is 0.\n");
@@ -4124,6 +4259,42 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
     Callback->didDeserialize(MF->getAssociatedModule(), v);
 
   scratch.clear();
+
+  // Read trailing reecords.
+  for (unsigned recordIdx = 0; recordIdx < numTrailingRecords; ++recordIdx) {
+    StringRef blobData;
+    llvm::Expected<llvm::BitstreamEntry> maybeNext =
+        SILCursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeNext)
+      return nullptr;
+    llvm::BitstreamEntry next = maybeNext.get();
+    assert(next.Kind == llvm::BitstreamEntry::Record);
+
+    scratch.clear();
+    llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(next.ID, scratch,
+                                                              &blobData);
+    if (!maybeKind)
+      return nullptr;
+    unsigned kind = maybeKind.get();
+
+    if (kind == SIL_EXTRA_STRING) {
+      unsigned stringFlavor;
+      SILExtraStringLayout::readRecord(scratch, stringFlavor);
+
+      switch (static_cast<ExtraStringFlavor>(stringFlavor)) {
+      case ExtraStringFlavor::AsmName:
+        v->setAsmName(blobData);
+        break;
+      case ExtraStringFlavor::Section:
+        v->setSection(blobData);
+        break;
+      }
+      continue;
+    }
+
+    return nullptr;
+  }
+
   maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry)
     MF->fatal(maybeEntry.takeError());
@@ -4131,6 +4302,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   if (entry.Kind == llvm::BitstreamEntry::EndBlock)
     return v;
 
+  scratch.clear();
   maybeKind = SILCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeKind)
     MF->fatal(maybeKind.takeError());

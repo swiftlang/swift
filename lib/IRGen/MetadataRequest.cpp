@@ -494,12 +494,8 @@ CanType IRGenModule::getRuntimeReifiedType(CanType type) {
 Type IRGenModule::substOpaqueTypesWithUnderlyingTypes(Type type) {
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
-  if (type->hasOpaqueArchetype()) {
-    auto context = getMaximalTypeExpansionContext();
-    return swift::substOpaqueTypesWithUnderlyingTypes(type, context);
-  }
-
-  return type;
+  auto context = getMaximalTypeExpansionContext();
+  return swift::substOpaqueTypesWithUnderlyingTypes(type, context);
 }
 
 CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
@@ -507,33 +503,20 @@ CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
       ->getCanonicalType();
 }
 
-SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(
-    SILType type, CanGenericSignature genericSig) {
+SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(SILType type) {
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
-  if (type.getASTType()->hasOpaqueArchetype()) {
-    auto context = getMaximalTypeExpansionContext();
-    return SILType::getPrimitiveType(
-      swift::substOpaqueTypesWithUnderlyingTypes(type.getASTType(), context),
-      type.getCategory());
-  }
-
-  return type;
+  auto context = getMaximalTypeExpansionContext();
+  return SILType::getPrimitiveType(
+    swift::substOpaqueTypesWithUnderlyingTypes(type.getASTType(), context),
+    type.getCategory());
 }
 
-std::pair<CanType, ProtocolConformanceRef>
-IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type,
-                                           ProtocolConformanceRef conformance) {
-  // Substitute away opaque types whose underlying types we're allowed to
-  // assume are constant.
-  if (type->hasOpaqueArchetype()) {
-    auto context = getMaximalTypeExpansionContext();
-    return std::make_pair(
-       swift::substOpaqueTypesWithUnderlyingTypes(type, context),
-       swift::substOpaqueTypesWithUnderlyingTypes(conformance, context));
-  }
-
-  return std::make_pair(type, conformance);
+ProtocolConformanceRef
+IRGenModule::substOpaqueTypesWithUnderlyingTypes(
+    ProtocolConformanceRef conformance) {
+  auto context = getMaximalTypeExpansionContext();
+  return swift::substOpaqueTypesWithUnderlyingTypes(conformance, context);
 }
 
 
@@ -750,7 +733,7 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
             theDecl, genericArgs.Types, NotForDefinition);
 
     response = IGF.emitGenericTypeMetadataAccessFunctionCall(
-        accessor, genericArgs.Values, request);
+        accessor, genericArgs.Values, request, genericArgs.hasPacks);
   }
 
   IGF.setScopedLocalTypeMetadata(theType, response);
@@ -901,6 +884,17 @@ bool irgen::isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
     // TODO: On platforms without ObjC interop, we can do direct access to
     // class metadata.
     return false;
+  }
+
+  if (IGM.isEmbeddedWithExistentials() &&
+      (isa<StructType>(type) || isa<BoundGenericStructType>(type) ||
+       isa<EnumType>(type) || isa<BoundGenericEnumType>(type))) {
+    if (type->hasArchetype()) {
+      llvm::errs() << "Cannot get metadata of generic class for type "
+                   << type << "\n";
+      llvm::report_fatal_error("cannot get metadata for type with archetype");
+    }
+    return true;
   }
 
   // Prespecialized struct/enum metadata gets no dedicated accessor yet and so
@@ -1269,6 +1263,10 @@ static MetadataResponse emitFixedArrayMetadataRef(IRGenFunction &IGF,
 static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
                                                  CanTupleType type,
                                                  DynamicMetadataRequest request) {
+  if (IGF.IGM.isEmbeddedWithExistentials()) {
+    return MetadataResponse::forComplete(IGF.IGM.getAddrOfTypeMetadata(type));
+  }
+
   if (type->containsPackExpansionType())
     return emitDynamicTupleTypeMetadataRef(IGF, type, request);
 
@@ -1570,6 +1568,9 @@ static CanPackType getInducedPackType(AnyFunctionType::CanParamArrayRef params,
 static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
                                                     CanFunctionType type,
                                                     DynamicMetadataRequest request) {
+  if (IGF.IGM.isEmbeddedWithExistentials()) {
+    return MetadataResponse::forComplete(IGF.IGM.getAddrOfTypeMetadata(type));
+  }
   auto result =
     IGF.emitAbstractTypeMetadataRef(type->getResult()->getCanonicalType());
 
@@ -1799,6 +1800,11 @@ namespace {
       return emitDirectMetadataRef(type);
     }
 
+    MetadataResponse visitBuiltinImplicitActor(CanBuiltinImplicitActorType type,
+                                               DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
     MetadataResponse
     visitBuiltinBridgeObjectType(CanBuiltinBridgeObjectType type,
                                  DynamicMetadataRequest request) {
@@ -1832,6 +1838,12 @@ namespace {
     MetadataResponse
     visitBuiltinExecutorType(CanBuiltinExecutorType type,
                              DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinImplicitActorType(CanBuiltinImplicitActorType type,
+                                  DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
     }
 
@@ -2462,11 +2474,9 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM, llvm::Function *accessor,
   IGF.Builder.CreateRet(ret);
 }
 
-MetadataResponse
-IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
-                                              llvm::Function *accessFunction,
-                                              ArrayRef<llvm::Value *> args,
-                                              DynamicMetadataRequest request) {
+MetadataResponse IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
+    llvm::Function *accessFunction, ArrayRef<llvm::Value *> args,
+    DynamicMetadataRequest request, bool hasPacks) {
 
   SmallVector<llvm::Value *, 8> callArgs;
 
@@ -2490,7 +2500,7 @@ IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
                                  accessFunction, callArgs);
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
-  call->setMemoryEffects(allocatedArgsBuffer
+  call->setMemoryEffects(hasPacks || allocatedArgsBuffer
                              ? llvm::MemoryEffects::inaccessibleOrArgMemOnly()
                              : llvm::MemoryEffects::none());
 
@@ -3380,7 +3390,9 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
 MetadataResponse
 IRGenFunction::emitTypeMetadataRef(CanType type,
                                    DynamicMetadataRequest request) {
-  if (type->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+  auto &langOpts = type->getASTContext().LangOpts;
+  if (langOpts.hasFeature(Feature::Embedded) &&
+      !langOpts.hasFeature(Feature::EmbeddedExistentials) &&
       !isMetadataAllowedInEmbedded(type)) {
     llvm::errs() << "Metadata pointer requested in embedded Swift for type "
                  << type << "\n";
@@ -3400,7 +3412,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   if (type->hasArchetype() ||
       !shouldTypeMetadataAccessUseAccessor(IGM, type) ||
       isa<PackType>(type) ||
-      type->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      langOpts.hasFeature(Feature::Embedded)) {
     return emitDirectTypeMetadataRef(*this, type, request);
   }
 
@@ -3592,8 +3604,8 @@ IRGenFunction::emitTypeMetadataRefForLayout(SILType ty,
 
 llvm::Value *IRGenFunction::emitValueGenericRef(CanType type) {
   if (auto integer = type->getAs<IntegerType>()) {
-    return llvm::ConstantInt::get(IGM.SizeTy,
-                    integer->getValue().zextOrTrunc(IGM.SizeTy->getBitWidth()));
+    auto value = integer->getValue().sextOrTrunc(IGM.SizeTy->getBitWidth());
+    return llvm::ConstantInt::get(IGM.SizeTy, value);
   }
 
   return tryGetLocalTypeData(type, LocalTypeDataKind::forValue());
@@ -3672,7 +3684,7 @@ namespace {
       //
       // TODO: If a nominal type is in the same source file as we're currently
       // emitting, we would be able to see its value witness table.
-      if (IGF.IGM.IsWellKnownBuiltinOrStructralType(t))
+      if (IGF.IGM.isWellKnownBuiltinOrStructuralType(t))
         return emitFromValueWitnessTable(t);
 
       // If the type is a singleton aggregate, the field's layout is equivalent

@@ -14,10 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "OpenedExistentials.h"
+#include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/OptionSet.h"
@@ -28,7 +30,6 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
 #include <functional>
@@ -257,6 +258,14 @@ static bool isStandardInfixLogicalOperator(Constraint *disjunction) {
   if (auto *decl = getOverloadChoiceDecl(choice))
     return decl->isOperator() &&
            decl->getBaseIdentifier().isStandardInfixLogicalOperator();
+  return false;
+}
+
+static bool isNilCoalescingOperator(Constraint *disjunction) {
+  auto *choice = disjunction->getNestedConstraints()[0];
+  if (auto *decl = getOverloadChoiceDecl(choice))
+    return decl->isOperator() &&
+           decl->getBaseIdentifier().isNilCoalescingOperator();
   return false;
 }
 
@@ -658,11 +667,20 @@ static void findFavoredChoicesBasedOnArity(
           return;
         }
 
-        if (overloadType->getNumParams() == argumentList->size() ||
-            llvm::count_if(*decl->getParameterList(), [](auto *param) {
-              return !param->isDefaultArgument();
-            }) == argumentList->size())
+        if (overloadType->getNumParams() == argumentList->size()) {
           favored.push_back(choice);
+          return;
+        }
+
+        if (auto *paramList = decl->getParameterList()) {
+          auto numNonDefaulted = llvm::count_if(*paramList, [](auto *param) {
+            return !param->isDefaultArgument();
+          });
+          if (numNonDefaulted == argumentList->size()) {
+            favored.push_back(choice);
+            return;
+          }
+        }
       });
 
   if (hasVariadicGenerics)
@@ -709,15 +727,29 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 
   auto *argument =
       argumentList->getUnlabeledUnaryExpr()->getSemanticsProvidingExpr();
+
+  // If the type associated with a member expression doesn't have any type
+  // variables it means that it was resolved during pre-check to a single
+  // declaration.
+  //
+  // This helps in situations like `Double(x)` where `x` is a property of some
+  // type that is referenced using an implicit `self.` injected by the compiler.
+  auto isResolvedMemberReference = [&cs](Expr *expr) -> bool {
+    auto *UDE = dyn_cast<UnresolvedDotExpr>(expr);
+    return UDE && !cs.getType(UDE)->hasTypeVariable();
+  };
+
   // The hack operated on "favored" types and only declaration references,
   // applications, and (dynamic) subscripts had them if they managed to
   // get an overload choice selected during constraint generation.
-  // It's sometimes possible to infer a type of a literal and an operator
-  // chain, so it should be allowed as well.
+  // 
+  // It's sometimes possible to infer a type of a literal, an operator
+  // chain, and a member, so it should be allowed as well.
   if (!(isExpr<DeclRefExpr>(argument) || isExpr<ApplyExpr>(argument) ||
         isExpr<SubscriptExpr>(argument) ||
         isExpr<DynamicSubscriptExpr>(argument) ||
-        isExpr<LiteralExpr>(argument) || isExpr<BinaryExpr>(argument)))
+        isExpr<LiteralExpr>(argument) || isExpr<BinaryExpr>(argument) ||
+        isResolvedMemberReference(argument)))
     return DisjunctionInfo::none();
 
   auto argumentType = cs.getType(argument)->getRValueType();
@@ -754,7 +786,7 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
   SmallVector<Constraint *, 2> favoredChoices;
   forEachDisjunctionChoice(
       cs, disjunction,
-      [&argumentType, &favoredChoices, &argument](
+      [&cs, &argumentType, &favoredChoices, &argument](
           Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
         if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
           return;
@@ -770,8 +802,15 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
             (isa<LiteralExpr>(argument) || isa<BinaryExpr>(argument)))
           return;
 
-        if (argumentType->isEqual(param.getPlainType()))
+        if (argumentType->isEqual(param.getPlainType())) {
+          if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
+            if (func->isAsyncContext() !=
+                cs.isAsynchronousContext(choice->getDeclContext()))
+              return;
+          }
+
           favoredChoices.push_back(choice);
+        }
       });
 
   return DisjunctionInfoBuilder(/*score=*/favoredChoices.empty() ? 0 : 1,
@@ -1009,9 +1048,9 @@ static void determineBestChoicesInContext(
         }
 
         for (const auto &literal : bindingSet.Literals) {
-          if (literal.second.hasDefaultType()) {
+          if (literal.hasDefaultType()) {
             // Add primary default type
-            auto type = restoreOptionality(literal.second.getDefaultType(),
+            auto type = restoreOptionality(literal.getDefaultType(),
                                            optionals.size());
             types.push_back({type,
                              /*fromLiteral=*/true});
@@ -1054,6 +1093,32 @@ static void determineBestChoicesInContext(
     auto resultType = cs.simplifyType(argFuncType->getResult());
     if (auto *typeVar = resultType->getAs<TypeVariableType>()) {
       auto bindingSet = cs.getBindingsFor(typeVar);
+
+      // `??` operator is overloaded on optionality of its result. When the
+      // first argument matches exactly, the ranking is going to be skewed
+      // towards selecting an overload choice that returns a non-optional type.
+      // This is not always correct i.e. when operator is involved in optional
+      // chaining. To avoid producing an incorrect favoring, let's skip the this
+      // disjunction when constraints associated with result type indicate
+      // that it should be optional.
+      //
+      // Simply adding it as a binding won't work because if the second argument
+      // is non-optional the overload that returns `T?` would still have a lower
+      // score.
+      if (!bindingSet.hasViableBindings() &&
+          !bindingSet.isDirectHole() &&
+          isNilCoalescingOperator(disjunction)) {
+        auto &cg = cs.getConstraintGraph();
+        if (llvm::any_of(cg[typeVar].getConstraints(),
+                         [&typeVar](Constraint *constraint) {
+                           if (constraint->getKind() !=
+                               ConstraintKind::OptionalObject)
+                             return false;
+                           return constraint->getFirstType()->isEqual(typeVar);
+                         })) {
+          continue;
+        }
+      }
 
       for (const auto &binding : bindingSet.Bindings) {
         resultTypes.push_back(binding.BindingType);
@@ -1285,27 +1350,20 @@ static void determineBestChoicesInContext(
               return 0.3;
           }
 
-          auto &ctx = cs.getASTContext();
-
           // Check if the other side conforms to `ExpressibleByArrayLiteral`
           // protocol (in some way). We want an overly optimistic result
           // here to avoid under-favoring.
           if (candidateType->isArray() &&
-              checkConformanceWithoutContext(
-                  paramType,
-                  ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral),
-                  /*allowMissing=*/true))
+              TypeChecker::conformsToKnownProtocol(
+                  paramType, KnownProtocolKind::ExpressibleByArrayLiteral))
             return 0.3;
 
           // Check if the other side conforms to
           // `ExpressibleByDictionaryLiteral` protocol (in some way).
           // We want an overly optimistic result here to avoid under-favoring.
           if (candidateType->isDictionary() &&
-              checkConformanceWithoutContext(
-                  paramType,
-                  ctx.getProtocol(
-                      KnownProtocolKind::ExpressibleByDictionaryLiteral),
-                  /*allowMissing=*/true))
+              TypeChecker::conformsToKnownProtocol(
+                  paramType, KnownProtocolKind::ExpressibleByDictionaryLiteral))
             return 0.3;
         }
 
@@ -1371,11 +1429,22 @@ static void determineBestChoicesInContext(
         }
       }
 
-      // If the parameter is `Any` we assume that all candidates are
-      // convertible to it, which makes it a perfect match. The solver
-      // would then decide whether erasing to an existential is preferable.
-      if (paramType->isAny())
-        return 1;
+      if (paramType->isAnyExistentialType()) {
+        // If the parameter is `Any` we assume that all candidates are
+        // convertible to it, which makes it a perfect match. The solver
+        // would then decide whether erasing to an existential is preferable.
+        if (paramType->isAny())
+          return 1;
+
+        // If the parameter is `Any.Type` we assume that all metatype
+        // candidates are convertible to it.
+        if (auto *EMT = paramType->getAs<ExistentialMetatypeType>()) {
+          if (EMT->getExistentialInstanceType()->isAny() &&
+              (candidateType->is<ExistentialMetatypeType>() ||
+               candidateType->is<MetatypeType>()))
+            return 1;
+        }
+      }
 
       // Check if a candidate could be matched to a parameter by
       // an existential opening.
@@ -1738,13 +1807,11 @@ static void determineBestChoicesInContext(
         });
 
     if (cs.isDebugMode()) {
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
 
       llvm::errs().indent(cs.solverState->getCurrentIndent())
           << "<<< Disjunction "
           << disjunction->getNestedConstraints()[0]->getFirstType()->getString(
-                 PO)
+                 PrintOptions::forDebugging())
           << " with score " << bestScore << "\n";
     }
 
@@ -1774,8 +1841,7 @@ static void determineBestChoicesInContext(
   }
 
   if (cs.isDebugMode() && bestOverallScore > 0) {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
+    PrintOptions PO = PrintOptions::forDebugging();
 
     auto getLogger = [&](unsigned extraIndent = 0) -> llvm::raw_ostream & {
       return llvm::errs().indent(cs.solverState->getCurrentIndent() +

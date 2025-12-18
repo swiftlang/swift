@@ -88,7 +88,10 @@ struct PreparedOverloadChange {
     AppliedPropertyWrapper,
 
     /// A fix was recorded because a property wrapper application failed.
-    AddedFix
+    AddedFix,
+
+    /// The type of an AST node was changed.
+    RecordedNodeType
   };
 
   /// The kind of change.
@@ -101,9 +104,10 @@ struct PreparedOverloadChange {
     /// For ChangeKind::AddedConstraint.
     Constraint *TheConstraint;
 
+    /// For ChangeKind::AddedBindConstraint.
     struct {
       TypeBase *FirstType;
-      TypeBase * SecondType;
+      TypeBase *SecondType;
     } Bind;
 
     /// For ChangeKind::OpenedTypes.
@@ -132,7 +136,17 @@ struct PreparedOverloadChange {
       ConstraintFix *TheFix;
       unsigned Impact;
     } Fix;
+
+    /// For ChangeKind::RecordedNodeType.
+    struct {
+      ASTNode Node;
+      Type TheType;
+    } Node;
   };
+
+  PreparedOverloadChange()
+      : Kind(ChangeKind::AddedTypeVariable),
+        TypeVar(nullptr) { }
 };
 
 /// A "pre-cooked" representation of all type variables and constraints
@@ -144,47 +158,48 @@ public:
   using Change = PreparedOverloadChange;
 
 private:
-  size_t Count;
-  DeclReferenceType DeclType;
+  Type OpenedType;
+  Type ThrownErrorType;
+  unsigned Count : 31;
+
+  /// A prepared overload for diagnostics is different than one without,
+  /// because of fixes and such.
+  unsigned ForDiagnostics : 1;
 
   size_t numTrailingObjects(OverloadToken<Change>) const {
     return Count;
   }
 
 public:
-  PreparedOverload(const DeclReferenceType &declType, ArrayRef<Change> changes)
-    : Count(changes.size()), DeclType(declType) {
+  PreparedOverload(Type openedType, Type thrownErrorType,
+                   ArrayRef<Change> changes, bool forDiagnostics)
+    : OpenedType(openedType), ThrownErrorType(thrownErrorType),
+      Count(changes.size()), ForDiagnostics(forDiagnostics) {
     std::uninitialized_copy(changes.begin(), changes.end(),
-                            getTrailingObjects<Change>());
+                            getTrailingObjects());
   }
 
   Type getOpenedType() const {
-    return DeclType.openedType;
+    return OpenedType;
   }
 
-  Type getAdjustedOpenedType() const {
-    return DeclType.adjustedOpenedType;
+  Type getThrownErrorType() const {
+    return ThrownErrorType;
   }
 
-  Type getReferenceType() const {
-    return DeclType.referenceType;
+  bool wasForDiagnostics() const {
+    return ForDiagnostics;
   }
 
-  Type getAdjustedReferenceType() const {
-    return DeclType.adjustedReferenceType;
-  }
-
-  Type getThrownErrorTypeOnAccess() const {
-    return DeclType.thrownErrorTypeOnAccess;
-  }
-
-  ArrayRef<Change> getChanges() const {
-    return ArrayRef<Change>(getTrailingObjects<Change>(), Count);
-  }
+  ArrayRef<Change> getChanges() const { return getTrailingObjects(Count); }
 };
 
 struct PreparedOverloadBuilder {
   SmallVector<PreparedOverload::Change, 8> Changes;
+  ConstraintLocator *Locator;
+
+  PreparedOverloadBuilder(ConstraintLocator *locator)
+    : Locator(locator) {}
 
   void addedTypeVariable(TypeVariableType *typeVar) {
     PreparedOverload::Change change;
@@ -245,6 +260,14 @@ struct PreparedOverloadBuilder {
     change.Kind = PreparedOverload::Change::AddedFix;
     change.Fix.TheFix = fix;
     change.Fix.Impact = impact;
+    Changes.push_back(change);
+  }
+
+  void recordedNodeType(ASTNode node, Type type) {
+    PreparedOverload::Change change;
+    change.Kind = PreparedOverload::Change::RecordedNodeType;
+    change.Node.Node = node;
+    change.Node.TheType = type;
     Changes.push_back(change);
   }
 };

@@ -58,7 +58,7 @@ func genericMetatypes<T, U>(_ t: T.Type, _ u: U.Type) {}
 
 protocol Bas {}
 
-// CHECK: define hidden swiftcc { ptr, ptr } @"$s17generic_metatypes14protocolTypeof{{.*}}"(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0)
+// CHECK: define hidden swiftcc { ptr, ptr } @"$s17generic_metatypes14protocolTypeof{{.*}}"(ptr noalias captures(none) dereferenceable({{.*}}) %0)
 func protocolTypeof(_ x: Bas) -> Bas.Type {
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds{{.*}} %T17generic_metatypes3BasP, ptr [[X:%.*]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load ptr, ptr [[METADATA_ADDR]]

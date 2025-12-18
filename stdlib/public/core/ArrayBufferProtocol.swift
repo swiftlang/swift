@@ -76,11 +76,13 @@ where Indices == Range<Int> {
   /// Returns a `_SliceBuffer` containing the elements in `bounds`.
   subscript(bounds: Range<Int>) -> _SliceBuffer<Element> { get }
 
+#if !$Embedded
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R
+#endif
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
@@ -90,11 +92,13 @@ where Indices == Range<Int> {
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R
 
+#if !$Embedded
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R
+#endif
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.

@@ -26,6 +26,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return Location(bridged: bridged.getLocation())
   }
 
+  public var declRef: DeclRef { DeclRef(bridged: bridged.getDeclRef()) }
+
+  public var sourceFile: SourceFile? { declRef.sourceFile }
+
   final public var description: String {
     return String(taking: bridged.getDebugDescription())
   }
@@ -51,6 +55,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }
 
   public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
+
+  public var isAddressor: Bool { bridged.isAddressor() }
 
   public var specializationLevel: Int { bridged.specializationLevel() }
 
@@ -84,8 +90,12 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     SubstitutionMap(bridged: bridged.getForwardingSubstitutionMap())
   }
 
-  public func mapTypeIntoContext(_ type: AST.`Type`) -> AST.`Type` {
-    return AST.`Type`(bridged: bridged.mapTypeIntoContext(type.bridged))
+  public func mapTypeIntoEnvironment(_ type: AST.`Type`) -> AST.`Type` {
+    return AST.`Type`(bridged: bridged.mapTypeIntoEnvironment(type.bridged))
+  }
+
+  public func mapTypeIntoEnvironment(_ type: Type) -> Type {
+    return Type(bridged: bridged.mapTypeIntoEnvironment(type.bridged))
   }
 
   /// Returns true if the function is a definition and not only an external declaration.
@@ -119,9 +129,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     blocks.reversed().lazy.flatMap { $0.instructions.reversed() }
   }
   
-  public var returnInstruction: ReturnInst? {
+  public var returnInstruction: ReturnInstruction? {
     for block in blocks.reversed() {
-      if let retInst = block.terminator as? ReturnInst { return retInst }
+      if let retInst = block.terminator as? ReturnInstruction { return retInst }
     }
     return nil
   }
@@ -267,6 +277,18 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return StringRef(bridged: bridged.getAccessorName()).string
   }
 
+  public var isInitializer: Bool {
+    return bridged.isInitializer()
+  }
+
+  public var isDeinitializer: Bool {
+    return bridged.isDeinitializer()
+  }
+
+  public var isImplicit: Bool {
+    return bridged.isImplicit()
+  }
+
   /// True, if the function runs with a swift 5.1 runtime.
   /// Note that this is function specific, because inlinable functions are de-serialized
   /// in a client module, which might be compiled with a different deployment target.
@@ -293,6 +315,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     case noRuntime
     case noExistentials
     case noObjCRuntime
+    case manualOwnership
   }
 
   public var performanceConstraints: PerformanceConstraints {
@@ -303,6 +326,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       case .NoRuntime: return .noRuntime
       case .NoExistentials: return .noExistentials
       case .NoObjCBridging: return .noObjCRuntime
+      case .ManualOwnership: return .manualOwnership
       default: fatalError("unknown performance constraint")
     }
   }
@@ -314,6 +338,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public enum InlineStrategy {
     case automatic
     case never
+    case heuristicAlways
     case always
   }
 
@@ -321,6 +346,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     switch bridged.getInlineStrategy() {
       case .InlineDefault: return .automatic
       case .NoInline: return .never
+      case .HeuristicAlwaysInline: return .heuristicAlways
       case .AlwaysInline: return .always
       default:
         fatalError()

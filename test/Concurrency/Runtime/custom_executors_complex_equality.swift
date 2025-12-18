@@ -66,6 +66,11 @@ actor MyActor {
 
   func test(expectedExecutor: NaiveQueueExecutor, expectedQueue: DispatchQueue) {
     expectedExecutor.preconditionIsolated("Expected deep equality to trigger for \(expectedExecutor) and our \(self.executor)")
+
+    // Ensure we get a usable value from asSerialExecutor() when the executor
+    // has complex equality.
+    _ = expectedExecutor.asUnownedSerialExecutor().asSerialExecutor()!.asUnownedSerialExecutor()
+
     print("\(Self.self): [\(self.executor.name)] on same context as [\(expectedExecutor.name)]")
   }
 }

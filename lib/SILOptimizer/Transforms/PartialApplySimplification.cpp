@@ -559,7 +559,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
     auto &entry = *callee->begin();
     
     // Insert an argument for the context before the originally applied args.
-    auto contextArgTy = callee->mapTypeIntoContext(
+    auto contextArgTy = callee->mapTypeIntoEnvironment(
                                  SILType::getPrimitiveObjectType(contextTy));
     if (isIndirectFormalParameter(contextParam.getConvention())) {
       contextArgTy = contextArgTy.getAddressType();

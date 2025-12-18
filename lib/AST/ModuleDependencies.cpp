@@ -717,18 +717,6 @@ ModuleDependenciesCache::findDependency(
   auto known = map.find(moduleName);
   if (known != map.end())
     optionalDep = &(known->second);
-
-  // During a scan, only produce the cached source module info for the current
-  // module under scan.
-  if (optionalDep.has_value()) {
-    auto dep = optionalDep.value();
-    if (dep->getAsSwiftSourceModule() &&
-        moduleName != mainScanModuleName &&
-        moduleName != "MainModuleCrossImportOverlays") {
-      return std::nullopt;
-    }
-  }
-
   return optionalDep;
 }
 
@@ -772,6 +760,14 @@ bool ModuleDependenciesCache::hasSwiftDependency(StringRef moduleName) const {
   return findSwiftDependency(moduleName).has_value();
 }
 
+int ModuleDependenciesCache::numberOfClangDependencies() const {
+  return ModuleDependenciesMap.at(ModuleDependencyKind::Clang).size();
+}
+int ModuleDependenciesCache::numberOfSwiftDependencies() const {
+  return ModuleDependenciesMap.at(ModuleDependencyKind::SwiftInterface).size() +
+         ModuleDependenciesMap.at(ModuleDependencyKind::SwiftBinary).size();
+}
+
 void ModuleDependenciesCache::recordDependency(
     StringRef moduleName, ModuleDependencyInfo dependency) {
   auto dependenciesKind = dependency.getKind();
@@ -783,61 +779,68 @@ void ModuleDependenciesCache::recordClangDependencies(
     const clang::tooling::dependencies::ModuleDepsGraph &dependencies,
     DiagnosticEngine &diags,
     BridgeClangDependencyCallback bridgeClangModule) {
-  for (const auto &dep : dependencies) {
-    auto depID =
-        ModuleDependencyID{dep.ID.ModuleName, ModuleDependencyKind::Clang};
-    if (hasDependency(depID)) {
-      auto priorClangModuleDetails =
-          findKnownDependency(depID).getAsClangModule();
-      DEBUG_ASSERT(priorClangModuleDetails);
-      auto priorContextHash = priorClangModuleDetails->contextHash;
-      auto newContextHash = dep.ID.ContextHash;
-      if (priorContextHash != newContextHash) {
-        // This situation means that within the same scanning action, Clang
-        // Dependency Scanner has produced two different variants of the same
-        // module. This is not supposed to happen, but we are currently
-        // hunting down the rare cases where it does, seemingly due to
-        // differences in Clang Scanner direct by-name queries and transitive
-        // header lookup queries.
-        //
-        // Emit a failure diagnostic here that is hopefully more actionable
-        // for the time being.
-        diags.diagnose(SourceLoc(),
-                           diag::dependency_scan_unexpected_variant,
-                           dep.ID.ModuleName);
-        diags.diagnose(
-            SourceLoc(),
-            diag::dependency_scan_unexpected_variant_context_hash_note,
-            priorContextHash, newContextHash);
-        diags.diagnose(
-            SourceLoc(),
-            diag::dependency_scan_unexpected_variant_module_map_note,
-            priorClangModuleDetails->moduleMapFile, dep.ClangModuleMapFile);
+  for (const auto &dep : dependencies)
+    recordClangDependency(dep, diags, bridgeClangModule);
+}
 
-        auto newClangModuleDetails = bridgeClangModule(dep).getAsClangModule();
-        auto diagnoseExtraCommandLineFlags =
-            [&diags](const ClangModuleDependencyStorage *checkModuleDetails,
-                   const ClangModuleDependencyStorage *baseModuleDetails,
-                   bool isNewlyDiscovered) -> void {
-          std::unordered_set<std::string> baseCommandLineSet(
-              baseModuleDetails->buildCommandLine.begin(),
-              baseModuleDetails->buildCommandLine.end());
-          for (const auto &checkArg : checkModuleDetails->buildCommandLine)
-            if (baseCommandLineSet.find(checkArg) == baseCommandLineSet.end())
-              diags.diagnose(
-                  SourceLoc(),
-                  diag::dependency_scan_unexpected_variant_extra_arg_note,
-                  isNewlyDiscovered, checkArg);
-        };
-        diagnoseExtraCommandLineFlags(priorClangModuleDetails,
-                                      newClangModuleDetails, true);
-        diagnoseExtraCommandLineFlags(newClangModuleDetails,
-                                      priorClangModuleDetails, false);
-      }
-    } else {
-      recordDependency(dep.ID.ModuleName, bridgeClangModule(dep));
-      addSeenClangModule(dep.ID);
-    }
+void ModuleDependenciesCache::recordClangDependency(
+    const clang::tooling::dependencies::ModuleDeps &dependency,
+    DiagnosticEngine &diags,
+    BridgeClangDependencyCallback bridgeClangModule) {
+  auto depID =
+      ModuleDependencyID{dependency.ID.ModuleName, ModuleDependencyKind::Clang};
+  if (!hasDependency(depID)) {
+    recordDependency(dependency.ID.ModuleName, bridgeClangModule(dependency));
+    addSeenClangModule(dependency.ID);
+    return;
+  }
+
+  auto priorClangModuleDetails =
+      findKnownDependency(depID).getAsClangModule();
+  DEBUG_ASSERT(priorClangModuleDetails);
+  auto priorContextHash = priorClangModuleDetails->contextHash;
+  auto newContextHash = dependency.ID.ContextHash;
+  if (priorContextHash != newContextHash) {
+    // This situation means that within the same scanning action, Clang
+    // Dependency Scanner has produced two different variants of the same
+    // module. This is not supposed to happen, but we are currently
+    // hunting down the rare cases where it does, seemingly due to
+    // differences in Clang Scanner direct by-name queries and transitive
+    // header lookup queries.
+    //
+    // Emit a failure diagnostic here that is hopefully more actionable
+    // for the time being.
+    diags.diagnose(SourceLoc(),
+                       diag::dependency_scan_unexpected_variant,
+                   dependency.ID.ModuleName);
+    diags.diagnose(
+        SourceLoc(),
+        diag::dependency_scan_unexpected_variant_context_hash_note,
+        priorContextHash, newContextHash);
+    diags.diagnose(
+        SourceLoc(),
+        diag::dependency_scan_unexpected_variant_module_map_note,
+        priorClangModuleDetails->moduleMapFile, dependency.ClangModuleMapFile);
+
+    auto newClangModuleDetails = bridgeClangModule(dependency).getAsClangModule();
+    auto diagnoseExtraCommandLineFlags =
+        [&diags](const ClangModuleDependencyStorage *checkModuleDetails,
+               const ClangModuleDependencyStorage *baseModuleDetails,
+               bool isNewlyDiscovered) -> void {
+      std::unordered_set<std::string> baseCommandLineSet(
+          baseModuleDetails->buildCommandLine.begin(),
+          baseModuleDetails->buildCommandLine.end());
+      for (const auto &checkArg : checkModuleDetails->buildCommandLine)
+        if (baseCommandLineSet.find(checkArg) == baseCommandLineSet.end())
+          diags.diagnose(
+              SourceLoc(),
+              diag::dependency_scan_unexpected_variant_extra_arg_note,
+              isNewlyDiscovered, checkArg);
+    };
+    diagnoseExtraCommandLineFlags(priorClangModuleDetails,
+                                  newClangModuleDetails, true);
+    diagnoseExtraCommandLineFlags(newClangModuleDetails,
+                                  priorClangModuleDetails, false);
   }
 }
 
@@ -901,7 +904,6 @@ void ModuleDependenciesCache::setSwiftOverlayDependencies(
     ModuleDependencyID moduleID,
     const ArrayRef<ModuleDependencyID> dependencyIDs) {
   auto dependencyInfo = findKnownDependency(moduleID);
-  assert(dependencyInfo.getSwiftOverlayDependencies().empty());
 #ifndef NDEBUG
   for (const auto &depID : dependencyIDs)
     assert(depID.Kind != ModuleDependencyKind::Clang);
@@ -916,7 +918,6 @@ void ModuleDependenciesCache::setCrossImportOverlayDependencies(
     ModuleDependencyID moduleID,
     const ModuleDependencyIDCollectionView dependencyIDs) {
   auto dependencyInfo = findKnownDependency(moduleID);
-  assert(dependencyInfo.getCrossImportOverlayDependencies().empty());
   // Copy the existing info to a mutable one we can then replace it with,
   // after setting its overlay dependencies.
   auto updatedDependencyInfo = dependencyInfo;

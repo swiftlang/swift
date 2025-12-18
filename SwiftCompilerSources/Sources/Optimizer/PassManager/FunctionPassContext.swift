@@ -111,10 +111,34 @@ struct FunctionPassContext : MutatingContext {
     return String(taking: bridgedPassContext.mangleOutlinedVariable(function.bridged))
   }
 
-  func mangle(withClosureArguments closureArgs: [(argumentIndex: Int, argumentValue: Value)],
+  enum ClosureArgumentMangling {
+    case closure(SingleValueInstruction)
+
+    /// The argument specializes for the same closure as a previous argument, e.g.
+    /// ```
+    ///   %1 = partial_apply %closure
+    ///   apply %f(%1, %1)    // first argument: `.closure(%1)`
+    ///                       // second argument: `.previousArgumentIndex(0)`
+    case previousArgumentIndex(Int)
+  }
+
+  func mangle(withClosureArguments closureArgs: [(argumentIndex: Int, argumentValue: ClosureArgumentMangling)],
               from applySiteCallee: Function
   ) -> String {
-    closureArgs.withBridgedArrayRef{ bridgedClosureArgs in
+    let bridgedArgManglings = closureArgs.map {
+      switch $0.argumentValue {
+      case .closure(let closure):
+        return BridgedPassContext.ClosureArgMangling(argIdx: $0.argumentIndex,
+                                                     inst: Optional<Instruction>(closure).bridged,
+                                                     otherArgIdx: -1)
+      case .previousArgumentIndex(let idx):
+        return BridgedPassContext.ClosureArgMangling(argIdx: $0.argumentIndex,
+                                                     inst: OptionalBridgedInstruction(),
+                                                     otherArgIdx: idx)
+      }
+    }
+
+    return bridgedArgManglings.withBridgedArrayRef{ bridgedClosureArgs in
       String(taking: bridgedPassContext.mangleWithClosureArgs(bridgedClosureArgs, applySiteCallee.bridged))
     }
   }
@@ -134,19 +158,48 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
-  func createSpecializedFunctionDeclaration(from original: Function, withName specializedFunctionName: String,
-                                            withParams specializedParameters: [ParameterInfo],
-                                            makeThin: Bool = false,
-                                            makeBare: Bool = false,
-                                            preserveGenericSignature: Bool = true) -> Function
-  {
+  func mangle(withExplodedPackArguments argIndices: [Int], from original: Function) -> String {
+    return argIndices.withBridgedArrayRef { bridgedArgIndices in
+      String(taking: bridgedPassContext.mangleWithExplodedPackArgs(bridgedArgIndices, original.bridged))
+    }
+  }
+
+  func mangle(withChangedRepresentation original: Function) -> String {
+    String(taking: bridgedPassContext.mangleWithChangedRepresentation(original.bridged))
+  }
+
+  func createSpecializedFunctionDeclaration(
+    from original: Function, withName specializedFunctionName: String,
+    withParams specializedParameters: [ParameterInfo],
+    withResults specializedResults: [ResultInfo]? = nil,
+    withRepresentation: FunctionTypeRepresentation? = nil,
+    makeBare: Bool = false,
+    preserveGenericSignature: Bool = true
+  ) -> Function {
     return specializedFunctionName._withBridgedStringRef { nameRef in
       let bridgedParamInfos = specializedParameters.map { $0._bridged }
+      let repr = withRepresentation ?? original.loweredFunctionType.functionTypeRepresentation
 
       return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
-        bridgedPassContext.createSpecializedFunctionDeclaration(nameRef, paramBuf.baseAddress, paramBuf.count,
-                                                                original.bridged, makeThin, makeBare,
-                                                                preserveGenericSignature).function
+
+        if let bridgedResultInfos = specializedResults?.map({ $0._bridged }) {
+
+          return bridgedResultInfos.withUnsafeBufferPointer { resultBuf in
+            return bridgedPassContext.createSpecializedFunctionDeclaration(
+              nameRef, paramBuf.baseAddress, paramBuf.count,
+              resultBuf.baseAddress, resultBuf.count,
+              original.bridged, repr.bridged, makeBare,
+              preserveGenericSignature
+            ).function
+          }
+        } else {
+          return bridgedPassContext.createSpecializedFunctionDeclaration(
+            nameRef, paramBuf.baseAddress, paramBuf.count,
+            nil, 0,
+            original.bridged, repr.bridged, makeBare,
+            preserveGenericSignature
+          ).function
+        }
       }
     }
   }

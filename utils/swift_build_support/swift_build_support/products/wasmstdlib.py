@@ -152,7 +152,6 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_STDLIB_STABLE_ABI:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_STDLIB_TRACING:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_STDLIB_HAS_ASLR:BOOL', 'FALSE')
-        self.cmake_options.define('SWIFT_STDLIB_CONCURRENCY_TRACING:BOOL', 'FALSE')
         self.cmake_options.define(
             'SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_RUNTIME_CRASH_REPORTER_CLIENT:BOOL', 'FALSE')
@@ -191,7 +190,11 @@ class WasmStdlib(cmake_product.CMakeProduct):
         # Test configuration
         self.cmake_options.define('SWIFT_INCLUDE_TESTS:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_SOURCEKIT_TESTS:BOOL', 'FALSE')
-        lit_test_paths = ['IRGen', 'stdlib', 'Concurrency/Runtime', 'embedded']
+        lit_test_paths = [
+            'IRGen', 'stdlib', 'Concurrency/Runtime', 'embedded',
+            # TODO(katei): Enable all interpreter tests
+            'Interpreter/enum.swift',
+        ]
         lit_test_paths = [os.path.join(
             self.build_dir, 'test-wasi-wasm32', path) for path in lit_test_paths]
         self.cmake_options.define('SWIFT_LIT_TEST_PATHS:STRING',

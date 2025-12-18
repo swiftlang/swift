@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -compute-side-effects -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -compute-side-effects -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -372,23 +372,24 @@ exit:
 // CHECK:         return [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'hoist_over_terminator_4'
 sil [ossa] @hoist_over_terminator_4 : $@convention(thin) (@owned C) -> @owned C {
-entry(%instance_c : @owned $C):
-    %lifetime_c_0 = begin_borrow %instance_c : $C
-    br work(%lifetime_c_0 : $C)
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0
+  br bb1(%1)
 
-work(%lifetime_c : @guaranteed $C):
-    cond_br undef, left, right
+bb1(%3 : @reborrow $C):
+  %4 = borrowed %3 from (%0)
+  cond_br undef, bb2, bb3
 
-left:
-    end_borrow %lifetime_c : $C
-    br exit
+bb2:
+  end_borrow %4
+  br bb4
 
-right:
-    end_borrow %lifetime_c : $C
-    br exit
+bb3:
+  end_borrow %4
+  br bb4
 
-exit:
-    return %instance_c : $C
+bb4:
+  return %0
 }
 
 // CHECK-LABEL: sil [ossa] @dont_hoist_over_some_barred_blocks : {{.*}} {
@@ -1020,21 +1021,23 @@ exit(%value : @owned $C):
 // CHECK:         begin_borrow
 // CHECK:         end_borrow
 // CHECK-LABEL: } // end sil function 'dont_hoist_over_begin_borrow_copy'
-sil [ossa] @dont_hoist_over_begin_borrow_copy : $@convention(thin) (@owned C) -> (@owned C) {
-entry(%owned_in : @owned $C):
-  %borrow_1 = begin_borrow [lexical] %owned_in : $C
-  apply undef(%borrow_1) : $@convention(thin) (@guaranteed C) -> ()
-  %copy_1_1 = copy_value %borrow_1 : $C
-  %borrow_out = begin_borrow [lexical] %copy_1_1 : $C
-  %copy_2 = copy_value %borrow_out : $C
-  end_borrow %borrow_1 : $C
-  destroy_value %owned_in : $C
-  apply undef(%borrow_out) : $@convention(thin) (@guaranteed C) -> ()
-  br exit(%copy_1_1 : $C, %borrow_out : $C, %copy_2 : $C)
-exit(%copy_1_2 : @owned $C, %borrow_in : @guaranteed $C, %copy_2_2 : @owned $C):
-  end_borrow %borrow_in : $C
-  destroy_value %copy_1_2 : $C
-  return %copy_2_2 : $C
+sil [ossa] @dont_hoist_over_begin_borrow_copy : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow [lexical] %0
+  %2 = apply undef(%1) : $@convention(thin) (@guaranteed C) -> ()
+  %3 = copy_value %1
+  %4 = begin_borrow [lexical] %3
+  %5 = copy_value %4
+  end_borrow %1
+  destroy_value %0
+  %8 = apply undef(%4) : $@convention(thin) (@guaranteed C) -> ()
+  br bb1(%3, %4, %5)
+
+bb1(%10 : @owned $C, %11 : @reborrow $C, %12 : @owned $C):
+  %13 = borrowed %11 from (%10)
+  end_borrow %13
+  destroy_value %10
+  return %12
 }
 
 // Do not hoist the end_borrow (or destroy_value) of Storage above the

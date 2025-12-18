@@ -1,4 +1,6 @@
-# Calling an actor-isolated method from a synchronous nonisolated context
+# Calling an actor-isolated method from a synchronous nonisolated context (ActorIsolatedCall)
+
+## Overview
 
 Accessing actor-isolated state from outside the actor can cause data races in your program. Resolve this error by calling actor-isolated functions on the actor.
 

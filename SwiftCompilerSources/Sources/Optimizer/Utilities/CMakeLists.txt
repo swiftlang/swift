@@ -11,10 +11,10 @@ swift_compiler_sources(Optimizer
   Devirtualization.swift
   EscapeUtils.swift
   FunctionSignatureTransforms.swift
-  FunctionTest.swift
   GenericSpecialization.swift
   LifetimeDependenceUtils.swift
   LocalVariableUtils.swift
   OptUtils.swift
   OwnershipLiveness.swift
+  Test.swift
 )

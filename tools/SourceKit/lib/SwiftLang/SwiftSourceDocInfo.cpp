@@ -543,8 +543,8 @@ static void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
     }
   } else {
     namelookup::lookupInModule(DC->getModuleScopeContext(),
-                               VD->getBaseName(), results,
-                               NLKind::UnqualifiedLookup,
+                               VD->getBaseName(), /*hasModuleSelector=*/false,
+                               results, NLKind::UnqualifiedLookup,
                                namelookup::ResolutionKind::Overloadable,
                                DC->getModuleScopeContext(),
                                VD->getLoc(),
@@ -2453,7 +2453,7 @@ static void resolveCursorFromUSR(
         if (DC->isTypeContext()) {
           auto ContainerType = DC->getSelfInterfaceType();
           ContainerType =
-              D->getInnermostDeclContext()->mapTypeIntoContext(ContainerType);
+              D->getInnermostDeclContext()->mapTypeIntoEnvironment(ContainerType);
         }
 
         ResolvedValueRefCursorInfoPtr Info = new ResolvedValueRefCursorInfo(

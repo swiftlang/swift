@@ -23,19 +23,19 @@ struct X {
 import Test
 
 public func test(x: X) {
-  // CHECK: note: annotate method 'test' with 'SWIFT_RETURNS_INDEPENDENT_VALUE' in C++ to make it available in Swift
+  // CHECK: note: annotate method 'test' with SWIFT_RETURNS_INDEPENDENT_VALUE in C++ to make it available in Swift
   // CHECK: int *test() { }
   // CHECK: ^
   // CHECK: SWIFT_RETURNS_INDEPENDENT_VALUE
   
   x.test()
   
-  // CHECK: note: annotate method 'other' with 'SWIFT_RETURNS_INDEPENDENT_VALUE' in C++ to make it available in Swift
+  // CHECK: note: annotate method 'other' with SWIFT_RETURNS_INDEPENDENT_VALUE in C++ to make it available in Swift
   // CHECK: Ptr other() { }
   // CHECK: ^
   // CHECK: SWIFT_RETURNS_INDEPENDENT_VALUE
   
-  // CHECK: note: annotate type 'Ptr' with 'SWIFT_SELF_CONTAINED' in C++ to make methods that return it available in Swift
+  // CHECK: note: annotate type 'Ptr' with SWIFT_SELF_CONTAINED in C++ to make methods that return it available in Swift
   // CHECK: struct Ptr {
   // CHECK: ^
   // CHECK: SWIFT_SELF_CONTAINED

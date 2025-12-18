@@ -407,15 +407,12 @@ private:
       auto &log = getDebugLogger();
       log << "Type variables in scope = "
           << "[";
-      auto typeVars = CS.getTypeVariables();
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
-      interleave(typeVars, [&](TypeVariableType *typeVar) {
-                   Type(typeVar).print(log, PO);
-                 },
-                 [&] {
-                   log << ", ";
-                 });
+      interleave(
+          CS.getTypeVariables(),
+          [&](TypeVariableType *typeVar) {
+            Type(typeVar).print(log, PrintOptions::forDebugging());
+          },
+          [&] { log << ", "; });
       log << "]" << '\n';
     }
 
@@ -543,19 +540,20 @@ class TypeVariableStep final : public BindingStep<TypeVarBindingProducer> {
   bool SawFirstLiteralConstraint = false;
 
 public:
-  TypeVariableStep(BindingContainer &bindings,
+  TypeVariableStep(ConstraintSystem &cs,
+                   TypeVariableType *typeVar,
+                   const BindingContainer &bindings,
                    SmallVectorImpl<Solution> &solutions)
-      : BindingStep(bindings.getConstraintSystem(), {bindings}, solutions),
-        TypeVar(bindings.getTypeVariable()) {}
+      : BindingStep(cs, {cs, typeVar, bindings}, solutions),
+        TypeVar(typeVar) {}
 
   void setup() override;
 
   StepResult resume(bool prevFailed) override;
 
   void print(llvm::raw_ostream &Out) override {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-    Out << "TypeVariableStep for " << TypeVar->getString(PO) << '\n';
+    Out << "TypeVariableStep for ";
+    Out << TypeVar->getString(PrintOptions::forDebugging()) << '\n';
   }
 
 protected:
@@ -871,8 +869,7 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
 
   /// The number of milliseconds until outer constraint system
   /// is considered "too complex" if timer is enabled.
-  std::optional<std::pair<ExpressionTimer::AnchorType, unsigned>>
-      OuterTimeRemaining = std::nullopt;
+  std::optional<unsigned> OuterTimeRemaining = std::nullopt;
 
   /// Conjunction constraint associated with this step.
   Constraint *Conjunction;
@@ -914,7 +911,7 @@ public:
 
     if (cs.Timer) {
       auto remainingTime = cs.Timer->getRemainingProcessTimeInSeconds();
-      OuterTimeRemaining.emplace(cs.Timer->getAnchor(), remainingTime);
+      OuterTimeRemaining.emplace(remainingTime);
     }
   }
 
@@ -929,11 +926,8 @@ public:
     if (HadFailure)
       restoreBestScore();
 
-    if (OuterTimeRemaining) {
-      auto anchor = OuterTimeRemaining->first;
-      auto remainingTime = OuterTimeRemaining->second;
-      CS.Timer.emplace(anchor, CS, remainingTime);
-    }
+    if (OuterTimeRemaining)
+      CS.Timer.emplace(CS, *OuterTimeRemaining);
   }
 
   StepResult resume(bool prevFailed) override;

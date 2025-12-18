@@ -95,9 +95,14 @@ class LookupTypeResult {
   SmallVector<LookupTypeResultEntry, 4> Results;
 
 public:
+  using const_iterator = SmallVectorImpl<LookupTypeResultEntry>::const_iterator;
+  const_iterator begin() const { return Results.begin(); }
+  const_iterator end() const { return Results.end(); }
+
   using iterator = SmallVectorImpl<LookupTypeResultEntry>::iterator;
   iterator begin() { return Results.begin(); }
   iterator end() { return Results.end(); }
+
   unsigned size() const { return Results.size(); }
 
   LookupTypeResultEntry operator[](unsigned index) const {
@@ -299,6 +304,44 @@ public:
   CheckRequirementsResult getKind() const { return Kind; }
 };
 
+/// Helper type for diagnosing a lookup that failed merely because it was
+/// restricted by a module selector.
+///
+/// To use this, perform the lookup again without its module selector and
+/// construct a \c ModuleSelectorCorrection from the lookup result. If
+/// there are any results, the \c diagnose() method will emit an error and a
+/// set of fix-it notes.
+class ModuleSelectorCorrection {
+  enum class CandidateKind {
+    /// A declaration that is found without depending on context.
+    /// Usually either a top-level type or a member with an explicit base type.
+    ContextFree,
+    /// A member declaration accessed via implicit \c self .
+    MemberViaSelf,
+    /// A member declaration not accessed via implicit \c self (usually a static
+    /// member of an enclosing type).
+    MemberViaContext,
+    /// A local declaration.
+    Local
+  };
+
+  using CandidateModule = std::pair<Identifier, CandidateKind>;
+  SmallSetVector<CandidateModule, 4> candidateModules;
+
+public:
+  ModuleSelectorCorrection(const LookupResult &candidates);
+  ModuleSelectorCorrection(const LookupTypeResult &candidates);
+  ModuleSelectorCorrection(const SmallVectorImpl<ValueDecl *> &candidates);
+  ModuleSelectorCorrection(const SmallVectorImpl<constraints::OverloadChoice> &candidates);
+
+  /// Emit an error and warnings if there were any candidates.
+  ///
+  /// \returns \c true if an error was diagnosed.
+  bool diagnose(ASTContext &ctx,
+                DeclNameLoc nameLoc,
+                DeclNameRef originalName) const;
+};
+
 /// Describes the kind of checked cast operation being performed.
 enum class CheckedCastContextKind {
   /// None: we're just establishing how to perform the checked cast. This
@@ -317,6 +360,18 @@ enum class CheckedCastContextKind {
   /// Coerce to checked cast. Used when we verify if it is possible to
   /// suggest to convert a coercion to a checked cast.
   Coercion,
+};
+
+/// Determines which BraceStmts should be type-checked.
+enum class BraceStmtChecking {
+  /// Type-check all BraceStmts. This should always be the case for regular
+  /// type-checking.
+  All,
+
+  /// Only type-check the body of a do-catch statement, not including catch
+  /// clauses. This is necessary for completion where we still need the caught
+  /// error type to be computed.
+  OnlyDoCatchBody,
 };
 
 namespace TypeChecker {
@@ -482,7 +537,7 @@ bool typeCheckStmtConditionElement(StmtConditionElement &elt, bool &isFalsable,
 ConcreteDeclRef getReferencedDeclForHasSymbolCondition(Expr *E);
 
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
-                      bool LeaveBodyUnchecked = false);
+                      BraceStmtChecking braceChecking = BraceStmtChecking::All);
 
 /// Try to apply the result builder transform of the given builder type
 /// to the body of the function.
@@ -753,8 +808,10 @@ Pattern *resolvePattern(Pattern *P, DeclContext *dc, bool isStmtCondition);
 ///
 /// \returns the type of the pattern, which may be an error type if an
 /// unrecoverable error occurred. If the options permit it, the type may
-/// involve \c UnresolvedType (for patterns with no type information) and
+/// involve \c PlaceholderType (for patterns with no type information) and
 /// unbound generic types.
+/// TODO: We ought to expose hooks that let callers open the
+/// PlaceholderTypes directly, similar to type resolution.
 Type typeCheckPattern(ContextualPattern pattern);
 
 /// Attempt to simplify an ExprPattern into a BoolPattern or
@@ -797,7 +854,8 @@ bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
 /// together.
 ///
 /// \returns true if a failure occurred.
-bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt);
+bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
+                              bool skipWhereClause);
 
 /// Compute the set of captures for the given closure.
 void computeCaptures(AbstractClosureExpr *ACE);
@@ -831,6 +889,12 @@ Expr *coerceToRValue(
 /// `LoadExpr`, because `ForceValueExpr` and `ParenExpr` supposed to appear
 /// only at certain positions in AST.
 Expr *addImplicitLoadExpr(
+    ASTContext &Context, Expr *expr,
+    std::function<Type(Expr *)> getType = [](Expr *E) { return E->getType(); },
+    std::function<void(Expr *, Type)> setType =
+        [](Expr *E, Type type) { E->setType(type); });
+
+Expr *addImplicitBorrowExpr(
     ASTContext &Context, Expr *expr,
     std::function<Type(Expr *)> getType = [](Expr *E) { return E->getType(); },
     std::function<void(Expr *, Type)> setType =
@@ -1039,6 +1103,11 @@ diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 std::optional<Diagnostic>
 diagnosticIfDeclCannotBeUnavailable(const Decl *D, SemanticAvailableAttr attr);
 
+/// Emit a warning on the first use of a compatibility memberwise initializer
+/// overload in a SourceFile.
+void diagnoseCompatMemberwiseInitIfNeeded(const ConstructorDecl *init,
+                                          SourceLoc loc);
+
 /// Checks whether the required range of versions of the compilation's target
 /// platform are available at the given `SourceRange`. If not, `Diagnose` is
 /// invoked.
@@ -1238,24 +1307,6 @@ bool diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
                                  std::optional<FunctionTypeRepr *> repr,
                                  DeclContext *dc,
                                  std::optional<TypeResolutionStage> stage);
-
-/// Walk the parallel structure of a type with user-provided placeholders and
-/// an inferred type produced by the type checker. Where placeholders can be
-/// found, suggest the corresponding inferred type.
-///
-/// For example,
-///
-/// \code
-///  func foo(_ x: [_] = [0])
-/// \endcode
-///
-/// Has a written type of `(ArraySlice (Placeholder))` and an inferred type of
-/// `(ArraySlice Int)`, so we walk to `Placeholder` and `Int` in each type and
-/// suggest replacing `_` with `Int`.
-///
-/// \param writtenType The interface type usually derived from a user-written
-/// type repr. \param inferredType The type inferred by the type checker.
-void notePlaceholderReplacementTypes(Type writtenType, Type inferredType);
 } // namespace TypeChecker
 
 /// Returns the protocol requirement kind of the given declaration.

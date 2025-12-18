@@ -263,7 +263,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   SmallString<64> potentialBindings;
   llvm::raw_svector_ostream bos(potentialBindings);
 
-  auto bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
+  const auto *bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
     if (CS.isDebugMode() && bindings.hasViableBindings()) {
       bos.indent(CS.solverState->getCurrentIndent() + 2);
       bos << "(";
@@ -280,13 +280,11 @@ StepResult ComponentStep::take(bool prevFailed) {
     CS.collectDisjunctions(disjunctions);
     std::vector<std::string> overloadDisjunctions;
     for (const auto &disjunction : disjunctions) {
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
-
       auto constraints = disjunction->getNestedConstraints();
       if (constraints[0]->getKind() == ConstraintKind::BindOverload)
         overloadDisjunctions.push_back(
-            constraints[0]->getFirstType()->getString(PO));
+            constraints[0]->getFirstType()->getString(
+                PrintOptions::forDebugging()));
     }
 
     if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
@@ -337,7 +335,8 @@ StepResult ComponentStep::take(bool prevFailed) {
     switch (*step) {
     case StepKind::Binding:
       return suspend(
-          std::make_unique<TypeVariableStep>(*bestBindings, Solutions));
+          std::make_unique<TypeVariableStep>(CS, bestBindings->getTypeVariable(),
+                                             *bestBindings, Solutions));
     case StepKind::Disjunction: {
       CS.retireConstraint(disjunction->first);
       return suspend(
@@ -357,14 +356,11 @@ StepResult ComponentStep::take(bool prevFailed) {
     // we can't solve this system unless we have free type variables
     // allowed in the solution.
     if (CS.isDebugMode()) {
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
-
       auto &log = getDebugLogger();
       log << "(failed due to free variables:";
       for (auto *typeVar : CS.getTypeVariables()) {
         if (!typeVar->getImpl().hasRepresentativeOrFixed()) {
-          log << " " << typeVar->getString(PO);
+          log << " " << typeVar->getString(PrintOptions::forDebugging());
         }
       }
       log << ")\n";
@@ -828,9 +824,13 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   // (expression) gets a fresh time slice to get solved. This
   // is important for closures with large number of statements
   // in them.
-  if (CS.Timer) {
+  if (CS.Timer)
     CS.Timer.reset();
-    CS.startExpressionTimer(element.getLocator());
+
+  {
+    auto *locator = element.getLocator();
+    auto anchor = simplifyLocatorToAnchor(locator);
+    CS.startExpression(anchor ? anchor : locator->getAnchor());
   }
 
   auto success = element.attempt(CS);
@@ -887,23 +887,24 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
     if (Solutions.size() > 1)
       filterSolutions(Solutions, /*minimize=*/true);
 
-    // In diagnostic mode we need to stop a conjunction
-    // but consider it successful if there are:
+    // In diagnostic mode we need to stop a conjunction but consider it
+    // successful if there are:
     //
-    // - More than one solution for this element. Ambiguity
-    //   needs to get propagated back to the outer context
-    //   to be diagnosed.
-    // - A single solution that requires one or more fixes,
-    //   continuing would result in more errors associated
-    //   with the failed element.
+    // - More than one solution for this element. Ambiguity needs to get
+    //   propagated back to the outer context to be diagnosed.
+    // - A single solution that requires one or more fixes or holes, since
+    //   continuing would result in more errors associated with the failed
+    //   element, and we don't preserve scores across elements.
     if (CS.shouldAttemptFixes()) {
       if (Solutions.size() > 1)
         Producer.markExhausted();
 
       if (Solutions.size() == 1) {
         auto score = Solutions.front().getFixedScore();
-        if (score.Data[SK_Fix] > 0 && !CS.isForCodeCompletion())
-          Producer.markExhausted();
+        if (!CS.isForCodeCompletion()) {
+          if (score.Data[SK_Fix] > 0 || score.Data[SK_Hole] > 0)
+            Producer.markExhausted();
+        }
       }
     } else if (Solutions.size() != 1) {
       return failConjunction();
@@ -1053,7 +1054,7 @@ void ConjunctionStep::SolverSnapshot::replaySolution(const Solution &solution) {
 
   // If inference succeeded, we are done.
   auto score = solution.getFixedScore();
-  if (score.Data[SK_Fix] == 0)
+  if (score.Data[SK_Fix] == 0 && score.Data[SK_Hole] == 0)
     return;
 
   // If this conjunction represents a closure and inference

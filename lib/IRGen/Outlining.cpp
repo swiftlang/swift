@@ -68,7 +68,7 @@ void OutliningMetadataCollector::collectTypeMetadata(SILType ty) {
   }
 
   // Substitute opaque types if allowed.
-  ty = IGF.IGM.substOpaqueTypesWithUnderlyingTypes(ty, CanGenericSignature());
+  ty = IGF.IGM.substOpaqueTypesWithUnderlyingTypes(ty);
 
   collectTypeMetadataForLayout(ty);
   collectTypeMetadataForDeinit(ty);
@@ -276,7 +276,7 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
   GenericEnvironment *env = digOutGenericEnvironment(loweredType);
 
   assert(env && "has archetype but no archetype?!");
-  return {loweredType->mapTypeOutOfContext()->getCanonicalType(),
+  return {loweredType->mapTypeOutOfEnvironment()->getCanonicalType(),
           env->getGenericSignature().getCanonicalSignature()};
 }
 

@@ -89,11 +89,20 @@ enum class TypeMetadataAddress {
 inline bool isEmbedded(CanType t) {
   return t->getASTContext().LangOpts.hasFeature(Feature::Embedded);
 }
-
+inline bool isEmbeddedWithoutEmbeddedExitentials(CanType t) {
+  auto &langOpts = t->getASTContext().LangOpts;
+  return langOpts.hasFeature(Feature::Embedded) &&
+    !langOpts.hasFeature(Feature::EmbeddedExistentials);
+}
 // Metadata is not generated and not allowed to be referenced in Embedded Swift,
 // expect for classes (both generic and non-generic), dynamic self, and
 // class-bound existentials.
 inline bool isMetadataAllowedInEmbedded(CanType t) {
+  auto &langOpts = t->getASTContext().LangOpts;
+  bool embeddedExistentials =
+    langOpts.hasFeature(Feature::EmbeddedExistentials) &&
+    langOpts.hasFeature(Feature::Embedded);
+
   if (isa<ClassType>(t) || isa<BoundGenericClassType>(t) ||
       isa<DynamicSelfType>(t)) {
     return true;
@@ -106,6 +115,9 @@ inline bool isMetadataAllowedInEmbedded(CanType t) {
     if (archeTy->requiresClass())
       return true;
   }
+
+  if (embeddedExistentials)
+    return true;
   return false;
 }
 
@@ -115,6 +127,11 @@ inline bool isEmbedded(Decl *d) {
 
 inline bool isEmbedded(const ProtocolConformance *c) {
   return c->getType()->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+}
+
+inline bool isEmbeddedWithoutEmbeddedExitentials(const ProtocolConformance *c) {
+  return isEmbedded(c) && !c->getType()->getASTContext().
+    LangOpts.hasFeature(Feature::EmbeddedExistentials);
 }
 
 /// A link entity is some sort of named declaration, combined with all
@@ -450,6 +467,10 @@ class LinkEntity {
     // These are both type kinds and protocol-conformance kinds.
     // TYPE KINDS: BEGIN {{
 
+    /// A SIL differentiability witness. The pointer is a
+    /// SILDifferentiabilityWitness*.
+    DifferentiabilityWitness,
+
     /// A lazy protocol witness accessor function. The pointer is a
     /// canonical TypeBase*, and the secondary pointer is a
     /// ProtocolConformance*.
@@ -459,10 +480,6 @@ class LinkEntity {
     /// canonical TypeBase*, and the secondary pointer is a
     /// ProtocolConformance*.
     ProtocolWitnessTableLazyCacheVariable,
-
-    /// A SIL differentiability witness. The pointer is a
-    /// SILDifferentiabilityWitness*.
-    DifferentiabilityWitness,
 
     // Everything following this is a type kind.
 
@@ -1098,7 +1115,7 @@ public:
   }
 
   static LinkEntity forValueWitnessTable(CanType type) {
-    assert(!isEmbedded(type));
+    assert(!isEmbeddedWithoutEmbeddedExitentials(type));
     LinkEntity entity;
     entity.setForType(Kind::ValueWitnessTable, type);
     return entity;
@@ -1128,7 +1145,7 @@ public:
   }
 
   static LinkEntity forProtocolWitnessTable(const ProtocolConformance *C) {
-    if (isEmbedded(C)) {
+    if (isEmbeddedWithoutEmbeddedExitentials(C)) {
       assert(C->getProtocol()->requiresClass());
     }
 
@@ -1846,11 +1863,20 @@ public:
 
   bool isAlwaysSharedLinkage() const;
 
+  /// Partial apply forwarders always need real private linkage,
+  /// to ensure the correct implementation is used in case of
+  /// colliding symbols.
+  bool privateMeansPrivate() const {
+    return getKind() == Kind::PartialApplyForwarder ||
+           getKind() == Kind::PartialApplyForwarderAsyncFunctionPointer ||
+           getKind() == Kind::PartialApplyForwarderCoroFunctionPointer;
+  }
+
   /// Whether the link entity's definitions must be considered non-unique.
   ///
   /// This applies only in the Embedded Swift linkage model, and is used for
   /// any symbols that have not been explicitly requested to have unique
-  /// definitions (e.g., with @_used).
+  /// definitions (e.g., with @used).
   bool hasNonUniqueDefinition() const;
 
 #undef LINKENTITY_GET_FIELD
@@ -1886,7 +1912,7 @@ class ApplyIRLinkage {
   IRLinkage IRL;
 public:
   ApplyIRLinkage(IRLinkage IRL) : IRL(IRL) {}
-  void to(llvm::GlobalValue *GV, bool definition = true) const {
+  void to(llvm::GlobalValue *GV, bool nonAliasedDefinition = true) const {
     llvm::Module *M = GV->getParent();
     const llvm::Triple Triple(M->getTargetTriple());
 
@@ -1899,9 +1925,16 @@ public:
     if (Triple.isOSBinFormatELF())
       return;
 
-    // COMDATs cannot be applied to declarations.  If we have a definition,
-    // apply the COMDAT.
-    if (definition)
+    // COMDATs cannot be applied to declarations. Also, definitions that are
+    // exported through aliases should not have COMDATs, because the alias
+    // itself might represent an externally visible symbol but such symbols
+    // are discarded from the symtab when other object files have a COMDAT
+    // group with the same signature.
+    //
+    // If we have a non-aliased definition with ODR-based linkage, attach it
+    // to a COMDAT group so that duplicate definitions across object files
+    // can be merged by the linker.
+    if (nonAliasedDefinition)
       if (IRL.Linkage == llvm::GlobalValue::LinkOnceODRLinkage ||
           IRL.Linkage == llvm::GlobalValue::WeakODRLinkage)
         if (Triple.supportsCOMDAT())

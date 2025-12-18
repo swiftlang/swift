@@ -24,6 +24,40 @@
 using namespace swift;
 using namespace swift::importer;
 
+/// Known C++ stdlib types, for which we can assume conformance to the standard
+/// (e.g., std::map has template parameters for key and value types, and has
+/// members like key_type, size_type, and operator[]).
+enum class CxxStdType {
+  uncategorized,
+  optional,
+  set,
+  unordered_set,
+  multiset,
+  pair,
+  map,
+  unordered_map,
+  multimap,
+  vector,
+  span,
+};
+
+static CxxStdType identifyCxxStdTypeByName(StringRef name) {
+#define CaseStd(name) Case(#name, CxxStdType::name)
+  return llvm::StringSwitch<CxxStdType>(name)
+      .CaseStd(optional)
+      .CaseStd(set)
+      .CaseStd(unordered_set)
+      .CaseStd(multiset)
+      .CaseStd(pair)
+      .CaseStd(map)
+      .CaseStd(unordered_map)
+      .CaseStd(multimap)
+      .CaseStd(vector)
+      .CaseStd(span)
+      .Default(CxxStdType::uncategorized);
+#undef CxxStdCase
+}
+
 /// Alternative to `NominalTypeDecl::lookupDirect`.
 /// This function does not attempt to load extensions of the nominal decl.
 static TinyPtrVector<ValueDecl *>
@@ -95,16 +129,6 @@ static FuncDecl *getInsertFunc(NominalTypeDecl *decl,
   return insert;
 }
 
-static bool isStdDecl(const clang::CXXRecordDecl *clangDecl,
-                      llvm::ArrayRef<StringRef> names) {
-  if (!clangDecl->isInStdNamespace())
-    return false;
-  if (!clangDecl->getIdentifier())
-    return false;
-  StringRef name = clangDecl->getName();
-  return llvm::is_contained(names, name);
-}
-
 static clang::TypeDecl *
 lookupNestedClangTypeDecl(const clang::CXXRecordDecl *clangDecl,
                           StringRef name) {
@@ -142,7 +166,7 @@ static ValueDecl *lookupOperator(NominalTypeDecl *decl, Identifier id,
 
   // If no member operator was found, look for out-of-class definitions in the
   // same module.
-  auto module = decl->getModuleContext();
+  auto module = decl->getModuleContextForNameLookup();
   SmallVector<ValueDecl *> nonMemberResults;
   module->lookupValue(id, NLKind::UnqualifiedLookup, nonMemberResults);
   for (const auto &nonMember : nonMemberResults) {
@@ -273,8 +297,17 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
                                           best)) {
   case clang::OR_Success: {
     if (auto clangCallee = best->Function) {
-      auto lookupTable = impl.findLookupTable(classDecl);
-      addEntryToLookupTable(*lookupTable, clangCallee, impl.getNameImporter());
+      // Declarations inside of a C++ namespace are added into two lookup
+      // tables: one for the __ObjC module, one for the actual owning Clang
+      // module of the decl. This is a hack that is meant to address the case
+      // when a namespace spans across multiple Clang modules. Mimic that
+      // behavior for the operator that we just instantiated.
+      auto lookupTable1 = impl.findLookupTable(classDecl);
+      addEntryToLookupTable(*lookupTable1, clangCallee, impl.getNameImporter());
+      auto owningModule = impl.getClangOwningModule(classDecl);
+      auto lookupTable2 = impl.findLookupTable(owningModule);
+      if (lookupTable1 != lookupTable2)
+        addEntryToLookupTable(*lookupTable2, clangCallee, impl.getNameImporter());
       return clangCallee;
     }
     break;
@@ -377,8 +410,13 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
   equalEqualDecl->setBody(equalEqualBody);
 
   impl.synthesizedAndAlwaysVisibleDecls.insert(equalEqualDecl);
-  auto lookupTable = impl.findLookupTable(classDecl);
-  addEntryToLookupTable(*lookupTable, equalEqualDecl, impl.getNameImporter());
+  auto lookupTable1 = impl.findLookupTable(classDecl);
+  addEntryToLookupTable(*lookupTable1, equalEqualDecl, impl.getNameImporter());
+  auto owningModule = impl.getClangOwningModule(classDecl);
+  auto lookupTable2 = impl.findLookupTable(owningModule);
+  if (lookupTable1 != lookupTable2)
+    addEntryToLookupTable(*lookupTable2, equalEqualDecl,
+                          impl.getNameImporter());
   return true;
 }
 
@@ -408,13 +446,11 @@ swift::importer::getImportedMemberOperator(const DeclBaseName &name,
   return nullptr;
 }
 
-void swift::conformToCxxIteratorIfNeeded(
-    ClangImporter::Implementation &impl, NominalTypeDecl *decl,
-    const clang::CXXRecordDecl *clangDecl) {
-  PrettyStackTraceDecl trace("conforming to UnsafeCxxInputIterator", decl);
-
-  assert(decl);
-  assert(clangDecl);
+static void
+conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
+                             NominalTypeDecl *decl,
+                             const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("trying to conform to UnsafeCxxInputIterator", decl);
   ASTContext &ctx = decl->getASTContext();
   clang::ASTContext &clangCtx = clangDecl->getASTContext();
 
@@ -627,13 +663,11 @@ void swift::conformToCxxIteratorIfNeeded(
   }
 }
 
-void swift::conformToCxxConvertibleToBoolIfNeeded(
-    ClangImporter::Implementation &impl, swift::NominalTypeDecl *decl,
-    const clang::CXXRecordDecl *clangDecl) {
-  PrettyStackTraceDecl trace("conforming to CxxConvertibleToBool", decl);
-
-  assert(decl);
-  assert(clangDecl);
+static void
+conformToCxxConvertibleToBoolIfNeeded(ClangImporter::Implementation &impl,
+                                      swift::NominalTypeDecl *decl,
+                                      const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("trying to conform to CxxConvertibleToBool", decl);
   ASTContext &ctx = decl->getASTContext();
 
   auto conversionId = ctx.getIdentifier("__convertToBool");
@@ -660,19 +694,13 @@ void swift::conformToCxxConvertibleToBoolIfNeeded(
                                    {KnownProtocolKind::CxxConvertibleToBool});
 }
 
-void swift::conformToCxxOptionalIfNeeded(
-    ClangImporter::Implementation &impl, NominalTypeDecl *decl,
-    const clang::CXXRecordDecl *clangDecl) {
+static void conformToCxxOptional(ClangImporter::Implementation &impl,
+                                 NominalTypeDecl *decl,
+                                 const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("conforming to CxxOptional", decl);
-
-  assert(decl);
-  assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
   clang::ASTContext &clangCtx = impl.getClangASTContext();
   clang::Sema &clangSema = impl.getClangSema();
-
-  if (!isStdDecl(clangDecl, {"optional"}))
-    return;
 
   ProtocolDecl *cxxOptionalProto =
       ctx.getProtocol(KnownProtocolKind::CxxOptional);
@@ -752,13 +780,11 @@ void swift::conformToCxxOptionalIfNeeded(
   decl->addMember(importedConstructor);
 }
 
-void swift::conformToCxxSequenceIfNeeded(
-    ClangImporter::Implementation &impl, NominalTypeDecl *decl,
-    const clang::CXXRecordDecl *clangDecl) {
-  PrettyStackTraceDecl trace("conforming to CxxSequence", decl);
-
-  assert(decl);
-  assert(clangDecl);
+static void
+conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
+                             NominalTypeDecl *decl,
+                             const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("trying to conform to CxxSequence", decl);
   ASTContext &ctx = decl->getASTContext();
 
   ProtocolDecl *cxxIteratorProto =
@@ -926,40 +952,30 @@ void swift::conformToCxxSequenceIfNeeded(
   }
 }
 
-static bool isStdSetType(const clang::CXXRecordDecl *clangDecl) {
-  return isStdDecl(clangDecl, {"set", "unordered_set", "multiset"});
-}
-
-static bool isStdMapType(const clang::CXXRecordDecl *clangDecl) {
-  return isStdDecl(clangDecl, {"map", "unordered_map", "multimap"});
-}
-
 bool swift::isUnsafeStdMethod(const clang::CXXMethodDecl *methodDecl) {
-  auto parentDecl =
+  auto *parentDecl =
       dyn_cast<clang::CXXRecordDecl>(methodDecl->getDeclContext());
-  if (!parentDecl)
+  if (!parentDecl || !parentDecl->isInStdNamespace() ||
+      !parentDecl->getIdentifier())
     return false;
-  if (!isStdSetType(parentDecl) && !isStdMapType(parentDecl))
-    return false;
-  if (methodDecl->getDeclName().isIdentifier() &&
-      methodDecl->getName() == "insert")
-    return true;
+
+  if (methodDecl->getIdentifier() && methodDecl->getName() == "insert") {
+    // Types for which the insert method is considered unsafe,
+    // due to potential iterator invalidation.
+    return llvm::StringSwitch<bool>(parentDecl->getName())
+        .Cases({"set", "unordered_set", "multiset"}, true)
+        .Cases({"map", "unordered_map", "multimap"}, true)
+        .Default(false);
+  }
   return false;
 }
 
-void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
-                                    NominalTypeDecl *decl,
-                                    const clang::CXXRecordDecl *clangDecl) {
+static void conformToCxxSet(ClangImporter::Implementation &impl,
+                            NominalTypeDecl *decl,
+                            const clang::CXXRecordDecl *clangDecl,
+                            bool isUniqueSet) {
   PrettyStackTraceDecl trace("conforming to CxxSet", decl);
-
-  assert(decl);
-  assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
-
-  // Only auto-conform types from the C++ standard library. Custom user types
-  // might have a similar interface but different semantics.
-  if (!isStdSetType(clangDecl))
-    return;
 
   auto valueType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
       decl, ctx.getIdentifier("value_type"));
@@ -981,11 +997,6 @@ void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("InsertionResult"),
                                insert->getResultInterfaceType());
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSet});
-
-  // If this isn't a std::multiset, try to also synthesize the conformance to
-  // CxxUniqueSet.
-  if (!isStdDecl(clangDecl, {"set", "unordered_set"}))
-    return;
 
   ProtocolDecl *cxxInputIteratorProto =
       ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
@@ -1011,22 +1022,20 @@ void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
                                rawIteratorTy);
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
                                rawMutableIteratorTy);
+
+  // Synthesize conformance to CxxUniqueSet if the caller asked for it
+  // (if decl is std::set or std::unordered_set, but not std::multiset)
+  if (!isUniqueSet)
+    return;
+
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxUniqueSet});
 }
 
-void swift::conformToCxxPairIfNeeded(ClangImporter::Implementation &impl,
-                                     NominalTypeDecl *decl,
-                                     const clang::CXXRecordDecl *clangDecl) {
+static void conformToCxxPair(ClangImporter::Implementation &impl,
+                             NominalTypeDecl *decl,
+                             const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("conforming to CxxPair", decl);
-
-  assert(decl);
-  assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
-
-  // Only auto-conform types from the C++ standard library. Custom user types
-  // might have a similar interface but different semantics.
-  if (!isStdDecl(clangDecl, {"pair"}))
-    return;
 
   auto firstType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
       decl, ctx.getIdentifier("first_type"));
@@ -1042,19 +1051,11 @@ void swift::conformToCxxPairIfNeeded(ClangImporter::Implementation &impl,
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxPair});
 }
 
-void swift::conformToCxxDictionaryIfNeeded(
-    ClangImporter::Implementation &impl, NominalTypeDecl *decl,
-    const clang::CXXRecordDecl *clangDecl) {
+static void conformToCxxDictionary(ClangImporter::Implementation &impl,
+                                   NominalTypeDecl *decl,
+                                   const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("conforming to CxxDictionary", decl);
-
-  assert(decl);
-  assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
-
-  // Only auto-conform types from the C++ standard library. Custom user types
-  // might have a similar interface but different semantics.
-  if (!isStdMapType(clangDecl))
-    return;
 
   auto keyType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
       decl, ctx.getIdentifier("key_type"));
@@ -1120,19 +1121,11 @@ void swift::conformToCxxDictionaryIfNeeded(
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxDictionary});
 }
 
-void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
-                                       NominalTypeDecl *decl,
-                                       const clang::CXXRecordDecl *clangDecl) {
+static void conformToCxxVector(ClangImporter::Implementation &impl,
+                               NominalTypeDecl *decl,
+                               const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("conforming to CxxVector", decl);
-
-  assert(decl);
-  assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
-
-  // Only auto-conform types from the C++ standard library. Custom user types
-  // might have a similar interface but different semantics.
-  if (!isStdDecl(clangDecl, {"vector"}))
-    return;
 
   auto valueType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
       decl, ctx.getIdentifier("value_type"));
@@ -1165,109 +1158,13 @@ void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxVector});
 }
 
-void swift::conformToCxxFunctionIfNeeded(
-    ClangImporter::Implementation &impl, NominalTypeDecl *decl,
-    const clang::CXXRecordDecl *clangDecl) {
-  PrettyStackTraceDecl trace("conforming to CxxFunction", decl);
-
-  assert(decl);
-  assert(clangDecl);
-  ASTContext &ctx = decl->getASTContext();
-  clang::ASTContext &clangCtx = impl.getClangASTContext();
-  clang::Sema &clangSema = impl.getClangSema();
-
-  // Only auto-conform types from the C++ standard library. Custom user types
-  // might have a similar interface but different semantics.
-  if (!isStdDecl(clangDecl, {"function"}))
-    return;
-
-  // There is no typealias for the argument types on the C++ side, so to
-  // retrieve the argument types we look at the overload of `operator()` that
-  // got imported into Swift.
-
-  auto callAsFunctionDecl = lookupDirectSingleWithoutExtensions<FuncDecl>(
-      decl, ctx.getIdentifier("callAsFunction"));
-  if (!callAsFunctionDecl)
-    return;
-
-  auto operatorCallDecl = dyn_cast_or_null<clang::CXXMethodDecl>(
-      callAsFunctionDecl->getClangDecl());
-  if (!operatorCallDecl)
-    return;
-
-  std::vector<clang::QualType> operatorCallParamTypes;
-  llvm::transform(
-      operatorCallDecl->parameters(),
-      std::back_inserter(operatorCallParamTypes),
-      [](const clang::ParmVarDecl *paramDecl) { return paramDecl->getType(); });
-
-  auto funcPointerType = clangCtx.getPointerType(clangCtx.getFunctionType(
-      operatorCallDecl->getReturnType(), operatorCallParamTypes,
-      clang::FunctionProtoType::ExtProtoInfo())).withConst();
-
-  // Create a fake variable with a function type that matches the type of
-  // `operator()`.
-  auto fakeFuncPointerVarDecl = clang::VarDecl::Create(
-      clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
-      clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
-      funcPointerType, clangCtx.getTrivialTypeSourceInfo(funcPointerType),
-      clang::StorageClass::SC_None);
-  auto fakeFuncPointerRefExpr = new (clangCtx) clang::DeclRefExpr(
-      clangCtx, fakeFuncPointerVarDecl, false, funcPointerType,
-      clang::ExprValueKind::VK_LValue, clang::SourceLocation());
-
-  auto clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
-      clang::QualType(clangDecl->getTypeForDecl(), 0));
-  SmallVector<clang::Expr *, 1> constructExprArgs = {fakeFuncPointerRefExpr};
-
-  // Instantiate the templated constructor that would accept this fake variable.
-  auto constructExprResult = clangSema.BuildCXXTypeConstructExpr(
-      clangDeclTyInfo, clangDecl->getLocation(), constructExprArgs,
-      clangDecl->getLocation(), /*ListInitialization*/ false);
-  if (!constructExprResult.isUsable())
-    return;
-
-  auto castExpr = dyn_cast_or_null<clang::CastExpr>(constructExprResult.get());
-  if (!castExpr)
-    return;
-
-  auto bindTempExpr =
-      dyn_cast_or_null<clang::CXXBindTemporaryExpr>(castExpr->getSubExpr());
-  if (!bindTempExpr)
-    return;
-
-  auto constructExpr =
-      dyn_cast_or_null<clang::CXXConstructExpr>(bindTempExpr->getSubExpr());
-  if (!constructExpr)
-    return;
-
-  auto constructorDecl = constructExpr->getConstructor();
-
-  auto importedConstructor =
-      impl.importDecl(constructorDecl, impl.CurrentVersion);
-  if (!importedConstructor)
-    return;
-  decl->addMember(importedConstructor);
-
-  // TODO: actually conform to some form of CxxFunction protocol
-
-}
-
-void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
-                                     NominalTypeDecl *decl,
-                                     const clang::CXXRecordDecl *clangDecl) {
+static void conformToCxxSpan(ClangImporter::Implementation &impl,
+                             NominalTypeDecl *decl,
+                             const clang::CXXRecordDecl *clangDecl) {
   PrettyStackTraceDecl trace("conforming to CxxSpan", decl);
-
-  assert(decl);
-  assert(clangDecl);
   ASTContext &ctx = decl->getASTContext();
   clang::ASTContext &clangCtx = impl.getClangASTContext();
   clang::Sema &clangSema = impl.getClangSema();
-
-  // Only auto-conform types from the C++ standard library. Custom user types
-  // might have a similar interface but different semantics.
-  if (!isStdDecl(clangDecl, {"span"}))
-    return;
 
   auto elementType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
       decl, ctx.getIdentifier("element_type"));
@@ -1334,7 +1231,7 @@ void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
 
   auto attr = AvailableAttr::createUniversallyDeprecated(
       importedConstructor->getASTContext(), "use 'init(_:)' instead.", "");
-  importedConstructor->getAttrs().add(attr);
+  importedConstructor->addAttribute(attr);
 
   decl->addMember(importedConstructor);
 
@@ -1347,5 +1244,62 @@ void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
     impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxSpan});
   } else {
     impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxMutableSpan});
+  }
+}
+
+void swift::deriveAutomaticCxxConformances(
+    ClangImporter::Implementation &Impl, NominalTypeDecl *result,
+    const clang::CXXRecordDecl *clangDecl) {
+
+  ASSERT(result && clangDecl && "this should not be called with nullptrs");
+
+  // Skip synthesizing conformances if the associated Clang node is from
+  // a module that doesn't require cplusplus, to prevent us from accidentally
+  // pulling in Cxx/CxxStdlib modules when a client is importing a C library.
+  //
+  // We will still attempt to synthesize to account for scenarios where the
+  // module specification is missing altogether.
+  if (auto *clangModule = Impl.getClangOwningModule(result->getClangNode());
+      clangModule && !requiresCPlusPlus(clangModule))
+    return;
+
+  // Automatic conformances: these may be applied to any type that fits the
+  // requirements.
+  conformToCxxIteratorIfNeeded(Impl, result, clangDecl);
+  conformToCxxSequenceIfNeeded(Impl, result, clangDecl);
+  conformToCxxConvertibleToBoolIfNeeded(Impl, result, clangDecl);
+
+  // CxxStdlib conformances: these should only apply to known C++ stdlib types,
+  // which we determine by name and membership in the std namespace.
+  if (!clangDecl->getIdentifier() || !clangDecl->isInStdNamespace())
+    return;
+
+  auto ty = identifyCxxStdTypeByName(clangDecl->getName());
+  switch (ty) {
+  case CxxStdType::uncategorized:
+    return;
+  case CxxStdType::optional:
+    conformToCxxOptional(Impl, result, clangDecl);
+    return;
+  case CxxStdType::set:
+  case CxxStdType::unordered_set:
+  case CxxStdType::multiset:
+    conformToCxxSet(Impl, result, clangDecl,
+                    /*isUniqueSet=*/ty != CxxStdType::multiset);
+    return;
+  case CxxStdType::pair:
+    conformToCxxPair(Impl, result, clangDecl);
+    return;
+  case CxxStdType::map:
+  case CxxStdType::unordered_map:
+  case CxxStdType::multimap:
+    conformToCxxDictionary(Impl, result, clangDecl);
+    return;
+  case CxxStdType::vector:
+    conformToCxxVector(Impl, result, clangDecl);
+    return;
+  case CxxStdType::span:
+    conformToCxxSpan(Impl, result, clangDecl);
+    return;
   }
 }

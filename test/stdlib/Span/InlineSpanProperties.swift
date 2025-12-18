@@ -119,6 +119,16 @@ suite.test("InlineArray.span property (String)")
   }    
 }
 
+suite.test("InlineArray.span property (empty, aligned)")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let empty: InlineArray<0, Padded> = []
+  let span = empty.span
+  expectTrue(span.isEmpty)
+  expectEqual(span.count, 0)
+}
+
 suite.test("InlineArray.mutableSpan property")
 .require(.stdlib_6_2).code
 {
@@ -145,4 +155,15 @@ suite.test("InlineArray.mutableSpan property (String)")
   span[3] = String(repeating: "0", count: Int.random(in: 100..<500))
   let s = span[3]
   expectTrue(s._isIdentical(to: v[3]))
+}
+
+suite.test("InlineArray.mutableSpan property (empty, aligned)")
+.require(.stdlib_6_2).code
+{
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  var empty: InlineArray<0, Padded> = []
+  var span = empty.mutableSpan
+  expectTrue(span.isEmpty)
+  expectEqual(span.count, 0)
 }

@@ -1653,6 +1653,27 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to reference member from the wrong module with a module
+/// selector, e.g.
+///
+/// ```swift
+/// import Foo
+/// import Bar
+///
+/// SomeType.Bar::methodDefinedInFoo()
+/// ```
+class MemberFromWrongModuleFailure final : public FailureDiagnostic {
+  ValueDecl *Member;
+  DeclNameRef Name;
+
+public:
+  MemberFromWrongModuleFailure(const Solution &solution, DeclNameRef name,
+                               ValueDecl *member, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), Member(member), Name(name) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose an attempt to reference member marked as `mutating`
 /// on immutable base e.g. `let` variable:
 ///
@@ -2428,6 +2449,15 @@ private:
   bool diagnoseMissingConformance() const;
 };
 
+class NonMetatypeDynamicTypeFailure final : public ContextualFailure {
+public:
+  NonMetatypeDynamicTypeFailure(const Solution &solution, Type instanceTy,
+                                Type metatypeTy, ConstraintLocator *locator)
+      : ContextualFailure(solution, instanceTy, metatypeTy, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 class MissingContextualBaseInMemberRefFailure final : public FailureDiagnostic {
   DeclNameRef MemberName;
 
@@ -2979,7 +3009,8 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Emit a warning for mismatched tuple labels.
+/// Emit a warning for mismatched tuple labels, which is upgraded to an error
+/// for a future language mode.
 class TupleLabelMismatchWarning final : public ContextualFailure {
 public:
   TupleLabelMismatchWarning(const Solution &solution, Type fromType,

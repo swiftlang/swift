@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,11 +17,13 @@
 #include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/DependencyScan/DependencyScanJSON.h"
 #include "swift/DependencyScan/StringUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/ThreadPool.h"
 
@@ -263,8 +265,12 @@ static int action_scan_dependency(std::vector<const char *> &Args,
 
 static std::vector<const char *>
 createArgs(ArrayRef<std::string> Cmd, StringSaver &Saver, Actions Action) {
-  if (!Cmd.empty() && StringRef(Cmd.front()).ends_with("swift-frontend"))
-    Cmd = Cmd.drop_front();
+  if (!Cmd.empty()) {
+    llvm::SmallString<261> path;
+    llvm::sys::path::native(Twine{Cmd.front()}, path);
+    if (llvm::sys::path::filename(path).starts_with("swift-frontend"))
+      Cmd = Cmd.drop_front();
+  }
 
   // Quote all the arguments before passing to scanner. The scanner is currently
   // tokenize the command-line again before parsing.
@@ -283,6 +289,8 @@ createArgs(ArrayRef<std::string> Cmd, StringSaver &Saver, Actions Action) {
 }
 
 int main(int argc, char *argv[]) {
+  PROGRAM_START(argc, argv);
+
   llvm::cl::HideUnrelatedOptions(Category);
   llvm::cl::ParseCommandLineOptions(argc, argv,
                                     "Test libSwiftScan interfaces\n");

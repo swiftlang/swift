@@ -240,10 +240,10 @@ func patternInstantiationConcreteValid() {
 
 func patternInstantiationConcreteInvalid() {
   let _: Set<Int> = patternInstantiationTupleTest1()
-  // expected-error@-1 {{cannot convert value of type '(repeat Array<_>)' to specified type 'Set<Int>'}}
+  // expected-error@-1 {{cannot convert value of type 'Array<_>' to specified type 'Set<Int>'}}
   // expected-error@-2 {{could not infer pack element #0 from context}}
 
-  let _: (Array<Int>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{'(repeat Array<Int, _>)' is not convertible to '(Array<Int>, Set<String>)', tuples have a different number of elements}}
+  let _: (Array<Int>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{cannot convert value of type '(Array<Int>, Array<_>)' to specified type '(Array<Int>, Set<String>)'}}
   // expected-error@-1 {{could not infer pack element #1 from context}}
 }
 
@@ -274,7 +274,7 @@ func patternInstantiationGenericInvalid<each T: Hashable>(t: repeat each T) {
   let _: (repeat Set<each T>) = patternInstantiationTupleTest1() // expected-error {{cannot convert value of type '(repeat Array<each T>)' to specified type '(repeat Set<each T>)}}
   // expected-error@-1 {{generic parameter 'each T' could not be inferred}}
 
-  let _: (repeat Array<each T>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{'(repeat Array<repeat each T, _>)' is not convertible to '(repeat Array<each T>, Set<String>)', tuples have a different number of elements}}
+  let _: (repeat Array<each T>, Set<String>) = patternInstantiationTupleTest1() // expected-error {{cannot convert value of type '(repeat Array<each T>, Array<_>)' to specified type '(repeat Array<each T>, Set<String>)'}}
   // expected-error@-1 {{could not infer pack element #1 from context}}
 }
 
@@ -299,4 +299,320 @@ func test_one_element_tuple_vs_non_tuple_matching() {
     test(V<Int>()) // Ok
     test(V<Int>.self) // Ok
   }
+}
+
+// Ensure correct behavior of lvalue tuple parameters
+
+/**
+ Previously `var`-backed parameters would end up wrapped
+ in an extraneous tuple level, leading to leading to incorrect
+ nesting in the output type due to the `LValueType` not being unwrapped.
+
+ https://github.com/swiftlang/swift/issues/85924
+ */
+func test_var_let_tuple_merge_equivalence() {
+  func merge<each A, each B>(_ a: (repeat each A), _ b: (repeat each B)) -> (repeat each A, repeat each B) {
+    return (repeat each a, repeat each b)
+  }
+
+  // allLets, TupleFirst
+  let _: (String, Int, String) = {
+    let a = ("a", 2) // (String, Int)
+    let b = "c" // String
+    return merge(a, b)
+  }()
+
+  // Before #85924 was fixed, this would type as ((String, Int), String)
+  // varFirst, TupleFirst
+  let _: (String, Int, String) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = ("a", 2) // @lvalue (String, Int)
+    let b = "c" // String
+    return merge(a, b)
+  }()
+
+  // varSecond, TupleFirst
+  let _: (String, Int, String) = {
+    let a = ("a", 2) // (String, Int)
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = "c" // @lvalue String
+    return merge(a, b)
+  }()
+
+  // allVars, TupleFirst
+  let _: (String, Int, String) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = ("a", 2) // @lvalue (String, Int)
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = "c" // @lvalue String
+    return merge(a, b)
+  }()
+
+  // allLets, TupleSecond
+  let _: (String, Int, String) = {
+    let a = "a"
+    let b = (2, "c")
+    return merge(a, b)
+  }()
+
+  // varFirst, TupleSecond
+  let _: (String, Int, String) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = "a"
+    let b = (2, "c")
+    return merge(a, b)
+  }()
+
+  // varSecond, TupleSecond
+  let _: (String, Int, String) = {
+    let a = "a"
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = (2, "c")
+    return merge(a, b)
+  }()
+
+  // allVars, TupleSecond
+  let _: (String, Int, String) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = "a"
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = (2, "c")
+    return merge(a, b)
+  }()
+
+  // allLets, MultiTuple
+  let _: (String, Int, String) = {
+    let a = ("a")
+    let b = (2, "c")
+    return merge(a, b)
+  }()
+
+  // varFirst, MultiTuple
+  let _: (String, Int, String) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = ("a")
+    let b = (2, "c")
+    return merge(a, b)
+  }()
+
+  // varSecond, MultiTuple
+  let _: (String, Int, String) = {
+    let a = ("a")
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = (2, "c")
+    return merge(a, b)
+  }()
+
+  // allVars, MultiTuple
+  let _: (String, Int, String) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = ("a")
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = (2, "c")
+    return merge(a, b)
+  }()
+}
+
+func test_var_let_tuple_append_equivalence() {
+  func append<each A, B>(_ a: (repeat each A), _ b: B) -> (repeat each A, B) {
+      return (repeat each a, b)
+  }
+
+  // allLets, TupleFirst
+  let _: (String, Int, String) = {
+    let a = ("a", 2) // (String, Int)
+    let b = "c" // String
+    return append(a, b)
+  }()
+
+  // varFirst, TupleFirst
+  let _: (String, Int, String) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = ("a", 2) // @lvalue (String, Int)
+    let b = "c" // String
+    return append(a, b)
+  }()
+
+  // varSecond, TupleFirst
+  let _: (String, Int, String) = {
+    let a = ("a", 2) // (String, Int)
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = "c" // @lvalue String
+    return append(a, b)
+  }()
+
+  // allVars, TupleFirst
+  let _: (String, Int, String) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = ("a", 2) // @lvalue (String, Int)
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = "c" // @lvalue String
+    return append(a, b)
+  }()
+
+  // allLets, TupleSecond
+  let _: (String, (Int, String)) = {
+    let a = "a"
+    let b = (2, "c")
+    return append(a, b)
+  }()
+
+  // varFirst, TupleSecond
+  let _: (String, (Int, String)) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = "a"
+    let b = (2, "c")
+    return append(a, b)
+  }()
+
+  // varSecond, TupleSecond
+  let _: (String, (Int, String)) = {
+    let a = "a"
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = (2, "c")
+    return append(a, b)
+  }()
+
+  // allVars, TupleSecond
+  let _: (String, (Int, String)) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = "a"
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = (2, "c")
+    return append(a, b)
+  }()
+
+  // allLets, MultiTuple
+  let _: (String, (Int, String)) = {
+    let a = ("a")
+    let b = (2, "c")
+    return append(a, b)
+  }()
+
+  // varFirst, MultiTuple
+  let _: (String, (Int, String)) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = ("a")
+    let b = (2, "c")
+    return append(a, b)
+  }()
+
+  // varSecond, MultiTuple
+  let _: (String, (Int, String)) = {
+    let a = ("a")
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = (2, "c")
+    return append(a, b)
+  }()
+
+  // allVars, MultiTuple
+  let _: (String, (Int, String)) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = ("a")
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = (2, "c")
+    return append(a, b)
+  }()
+}
+
+func test_var_let_tuple_prefixOnto_equivalence() {
+  func prefixOnto<A, each B>(_ a: A, _ b: (repeat each B)) -> (A, repeat each B) {
+      return (a, repeat each b)
+  }
+
+  // allLets, TupleFirst
+  let _: ((String, Int), String) = {
+    let a = ("a", 2) 
+    let b = "c"
+    return prefixOnto(a, b)
+  }()
+
+  // varFirst, TupleFirst
+  let _: ((String, Int), String) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = ("a", 2)
+    let b = "c"
+    return prefixOnto(a, b)
+  }()
+
+  // varSecond, TupleFirst
+  let _: ((String, Int), String) = {
+    let a = ("a", 2)
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = "c"
+    return prefixOnto(a, b)
+  }()
+
+  // allVars, TupleFirst
+  let _: ((String, Int), String) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = ("a", 2)
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = "c"
+    return prefixOnto(a, b)
+  }()
+
+  // allLets, TupleSecond
+  let _: (String, Int, String) = {
+    let a = "a"
+    let b = (2, "c")
+    return prefixOnto(a, b)
+  }()
+
+  // varFirst, TupleSecond
+  let _: (String, Int, String) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = "a"
+    let b = (2, "c")
+    return prefixOnto(a, b)
+  }()
+
+  // varSecond, TupleSecond
+  let _: (String, Int, String) = {
+    let a = "a"
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = (2, "c")
+    return prefixOnto(a, b)
+  }()
+
+  // allVars, TupleSecond
+  let _: (String, Int, String) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = "a"
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = (2, "c")
+    return prefixOnto(a, b)
+  }()
+
+  // allLets, MultiTuple
+  let _: (String, Int, String) = {
+    let a = ("a")
+    let b = (2, "c")
+    return prefixOnto(a, b)
+  }()
+
+  // varFirst, MultiTuple
+  let _: (String, Int, String) = {
+    // expected-warning@+1{{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = ("a")
+    let b = (2, "c")
+    return prefixOnto(a, b)
+  }()
+
+  // varSecond, MultiTuple
+  let _: (String, Int, String) = {
+    let a = ("a")
+    // expected-warning@+1{{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = (2, "c")
+    return prefixOnto(a, b)
+  }()
+
+  // allVars, MultiTuple
+  let _: (String, Int, String) = {
+    // expected-warning@+1 {{variable 'a' was never mutated; consider changing to 'let' constant}}
+    var a = ("a")
+    // expected-warning@+1 {{variable 'b' was never mutated; consider changing to 'let' constant}}
+    var b = (2, "c")
+    return prefixOnto(a, b)
+  }()
 }

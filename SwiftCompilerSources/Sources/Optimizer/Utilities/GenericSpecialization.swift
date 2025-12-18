@@ -48,6 +48,9 @@ private struct VTableSpecializer {
     }
 
     let classDecl = classType.nominal! as! ClassDecl
+    if classDecl.isForeign {
+      return
+    }
     guard let origVTable = context.lookupVTable(for: classDecl) else {
       if context.enableWMORequiredDiagnostics {
         context.diagnosticEngine.diagnose(.cannot_specialize_class, classType, at: errorLocation)
@@ -79,7 +82,7 @@ private struct VTableSpecializer {
   }
 
   private func specializeEntries(of vTable: VTable, _ notifyNewFunction: (Function) -> ()) -> [VTable.Entry] {
-    return vTable.entries.map { entry in
+    return vTable.entries.compactMap { entry in
       if !entry.implementation.isGeneric {
         return entry
       }
@@ -92,6 +95,14 @@ private struct VTableSpecializer {
             let specializedMethod = context.specialize(function: entry.implementation, for: methodSubs,
                                                        convertIndirectToDirect: true, isMandatory: true)
       else {
+        if let constructor = entry.methodDecl.decl as? ConstructorDecl,
+           !constructor.isInheritable
+        {
+          // For some reason, SILGen is putting constructors in the vtable, though they are never
+          // called through the vtable.
+          // Dropping those vtable entries allows using constructors with generic arguments.
+          return nil
+        }
         return entry
       }
       notifyNewFunction(specializedMethod)
@@ -148,7 +159,7 @@ func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassC
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
             context.loadFunction(function: origMethod, loadCalleesRecursively: true),
             let specializedMethod = context.specialize(function: origMethod, for: methodSubs,
-                                                       convertIndirectToDirect: true, isMandatory: true)
+                                                       convertIndirectToDirect: false, isMandatory: true)
       else {
         return origEntry
       }
@@ -215,7 +226,7 @@ private func specializeDefaultMethods(for conformance: Conformance,
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
             context.loadFunction(function: origMethod, loadCalleesRecursively: true),
             let specializedMethod = context.specialize(function: origMethod, for: methodSubs,
-                                                       convertIndirectToDirect: true, isMandatory: true)
+                                                       convertIndirectToDirect: false, isMandatory: true)
       else {
         return origEntry
       }

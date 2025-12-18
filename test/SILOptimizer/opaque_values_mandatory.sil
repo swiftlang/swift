@@ -1,7 +1,7 @@
 // RUN: %target-sil-opt -diagnostics -enable-sil-opaque-values %s | \
 // RUN:     %target-sil-opt -Onone-performance -enable-sil-verify-all \
 // RUN:                     -enable-sil-opaque-values -emit-sorted-sil \
-// RUN:                     -enable-ossa-modules -enable-copy-propagation \
+// RUN:                     -enable-copy-propagation \
 // RUN:                     -enable-lexical-borrow-scopes | \
 // RUN:     %FileCheck %s
 //

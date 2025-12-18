@@ -202,7 +202,7 @@ ProtocolConformanceRef swift::lookupConformance(Type type,
   // If we are recursively checking for implicit conformance of a nominal
   // type to a KnownProtocol, fail without evaluating this request. This
   // squashes cycles.
-  LookupConformanceInModuleRequest request{{type, protocol}};
+  LookupConformanceRequest request{{type, protocol}};
   if (auto kp = protocol->getKnownProtocolKind()) {
     if (auto nominal = type->getAnyNominal()) {
       ImplicitKnownProtocolConformanceRequest icvRequest{nominal, *kp};
@@ -543,8 +543,8 @@ static ProtocolConformanceRef getPackTypeConformance(
 }
 
 ProtocolConformanceRef
-LookupConformanceInModuleRequest::evaluate(
-    Evaluator &evaluator, LookupConformanceDescriptor desc) const {
+LookupConformanceRequest::evaluate(Evaluator &evaluator,
+                                   LookupConformanceDescriptor desc) const {
   auto type = desc.Ty;
   auto *protocol = desc.PD;
   ASTContext &ctx = protocol->getASTContext();
@@ -609,10 +609,9 @@ LookupConformanceInModuleRequest::evaluate(
   if (type->isTypeVariableOrMember())
     return ProtocolConformanceRef::forAbstract(type, protocol);
 
-  // UnresolvedType is a placeholder for an unknown type used when generating
-  // diagnostics.  We consider it to conform to all protocols, since the
-  // intended type might have. Same goes for PlaceholderType.
-  if (type->is<UnresolvedType>() || type->is<PlaceholderType>())
+  // PlaceholderType is a placeholder for an unknown type. We consider it to
+  // conform to all protocols, since the intended type might have.
+  if (type->is<PlaceholderType>())
     return ProtocolConformanceRef::forAbstract(type, protocol);
 
   // Pack types can conform to protocols.
@@ -961,7 +960,7 @@ bool TypeBase::isEscapable() {
 bool TypeBase::isEscapable(GenericSignature sig) {
   Type contextTy = this;
   if (sig) {
-    contextTy = sig.getGenericEnvironment()->mapTypeIntoContext(contextTy);
+    contextTy = sig.getGenericEnvironment()->mapTypeIntoEnvironment(contextTy);
   }
   return contextTy->isEscapable();
 }
@@ -979,7 +978,7 @@ bool TypeBase::isBitwiseCopyable() {
 bool TypeBase::isBitwiseCopyable(GenericSignature sig) {
   Type contextTy = this;
   if (sig) {
-    contextTy = sig.getGenericEnvironment()->mapTypeIntoContext(contextTy);
+    contextTy = sig.getGenericEnvironment()->mapTypeIntoEnvironment(contextTy);
   }
   return contextTy->isBitwiseCopyable();
 }

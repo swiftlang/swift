@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s %S/delegate.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated %s %S/delegate.swift
 
 // Serialized partial AST support:
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name main -emit-module-path %t.swiftmodule -primary-file %s %S/delegate.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name main -parse-as-library -typecheck %t.swiftmodule -primary-file %S/delegate.swift -verify -verify-ignore-unknown
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name main -parse-as-library -typecheck %t.swiftmodule -primary-file %S/delegate.swift -verify -verify-ignore-unrelated -verify-ignore-unknown
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name main -parse-as-library -typecheck -enable-upcoming-feature DeprecateApplicationMain %t.swiftmodule -primary-file %S/delegate.swift -verify -verify-ignore-unknown -verify-additional-prefix deprecated-
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name main -parse-as-library -typecheck -enable-upcoming-feature DeprecateApplicationMain %t.swiftmodule -primary-file %S/delegate.swift -verify -verify-ignore-unrelated -verify-ignore-unknown -verify-additional-prefix deprecated-
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_DeprecateApplicationMain

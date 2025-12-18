@@ -397,7 +397,7 @@ public:
     case Kind::Parameter:
       auto *param = getParameter();
       auto *dc = param->getDeclContext();
-      return dc->mapTypeIntoContext(param->getInterfaceType())
+      return dc->mapTypeIntoEnvironment(param->getInterfaceType())
           ->lookThroughAllOptionalTypes();
     }
     llvm_unreachable("bad kind");
@@ -3211,8 +3211,9 @@ public:
       }
     }
 
-    Diags.diagnose(loc, message).highlight(highlight)
-      .warnUntilSwiftVersionIf(classification.shouldDowngradeToWarning(), 6);
+    Diags.diagnose(loc, message)
+        .highlight(highlight)
+        .warnUntilLanguageModeIf(classification.shouldDowngradeToWarning(), 6);
     maybeAddRethrowsNote(Diags, loc, reason);
 
     // If this is a call without expected 'try[?|!]', like this:
@@ -4036,6 +4037,12 @@ private:
     ContextScope scope(*this, /*newContext*/ std::nullopt);
     scope.setCoverageForSingleValueStmtExpr();
     SVE->getStmt()->walk(*this);
+
+    if (auto preamble = SVE->getForExpressionPreamble()) {
+      preamble->ForAccumulatorDecl->walk(*this);
+      preamble->ForAccumulatorBinding->walk(*this);
+    }
+
     scope.preserveCoverageFromSingleValueStmtExpr();
     return ShouldNotRecurse;
   }
@@ -4660,13 +4667,15 @@ private:
   void diagnoseRedundantAwait(AwaitExpr *E) const {
     if (auto *SVE = SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(E)) {
       // For an if/switch expression, produce a tailored warning.
-      Ctx.Diags.diagnose(E->getAwaitLoc(),
-                         diag::effect_marker_on_single_value_stmt,
-                         "await", SVE->getStmt()->getKind())
-        .highlight(E->getAwaitLoc());
+      Ctx.Diags
+          .diagnose(E->getAwaitLoc(), diag::effect_marker_on_single_value_stmt,
+                    "await", SVE->getStmt()->getKind())
+          .highlight(E->getAwaitLoc())
+          .fixItRemove(E->getAwaitLoc());
       return;
     }
-    Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await);
+    Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await)
+        .fixItRemove(E->getAwaitLoc());
   }
 
   void diagnoseRedundantUnsafe(UnsafeExpr *E) const {
@@ -4706,37 +4715,7 @@ private:
     // Make a note of any initializers that are the synthesized right-hand side
     // for an "if let x".
     for (const auto &condition: stmt->getCond()) {
-      switch (condition.getKind()) {
-      case StmtConditionElement::CK_Availability:
-      case StmtConditionElement::CK_Boolean:
-      case StmtConditionElement::CK_HasSymbol:
-        continue;
-
-      case StmtConditionElement::CK_PatternBinding:
-        break;
-      }
-
-      auto init = condition.getInitializer();
-      if (!init)
-        continue;
-
-      auto pattern = condition.getPattern();
-      if (!pattern)
-        continue;
-
-      auto optPattern = dyn_cast<OptionalSomePattern>(pattern);
-      if (!optPattern)
-        continue;
-
-      auto var = optPattern->getSubPattern()->getSingleVar();
-      if (!var)
-        continue;
-
-      // If the right-hand side has the same location as the variable, it was
-      // synthesized.
-      if (var->getLoc().isValid() &&
-          var->getLoc() == init->getStartLoc() &&
-          init->getStartLoc() == init->getEndLoc())
+      if (auto *init = condition.getSynthesizedShorthandInitOrNull())
         synthesizedIfLetInitializers.insert(init);
     }
   }
@@ -4800,9 +4779,9 @@ private:
       return;
 
     Ctx.Diags.diagnose(anchor->getStartLoc(), diag::async_expr_without_await)
-      .warnUntilSwiftVersionIf(downgradeToWarning, 6)
-      .fixItInsert(loc, insertText)
-      .highlight(anchor->getSourceRange());
+        .warnUntilLanguageModeIf(downgradeToWarning, 6)
+        .fixItInsert(loc, insertText)
+        .highlight(anchor->getSourceRange());
 
     for (const DiagnosticInfo &diag: errors) {
       switch (diag.reason.getKind()) {
@@ -4903,7 +4882,7 @@ private:
       Ctx.Diags
           .diagnose(loc, diag::actor_isolated_access_outside_of_actor_context,
                     declIsolation, declRef.getDecl(), isCall)
-          .warnUntilSwiftVersionIf(errorInfo.downgradeToWarning, 6)
+          .warnUntilLanguageModeIf(errorInfo.downgradeToWarning, 6)
           .fixItInsert(fixItLoc, insertText)
           .highlight(anchor->getSourceRange());
       return true;

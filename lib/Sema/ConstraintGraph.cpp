@@ -910,6 +910,9 @@ bool ConstraintGraph::contractEdges() {
     if (!(tyvar1 && tyvar2))
       continue;
 
+    auto rep1 = CS.getRepresentative(tyvar1);
+    auto rep2 = CS.getRepresentative(tyvar2);
+
     // If the argument is allowed to bind to `inout`, in general,
     // it's invalid to contract the edge between argument and parameter,
     // but if we can prove that there are no possible bindings
@@ -919,9 +922,10 @@ bool ConstraintGraph::contractEdges() {
     // Such action is valid because argument type variable can
     // only get its bindings from related overload, which gives
     // us enough information to decided on l-valueness.
-    if (tyvar1->getImpl().canBindToInOut()) {
+    if (rep1->getImpl().canBindToInOut()) {
       bool isNotContractable = true;
-      if (auto bindings = CS.getBindingsFor(tyvar1)) {
+      auto bindings = CS.getBindingsFor(rep1);
+      if (bindings.isViable()) {
         // Holes can't be contracted.
         if (bindings.isHole())
           continue;
@@ -947,9 +951,6 @@ bool ConstraintGraph::contractEdges() {
       if (isNotContractable)
         continue;
     }
-
-    auto rep1 = CS.getRepresentative(tyvar1);
-    auto rep2 = CS.getRepresentative(tyvar2);
 
     if (CS.isDebugMode()) {
       auto indent = CS.solverState ? CS.solverState->getCurrentIndent() : 0;
@@ -1048,19 +1049,14 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
 }
 
 void ConstraintGraphNode::dump() const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
-  print(llvm::dbgs(), 0, PO);
+  print(llvm::dbgs(), 0, PrintOptions::forDebugging());
 }
 
 void ConstraintGraph::print(ArrayRef<TypeVariableType *> typeVars,
                             llvm::raw_ostream &out) {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
-
   for (auto typeVar : typeVars) {
-    (*this)[typeVar].print(
-        out, (CS.solverState ? CS.solverState->getCurrentIndent() : 0) + 2, PO);
+    auto indent = (CS.solverState ? CS.solverState->getCurrentIndent() : 0) + 2;
+    (*this)[typeVar].print(out, indent, PrintOptions::forDebugging());
     out << "\n";
   }
 }
@@ -1077,8 +1073,7 @@ void ConstraintGraph::printConnectedComponents(
     ArrayRef<TypeVariableType *> typeVars,
     llvm::raw_ostream &out) {
   auto components = computeConnectedComponents(typeVars);
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+
   for (const auto& component : components) {
     out.indent((CS.solverState ? CS.solverState->getCurrentIndent() : 0) + 2);
     out << component.solutionIndex << ": ";
@@ -1087,13 +1082,12 @@ void ConstraintGraph::printConnectedComponents(
     };
 
     // Print all of the type variables in this connected component.
-    interleave(component.typeVars,
-               [&](TypeVariableType *typeVar) {
-                 Type(typeVar).print(out, PO);
-               },
-               [&] {
-                 out << ' ';
-               });
+    interleave(
+        component.typeVars,
+        [&](TypeVariableType *typeVar) {
+          Type(typeVar).print(out, PrintOptions::forDebugging());
+        },
+        [&] { out << ' '; });
   }
 }
 

@@ -1,6 +1,8 @@
 /// This file implements the driver loop which attempts Knuth-Bendix completion
 /// with various strategies on all instances in parallel.
 
+let numTasks = 32
+
 struct Dispatcher {
   let subset: [Int]
   let strategies: [Strategy]
@@ -48,7 +50,7 @@ struct Solver {
   mutating func solve() async {
     if output {
       print("# Remaining \(subset.count)")
-      print("# n:\tpresentation:\tcardinality:\tcomplete presentation:\tstrategy:")
+      print("# n:\tpresentation:\tcardinality:\tcomplete:\tstrategy:")
     }
 
     // The shortlex order with identity permutation of generators solves
@@ -173,9 +175,8 @@ struct Solver {
   mutating func attempt(_ strategies: [Strategy]) async {
     if subset.isEmpty { return }
 
-    let solved = await withTaskGroup(of: (Int, Int, Solution?).self) { group in
-      var dispatcher = Dispatcher(subset: subset,
-                                  strategies: strategies)
+    await withTaskGroup(of: (Int, Int, Solution?).self) { group in
+      var dispatcher = Dispatcher(subset: subset, strategies: strategies)
       var solved: [Int: (Int, Solution)] = [:]
       var pending: [Int: Int] = [:]
 
@@ -216,6 +217,7 @@ struct Solver {
           // The lowest-numbered strategy is the 'official' solution for the instance.
           var betterStrategy = true
           if let (oldStrategyIndex, _) = solved[instance] {
+            precondition(oldStrategyIndex != strategyIndex)
             if oldStrategyIndex < strategyIndex {
               betterStrategy = false
             }
@@ -226,56 +228,57 @@ struct Solver {
           }
         }
 
-        retireStrategies()
+        while retireStrategy() {}
       }
 
-      func retireStrategies() {
-        var retired: [Int: [Int]] = [:]
-        let pendingInOrder = pending.sorted { $0.key < $1.key }
-        for (strategyIndex, numTasks) in pendingInOrder {
-          precondition(strategyIndex <= dispatcher.currentStrategy)
-          if dispatcher.currentStrategy == strategyIndex { break }
-          if numTasks > 0 { break }
+      func retireStrategy() -> Bool {
+        // Check if nothing remains.
+        guard let minPending = pending.keys.min() else { return false }
 
-          pending[strategyIndex] = nil
-          retired[strategyIndex] = []
-        }
+        // Check if we're going to dispatch more instances with this strategy.
+        precondition(minPending <= dispatcher.currentStrategy)
+        if minPending == dispatcher.currentStrategy { return false }
 
-        if retired.isEmpty { return }
+        // Check if we're still waiting for instances to finish with this
+        // strategy.
+        if pending[minPending]! > 0 { return false }
 
-        // If we are done dispatching a strategy, look at all instances solved
-        // by that strategy and print them out.
-        for n in subset {
-          if let (strategyIndex, solution) = solved[n] {
-            if retired[strategyIndex] != nil {
-              retired[strategyIndex]!.append(n)
+        // Otherwise, retire this strategy.
+        pending[minPending] = nil
 
-              // Print the instance and solution.
-              var str = "\(n + 1)\t\(instances[n])\t"
+        // Print out all instances solved by this strategy and remove them
+        // from the list.
+        subset = subset.filter { n in
+          guard let (strategyIndex, solution) = solved[n] else { return true }
+          guard strategyIndex == minPending else { return true }
 
-              if let cardinality = solution.cardinality {
-                str += "finite:\(cardinality)"
-                finite[cardinality, default: 0] += 1
-              } else {
-                str += "infinite"
-              }
-              str += "\tfcrs:\(solution.presentation)"
+          // Print the instance and solution.
+          var str = "\(n + 1)\t\(instances[n])\t"
 
-              // Print the extra generators that were added, if any.
-              if !solution.extra.isEmpty {
-                str += "\t\(printRules(solution.extra))"
-              }
-
-              if output {
-                print(str)
-              }
-            }
+          if let cardinality = solution.cardinality {
+            str += "finite:\(cardinality)"
+            finite[cardinality, default: 0] += 1
+          } else {
+            str += "infinite"
           }
+          str += "\tfcrs:\(solution.presentation)"
+
+          // Print the extra generators that were added, if any.
+          if !solution.extra.isEmpty {
+            str += "\t\(printRules(solution.extra))"
+          }
+
+          if output {
+            print(str)
+          }
+
+          return false
         }
+
+        return true
       }
 
-      // We run 32 tasks at a time.
-      for _ in 0 ..< 32 {
+      for _ in 0 ..< numTasks {
         startTask()
       }
 
@@ -283,10 +286,6 @@ struct Solver {
         startTask()
         completeTask(instance, strategyIndex, solution)
       }
-
-      return solved
     }
-
-    subset = subset.filter { solved[$0] == nil }
   }
 }

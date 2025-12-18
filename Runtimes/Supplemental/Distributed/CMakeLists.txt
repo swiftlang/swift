@@ -13,6 +13,7 @@ list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_SOURCE_DIR}/../cmake/modules"
   "${CMAKE_SOURCE_DIR}/../../cmake/modules")
 
+include(LanguageVersions)
 include(SwiftProjectVersion)
 project(SwiftDistributed
   LANGUAGES C CXX Swift
@@ -22,17 +23,10 @@ if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Distributed must build as a standalone project")
 endif()
 
-set(CMAKE_Swift_LANGUAGE_VERSION 5)
-
 set(CMAKE_POSITION_INDEPENDENT_CODE YES)
 
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
-
-set(CMAKE_CXX_EXTENSIONS NO)
-set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
-set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
-
 set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
 
 set(${PROJECT_NAME}_SWIFTC_SOURCE_DIR
@@ -71,6 +65,9 @@ option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime 
 option(${PROJECT_NAME}_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization"
   ${SwiftCore_ENABLE_PRESPECIALIZATION})
 
+option(${PROJECT_NAME}_ENABLE_DIRECT_RETAIN_RELEASE "Use direct retain release"
+  ${SwiftCore_ENABLE_DIRECT_RETAIN_RELEASE})
+
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
@@ -90,6 +87,11 @@ add_compile_options(
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
+if(${PROJECT_NAME}_ENABLE_DIRECT_RETAIN_RELEASE)
+  find_package(SwiftSwiftDirectRuntime REQUIRED)
+  add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-direct-retain-release>")
+endif()
+
 # LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
 # LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
 # LNK4217: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj' in function 'function'
@@ -99,7 +101,7 @@ add_compile_options(
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 # Ensure all symbols are fully resolved on Linux
-add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
+add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 add_library(swiftDistributed
   DistributedActor.cpp
@@ -117,6 +119,13 @@ cmake_policy(GET CMP0157 Policy157Enabled)
 if(Policy157Enabled STREQUAL NEW)
   set_target_properties(swiftDistributed PROPERTIES
     LINKER_LANGUAGE CXX)
+  # `CMAKE_STATIC_LIBRARY_PREFIX_Swift` will not impact the prefix for this
+  # library because we have changed the linker language to C++. This is required
+  # for Windows to properly reference this library.
+  if(NOT BUILD_SHARED_LIBS)
+    set_target_properties(swiftDistributed PROPERTIES
+      PREFIX lib)
+  endif()
 endif()
 
 target_compile_definitions(swiftDistributed PRIVATE
@@ -145,7 +154,8 @@ target_link_libraries(swiftDistributed PRIVATE
   swift_Concurrency
   swift_Builtin_float
   $<$<PLATFORM_ID:Android>:swiftAndroid>
-  $<$<PLATFORM_ID:Windows>:swiftWinSDK>)
+  $<$<PLATFORM_ID:Windows>:swiftWinSDK>
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
 install(TARGETS swiftDistributed
   EXPORT SwiftDistributedTargets

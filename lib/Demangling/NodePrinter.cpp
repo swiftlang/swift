@@ -487,6 +487,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::ReadAccessor:
   case Node::Kind::Read2Accessor:
   case Node::Kind::RelatedEntityDeclName:
+  case Node::Kind::RepresentationChanged:
   case Node::Kind::RetroactiveConformance:
   case Node::Kind::Setter:
   case Node::Kind::Shared:
@@ -622,6 +623,8 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
     case Node::Kind::DependentGenericParamValueMarker:
     case Node::Kind::CoroFunctionPointer:
     case Node::Kind::DefaultOverride:
+    case Node::Kind::BorrowAccessor:
+    case Node::Kind::MutateAccessor:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1245,6 +1248,15 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       }
       Printer << "]";
       break;
+    case FunctionSigSpecializationParamKind::ClosurePropPreviousArg:
+      if (Idx + 2 > End)
+        return;
+      Printer << "[";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << " ";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << "]";
+      break;
     default:
       assert(
        ((V & unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) ||
@@ -1318,6 +1330,10 @@ void NodePrinter::printSpecializationPrefix(NodePointer node,
       Printer << "specialized ";
       SpecializationPrefixPrinted = true;
     }
+    return;
+  }
+  if (node->getFirstChild()->getKind() == Node::Kind::RepresentationChanged) {
+    Printer << "representation changed of ";
     return;
   }
   Printer << Description << " <";
@@ -1416,6 +1432,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::AsyncRemoved:
     Printer << "async demotion of ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::RepresentationChanged:
+    Printer << "representation changed of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::CurryThunk:
@@ -1887,11 +1907,15 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::FunctionSignatureSpecializationParam:
     printer_unreachable("should be handled in printSpecializationPrefix");
   case Node::Kind::FunctionSignatureSpecializationParamPayload: {
-    std::string demangledName = demangleSymbolAsString(Node->getText());
-    if (demangledName.empty()) {
-      Printer << Node->getText();
-    } else {
-      Printer << demangledName;
+    if (Node->hasText()) {
+      std::string demangledName = demangleSymbolAsString(Node->getText());
+      if (demangledName.empty()) {
+        Printer << Node->getText();
+      } else {
+        Printer << demangledName;
+      }
+    } else if (Node->hasIndex()) {
+      Printer << Node->getIndex();
     }
     return nullptr;
   }
@@ -1968,6 +1992,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       return nullptr;
     case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "Closure Propagated";
+      return nullptr;
+    case FunctionSigSpecializationParamKind::ClosurePropPreviousArg:
+      Printer << "Same As Argument";
       return nullptr;
     case FunctionSigSpecializationParamKind::ExistentialToGeneric:
     case FunctionSigSpecializationParamKind::Dead:
@@ -2369,14 +2396,28 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << "merged ";
     }
     return nullptr;
-  case Node::Kind::TypeSymbolicReference:
+  case Node::Kind::TypeSymbolicReference: {
     Printer << "type symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    if (Node->hasRemoteAddress()) {
+      auto ra = Node->getRemoteAddress();
+      Printer.writeHex(ra.first);
+      Printer << " (" << ra.second << ")";
+    } else if (Node->hasIndex()) {
+      Printer.writeHex(Node->getIndex());
+    }
     return nullptr;
-  case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
+  }
+  case Node::Kind::OpaqueTypeDescriptorSymbolicReference: {
     Printer << "opaque type symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    if (Node->hasRemoteAddress()) {
+      auto ra = Node->getRemoteAddress();
+      Printer.writeHex(ra.first);
+      Printer << " (" << ra.second << ")";
+    } else if (Node->hasIndex()) {
+      Printer.writeHex(Node->getIndex());
+    }
     return nullptr;
+  }
   case Node::Kind::DistributedThunk:
     if (!Options.ShortenThunk) {
       Printer << "distributed thunk ";
@@ -2761,6 +2802,12 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::InitAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "init");
+  case Node::Kind::BorrowAccessor:
+    return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
+                                "borrow");
+  case Node::Kind::MutateAccessor:
+    return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
+                                "mutate");
   case Node::Kind::Allocator:
     return printEntity(
         Node, depth, asPrefixContext, TypePrinting::FunctionStyle,

@@ -829,9 +829,7 @@ bool ConstraintSystem::Candidate::solve(
 
   // Allocate new constraint system for sub-expression.
   ConstraintSystem cs(DC, std::nullopt);
-
-  // Set up expression type checker timer for the candidate.
-  cs.startExpressionTimer(E);
+  cs.startExpression(E);
 
   // Generate constraints for the new system.
   if (auto generatedExpr = cs.generateConstraints(E, DC)) {
@@ -1157,7 +1155,7 @@ void ConstraintSystem::shrink(Expr *expr) {
     ///
     /// \param collection The type of the collection container.
     ///
-    /// \returns Null type, ErrorType or UnresolvedType on failure,
+    /// \returns Null type or ErrorType on failure,
     /// properly constructed type otherwise.
     Type extractElementType(Type collection) {
       auto &ctx = CS.getASTContext();
@@ -1166,8 +1164,7 @@ void ConstraintSystem::shrink(Expr *expr) {
 
       auto base = collection.getPointer();
       auto isInvalidType = [](Type type) -> bool {
-        return type.isNull() || type->hasUnresolvedType() ||
-               type->hasError();
+        return type.isNull() || type->hasError();
       };
 
       // Array type.
@@ -1179,9 +1176,6 @@ void ConstraintSystem::shrink(Expr *expr) {
 
       // Map or Set or any other associated collection type.
       if (auto boundGeneric = dyn_cast<BoundGenericType>(base)) {
-        if (boundGeneric->hasUnresolvedType())
-          return boundGeneric;
-
         // Avoid handling InlineArray, building a tuple would be wrong, and
         // we want to eliminate shrink.
         if (boundGeneric->getDecl() == ctx.getInlineArrayDecl())
@@ -1290,9 +1284,7 @@ void ConstraintSystem::shrink(Expr *expr) {
         auto elementType = extractElementType(contextualType);
         // If we couldn't deduce element type for the collection, let's
         // not attempt to solve it.
-        if (!elementType ||
-            elementType->hasError() ||
-            elementType->hasUnresolvedType())
+        if (!elementType || elementType->hasError())
           return;
 
         contextualType = elementType;
@@ -1461,18 +1453,7 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
       return std::nullopt;
 
     case SolutionResult::TooComplex: {
-      auto affectedRange = solution.getTooComplexAt();
-
-      // If affected range is unknown, let's use whole
-      // target.
-      if (!affectedRange)
-        affectedRange = target.getSourceRange();
-
-      getASTContext()
-          .Diags.diagnose(affectedRange->Start, diag::expression_too_complex)
-          .highlight(*affectedRange);
-
-      solution.markAsDiagnosed();
+      diagnoseTooComplex(target.getLoc(), solution);
       return std::nullopt;
     }
 
@@ -1507,6 +1488,19 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
   llvm_unreachable("Loop always returns");
 }
 
+void ConstraintSystem::diagnoseTooComplex(SourceLoc fallbackLoc,
+                                          SolutionResult &result) {
+  auto affectedRange = result.getTooComplexAt();
+
+  SourceLoc loc = (affectedRange ? affectedRange->Start : fallbackLoc);
+  auto diag = getASTContext().Diags.diagnose(loc, diag::expression_too_complex);
+
+  if (affectedRange)
+    diag.highlight(*affectedRange);
+
+  result.markAsDiagnosed();
+}
+
 SolutionResult
 ConstraintSystem::solveImpl(SyntacticElementTarget &target,
                             FreeTypeVariableBinding allowFreeTypeVariables) {
@@ -1524,9 +1518,8 @@ ConstraintSystem::solveImpl(SyntacticElementTarget &target,
 
   assert(!solverState && "cannot be used directly");
 
-  // Set up the expression type checker timer.
   if (Expr *expr = target.getAsExpr())
-    startExpressionTimer(expr);
+    startExpression(expr);
 
   if (generateConstraints(target, allowFreeTypeVariables))
     return SolutionResult::forError();
@@ -1582,10 +1575,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
 void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   assert(solverState);
-
-  setPhase(ConstraintSystemPhase::Solving);
-
-  SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
 
   // If constraint system failed while trying to
   // genenerate constraints, let's stop right here.
@@ -1711,8 +1700,7 @@ bool ConstraintSystem::solveForCodeCompletion(
     // Tell the constraint system what the contextual type is.
     setContextualInfo(expr, target.getExprContextualTypeInfo());
 
-    // Set up the expression type checker timer.
-    startExpressionTimer(expr);
+    startExpression(expr);
 
     shrink(expr);
   }
@@ -1806,12 +1794,6 @@ ConstraintSystem::filterDisjunction(
     // constraint, so instead let's keep the disjunction, but disable all
     // unviable choices.
     if (choice->getOverloadChoice().isKeyPathDynamicMemberLookup()) {
-      // Early simplification of the "keypath dynamic member lookup" choice
-      // is impossible because it requires constraints associated with
-      // subscript index expression to be present.
-      if (Phase == ConstraintSystemPhase::ConstraintGeneration)
-        return SolutionKind::Unsolved;
-
       for (auto *currentChoice : disjunction->getNestedConstraints()) {
         if (currentChoice->isDisabled())
           continue;
@@ -2059,7 +2041,7 @@ tryOptimizeGenericDisjunction(ConstraintSystem &cs, Constraint *disjunction,
     assert(decl);
 
     auto *AFD = dyn_cast<AbstractFunctionDecl>(decl);
-    if (!AFD || !AFD->isGeneric())
+    if (!AFD || !AFD->hasGenericParamList())
       return false;
 
     if (AFD->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
@@ -2584,8 +2566,8 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
     conversionType = bindings.Bindings[0].BindingType;
   } else {
     for (const auto &literal : bindings.Literals) {
-      if (literal.second.viableAsBinding()) {
-        conversionType = literal.second.getDefaultType();
+      if (literal.viableAsBinding()) {
+        conversionType = literal.getDefaultType();
         break;
       }
     }

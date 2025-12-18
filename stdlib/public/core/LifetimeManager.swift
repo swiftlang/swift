@@ -184,6 +184,7 @@ public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   return try unsafe body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
 }
 
+#if !$Embedded
 /// ABI: Historical withUnsafePointer(to:_:) rethrows, expressed as "throws",
 /// which is ABI-compatible with "rethrows".
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
@@ -196,6 +197,7 @@ internal func __abi_withUnsafePointer<T, Result>(
 {
   return try unsafe body(UnsafePointer<T>(Builtin.addressOfBorrow(value)))
 }
+#endif
 
 /// Invokes the given closure with a pointer to the given argument.
 ///
@@ -229,6 +231,7 @@ public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   try unsafe body(UnsafePointer<T>(Builtin.addressof(&value)))
 }
 
+#if !$Embedded
 /// ABI: Historical withUnsafePointer(to:_:) rethrows,
 /// expressed as "throws", which is ABI-compatible with "rethrows".
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
@@ -240,6 +243,7 @@ internal func __abi_se0413_withUnsafePointer<T, Result>(
 ) throws -> Result {
   return try unsafe body(UnsafePointer<T>(Builtin.addressof(&value)))
 }
+#endif
 
 /// Invokes the given closure with a pointer to the given argument.
 ///

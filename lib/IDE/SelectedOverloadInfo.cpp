@@ -56,10 +56,10 @@ swift::ide::getSelectedOverloadInfo(const Solution &S,
         OverloadChoiceKind::KeyPathApplication) {
       auto Params = Result.ValueTy->getAs<AnyFunctionType>()->getParams();
       if (Params.size() == 1 &&
-          Params[0].getPlainType()->is<UnresolvedType>()) {
+          Params[0].getPlainType()->is<ErrorType>()) {
         auto *KPDecl = CS.getASTContext().getKeyPathDecl();
         Type KPTy =
-            KPDecl->mapTypeIntoContext(KPDecl->getDeclaredInterfaceType());
+            KPDecl->mapTypeIntoEnvironment(KPDecl->getDeclaredInterfaceType());
         Type KPValueTy = KPTy->castTo<BoundGenericType>()->getGenericArgs()[1];
         KPTy =
             BoundGenericType::get(KPDecl, Type(), {Result.BaseTy, KPValueTy});
@@ -79,7 +79,7 @@ swift::ide::getSelectedOverloadInfo(const Solution &S,
         fnType->getParams()[0].getPlainType()->castTo<BoundGenericType>();
 
     auto *keyPathDecl = keyPathTy->getAnyNominal();
-    assert(isKnownKeyPathType(keyPathTy) &&
+    assert(keyPathTy->isKnownKeyPathType() &&
            "parameter is supposed to be a keypath");
 
     auto KeyPathDynamicLocator = CS.getConstraintLocator(

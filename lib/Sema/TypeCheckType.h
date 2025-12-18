@@ -675,6 +675,12 @@ public:
     return unboundTyOpener;
   }
 
+  static Type defaultUnboundTypeOpener(UnboundGenericType *ty) {
+    // FIXME: Don't let unbound generic types escape type resolution.
+    // For now, just return the unbound generic type.
+    return ty;
+  }
+
   HandlePlaceholderTypeReprFn getPlaceholderHandler() const {
     return placeholderHandler;
   }

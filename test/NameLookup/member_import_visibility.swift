@@ -2,9 +2,9 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/MemberImportVisibility/members_A.swift
 // RUN: %target-swift-frontend -emit-module -I %t -o %t -package-name TestPackage %S/Inputs/MemberImportVisibility/members_B.swift
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/Inputs/MemberImportVisibility/members_C.swift
-// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage -verify-additional-prefix ambiguity-
-// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 6 -package-name TestPackage -verify-additional-prefix ambiguity-
-// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify -verify-ignore-unrelated -swift-version 5 -package-name TestPackage -verify-additional-prefix ambiguity-
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify -verify-ignore-unrelated -swift-version 6 -package-name TestPackage -verify-additional-prefix ambiguity-
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify -verify-ignore-unrelated -swift-version 5 -package-name TestPackage -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 // REQUIRES: swift_feature_MemberImportVisibility
 
@@ -85,7 +85,7 @@ extension X {
     _ = (NestedInA, NestedInB, NestedInC).self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
     _ = GenericType<NestedInB>.self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
     _ = NestedInC.self
-    _ = AmbiguousNestedType.self
+    _ = AmbiguousNestedType.self // expected-ambiguity-error{{ambiguous use of 'AmbiguousNestedType'}}
   }
 
   var hasNestedInAType: NestedInA { fatalError() }
@@ -99,6 +99,24 @@ extension X {
   func hasNestedInAInGenericReqs<T>(_ t: T) where T: ProtoNestedInA { }
   func hasNestedInBInGenericReqs<T>(_ t: T) where T: ProtoNestedInB { } // expected-member-visibility-error{{protocol 'ProtoNestedInB' is not available due to missing import of defining module 'members_B'}}
   func hasNestedInCInGenericReqs<T>(_ t: T) where T: ProtoNestedInC { }
+
+  func testMembersShadowingGlobals() {
+    shadowedByMemberOnXinA()
+    shadowedByMemberOnXinB() // expected-member-visibility-warning{{'shadowedByMemberOnXinB()' is deprecated}}
+    shadowedByMemberOnXinC()
+
+    _ = max(0, 1) // expected-ambiguity-error{{static member 'max' cannot be used on instance of type 'X'}}
+    // expected-ambiguity-error@-1{{cannot call value of non-function type 'Int'}}
+  }
+
+  static func testStaticMembersShadowingGlobals() {
+    shadowedByStaticMemberOnXinA()
+    shadowedByStaticMemberOnXinB() // expected-member-visibility-warning{{'shadowedByStaticMemberOnXinB()' is deprecated}}
+    shadowedByStaticMemberOnXinC()
+
+    _ = max(0, 1) // expected-ambiguity-error{{use of 'max' refers to instance method rather than global function 'max' in module 'Swift'}}
+    // expected-ambiguity-note@-1{{use 'Swift.' to reference the global function in module 'Swift'}}
+  }
 }
 
 extension X.NestedInA {}
@@ -148,4 +166,15 @@ func testLeadingDotSyntax() {
   takesP(.zInB) // expected-member-visibility-error{{static property 'zInB' is not available due to missing import of defining module 'members_B'}}
   takesP(.zInC)
   takesP(.zAmbiguous)
+}
+
+func testConformanceMember(_ h1: HasEquatableMembers, _ h2: HasEquatableMembers) {
+  _ = h1.a == h2.a
+  // Technically, this references the EquatableInB.== member that hasn't been
+  // imported. However, the conformance of EquatableInB: Equatable is visible
+  // here because conformances are not yet subject to import visibility rules.
+  // As a result, the == requirement is technically visible and therefore there
+  // should be no diagnostic with MemberImportVisibility enabled.
+  _ = h1.b == h2.b
+  _ = h1.c == h2.c
 }

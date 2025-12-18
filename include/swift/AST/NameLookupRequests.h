@@ -350,10 +350,10 @@ private:
 
 /// Request the nominal type declaration to which the given custom
 /// attribute refers.
-class CustomAttrNominalRequest :
-    public SimpleRequest<CustomAttrNominalRequest,
-                         NominalTypeDecl *(CustomAttr *, DeclContext *),
-                         RequestFlags::Cached> {
+class CustomAttrNominalRequest
+    : public SimpleRequest<CustomAttrNominalRequest,
+                           NominalTypeDecl *(CustomAttr *),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -361,8 +361,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  NominalTypeDecl *
-  evaluate(Evaluator &evaluator, CustomAttr *attr, DeclContext *dc) const;
+  NominalTypeDecl *evaluate(Evaluator &evaluator, CustomAttr *attr) const;
 
 public:
   // Caching
@@ -476,23 +475,43 @@ using QualifiedLookupResult = SmallVector<ValueDecl *, 4>;
 class LookupInModuleRequest
     : public SimpleRequest<
           LookupInModuleRequest,
-          QualifiedLookupResult(const DeclContext *, DeclName, NLKind,
+          QualifiedLookupResult(const DeclContext *, DeclName, bool, NLKind,
                                 namelookup::ResolutionKind, const DeclContext *,
                                 NLOptions),
           RequestFlags::Uncached | RequestFlags::DependencySink> {
 public:
   LookupInModuleRequest(
-      const DeclContext *, DeclName, NLKind,
+      const DeclContext *, DeclName, bool, NLKind,
       namelookup::ResolutionKind, const DeclContext *,
       SourceLoc, NLOptions);
 
 private:
   friend SimpleRequest;
 
-  // Evaluation.
+  /// Performs a lookup into the given module and its imports.
+  ///
+  /// If 'moduleOrFile' is a ModuleDecl, we search the module and its
+  /// public imports. If 'moduleOrFile' is a SourceFile, we search the
+  /// file's parent module, the module's public imports, and the source
+  /// file's private imports.
+  ///
+  /// \param evaluator The request evaluator.
+  /// \param moduleOrFile The module or file unit to search, including imports.
+  /// \param name The name to look up.
+  /// \param hasModuleSelector Whether \p name was originally qualified by a
+  ///        module selector. This information is threaded through to underlying
+  ///        lookup calls; the callee is responsible for actually applying the
+  ///        module selector.
+  /// \param lookupKind Whether this lookup is qualified or unqualified.
+  /// \param resolutionKind What sort of decl is expected.
+  /// \param moduleScopeContext The top-level context from which the lookup is
+  ///        being performed, for checking access. This must be either a
+  ///        FileUnit or a Module.
+  /// \param options Lookup options to apply.
   QualifiedLookupResult
   evaluate(Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
-           NLKind lookupKind, namelookup::ResolutionKind resolutionKind,
+           bool hasModuleSelector, NLKind lookupKind,
+           namelookup::ResolutionKind resolutionKind,
            const DeclContext *moduleScopeContext, NLOptions options) const;
 
 public:
@@ -757,10 +776,11 @@ void simple_display(llvm::raw_ostream &out,
 
 SourceLoc extractNearestSourceLoc(const LookupConformanceDescriptor &desc);
 
-class LookupConformanceInModuleRequest
-    : public SimpleRequest<LookupConformanceInModuleRequest,
+class LookupConformanceRequest
+    : public SimpleRequest<LookupConformanceRequest,
                            ProtocolConformanceRef(LookupConformanceDescriptor),
-                           RequestFlags::Uncached|RequestFlags::DependencySink> {
+                           RequestFlags::Uncached |
+                               RequestFlags::DependencySink> {
 public:
   using SimpleRequest::SimpleRequest;
 

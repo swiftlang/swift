@@ -286,8 +286,7 @@ void ASTSourceFileScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
   auto sr = AFD->getOriginalBodySourceRange();
   if (sr.isInvalid())
     return;
-  ASTScopeImpl *bodyScope =
-      findInnermostEnclosingScope(AFD->getParentModule(), sr.Start, nullptr);
+  ASTScopeImpl *bodyScope = findInnermostEnclosingScope(sr.Start, nullptr);
   if (!bodyScope->getWasExpanded())
     bodyScope->expandAndBeCurrent(*scopeCreator);
 }
@@ -959,11 +958,8 @@ AnnotatedInsertionPoint
 ConditionalClausePatternUseScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   auto *initializer = sec.getInitializer();
-  if (!isa<ErrorExpr>(initializer)) {
-    scopeCreator
-      .constructExpandAndInsert<ConditionalClauseInitializerScope>(
-        this, initializer);
-    }
+  scopeCreator.constructExpandAndInsert<ConditionalClauseInitializerScope>(
+      this, initializer);
 
   return {this,
           "Succeeding code must be in scope of conditional clause pattern bindings"};

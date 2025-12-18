@@ -17,3 +17,20 @@ Namespaces:
     Methods:
     - Name: data
       SwiftName: __dataUnsafe()
+    - Name: size
+      SwiftSafety: safe
+    - Name: size_bytes
+      SwiftSafety: safe
+    - Name: empty
+      SwiftSafety: safe
+  - Name: basic_string_view
+    Methods:
+    - Name: size
+      SwiftSafety: safe
+    - Name: max_size
+      SwiftSafety: safe
+    - Name: length
+      SwiftSafety: safe
+    - Name: empty
+      SwiftSafety: safe
+ 

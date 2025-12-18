@@ -63,6 +63,29 @@ inline bool requiresFeatureCoroutineAccessors(AccessorKind kind) {
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
+    return false;
+  }
+}
+
+inline bool requiresFeatureBorrowAndMutateAccessors(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
+    return true;
+  case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
+  case AccessorKind::Set:
+  case AccessorKind::Read:
+  case AccessorKind::Read2:
+  case AccessorKind::Modify:
+  case AccessorKind::Modify2:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Init:
     return false;
   }
 }
@@ -82,6 +105,8 @@ inline bool isYieldingAccessor(AccessorKind kind) {
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
     return false;
   }
 }
@@ -101,6 +126,8 @@ inline bool isYieldingImmutableAccessor(AccessorKind kind) {
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
     return false;
   }
 }
@@ -120,6 +147,8 @@ inline bool isYieldingMutableAccessor(AccessorKind kind) {
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
     return false;
   }
 }
@@ -278,6 +307,9 @@ enum class ReadImplKind {
 
   /// There's a read coroutine.
   Read2,
+
+  /// There's a borrow accessor.
+  Borrow,
 };
 enum { NumReadImplKindBits = 4 };
 
@@ -307,6 +339,9 @@ enum class WriteImplKind {
 
   /// There's a modify coroutine.
   Modify2,
+
+  /// There's a mutate accessor.
+  Mutate,
 };
 enum { NumWriteImplKindBits = 4 };
 
@@ -335,6 +370,9 @@ enum class ReadWriteImplKind {
   // access pattern.
   StoredWithDidSet,
   InheritedWithDidSet,
+
+  /// There's a mutate accessor.
+  Mutate,
 };
 enum { NumReadWriteImplKindBits = 4 };
 
@@ -388,33 +426,44 @@ public:
       return;
 
     case WriteImplKind::Set:
-      assert(readImpl == ReadImplKind::Get ||
-             readImpl == ReadImplKind::Address ||
-             readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2);
+      assert(
+          readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2 ||
+          readImpl == ReadImplKind::Borrow);
       assert(readWriteImpl == ReadWriteImplKind::MaterializeToTemporary ||
              readWriteImpl == ReadWriteImplKind::Modify ||
              readWriteImpl == ReadWriteImplKind::Modify2);
       return;
 
     case WriteImplKind::Modify:
-      assert(readImpl == ReadImplKind::Get ||
-             readImpl == ReadImplKind::Address ||
-             readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2);
+      assert(
+          readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2 ||
+          readImpl == ReadImplKind::Borrow);
       assert(readWriteImpl == ReadWriteImplKind::Modify);
       return;
 
     case WriteImplKind::Modify2:
-      assert(readImpl == ReadImplKind::Get ||
-             readImpl == ReadImplKind::Address ||
-             readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2);
+      assert(
+          readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2 ||
+          readImpl == ReadImplKind::Borrow);
       assert(readWriteImpl == ReadWriteImplKind::Modify2);
       return;
 
     case WriteImplKind::MutableAddress:
-      assert(readImpl == ReadImplKind::Get ||
-             readImpl == ReadImplKind::Address ||
-             readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2);
+      assert(
+          readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2 ||
+          readImpl == ReadImplKind::Borrow);
       assert(readWriteImpl == ReadWriteImplKind::MutableAddress);
+      return;
+    case WriteImplKind::Mutate:
+      assert(
+          readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2 ||
+          readImpl == ReadImplKind::Borrow);
+      assert(readWriteImpl == ReadWriteImplKind::Mutate);
       return;
     }
     llvm_unreachable("bad write impl kind");

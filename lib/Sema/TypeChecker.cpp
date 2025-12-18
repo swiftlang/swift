@@ -384,6 +384,10 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       Ctx.evaluator,
       CheckInconsistentWeakLinkedImportsRequest{SF->getParentModule()}, {});
 
+  // Opt-in performance hint diagnostics for performance-critical code.
+  if (performanceHintDiagnosticsEnabled(Ctx, SF))
+    evaluateOrDefault(Ctx.evaluator, EmitPerformanceHints{SF}, {});
+
   // Perform various AST transforms we've been asked to perform.
   if (!Ctx.hadError() && Ctx.LangOpts.DebuggerTestingTransform)
     performDebuggerTestingTransform(*SF);
@@ -610,7 +614,7 @@ bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
                                    DeclContext *dc,
                                    std::optional<TypeResolutionStage> stage) {
   if (stage)
-    type = dc->mapTypeIntoContext(type);
+    type = dc->mapTypeIntoEnvironment(type);
   auto tanSpace = type->getAutoDiffTangentSpace(
       LookUpConformanceInModule());
   if (!tanSpace)

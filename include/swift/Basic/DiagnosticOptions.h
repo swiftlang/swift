@@ -14,7 +14,7 @@
 #define SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 
 #include "swift/Basic/PrintDiagnosticNamesMode.h"
-#include "swift/Basic/WarningAsErrorRule.h"
+#include "swift/Basic/WarningGroupBehaviorRule.h"
 #include "llvm/ADT/Hashing.h"
 #include <vector>
 
@@ -41,6 +41,17 @@ public:
   /// \c VerifyMode is not \c NoVerify.
   bool VerifyIgnoreUnknown = false;
 
+  /// Indicates whether to allow diagnostics for locations outside files parsed
+  /// for 'expected' diagnostics if \c VerifyMode is not \c NoVerify. Does not
+  /// allow diagnostics at <unknown>, that is controlled by VerifyIgnoreUnknown.
+  bool VerifyIgnoreUnrelated = false;
+
+  /// Indicates whether to ignore \c diag::in_macro_expansion. This is useful
+  /// for when they occur in unnamed buffers (such as clang attribute buffers),
+  /// but VerifyIgnoreUnrelated is too blunt of a tool. Note that notes of this
+  /// kind are not printed by \c PrintingDiagnosticConsumer.
+  bool VerifyIgnoreMacroLocationNote = false;
+
   /// Indicates whether diagnostic passes should be skipped.
   bool SkipDiagnosticPasses = false;
 
@@ -58,11 +69,14 @@ public:
   /// Suppress all warnings
   bool SuppressWarnings = false;
   
+  /// Suppress all notes
+  bool SuppressNotes = false;
+
   /// Suppress all remarks
   bool SuppressRemarks = false;
 
   /// Rules for escalating warnings to errors
-  std::vector<WarningAsErrorRule> WarningsAsErrorsRules;
+  llvm::SmallVector<WarningGroupBehaviorRule, 4> WarningGroupControlRules;
 
   /// When printing diagnostics, include either the diagnostic name
   /// (diag::whatever) at the end or the associated diagnostic group.

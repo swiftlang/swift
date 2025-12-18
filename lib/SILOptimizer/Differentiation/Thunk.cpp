@@ -121,8 +121,8 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   auto thunkDeclType =
       thunkType->getWithExtInfo(thunkType->getExtInfo().withNoEscape(false));
 
-  auto fromInterfaceType = fromType->mapTypeOutOfContext()->getCanonicalType();
-  auto toInterfaceType = toType->mapTypeOutOfContext()->getCanonicalType();
+  auto fromInterfaceType = fromType->mapTypeOutOfEnvironment()->getCanonicalType();
+  auto toInterfaceType = toType->mapTypeOutOfEnvironment()->getCanonicalType();
 
   Mangle::ASTMangler mangler(module.getASTContext());
   std::string name = mangler.mangleReabstractionThunkHelper(
@@ -207,7 +207,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
       auto paramTy = fromConv.getSILType(fromType->getParameters()[paramIdx],
                                          builder.getTypeExpansionContext());
       if (!paramTy.hasArchetype())
-        paramTy = thunk->mapTypeIntoContext(paramTy);
+        paramTy = thunk->mapTypeIntoEnvironment(paramTy);
       assert(paramTy.isAddress());
       auto toArg = *toArgIter++;
       auto *buf = createAllocStack(toArg->getType());
@@ -417,7 +417,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
 
   Mangle::DifferentiationMangler mangler(parentThunk->getASTContext());
   auto fromInterfaceType =
-      linearMapType->mapTypeOutOfContext()->getCanonicalType();
+      linearMapType->mapTypeOutOfEnvironment()->getCanonicalType();
 
   auto thunkName = mangler.mangleLinearMapSubsetParametersThunk(
       fromInterfaceType, kind.getLinearMapKind(),
@@ -621,22 +621,33 @@ getOrCreateSubsetParametersThunkForLinearMap(
 
   // If differential thunk, deallocate local allocations and directly return
   // `apply` result (if it is desired).
+  // TODO: Unify with VJP code below
   if (kind == AutoDiffDerivativeFunctionKind::JVP) {
     SmallVector<SILValue, 8> differentialDirectResults;
     extractAllElements(ai, builder, differentialDirectResults);
     SmallVector<SILValue, 8> allResults;
     collectAllActualResultsInTypeOrder(ai, differentialDirectResults, allResults);
-    unsigned numResults = thunk->getConventions().getNumDirectSILResults() +
-     thunk->getConventions().getNumDirectSILResults();
     SmallVector<SILValue, 8> results;
-    for (unsigned idx : *actualConfig.resultIndices) {
-      if (idx >= numResults)
-        break;
 
-      auto result = allResults[idx];
-      if (desiredConfig.isWrtResult(idx))
-        results.push_back(result);
-      else {
+    unsigned firstSemanticParamResultIdx = origFnType->getNumResults();
+    for (unsigned resultIndex : *actualConfig.resultIndices) {
+      SILValue result;
+      if (resultIndex >= firstSemanticParamResultIdx) {
+        auto semanticResultArgIdx = resultIndex - firstSemanticParamResultIdx;
+        result =
+          *std::next(ai->getAutoDiffSemanticResultArguments().begin(),
+                     semanticResultArgIdx);
+      } else
+        result = allResults[resultIndex];
+
+      // If result is desired:
+      // - Do nothing if result is indirect.
+      //   (It was already forwarded to the `apply` instruction).
+      // - Push it to `results` if result is direct.
+      if (desiredConfig.isWrtResult(resultIndex)) {
+        if (result->getType().isObject())
+          results.push_back(result);
+      } else { // Otherwise, cleanup the unused results.
         if (result->getType().isAddress())
           builder.emitDestroyAddrAndFold(loc, result);
         else
@@ -725,7 +736,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   auto *caller = derivativeFn->getFunction();
   if (targetType->hasArchetype()) {
     auto substTargetType =
-        caller->mapTypeIntoContext(targetType->mapTypeOutOfContext())
+        caller->mapTypeIntoEnvironment(targetType->mapTypeOutOfEnvironment())
             ->getCanonicalType();
     targetType = SILType::getPrimitiveObjectType(substTargetType)
                      .castTo<SILFunctionType>();
@@ -759,7 +770,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   assert(!origName.empty() && "Original function name could not be resolved");
   Mangle::DifferentiationMangler mangler(adContext.getASTContext());
   auto thunkName = mangler.mangleDerivativeFunctionSubsetParametersThunk(
-      origName, targetType->mapTypeOutOfContext()->getCanonicalType(),
+      origName, targetType->mapTypeOutOfEnvironment()->getCanonicalType(),
       kind, actualConfig.parameterIndices, actualConfig.resultIndices,
       desiredConfig.parameterIndices);
 
@@ -795,7 +806,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
     assocRef = builder.createWitnessMethod(
         loc, assocMethodInst->getLookupType(),
         assocMethodInst->getConformance(), assocMethodInst->getMember(),
-        thunk->mapTypeIntoContext(assocMethodInst->getType()));
+        thunk->mapTypeIntoEnvironment(assocMethodInst->getType()));
   } else if (auto *assocMethodInst =
                  peerThroughFunctionConversions<ClassMethodInst>(
                      derivativeFn)) {
@@ -806,7 +817,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
 #endif
     assocRef = builder.createClassMethod(
         loc, classOperand, assocMethodInst->getMember(),
-        thunk->mapTypeIntoContext(assocMethodInst->getType()));
+        thunk->mapTypeIntoEnvironment(assocMethodInst->getType()));
   } else if (auto *diffWitFn = peerThroughFunctionConversions<
                  DifferentiabilityWitnessFunctionInst>(derivativeFn)) {
     assocRef = builder.createDifferentiabilityWitnessFunction(

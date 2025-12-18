@@ -29,19 +29,7 @@ Forces conformances of the attributed protocol to always have their Type Metadat
 
 ## `@_alwaysEmitIntoClient`
 
-Forces the body of a function to be emitted into client code.
-
-Note that this is distinct from `@inline(__always)`; it doesn't force inlining
-at call-sites, it only means that the implementation is compiled into the
-module which uses the code.
-
-This means that `@_alwaysEmitIntoClient` definitions are _not_ part of the
-defining module's ABI, so changing the implementation at a later stage
-does not break ABI.
-
-Most notably, default argument expressions are implicitly
-`@_alwaysEmitIntoClient`, which means that adding a default argument to a
-function which did not have one previously does not break ABI.
+Forces the body of a function to be emitted into client code. This underscored attribute was formalized as `@export(implementation)` as part of [SE-0497](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0497-definition-visibility.md).
 
 ## `@_assemblyVision`
 
@@ -1117,12 +1105,6 @@ if it is never explicitly bound using a typed pointer method like
 bound, it must only be used with compatible typed memory accesses for as long
 as the binding is active.
 
-## `@_section("section_name")`
-
-Places a global variable or a top-level function into a section of the object
-file with the given name. It's the equivalent of clang's
-`__attribute__((section))`.
-
 ## `@_semantics("uniquely.recognized.id")`
 
 Allows the optimizer to make use of some key invariants in performance critical
@@ -1319,12 +1301,6 @@ for more details.
 ## `@_unsafeInheritExecutor`
 
 This `async` function uses the pre-SE-0338 semantics of unsafely inheriting the caller's executor.  This is an underscored feature because the right way of inheriting an executor is to pass in the required executor and switch to it.  Unfortunately, there are functions in the standard library which need to inherit their caller's executor but cannot change their ABI because they were not defined as `@_alwaysEmitIntoClient` in the initial release.
-
-## `@_used`
-
-Marks a global variable or a top-level function as "used externally" even if it
-does not have visible users in the compilation unit. It's the equivalent of
-clang's `__attribute__((used))`.
 
 ## `@_weakLinked`
 

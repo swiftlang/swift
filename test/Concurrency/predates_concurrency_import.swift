@@ -3,9 +3,9 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -target %target-swift-5.1-abi-triple
 
-// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify  -parse-as-library -enable-upcoming-feature GlobalConcurrency -Wwarning PreconcurrencyImport
-// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -parse-as-library -enable-upcoming-feature GlobalConcurrency -Wwarning PreconcurrencyImport
-// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=complete  -parse-as-library -enable-upcoming-feature GlobalConcurrency -Wwarning PreconcurrencyImport
+// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -verify-ignore-unrelated  -parse-as-library -enable-upcoming-feature GlobalConcurrency -Wwarning PreconcurrencyImport
+// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -verify-ignore-unrelated -strict-concurrency=targeted -parse-as-library -enable-upcoming-feature GlobalConcurrency -Wwarning PreconcurrencyImport
+// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -verify-ignore-unrelated -strict-concurrency=complete  -parse-as-library -enable-upcoming-feature GlobalConcurrency -Wwarning PreconcurrencyImport
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalConcurrency

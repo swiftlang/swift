@@ -341,21 +341,15 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserStateBase *SIL,
                PersistentParserState *PersistentState)
     : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState) {}
 
-Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
-               SILParserStateBase *SIL,
-               PersistentParserState *PersistentState)
-    : Parser(
-          std::unique_ptr<Lexer>(new Lexer(
-              SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
-              BufferID, LexerDiags,
-              sourceFileKindToLexerMode(SF.Kind),
-              SF.Kind == SourceFileKind::Main
-                  ? HashbangMode::Allowed
-                  : HashbangMode::Disallowed,
-              SF.getASTContext().LangOpts.AttachCommentsToDecls
-                  ? CommentRetentionMode::AttachToNextToken
-                  : CommentRetentionMode::None)),
-          SF, SIL, PersistentState) {}
+Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine *LexerDiags,
+               SILParserStateBase *SIL, PersistentParserState *PersistentState)
+    : Parser(std::unique_ptr<Lexer>(new Lexer(
+                 SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
+                 BufferID, LexerDiags, sourceFileKindToLexerMode(SF.Kind),
+                 SF.Kind == SourceFileKind::Main ? HashbangMode::Allowed
+                                                 : HashbangMode::Disallowed,
+                 CommentRetentionMode::AttachToNextToken)),
+             SF, SIL, PersistentState) {}
 
 namespace {
 
@@ -607,7 +601,7 @@ SourceLoc Parser::consumeAttributeLParen() {
   SourceLoc LastTokenEndLoc = getEndOfPreviousLoc();
   if (LastTokenEndLoc != Tok.getLoc() && !isInSILMode()) {
     diagnose(LastTokenEndLoc, diag::attr_extra_whitespace_before_lparen)
-        .warnUntilSwiftVersion(6);
+        .warnUntilLanguageMode(6);
   }
   return consumeToken(tok::l_paren);
 }
@@ -623,7 +617,7 @@ bool Parser::isAtAttributeLParen(bool isCustomAttr) {
   if (!Tok.isFollowingLParen())
     return false;
 
-  if (Context.isSwiftVersionAtLeast(6)) {
+  if (Context.isLanguageModeAtLeast(6)) {
     // No-space '(' are always arguments.
     if (getEndOfPreviousLoc() == Tok.getLoc())
       return true;
@@ -1199,6 +1193,8 @@ struct ParserUnit::Implementation {
   SerializationOptions SerializationOpts;
   DiagnosticEngine Diags;
   ASTContext &Ctx;
+  SourceManager &SM;
+  unsigned BufferID;
   SourceFile *SF;
   std::unique_ptr<Parser> TheParser;
 
@@ -1208,7 +1204,8 @@ struct ParserUnit::Implementation {
         SILOpts(SILOptions()), Diags(SM),
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
                              clangImporterOpts, symbolGraphOpts, CASOpts,
-                             SerializationOpts, SM, Diags)) {
+                             SerializationOpts, SM, Diags)),
+        SM(SM), BufferID(BufferID) {
     registerParseRequestFunctions(Ctx.evaluator);
 
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
@@ -1222,6 +1219,7 @@ struct ParserUnit::Implementation {
 
   ~Implementation() {
     TheParser.reset();
+    SM.deleteSourceFile(BufferID);
     delete &Ctx;
   }
 };
@@ -1243,12 +1241,10 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
     : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(), "input")) {
 
   std::unique_ptr<Lexer> Lex;
-  Lex.reset(new Lexer(Impl.LangOpts, SM,
-                      BufferID, &Impl.Diags,
-                      LexerMode::Swift,
-                      HashbangMode::Allowed,
-                      CommentRetentionMode::None,
-                      Offset, EndOffset));
+  Lex.reset(new Lexer(Impl.LangOpts, SM, BufferID, &Impl.Diags,
+                      LexerMode::Swift, HashbangMode::Allowed,
+                      CommentRetentionMode::AttachToNextToken, Offset,
+                      EndOffset));
   Impl.TheParser.reset(new Parser(std::move(Lex), *Impl.SF, /*SIL=*/nullptr,
                                   /*PersistentState=*/nullptr));
 }

@@ -141,7 +141,7 @@ void ExistentialSpecializerCloner::cloneArguments(
       // Clone arguments that are not rewritten.
       auto Ty = params[ArgDesc.Index].getArgumentType(
           M, NewFTy, NewF.getTypeExpansionContext());
-      auto LoweredTy = NewF.getLoweredType(NewF.mapTypeIntoContext(Ty));
+      auto LoweredTy = NewF.getLoweredType(NewF.mapTypeIntoEnvironment(Ty));
       auto MappedTy =
           LoweredTy.getCategoryType(ArgDesc.Arg->getType().getCategory());
       auto *NewArg =
@@ -153,7 +153,7 @@ void ExistentialSpecializerCloner::cloneArguments(
     // Create the generic argument.
     GenericTypeParamType *GenericParam = iter->second;
     SILType GenericSILType =
-        NewF.getLoweredType(NewF.mapTypeIntoContext(GenericParam));
+        NewF.getLoweredType(NewF.mapTypeIntoEnvironment(GenericParam));
     GenericSILType = GenericSILType.getCategoryType(
                                           ArgDesc.Arg->getType().getCategory());
     auto *NewArg = ClonedEntryBB->createFunctionArgument(
@@ -381,7 +381,7 @@ void ExistentialTransform::populateThunkBody() {
   SILModule &M = F->getModule();
 
   F->setThunk(IsSignatureOptimizedThunk);
-  F->setInlineStrategy(AlwaysInline);
+  F->setInlineStrategy(HeuristicAlwaysInline);
 
   /// Remove original body of F.
   for (auto It = F->begin(), End = F->end(); It != End;) {
@@ -443,7 +443,7 @@ void ExistentialTransform::populateThunkBody() {
       switch (ExistentialRepr) {
       case ExistentialRepresentation::Opaque: {
         archetypeValue = Builder.createOpenExistentialAddr(
-            Loc, OrigOperand, OpenedSILType, it->second.AccessType);
+            Loc, OrigOperand, OpenedSILType.getAddressType(), it->second.AccessType);
         SILValue calleeArg = archetypeValue;
         if (OriginallyConsumed) {
           // open_existential_addr projects a borrowed address into the
@@ -637,7 +637,7 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
     SubstitutionMap Subs = SubstitutionMap::get(
       NewFGenericSig,
       [&](SubstitutableType *type) -> Type {
-        return NewFGenericEnv->mapTypeIntoContext(type);
+        return NewFGenericEnv->mapTypeIntoEnvironment(type);
       },
       LookUpConformanceInModule());
     ExistentialSpecializerCloner cloner(F, NewF, Subs, ArgumentDescList,

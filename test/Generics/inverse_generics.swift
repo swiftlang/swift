@@ -538,5 +538,5 @@ func testYap(_ y: Yapping<NC>) {
 protocol Veggie: ~Copyable {}
 func generalized(_ x: Any.Type) {}
 func testMetatypes(_ t: (any Veggie & ~Copyable).Type) {
-  generalized(t) // expected-error {{cannot convert value of type '(any Veggie & ~Copyable).Type' to expected argument type 'any Any.Type'}}
+  generalized(t) // expected-error {{argument type 'any Veggie & ~Copyable' does not conform to expected type 'Copyable'}}
 }

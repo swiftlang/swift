@@ -40,12 +40,12 @@ WARNING(warning_upcoming_feature_on_by_default, none,
         "upcoming feature '%0' is already enabled as of Swift version %1",
         (StringRef, unsigned))
 
-GROUPED_WARNING(unrecognized_feature, StrictLanguageFeatures, DefaultIgnore,
+GROUPED_WARNING(unrecognized_feature, UnrecognizedStrictLanguageFeatures, none,
                 "'%0' is not a recognized "
                 "%select{experimental|upcoming}1 feature",
                 (StringRef, bool))
 
-GROUPED_WARNING(feature_not_experimental, StrictLanguageFeatures, DefaultIgnore,
+GROUPED_WARNING(feature_not_experimental, UnrecognizedStrictLanguageFeatures, none,
                 "'%0' is not an experimental feature, "
                 "use -%select{disable|enable}1-upcoming-feature instead",
                 (StringRef, bool))
@@ -67,11 +67,6 @@ GROUPED_WARNING(feature_does_not_support_migration_mode, StrictLanguageFeatures,
 ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "
       "expected one of 'api', 'spi', 'ipi', or 'other'", (StringRef))
-
-ERROR(error_old_spi_only_import_unsupported, none,
-      "'-experimental-spi-imports' is unsupported in Swift 6, "
-      "use '@_spiOnly' instead",
-      ())
 
 ERROR(error_unknown_require_explicit_availability, none,
       "unknown argument '%0', passed to -require-explicit-availability, "
@@ -155,6 +150,9 @@ ERROR(error_load_resolved_plugin,none,
 
 NOTE(note_valid_swift_versions, none,
      "valid arguments to '-swift-version' are %0", (StringRef))
+
+ERROR(error_module_interface_requires_language_mode,none,
+      "emitting module interface files requires '-language-mode'", ())
 
 ERROR(error_mode_cannot_emit_dependencies,none,
       "this mode does not support emitting dependency files", ())
@@ -302,26 +300,9 @@ REMARK(remark_indexing_system_module,none,
        "%select{|; skipping because of a broken swiftinterface}1",
        (StringRef, bool))
 
-ERROR(error_create_symbolic_interfaces_dir,none,
-      "creating symbolic interfaces directory: %0", (StringRef))
-ERROR(error_symbolic_interfaces_failed_status_check,none,
-      "failed file status check: %0", (StringRef))
-ERROR(error_write_symbolic_interface,none,
-      "writing symbolic interface file: %0", (StringRef))
-REMARK(remark_emitting_symbolic_interface_module,none,
-       "emitting symbolic interface at %0"
-       "%select{|; skipping because it's up to date}1",
-       (StringRef, bool))
-
 ERROR(error_wrong_number_of_arguments,none,
       "wrong number of '%0' arguments (expected %1, got %2)",
       (StringRef, int, int))
-
-ERROR(error_formatting_multiple_file_ranges,none,
-      "file ranges don't support multiple input files", ())
-
-ERROR(error_formatting_invalid_range,none,
-      "file range is invalid", ())
 
 WARNING(stats_disabled,none,
         "compiler was not built with support for collecting statistics", ())
@@ -514,7 +495,6 @@ REMARK(matching_output_produced,none,
 // Caching related diagnostics
 GROUPED_ERROR(error_caching_no_cas_fs, CompilationCaching, none,
     "caching is enabled without CAS file-system options, input is not immutable", ())
-ERROR(error_prefix_mapping, none, "cannot create scanner prefix mapping: '%0'", (StringRef))
 
 REMARK(replay_output, none, "replay output file '%0': key '%1'", (StringRef, StringRef))
 REMARK(output_cache_miss, none, "cache miss for input file '%0': key '%1'", (StringRef, StringRef))
@@ -524,7 +504,7 @@ GROUPED_ERROR(error_invalid_cas_id, CompilationCaching, none, "CAS cannot parse 
 GROUPED_ERROR(error_cas, CompilationCaching, none, "CAS error encountered during %0: %1", (StringRef, StringRef))
 GROUPED_ERROR(error_cas_fs_creation, CompilationCaching, none, "cannot create CAS filesystem: %0", (StringRef))
 GROUPED_ERROR(error_cache_key_creation, CompilationCaching, none, "cannot create cache key for compilation %0: %1", (StringRef, StringRef))
-GROUPED_ERROR(error_cas_file_ref, CompilationCaching, none, "cannot load file %0 from CAS filesystem", (StringRef))
+GROUPED_ERROR(error_cas_file_ref, CompilationCaching, none, "cannot load file %0 from CAS filesystem: %1", (StringRef, StringRef))
 GROUPED_ERROR(error_cas_conflict_options, CompilationCaching, none, "cannot setup CAS due to conflicting '-cas-*' options", ())
 GROUPED_ERROR(error_cas_initialization, CompilationCaching, none, "CAS cannot be initialized from the specified '-cas-*' options: %0", (StringRef))
 GROUPED_ERROR(error_cas_malformed_input, CompilationCaching, none, "CAS input '%0' is malformed: %1", (StringRef, StringRef))
@@ -592,6 +572,8 @@ ERROR(layout_string_instantiation_without_layout_strings,none,
 
 ERROR(evolution_with_embedded,none,
       "Library evolution cannot be enabled with embedded Swift.", ())
+ERROR(embedded_existentials_without_embedded,none,
+      "EmbeddedExistentials requires enabling embedded Swift.", ())
 ERROR(wmo_with_embedded,none,
       "Whole module optimization (wmo) must be enabled with embedded Swift.", ())
 ERROR(objc_with_embedded,none,
@@ -605,6 +587,14 @@ ERROR(no_swift_sources_with_embedded,none,
 
 ERROR(package_cmo_requires_library_evolution, none,
         "Library evolution must be enabled for Package CMO", ())
+
+WARNING(internal_bridging_header_without_library_evolution,none,
+        "using internal bridging headers without library evolution can cause instability", ())
+
+ERROR(error_invalid_clang_header_access_level, none,
+      "invalid minimum clang header access level '%0'; chose from "
+      "'public'|'package'|'internal'",
+      (StringRef))
 
 ERROR(experimental_not_supported_in_production,none,
       "experimental feature '%0' cannot be enabled in production compiler",
@@ -633,6 +623,8 @@ NOTE(dependency_scan_unexpected_variant_module_map_note, none,
 NOTE(dependency_scan_unexpected_variant_extra_arg_note, none,
      "%select{first|second}0 module command-line has extra argument: '%1'", (bool, StringRef))
 
+ERROR(bridging_header_and_pch_internal_mismatch,none,
+      "bridging header and precompiled header options mismatch on internal vs. public import", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

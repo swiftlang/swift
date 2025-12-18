@@ -155,6 +155,10 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING
 set(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES "" CACHE STRING
     "List of extra target triples to build the embedded Swift standard library for")
 
+set(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES "" CACHE STRING
+    "List of SDKs to use for target triples, in the form triple@sdkpath.
+    Using this variable precludes setting directly the value for  SWIFT_SDK_embedded_ARCH_\$\{ARCH\}_PATH")
+
 if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "linux") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "wasi") AND
@@ -273,7 +277,7 @@ foreach(triple ${SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES})
   list(GET list 0 arch)
   list(GET list 1 vendor)
   list(GET list 2 os)
-  string(REGEX REPLACE "[0-9]+(\\.[0-9]+)+" " " mod "${triple}")
+  string(REGEX REPLACE "[0-9]+(\\.[0-9]+)+" "" mod "${triple}")
 
   list(FILTER EMBEDDED_STDLIB_TARGET_TRIPLES EXCLUDE REGEX " ${mod} ")
 
@@ -281,6 +285,25 @@ foreach(triple ${SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES})
     "${arch} ${mod} ${triple}"
   )
 endforeach()
+
+if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
+  message(WARNING "Configuring SDKs using content of SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES \
+    Setting directly SWIFT_SDK_embedded_ARCH_\$\{ARCH\}_PATH will not work")
+  foreach(triple_configuration ${SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES})
+    if(triple_configuration STREQUAL "")
+      continue()
+    endif()
+
+    # Line format: <triple>[@<path to SDK>]
+    string(REPLACE "@" ";" triple_configuration_list "${triple_configuration}")
+    list(LENGTH triple_configuration_list triple_configuration_list_length)
+    if(triple_configuration_list_length GREATER_EQUAL 2)
+      list(GET triple_configuration_list 0 triple)
+      list(GET triple_configuration_list 1 sdk_path)
+      set(EMBEDDED_STDLIB_SDK_FOR_${triple} "${sdk_path}")
+    endif()
+  endforeach()
+endif()
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(triples)
@@ -297,6 +320,10 @@ endif()
 if(SWIFT_BUILD_STDLIB)
   # These must be kept in dependency order so that any referenced targets
   # exist at the time we look for them in add_swift_*.
+  if(SWIFT_BUILD_SWIFT_DIRECT_RUNTIME)
+    add_subdirectory(SwiftDirectRuntime)
+  endif()
+
   add_subdirectory(runtime)
   add_subdirectory(stubs)
   add_subdirectory(core)
@@ -366,4 +393,3 @@ endif()
 if(SWIFT_BUILD_LIBEXEC)
 add_subdirectory(libexec)
 endif()
-

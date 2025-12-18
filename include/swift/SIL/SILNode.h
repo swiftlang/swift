@@ -33,6 +33,7 @@ class NonSingleValueInstruction;
 class SILModule;
 class ValueBase;
 class SILNode;
+class SILPrintContext;
 class SILValue;
 
 /// An enumeration which contains values for all the nodes in SILNodes.def.
@@ -228,7 +229,8 @@ protected:
                  lexical : 1,
                  fromVarDecl : 1,
                  usesMoveableValueDebugInfo : 1,
-                 hasInvalidatedVarInfo : 1);
+                 hasInvalidatedVarInfo : 1,
+                 isNested : 1);
 
     SHARED_FIELD(AllocBoxInst, uint8_t
                  dynamicLifetime : 1,
@@ -430,12 +432,14 @@ public:
   /// will be valid SIL assembly; otherwise, it will be an arbitrary
   /// format suitable for debugging.
   void print(raw_ostream &OS) const;
+  void print(SILPrintContext &ctx) const;
   void dump() const;
 
   /// Pretty-print the node in context, preceded by its operands (if the
   /// value represents the result of an instruction) and followed by its
   /// users.
   void printInContext(raw_ostream &OS) const;
+  void printInContext(SILPrintContext &ctx) const;
   void dumpInContext() const;
 
   // Cast to SingleValueInstruction.  This is an implementation detail

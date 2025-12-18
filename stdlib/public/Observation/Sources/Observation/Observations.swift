@@ -260,7 +260,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
           // this will mean our next await for the emission will ensure the suspension return of the willChange context
           // back to the trailing edges of the mutations. In short, this enables the transactionality bounded by the
           // isolation of the mutation.
-          await withIsolatedTaskCancellationHandler(operation: {
+          await withTaskCancellationHandler(operation: {
             await State.willChange(isolation: iterationIsolation, state: state, id: id)
           }, onCancel: {
             // ensure to clean out our continuation upon cancellation

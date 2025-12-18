@@ -20,6 +20,8 @@
 #ifndef SWIFT_LOWERING_MANAGEDVALUE_H
 #define SWIFT_LOWERING_MANAGEDVALUE_H
 
+#define SWIFT_INCLUDED_IN_SILGEN_SOURCES
+
 #include "Cleanup.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "swift/Basic/Assertions.h"

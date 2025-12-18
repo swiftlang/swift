@@ -2,6 +2,6 @@
 
 // CHECK-LABEL: sil {{.*}} @$s{{.*}}23keyPathToImportedMember
 func keyPathToImportedMember() {
-  // CHECK: keypath $KeyPath<Butt, Int32>, (root $Butt; gettable_property $Int32,  id @ButtSize
+  // CHECK: keypath $KeyPath<Butt, Int32>, (root $Butt; gettable_property $Int32, id @$sSo4ButtV4sizes5Int32VvgTo
   _ = \Butt.size
 }

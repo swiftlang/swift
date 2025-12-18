@@ -377,7 +377,8 @@ bool CompileInstance::performCompile(
   CI->addDiagnosticConsumer(DiagC);
   SWIFT_DEFER { CI->removeDiagnosticConsumer(DiagC); };
   int ReturnValue = 0;
-  return performCompileStepsPostSema(*CI, ReturnValue, /*observer=*/nullptr);
+  return performCompileStepsPostSema(*CI, ReturnValue, /*observer=*/nullptr,
+                                     Args);
 }
 
 bool CompileInstance::shouldCheckDependencies() const {

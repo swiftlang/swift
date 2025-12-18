@@ -13,7 +13,14 @@ func deprecated() -> Int { 0 }
 var globalVar3 = #stringify({ deprecated() })
 // expected-note@-1 {{in expansion of macro 'stringify' here}}
 // expected-warning@-2{{'deprecated()' is deprecated}}
+// expected-expansion@-3:18{{
+//   expected-warning@2:9{{'deprecated()' is deprecated}}
+// }}
 
 var globalVar4 = #stringify({ deprecated() })
 // expected-note@-1 {{in expansion of macro 'stringify' here}}
 // expected-warning@-2{{'deprecated()' is deprecated}}
+// expected-expansion@-3:18{{
+//   expected-warning@2:9{{'deprecated()' is deprecated}}
+// }}
+

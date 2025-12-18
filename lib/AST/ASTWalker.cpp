@@ -558,7 +558,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (WalkGenerics && visitTrailingRequirements(AFD))
       return true;
 
-    if (AFD->getBody(/*canSynthesize=*/false)) {
+    // If we're not walking macro expansions, avoid walking into a body if it
+    // was expanded from a macro.
+    auto SkipBody = !Walker.shouldWalkMacroArgumentsAndExpansion().second &&
+                    AFD->isBodyMacroExpanded();
+
+    if (!SkipBody && AFD->getBody(/*canSynthesize=*/false)) {
       AbstractFunctionDecl::BodyKind PreservedKind = AFD->getBodyKind();
       if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(AFD->getBody())))
         AFD->setBody(S, PreservedKind);
@@ -598,23 +603,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   //===--------------------------------------------------------------------===//
   //                                  Exprs
   //===--------------------------------------------------------------------===//
-
-  // A macro for handling the "semantic expressions" that are common
-  // on sugared expression nodes like string interpolation.  The
-  // semantic expression is set up by type-checking to include all the
-  // other children as sub-expressions, so if it exists, we should
-  // just bypass the rest of the visitation.
-#define HANDLE_SEMANTIC_EXPR(NODE)                         \
-  do {                                                     \
-    if (Expr *_semanticExpr = NODE->getSemanticExpr()) {   \
-      if ((_semanticExpr = doIt(_semanticExpr))) {         \
-        NODE->setSemanticExpr(_semanticExpr);              \
-      } else {                                             \
-        return nullptr;                                    \
-      }                                                    \
-      return NODE;                                         \
-    }                                                      \
-  } while (false)
 
   Expr *visitErrorExpr(ErrorExpr *E) {
     if (auto *origExpr = E->getOriginalExpr()) {
@@ -1267,7 +1255,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   
   Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
     return E;
   }
 
@@ -1385,6 +1372,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
 
   Expr *visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
+    if (auto preamble = E->getForExpressionPreamble()) {
+      if (doIt(preamble->ForAccumulatorDecl)) {
+        return nullptr;
+      }
+
+      if (doIt(preamble->ForAccumulatorBinding)) {
+        return nullptr;
+      }
+    }
+
     if (auto *S = doIt(E->getStmt())) {
       E->setStmt(S);
     } else {

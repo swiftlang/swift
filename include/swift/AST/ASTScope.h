@@ -327,18 +327,15 @@ private:
 
 protected:
   /// Not const because may reexpand some scopes.
-  ASTScopeImpl *findInnermostEnclosingScope(ModuleDecl *,
-                                            SourceLoc,
+  ASTScopeImpl *findInnermostEnclosingScope(SourceLoc,
                                             NullablePtr<raw_ostream>);
-  ASTScopeImpl *findInnermostEnclosingScopeImpl(ModuleDecl *,
-                                                SourceLoc,
+  ASTScopeImpl *findInnermostEnclosingScopeImpl(SourceLoc,
                                                 NullablePtr<raw_ostream>,
                                                 SourceManager &,
                                                 ScopeCreator &);
 
 private:
-  NullablePtr<ASTScopeImpl> findChildContaining(ModuleDecl *,
-                                                SourceLoc loc,
+  NullablePtr<ASTScopeImpl> findChildContaining(SourceLoc loc,
                                                 SourceManager &sourceMgr) const;
 
 #pragma mark - - lookup- per scope
@@ -1855,7 +1852,6 @@ public:
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
-  NullablePtr<AbstractClosureExpr> parentClosureIfAny() const; // public??
   BraceStmt *getStmt() const override { return stmt; }
 
 protected:

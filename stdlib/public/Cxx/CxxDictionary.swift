@@ -144,6 +144,60 @@ extension CxxDictionary {
     }
   }
 
+  @inlinable
+  public func mapValues<R, E>(
+    _ transform: (Value) throws(E) -> R.Value
+  ) throws(E) -> R where R: CxxDictionary, R.Key == Key {
+    var result = R.init()
+
+    var iterator = __beginUnsafe()
+    let endIterator = __endUnsafe()
+
+    while iterator != endIterator {
+      let pair = iterator.pointee
+      try result.__insertUnsafe(R.Element(first: pair.first, second: transform(pair.second)))
+      iterator = iterator.successor()
+    }
+
+    return result
+  }
+
+  @inlinable
+  @_disfavoredOverload
+  public func mapValues<E>(
+    _ transform: (Value) throws(E) -> Value
+  ) throws(E) -> Self {
+    return try mapValues(transform) as Self
+  }
+
+  @inlinable
+  public func compactMapValues<R, E>(
+    _ transform: (Value) throws(E) -> R.Value?
+  ) throws(E) -> R where R: CxxDictionary, R.Key == Key {
+    var result = R.init()
+
+    var iterator = __beginUnsafe()
+    let endIterator = __endUnsafe()
+
+    while iterator != endIterator {
+      let pair = iterator.pointee
+      if let value = try transform(pair.second) {
+          result.__insertUnsafe(R.Element(first: pair.first, second: value))
+      }
+      iterator = iterator.successor()
+    }
+
+    return result
+  }
+
+  @inlinable
+  @_disfavoredOverload
+  public func compactMapValues<E>(
+    _ transform: (Value) throws(E) -> Value?
+  ) throws(E) -> Self {
+    return try compactMapValues(transform) as Self
+  }
+
   public func filter(_ isIncluded: (_ key: Key, _ value: Value) throws -> Bool) rethrows -> Self {
     var filteredDictionary = Self.init()
     var iterator = __beginUnsafe()

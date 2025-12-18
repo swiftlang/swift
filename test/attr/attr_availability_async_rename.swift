@@ -1,8 +1,8 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs/custom-modules
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -parse-as-library -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -parse-as-library -I %S/Inputs/custom-modules
 
 import ObjcAsync
 

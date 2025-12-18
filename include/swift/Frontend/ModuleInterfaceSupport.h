@@ -40,6 +40,9 @@ struct ModuleInterfaceOptions {
   /// with types sharing a name with a module.
   bool AliasModuleNames = false;
 
+  /// Should we emit module selectors into the module interface?
+  bool UseModuleSelectors = false;
+
   /// See \ref FrontendOptions.PrintFullConvention.
   /// [TODO: Clang-type-plumbing] This check should go away.
   bool PrintFullConvention = false;

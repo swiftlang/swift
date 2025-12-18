@@ -126,7 +126,7 @@ public var i: Int {
 
 // CHECK-LABEL: define{{.*}} void @increment_i_async(
 //                  ptr swiftasync %0
-// CHECK-SAME:      ptr{{( nocapture)?}} swiftself{{( captures\(none\))?}} dereferenceable({{8|4}}) %1
+// CHECK-SAME:      ptr swiftself captures(none) dereferenceable({{8|4}}) %1
 // CHECK-SAME:  )
 // CHECK-SAME:  {
 //      :         [[SIZE_32:%[^,]+]] = load i32

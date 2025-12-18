@@ -158,7 +158,7 @@ only(%wrapper : $Wrapper):
 // potentially trivial because specializing the function will not result in a
 // thunk.
 //
-// CHECK-LABEL: sil shared [signature_optimized_thunk] [always_inline] @take_wrapper_shared : $@convention(thin) (Wrapper) -> () {
+// CHECK-LABEL: sil shared [signature_optimized_thunk] [heuristic_always_inline] @take_wrapper_shared : $@convention(thin) (Wrapper) -> () {
 // CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s19take_wrapper_sharedTf4x_n
 // CHECK: [[KLASS:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.klass
@@ -236,7 +236,7 @@ only(%wrapper : $Wrapper):
 // dead leaves of the relevant sort, that being potentially trivial because
 // specializing the function will not result in a thunk.
 //
-// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_wrapper_private : $@convention(thin) (Wrapper) -> () {
+// CHECK-LABEL: sil private [signature_optimized_thunk] [heuristic_always_inline] @take_wrapper_private : $@convention(thin) (Wrapper) -> () {
 // CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s20take_wrapper_privateTf4x_n
 // CHECK: [[KLASS:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.klass
@@ -282,7 +282,7 @@ only(%wrapper : $Wrapper):
 // changes there would be needless ARC traffic around the klass field.  So, 
 // argument explosion *should* result in a specialization in this case.
 //
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @take_wrapper_for_int : $@convention(thin) (Wrapper) -> () {
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] @take_wrapper_for_int : $@convention(thin) (Wrapper) -> () {
 // CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s20take_wrapper_for_intTf4x_n
 // CHECK: [[INT:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.int
@@ -320,7 +320,7 @@ only(%wrapper : $Wrapper):
 // changes there would be needless ARC traffic around the klass field.  So, 
 // argument explosion *should* result in a specialization in this case.
 //
-// CHECK-LABEL: sil public_external [signature_optimized_thunk] [always_inline] @take_wrapper_for_int_public_external : $@convention(thin) (Wrapper) -> () {
+// CHECK-LABEL: sil public_external [signature_optimized_thunk] [heuristic_always_inline] @take_wrapper_for_int_public_external : $@convention(thin) (Wrapper) -> () {
 // CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s36take_wrapper_for_int_public_externalTf4x_n
 // CHECK: [[INT:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.int
@@ -357,7 +357,7 @@ only(%wrapper : $Wrapper):
 // Wrapper from which it only uses the int field.  The klass field goes unused.
 // Without changes there would be needless ARC traffic around the klass field.
 // So, argument explosion *should* result in a specialization in this case.
-// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @take_wrapper_for_int_hidden
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [heuristic_always_inline] @take_wrapper_for_int_hidden
 // CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s27take_wrapper_for_int_hiddenTf4x_n : $@convention(thin) (Int) -> ()
 // CHECK: [[INT:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.int
@@ -394,7 +394,7 @@ only(%wrapper : $Wrapper):
 // Wrapper from which it only uses the int field.  The klass field goes unused.
 // Without changes there would be needless ARC traffic around the klass field.
 // So, argument explosion *should* result in a specialization in this case.
-// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_wrapper_for_int_private
+// CHECK-LABEL: sil private [signature_optimized_thunk] [heuristic_always_inline] @take_wrapper_for_int_private
 // CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s28take_wrapper_for_int_privateTf4x_n : $@convention(thin) (Int) -> ()
 // CHECK: [[INT:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.int
@@ -456,7 +456,7 @@ only(%wrapper : $Wrapper):
 // specializing reduces ARC traffic on account of the fact that the stripped
 // fields are non-trivial.
 //
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @take_pair_unused : $@convention(thin) (Pair) -> ()
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] @take_pair_unused : $@convention(thin) (Pair) -> ()
 // CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s16take_pair_unusedTf4d_n
 // CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
@@ -492,7 +492,7 @@ only(%pair : $Pair):
 // specializing reduces ARC traffic on account of the fact that the stripped
 // fields are non-trivial.
 //
-// CHECK-LABEL: sil public_external [signature_optimized_thunk] [always_inline] @take_pair_unused_public_external : $@convention(thin) (Pair) -> () {
+// CHECK-LABEL: sil public_external [signature_optimized_thunk] [heuristic_always_inline] @take_pair_unused_public_external : $@convention(thin) (Pair) -> () {
 // CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s32take_pair_unused_public_externalTf4d_n
 // CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
@@ -528,7 +528,7 @@ only(%pair : $Pair):
 // specializing reduces ARC traffic on account of the fact that the stripped
 // fields are non-trivial.
 //
-// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @take_pair_unused_hidden : $@convention(thin) (Pair) -> () {
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [heuristic_always_inline] @take_pair_unused_hidden : $@convention(thin) (Pair) -> () {
 // CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s23take_pair_unused_hiddenTf4d_n
 // CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
@@ -564,7 +564,7 @@ only(%pair : $Pair):
 // specializing reduces ARC traffic on account of the fact that the stripped
 // fields are non-trivial.
 //
-// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_pair_unused_private : $@convention(thin) (Pair) -> () {
+// CHECK-LABEL: sil private [signature_optimized_thunk] [heuristic_always_inline] @take_pair_unused_private : $@convention(thin) (Pair) -> () {
 // CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s24take_pair_unused_privateTf4d_n
 // CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
@@ -608,7 +608,7 @@ only(%pair : $Pair):
 // specializing reduces ARC traffic on account of the fact that the stripped
 // field is non-trivial.
 //
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @take_pair_for_klass1 : $@convention(thin) (Pair) -> () {
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] @take_pair_for_klass1 : $@convention(thin) (Pair) -> () {
 // CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s20take_pair_for_klass1Tf4x_n
 // CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
@@ -647,7 +647,7 @@ only(%pair : $Pair):
 // specializing reduces ARC traffic on account of the fact that the stripped
 // field is non-trivial.
 //
-// CHECK-LABEL: sil public_external [signature_optimized_thunk] [always_inline] @take_pair_for_klass1_public_external : $@convention(thin) (Pair) -> () {
+// CHECK-LABEL: sil public_external [signature_optimized_thunk] [heuristic_always_inline] @take_pair_for_klass1_public_external : $@convention(thin) (Pair) -> () {
 // CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s36take_pair_for_klass1_public_externalTf4x_n
 // CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
@@ -688,7 +688,7 @@ only(%pair : $Pair):
 // avoiding passing the full Pair with its unused field klass2 avoids extraneous
 // ARC traffic around that field (i.e. #Pair.klass2).
 //
-// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @take_pair_for_klass1_hidden : $@convention(thin) (Pair) -> () {
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [heuristic_always_inline] @take_pair_for_klass1_hidden : $@convention(thin) (Pair) -> () {
 // CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s27take_pair_for_klass1_hiddenTf4x_n
 // CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
@@ -729,7 +729,7 @@ only(%pair : $Pair):
 // (2) avoiding passing the full Pair with its unused field klass2 avoids
 // extraneous ARC traffic around that field (i.e. #Pair.klass2).
 //
-// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_pair_for_klass1_private : $@convention(thin) (Pair) -> () {
+// CHECK-LABEL: sil private [signature_optimized_thunk] [heuristic_always_inline] @take_pair_for_klass1_private : $@convention(thin) (Pair) -> () {
 // CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s28take_pair_for_klass1_privateTf4x_n
 // CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
@@ -776,7 +776,7 @@ only(%pair : $Pair):
 // specializing reduces ARC traffic on account of the fact that the stripped
 // field is non-trivial.
 //
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @take_pair_for_klass2 : $@convention(thin) (Pair) -> () {
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] @take_pair_for_klass2 : $@convention(thin) (Pair) -> () {
 // CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s20take_pair_for_klass2Tf4x_n
 // CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
@@ -815,7 +815,7 @@ only(%pair : $Pair):
 // specializing reduces ARC traffic on account of the fact that the stripped
 // field is non-trivial.
 //
-// CHECK-LABEL: sil public_external [signature_optimized_thunk] [always_inline] @take_pair_for_klass2_public_external : $@convention(thin) (Pair) -> () {
+// CHECK-LABEL: sil public_external [signature_optimized_thunk] [heuristic_always_inline] @take_pair_for_klass2_public_external : $@convention(thin) (Pair) -> () {
 // CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s36take_pair_for_klass2_public_externalTf4x_n
 // CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
@@ -856,7 +856,7 @@ only(%pair : $Pair):
 // avoiding passing the full Pair with its unused field klass1 avoids extraneous
 // ARC traffic around that field (i.e. #Pair.klass1).
 //
-// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @take_pair_for_klass2_hidden : $@convention(thin) (Pair) -> () {
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [heuristic_always_inline] @take_pair_for_klass2_hidden : $@convention(thin) (Pair) -> () {
 // CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s27take_pair_for_klass2_hiddenTf4x_n
 // CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
@@ -897,7 +897,7 @@ only(%pair : $Pair):
 // (2) avoiding passing the full Pair with its unused field klass1 avoids
 // extraneous ARC traffic around that field (i.e. #Pair.klass1).
 //
-// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_pair_for_klass2_private : $@convention(thin) (Pair) -> () {
+// CHECK-LABEL: sil private [signature_optimized_thunk] [heuristic_always_inline] @take_pair_for_klass2_private : $@convention(thin) (Pair) -> () {
 // CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s28take_pair_for_klass2_privateTf4x_n
 // CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
@@ -1122,7 +1122,7 @@ only(%pair : $Pair):
 // result in specialization because there are only three (the heuristic for max
 // explosion size) live nodes in the type-tree.
 //
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3 : $@convention(thin) (Quintuple) -> () {
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] @take_quintuple_for_klass1_through_3 : $@convention(thin) (Quintuple) -> () {
 // CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s35take_quintuple_for_klass1_through_3Tf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () 
 // CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
@@ -1165,7 +1165,7 @@ only(%quintuple : $Quintuple):
 // result in specialization because there are only three (the heuristic for max
 // explosion size) live nodes in the type-tree.
 //
-// CHECK-LABEL: sil public_external [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_public_external : $@convention(thin) (Quintuple) -> () {
+// CHECK-LABEL: sil public_external [signature_optimized_thunk] [heuristic_always_inline] @take_quintuple_for_klass1_through_3_public_external : $@convention(thin) (Quintuple) -> () {
 // CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s51take_quintuple_for_klass1_through_3_public_externalTf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () 
 // CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
@@ -1208,7 +1208,7 @@ only(%quintuple : $Quintuple):
 // result in specialization because there are only three (the heuristic for max
 // explosion size) live nodes in the type-tree.
 //
-// CHECK-LABEL: sil shared [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_shared : $@convention(thin) (Quintuple) -> () {
+// CHECK-LABEL: sil shared [signature_optimized_thunk] [heuristic_always_inline] @take_quintuple_for_klass1_through_3_shared : $@convention(thin) (Quintuple) -> () {
 // CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s42take_quintuple_for_klass1_through_3_sharedTf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () 
 // CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
@@ -1251,7 +1251,7 @@ only(%quintuple : $Quintuple):
 // result in specialization because there are only three (the heuristic for max
 // explosion size) live nodes in the type-tree.
 //
-// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_hidden : $@convention(thin) (Quintuple) -> () {
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [heuristic_always_inline] @take_quintuple_for_klass1_through_3_hidden : $@convention(thin) (Quintuple) -> () {
 // CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s42take_quintuple_for_klass1_through_3_hiddenTf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () 
 // CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
@@ -1294,7 +1294,7 @@ only(%quintuple : $Quintuple):
 // result in specialization because there are only three (the heuristic for max
 // explosion size) live nodes in the type-tree.
 //
-// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_private : $@convention(thin) (Quintuple) -> () {
+// CHECK-LABEL: sil private [signature_optimized_thunk] [heuristic_always_inline] @take_quintuple_for_klass1_through_3_private : $@convention(thin) (Quintuple) -> () {
 // CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s43take_quintuple_for_klass1_through_3_privateTf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () 
 // CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
@@ -1432,7 +1432,7 @@ only(%quintuple : $Quintuple):
 // live than the limit imposed by the heuristic, six because the specializing
 // the function will not result in a thunk.
 //
-// CHECK-LABEL: sil shared [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_4_shared : $@convention(thin) (Quintuple) -> () {
+// CHECK-LABEL: sil shared [signature_optimized_thunk] [heuristic_always_inline] @take_quintuple_for_klass1_through_4_shared : $@convention(thin) (Quintuple) -> () {
 // CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s42take_quintuple_for_klass1_through_4_sharedTf4x_n : $@convention(thin) (Klass, Klass, Klass, Klass) -> () 
 // CHECK: [[KLASS4:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass4
@@ -1523,7 +1523,7 @@ only(%quintuple : $Quintuple):
 // live than the limit imposed by the heuristic, six because the specializing
 // the function will not result in a thunk.
 //
-// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_4_private : $@convention(thin) (Quintuple) -> () {
+// CHECK-LABEL: sil private [signature_optimized_thunk] [heuristic_always_inline] @take_quintuple_for_klass1_through_4_private : $@convention(thin) (Quintuple) -> () {
 // CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
 // CHECK: [[FUNCTION:%.*]] = function_ref @$s43take_quintuple_for_klass1_through_4_privateTf4x_n : $@convention(thin) (Klass, Klass, Klass, Klass) -> () 
 // CHECK: [[KLASS4:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass4
@@ -1579,7 +1579,7 @@ only(%quintuple : $Quintuple):
 // *should* result in specialization because there are only three live leaves in
 // the type tree after considering the owned-to-guaranteed transformation.
 //
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5 : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5 : $@convention(thin) (@owned Quintuple) -> () {
 // CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
 // CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
 // CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
@@ -1628,7 +1628,7 @@ only(%quintuple : $Quintuple):
 // *should* result in specialization because there are only three live leaves in
 // the type tree after considering the owned-to-guaranteed transformation.
 //
-// CHECK-LABEL: sil public_external [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_public_external : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK-LABEL: sil public_external [signature_optimized_thunk] [heuristic_always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_public_external : $@convention(thin) (@owned Quintuple) -> () {
 // CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
 // CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
 // CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
@@ -1678,7 +1678,7 @@ only(%quintuple : $Quintuple):
 // *should* result in specialization because there are only three live leaves
 // in the type tree after considering the owned-to-guaranteed transformation.
 //
-// CHECK-LABEL: sil shared [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_shared : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK-LABEL: sil shared [signature_optimized_thunk] [heuristic_always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_shared : $@convention(thin) (@owned Quintuple) -> () {
 // CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
 // CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
 // CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
@@ -1728,7 +1728,7 @@ only(%quintuple : $Quintuple):
 // *should* result in specialization because there are only three live leaves
 // in the type tree after considering the owned-to-guaranteed transformation.
 //
-// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_hidden : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [heuristic_always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_hidden : $@convention(thin) (@owned Quintuple) -> () {
 // CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
 // CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
 // CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
@@ -1778,7 +1778,7 @@ only(%quintuple : $Quintuple):
 // *should* result in specialization because there are only three live leaves
 // in the type tree after considering the owned-to-guaranteed transformation.
 //
-// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_private : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK-LABEL: sil private [signature_optimized_thunk] [heuristic_always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_private : $@convention(thin) (@owned Quintuple) -> () {
 // CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
 // CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
 // CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2

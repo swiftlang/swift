@@ -20,6 +20,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "clang/AST/Attr.h"
+#include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
@@ -74,6 +75,7 @@ namespace dependencies {
 namespace swift {
 enum class ResultConvention : uint8_t;
 class ASTContext;
+class CASOptions;
 class CompilerInvocation;
 class ClangImporterOptions;
 class ClangInheritanceInfo;
@@ -82,6 +84,7 @@ class ClangNode;
 class ConcreteDeclRef;
 class Decl;
 class DeclContext;
+class DiagnosticEngine;
 class EffectiveClangContext;
 class EnumDecl;
 class FuncDecl;
@@ -223,8 +226,9 @@ public:
   ///
   /// \return a pair of the Clang Driver and the diagnostic engine, which needs
   /// to be alive during the use of the Driver.
-  static std::pair<clang::driver::Driver,
-                   llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine>>
+  static std::tuple<clang::driver::Driver,
+                    llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine>,
+                    std::unique_ptr<clang::DiagnosticOptions>>
   createClangDriver(
       const LangOptions &LangOpts,
       const ClangImporterOptions &ClangImporterOpts,
@@ -487,7 +491,7 @@ public:
   bool dumpPrecompiledModule(StringRef modulePath, StringRef outputPath);
 
   bool runPreprocessor(StringRef inputPath, StringRef outputPath);
-  const clang::Module *getClangOwningModule(ClangNode Node) const;
+  const clang::Module *getClangOwningModule(ClangNode Node) const override;
   bool hasTypedef(const clang::Decl *typeDecl) const;
 
   void verifyAllModules() override;
@@ -616,6 +620,15 @@ public:
 
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
 
+  bool needsClosureConstructor(
+      const clang::CXXRecordDecl *recordDecl) const override;
+
+  bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const override;
+  bool isDeconstructedSwiftClosure(const clang::Type *type) const override;
+
+  const clang::FunctionType *extractCXXFunctionType(
+      const clang::CXXRecordDecl *functionalTypeDecl) const override;
+
   FuncDecl *getAvailabilityDomainPredicate(const clang::VarDecl *var) override;
 
   bool isAnnotatedWith(const clang::CXXMethodDecl *method, StringRef attr);
@@ -733,6 +746,12 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
 /// as permissive as the input C++ access.
 AccessLevel convertClangAccess(clang::AccessSpecifier access);
 
+/// Lookup and return the copy constructor of \a decl
+///
+/// Returns nullptr if \a decl doesn't have a valid copy constructor
+const clang::CXXConstructorDecl *
+findCopyConstructor(const clang::CXXRecordDecl *decl);
+
 /// Read file IDs from 'private_fileid' Swift attributes on a Clang decl.
 ///
 /// May return >1 fileID when a decl is annotated more than once, which should
@@ -832,17 +851,24 @@ std::optional<T> matchSwiftAttrConsideringInheritance(
 /// Matches a `swift_attr("...")` on the record type pointed to by the given
 /// Clang type, searching base classes if it's a C++ class.
 ///
-/// \param type A Clang pointer type.
+/// \param type A Clang pointer or reference type.
 /// \param patterns List of attribute name-value pairs to match.
 /// \returns Matched value or std::nullopt.
 template <typename T>
 std::optional<T> matchSwiftAttrOnRecordPtr(
     const clang::QualType &type,
     llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  clang::QualType pointeeType;
   if (const auto *ptrType = type->getAs<clang::PointerType>()) {
-    if (const auto *recordDecl = ptrType->getPointeeType()->getAsRecordDecl()) {
-      return matchSwiftAttrConsideringInheritance<T>(recordDecl, patterns);
-    }
+    pointeeType = ptrType->getPointeeType();
+  } else if (const auto *refType = type->getAs<clang::ReferenceType>()) {
+    pointeeType = refType->getPointeeType();
+  } else {
+    return std::nullopt;
+  }
+
+  if (const auto *recordDecl = pointeeType->getAsRecordDecl()) {
+    return matchSwiftAttrConsideringInheritance<T>(recordDecl, patterns);
   }
   return std::nullopt;
 }
@@ -868,6 +894,25 @@ struct ClangInvocationFileMapping {
   bool requiresBuiltinHeadersInSystemModules;
 };
 
+class ClangInvocationFileMappingContext {
+public:
+  const LangOptions &LangOpts;
+  SearchPathOptions &SearchPathOpts;
+  ClangImporterOptions &ClangImporterOpts;
+  const CASOptions &CASOpts;
+  DiagnosticEngine &Diags;
+
+  ClangInvocationFileMappingContext(
+    const LangOptions &LangOpts, SearchPathOptions &SearchPathOpts,
+    ClangImporterOptions &ClangImporterOpts, const CASOptions &CASOpts,
+    DiagnosticEngine &Diags)
+    : LangOpts(LangOpts), SearchPathOpts(SearchPathOpts),
+      ClangImporterOpts(ClangImporterOpts), CASOpts(CASOpts),
+      Diags(Diags) {}
+
+  ClangInvocationFileMappingContext(const swift::ASTContext &Ctx);
+};
+
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
 /// We inject modulemaps for those libraries into their include directories
 /// to allow using them from Swift.
@@ -875,7 +920,7 @@ struct ClangInvocationFileMapping {
 /// `suppressDiagnostic` prevents us from emitting warning messages when we
 /// are unable to find headers.
 ClangInvocationFileMapping getClangInvocationFileMapping(
-    const ASTContext &ctx,
+    const ClangInvocationFileMappingContext &ctx,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
     bool suppressDiagnostic = false);
 
@@ -883,7 +928,7 @@ ClangInvocationFileMapping getClangInvocationFileMapping(
 /// primarily to inject modulemaps on platforms with non-modularized
 /// platform libraries.
 ClangInvocationFileMapping applyClangInvocationMapping(
-    const ASTContext &ctx,
+    const ClangInvocationFileMappingContext &ctx,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseVFS,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &fileSystem,
     bool suppressDiagnostics = false);

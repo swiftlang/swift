@@ -9,6 +9,12 @@ if((SWIFT_BUILD_CLANG_OVERLAYS
   list(APPEND swift_stdlib_unittest_darwin_dependencies _Builtin_float)
 endif()
 
+if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
+  # This library imports Foundation from the SDK, which re-exports
+  # Observation which is part of this build.
+  list(APPEND swift_stdlib_unittest_darwin_dependencies Observation)
+endif()
+
 set(swift_stdlib_unittest_compile_flags
   "-Xfrontend" "-disable-objc-attr-requires-foundation-module")
 
