@@ -414,13 +414,24 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     }
 
     bool isClangInstanceMethod =
-        isa<clang::CXXMethodDecl>(ClangDecl) &&
-        !isa<clang::CXXConstructorDecl>(ClangDecl) &&
-        cast<clang::CXXMethodDecl>(ClangDecl)->isInstance();
-    size_t swiftNumParams = MappedDecl->getParameters()->size() -
-                            (ClangDecl->isVariadic() ? 1 : 0);
-    ASSERT((MappedDecl->isImportAsInstanceMember() == isClangInstanceMethod) ==
-           (getNumParams(ClangDecl) == swiftNumParams));
+        (isa<clang::CXXMethodDecl>(ClangDecl) &&
+         !isa<clang::CXXConstructorDecl>(ClangDecl) &&
+         cast<clang::CXXMethodDecl>(ClangDecl)->isInstance()) ||
+        (isa<clang::ObjCMethodDecl>(ClangDecl) &&
+         cast<clang::ObjCMethodDecl>(ClangDecl)->isInstanceMethod());
+
+    size_t swiftNumParams = MappedDecl->getParameters()->size();
+    if (MappedDecl->isInstanceMember() && !isClangInstanceMethod) {
+      ASSERT(MappedDecl->isImportAsInstanceMember());
+      swiftNumParams += 1;
+    }
+    if (getNumParams(ClangDecl) != swiftNumParams) {
+      DLOG("mismatching parameter lists");
+      assert(ClangDecl->isVariadic() ||
+             MappedDecl->getForeignErrorConvention().has_value() ||
+             MappedDecl->getForeignAsyncConvention().has_value());
+      return false;
+    }
 
     size_t selfParamIndex = MappedDecl->isImportAsInstanceMember()
                                 ? MappedDecl->getSelfIndex()
@@ -531,6 +542,9 @@ private:
   void printMethodSignature(const FuncDecl *Method) {
     auto options =
         PrintOptions::printForDiagnostics(AccessLevel::Private, true);
+    for (const auto *attr : Method->getAttrs()) {
+      options.ExcludeAttrList.push_back(attr->getKind());
+    }
     StreamPrinter printer(out);
     Method->print(printer, options);
   }
