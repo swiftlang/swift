@@ -28,9 +28,7 @@ import SubE
 // CHECK-REMARK-SAVE: remark: Incremental module scan: Serializing module scanning dependency cache to:
 
 // CHECK-REMARK-LOAD: remark: Incremental module scan: Re-using serialized module scanning dependency cache from:
-// FIXME: Today, we do not serialize dependencies of the main source module which results in a lookup for 'C' even though
-// it is fully redundant.
-// CHECK-REMARK-LOAD: remark: Number of named Clang module queries: '1'
+// CHECK-REMARK-LOAD: remark: Number of named Clang module queries: '0'
 // CHECK-REMARK-LOAD: remark: Number of recorded Clang module dependencies queried by-name from a Swift client: '0'
 // CHECK-REMARK-LOAD: remark: Number of recorded Swift module dependencies: '8'
 // CHECK-REMARK-LOAD: remark: Number of recorded Clang module dependencies: '7'
