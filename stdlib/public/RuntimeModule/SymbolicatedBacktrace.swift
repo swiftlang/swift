@@ -273,7 +273,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   }
 
   /// Construct a SymbolicatedBacktrace from a backtrace and a list of images.
-  private init(backtrace: Backtrace, images: ImageMap, frames: [Frame]) {
+  init(backtrace: Backtrace, images: ImageMap, frames: [Frame]) {
     self.backtrace = backtrace
     self.images = images
     self.frames = frames
