@@ -2233,6 +2233,12 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
+    SWIFT_ENABLE_RUNTIME_MODULE = "YES";
+    SWIFT_ENABLE_BACKTRACING = $(if ($Platform.OS -ne [OS]::Windows -or $Platform.Architecture.ShortName -ne "x86") {
+        "YES"
+      } else {
+        "NO"
+      });
     SWIFT_ENABLE_SYNCHRONIZATION = "YES";
     SWIFT_ENABLE_VOLATILE = "YES";
     SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
@@ -2274,7 +2280,17 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     if ($TestLLVM) { $Targets += @("check-llvm") }
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
-    if ($TestSwift) { $Targets += @("check-swift", "SwiftCompilerPlugin") }
+    if ($TestSwift) {
+      $Targets += @("check-swift", "SwiftCompilerPlugin")
+
+      # Copy the backtracer into position 
+      $RuntimeBinaryCache = Get-ProjectBinaryCache $BuildPlatform Runtime
+      $CompilerCache = Get-ProjectBinaryCache $BuildPlatform Compilers
+      Copy-Item `
+        -Path $RuntimeBinaryCache\libexec `
+        -Destination $CompilerCache `
+        -Recurse -Force
+    }
     if ($TestLLDB) { $Targets += @("check-lldb") }
     if ($TestLLDBSwift) { $Targets += @("check-lldb-swift") }
     if ($TestLLDB -or $TestLLDBSwift) {
@@ -2687,14 +2703,6 @@ function Build-Runtime([Hashtable] $Platform) {
     }
   }
 
-  # Only enable backtracing for platforms other than 32-bit Windows;
-  # right now, the Swift compiler doesn't properly support stdcall.
-  if ($Platform.OS -ne [OS]::Windows -or $Platform.Architecture.ShortName -ne "x86") {
-    $PlatformDefines += @{
-      SWIFT_ENABLE_BACKTRACING = "YES";
-    }
-  }
-
   Build-CMakeProject `
     -Src $SourceCache\swift `
     -Bin (Get-ProjectBinaryCache $Platform Runtime) `
@@ -2713,6 +2721,11 @@ function Build-Runtime([Hashtable] $Platform) {
       SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
       SWIFT_ENABLE_SYNCHRONIZATION = "YES";
       SWIFT_ENABLE_RUNTIME_MODULE = "YES";
+      SWIFT_ENABLE_BACKTRACING = $(if ($Platform.OS -ne [OS]::Windows -or $Platform.Architecture.ShortName -ne "x86") {
+          "YES"
+        } else {
+          "NO"
+        });
       SWIFT_BUILD_LIBEXEC = "YES";
       SWIFT_ENABLE_VOLATILE = "YES";
       SWIFT_NATIVE_SWIFT_TOOLS_PATH = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin"));
@@ -2721,6 +2734,9 @@ function Build-Runtime([Hashtable] $Platform) {
     })
 }
 
+# Note: This is only used by Android; if you're looking for tests on the Swift
+#       compiler/runtime otherwise, Test-Compilers is the place you need to be
+#       looking.
 function Test-Runtime([Hashtable] $Platform) {
   if ($IsCrossCompiling) {
     throw "Swift runtime tests are not supported when cross-compiling"
@@ -2742,14 +2758,6 @@ function Test-Runtime([Hashtable] $Platform) {
     }
   }
 
-  # Only enable backtracing for platforms other than 32-bit Windows;
-  # right now, the Swift compiler doesn't properly support stdcall.
-  if ($Platform.OS -ne [OS]::Windows -or $Platform.Architecture.ShortName -ne "x86") {
-    $PlatformDefines += @{
-      SWIFT_ENABLE_BACKTRACING = "YES";
-    }
-  }
-
   Invoke-IsolatingEnvVars {
     # Filter known issues when testing on Windows
     Load-LitTestOverrides $PSScriptRoot/windows-swift-android-lit-test-overrides.txt
@@ -2761,13 +2769,14 @@ function Test-Runtime([Hashtable] $Platform) {
       -UseBuiltCompilers C,CXX,Swift `
       -SwiftSDK $null `
       -BuildTargets check-swift-validation-only_non_executable `
-      -Defines ($PlatformDefines + @{
+      -Defines @{
         SWIFT_INCLUDE_TESTS = "YES";
         SWIFT_INCLUDE_TEST_BINARIES = "YES";
         SWIFT_BUILD_TEST_SUPPORT_MODULES = "YES";
         SWIFT_NATIVE_LLVM_TOOLS_PATH = Join-Path -Path $CompilersBinaryCache -ChildPath "bin";
+        SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
         LLVM_LIT_ARGS = "-vv";
-      })
+      }
   }
 }
 

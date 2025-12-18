@@ -47,6 +47,7 @@ public struct Win32Unwinder<C: Win32Context, M: MemoryReader>
   var machineType: UInt32
   var stackFrame: STACKFRAME64
 
+  var first: Bool
   var done: Bool
 
   var images: ImageMap
@@ -58,6 +59,7 @@ public struct Win32Unwinder<C: Win32Context, M: MemoryReader>
     ntContext: UnsafeMutableRawPointer,
     images: ImageMap,
     memoryReader: MemoryReader) {
+    self.first = true
     self.done = false
     self.images = images
     self.context = context
@@ -175,11 +177,19 @@ public struct Win32Unwinder<C: Win32Context, M: MemoryReader>
       return nil
     }
 
+    if first {
+      first = false
+      #if DEBUG_WIN32_UNWINDER
+      print("Initial PC returned \(hex(Address(stackFrame.AddrPC.Offset)))")
+      #endif
+      return .programCounter(Address(stackFrame.AddrPC.Offset))
+    }
+
     #if DEBUG_WIN32_UNWINDER
     print("StackWalk64 returned \(hex(Address(stackFrame.AddrPC.Offset)))")
     #endif
 
-    return .programCounter(Address(stackFrame.AddrPC.Offset))
+    return .returnAddress(Address(stackFrame.AddrPC.Offset))
   }
 }
 

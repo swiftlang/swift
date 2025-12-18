@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -Xfrontend -parse-as-library -Xfrontend -disable-availability-checking -Onone -o %t/SimpleBacktrace
-// RUN: %target-codesign %t/SimpleBacktrace
-// RUN: %target-run %t/SimpleBacktrace | %FileCheck %s
+// RUN: %target-build-swift %s -Xfrontend -parse-as-library -Xfrontend -disable-availability-checking -Onone -o %t/SimpleBacktrace.exe
+// RUN: %target-codesign %t/SimpleBacktrace.exe
+// RUN: %target-run %t/SimpleBacktrace.exe | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: backtracing

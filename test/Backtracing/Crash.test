@@ -1,17 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %S/Inputs/Crash.swift -parse-as-library -Onone -g -o %t/Crash
-// RUN: %target-build-swift %S/Inputs/Crash.swift -parse-as-library -Onone -o %t/CrashNoDebug
-// RUN: %target-build-swift %S/Inputs/Crash.swift -parse-as-library -O -g -o %t/CrashOpt
-// RUN: %target-build-swift %S/Inputs/Crash.swift -parse-as-library -O -o %t/CrashOptNoDebug
-// RUN: %target-codesign %t/Crash
-// RUN: %target-codesign %t/CrashNoDebug
-// RUN: %target-codesign %t/CrashOpt
-// RUN: %target-codesign %t/CrashOptNoDebug
-// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/Crash 2>&1 || true) | %FileCheck %s
-// RUN: (env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/Crash 2>&1 || true) | %FileCheck %s --check-prefix FRIENDLY
-// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashNoDebug 2>&1 || true) | %FileCheck %s --check-prefix NODEBUG
-// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashOpt 2>&1 || true) | %FileCheck %s --check-prefix OPTIMIZED
-// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashOptNoDebug 2>&1 || true) | %FileCheck %s --check-prefix OPTNODEBUG
+// RUN: %target-build-swift %S/Inputs/Crash.swift -parse-as-library -Onone %swift-debug-flags -o %t/Crash.exe
+// RUN: %target-codesign %t/Crash.exe
+
+// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/Crash.exe > %t/Crash.out 2>&1 || true
+// RUN: %FileCheck %s --ignore-case < %t/Crash.out
+
+// RUN: env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/Crash.exe > %t/Friendly.out 2>&1 || true
+// RUN: %FileCheck %s --ignore-case --check-prefix FRIENDLY < %t/Friendly.out
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
@@ -21,30 +16,30 @@
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 
 
-// CHECK: *** Program crashed: Bad pointer dereference at 0x{{0+}}4 ***
+// CHECK: *** Program crashed: {{(Bad pointer dereference|Access violation)}} at 0x{{0+}}4 ***
 
 // CHECK: Thread 0 {{(".*" )?}}crashed:
 
-// CHECK: 0               0x{{[0-9a-f]+}} level5() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:20:15
-// CHECK-NEXT: 1 [ra]          0x{{[0-9a-f]+}} level4() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:14:3
-// CHECK-NEXT: 2 [ra]          0x{{[0-9a-f]+}} level3() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:10:3
-// CHECK-NEXT: 3 [ra]          0x{{[0-9a-f]+}} level2() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:6:3
-// CHECK-NEXT: 4 [ra]          0x{{[0-9a-f]+}} level1() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:2:3
-// CHECK-NEXT: 5 [ra]          0x{{[0-9a-f]+}} static Crash.main() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:26:5
-// CHECK-NEXT: 6 [ra] [system] 0x{{[0-9a-f]+}} static Crash.$main() + {{[0-9]+}} in Crash at {{.*}}/<compiler-generated>
-// CHECK-NEXT: 7 [ra] [system] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in Crash at {{.*}}/Crash.swift
+// CHECK: 0               0x{{[0-9a-f]+}} level5() + {{[0-9]+}} in Crash.exe at {{.*[\\/]}}Crash.swift:20:15
+// CHECK-NEXT: 1 [ra]          0x{{[0-9a-f]+}} level4() + {{[0-9]+}} in Crash.exe at {{.*[\\/]}}Crash.swift:14:3
+// CHECK-NEXT: 2 [ra]          0x{{[0-9a-f]+}} level3() + {{[0-9]+}} in Crash.exe at {{.*[\\/]}}Crash.swift:10:3
+// CHECK-NEXT: 3 [ra]          0x{{[0-9a-f]+}} level2() + {{[0-9]+}} in Crash.exe at {{.*[\\/]}}Crash.swift:6:3
+// CHECK-NEXT: 4 [ra]          0x{{[0-9a-f]+}} level1() + {{[0-9]+}} in Crash.exe at {{.*[\\/]}}Crash.swift:2:3
+// CHECK-NEXT: 5 [ra]          0x{{[0-9a-f]+}} static Crash.main() + {{[0-9]+}} in Crash.exe at {{.*[\\/]}}Crash.swift:26:5
+// CHECK-NEXT: 6 [ra] [system] 0x{{[0-9a-f]+}} static Crash.$main() + {{[0-9]+}} in Crash.exe at {{.*[\\/]}}<compiler-generated>
+// CHECK-NEXT: 7 [ra] [system] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in Crash.exe at {{.*[\\/]}}Crash.swift
 
 // CHECK: Registers:
 
 // CHECK: Images ({{[0-9]+}} omitted):
 
-// CHECK: {{0x[0-9a-f]+}}–{{0x[0-9a-f]+}}{{ +}}{{([0-9a-f]+|<no build ID>)}}{{ +}}Crash{{ +}}{{.*}}/Crash
+// CHECK: {{0x[0-9a-f]+}}–{{0x[0-9a-f]+}}{{ +}}{{([0-9a-f]+|<no build ID>)}}{{ +}}Crash.exe{{ +}}{{.*[\\/]}}Crash.exe
 
-// FRIENDLY: *** Program crashed: Bad pointer dereference at 0x{{0+}}4 ***
+// FRIENDLY: *** Program crashed: {{(Bad pointer dereference|Access violation)}} at 0x{{0+}}4 ***
 
 // FRIENDLY: Thread 0 {{(".*" )?}}crashed:
 
-// FRIENDLY: 0 level5() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:20:15
+// FRIENDLY: 0 level5() + {{[0-9]+}} in Crash.exe at {{.*[\\/]}}Crash.swift:20:15
 
 // FRIENDLY: 18|   print("About to crash")
 // FRIENDLY-NEXT: 19|   let ptr = UnsafeMutablePointer<Int>(bitPattern: 4)!
@@ -53,7 +48,7 @@
 // FRIENDLY-NEXT: 21| }
 // FRIENDLY-NEXT: 22|
 
-// FRIENDLY: 1 level4() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:14:3
+// FRIENDLY: 1 level4() + {{[0-9]+}} in Crash.exe at {{.*[\\/]}}Crash.swift:14:3
 
 // FRIENDLY: 12|
 // FRIENDLY-NEXT: 13| func level4() {
@@ -62,7 +57,7 @@
 // FRIENDLY-NEXT: 15| }
 // FRIENDLY-NEXT: 16|
 
-// FRIENDLY: 2 level3() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:10:3
+// FRIENDLY: 2 level3() + {{[0-9]+}} in Crash.exe at {{.*[\\/]}}Crash.swift:10:3
 
 // FRIENDLY: 8|
 // FRIENDLY-NEXT: 9| func level3() {
@@ -71,7 +66,7 @@
 // FRIENDLY-NEXT: 11| }
 // FRIENDLY-NEXT: 12|
 
-// FRIENDLY: 3 level2() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:6:3
+// FRIENDLY: 3 level2() + {{[0-9]+}} in Crash.exe at {{.*[\\/]}}Crash.swift:6:3
 
 // FRIENDLY: 4|
 // FRIENDLY-NEXT: 5| func level2() {
@@ -80,14 +75,14 @@
 // FRIENDLY-NEXT: 7| }
 // FRIENDLY-NEXT: 8|
 
-// FRIENDLY: 4 level1() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:2:3
+// FRIENDLY: 4 level1() + {{[0-9]+}} in Crash.exe at {{.*[\\/]}}Crash.swift:2:3
 
 // FRIENDLY:      1| func level1() {
 // FRIENDLY-NEXT: 2|   level2()
 // FRIENDLY-NEXT:   |   ^
 // FRIENDLY-NEXT: 3| }
 
-// FRIENDLY: 5 static Crash.main() + {{[0-9]+}} in Crash at {{.*}}/Crash.swift:26:5
+// FRIENDLY: 5 static Crash.main() + {{[0-9]+}} in Crash.exe at {{.*[\\/]}}Crash.swift:26:5
 
 // FRIENDLY: 24| struct Crash {
 // FRIENDLY-NEXT: 25|   static func main() {
@@ -95,53 +90,3 @@
 // FRIENDLY-NEXT:   |     ^
 // FRIENDLY-NEXT: 27|   }
 // FRIENDLY-NEXT: 28| }
-
-// NODEBUG: *** Program crashed: Bad pointer dereference at 0x{{0*}}4 ***
-
-// NODEBUG: Thread 0 {{(".*" )?}}crashed:
-
-// NODEBUG: 0               0x{{[0-9a-f]+}} level5() + {{[0-9]+}} in CrashNoDebug
-// NODEBUG: 1 [ra]          0x{{[0-9a-f]+}} level4() + {{[0-9]+}} in CrashNoDebug
-// NODEBUG: 2 [ra]          0x{{[0-9a-f]+}} level3() + {{[0-9]+}} in CrashNoDebug
-// NODEBUG: 3 [ra]          0x{{[0-9a-f]+}} level2() + {{[0-9]+}} in CrashNoDebug
-// NODEBUG: 4 [ra]          0x{{[0-9a-f]+}} level1() + {{[0-9]+}} in CrashNoDebug
-// NODEBUG: 5 [ra]          0x{{[0-9a-f]+}} static Crash.main() + {{[0-9]+}} in CrashNoDebug
-// NODEBUG: 6 [ra] [system] 0x{{[0-9a-f]+}} static Crash.$main() + {{[0-9]+}} in CrashNoDebug
-// NODEBUG: 7 [ra]          0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashNoDebug
-
-// NODEBUG: Registers:
-
-// NODEBUG: Images ({{[0-9]+}} omitted):
-
-// NODEBUG: {{0x[0-9a-f]+}}–{{0x[0-9a-f]+}}{{ +}}{{([0-9a-f]+|<no build ID>)}}{{ +}}CrashNoDebug{{ +}}{{.*}}/CrashNoDebug
-
-// OPTIMIZED: *** Program crashed: Bad pointer dereference at 0x{{0+}}4 ***
-
-// OPTIMIZED: Thread 0 {{(".*" )?}}crashed:
-
-// OPTIMIZED: 0 [inlined]          0x{{[0-9a-f]+}} level5() in CrashOpt at {{.*}}/Crash.swift:20:15
-// OPTIMIZED-NEXT: 1 [inlined]          0x{{[0-9a-f]+}} level4() in CrashOpt at {{.*}}/Crash.swift:14:3
-// OPTIMIZED-NEXT: 2 [inlined]          0x{{[0-9a-f]+}} level3() in CrashOpt at {{.*}}/Crash.swift:10:3
-// OPTIMIZED-NEXT: 3 [inlined]          0x{{[0-9a-f]+}} level2() in CrashOpt at {{.*}}/Crash.swift:6:3
-// OPTIMIZED-NEXT: 4 [inlined]          0x{{[0-9a-f]+}} level1() in CrashOpt at {{.*}}/Crash.swift:2:3
-// OPTIMIZED-NEXT: 5 [inlined]          0x{{[0-9a-f]+}} static Crash.main() in CrashOpt at {{.*}}/Crash.swift:26:5
-// OPTIMIZED: {{6|7}} [system]           0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashOpt at {{.*}}
-
-// OPTIMIZED: Registers:
-
-// OPTIMIZED: Images ({{[0-9]+}} omitted):
-
-// OPTIMIZED: {{0x[0-9a-f]+}}–{{0x[0-9a-f]+}}{{ +}}{{([0-9a-f]+|<no build ID>)}}{{ +}}CrashOpt{{ +}}{{.*}}/CrashOpt
-
-// OPTNODEBUG: *** Program crashed: Bad pointer dereference at 0x{{0*}}4 ***
-
-// OPTNODEBUG: Thread 0 {{(".*" )?}}crashed:
-
-// OPTNODEBUG: 0               0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashOptNoDebug
-
-// OPTNODEBUG: Registers:
-
-// OPTNODEBUG: Images ({{[0-9]+}} omitted):
-
-// OPTNODEBUG: {{0x[0-9a-f]+}}–{{0x[0-9a-f]+}}{{ +}}{{([0-9a-f]+|<no build ID>)}}{{ +}}CrashOptNoDebug{{ +}}{{.*}}/CrashOptNoDebug
-

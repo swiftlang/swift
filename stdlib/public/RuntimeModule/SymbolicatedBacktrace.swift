@@ -560,6 +560,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
       let address = frame.adjustedProgramCounter
       if let imageNdx = theImages.indexOfImage(at: address) {
         let name = theImages[imageNdx].name ?? "<unknown>"
+
         var symbol: Symbol = Symbol(imageIndex: imageNdx,
                                     imageName: name,
                                     rawName: "<unknown>",

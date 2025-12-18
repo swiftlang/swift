@@ -30,9 +30,14 @@ SRWLOCK crashLock = SRWLOCK_INIT;
 
 CrashInfo crashInfo;
 
+void *altStackTop;
+
 void *pcFromContext(PCONTEXT Context);
 LONG NTAPI handleException(EXCEPTION_POINTERS *ExceptionInfo);
 LONG NTAPI reinstallUnhandledExceptionFilter(EXCEPTION_POINTERS *ExceptionInfo);
+LONG callWithAltStack(EXCEPTION_POINTERS *arg,
+                      LONG (*fn)(EXCEPTION_POINTERS *));
+LONG reallyHandleException(EXCEPTION_POINTERS *ExceptionInfo);
 
 }
 
@@ -43,6 +48,13 @@ namespace backtrace {
 SWIFT_RUNTIME_STDLIB_INTERNAL ErrorCode
 _swift_installCrashHandler()
 {
+  // Allocate an alternate stack to use when handling exceptions
+  const size_t altStackSize = 65536;
+  void *altStackBase = VirtualAlloc(NULL, altStackSize,
+                                    MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+  altStackTop = (char *)altStackBase + altStackSize;
+
+  // Install the exception handler
   AddVectoredExceptionHandler(0, reinstallUnhandledExceptionFilter);
   SetUnhandledExceptionFilter(handleException);
 
@@ -72,18 +84,84 @@ LONG reinstallUnhandledExceptionFilter(EXCEPTION_POINTERS *ExceptionInfo) {
   return EXCEPTION_CONTINUE_SEARCH;
 }
 
+// Call a function, passing an argument, but using the alternate stack
+LONG callWithAltStack(EXCEPTION_POINTERS *arg,
+                      LONG (*fn)(EXCEPTION_POINTERS *)) {
+#if defined(__x86_64__)
+  register LONG result __asm__("rax");
+
+  asm volatile (
+    "    xchg  %%rsp, %3;      \
+         subq  $16, %%rsp;     \
+         movq  %3, (%%rsp);    \
+         callq *%2;            \
+         movq  (%%rsp), %%rsp; \
+    "
+    : "=a" (result)
+    : "c" (arg), "d" (fn), "r" (altStackTop)
+    : "memory"
+  );
+
+  return result;
+#elif defined(__arm64__)
+  register LONG result __asm__("x0");
+  register LONG (*fn_reg)(EXCEPTION_POINTERS *) __asm__("x1");
+
+  asm volatile (
+    "    str sp, [%3, -16]!; \
+         mov sp, %3;         \
+         jsr %2;             \
+         ldr sp, [sp];       \
+    "
+    : "=r" (result)
+    : "0" (arg), "r" (fn_reg), "r" (altStackTop)
+    : "memory"
+  );
+
+  return result;
+#else
+#warning You should fill this out with code for your architecture
+  // Don't actually switch stack
+  return fn(arg);
+#endif
+}
+
 LONG handleException(EXCEPTION_POINTERS *ExceptionInfo) {
+  LONG result;
+
+  AcquireSRWLockExclusive(&crashLock);
+  result = callWithAltStack(ExceptionInfo, reallyHandleException);
+  ReleaseSRWLockExclusive(&crashLock);
+
+  if (pOldFilter)
+    return pOldFilter(ExceptionInfo);
+
+  return result;
+}
+
+LONG reallyHandleException(EXCEPTION_POINTERS *ExceptionInfo) {
   HANDLE hOutput;
   if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
     hOutput = GetStdHandle(STD_ERROR_HANDLE);
   else
     hOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 
-  AcquireSRWLockExclusive(&crashLock);
-
   crashInfo.crashing_thread = GetCurrentThreadId();
   crashInfo.signal = ExceptionInfo->ExceptionRecord->ExceptionCode;
-  crashInfo.fault_address = (uint64_t)(ExceptionInfo->ExceptionRecord->ExceptionAddress);
+
+  // For access violations or in-page-errors, the fault address is the
+  // address of the inaccessible data; for others, it's the instruction
+  // address.  We do this to match the behaviour on other platforms.
+  switch (ExceptionInfo->ExceptionRecord->ExceptionCode) {
+  case EXCEPTION_ACCESS_VIOLATION:
+  case EXCEPTION_IN_PAGE_ERROR:
+    crashInfo.fault_address = ExceptionInfo->ExceptionRecord->ExceptionInformation[1];
+    break;
+  default:
+    crashInfo.fault_address = (uint64_t)(ExceptionInfo->ExceptionRecord->ExceptionAddress);
+    break;
+  }
+
   crashInfo.exception_info = (uint64_t)ExceptionInfo;
 
   _swift_displayCrashMessage(ExceptionInfo->ExceptionRecord->ExceptionCode,
@@ -97,11 +175,6 @@ LONG handleException(EXCEPTION_POINTERS *ExceptionInfo) {
       ? " failed\n\n" : " failed ***\n\n";
     WriteFile(hOutput, message, strlen(message), NULL, NULL);
   }
-
-  ReleaseSRWLockExclusive(&crashLock);
-
-  if (pOldFilter)
-    return pOldFilter(ExceptionInfo);
 
   return EXCEPTION_EXECUTE_HANDLER;
 }
