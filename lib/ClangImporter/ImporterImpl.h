@@ -624,6 +624,11 @@ public:
   void getMangledName(clang::MangleContext *mangler,
                       const clang::NamedDecl *clangDecl, raw_ostream &os);
 
+  /// Writes the Itanium mangled name (even on platforms that do not use Itanium
+  /// mangling, such as Windows) of \p clangDecl to \p os.
+  void getItaniumMangledName(const clang::NamedDecl *clangDecl,
+                             raw_ostream &os);
+
 private:
   /// The Importer may be configured to load modules of a different OS Version
   /// than the underlying Swift compilation. This is the `TargetOptions`
