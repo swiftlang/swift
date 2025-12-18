@@ -4332,6 +4332,17 @@ protected:
     assignment.markForDeletion(bc);
   }
 
+  void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *bc) {
+    auto addr = assignment.getAddressForValue(bc->getOperand());
+    auto builder = assignment.getBuilder(bc->getIterator());
+    auto loaded = builder.createLoad(bc->getLoc(), addr,
+                                     LoadOwnershipQualifier::Unqualified);
+    auto newVal = builder.createUncheckedBitwiseCast(bc->getLoc(), loaded,
+                                                     bc->getType());
+    bc->replaceAllUsesWith(newVal);
+    assignment.markForDeletion(bc);
+  }
+
   void visitEnumInst(EnumInst *e) {
     assert(!assignment.isLargeLoadableType(e->getType()));
     auto opd = e->getOperand();
