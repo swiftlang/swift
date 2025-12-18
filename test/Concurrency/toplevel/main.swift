@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
 
-// RUN: %target-swift-frontend -typecheck -verify %t/main.swift %t/foo.swift -enable-experimental-async-top-level -swift-version 6 -verify-additional-prefix swift6-
-// RUN: %target-swift-frontend -typecheck -verify %t/main.swift %t/foo.swift -enable-experimental-async-top-level -swift-version 5 -verify-additional-prefix swift5-
+// RUN: %target-swift-frontend -typecheck -verify %t/main.swift %t/foo.swift -swift-version 6 -verify-additional-prefix swift6-
+// RUN: %target-swift-frontend -typecheck -verify %t/main.swift %t/foo.swift -swift-version 5 -verify-additional-prefix swift5-
 
 //--- foo.swift
 func foo() -> Int {
