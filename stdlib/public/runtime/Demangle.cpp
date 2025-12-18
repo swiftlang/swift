@@ -1053,7 +1053,7 @@ namespace swift {
                             size_t mangledNameLength,
                             char *outputBuffer,
                             size_t *outputBufferSize,
-                            uint32_t flags) {
+                            size_t flags) {
       if (flags > 1) {
         // ignore not supported flags
         return nullptr;
