@@ -43,7 +43,7 @@ char * _swift_runtime_demangle(
   size_t mangledNameLength,
   char *outputBuffer,
   size_t *outputBufferSize,
-  uint32_t flags
+  size_t flags
 );
 
 #ifdef __cplusplus

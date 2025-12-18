@@ -57,7 +57,7 @@ char *_swift_runtime_demangle(const char *rawName,
                               size_t rawNameLength,
                               char *outputBuffer,
                               size_t *outputBufferSize,
-                              uint32_t flags);
+                              size_t flags);
 
 #ifdef __cplusplus
 }
