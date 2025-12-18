@@ -204,3 +204,30 @@ extension CollectionOfOne: CustomReflectable {
 
 extension CollectionOfOne: Sendable where Element: Sendable { }
 extension CollectionOfOne.Iterator: Sendable where Element: Sendable { }
+
+extension CollectionOfOne where Element: Equatable {
+  @_alwaysEmitIntoClient
+  public static func ==(lhs: CollectionOfOne<Element>, rhs: CollectionOfOne<Element>) -> Bool {
+    return lhs._element == rhs._element
+  }
+}
+
+extension CollectionOfOne where Element: Hashable {
+  @_alwaysEmitIntoClient
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(self._element)
+  }
+
+  @_alwaysEmitIntoClient
+  public var hashValue: Int { // Prevent compiler from synthesizing hashValue.
+    var hasher = Hasher()
+    self.hash(into: &hasher)
+    return hasher.finalize()
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension CollectionOfOne: Equatable where Element: Equatable {}
+
+@available(SwiftStdlib 6.3, *)
+extension CollectionOfOne: Hashable where Element: Hashable {}
