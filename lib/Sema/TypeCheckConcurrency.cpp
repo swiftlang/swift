@@ -5025,6 +5025,10 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
     auto normalIsolation = computeClosureIsolationFromParent(
         closure, parentIsolation, checkIsolatedCapture);
 
+    bool isIsolationBoundary =
+        isIsolationInferenceBoundaryClosure(closure,
+                                            /*canInheritActorContext=*/true);
+
     // The solver has to be conservative and produce a conversion to
     // `nonisolated(nonsending)` because at solution application time
     // we don't yet know whether there are any captures which would
@@ -5035,7 +5039,7 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
     // isolated parameters. If our closure is nonisolated and we have a
     // conversion to nonisolated(nonsending), then we should respect that.
     if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure);
-        !normalIsolation.isGlobalActor()) {
+        isIsolationBoundary || !normalIsolation.isGlobalActor()) {
       if (auto *fce =
               dyn_cast_or_null<FunctionConversionExpr>(Parent.getAsExpr())) {
         auto expectedIsolation =
@@ -5054,8 +5058,7 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
     // NOTE: Since we already checked for global actor isolated things, we
     // know that all Sendable closures must be nonisolated. That is why it is
     // safe to rely on this path to handle Sendable closures.
-    if (isIsolationInferenceBoundaryClosure(closure,
-                                            /*canInheritActorContext=*/true))
+    if (isIsolationBoundary)
       return ActorIsolation::forNonisolated(/*unsafe=*/false);
 
     return normalIsolation;
