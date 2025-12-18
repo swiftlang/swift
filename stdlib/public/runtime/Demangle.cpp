@@ -1075,10 +1075,6 @@ namespace swift {
         auto options = DemangleOptions();
         // Very simple flags parsing, move to something more proper once we support more flags
         bool shouldNullTerminateString = flags & 1;
-        if (shouldUseSimplifiedUIDemangleOptions) {
-          // simplified display options, for backtraces
-          options = DemangleOptions::SimplifiedUIDemangleOptions();
-        }
 
         auto result = Demangle::demangleSymbolAsString(name, options);
         size_t bufferSize = 0;
