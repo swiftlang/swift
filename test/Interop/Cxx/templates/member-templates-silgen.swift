@@ -4,16 +4,16 @@ import MemberTemplates
 
 // CHECK-LABEL: sil hidden @$s4main9basicTestyyF : $@convention(thin) () -> ()
 
-// CHECK: [[ADD:%.*]] = function_ref @$sSo18HasMemberTemplatesV17addSameTypeParamsys5Int32VAE_AEtFTo : $@convention(cxx_method) (Int32, Int32, @inout HasMemberTemplates) -> Int32
+// CHECK: [[ADD:%.*]] = function_ref @$sSo18HasMemberTemplatesV030__swift_specializedThunk__ZN18ab37Templates17addSameTypeParamsIiEET_S1_N1_ys5Int32VAE_AEtFTo : $@convention(cxx_method) (Int32, Int32, @inout HasMemberTemplates) -> Int32
 // CHECK: apply [[ADD]]({{.*}}) : $@convention(cxx_method) (Int32, Int32, @inout HasMemberTemplates) -> Int32
 
-// CHECK: [[ADD_TWO_TEMPLATES:%.*]] = function_ref @$sSo18HasMemberTemplatesV18addMixedTypeParamsys5Int32VAE_AEtFTo : $@convention(cxx_method) (Int32, Int32, @inout HasMemberTemplates) -> Int32
+// CHECK: [[ADD_TWO_TEMPLATES:%.*]] = function_ref @$sSo18HasMemberTemplatesV030__swift_specializedThunk__ZN18aB42Templates18addMixedTypeParamsIiiEET_S1_T0_ys5Int32VAE_AEtFTo : $@convention(cxx_method) (Int32, Int32, @inout HasMemberTemplates) -> Int32
 // CHECK: apply [[ADD_TWO_TEMPLATES]]({{.*}}) : $@convention(cxx_method) (Int32, Int32, @inout HasMemberTemplates) -> Int32
 
-// CHECK: [[ADD_ALL:%.*]] = function_ref @$sSo18HasMemberTemplatesV6addAllys5Int32VAE_A2EtFTo : $@convention(cxx_method) (Int32, Int32, Int32, @inout HasMemberTemplates) -> Int32
+// CHECK: [[ADD_ALL:%.*]] = function_ref @$sSo18HasMemberTemplatesV030__swift_specializedThunk__ZN18aB28Templates6addAllIiiEEiiT_T0_ys5Int32VAE_A2EtFTo : $@convention(cxx_method) (Int32, Int32, Int32, @inout HasMemberTemplates) -> Int32
 // CHECK: apply [[ADD_ALL]]({{.*}}) : $@convention(cxx_method) (Int32, Int32, Int32, @inout HasMemberTemplates) -> Int32
 
-// CHECK: [[DO_NOTHING:%.*]] = function_ref @$sSo18HasMemberTemplatesV17doNothingConstRefyys5Int32VFTo : $@convention(cxx_method) (@in_guaranteed Int32, @inout HasMemberTemplates) -> ()
+// CHECK: [[DO_NOTHING:%.*]] = function_ref @$sSo18HasMemberTemplatesV030__swift_specializedThunk__ZN18aB37Templates17doNothingConstRefIiEEvRKT_yys5Int32VFTo : $@convention(cxx_method) (@in_guaranteed Int32, @inout HasMemberTemplates) -> ()
 // CHECK: apply [[DO_NOTHING]]({{.*}}) : $@convention(cxx_method) (@in_guaranteed Int32, @inout HasMemberTemplates) -> ()
 
 // CHECK-LABEL: end sil function '$s4main9basicTestyyF'
@@ -26,17 +26,17 @@ func basicTest() {
   obj.doNothingConstRef(i)
 }
 
-// CHECK-LABEL: sil [asmname "{{.*}}addSameTypeParams{{.*}}"] [clang HasMemberTemplates.addSameTypeParams] @$sSo18HasMemberTemplatesV17addSameTypeParamsys5Int32VAE_AEtFTo : $@convention(cxx_method) (Int32, Int32, @inout HasMemberTemplates) -> Int32
+// CHECK-LABEL: sil [asmname "{{.*}}addSameTypeParams{{.*}}"] [clang HasMemberTemplates.__swift_specializedThunk__ZN18HasMemberTemplates17addSameTypeParamsIiEET_S1_S1_] @$sSo18HasMemberTemplatesV030__swift_specializedThunk__ZN18ab37Templates17addSameTypeParamsIiEET_S1_N1_ys5Int32VAE_AEtFTo : $@convention(cxx_method) (Int32, Int32, @inout HasMemberTemplates) -> Int32
 
-// CHECK-LABEL: sil [asmname "{{.*}}addMixedTypeParams{{.*}}"] [clang HasMemberTemplates.addMixedTypeParams] @$sSo18HasMemberTemplatesV18addMixedTypeParamsys5Int32VAE_AEtFTo : $@convention(cxx_method) (Int32, Int32, @inout HasMemberTemplates) -> Int32
+// CHECK-LABEL: sil [asmname "{{.*}}addMixedTypeParams{{.*}}"] [clang HasMemberTemplates.__swift_specializedThunk__ZN18HasMemberTemplates18addMixedTypeParamsIiiEET_S1_T0_] @$sSo18HasMemberTemplatesV030__swift_specializedThunk__ZN18aB42Templates18addMixedTypeParamsIiiEET_S1_T0_ys5Int32VAE_AEtFTo : $@convention(cxx_method) (Int32, Int32, @inout HasMemberTemplates) -> Int32
 
-// CHECK-LABEL: sil [asmname "{{.*}}addAll{{.*}}"] [clang HasMemberTemplates.addAll] @$sSo18HasMemberTemplatesV6addAllys5Int32VAE_A2EtFTo : $@convention(cxx_method) (Int32, Int32, Int32, @inout HasMemberTemplates) -> Int32
+// CHECK-LABEL: sil [asmname "{{.*}}addAll{{.*}}"] [clang HasMemberTemplates.__swift_specializedThunk__ZN18HasMemberTemplates6addAllIiiEEiiT_T0_] @$sSo18HasMemberTemplatesV030__swift_specializedThunk__ZN18aB28Templates6addAllIiiEEiiT_T0_ys5Int32VAE_A2EtFTo : $@convention(cxx_method) (Int32, Int32, Int32, @inout HasMemberTemplates) -> Int32
 
-// CHECK-LABEL: sil [asmname "{{.*}}doNothingConstRef{{.*}}"] [clang HasMemberTemplates.doNothingConstRef] @$sSo18HasMemberTemplatesV17doNothingConstRefyys5Int32VFTo : $@convention(cxx_method) (@in_guaranteed Int32, @inout HasMemberTemplates) -> ()
+// CHECK-LABEL: sil [asmname "{{.*}}doNothingConstRef{{.*}}"] [clang HasMemberTemplates.__swift_specializedThunk__ZN18HasMemberTemplates17doNothingConstRefIiEEvRKT_] @$sSo18HasMemberTemplatesV030__swift_specializedThunk__ZN18aB37Templates17doNothingConstRefIiEEvRKT_yys5Int32VFTo : $@convention(cxx_method) (@in_guaranteed Int32, @inout HasMemberTemplates) -> ()
 
 // CHECK-LABEL: sil hidden @$s4main12testSetValueyyF : $@convention(thin) () -> ()
 
-// CHECK: [[SET_VALUE:%.*]] = function_ref @$sSo0044TemplateClassWithMemberTemplatesCInt_CeCInkcV8setValueyySiFTo : $@convention(cxx_method) (Int, @inout TemplateClassWithMemberTemplates<CInt>) -> ()
+// CHECK: [[SET_VALUE:%.*]] = function_ref @$sSo0044TemplateClassWithMemberTemplatesCInt_CeCInkcV81__swift_specializedThunk__ZN32TemplateClassWithMemberTemplatesIiE8setValueIlEEvT_yySiFTo : $@convention(cxx_method) (Int, @inout TemplateClassWithMemberTemplates<CInt>) -> ()
 // CHECK: apply [[SET_VALUE]]({{.*}}) : $@convention(cxx_method) (Int, @inout TemplateClassWithMemberTemplates<CInt>) -> ()
 
 // CHECK-LABEL: end sil function '$s4main12testSetValueyyF'
@@ -47,13 +47,13 @@ func testSetValue() {
 
 // CHECK-LABEL: sil hidden @$s4main17testStaticMembersyyF : $@convention(thin) () -> ()
 
-// CHECK: [[ADD_FN:%.*]] = function_ref @$sSo24HasStaticMemberTemplatesV3addyS2i_SitFZTo : $@convention(c) (Int, Int) -> Int
+// CHECK: [[ADD_FN:%.*]] = function_ref @$sSo24HasStaticMemberTemplatesV030__swift_specializedThunk__ZN24abc22Templates3addIlEET_S1_L1_yS2i_SitFZTo : $@convention(c) (Int, Int) -> Int
 // CHECK: apply [[ADD_FN]]({{.*}}) : $@convention(c) (Int, Int) -> Int
 
-// CHECK: [[ADD_TWO_TEMPLATES_FN:%.*]] = function_ref @$sSo24HasStaticMemberTemplatesV06addTwoD0yS2i_s4Int8VtFZTo : $@convention(c) (Int, Int8) -> Int
+// CHECK: [[ADD_TWO_TEMPLATES_FN:%.*]] = function_ref @$sSo24HasStaticMemberTemplatesV030__swift_specializedThunk__ZN24abc17Templates15addTwoD13IlcEET_S1_T0_yS2i_s4Int8VtFZTo : $@convention(c) (Int, Int8) -> Int
 // CHECK: apply [[ADD_TWO_TEMPLATES_FN]]({{.*}}) : $@convention(c) (Int, Int8) -> Int
 
-// CHECK: [[REMOVE_REFERENCE_FN:%.*]] = function_ref @$sSo24HasStaticMemberTemplatesV15removeReferenceyS2izFZTo : $@convention(c) (@inout Int) -> Int
+// CHECK: [[REMOVE_REFERENCE_FN:%.*]] = function_ref @$sSo24HasStaticMemberTemplatesV030__swift_specializedThunk__ZN24abC36Templates15removeReferenceIlEET_RS1_yS2izFZTo : $@convention(c) (@inout Int) -> Int
 // CHECK: apply [[REMOVE_REFERENCE_FN]]({{.*}}) : $@convention(c) (@inout Int) -> Int
 
 // CHECK-LABEL: end sil function '$s4main17testStaticMembersyyF'
@@ -65,8 +65,8 @@ func testStaticMembers() {
   HasStaticMemberTemplates.removeReference(&x)
 }
 
-// CHECK: sil hidden_external [asmname "{{.*}}add{{.*}}"] [clang HasStaticMemberTemplates.add] @$sSo24HasStaticMemberTemplatesV3addyS2i_SitFZTo : $@convention(c) (Int, Int) -> Int
+// CHECK: sil hidden_external [asmname "{{.*}}add{{.*}}"] [clang HasStaticMemberTemplates.__swift_specializedThunk__ZN24HasStaticMemberTemplates3addIlEET_S1_S1_] @$sSo24HasStaticMemberTemplatesV030__swift_specializedThunk__ZN24abc22Templates3addIlEET_S1_L1_yS2i_SitFZTo : $@convention(c) (Int, Int) -> Int
 
-// CHECK: sil hidden_external [asmname "{{.*}}addTwoTemplates{{.*}}"] [clang HasStaticMemberTemplates.addTwoTemplates] @$sSo24HasStaticMemberTemplatesV06addTwoD0yS2i_s4Int8VtFZTo : $@convention(c) (Int, Int8) -> Int
+// CHECK: sil hidden_external [asmname "{{.*}}addTwoTemplates{{.*}}"] [clang HasStaticMemberTemplates.__swift_specializedThunk__ZN24HasStaticMemberTemplates15addTwoTemplatesIlcEET_S1_T0_] @$sSo24HasStaticMemberTemplatesV030__swift_specializedThunk__ZN24abc17Templates15addTwoD13IlcEET_S1_T0_yS2i_s4Int8VtFZTo : $@convention(c) (Int, Int8) -> Int
 
-// CHECK: sil hidden_external [asmname "{{.*}}removeReference{{.*}}"] [clang HasStaticMemberTemplates.removeReference] @$sSo24HasStaticMemberTemplatesV15removeReferenceyS2izFZTo : $@convention(c) (@inout Int) -> Int
+// CHECK: sil hidden_external [asmname "{{.*}}removeReference{{.*}}"] [clang HasStaticMemberTemplates.__swift_specializedThunk__ZN24HasStaticMemberTemplates15removeReferenceIlEET_RS1_] @$sSo24HasStaticMemberTemplatesV030__swift_specializedThunk__ZN24abC36Templates15removeReferenceIlEET_RS1_yS2izFZTo : $@convention(c) (@inout Int) -> Int

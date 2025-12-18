@@ -7818,6 +7818,20 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
   if (!inserted)
     return ConcreteDeclRef(fnIt->second);
 
+  // Before we proceed to import the newly instantiated C++ function, make sure
+  // it gets a unique name in Swift. In particular, it must have a different
+  // name from all the other instantiations of the same function template, to
+  // prevent Swift from incorrectly deduplicating the multiple instantiations,
+  // which would cause a silent miscompile. The naming itself is not important,
+  // since this will only get called from synthesized code. Let's use the
+  // mangled Clang name of this instantiation as the swift_name.
+  std::string mangledNewFn;
+  llvm::raw_string_ostream mangleRawStream(mangledNewFn);
+  mangleRawStream << "__swift_specializedThunk_";
+  getMangledName(mangleRawStream, newFn);
+  newFn->addAttr(clang::SwiftNameAttr::CreateImplicit(newFn->getASTContext(),
+                                                      mangledNewFn));
+
   auto *newDecl = cast_or_null<ValueDecl>(
       decl->getASTContext().getClangModuleLoader()->importDeclDirectly(newFn));
   if (!newDecl)
