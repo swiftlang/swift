@@ -213,16 +213,18 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     swift::DependencyTracker &DependencyTracker,
     std::shared_ptr<llvm::cas::ObjectStore> CAS,
     std::shared_ptr<llvm::cas::ActionCache> ActionCache,
-    llvm::PrefixMapper *Mapper, DiagnosticEngine &Diagnostics)
+    DependencyScannerDiagnosticReporter &DiagnosticReporter,
+    llvm::PrefixMapper *Mapper)
     : workerCompilerInvocation(
           std::make_unique<CompilerInvocation>(ScanCompilerInvocation)),
       clangScanningTool(*globalScanningService.ClangScanningService,
                         getClangScanningFS(CAS, ScanASTContext)),
-      CAS(CAS), ActionCache(ActionCache) {
+      CAS(CAS), ActionCache(ActionCache),
+      diagnosticReporter(DiagnosticReporter) {
   // Instantiate a worker-specific diagnostic engine and copy over
   // the scanner's diagnostic consumers (expected to be thread-safe).
   workerDiagnosticEngine = std::make_unique<DiagnosticEngine>(ScanASTContext.SourceMgr);
-  for (auto &scannerDiagConsumer : Diagnostics.getConsumers())
+  for (auto &scannerDiagConsumer : DiagnosticReporter.Diagnostics.getConsumers())
     workerDiagnosticEngine->addConsumer(*scannerDiagConsumer);
 
   workerASTContext = std::unique_ptr<ASTContext>(
@@ -299,6 +301,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
 SwiftModuleScannerQueryResult
 ModuleDependencyScanningWorker::scanFilesystemForSwiftModuleDependency(
     Identifier moduleName, bool isTestableImport) {
+  diagnosticReporter.registerSwiftModuleQuery();
   return swiftModuleScannerLoader->lookupSwiftModule(moduleName,
                                                      isTestableImport);
 }
@@ -309,6 +312,7 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     LookupModuleOutputCallback lookupModuleOutput,
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenModules) {
+  diagnosticReporter.registerNamedClangModuleQuery();
   auto clangModuleDependencies = clangScanningTool.getModuleDependencies(
       moduleName.str(), clangScanningModuleCommandLineArgs,
       clangScanningWorkingDirectoryPath, alreadySeenModules,
@@ -323,7 +327,6 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
       });
     return std::nullopt;
   }
-
   return clangModuleDependencies.get();
 }
 
@@ -524,9 +527,11 @@ ModuleDependencyScanner::ModuleDependencyScanner(
     swift::DependencyTracker &DependencyTracker,
     std::shared_ptr<llvm::cas::ObjectStore> CAS,
     std::shared_ptr<llvm::cas::ActionCache> ActionCache,
-    DiagnosticEngine &Diagnostics, bool ParallelScan)
+    DiagnosticEngine &Diagnostics, bool ParallelScan,
+    bool EmitScanRemarks)
     : ScanCompilerInvocation(ScanCompilerInvocation),
-      ScanASTContext(ScanASTContext), IssueReporter(Diagnostics),
+      ScanASTContext(ScanASTContext),
+      ScanDiagnosticReporter(Diagnostics, EmitScanRemarks),
       ModuleOutputPath(ScanCompilerInvocation.getFrontendOptions()
                        .ExplicitModulesOutputPath),
       SDKModuleOutputPath(ScanCompilerInvocation.getFrontendOptions()
@@ -557,7 +562,8 @@ ModuleDependencyScanner::ModuleDependencyScanner(
   for (size_t i = 0; i < NumThreads; ++i)
     Workers.emplace_front(std::make_unique<ModuleDependencyScanningWorker>(
         ScanningService, ScanCompilerInvocation, SILOptions, ScanASTContext,
-        DependencyTracker, CAS, ActionCache, PrefixMapper.get(), Diagnostics));
+        DependencyTracker, CAS, ActionCache, ScanDiagnosticReporter,
+        PrefixMapper.get()));
 }
 
 static std::set<ModuleDependencyID>
@@ -897,11 +903,12 @@ ModuleDependencyScanner::performDependencyScan(ModuleDependencyID rootModuleID) 
   if (ScanCompilerInvocation.getSearchPathOptions().BridgingHeaderChaining) {
     auto err = performBridgingHeaderChaining(rootModuleID, allModules);
     if (err)
-      IssueReporter.Diagnostics.diagnose(SourceLoc(),
+      ScanDiagnosticReporter.Diagnostics.diagnose(SourceLoc(),
                                          diag::error_scanner_extra,
                                          toString(std::move(err)));
   }
 
+  ScanDiagnosticReporter.emitScanMetrics(DependencyCache);
   return allModules.takeVector();
 }
 
@@ -1091,16 +1098,17 @@ void ModuleDependencyScanner::reQueryMissedModulesFromCache(
           unresolvedModuleID);
       DependencyCache.addVisibleClangModules(
           unresolvedImport.first, {unresolvedImport.second.importIdentifier});
+      ScanDiagnosticReporter.registerNamedClangDependency();
     } else {
       // Failed to resolve module dependency.
-      IssueReporter.diagnoseModuleNotFoundFailure(
+      ScanDiagnosticReporter.diagnoseModuleNotFoundFailure(
           unresolvedImport.second, DependencyCache, unresolvedImport.first,
           attemptToFindResolvingSerializedSearchPath(unresolvedImport.second));
     }
   }
 }
 
-void ModuleDependencyScanner::performParallelClangModuleLookup(
+void ModuleDependencyScanner::performClangModuleLookup(
     const ImportStatementInfoMap &unresolvedImportsMap,
     const ImportStatementInfoMap &unresolvedOptionalImportsMap,
     BatchClangModuleLookupResult &result) {
@@ -1177,6 +1185,8 @@ void ModuleDependencyScanner::cacheComputedClangModuleLookupResults(
           // Add the resolved dependency ID
           if (lookupResult.discoveredDependencyInfos.contains(
                   moduleIdentifier)) {
+            if (!DependencyCache.hasDependency(dependencyID))
+              ScanDiagnosticReporter.registerNamedClangDependency();
             auto dependencyInfo = lookupResult.discoveredDependencyInfos.at(
                 moduleImport.importIdentifier);
             allDiscoveredClangModules.insert(dependencyID);
@@ -1231,7 +1241,7 @@ void ModuleDependencyScanner::resolveAllClangModuleDependencies(
   // Execute parallel lookup of all unresolved import
   // identifiers as Clang modules.
   BatchClangModuleLookupResult lookupResult;
-  performParallelClangModuleLookup(
+  performClangModuleLookup(
       unresolvedImportsMap, unresolvedOptionalImportsMap, lookupResult);
 
   // Use the computed scan results to record directly-queried clang module
@@ -1410,7 +1420,7 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
           importedSwiftDependencies.insert(
               {moduleImport.importIdentifier,
                lookupResult.foundDependencyInfo->getKind()});
-          IssueReporter.warnOnIncompatibleCandidates(
+          ScanDiagnosticReporter.warnOnIncompatibleCandidates(
               moduleImport.importIdentifier,
               lookupResult.incompatibleCandidates);
           // Module was resolved from a cache
@@ -1419,9 +1429,9 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
           importedSwiftDependencies.insert(
               {moduleImport.importIdentifier, cachedInfo.value()->getKind()});
         else
-          IssueReporter.diagnoseFailureOnOnlyIncompatibleCandidates(
-              moduleImport, lookupResult.incompatibleCandidates,
-              DependencyCache, std::nullopt);
+          ScanDiagnosticReporter.diagnoseFailureOnOnlyIncompatibleCandidates(
+                     moduleImport, lookupResult.incompatibleCandidates,
+                     DependencyCache, std::nullopt);
       };
 
   for (const auto &importInfo : moduleDependencyInfo.getModuleImports())
@@ -1611,7 +1621,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
                                          *(lookupResult.foundDependencyInfo));
         swiftOverlayDependencies.insert(
             {moduleName, lookupResult.foundDependencyInfo->getKind()});
-        IssueReporter.warnOnIncompatibleCandidates(
+        ScanDiagnosticReporter.warnOnIncompatibleCandidates(
             moduleName, lookupResult.incompatibleCandidates);
         // Module was resolved from a cache
       } else if (auto cachedInfo =
@@ -1619,7 +1629,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
         swiftOverlayDependencies.insert(
             {moduleName, cachedInfo.value()->getKind()});
       else
-        IssueReporter.diagnoseFailureOnOnlyIncompatibleCandidates(
+        ScanDiagnosticReporter.diagnoseFailureOnOnlyIncompatibleCandidates(
             ScannerImportStatementInfo(moduleName),
             lookupResult.incompatibleCandidates, DependencyCache,
             std::nullopt);
@@ -2098,7 +2108,7 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
   return bridgedDependencyInfo;
 }
 
-void ModuleDependencyIssueReporter::diagnoseModuleNotFoundFailure(
+void DependencyScannerDiagnosticReporter::diagnoseModuleNotFoundFailure(
     const ScannerImportStatementInfo &moduleImport,
     const ModuleDependenciesCache &cache,
     std::optional<ModuleDependencyID> dependencyOf,
@@ -2209,7 +2219,7 @@ void ModuleDependencyIssueReporter::diagnoseModuleNotFoundFailure(
   ReportedMissing.insert(moduleImport.importIdentifier);
 }
 
-void ModuleDependencyIssueReporter::diagnoseFailureOnOnlyIncompatibleCandidates(
+void DependencyScannerDiagnosticReporter::diagnoseFailureOnOnlyIncompatibleCandidates(
     const ScannerImportStatementInfo &moduleImport,
     const std::vector<SwiftModuleScannerQueryResult::IncompatibleCandidate>
         &candidates,
@@ -2238,7 +2248,14 @@ void ModuleDependencyIssueReporter::diagnoseFailureOnOnlyIncompatibleCandidates(
                                 candidates);
 }
 
-void ModuleDependencyIssueReporter::warnOnIncompatibleCandidates(
+DependencyScannerDiagnosticReporter::DependencyScannerDiagnosticReporter(
+    DiagnosticEngine &Diagnostics, bool EmitScanRemarks)
+    : Diagnostics(Diagnostics), EmitScanRemarks(EmitScanRemarks) {
+  if (EmitScanRemarks)
+    ScanMetrics = std::make_unique<ScannerMetrics>();
+}
+
+void DependencyScannerDiagnosticReporter::warnOnIncompatibleCandidates(
     StringRef moduleName,
     const std::vector<SwiftModuleScannerQueryResult::IncompatibleCandidate>
         &candidates) {
@@ -2248,6 +2265,48 @@ void ModuleDependencyIssueReporter::warnOnIncompatibleCandidates(
   for (const auto &candidate : candidates)
     Diagnostics.diagnose(SourceLoc(), diag::dependency_scan_module_incompatible,
                          candidate.path, candidate.incompatibilityReason);
+}
+
+void DependencyScannerDiagnosticReporter::registerSwiftModuleQuery() {
+  if (!EmitScanRemarks)
+    return;
+  assert(ScanMetrics);
+  ScanMetrics->SwiftModuleQueries++;
+}
+
+void DependencyScannerDiagnosticReporter::registerNamedClangModuleQuery() {
+  if (!EmitScanRemarks)
+    return;
+  assert(ScanMetrics);
+  ScanMetrics->NamedClangModuleQueries++;
+}
+
+void DependencyScannerDiagnosticReporter::registerNamedClangDependency() {
+  if (!EmitScanRemarks)
+    return;
+  assert(ScanMetrics);
+  ScanMetrics->RecordedNamedClangModuleDependencies++;
+}
+
+void DependencyScannerDiagnosticReporter::emitScanMetrics(
+    const ModuleDependenciesCache &cache) const {
+  if (!EmitScanRemarks || !ScanMetrics)
+    return;
+
+  Diagnostics.diagnose(SourceLoc(), diag::dependency_scan_number_swift_queries,
+                       ScanMetrics->SwiftModuleQueries);
+  Diagnostics.diagnose(SourceLoc(),
+                       diag::dependency_scan_number_named_clang_queries,
+                       ScanMetrics->NamedClangModuleQueries);
+  Diagnostics.diagnose(SourceLoc(),
+                       diag::dependency_scan_number_named_clang_dependencies,
+                       ScanMetrics->RecordedNamedClangModuleDependencies);
+  Diagnostics.diagnose(SourceLoc(),
+                       diag::dependency_scan_number_swift_dependencies,
+                       cache.numberOfSwiftDependencies());
+  Diagnostics.diagnose(SourceLoc(),
+                       diag::dependency_scan_number_clang_dependencies,
+                       cache.numberOfClangDependencies());
 }
 
 std::optional<std::pair<ModuleDependencyID, std::string>>
