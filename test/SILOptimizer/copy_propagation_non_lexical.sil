@@ -27,4 +27,34 @@ bb0(%0 : @owned $Builtin.BridgeObject):
   return %8
 }
 
+// CHECK-LABEL: sil [ossa] @test_add_cancellation_handler :
+// CHECK:         builtin "taskAddCancellationHandler"
+// CHECK-NEXT:    builtin "taskRemoveCancellationHandler"
+// CHECK-NEXT:    destroy_value
+// CHECK-LABEL: } // end sil function 'test_add_cancellation_handler'
+sil [ossa] @test_add_cancellation_handler : $@convention(thin) @async () -> () {
+bb0:
+  %0 = partial_apply [on_stack] undef() : $@convention(thin) @Sendable () -> ()
+  %1 = builtin "taskAddCancellationHandler"(%0) : $UnsafeRawPointer
+  %2 = builtin "taskRemoveCancellationHandler"(%1) : $()
+  destroy_value %0
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @test_add_priority_escalation_handler :
+// CHECK:         builtin "taskAddPriorityEscalationHandler"
+// CHECK-NEXT:    builtin "taskRemovePriorityEscalationHandler"
+// CHECK-NEXT:    destroy_value
+// CHECK-LABEL: } // end sil function 'test_add_priority_escalation_handler'
+sil [ossa] @test_add_priority_escalation_handler : $@convention(thin) @async () -> () {
+bb0:
+  %0 = partial_apply [on_stack] undef() : $@convention(thin) @Sendable (UInt8, UInt8) -> ()
+  %1 = builtin "taskAddPriorityEscalationHandler"(%0) : $UnsafeRawPointer
+  %2 = builtin "taskRemovePriorityEscalationHandler"(%1) : $()
+  destroy_value %0
+  %4 = tuple ()
+  return %4
+}
+
 
