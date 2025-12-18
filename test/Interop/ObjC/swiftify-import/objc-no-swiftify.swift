@@ -7,8 +7,7 @@
 
 import NoSwiftifyClang
 
-// CHECK-NOT: @_alwaysEmitIntoClient @_disfavoredOverload public func callAutoreleaseParam
-// CHECK-NOT: @_alwaysEmitIntoClient @_disfavoredOverload public func callAutoreleaseReturn
+// CHECK-NOT: @_alwaysEmitIntoClient @_disfavoredOverload
 
 public func callAutoreleaseParam(_ p: UnsafeMutableBufferPointer<SomeClass>) {
     // expected-error@+2{{missing argument for parameter #2 in call}}
@@ -19,4 +18,14 @@ public func callAutoreleaseParam(_ p: UnsafeMutableBufferPointer<SomeClass>) {
 public func callAutoreleaseReturn() {
     // expected-error@+1{{cannot convert value of type 'AutoreleasingUnsafeMutablePointer<SomeClass?>?' to specified type 'UnsafeMutableBufferPointer<SomeClass>'}}
     let p: UnsafeMutableBufferPointer<SomeClass> = autoreleaseReturn(10)
+}
+
+public func callErrorAsTry(_ x: Foo, _ p: UnsafeMutablePointer<CInt>, _ error: AutoreleasingUnsafeMutablePointer<NSError?>) {
+  x.error(asTry: 10, p, error: error)
+}
+
+public func callCompletionHandlerAsAsync(_ x: Foo, _ p: UnsafeMutablePointer<CInt>) {
+  x.completionHandler(asAsync: 10, p, completionHandler: { (a: NSData?, b: NSError?) in
+    print("asdf")
+  })
 }

@@ -16,3 +16,4 @@
 // CHECK-NOT: @_alwaysEmitIntoClient {{.*}} longLiteral
 // CHECK-NOT: @_alwaysEmitIntoClient {{.*}} sizeofType
 // CHECK-NOT: @_alwaysEmitIntoClient {{.*}} sizeofParam
+// CHECK-NOT: @_alwaysEmitIntoClient {{.*}} variadic
