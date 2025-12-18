@@ -259,8 +259,13 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
                                  operation: () async throws -> R,
                                  isolation: isolated (any Actor)?,
                                  file: String = #fileID, line: UInt = #line) async rethrows -> R {
+#if $BuiltinConcurrencyStackNesting
     Builtin.taskLocalValuePush(key, consume valueDuringOperation)
     defer { Builtin.taskLocalValuePop() }
+#else
+    _taskLocalValuePush(key: key, value: consume valueDuringOperation)
+    defer { _taskLocalValuePop() }
+#endif
 
     return try await operation()
   }
@@ -275,8 +280,13 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     operation: () async throws -> R,
     file: String = #fileID, line: UInt = #line
   ) async rethrows -> R {
+#if $BuiltinConcurrencyStackNesting
     Builtin.taskLocalValuePush(key, consume valueDuringOperation)
     defer { Builtin.taskLocalValuePop() }
+#else
+    _taskLocalValuePush(key: key, value: consume valueDuringOperation)
+    defer { _taskLocalValuePop() }
+#endif
 
     return try await operation()
   }
@@ -299,8 +309,13 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @discardableResult
   public func withValue<R>(_ valueDuringOperation: Value, operation: () throws -> R,
                            file: String = #fileID, line: UInt = #line) rethrows -> R {
+#if $BuiltinConcurrencyStackNesting
     Builtin.taskLocalValuePush(key, valueDuringOperation)
     defer { Builtin.taskLocalValuePop() }
+#else
+    _taskLocalValuePush(key: key, value: valueDuringOperation)
+    defer { _taskLocalValuePop() }
+#endif
 
     return try operation()
   }
@@ -343,6 +358,19 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 }
 
 // ==== ------------------------------------------------------------------------
+
+@available(SwiftStdlib 5.1, *)
+@usableFromInline
+@_silgen_name("swift_task_localValuePush")
+func _taskLocalValuePush<Value>(
+  key: Builtin.RawPointer/*: Key*/,
+  value: __owned Value
+) // where Key: TaskLocal
+
+@available(SwiftStdlib 5.1, *)
+@usableFromInline
+@_silgen_name("swift_task_localValuePop")
+func _taskLocalValuePop()
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_localValueGet")
