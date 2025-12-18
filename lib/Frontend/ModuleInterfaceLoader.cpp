@@ -2515,6 +2515,12 @@ struct ExplicitCASModuleLoader::Implementation {
   // Same as the regular explicit module map but must be loaded from
   // CAS, instead of a file that is not tracked by the dependency.
   void parseSwiftExplicitModuleMap(StringRef ID) {
+    // ModuleLoader can be setup with no explicit module map and explicitly
+    // setup each individual dependencies via `addExplicitModulePath` function.
+    // If the input CASID is empty, just return.
+    if (ID.empty())
+      return;
+
     ExplicitModuleMapParser parser(Allocator);
     llvm::StringMap<ExplicitClangModuleInputInfo> ExplicitClangModuleMap;
     llvm::StringMap<std::string> ModuleAliases;
@@ -2700,9 +2706,12 @@ bool ExplicitCASModuleLoader::findModule(
       Impl.CAS, Impl.Cache, Ctx.Diags, moduleCASID,
       file_types::ID::TY_SwiftModuleFile, moduleInfo.modulePath);
   if (!moduleBuf) {
-    // We cannot read the module content, diagnose.
-    Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,
-                       moduleInfo.modulePath);
+    // Cannot load the module. For any real issues like malformed CASID or
+    // module, the error has been diagnosed in
+    // `loadCachedCompileResultFromCacheKey`. The only way to reach here without
+    // error diagnostics is that the module is not found via loader, just return
+    // false in the case so the next loader can try findModule without hitting
+    // an error.
     return false;
   }
 
