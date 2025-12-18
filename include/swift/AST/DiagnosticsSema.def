@@ -2432,6 +2432,22 @@ WARNING(dependency_scan_module_incompatible, none,
         "module file '%0' is incompatible with this Swift compiler: %1",
         (StringRef, StringRef))
 
+REMARK(dependency_scan_number_swift_queries, none,
+       "Number of Swift module queries: '%0'",
+       (uint32_t))
+REMARK(dependency_scan_number_named_clang_queries, none,
+       "Number of named Clang module queries: '%0'",
+       (uint32_t))
+REMARK(dependency_scan_number_swift_dependencies, none,
+       "Number of recorded Swift module dependencies: '%0'",
+       (uint32_t))
+REMARK(dependency_scan_number_named_clang_dependencies, none,
+       "Number of recorded Clang module dependencies queried by-name from a Swift client: '%0'",
+       (uint32_t))
+REMARK(dependency_scan_number_clang_dependencies, none,
+       "Number of recorded Clang module dependencies: '%0'",
+       (uint32_t))
+
 ERROR(clang_dependency_scan_error, none, "clang dependency scanning failure: %0", (StringRef))
 
 ERROR(clang_header_dependency_scan_error, none, "bridging header dependency scanning failure: %0", (StringRef))

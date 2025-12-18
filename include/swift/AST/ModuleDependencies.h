@@ -1111,6 +1111,11 @@ public:
   bool hasDependency(StringRef moduleName) const;
   /// Whether we have cached dependency information for the given Swift module.
   bool hasSwiftDependency(StringRef moduleName) const;
+  /// Report the number of recorded Clang dependencies
+  int numberOfClangDependencies() const;
+  /// Report the number of recorded Swift dependencies
+  /// (Textual + Binary)
+  int numberOfSwiftDependencies() const;
 
   const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &
   getAlreadySeenClangModules() const {

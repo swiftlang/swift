@@ -1410,7 +1410,8 @@ performModuleScanImpl(
       instance->getASTContext(), *instance->getDependencyTracker(),
       instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
       instance->getDiags(),
-      instance->getInvocation().getFrontendOptions().ParallelDependencyScan);
+      instance->getInvocation().getFrontendOptions().ParallelDependencyScan,
+      instance->getInvocation().getFrontendOptions().EmitDependencyScannerRemarks);
 
   // Identify imports of the main module and add an entry for it
   // to the dependency graph.
@@ -1462,7 +1463,9 @@ static llvm::ErrorOr<swiftscan_import_set_t> performModulePrescanImpl(
       instance->getASTContext(), *instance->getDependencyTracker(),
       instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
       instance->getDiags(),
-      instance->getInvocation().getFrontendOptions().ParallelDependencyScan);
+      instance->getInvocation().getFrontendOptions().ParallelDependencyScan,
+      instance->getInvocation().getFrontendOptions().EmitDependencyScannerRemarks);
+
   // Execute import prescan, and write JSON output to the output stream
   auto mainDependencies =
       scanner.getMainModuleDependencyInfo(instance->getMainModule());
