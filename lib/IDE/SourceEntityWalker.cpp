@@ -451,8 +451,31 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
         return Action::Stop();
     }
 
-    if (!SE->getArgs()->walk(*this))
-      return Action::Stop();
+    // For regular subscripts (not dynamic member lookups), the index expressions
+    // are always read, regardless of how the subscript is being used (read or write).
+    // Do not propagate a write access kind into the subscript arguments.
+    // However, for dynamic member lookup subscripts, the argument represents
+    // a member being accessed, so it should reflect the access kind.
+    bool isDynamicMemberLookup = false;
+    if (SubscrD) {
+      if (auto *args = SE->getArgs()) {
+        auto &ctx = SubscrD->getASTContext();
+        if (args->isUnary() &&
+            args->getLabel(0) == ctx.Id_dynamicMember) {
+          isDynamicMemberLookup = true;
+        }
+      }
+    }
+
+    if (!isDynamicMemberLookup) {
+      llvm::SaveAndRestore<std::optional<AccessKind>>
+          C(this->OpAccess, AccessKind::Read);
+      if (!SE->getArgs()->walk(*this))
+        return Action::Stop();
+    } else {
+      if (!SE->getArgs()->walk(*this))
+        return Action::Stop();
+    }
 
     if (SubscrD) {
       if (!passSubscriptReference(SubscrD, E->getEndLoc(), data, false))
