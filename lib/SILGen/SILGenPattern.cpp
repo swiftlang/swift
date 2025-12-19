@@ -56,6 +56,9 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
   }
   p = p->getSemanticsProvidingPattern();
   switch (p->getKind()) {
+  case PatternKind::Opaque:
+    dumpPattern(cast<OpaquePattern>(p)->getSubPattern(), os);
+    return;
   case PatternKind::Any:
     os << '_';
     return;
@@ -110,6 +113,7 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
   if (!p) return false;
 
   switch (p->getKind()) {
+
   case PatternKind::Any:
   case PatternKind::Named:
   case PatternKind::Expr:
@@ -130,6 +134,7 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Binding:
+  case PatternKind::Opaque:
     return isDirectlyRefutablePattern(p->getSemanticsProvidingPattern());
   }  
   llvm_unreachable("bad pattern");
@@ -191,6 +196,7 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Binding:
+  case PatternKind::Opaque:
     return getNumSpecializationsRecursive(p->getSemanticsProvidingPattern(), n);
   }  
   llvm_unreachable("bad pattern");
@@ -232,6 +238,7 @@ static bool isWildcardPattern(const Pattern *p) {
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Binding:
+  case PatternKind::Opaque:
     return isWildcardPattern(p->getSemanticsProvidingPattern());
   }
 
@@ -291,6 +298,9 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
     }
     return nullptr;
   }
+
+  case PatternKind::Opaque:
+    return getSimilarSpecializingPattern(cast<OpaquePattern>(p)->getSubPattern(), first);
     
   case PatternKind::Paren:
   case PatternKind::Binding:
@@ -1236,6 +1246,8 @@ bindRefutablePatterns(const ClauseRow &row, ArgArray args,
     case PatternKind::Named:
       break;
 
+    case PatternKind::Opaque:
+
     case PatternKind::Expr: {
       ExprPattern *exprPattern = cast<ExprPattern>(pattern);
       DebugLocOverrideRAII LocOverride{SGF.B,
@@ -1585,6 +1597,8 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Binding:
+  // FIXME: unsure about this but don't know what else to do
+  case PatternKind::Opaque:
     llvm_unreachable("non-semantic pattern kind!");
   
   case PatternKind::Tuple:
@@ -2750,6 +2764,9 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
       return visit(P->getSubPattern(), mv);
     }
     void visitTypedPattern(TypedPattern *P, ManagedValue mv) {
+      return visit(P->getSubPattern(), mv);
+    }
+    void visitOpaquePattern(OpaquePattern *P, ManagedValue mv) {
       return visit(P->getSubPattern(), mv);
     }
   };

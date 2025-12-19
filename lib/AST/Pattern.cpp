@@ -50,6 +50,7 @@ DescriptivePatternKind Pattern::getDescriptiveKind() const {
     TRIVIAL_PATTERN_KIND(OptionalSome);
     TRIVIAL_PATTERN_KIND(Bool);
     TRIVIAL_PATTERN_KIND(Expr);
+    TRIVIAL_PATTERN_KIND(Opaque);
 
   case PatternKind::Binding:
     switch (cast<BindingPattern>(this)->getIntroducer()) {
@@ -91,6 +92,7 @@ StringRef Pattern::getDescriptivePatternKindName(DescriptivePatternKind K) {
     ENTRY(Expr, "expression pattern");
     ENTRY(Var, "'var' binding pattern");
     ENTRY(Let, "'let' binding pattern");
+    ENTRY(Opaque, "opaque pattern");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptivePatternKind");
@@ -262,6 +264,7 @@ void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn) const {
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Binding:
+  case PatternKind::Opaque:
     return getSemanticsProvidingPattern()->forEachVariable(fn);
 
   case PatternKind::Tuple:
@@ -311,6 +314,8 @@ void Pattern::forEachNode(llvm::function_ref<void(Pattern*)> f) {
     return cast<TypedPattern>(this)->getSubPattern()->forEachNode(f);
   case PatternKind::Binding:
     return cast<BindingPattern>(this)->getSubPattern()->forEachNode(f);
+  case PatternKind::Opaque:
+    return cast<OpaquePattern>(this)->getSubPattern()->forEachNode(f);
 
   case PatternKind::Tuple:
     for (auto elt : cast<TuplePattern>(this)->getElements())
@@ -789,6 +794,7 @@ Pattern::getOwnership(
     USE_SUBPATTERN(Paren)
     USE_SUBPATTERN(Typed)
     USE_SUBPATTERN(Binding)
+    USE_SUBPATTERN(Opaque)
 #undef USE_SUBPATTERN
     void visitTuplePattern(TuplePattern *p) {
       for (auto &element : p->getElements()) {

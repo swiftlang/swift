@@ -6081,6 +6081,7 @@ namespace {
     USE_SUBPATTERN(Paren)
     USE_SUBPATTERN(Typed)
     USE_SUBPATTERN(Binding)
+    USE_SUBPATTERN(Opaque)
 #undef USE_SUBPATTERN
 
 #define PATTERN(Kind, Parent)

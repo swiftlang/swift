@@ -1476,6 +1476,10 @@ buildDefaultInitializerString(DeclContext *dc, Pattern *pattern) {
   case PatternKind::Binding:
     return buildDefaultInitializerString(
         dc, cast<BindingPattern>(pattern)->getSubPattern());
+
+  case PatternKind::Opaque:
+    return buildDefaultInitializerString(
+        dc, cast<OpaquePattern>(pattern)->getSubPattern());
   }
 
   llvm_unreachable("Unhandled PatternKind in switch.");

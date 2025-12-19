@@ -2001,6 +2001,11 @@ namespace {
       printField(P->getValue(), Label::always("value"));
       printFoot();
     }
+    void visitOpaquePattern(OpaquePattern *P, Label label){
+      printCommon(P, "pattern_opaque", label);
+      printRec(P->getSubPattern(), Label::optional("sub_pattern"));
+      printFoot();
+    }
 
   };
 

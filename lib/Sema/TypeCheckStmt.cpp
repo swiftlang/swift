@@ -140,12 +140,7 @@ namespace {
       if (auto *FES = dyn_cast<ForEachStmt>(S))
       {
         FES->setDeclContext(ParentDC);
-        if (!isa<PackExpansionExpr>(FES->getParsedSequence()))
-        {
-          if (!FES->getParsedSequence()->getType()->hasError()
-              && !FES->getPattern()->getType()->hasError())
             FES->desugar();
-        }
       }
 
       return Action::Continue(S);
@@ -3447,6 +3442,14 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
 
 static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
  auto *parsedSequence = stmt->getParsedSequence();
+
+ if (isa<PackExpansionExpr>(parsedSequence))
+   return nullptr;
+
+ if (parsedSequence->getType()->hasError()
+      || stmt->getPattern()->getType()->hasError())
+   return nullptr;
+
  auto *dc = stmt->getDeclContext();
  auto &ctx = dc->getASTContext();
  bool isAsync = stmt->getAwaitLoc().isValid();
@@ -3508,9 +3511,6 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
   auto *PB = PatternBindingDecl::createImplicit(
       ctx, StaticSpellingKind::None, pattern, makeIteratorCall, dc);
 
-  if (TypeChecker::typeCheckPatternBinding(PB, 0))
-    return nullptr;
-
   // The result type of `.makeIterator()` is used to form a call to
   // `.next()`. `next()` is called on each iteration of the loop.
   FuncDecl *nextFn = 
@@ -3565,19 +3565,12 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
 
   auto elementPattern = stmt->getPattern();
   auto optPatternType = OptionalType::get(elementPattern->getType());
-  swift::constraints::SyntacticElementTarget nextTarget(nextCall, dc, CTP_ForEachElement,
-                                      /*contextualType=*/optPatternType,
-                                      /*isDiscarded=*/false);
-
-  auto nextCallTarget = TypeChecker::typeCheckExpression(nextTarget);
-  if (nextCallTarget == std::nullopt)
-    return nullptr;
-  nextCall = nextCallTarget->getAsExpr();
 
   SmallVector<StmtConditionElement, 1> cond;
+  auto *opaquePattern = new (ctx) OpaquePattern(elementPattern);
+  opaquePattern->setType(optPatternType);
 
-  auto *somePattern = OptionalSomePattern::createImplicit(ctx, stmt->getPattern());
-  somePattern->setType(optPatternType);
+  auto *somePattern = OptionalSomePattern::createImplicit(ctx, opaquePattern);
 
   auto PBI = ConditionalPatternBindingInfo::create(ctx, SourceLoc(), somePattern, nextCall);
   auto conditionElement = StmtConditionElement(PBI);
@@ -3603,8 +3596,6 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
       nullptr, /*implicit*/ true, ctx);
   }
 
-  // FIXME: do we need to do anything extra here or elseswhere if the for each
-  // stmt is async?
   auto* whileStmt = new (ctx) WhileStmt(stmt->getLabelInfo(), SourceLoc(), ctx.AllocateCopy(cond), whileBody, true);
   stmt->setBreakTarget(whileStmt);
   stmt->setContinueTarget(whileStmt);
@@ -3613,7 +3604,11 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
   stmts.push_back(PB);
   stmts.push_back(whileStmt);
 
-  return BraceStmt::create(ctx, stmt->getStartLoc(), stmts, stmt->getEndLoc());
+  auto *braceStmt = BraceStmt::create(ctx, stmt->getStartLoc(), stmts, stmt->getEndLoc());
+  StmtChecker checker(stmt->getDeclContext());
+  // FIXME: do I wanna check the output?
+  checker.typeCheckStmt(braceStmt);
+  return braceStmt;
 }
 
 BraceStmt* DesugarForEachStmtRequest::evaluate(Evaluator &evaluator, ForEachStmt *stmt) const {

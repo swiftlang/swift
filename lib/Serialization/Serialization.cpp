@@ -4034,6 +4034,7 @@ private:
       writePattern(typed->getSubPattern());
       break;
     }
+
     case PatternKind::Is:
     case PatternKind::EnumElement:
     case PatternKind::OptionalSome:
@@ -4050,6 +4051,10 @@ private:
       writePattern(var->getSubPattern());
       break;
     }
+
+    case PatternKind::Opaque:
+      writePattern(cast<OpaquePattern>(pattern)->getSubPattern());
+      break;
     }
   }
 

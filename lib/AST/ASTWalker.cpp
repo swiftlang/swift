@@ -2239,6 +2239,14 @@ Pattern *Traversal::visitExprPattern(ExprPattern *P) {
   return nullptr;
 }
 
+Pattern *Traversal::visitOpaquePattern(OpaquePattern *P) {
+  if (Pattern *newSub = doIt(P->getSubPattern())) {
+    P->setSubPattern(newSub);
+    return P;
+  }
+  return nullptr;
+}
+
 Pattern *Traversal::visitBindingPattern(BindingPattern *P) {
   if (Pattern *newSub = doIt(P->getSubPattern())) {
     P->setSubPattern(newSub);

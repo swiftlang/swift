@@ -2664,6 +2664,9 @@ namespace {
     VarDecl *visitAnyPattern(AnyPattern *P) {
       return nullptr;
     }
+    VarDecl *visitOpaquePattern(OpaquePattern *P) {
+      return visit(P->getSubPattern());
+    }
 
     // Refutable patterns shouldn't ever come up.
 #define REFUTABLE_PATTERN(ID, BASE)                                        \

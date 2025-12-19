@@ -2718,6 +2718,13 @@ namespace {
       };
 
       switch (pattern->getKind()) {
+      case PatternKind::Opaque: {
+        auto *opaque = cast<OpaquePattern>(pattern);
+        auto *ogPattern = opaque->getSubPattern();
+        auto underlyingType = ogPattern->getType();
+        return setType(underlyingType);
+
+      }
       case PatternKind::Paren: {
         auto *paren = cast<ParenPattern>(pattern);
 

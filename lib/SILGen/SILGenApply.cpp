@@ -8047,6 +8047,9 @@ ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
     void visitBindingPattern(BindingPattern *P) {
       return visit(P->getSubPattern());
     }
+    void visitOpaquePattern(OpaquePattern *P) {
+      return visit(P->getSubPattern());
+    }
     void visitTuplePattern(TuplePattern *P) {
       path.push_back(0);
       for (unsigned i : indices(P->getElements())) {
