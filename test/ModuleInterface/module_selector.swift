@@ -125,13 +125,47 @@ public protocol Proto {
   // CHECK-DISABLED-SAME: TestCase.Struct<Swift.Int>
   typealias TypeAlias = Struct<Int>
 
+  // CHECK: typealias ID =
+  // CHECK-SAME: Self.AssocType.ID
+  typealias ID = AssocType.ID
+
   // CHECK: func requirement() -> Self.AssocType.ID
   func requirement() -> AssocType.ID
 
   // CHECK: func requirement2() ->
-  // CHECK-ENABLED: Self.TypeAlias.TestCase::Nested
-  // CHECK-DISABLED: Self.TypeAlias.Nested
+  // CHECK-SAME: Self.TypeAlias.Nested
   func requirement2() -> TypeAlias.Nested
 
   // CHECK: }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension Proto {
+  public typealias Text = String
+}
+
+// Test cases from rdar://166180424
+
+// CHECK-LABEL: func fn3<T>(_ t: T) ->
+// CHECK-SAME: T.TypeAlias.Nested
+@available(SwiftStdlib 5.1, *)
+public func fn3<T: Proto>(_ t: T) -> T.TypeAlias.Nested { fatalError() }
+
+// CHECK-LABEL: struct ProtoSet
+@available(SwiftStdlib 5.1, *)
+public struct ProtoSet<T: Proto> {
+  // CHECK: let ids:
+  // CHECK-ENABLED-SAME: Swift::Set<T.ID>
+  // CHECK-DISABLED-SAME: Swift.Set<T.ID>
+  public let ids: Set<T.ID>
+
+  // CHECK: let texts:
+  // CHECK-ENABLED-SAME: Swift::Set<T.Text>
+  // CHECK-DISABLED-SAME: Swift.Set<T.Text>
+  public let texts: Set<T.Text>
+
+  // CHECK: let singleText:
+  // CHECK-SAME: T.Text
+  public let singleText: T.Text
+}
+
