@@ -3512,9 +3512,15 @@ class LargeLoadableHeuristic {
 
   llvm::DenseMap<SILType, Properties> largeTypeProperties;
 
+  /// Cutoff used to determine when to deem a type as large solely on the number
+  /// of registers.
   static const unsigned NumRegistersVeryLargeType = 16;
+  /// Cutoff when we start considering other properties to determine when we
+  /// deem a type as large.
   static const unsigned NumRegistersLargeType = 8;
-  static const unsigned numUsesThreshold = 8;
+  /// Cutoff when we start to deem a type as large based on the number of uses
+  /// (requires the number or registers to be at least 8).
+  static const unsigned NumUsesThreshold = 8;
 
   bool UseAggressiveHeuristic;
 
@@ -3792,7 +3798,7 @@ bool LargeLoadableHeuristic::isLargeLoadableType(SILType ty) {
   if (regs >= NumRegistersVeryLargeType)
     return true;
 
-  if (entry.numUses() > numUsesThreshold)
+  if (entry.numUses() > NumUsesThreshold)
    return true;
 
   if (entry.hasStore())
