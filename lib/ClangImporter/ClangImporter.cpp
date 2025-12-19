@@ -13,7 +13,6 @@
 // This file implements support for loading Clang modules into Swift.
 //
 //===----------------------------------------------------------------------===//
-#include "swift/ClangImporter/ClangImporter.h"
 #include "CFTypeInfo.h"
 #include "ClangDerivedConformances.h"
 #include "ClangDiagnosticConsumer.h"
@@ -29,7 +28,6 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Evaluator.h"
-#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
@@ -45,13 +43,11 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
