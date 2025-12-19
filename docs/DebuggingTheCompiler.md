@@ -38,6 +38,7 @@ benefit of all Swift developers.
         - [Reducing SIL test cases using bug_reducer](#reducing-sil-test-cases-using-bug_reducer)
     - [Disabling PCH Verification](#disabling-pch-verification)
     - [Diagnosing LSAN Failures in the Compiler](#diagnosing-lsan-failures-in-the-compiler)
+    - [Diagnosing the modules and swiftinterface files that the Compiler is loading](#diagnosing-the-modules-and-swiftinterface-files-that-the-compiler-is-loading)
 - [Debugging the Compiler Build](#debugging-the-compiler-build)
     - [Build Dry Run](#build-dry-run)
 - [Debugging the Compiler Driver](#debugging-the-compiler-driver-build)
@@ -936,6 +937,34 @@ docker exec -u 0:0 -it lsan-reproducer bash
 $ apt update
 $ apt install vim
 ```
+
+## Diagnosing the modules and swiftinterface files that the Compiler is loading
+
+In order to determine which swiftinterface files or modules a compiler is
+loading, one can pass in the `-Rmodule-loading` flag to the compiler. This will
+cause the compiler to emit diagnostics that show where it is loading modules
+from. E.x.:
+
+```
+<unknown>:0: remark: 'Swift' has a required transitive dependency on 'SwiftShims'
+<unknown>:0: remark: loaded module 'SwiftShims'; source: '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX14.5.sdk/usr/lib/swift/shims/module.modulemap', loaded: '2HUHAYXMA6V6X/SwiftShims-2VJU34GCOR4TK.pcm'
+<unknown>:0: remark: loaded module 'Swift'; source: '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX14.5.sdk/usr/lib/swift/Swift.swiftmodule/arm64e-apple-macos.swiftinterface', loaded: '$MODULE_CACHE_PATH/Swift-145L0LE2COJMJ.swiftmodule'
+<unknown>:0: remark: '_StringProcessing' has a required transitive dependency on 'Swift'
+<unknown>:0: remark: loaded module '_StringProcessing'; source: '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX14.5.sdk/usr/lib/swift/_StringProcessing.swiftmodule/arm64e-apple-macos.swiftinterface', loaded: '$MODULE_CACHE_PATH/_StringProcessing-GDUC793JZ4FG.swiftmodule'
+<unknown>:0: remark: loaded module '_SwiftConcurrencyShims'; source: '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX14.5.sdk/usr/lib/swift/shims/module.modulemap', loaded: '$MODULE_CACHE_PATH/2HUHAYXMA6V6X/_SwiftConcurrencyShims-2VJU34GCOR4TK.pcm'
+<unknown>:0: remark: '_Concurrency' has a required transitive dependency on 'Swift'
+<unknown>:0: remark: '_Concurrency' has a required transitive dependency on 'SwiftShims'
+<unknown>:0: remark: loaded module '_Concurrency'; source: '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX14.5.sdk/usr/lib/swift/_Concurrency.swiftmodule/arm64e-apple-macos.swiftinterface', loaded: '$MODULE_CACHE_PATH/_Concurrency-2F0RT3BEWY3IN.swiftmodule'
+```
+
+One can also control whether or not the compiler prefers the interface or
+serialized version of a module by using the environment variable
+`SWIFT_FORCE_MODULE_LOADING`. The supported options are:
+
+* prefer-interface
+* prefer-serialized
+* only-interface
+* only-serialized
 
 # Debugging the Compiler Build
 
