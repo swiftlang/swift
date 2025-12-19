@@ -3255,8 +3255,9 @@ static bool isDeclaredInModule(const ClangModuleUnit *ModuleFilter,
   return ModuleFilter == ContainingUnit;
 }
 
-static const clang::Module *
-getClangOwningModule(ClangNode Node, const clang::ASTContext &ClangCtx) {
+const clang::Module *
+importer::getClangOwningModule(ClangNode Node,
+                               const clang::ASTContext &ClangCtx) {
   assert(!Node.getAsModule() && "not implemented for modules");
 
   if (const clang::Decl *D = Node.getAsDecl()) {
@@ -4315,12 +4316,7 @@ const clang::CompilerInstance &ClangImporter::getClangInstance() const {
 }
 
 const clang::Module *ClangImporter::getClangOwningModule(ClangNode Node) const {
-  return Impl.getClangOwningModule(Node);
-}
-
-const clang::Module *
-ClangImporter::Implementation::getClangOwningModule(ClangNode Node) const {
-  return ::getClangOwningModule(Node, getClangASTContext());
+  return importer::getClangOwningModule(Node, Impl.getClangASTContext());
 }
 
 bool ClangImporter::hasTypedef(const clang::Decl *typeDecl) const {
