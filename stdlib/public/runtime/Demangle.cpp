@@ -1129,12 +1129,11 @@ namespace swift {
         size_t toCopy = std::min(bufferSize, result.length());
 
         // Are we accidentally cutting of an UTF8 codepoint in the middle?
-        // there may be up to 4 continuations of a codepoint so we need to see if we're cutting off in the middle,
+        // There may be up to 4 continuations of a codepoint so we need to see if we're cutting off in the middle,
         // and if so, back out until we find the actual non-continuation byte.
         while (toCopy > 0 &&
-               toCopy < result.length() &&
-               isUTF8CodePointContinuationByte(result.data()[toCopy])) {
-          // we're in the middle of an utf8 scalar, and would overwrite it with a null terminator resulting in a truncated UTF8-scalar.
+               toCopy + 1 < result.length() && isUTF8CodePointContinuationByte(result.data()[toCopy + 1])) {
+          // we're in the middle of an utf8 scalar, a truncated UTF8-scalar.
           // don't do that, and instead truncate further back
           toCopy -= 1;
         }
