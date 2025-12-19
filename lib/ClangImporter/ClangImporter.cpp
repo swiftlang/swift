@@ -5237,39 +5237,6 @@ namespace {
   };
 }
 
-TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
-    Evaluator &evaluator, CXXNamespaceMemberLookupDescriptor desc) const {
-  EnumDecl *namespaceDecl = desc.namespaceDecl;
-  DeclName name = desc.name;
-  auto *clangNamespaceDecl =
-      cast<clang::NamespaceDecl>(namespaceDecl->getClangDecl());
-  auto &ctx = namespaceDecl->getASTContext();
-
-  TinyPtrVector<ValueDecl *> result;
-  CollectLookupResults collector(name, result);
-
-  llvm::SmallPtrSet<clang::NamedDecl *, 8> importedDecls;
-  for (auto redecl : clangNamespaceDecl->redecls()) {
-    auto allResults = evaluateOrDefault(
-        ctx.evaluator, ClangDirectLookupRequest({namespaceDecl, redecl, name}),
-        {});
-
-    for (auto found : allResults) {
-      auto clangMember = cast<clang::NamedDecl *>(found);
-      auto it = importedDecls.insert(clangMember);
-      // Skip over members already found during lookup in
-      // prior redeclarations.
-      if (!it.second)
-        continue;
-      if (auto import =
-              ctx.getClangModuleLoader()->importDeclDirectly(clangMember))
-        collector.add(cast<ValueDecl>(import));
-    }
-  }
-
-  return result;
-}
-
 static const llvm::StringMap<std::vector<int>> STLConditionalParams{
     {"basic_string", {0}},
     {"vector", {0}},

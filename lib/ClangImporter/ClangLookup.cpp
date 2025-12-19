@@ -22,16 +22,22 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Evaluator.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/AST/Type.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Subsystems.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclBase.h"
 #include "clang/AST/DeclTemplate.h"
@@ -42,8 +48,45 @@
 #include "clang/Serialization/ASTWriter.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include <utility>
 
 using namespace swift;
+
+namespace {
+/// Collects name lookup results into the given tiny vector, for use in the
+/// various ClangImporter lookup routines.
+class CollectLookupResults {
+  DeclName name;
+  TinyPtrVector<ValueDecl *> &result;
+
+public:
+  CollectLookupResults(DeclName name, TinyPtrVector<ValueDecl *> &result)
+      : name(name), result(result) {}
+
+  void add(ValueDecl *imported) {
+    result.push_back(imported);
+
+    // Expand any macros introduced by the Clang importer.
+    imported->visitAuxiliaryDecls([&](Decl *decl) {
+      auto valueDecl = dyn_cast<ValueDecl>(decl);
+      if (!valueDecl)
+        return;
+
+      // Bail out if the auxiliary decl was not produced by a macro.
+      auto module = decl->getDeclContext()->getParentModule();
+      auto *sf = module->getSourceFileContainingLocation(decl->getLoc());
+      if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+        return;
+
+      // Only produce results that match the requested name.
+      if (!valueDecl->getName().matchesRef(name))
+        return;
+
+      result.push_back(valueDecl);
+    });
+  }
+};
+} // anonymous namespace
 
 static SmallVector<SwiftLookupTable::SingleEntry, 4>
 lookupInClassTemplateSpecialization(
@@ -134,4 +177,36 @@ ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
                   return first == second;
                 });
   return filteredDecls;
+}
+
+TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
+    Evaluator &evaluator, CXXNamespaceMemberLookupDescriptor desc) const {
+  EnumDecl *namespaceDecl = desc.namespaceDecl;
+  DeclName name = desc.name;
+  auto *clangNamespaceDecl =
+      cast<clang::NamespaceDecl>(namespaceDecl->getClangDecl());
+  auto &ctx = namespaceDecl->getASTContext();
+
+  TinyPtrVector<ValueDecl *> result;
+  CollectLookupResults collector(name, result);
+
+  llvm::SmallPtrSet<clang::NamedDecl *, 8> importedDecls;
+  for (auto redecl : clangNamespaceDecl->redecls()) {
+    auto allResults = evaluateOrDefault(
+        ctx.evaluator, ClangDirectLookupRequest({namespaceDecl, redecl, name}),
+        {});
+
+    for (auto found : allResults) {
+      auto clangMember = cast<clang::NamedDecl *>(found);
+      auto it = importedDecls.insert(clangMember);
+      // Skip over members already found during lookup in prior redeclarations.
+      if (!it.second)
+        continue;
+      if (auto import =
+              ctx.getClangModuleLoader()->importDeclDirectly(clangMember))
+        collector.add(cast<ValueDecl>(import));
+    }
+  }
+
+  return result;
 }
