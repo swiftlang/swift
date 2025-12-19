@@ -3605,7 +3605,9 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
 
   if (!capturedEnvs.empty() ||
       expectedType->hasPrimaryArchetype() ||
-      sourceType->hasPrimaryArchetype()) {
+      sourceType->hasPrimaryArchetype() ||
+      (inputSubstType && inputSubstType->hasPrimaryArchetype()) ||
+      (outputSubstType && outputSubstType->hasPrimaryArchetype())) {
     // Get the existing generic signature.
     baseGenericSig = fn->getLoweredFunctionType()
         ->getInvocationGenericSignature();
