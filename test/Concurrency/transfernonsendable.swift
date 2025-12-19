@@ -1794,7 +1794,7 @@ extension MyActor {
 func nonSendableAllocBoxConsumingParameter(x: consuming SendableKlass) async throws {
   try await withThrowingTaskGroup(of: Void.self) { group in
     group.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      useValue(x) // expected-note {{closure captures reference to mutable parameter 'x' which is accessible to code in the current task}}
+      useValue(x) // expected-note {{closure captures reference to mutable parameter 'x' which remains modifiable by code in the current task}}
     }
 
     try await group.waitForAll()
@@ -1807,7 +1807,7 @@ func nonSendableAllocBoxConsumingVar() async throws {
 
   try await withThrowingTaskGroup(of: Void.self) { group in
     group.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      useValue(x) // expected-note {{closure captures reference to mutable var 'x' which is accessible to code in the current task}}
+      useValue(x) // expected-note {{closure captures reference to mutable var 'x' which remains modifiable by code in the current task}}
     }
 
     try await group.waitForAll()
@@ -1865,7 +1865,7 @@ func testFunctionIsNotEmpty(input: SendableKlass) async throws {
   var result: [SendableKlass] = []
   try await withThrowingTaskGroup(of: Void.self) { taskGroup in // expected-warning {{no calls to throwing functions occur within 'try' expression}}
     taskGroup.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      result.append(input) // expected-note {{closure captures reference to mutable var 'result' which is accessible to code in the current task}}
+      result.append(input) // expected-note {{closure captures reference to mutable var 'result' which remains modifiable by code in the current task}}
     }
   }
 }
