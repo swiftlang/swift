@@ -804,6 +804,10 @@ option(SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   "Enable experimental SwiftParser validation by default"
   FALSE)
 
+option(SWIFT_ENABLE_DIRECT_RETAIN_RELEASE
+  "Enable use of direct refcounting calls by default"
+  FALSE)
+
 cmake_dependent_option(SWIFT_BUILD_SOURCEKIT
   "Build SourceKit" TRUE
   "SWIFT_ENABLE_DISPATCH" FALSE)

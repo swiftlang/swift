@@ -560,7 +560,7 @@ public:
   unsigned MergeableTraps : 1;
 
   /// Enable the use of swift_retain/releaseDirect functions.
-  unsigned EnableSwiftDirectRuntime : 1;
+  unsigned EnableSwiftDirectRetainRelease : 1;
 
   /// The number of threads for multi-threaded code generation.
   unsigned NumThreads = 0;
@@ -689,7 +689,7 @@ public:
         EmitAsyncFramePushPopMetadata(true), EmitTypeMallocForCoroFrame(true),
         AsyncFramePointerAll(false), UseProfilingMarkerThunks(false),
         UseCoroCCX8664(false), UseCoroCCArm64(false), MergeableTraps(false),
-        EnableSwiftDirectRuntime(false),
+        EnableSwiftDirectRetainRelease(SWIFT_ENABLE_DIRECT_RETAIN_RELEASE),
         DebugInfoForProfiling(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
