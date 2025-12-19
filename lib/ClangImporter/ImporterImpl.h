@@ -970,10 +970,6 @@ public:
   ClangModuleUnit *getClangModuleForDecl(const clang::Decl *D,
                                          bool allowForwardDeclaration = false);
 
-  /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
-  /// have a valid owning module.
-  const clang::Module *getClangOwningModule(ClangNode Node) const;
-
   /// Whether NSUInteger can be imported as Int in certain contexts. If false,
   /// should always be imported as UInt.
   static bool shouldAllowNSUIntegerAsInt(bool isFromSystemModule,
@@ -2221,6 +2217,13 @@ getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
   }
   return nullptr;
 }
+
+/// Returns the module \p Node comes from, or \c nullptr if \p Node does not
+/// have a valid owning module.
+///
+/// Note that \p Node cannot itself be a clang::Module.
+const clang::Module *getClangOwningModule(ClangNode Node,
+                                          const clang::ASTContext &ClangCtx);
 
 } // end namespace importer
 } // end namespace swift

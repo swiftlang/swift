@@ -304,7 +304,7 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
       // behavior for the operator that we just instantiated.
       auto lookupTable1 = impl.findLookupTable(classDecl);
       addEntryToLookupTable(*lookupTable1, clangCallee, impl.getNameImporter());
-      auto owningModule = impl.getClangOwningModule(classDecl);
+      auto owningModule = importer::getClangOwningModule(classDecl, clangCtx);
       auto lookupTable2 = impl.findLookupTable(owningModule);
       if (lookupTable1 != lookupTable2)
         addEntryToLookupTable(*lookupTable2, clangCallee, impl.getNameImporter());
@@ -412,7 +412,7 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
   impl.synthesizedAndAlwaysVisibleDecls.insert(equalEqualDecl);
   auto lookupTable1 = impl.findLookupTable(classDecl);
   addEntryToLookupTable(*lookupTable1, equalEqualDecl, impl.getNameImporter());
-  auto owningModule = impl.getClangOwningModule(classDecl);
+  auto owningModule = importer::getClangOwningModule(classDecl, clangCtx);
   auto lookupTable2 = impl.findLookupTable(owningModule);
   if (lookupTable1 != lookupTable2)
     addEntryToLookupTable(*lookupTable2, equalEqualDecl,
@@ -1259,7 +1259,8 @@ void swift::deriveAutomaticCxxConformances(
   //
   // We will still attempt to synthesize to account for scenarios where the
   // module specification is missing altogether.
-  if (auto *clangModule = Impl.getClangOwningModule(result->getClangNode());
+  if (auto *clangModule = importer::getClangOwningModule(
+          result->getClangNode(), Impl.getClangASTContext());
       clangModule && !requiresCPlusPlus(clangModule))
     return;
 
