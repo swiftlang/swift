@@ -22,8 +22,10 @@ if #available(SwiftStdlib 6.3, *) {
     expectEqual(try? demangle("Swift is super cool!"), nil)
 
     // Test that correct symbols are demangled. (Test all documented prefixes)
+    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) // legacy mangling is not supported on Linux
     expectEqual(try? demangle("_TSb"), "Swift.Bool")
     expectEqual(try? demangle("_T0Si"), "Swift.Int")
+    #endif
     expectEqual(try? demangle("$SSdXSaXSq"), "[Swift.Double]?")
     expectEqual(try? demangle("_$S8Demangle4main4argc4argvs5Int32VAF_SpySpys4Int8VGSgGtF"), "Demangle.main(argc: Swift.Int32, argv: Swift.UnsafeMutablePointer<Swift.Optional<Swift.UnsafeMutablePointer<Swift.Int8>>>) -> Swift.Int32")
     expectEqual(try? demangle("$sSG"), "Swift.RandomNumberGenerator")
@@ -79,6 +81,7 @@ if #available(SwiftStdlib 6.3, *) {
     }
 
     // Test that correct symbols are demangled. (Test all documented prefixes)
+    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) // legacy mangling is not supported on Linux
     test { outputSpan in
       do {
         try demangle("_TSb".utf8Span, into: &outputSpan)
@@ -88,7 +91,9 @@ if #available(SwiftStdlib 6.3, *) {
         expectTrue(false, "Got unexpected error: \(error)")
       }
     }
+    #endif
 
+    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) // legacy mangling is not supported on Linux
     test { outputSpan in
       do {
         try demangle("_T0Si".utf8Span, into: &outputSpan)
@@ -98,6 +103,7 @@ if #available(SwiftStdlib 6.3, *) {
         expectTrue(false, "Got unexpected error: \(error)")
       }
     }
+    #endif
 
     test { outputSpan in
       do {
