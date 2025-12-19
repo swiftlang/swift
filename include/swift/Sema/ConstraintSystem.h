@@ -2196,7 +2196,7 @@ private:
 
   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> ExprWeights;
 
-  /// Allocator used for all of the related constraint systems.
+  /// Allocator used for data that is local to this constraint system.
   llvm::BumpPtrAllocator Allocator;
 
   /// Arena used for memory management of constraint-checker-related
