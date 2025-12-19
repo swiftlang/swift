@@ -412,7 +412,10 @@ bool OptimizeHopToExecutor::needsExecutor(SILInstruction *inst) {
   // executors since caller isolation inheriting functions do not hop in their
   // prologue.
   if (auto fas = FullApplySite::isa(inst);
-      fas && fas.isAsync() && fas.isCallerIsolationInheriting()) {
+      fas && fas.isAsync() &&
+      fixme_isCallerIsoInheriting(fas)
+//      fas.isCallerIsolationInheriting()
+      ) {
     return true;
   }
 
