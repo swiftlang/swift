@@ -19,6 +19,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/Import.h"
 #include "swift/AST/ParameterList.h"
 
 #include "clang/AST/ASTContext.h"
@@ -550,9 +551,22 @@ private:
   }
 };
 
+static bool shouldSkipModule(ModuleDecl *M) {
+  if (M->getName().str() == CLANG_HEADER_MODULE_NAME) {
+    DLOG("is from bridging header (or C++ namespace)\n");
+    return false;
+  }
+
+  if (M->getImplicitImportInfo().StdlibKind != ImplicitStdlibKind::Stdlib) {
+    DLOG("module " << M->getNameStr() << " does not import stdlib\n");
+    return true;
+  }
+
+  return false;
+}
+
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
-  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers) ||
-      SwiftContext.ClangImporterOpts.DisableSafeInteropWrappers)
+  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
     return;
   auto ClangDecl = dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
   if (!ClangDecl)
@@ -562,6 +576,9 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       "Checking '" << *ClangDecl << "' (imported as '"
                    << MappedDecl->getName().getBaseName().userFacingName()
                    << "')\n");
+
+  if (shouldSkipModule(MappedDecl->getParentModule()))
+    return;
 
   {
     UnaliasedInstantiationVisitor visitor;
@@ -615,8 +632,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
 
 void ClangImporter::Implementation::swiftifyProtocol(
     NominalTypeDecl *MappedDecl) {
-  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers) ||
-      SwiftContext.ClangImporterOpts.DisableSafeInteropWrappers)
+  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
     return;
   if (!isa<ProtocolDecl, ClassDecl>(MappedDecl))
     return;
@@ -630,6 +646,10 @@ void ClangImporter::Implementation::swiftifyProtocol(
 
   DLOG_SCOPE("Checking '" << MappedDecl->getName()
               << "' protocol for methods with bounds and lifetime info\n");
+
+  if (shouldSkipModule(MappedDecl->getParentModule()))
+    return;
+
   llvm::SmallString<128> MacroString;
   {
     llvm::raw_svector_ostream out(MacroString);
