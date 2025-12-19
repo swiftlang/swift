@@ -7,8 +7,8 @@
 // from being picked up as the canonical decl.
 // RUN: %empty-directory(%t/sdk)
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -sdk %t/sdk \
-// RUN:   -Xcc -Werror %t/test.swift -import-objc-header %t/test.h -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -sdk %t/sdk \
+// RUN:   -Xcc -Werror %t%{fs-sep}test.swift -import-objc-header %t%{fs-sep}test.h -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions
 
 // Check that ClangImporter does not try to apply _SwiftifyImport to functions in SwiftShims,
 // as it does not import the standard library types.
