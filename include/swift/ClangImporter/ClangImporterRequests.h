@@ -64,14 +64,16 @@ void simple_display(llvm::raw_ostream &out,
                     const ClangDirectLookupDescriptor &desc);
 SourceLoc extractNearestSourceLoc(const ClangDirectLookupDescriptor &desc);
 
-/// This matches SwiftLookupTable::SingleEntry;
-using SingleEntry = llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *,
-                                       clang::ModuleMacro *>;
+/// This matches SwiftLookupTable::SingleEntry
+using ClangDirectLookupEntry =
+    llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *,
+                       clang::ModuleMacro *>;
+
 /// Uses the appropriate SwiftLookupTable to find a set of clang decls given
 /// their name.
 class ClangDirectLookupRequest
     : public SimpleRequest<ClangDirectLookupRequest,
-                           SmallVector<SingleEntry, 4>(
+                           SmallVector<ClangDirectLookupEntry, 4>(
                                ClangDirectLookupDescriptor),
                            RequestFlags::Uncached> {
 public:
@@ -81,8 +83,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  SmallVector<SingleEntry, 4> evaluate(Evaluator &evaluator,
-                                       ClangDirectLookupDescriptor desc) const;
+  SmallVector<ClangDirectLookupEntry, 4>
+  evaluate(Evaluator &evaluator, ClangDirectLookupDescriptor desc) const;
 };
 
 /// The input type for a namespace member lookup request.
