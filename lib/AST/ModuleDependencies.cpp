@@ -717,18 +717,6 @@ ModuleDependenciesCache::findDependency(
   auto known = map.find(moduleName);
   if (known != map.end())
     optionalDep = &(known->second);
-
-  // During a scan, only produce the cached source module info for the current
-  // module under scan.
-  if (optionalDep.has_value()) {
-    auto dep = optionalDep.value();
-    if (dep->getAsSwiftSourceModule() &&
-        moduleName != mainScanModuleName &&
-        moduleName != "MainModuleCrossImportOverlays") {
-      return std::nullopt;
-    }
-  }
-
   return optionalDep;
 }
 
@@ -770,6 +758,14 @@ bool ModuleDependenciesCache::hasDependency(StringRef moduleName) const {
 
 bool ModuleDependenciesCache::hasSwiftDependency(StringRef moduleName) const {
   return findSwiftDependency(moduleName).has_value();
+}
+
+int ModuleDependenciesCache::numberOfClangDependencies() const {
+  return ModuleDependenciesMap.at(ModuleDependencyKind::Clang).size();
+}
+int ModuleDependenciesCache::numberOfSwiftDependencies() const {
+  return ModuleDependenciesMap.at(ModuleDependencyKind::SwiftInterface).size() +
+         ModuleDependenciesMap.at(ModuleDependencyKind::SwiftBinary).size();
 }
 
 void ModuleDependenciesCache::recordDependency(
@@ -908,7 +904,6 @@ void ModuleDependenciesCache::setSwiftOverlayDependencies(
     ModuleDependencyID moduleID,
     const ArrayRef<ModuleDependencyID> dependencyIDs) {
   auto dependencyInfo = findKnownDependency(moduleID);
-  assert(dependencyInfo.getSwiftOverlayDependencies().empty());
 #ifndef NDEBUG
   for (const auto &depID : dependencyIDs)
     assert(depID.Kind != ModuleDependencyKind::Clang);
@@ -923,7 +918,6 @@ void ModuleDependenciesCache::setCrossImportOverlayDependencies(
     ModuleDependencyID moduleID,
     const ModuleDependencyIDCollectionView dependencyIDs) {
   auto dependencyInfo = findKnownDependency(moduleID);
-  assert(dependencyInfo.getCrossImportOverlayDependencies().empty());
   // Copy the existing info to a mutable one we can then replace it with,
   // after setting its overlay dependencies.
   auto updatedDependencyInfo = dependencyInfo;

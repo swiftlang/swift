@@ -80,28 +80,11 @@ struct Wrapper {
 var i: Int
 
 var i_accessor: Int {
-  borrow { // expected-error{{a 'borrow' accessor is supported only on a struct or enum}}
+  borrow { // expected-error{{a 'borrow' accessor is supported only on a struct}}
     fatalError()
   }
-  mutate { // expected-error{{a 'mutate' accessor is supported only on a struct or enum}}
+  mutate { // expected-error{{a 'mutate' accessor is supported only on a struct}}
     return &i // expected-error{{'&' may only be used to pass an argument to inout parameter}}
-  }
-}
-
-var _count: Int = 0
-
-enum Color {
-  case red
-  case green
-  case blue
-
-  var count: Int {
-    borrow {
-      return _count
-    }
-    mutate {
-      return &_count
-    }
   }
 }
 
@@ -113,10 +96,10 @@ class KlassWrapper {
   }
 
   var k: Klass {
-    borrow {// expected-error{{a 'borrow' accessor is supported only on a struct or enum}}
+    borrow {// expected-error{{a 'borrow' accessor is supported only on a struct}}
       return _k
     }
-    mutate {// expected-error{{a 'mutate' accessor is supported only on a struct or enum}}
+    mutate {// expected-error{{a 'mutate' accessor is supported only on a struct}}
       return &_k
     }
   }

@@ -1084,6 +1084,8 @@ protected:
 
     // Infer non-Escapable results.
     if (isDiagnosedNonEscapable(getResultOrYield())) {
+      inferNonEscapableResultOnSameTypeParam();
+
       if (isInit() && isImplicitOrSIL()) {
         inferImplicitInit();
       } else if (hasImplicitSelfParam()) {
@@ -1105,6 +1107,45 @@ protected:
     inferInoutParams();
   }
 
+  // Infer a dependency to the ~Escapable result from all parameters of the same
+  // type.
+  void inferNonEscapableResultOnSameTypeParam() {
+    // The function declaration's substituted result type.
+    CanType resultTy = getResultOrYield()->getCanonicalType();
+
+    TargetDeps *targetDeps = depBuilder.getInferredTargetDeps(resultIndex);
+    if (!targetDeps)
+      return;
+
+    // Ignore mutating self. An 'inout' modifier effectively makes the parameter
+    // a different type for lifetime inference.
+    if (hasImplicitSelfParam() && !afd->getImplicitSelfDecl()->isInOut()) {
+      Type selfTy = afd->mapTypeIntoEnvironment(dc->getSelfInterfaceType());
+      if (selfTy->getCanonicalType() == resultTy) {
+        targetDeps->inheritIndices.set(selfIndex);
+      }
+    }
+
+    unsigned paramIndex = 0;
+    for (auto *param : *afd->getParameters()) {
+      SWIFT_DEFER { paramIndex++; };
+
+      // Ignore 'inout' parameters. An 'inout' modifier effectively makes the
+      // parameter a different type for lifetime inference. An 'inout' parameter
+      // defaults to being the source and target of a self-dependency, as
+      // covered by the 'inout' rule.
+      if (param->isInOut())
+        continue;
+
+      CanType paramTy = afd->mapTypeIntoEnvironment(
+        param->getInterfaceType())->getCanonicalType();
+      if (paramTy != resultTy)
+        continue;
+
+      targetDeps->inheritIndices.set(paramIndex);
+    }
+  }
+
   // Infer dependence for an accessor whose non-escapable result depends on
   // self. This includes _read and _modify.
   //
@@ -1117,7 +1158,8 @@ protected:
     bool nonEscapableSelf = isDiagnosedNonEscapable(dc->getSelfTypeInContext());
     if (nonEscapableSelf && accessor->getImplicitSelfDecl()->isInOut()) {
       // First, infer the dependency of the inout non-Escapable 'self'. This may
-      // result in two inferred dependencies for accessors.
+      // result in two inferred dependencies for accessors (one targetting
+      // selfIndex here, and one targetting resultIndex below).
       inferMutatingAccessor(accessor);
     }
     // Handle synthesized wrappers...
@@ -1255,6 +1297,9 @@ protected:
     if (!resultDeps)
       return; // .sil implicit initializers may have been annotated.
 
+    if (!resultDeps->empty())
+      return; // same-type inferrence applied; don't issue diagnostics.
+
     unsigned paramIndex = 0;
     for (auto *param : *afd->getParameters()) {
       SWIFT_DEFER { paramIndex++; };
@@ -1292,6 +1337,9 @@ protected:
     TargetDeps *resultDeps = depBuilder.getInferredTargetDeps(resultIndex);
     if (!resultDeps)
       return;
+
+    if (!resultDeps->empty())
+      return; // same-type inferrence applied; don't issue diagnostics.
 
     bool nonEscapableSelf = isDiagnosedNonEscapable(dc->getSelfTypeInContext());
     // Do not infer the result's dependence when the method is mutating and
@@ -1358,6 +1406,9 @@ protected:
     TargetDeps *resultDeps = depBuilder.getInferredTargetDeps(resultIndex);
     if (!resultDeps)
       return;
+
+    if (!resultDeps->empty())
+      return; // same-type inferrence applied; don't issue diagnostics.
 
     // Strict inference only handles a single escapable parameter,
     // which is an unambiguous borrow dependence.

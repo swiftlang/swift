@@ -1087,7 +1087,7 @@ static bool diagnosePotentialUnavailability(
       // Don't downgrade
     } else if (behaviorLimit >= DiagnosticBehavior::Warning) {
       err.limitBehavior(behaviorLimit);
-    } else {
+    } else if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl)) {
       err.warnUntilLanguageMode(6);
     }
 
@@ -2179,7 +2179,8 @@ bool diagnoseExplicitUnavailability(
   // obsolete decls still map to valid ObjC runtime names, so behave correctly
   // at runtime, even though their use would produce an error outside of a
   // #keyPath expression.
-  auto limit = Flags.contains(DeclAvailabilityFlag::ForObjCKeyPath)
+  auto limit = (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl) &&
+                Flags.contains(DeclAvailabilityFlag::ForObjCKeyPath))
                   ? DiagnosticBehavior::Warning
                   : DiagnosticBehavior::Unspecified;
 
@@ -2968,10 +2969,12 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
                                    attr->getMessage());
     if (D->preconcurrency()) {
       diag.limitBehavior(DiagnosticBehavior::Warning);
-    } else if (shouldWarnUntilFutureVersion()) {
-      diag.warnUntilFutureLanguageMode();
-    } else {
-      diag.warnUntilLanguageMode(6);
+    } else if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl)) {
+      if (shouldWarnUntilFutureVersion()) {
+        diag.warnUntilFutureLanguageMode();
+      } else {
+        diag.warnUntilLanguageMode(6);
+      }
     }
 
     if (!attr->getRename().empty()) {
@@ -2992,10 +2995,12 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
     SourceLoc diagLoc = call ? call->getLoc() : R.Start;
     auto diag = ctx.Diags.diagnose(diagLoc, diag::async_unavailable_decl, D,
                                    attr->Message);
-    if (shouldWarnUntilFutureVersion()) {
-      diag.warnUntilFutureLanguageMode();
-    } else {
-      diag.warnUntilLanguageMode(6);
+    if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl)) {
+      if (shouldWarnUntilFutureVersion()) {
+        diag.warnUntilFutureLanguageMode();
+      } else {
+        diag.warnUntilLanguageMode(6);
+      }
     }
   }
   D->diagnose(diag::decl_declared_here, D);

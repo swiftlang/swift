@@ -84,14 +84,20 @@ struct PotentialBinding {
   /// because they are synthetic, they have a locator instead.
   PointerUnion<Constraint *, ConstraintLocator *> BindingSource;
 
+  /// When the binding is transferred through a subtype chain, this
+  /// marks a type variable for which it was originally inferred.
+  TypeVariableType *Originator;
+
   PotentialBinding(Type type, AllowedBindingKind kind,
-                   PointerUnion<Constraint *, ConstraintLocator *> source)
-      : BindingType(type), Kind(kind), BindingSource(source) {}
+                   PointerUnion<Constraint *, ConstraintLocator *> source,
+                   TypeVariableType *originator)
+      : BindingType(type), Kind(kind), BindingSource(source),
+        Originator(originator) {}
 
   PotentialBinding(Type type, AllowedBindingKind kind, Constraint *source)
       : PotentialBinding(
-            type, kind,
-            PointerUnion<Constraint *, ConstraintLocator *>(source)) {}
+            type, kind, PointerUnion<Constraint *, ConstraintLocator *>(source),
+            /*originator=*/nullptr) {}
 
   bool isDefaultableBinding() const {
     if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
@@ -124,12 +130,19 @@ struct PotentialBinding {
   Constraint *getSource() const { return cast<Constraint *>(BindingSource); }
 
   PotentialBinding withType(Type type) const {
-    return {type, Kind, BindingSource};
+    return {type, Kind, BindingSource, Originator};
   }
 
   PotentialBinding withSameSource(Type type, AllowedBindingKind kind) const {
-    return {type, kind, BindingSource};
+    return {type, kind, BindingSource, Originator};
   }
+
+  PotentialBinding asTransitiveFrom(TypeVariableType *originator) const {
+    ASSERT(originator);
+    return {BindingType, Kind, BindingSource, originator};
+  }
+
+  bool isTransitive() const { return bool(Originator); }
 
   /// Determine whether this binding could be a viable candidate
   /// to be "joined" with some other binding. It has to be at least
@@ -140,12 +153,13 @@ struct PotentialBinding {
                                   ConstraintLocator *locator) {
     return {PlaceholderType::get(typeVar->getASTContext(), typeVar),
             AllowedBindingKind::Exact,
-            /*source=*/locator};
+            /*source=*/locator, /*originator=*/nullptr};
   }
 
   static PotentialBinding forPlaceholder(Type placeholderTy) {
     return {placeholderTy, AllowedBindingKind::Exact,
-            PointerUnion<Constraint *, ConstraintLocator *>()};
+            PointerUnion<Constraint *, ConstraintLocator *>(),
+            /*originator=*/nullptr};
   }
 
   void print(llvm::raw_ostream &out, const PrintOptions &PO) const;
@@ -492,7 +506,7 @@ public:
   /// \param isTransitive Indicates whether this binding has been
   /// acquired through transitive inference and requires extra
   /// checking.
-  bool isViable(PotentialBinding &binding, bool isTransitive);
+  bool isViable(PotentialBinding &binding);
 
   /// Determine whether this set has any "viable" (or non-hole) bindings.
   ///
@@ -624,10 +638,7 @@ private:
   /// Add a new binding to the set.
   ///
   /// \param binding The binding to add.
-  /// \param isTransitive Indicates whether this binding has been
-  /// acquired through transitive inference and requires validity
-  /// checking.
-  void addBinding(PotentialBinding binding, bool isTransitive);
+  void addBinding(PotentialBinding binding);
 
   void addDefault(Constraint *constraint);
 
