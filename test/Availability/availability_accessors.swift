@@ -579,14 +579,11 @@ func testKeyPathArguments_Struct() {
   takesSendableKeyPath(x, \.deprecatedSetter)
 
   func takesWritableKeyPath<T, U>(_ t: inout T, _ keyPath: WritableKeyPath<T, U>) -> () { }
-  // expected-note@-1 2 {{in call to function 'takesWritableKeyPath'}}
 
   takesWritableKeyPath(&x, \.available)
   takesWritableKeyPath(&x, \.unavailableGetter) // expected-error {{getter for 'unavailableGetter' is unavailable}}
   takesWritableKeyPath(&x, \.unavailableSetter) // expected-error {{setter for 'unavailableSetter' is unavailable}}
-  // expected-error@-1 {{generic parameter 'U' could not be inferred}}
   takesWritableKeyPath(&x, \.unavailableGetterAndSetter) // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
-  // expected-error@-1 {{generic parameter 'U' could not be inferred}}
   takesWritableKeyPath(&x, \.deprecatedGetter) // expected-warning {{getter for 'deprecatedGetter' is deprecated: reading not recommended}}
   takesWritableKeyPath(&x, \.deprecatedSetter) // expected-warning {{setter for 'deprecatedSetter' is deprecated: writing not recommended}}
 
