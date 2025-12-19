@@ -8366,7 +8366,7 @@ static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
             hasUnsafeAPIAttr(cxxRecord))
           return false;
 
-        if (hasIteratorAPIAttr(cxxRecord) || isIterator(cxxRecord))
+        if (hasIteratorAPIAttr(cxxRecord) || hasIteratorCategory(cxxRecord))
           return true;
 
         if (hasPointerInSubobjects(cxxRecord))
@@ -8487,7 +8487,7 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
   if (isSwiftClassType(cxxDecl))
     return CxxRecordSemanticsKind::SwiftClassType;
 
-  if (hasIteratorAPIAttr(cxxDecl) || isIterator(cxxDecl)) {
+  if (hasIteratorAPIAttr(cxxDecl) || hasIteratorCategory(cxxDecl)) {
     return CxxRecordSemanticsKind::Iterator;
   }
 
@@ -8747,7 +8747,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
           return true;
 
         if (hasIteratorAPIAttr(cxxRecordReturnType) ||
-            isIterator(cxxRecordReturnType))
+            hasIteratorCategory(cxxRecordReturnType))
           return false;
 
         // Mark this as safe to help our diganostics down the road.
