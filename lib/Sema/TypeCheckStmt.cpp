@@ -141,7 +141,11 @@ namespace {
       {
         FES->setDeclContext(ParentDC);
         if (!isa<PackExpansionExpr>(FES->getParsedSequence()))
-          FES->desugar();
+        {
+          if (!FES->getParsedSequence()->getType()->hasError()
+              && !FES->getPattern()->getType()->hasError())
+            FES->desugar();
+        }
       }
 
       return Action::Continue(S);
