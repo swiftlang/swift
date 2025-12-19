@@ -1119,6 +1119,11 @@ namespace swift {
         // we allocate the buffer for the result; truncation cannot happen in this case.
         auto totalLength = result.length();
         auto outputBuffer = (char *)::malloc(totalLength);
+        if (!outputBuffer) {
+          // malloc could have failed, let's handle it gracefully
+          *outputSize = 0;
+          return nullptr;
+        }
         size_t bufferSize = result.length();
 
         size_t toCopy = std::min(bufferSize, result.length());
