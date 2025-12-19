@@ -137,7 +137,12 @@ static bool isDirectLookupMemberContext(const clang::Decl *foundClangDecl,
   return false;
 }
 
-SmallVector<SwiftLookupTable::SingleEntry, 4>
+static_assert(
+    std::is_same_v<SwiftLookupTable::SingleEntry, ClangDirectLookupEntry>,
+    "ClangDirectLookupRequest should return same type as entries in "
+    "SwiftLookupTable");
+
+SmallVector<ClangDirectLookupEntry, 4>
 ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
                                    ClangDirectLookupDescriptor desc) const {
   auto &ctx = desc.decl->getASTContext();
