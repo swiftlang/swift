@@ -2,7 +2,7 @@ import AST
 import SIL
 
 extension Type {
-  func isBranchTracingEnumIn(vjp: Function) -> Bool {
+  func isBranchTracingEnum(in vjp: Function) -> Bool {
     return self.bridged.isAutodiffBranchTracingEnumInVJP(vjp.bridged)
   }
 }
@@ -46,7 +46,7 @@ private func getCapturedArgTypesTupleForClosure(
 //     case bbB((predecessor: _AD__$xxx_bbB__Pred__xxx, /* closure types */))
 //     case bbC((predecessor: _AD__$xxx_bbC__Pred__xxx, /* closure types */))
 //   }
-private func getBranchTracingEnumPreds(bteType: Type, vjp: Function) -> Set<Type> {
+private func getBranchTracingEnumPreds(bteType: Type, in vjp: Function) -> Set<Type> {
   guard let enumCases = bteType.getEnumCases(in: vjp) else {
     return []
   }
@@ -56,7 +56,7 @@ private func getBranchTracingEnumPreds(bteType: Type, vjp: Function) -> Set<Type
     guard let firstTupleElementType = enumCase.payload!.tupleElements.first else {
       continue
     }
-    if firstTupleElementType.isBranchTracingEnumIn(vjp: vjp) {
+    if firstTupleElementType.isBranchTracingEnum(in: vjp) {
       btePreds.insert(firstTupleElementType)
     }
   }
@@ -67,14 +67,14 @@ private func getBranchTracingEnumPreds(bteType: Type, vjp: Function) -> Set<Type
 private func iterateOverBranchTracingEnumPreds(
   bteToPredsDict: inout [Type: Set<Type>],
   currentBTEType: Type,
-  vjp: Function
+  in vjp: Function
 ) {
-  let currentBTEPreds = getBranchTracingEnumPreds(bteType: currentBTEType, vjp: vjp)
+  let currentBTEPreds = getBranchTracingEnumPreds(bteType: currentBTEType, in: vjp)
   bteToPredsDict[currentBTEType] = currentBTEPreds
   for currentBTEPred in currentBTEPreds {
     if bteToPredsDict[currentBTEPred] == nil {
       iterateOverBranchTracingEnumPreds(
-        bteToPredsDict: &bteToPredsDict, currentBTEType: currentBTEPred, vjp: vjp)
+        bteToPredsDict: &bteToPredsDict, currentBTEType: currentBTEPred, in: vjp)
     }
   }
 }
@@ -103,12 +103,12 @@ private func iterateOverBranchTracingEnumPreds(
 //   enum _AD__$xxx_bbD__Pred__xxx {
 //     case bbE((/* closure types */))
 //   }
-private func getBranchTracingEnumSpecializationQueue(topBTEType: Type, vjp: Function) -> [Type] {
+private func getBranchTracingEnumSpecializationQueue(topBTEType: Type, in vjp: Function) -> [Type] {
   var bteToPredsDict = [Type: Set<Type>]()
   iterateOverBranchTracingEnumPreds(
     bteToPredsDict: &bteToPredsDict,
     currentBTEType: topBTEType,
-    vjp: vjp)
+    in: vjp)
   var bteSpecializationQueue = [Type]()
   let bteCount = bteToPredsDict.count
 
@@ -220,7 +220,7 @@ private func getSpecializedParamDeclForEnumCase(
       }
     } else {
       newElementType = oldElementType.rawType
-      if elementIndex == 0 && oldElementType.isBranchTracingEnumIn(vjp: topVJP) {
+      if elementIndex == 0 && oldElementType.isBranchTracingEnum(in: topVJP) {
         let predED = newElementType.nominal as! EnumDecl
         let predBTEType = remapType(
           type: getBranchTracingEnumLoweredType(ed: predED, vjp: topVJP),
@@ -332,7 +332,7 @@ func autodiffSpecializeBranchTracingEnums(
   topVJP: Function, topBTE: Type, closuresInBTE: [ClosureInBTE],
   context: FunctionPassContext
 ) -> [Type: Type] {
-  let bteSpecializationQueue: [Type] = getBranchTracingEnumSpecializationQueue(topBTEType: topBTE, vjp: topVJP)
+  let bteSpecializationQueue: [Type] = getBranchTracingEnumSpecializationQueue(topBTEType: topBTE, in: topVJP)
 
   var closuresInBTEByBTE = [Type: [ClosureInBTE]]()
   for closureInBTE in closuresInBTE {

@@ -812,7 +812,7 @@ private extension Collection {
 
 private extension BasicBlock {
   func getBranchTracingEnumArg(vjp: Function) -> Argument? {
-    return self.arguments.filter { $0.type.isBranchTracingEnumIn(vjp: vjp) }.singleElementAssumingAtMostOne
+    return self.arguments.filter { $0.type.isBranchTracingEnum(in: vjp) }.singleElementAssumingAtMostOne
   }
 }
 
@@ -889,7 +889,7 @@ private func getPartialApplyOfPullbackInExitVJPBB(vjp: Function) -> PartialApply
 private func findOptionalNoneMatchingOptionalSome(in vjp: Function, closuresInBTE: [ClosureInBTE]) -> [ClosureInBTE] {
   let branchTracingEnumInstructions: [EnumInst] = vjp.instructions.filter { $0 is EnumInst }.map {
     $0 as! EnumInst
-  }.filter { $0.type.isBranchTracingEnumIn(vjp: vjp) }
+  }.filter { $0.type.isBranchTracingEnum(in: vjp) }
 
   var closuresInBTEForOptionalNone = [ClosureInBTE]()
 
@@ -1022,7 +1022,7 @@ private func getBTEPayloadArgOfPbBBInfo(_ bb: BasicBlock, vjp: Function)
         continue
       }
       let enumType = uedi.`enum`.type
-      if !enumType.isBranchTracingEnumIn(vjp: vjp) {
+      if !enumType.isBranchTracingEnum(in: vjp) {
         log("getBTEPayloadArgOfPbBBInfo: enum type \(enumType) is not a branch tracing enum in VJP \(vjp.name)")
         continue
       }
@@ -1038,7 +1038,7 @@ private func getBTEPayloadArgOfPbBBInfo(_ bb: BasicBlock, vjp: Function)
     if let sei = predBB.terminator as? SwitchEnumInst {
       log("getBTEPayloadArgOfPbBBInfo: terminator of pred bb is switch_enum instruction")
       let enumType = sei.enumOp.type
-      if !enumType.isBranchTracingEnumIn(vjp: vjp) {
+      if !enumType.isBranchTracingEnum(in: vjp) {
         log("getBTEPayloadArgOfPbBBInfo: enum type \(enumType) is not a branch tracing enum in VJP \(vjp.name)")
         continue
       }
@@ -1151,7 +1151,7 @@ private func findBTEUses(for rootClosure: SingleValueInstruction) -> [ClosureInB
         log("findBTEUses: unexpected use of payload tuple, aborting: \(tiUse)")
         return []
       }
-      guard ei.type.isBranchTracingEnumIn(vjp: vjp) else {
+      guard ei.type.isBranchTracingEnum(in: vjp) else {
         log("findBTEUses: enum type \(ei.type) is not a " +
             "branch tracing enum in VJP \(vjp.name), aborting")
         return []
