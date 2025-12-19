@@ -186,7 +186,6 @@ if #available(SwiftStdlib 6.3, *) {
       // therefore, the output must properly truncate to just a single "ą"
       //
       // 2 bytes - "ą"
-      // 1 byte - "\0"
       expectEqual(String(copying: try! UTF8Span(validating: smolOutputSpan.span)), "ą")
     } catch {
       expectTrue(false, "Got unexpected error: \(error)")
