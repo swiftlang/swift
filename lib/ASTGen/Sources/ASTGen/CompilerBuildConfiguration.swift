@@ -327,12 +327,21 @@ private enum InactiveCodeChecker {
       return false
     }
 
+    var previousToken: TokenSyntax? = nil
     for token in syntax.tokens(viewMode: .sourceAccurate) {
+      defer { previousToken = token }
+
       // Match what we're looking for, and continue iterating if it doesn't
       // match.
       switch self {
       case .name(let name):
         if let identifier = token.identifier, identifier.name == name {
+          // Skip if this is a variable declaration
+          if let prev = previousToken,
+             let prevKeyword = prev.keywordKind,
+             (prevKeyword == .var || prevKeyword == .let) {
+            continue
+          }
           break
         }
 
