@@ -729,6 +729,13 @@ public:
                            SourceKitCancellationToken CancellationToken,
                            CategorizedEditsReceiver Receiver) override;
 
+  void getObjCSelector(StringRef PrimaryFilePath,
+                       StringRef InputBufferName,
+                       unsigned Offset,
+                       ArrayRef<const char *> Args,
+                       SourceKitCancellationToken CancellationToken,
+                       std::function<void(const RequestResult<std::string> &)> Receiver) override;
+
   void getDocInfo(llvm::MemoryBuffer *InputBuf,
                   StringRef ModuleName,
                   ArrayRef<const char *> Args,
