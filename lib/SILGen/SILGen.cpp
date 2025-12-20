@@ -1418,14 +1418,19 @@ void SILGenModule::emitDifferentiabilityWitness(
   auto *diffWitness = M.lookUpDifferentiabilityWitness(key);
   if (!diffWitness) {
     // Differentiability witnesses have the same linkage as the original
-    // function, stripping external.
-    auto linkage = stripExternalFromLinkage(originalFunction->getLinkage());
+    // function, stripping external. For @_alwaysEmitIntoClient original
+    // functions, force PublicNonABI linkage of the differentiability witness so
+    // we can serialize it (the original function itself might be HiddenExternal
+    // in this case if we only have declaration without definition).
+    auto linkage =
+        originalFunction->markedAsAlwaysEmitIntoClient()
+            ? SILLinkage::PublicNonABI
+            : stripExternalFromLinkage(originalFunction->getLinkage());
     diffWitness = SILDifferentiabilityWitness::createDefinition(
         M, linkage, originalFunction, diffKind, silConfig.parameterIndices,
         silConfig.resultIndices, config.derivativeGenericSignature,
         /*jvp*/ nullptr, /*vjp*/ nullptr,
-        /*isSerialized*/ hasPublicVisibility(originalFunction->getLinkage()),
-        attr);
+        /*isSerialized*/ hasPublicVisibility(linkage), attr);
   }
 
   // Set derivative function in differentiability witness.
