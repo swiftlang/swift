@@ -500,7 +500,7 @@ struct CustomRefCountingOperationResult {
 
   CustomRefCountingOperationResultKind kind;
   ValueDecl *operation;
-  std::string name;
+  StringRef name;
 };
 
 class CustomRefCountingOperation

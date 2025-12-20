@@ -216,8 +216,12 @@ public:
                                           DeclContext *newContext,
                                           ClangInheritanceInfo inheritance) = 0;
 
-  /// Returnes the original method if \param decl is a clone from a base class
+  /// Returns the original method if \param decl is a clone from a base class
   virtual ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) = 0;
+
+  /// Returns true if we synthesize this member for every type so no need to
+  /// clone it for the derived classes.
+  virtual bool isMemberSynthesizedPerType(const ValueDecl *decl) = 0;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
