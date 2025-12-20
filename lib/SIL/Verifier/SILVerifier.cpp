@@ -7311,95 +7311,96 @@ public:
   void visitSILFunction(SILFunction *F) {
     PrettyStackTraceSILFunction stackTrace("verifying", F);
 
-    std::optional<VerifierErrorEmitterGuard> functionTypeErrorGuard{{this, F}};
-    CanSILFunctionType FTy = F->getLoweredFunctionType();
-    verifySILFunctionType(FTy);
-    verifyParentFunctionSILFunctionType(FTy);
-
     SILModule &mod = F->getModule();
-    bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
+    {
+      VerifierErrorEmitterGuard functionTypeErrorGuard(this, F);
+      CanSILFunctionType FTy = F->getLoweredFunctionType();
+      verifySILFunctionType(FTy);
+      verifyParentFunctionSILFunctionType(FTy);
 
-    require(!F->isAnySerialized() || !mod.isSerialized() || mod.isParsedAsSerializedSIL(),
-            "cannot have a serialized function after the module has been serialized");
+      bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
 
-    switch (F->getLinkage()) {
-    case SILLinkage::Public:
-    case SILLinkage::Package:
-    case SILLinkage::Shared:
-      require(F->isDefinition() || F->hasForeignBody(),
-              "public/package/shared function must have a body");
-      break;
-    case SILLinkage::PublicNonABI:
-    case SILLinkage::PackageNonABI:
-      require(F->isDefinition(),
-              "alwaysEmitIntoClient function must have a body");
-      require(F->isAnySerialized() || mod.isSerialized(),
-              "alwaysEmitIntoClient function must be serialized");
-      break;
-    case SILLinkage::Hidden:
-    case SILLinkage::Private:
-      require(F->isDefinition() || F->hasForeignBody(),
-              "internal/private function must have a body");
-      require(!F->isAnySerialized() || embedded,
-              "internal/private function cannot be serialized or serializable");
-      break;
-    case SILLinkage::PublicExternal:
-      require(F->isExternalDeclaration() ||
-              F->isAnySerialized() ||
-              mod.isSerialized(),
-            "public-external function definition must be serialized");
-      break;
-    case SILLinkage::PackageExternal:
-      require(F->isExternalDeclaration() ||
-              F->isAnySerialized() ||
-              mod.isSerialized(),
-              "package-external function definition must be serialized");
-      break;
-    case SILLinkage::HiddenExternal:
-      require(F->isExternalDeclaration() || embedded,
-              "hidden-external function cannot have a body");
-      break;
-    }
+      require(!F->isAnySerialized() || !mod.isSerialized() || mod.isParsedAsSerializedSIL(),
+              "cannot have a serialized function after the module has been serialized");
 
-    // Don't verify functions that were skipped. We are likely to see them in
-    // FunctionBodySkipping::NonInlinableWithoutTypes mode.
-    auto Ctx = F->getDeclContext();
-    if (Ctx) {
-      if (auto AFD = dyn_cast<AbstractFunctionDecl>(Ctx)) {
-        if (AFD->isBodySkipped())
+      switch (F->getLinkage()) {
+      case SILLinkage::Public:
+      case SILLinkage::Package:
+      case SILLinkage::Shared:
+        require(F->isDefinition() || F->hasForeignBody(),
+                "public/package/shared function must have a body");
+        break;
+      case SILLinkage::PublicNonABI:
+      case SILLinkage::PackageNonABI:
+        require(F->isDefinition(),
+                "alwaysEmitIntoClient function must have a body");
+        require(F->isAnySerialized() || mod.isSerialized(),
+                "alwaysEmitIntoClient function must be serialized");
+        break;
+      case SILLinkage::Hidden:
+      case SILLinkage::Private:
+        require(F->isDefinition() || F->hasForeignBody(),
+                "internal/private function must have a body");
+        require(!F->isAnySerialized() || embedded,
+                "internal/private function cannot be serialized or serializable");
+        break;
+      case SILLinkage::PublicExternal:
+        require(F->isExternalDeclaration() ||
+                F->isAnySerialized() ||
+                mod.isSerialized(),
+              "public-external function definition must be serialized");
+        break;
+      case SILLinkage::PackageExternal:
+        require(F->isExternalDeclaration() ||
+                F->isAnySerialized() ||
+                mod.isSerialized(),
+                "package-external function definition must be serialized");
+        break;
+      case SILLinkage::HiddenExternal:
+        require(F->isExternalDeclaration() || embedded,
+                "hidden-external function cannot have a body");
+        break;
+      }
+
+      // Don't verify functions that were skipped. We are likely to see them in
+      // FunctionBodySkipping::NonInlinableWithoutTypes mode.
+      auto Ctx = F->getDeclContext();
+      if (Ctx) {
+        if (auto AFD = dyn_cast<AbstractFunctionDecl>(Ctx)) {
+          if (AFD->isBodySkipped())
+            return;
+        }
+      }
+
+      if (F->isExternalDeclaration()) {
+        if (F->hasForeignBody())
           return;
+
+        require(F->isAvailableExternally(),
+                "external declaration of internal SILFunction not allowed");
+        // If F is an external declaration, there is nothing further to do,
+        // return.
+        return;
+      }
+
+      require(!FTy->hasErasedIsolation(),
+              "function declarations cannot have erased isolation");
+
+      assert(!F->hasForeignBody());
+
+      // Make sure that our SILFunction only has context generic params if our
+      // SILFunctionType is non-polymorphic.
+      if (F->getGenericEnvironment() &&
+          !F->getGenericEnvironment()->getGenericSignature()
+              ->areAllParamsConcrete()) {
+        require(FTy->isPolymorphic(),
+                "non-generic function definitions cannot have a "
+                "generic environment");
+      } else {
+        require(!FTy->isPolymorphic(),
+                "generic function definition must have a generic environment");
       }
     }
-
-    if (F->isExternalDeclaration()) {
-      if (F->hasForeignBody())
-        return;
-
-      require(F->isAvailableExternally(),
-              "external declaration of internal SILFunction not allowed");
-      // If F is an external declaration, there is nothing further to do,
-      // return.
-      return;
-    }
-
-    require(!FTy->hasErasedIsolation(),
-            "function declarations cannot have erased isolation");
-
-    assert(!F->hasForeignBody());
-
-    // Make sure that our SILFunction only has context generic params if our
-    // SILFunctionType is non-polymorphic.
-    if (F->getGenericEnvironment() &&
-        !F->getGenericEnvironment()->getGenericSignature()
-            ->areAllParamsConcrete()) {
-      require(FTy->isPolymorphic(),
-              "non-generic function definitions cannot have a "
-              "generic environment");
-    } else {
-      require(!FTy->isPolymorphic(),
-              "generic function definition must have a generic environment");
-    }
-    functionTypeErrorGuard.reset();
 
     // Before verifying the body of the function, validate the SILUndef map to
     // make sure that all SILUndef in the function's map point at the function

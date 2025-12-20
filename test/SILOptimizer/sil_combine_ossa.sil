@@ -2185,7 +2185,7 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.RawPointer):
 // CHECK: bb0(
 // CHECK-NEXT: unchecked_bitwise_cast
 // CHECK-NEXT: unchecked_trivial_bit_cast
-// CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: unchecked_bitwise_cast
 // CHECK-NOT: unchecked_bitwise_cast
 // CHECK-NOT: unchecked_ownership_conversion
 // CHECK: } // end sil function 'bitwise_combines_owned'
@@ -2212,7 +2212,7 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.RawPointer):
 // CHECK: bb0(
 // CHECK-NEXT: unchecked_bitwise_cast
 // CHECK-NEXT: unchecked_trivial_bit_cast
-// CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: unchecked_bitwise_cast
 // CHECK-NOT: unchecked_bitwise_cast
 // CHECK-NOT: unchecked_ownership_conversion
 // CHECK: } // end sil function 'bitwise_combines_guaranteed'
@@ -2225,12 +2225,23 @@ bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : $Builtin.RawPointer):
   // promote trivial
   %4 = unchecked_bitwise_cast %0 : $Builtin.NativeObject to $Builtin.RawPointer
 
-  // promote ref
+  // don't promote ref
   %5 = unchecked_bitwise_cast %0 : $Builtin.NativeObject to $Optional<Builtin.NativeObject>
 
   %6 = tuple(%3 : $Optional<Builtin.NativeObject>, %4 : $Builtin.RawPointer, %5 : $Optional<Builtin.NativeObject>)
   %6a = copy_value %6 : $(Optional<Builtin.NativeObject>, Builtin.RawPointer, Optional<Builtin.NativeObject>)
   return %6a : $(Optional<Builtin.NativeObject>, Builtin.RawPointer, Optional<Builtin.NativeObject>)
+}
+
+// CHECK-LABEL: @dont_fold_unchecked_bitwise_cast_to_unowned :
+// CHECK:         %1 = unchecked_bitwise_cast %0 : $E to $B
+// CHECK:       } // end sil function 'dont_fold_unchecked_bitwise_cast_to_unowned'
+sil [ossa] @dont_fold_unchecked_bitwise_cast_to_unowned : $@convention(thin) (@owned E) -> @owned B {
+bb0(%0 : @owned $E):
+  %1 = unchecked_bitwise_cast %0 to $B
+  %2 = copy_value %1
+  destroy_value %0
+  return %2
 }
 
 // CHECK-LABEL: @remove_pointer_compare_to_zero :
@@ -4669,11 +4680,9 @@ bb0:
 }
 
 
-// Check for disabled optimization of unchecked_bitwise_cast to unchecked_ref_cast in ossa
-// This test can be optimized when ossa is supported in the SILCombine for unchecked_bitwise_cast
 // CHECK-LABEL: sil [ossa] @refcast :
 // CHECK: bb0
-// CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: unchecked_bitwise_cast
 // CHECK-NEXT: copy_value
 // CHECK-NEXT: destroy_value
 // CHECK-NEXT: return
@@ -5072,7 +5081,7 @@ bb2(%error : @owned $Error):
 sil [ossa] @takeKlass : $@convention(thin) (@owned Optional<Klass>) -> ()
 
 // CHECK_FORWARDING_OWNERSHIP_KIND-LABEL: sil shared [ossa] @$s8refcast24main5KlassC_Tg5 : 
-// CHECK_FORWARDING_OWNERSHIP_KIND: unchecked_ref_cast %1 : $Klass to $Optional<Klass>, forwarding: @unowned
+// CHECK_FORWARDING_OWNERSHIP_KIND:          unchecked_bitwise_cast
 // CHECK_FORWARDING_OWNERSHIP_KIND-LABEL: } // end sil function '$s8refcast24main5KlassC_Tg5'
 sil [ossa] @refcast2 : $@convention(thin) <T> (@in T, @owned Klass) -> () {
 bb0(%0 : $*T, %1 : @owned $Klass):

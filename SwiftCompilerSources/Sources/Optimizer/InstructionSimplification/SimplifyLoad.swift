@@ -26,6 +26,9 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
     if replaceLoadOfGlobalLet(context) {
       return
     }
+    if tryRemoveAddressCast(context) {
+      return
+    }
     removeIfDead(context)
   }
 
@@ -113,6 +116,27 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
     // Also erases a builtin "once" on which the global_addr depends on. This is fine
     // because we only replace the load if the global init function doesn't have any side effect.
     transitivelyErase(load: self, context)
+    return true
+  }
+
+  /// Replaces address casts of heap objects
+  /// ```
+  ///   %1 = unchecked_addr_cast %0 : $*SomeClass to $*OtherClass
+  ///   %2 = load [copy] %1
+  /// ```
+  /// with ref-casts of the loaded value
+  /// ```
+  ///   %1 = load [copy] %0
+  ///   %2 = unchecked_ref_cast %1 : $SomeClass to $OtherClass
+  /// ```
+  private func tryRemoveAddressCast(_ context: SimplifyContext) -> Bool {
+    guard let addrCast = address.isAddressCastOfHeapObjects else {
+      return false
+    }
+    let builder = Builder(before: self, context)
+    let newLoad = builder.createLoad(fromAddress: addrCast.fromAddress, ownership: loadOwnership)
+    let cast = builder.createUncheckedRefCast(from: newLoad, to: addrCast.type.objectType)
+    replace(with: cast, context)
     return true
   }
 
@@ -359,6 +383,18 @@ private extension Value {
        let object = initval as? ObjectInst
     {
       return object
+    }
+    return nil
+  }
+}
+
+extension Value {
+  var isAddressCastOfHeapObjects: UncheckedAddrCastInst? {
+    if let addrCast = self as? UncheckedAddrCastInst,
+       addrCast.fromAddress.type.isHeapObjectReferenceType,
+       addrCast.type.isHeapObjectReferenceType
+    {
+      return addrCast
     }
     return nil
   }
