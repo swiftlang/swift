@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-experimental-async-top-level -emit-silgen %s | %FileCheck %s
 // RUN: %target-swift-frontend -experimental-skip-non-inlinable-function-bodies -experimental-skip-non-inlinable-function-bodies-without-types -emit-silgen %s | %FileCheck -check-prefix=SKIPPED-FUNC-EMITTED %s
 
 guard let x: Int = nil else { while true { } }
