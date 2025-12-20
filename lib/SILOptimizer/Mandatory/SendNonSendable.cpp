@@ -1668,6 +1668,24 @@ public:
                  callerIsolationStr);
   }
 
+  void
+  emitNamedFunctionArgumentClosureMutable(SILLocation loc, Identifier name,
+                                          ApplyIsolationCrossing crossing) {
+    emitNamedOnlyError(loc, name);
+
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), crossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), crossing.getCallerIsolation());
+    diagnoseNote(
+        loc,
+        diag::regionbasedisolation_named_isolated_closure_yields_race_mutable,
+        calleeIsolationStr, name, getIsolationRegionInfo()->isTaskIsolated(),
+        callerIsolationStr);
+  }
+
   void emitTypedSendingNeverSendableToSendingParam(SILLocation loc,
                                                    Type inferredType) {
     diagnoseError(loc, diag::regionbasedisolation_type_send_yields_race,
@@ -2104,6 +2122,27 @@ bool SentNeverSendableDiagnosticInferrer::initForIsolatedPartialApply(
   // going to be returning some form of a SILFunctionArgument which is always
   // easy to find a name for.
   if (auto rootValueAndName = inferNameAndRootHelper(op->get())) {
+    // See if our underlying value is a SILBox type that contains a Sendable
+    // type. In that case, we could have only emitted this error if we were
+    // escaping the box itself. In such a case, we want to emit a better
+    // diagnostic that mentions that the reason we are emitting an error is b/c
+    // the value is mutable.
+    if (auto boxTy = op->get()->getType().getAs<SILBoxType>();
+        boxTy && boxTy->getLayout()->isMutable() &&
+        llvm::all_of(boxTy->getLayout()->getFields(),
+                     [&op](const SILField &field) -> bool {
+                       auto fieldTy = field.getAddressType();
+                       if (fieldTy.hasTypeParameter())
+                         fieldTy =
+                             op->getFunction()->mapTypeIntoEnvironment(fieldTy);
+                       return SILIsolationInfo::isSendableType(
+                           fieldTy, op->getFunction());
+                     })) {
+      diagnosticEmitter.emitNamedFunctionArgumentClosureMutable(
+          diagnosticOp->getUser()->getLoc(), rootValueAndName->first, crossing);
+      return true;
+    }
+
     diagnosticEmitter.emitNamedFunctionArgumentClosure(
         diagnosticOp->getUser()->getLoc(), rootValueAndName->first, crossing);
     return true;
