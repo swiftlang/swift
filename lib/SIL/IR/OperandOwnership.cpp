@@ -1054,11 +1054,11 @@ BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildMainActorExecutorRef)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContextWithType)
 
 // InstantaneousUse since we take in a closure at +0.
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TaskAddCancellationHandler)
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, TaskAddCancellationHandler)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemoveCancellationHandler)
 // InstantaneousUse since we take in a closure at +0.
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TaskAddPriorityEscalationHandler)
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, TaskAddPriorityEscalationHandler)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemovePriorityEscalationHandler)
 // This is a trivial use since our first operand is a Builtin.RawPointer and our

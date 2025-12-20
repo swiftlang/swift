@@ -1,4 +1,4 @@
-//===--- SimplifyBeginAndLoadBorrow.swift ---------------------------------===//
+//===--- SimplifyBeginBorrow.swift ----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,68 +14,72 @@ import SIL
 
 extension BeginBorrowInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
-    if borrowedValue.ownership == .owned,
-       // We need to keep lexical lifetimes in place.
-       !isLexical,
-       // The same for borrow-scopes which encapsulated pointer escapes.
-       !findPointerEscapingUse(of: borrowedValue)
-    {
-      tryReplaceBorrowWithOwnedOperand(beginBorrow: self, context)
-    } else {
-      removeBorrowOfThinFunction(beginBorrow: self, context)
-    }
-  }
-}
-
-extension LoadBorrowInst : Simplifiable, SILCombineSimplifiable {
-  func simplify(_ context: SimplifyContext) {
-    if uses.ignoreDebugUses.ignore(usersOfType: EndBorrowInst.self).isEmpty {
-      context.erase(instructionIncludingAllUsers: self)
+    if isLexical && context.preserveDebugInfo {
+      // We must not remove `begin_borrow [lexical] because this is important for diagnostic passes.
       return
     }
 
-    // If the load_borrow is followed by a copy_value, combine both into a `load [copy]`:
-    // ```
-    //   %1 = load_borrow %0
-    //   %2 = some_forwarding_instruction %1 // zero or more forwarding instructions
-    //   %3 = copy_value %2
-    //   end_borrow %1
-    // ```
-    // ->
-    // ```
-    //   %1 = load [copy] %0
-    //   %3 = some_forwarding_instruction %1 // zero or more forwarding instructions
-    // ```
-    //
-    tryCombineWithCopy(context)
-  }
-
-  private func tryCombineWithCopy(_ context: SimplifyContext) {
-    let forwardedValue = lookThroughSingleForwardingUses()
-    guard let singleUser = forwardedValue.uses.ignore(usersOfType: EndBorrowInst.self).singleUse?.instruction,
-          let copy = singleUser as? CopyValueInst,
-          copy.parentBlock == self.parentBlock else {
-      return
+    switch borrowedValue.ownership {
+    case .owned:
+      if tryReplaceBorrowWithOwnedOperand(beginBorrow: self, context) {
+        return
+      }
+    case .guaranteed:
+      if tryReplaceInnerBorrowScope(beginBorrow: self, context) {
+        return
+      }
+    default:
+      // Note that the operand of `begin_borrow` can have "none" ownership, e.g. in case of
+      // ```
+      //   %1 = enum $NonTrivialEnum, #NonTrivialEnum.trivialCase!enumelt        // ownership = none
+      //   %2 = begin_borrow %1
+      // ```
+      break
     }
-    let builder = Builder(before: self, context)
-    let loadCopy = builder.createLoad(fromAddress: address, ownership: .copy)
-    let forwardedOwnedValue = replaceGuaranteed(value: self, withOwnedValue: loadCopy, context)
-    copy.replace(with: forwardedOwnedValue, context)
-    context.erase(instructionIncludingAllUsers: self)
+    removeBorrowOfThinFunction(beginBorrow: self, context)
   }
 }
 
-private func tryReplaceBorrowWithOwnedOperand(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) {
+// See comments of `tryReplaceCopy` and `convertAllUsesToOwned`
+private func tryReplaceBorrowWithOwnedOperand(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) -> Bool {
+  if findPointerEscapingUse(of: beginBorrow.borrowedValue) {
+    return false
+  }
+
   // The last value of a (potentially empty) forwarding chain, beginning at the `begin_borrow`.
-  let forwardedValue = beginBorrow.lookThroughSingleForwardingUses()
-  if forwardedValue.allUsesCanBeConvertedToOwned {
-    if tryReplaceCopy(of: forwardedValue, withCopiedOperandOf: beginBorrow, context) {
-      return
-    }
-    if beginBorrow.borrowedValue.isDestroyed(after: beginBorrow) {
-      convertAllUsesToOwned(of: beginBorrow, context)
-    }
+  let forwardedValue = beginBorrow.lookThroughOwnedConvertibaleForwardingChain()
+  guard forwardedValue.allUsesCanBeConvertedToOwned else {
+    return false
   }
+  if tryReplaceCopy(of: forwardedValue, withCopiedOperandOf: beginBorrow, context) {
+    return true
+  }
+  if beginBorrow.borrowedValue.isDestroyed(after: beginBorrow) {
+    convertAllUsesToOwned(of: beginBorrow, context)
+    return true
+  }
+  return false
+}
+
+/// Removes a borrow scope if the borrowed operand is already a guaranteed value.
+/// ```
+///   bb0(%0 : @guaranteed $T):
+///     %1 = begin_borrow %0
+///     // ... uses of %1
+///     end_borrow %1
+/// ```
+/// ->
+/// ```
+///   bb0(%0 : @guaranteed $T):
+///     // ... uses of %0
+/// ```
+private func tryReplaceInnerBorrowScope(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) -> Bool {
+  guard beginBorrow.scopeEndingOperands.allSatisfy({ $0.instruction is EndBorrowInst }) else {
+    return false
+  }
+  beginBorrow.uses.ignore(usersOfType: EndBorrowInst.self).replaceAll(with: beginBorrow.borrowedValue, context)
+  context.erase(instructionIncludingAllUsers: beginBorrow)
+  return true
 }
 
 private func removeBorrowOfThinFunction(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) {
@@ -143,8 +147,9 @@ private func convertAllUsesToOwned(of beginBorrow: BeginBorrowInst, _ context: S
   context.erase(instructionIncludingAllUsers: beginBorrow)
 }
 
-private extension Value {
-  /// Returns the last value of a (potentially empty) forwarding chain.
+extension Value {
+  /// Returns the last value of a (potentially empty) forwarding chain where all operands can be
+  /// converted to "owned" ownership.
   /// For example, returns %3 for the following def-use chain:
   /// ```
   ///   %1 = struct_extract %self, #someField
@@ -152,18 +157,20 @@ private extension Value {
   ///   %3 = struct $S(%2)   // %3 has no forwarding users
   /// ```
   /// Returns self if this value has no uses which are ForwardingInstructions.
-  func lookThroughSingleForwardingUses() -> Value {
-    if let singleUse = uses.ignore(usersOfType: EndBorrowInst.self).singleUse,
+  func lookThroughOwnedConvertibaleForwardingChain() -> Value {
+    if let singleUse = uses.ignore(usersOfType: EndBorrowInst.self).ignoreDebugUses.ignoreTypeDependence.singleUse,
        let fwdInst = singleUse.instruction as? (SingleValueInstruction & ForwardingInstruction),
        fwdInst.canConvertToOwned,
        fwdInst.isSingleForwardedOperand(singleUse),
        fwdInst.parentBlock == parentBlock
     {
-      return fwdInst.lookThroughSingleForwardingUses()
+      return fwdInst.lookThroughOwnedConvertibaleForwardingChain()
     }
     return self
   }
+}
 
+private extension Value {
   var allUsesCanBeConvertedToOwned: Bool {
     let relevantUses = uses.ignore(usersOfType: EndBorrowInst.self)
     return relevantUses.allSatisfy { $0.canAccept(ownership: .owned) }
@@ -209,12 +216,12 @@ private extension ForwardingInstruction {
 
 /// Replaces a guaranteed value with an owned value.
 ///
-/// If the `guaranteedValue`'s use is a ForwardingInstruction (or forwarding instruction chain),
+/// If the `value`'s use is a ForwardingInstruction (or forwarding instruction chain),
 /// it is converted to an owned version of the forwarding instruction (or instruction chain).
 ///
-/// Returns the last owned value in a forwarding-chain or `ownedValue` if `guaranteedValue` has
+/// Returns the last owned value in a forwarding-chain or `ownedValue` if `value` has
 /// no forwarding uses.
-private func replaceGuaranteed(value: Value, withOwnedValue ownedValue: Value, _ context: SimplifyContext) -> Value {
+func replaceGuaranteed(value: SingleValueInstruction, withOwnedValue ownedValue: Value, _ context: SimplifyContext) -> Value {
   var result = ownedValue
   var numForwardingUses = 0
   for use in value.uses {
@@ -239,6 +246,11 @@ private func replaceGuaranteed(value: Value, withOwnedValue ownedValue: Value, _
       result = replaceGuaranteed(value: fwdInst, withOwnedValue: fwdInst, context)
     case is EndBorrowInst:
       break
+    case let dv as DebugValueInst where dv != value.next:
+      // Move the debug_value immediatly after the value definition to avoid a use-after-consume
+      // in case the debug_value is originally located after the forwarding instruction.
+      dv.move(before: value.next!, context)
+      fallthrough
     default:
       precondition(use.canAccept(ownership: .owned))
       use.set(to: ownedValue, context)
