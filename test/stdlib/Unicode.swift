@@ -110,4 +110,12 @@ UnicodeAPIs.test("UTF-8 and UTF-16 queries") {
   }
 }
 
+
+UnicodeAPIs.test("ASCII._isScalar") {
+  expectTrue(ASCII._isScalar(0))
+  expectTrue(ASCII._isScalar(0x7F))
+  expectFalse(ASCII._isScalar(0x80))
+  expectFalse(ASCII._isScalar(0xFF))
+}
+
 runAllTests()
