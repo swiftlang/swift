@@ -6733,7 +6733,7 @@ class OpaqueExpr final : public Expr {
 
 public:
   OpaqueExpr(Expr* originalExpr)
-    : Expr(ExprKind::Opaque, /*implicit*/ true, originalExpr->getType()),
+    : Expr(ExprKind::Opaque, /*implicit*/ true, Type()),
       OriginalExpr(originalExpr) {}
 
   Expr *getOriginalExpr() const { return OriginalExpr; }

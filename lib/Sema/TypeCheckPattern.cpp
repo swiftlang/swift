@@ -1159,14 +1159,24 @@ Pattern *TypeChecker::coercePatternToType(
     return P;
   }
 
-  case PatternKind::Opaque:
+  case PatternKind::Opaque: {
+    auto VP = cast<OpaquePattern>(P);
+    auto sub = VP->getSubPattern();
+
+    sub = coercePatternToType(
+        pattern.forSubPattern(sub, /*retainTopLevel=*/false), type, subOptions,
+        tryRewritePattern);
+    if (!sub)
+      return nullptr;
+    VP->setSubPattern(sub);
+    if (sub->hasType())
+      VP->setType(sub->getType());
+    return P;
+  }
+
   case PatternKind::Binding: {
     auto VP = cast<BindingPattern>(P);
-    Pattern *sub = nullptr;
-    if (!VP)
-      sub = cast<OpaquePattern>(P)->getSubPattern();
-    else 
-      sub = VP->getSubPattern();
+    auto sub = VP->getSubPattern();
 
     sub = coercePatternToType(
         pattern.forSubPattern(sub, /*retainTopLevel=*/false), type, subOptions,
