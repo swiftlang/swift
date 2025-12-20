@@ -670,20 +670,27 @@ ConstraintSystem::SolverState::~SolverState() {
     CS.activateConstraint(constraint);
   }
 
+  auto &ctx = CS.getASTContext();
+
   // If global constraint debugging is off and we are finished logging the
   // current solution attempt, switch debugging back off.
-  const auto &tyOpts = CS.getASTContext().TypeCheckerOpts;
-  if (!tyOpts.DebugConstraintSolver &&
-      tyOpts.DebugConstraintSolverAttempt &&
-      tyOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
+  if (!ctx.TypeCheckerOpts.DebugConstraintSolver &&
+      ctx.TypeCheckerOpts.DebugConstraintSolverAttempt &&
+      ctx.TypeCheckerOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
     CS.Options -= ConstraintSystemFlags::DebugConstraints;
   }
 
   // This statistic is special because it's not a counter; we just update
   // it in one shot at the end.
-  ASTBytesAllocated = CS.getASTContext().getSolverMemory();
+  if (ctx.Stats) {
+    auto &counters = ctx.Stats->getFrontendCounters();
+    int64_t bytes = CS.getAllocator().getBytesAllocated();
+    counters.NumSolverBytesAllocated += bytes;
+    counters.MaxSolverBytesAllocated =
+        std::max(counters.MaxSolverBytesAllocated, bytes);
+  }
 
-  // Write our local statistics back to the overall statistics.
+  // Write our local debug statistics back to the overall debug statistics.
   #define CS_STATISTIC(Name, Description) JOIN2(Overall,Name) += Name;
   #include "swift/Sema/ConstraintSolverStats.def"
 
