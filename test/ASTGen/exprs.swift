@@ -140,6 +140,14 @@ class TestClosure {
   }
 }
 
+func testDollarIdentifiers() {
+  // https://github.com/swiftlang/swift/issues/54030
+
+  #if false
+  if $0 {}
+  #endif
+  }
+
 func testInOut() {
   func acceptInOut(arg: inout Int) { arg += 1 }
   var value = 42
