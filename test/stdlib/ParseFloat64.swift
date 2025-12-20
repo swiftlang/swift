@@ -325,6 +325,47 @@ tests.test("Decimal Floats") {
   expectParse("999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999.999999999999999999999999999", Float64.infinity)
 }
 
+tests.test("Substring - short") {
+  let s1 = "1.02.03.0"
+  let s1sub = s1[s1.firstIndex(of: "2")!..<s1.firstIndex(of: "3")!]
+  let parsed = Float64(s1sub)
+  expectNotNil(parsed)
+  expectEqual(parsed!.bitPattern, (2.0).bitPattern)
+}
+
+tests.test("Substring - long") {
+  let s1 = "1.00000000000000000000000000000000002.0000000000000000000000000000000000000000000000000000000003.00000000000000004.0000000000000000"
+  let s1sub = s1[s1.firstIndex(of: "2")!..<s1.firstIndex(of: "3")!]
+  let parsed = Float64(s1sub)
+  expectNotNil(parsed)
+  expectEqual(parsed!.bitPattern, (2.0).bitPattern)
+}
+
+/*
+ // These need Foundation to run, so can't run on Linux?
+tests.test("Bridged - short") {
+  let s1 = "1.02.03.0"
+  let nss1 = NSString(utf8String: s1)!
+  let bridged = String(nss1)
+  let range = bridged.firstIndex(of: "2")!..<bridged.firstIndex(of: "3")!
+  let sub = bridged[range]
+  let parsed = Float64(sub)
+  expectNotNil(parsed)
+  expectEqual(parsed!.bitPattern, (2.0).bitPattern)
+}
+
+tests.test("Bridged - long") {
+  let s1 = "1.02.0000000000000000000000000000000000000000000000000000000000003.04.05.06.07.08.09.010.011.012.013.014.015.0"
+  let nss1 = NSString(utf8String: s1)!
+  let bridged = String(nss1)
+  let range = bridged.firstIndex(of: "2")!..<bridged.firstIndex(of: "3")!
+  let sub = bridged[range]
+  let parsed = Float64(sub)
+  expectNotNil(parsed)
+  expectEqual(parsed!.bitPattern, (2.0).bitPattern)
+}
+ */
+
 @_extern(c, "_swift_stdlib_strtod_clocale")
 func _swift_stdlib_strtod_clocale(
   _: Optional<UnsafePointer<CChar>>,
