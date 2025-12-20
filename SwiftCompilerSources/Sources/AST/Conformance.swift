@@ -87,6 +87,23 @@ public struct Conformance: CustomStringConvertible, Hashable, NoReflectionChildr
     assert(isConcrete)
     return bridged.getAssociatedConformance(assocType.bridged, proto.bridged).conformance
   }
+  
+  // This is a less precise definition of "resilient conformance" because it's
+  // only used for SIL optimizations -- where it's okay to think a conformance
+  // is resilient even if IRGen will decide it's not (see
+  // IRGenModule::isResilientConformance).
+  public func isResilientConformance(currentModule: ModuleDecl) -> Bool {
+    let conformanceModule = self.protocol.parentModule
+    let protocolModule = self.protocol.parentModule
+    
+    // If the protocol and the conformance are both in the current module,
+    // they're not resilient.
+    if conformanceModule == currentModule && protocolModule == currentModule {
+      return false
+    }
+    
+    return true
+  }
 }
 
 public struct ConformanceArray : RandomAccessCollection, CustomReflectable {

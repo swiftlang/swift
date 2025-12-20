@@ -7509,6 +7509,9 @@ class MetatypeInst final
                ArrayRef<SILValue> TypeDependentOperands)
     : NullaryInstructionWithTypeDependentOperandsBase(DebugLoc,
                                           TypeDependentOperands, Metatype) {}
+    
+  static MetatypeInst *create(SILDebugLocation DebugLoc, SILType Metatype,
+                              SILModule &Mod);
 
   static MetatypeInst *create(SILDebugLocation DebugLoc, SILType Metatype,
                               SILFunction *F);
@@ -8185,6 +8188,11 @@ class InitExistentialMetatypeInst final
                               SILValue metatype,
                               ArrayRef<SILValue> TypeDependentOperands,
                               ArrayRef<ProtocolConformanceRef> conformances);
+
+  static InitExistentialMetatypeInst *
+  create(SILDebugLocation DebugLoc, SILType existentialMetatypeType,
+         SILValue metatype, ArrayRef<ProtocolConformanceRef> conformances,
+         SILModule &mod);
 
   static InitExistentialMetatypeInst *
   create(SILDebugLocation DebugLoc, SILType existentialMetatypeType,

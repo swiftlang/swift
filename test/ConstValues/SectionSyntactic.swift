@@ -126,9 +126,16 @@ var capturedMutableVar = TestClass()
 
 struct S { }
 enum E { case a }
+protocol P1 { }
+protocol P2 { }
+extension S: P1, P2 { }
 
 // metatypes
 @section("mysection") let metatype1 = Int.self // ok
+@section("mysection") let metatype2: Any.Type = Int.self // ok
+@section("mysection") let metatype3: Any.Type = S.self // ok
+@section("mysection") let metatype4: any (P1).Type = S.self // ok
+@section("mysection") let metatype5: any (P1 & P2).Type = S.self // ok
 
 // invalid metatype references
 @section("mysection") let invalidMetatype1 = Int.self.self
@@ -138,6 +145,14 @@ enum E { case a }
 @section("mysection") let invalidMetatype3 = Array<Int>.self // generic
 // expected-error@-1{{type expressions not supported in a constant expression}}
 @section("mysection") let invalidMetatype4 = Mirror.self // resilient
+// expected-error@-1{{type expressions not supported in a constant expression}}
+@section("mysection") let invalidMetatype5: any (Hashable).Type = Int.self
+// expected-error@-1{{type expressions not supported in a constant expression}}
+@section("mysection") let invalidMetatype6: any (Hashable & Sendable).Type = Int.self
+// expected-error@-1{{type expressions not supported in a constant expression}}
+@section("mysection") let invalidMetatype7: any (Sendable).Type = S.self
+// expected-error@-1{{type expressions not supported in a constant expression}}
+@section("mysection") let invalidMetatype8: any (P1 & Sendable).Type = S.self
 // expected-error@-1{{type expressions not supported in a constant expression}}
 
 // tuples

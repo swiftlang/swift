@@ -406,6 +406,10 @@ bool BridgedType::isAddressableForDeps(BridgedFunction f) const {
   return unbridged().isAddressableForDeps(*f.getFunction());
 }
 
+bool BridgedType::isFixedABI(BridgedFunction f) const {
+  return unbridged().isFixedABI(*f.getFunction());
+}
+
 BridgedASTType BridgedType::getRawLayoutSubstitutedLikeType() const {
   return {unbridged().getRawLayoutSubstitutedLikeType().getPointer()};
 }
@@ -1298,6 +1302,10 @@ BridgedConformanceArray BridgedInstruction::InitExistentialAddrInst_getConforman
 
 BridgedCanType BridgedInstruction::InitExistentialAddrInst_getFormalConcreteType() const {
   return getAs<swift::InitExistentialAddrInst>()->getFormalConcreteType();
+}
+
+BridgedConformanceArray BridgedInstruction::InitExistentialMetatypeInst_getConformances() const {
+  return {getAs<swift::InitExistentialMetatypeInst>()->getConformances()};
 }
 
 bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {
