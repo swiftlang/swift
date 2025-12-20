@@ -388,7 +388,14 @@ extension String {
       }
     }
 
-    let len = _swift_stdlib_strlen(cPtr)
+    var len: Int
+    if _fastPath(Encoding.CodeUnit.self == UInt8.self) {
+      len = _swift_stdlib_strlen(UnsafeRawPointer(cPtr).assumingMemoryBound(to: CChar.self))
+    } else {
+      var end = cPtr
+      while end.pointee != 0 { end += 1 }
+      len = end - cPtr
+    }
     let codeUnits = UnsafeBufferPointer(start: cPtr, count: len)
     return String._fromCodeUnits(
       codeUnits, encoding: encoding, repair: isRepairing)
