@@ -14,6 +14,7 @@ add_swift_host_library(swiftClangImporter STATIC
   ClangImporter.cpp
   ClangImporterRequests.cpp
   ClangIncludePaths.cpp
+  ClangLookup.cpp
   ClangModuleDependencyScanner.cpp
   ClangSourceBufferImporter.cpp
   SwiftDeclSynthesizer.cpp
