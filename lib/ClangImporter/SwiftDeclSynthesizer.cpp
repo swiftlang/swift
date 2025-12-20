@@ -27,15 +27,21 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Attrs.inc"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclarationName.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/Mangle.h"
+#include "clang/AST/OperationKinds.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/Type.h"
+#include "clang/Basic/LangOptions.h"
 #include "clang/Basic/SourceLocation.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/Sema/DelayedDiagnostic.h"
+#include "clang/Sema/Sema.h"
 
 using namespace swift;
 using namespace importer;
@@ -3557,6 +3563,138 @@ void SwiftDeclSynthesizer::addExplicitDeinitIfRequired(
       synthesizeDeinitBodyForCustomDestroy, destroyFunc);
 
   nominal->addMember(destructor);
+}
+
+static void cloneReferenceAttributes(const clang::CXXRecordDecl *from,
+                                     clang::CXXRecordDecl *to,
+                                     clang::ASTContext &ctx) {
+  if (!from->hasAttr<clang::SwiftAttrAttr>())
+    return;
+  for (auto attr : from->getAttrs()) {
+    if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+      if (swiftAttr->getAttribute().starts_with("release:"))
+        to->addAttr(
+            clang::SwiftAttrAttr::Create(ctx, swiftAttr->getAttribute()));
+      else if (swiftAttr->getAttribute().starts_with("retain:"))
+        to->addAttr(
+            clang::SwiftAttrAttr::Create(ctx, swiftAttr->getAttribute()));
+    }
+  }
+}
+
+std::pair<CustomRefCountingOperationResult, CustomRefCountingOperationResult>
+SwiftDeclSynthesizer::addRefCountOperations(
+    ClassDecl *decl, clang::CXXRecordDecl *clangDecl, const ClassDecl *baseDecl,
+    const clang::CXXRecordDecl *baseClangDecl) {
+  auto &context = ImporterImpl.SwiftContext;
+  auto &clangCtx = ImporterImpl.getClangASTContext();
+  auto retainResult =
+      evaluateOrDefault(context.evaluator,
+                        CustomRefCountingOperation(
+                            {baseDecl, CustomRefCountingOperationKind::retain}),
+                        {});
+  auto releaseResult = evaluateOrDefault(
+      context.evaluator,
+      CustomRefCountingOperation(
+          {baseDecl, CustomRefCountingOperationKind::release}),
+      {});
+  if (retainResult.kind == CustomRefCountingOperationResult::immortal ||
+      releaseResult.kind == CustomRefCountingOperationResult::immortal) {
+    cloneReferenceAttributes(baseClangDecl, clangDecl, clangCtx);
+    return std::make_pair(retainResult, releaseResult);
+  }
+  if (!retainResult.operation || !releaseResult.operation)
+    return std::make_pair(retainResult, releaseResult);
+  auto retainClangFn =
+      cast<clang::FunctionDecl>(retainResult.operation->getClangDecl());
+  auto releaseClangFn =
+      cast<clang::FunctionDecl>(releaseResult.operation->getClangDecl());
+
+  // Synthesize forwarding function.
+  auto &clangSema = ImporterImpl.getClangSema();
+
+  clang::QualType methodType = clangCtx.getFunctionType(
+      clangCtx.VoidTy, {}, clang::FunctionProtoType::ExtProtoInfo{});
+
+  auto generateLifetimeOperation =
+      [&](const clang::FunctionDecl *fd) -> const clang::CXXMethodDecl * {
+    auto loc = fd->getLocation();
+    auto &ident = clangCtx.Idents.get("__synthesized_lifetimeAccessor_" +
+                                      fd->getNameAsString());
+    clang::DeclarationName methodName(&ident);
+    auto method = clang::CXXMethodDecl::Create(
+        clangCtx, clangDecl, fd->getSourceRange().getBegin(),
+        clang::DeclarationNameInfo(methodName, clang::SourceLocation()),
+        methodType, clangCtx.getTrivialTypeSourceInfo(methodType),
+        clang::SC_None,
+        /*usesFPIntrin=*/false, /*isInline=*/true,
+        clang::ConstexprSpecKind::Unspecified, fd->getSourceRange().getEnd());
+    method->setImplicit();
+    method->setImplicitlyInline();
+    method->setAccess(clang::AccessSpecifier::AS_public);
+    method->addAttr(clang::NoDebugAttr::CreateImplicit(clangCtx));
+
+    clang::Expr *argExpr =
+        clang::CXXThisExpr::Create(clangCtx, clang::SourceLocation(),
+                                   method->getThisType(), /*IsImplicit=*/false);
+
+    if (auto calledMethod = dyn_cast<clang::CXXMethodDecl>(fd)) {
+      if (calledMethod->isStatic())
+        return nullptr;
+      auto memberExpr = clangSema.BuildMemberExpr(
+          argExpr, /*isArrow=*/true, loc, clang::NestedNameSpecifierLoc(),
+          clang::SourceLocation(),
+          const_cast<clang::CXXMethodDecl *>(calledMethod),
+          clang::DeclAccessPair::make(
+              const_cast<clang::CXXMethodDecl *>(calledMethod),
+              clang::AS_public),
+          /*HadMultipleCandidates=*/false, calledMethod->getNameInfo(),
+          methodType, clang::VK_PRValue, clang::OK_Ordinary);
+      auto memberCall = clang::CXXMemberCallExpr::Create(
+          clangCtx, memberExpr, {}, clangCtx.VoidTy, clang::VK_PRValue, loc,
+          clang::FPOptionsOverride());
+      method->setBody(clang::CompoundStmt::Create(
+          clangCtx, {memberCall}, clang::FPOptionsOverride(), loc, loc));
+    } else {
+      clang::Expr *fnExpr = clang::DeclRefExpr::Create(
+          clangCtx, clang::NestedNameSpecifierLoc(), clang::SourceLocation(),
+          const_cast<clang::FunctionDecl *>(fd),
+          /*RefersToEnclosingVariableOrCapture=*/false, loc, fd->getType(),
+          clang::VK_LValue);
+      auto call =
+          clangSema.BuildCallExpr(nullptr, fnExpr, clang::SourceLocation(),
+                                  {argExpr}, clang::SourceLocation());
+      method->setBody(clang::CompoundStmt::Create(
+          clangCtx, {call.get()}, clang::FPOptionsOverride(), loc, loc));
+    }
+    return method;
+  };
+
+  auto synthesizedRetain = generateLifetimeOperation(retainClangFn);
+  auto synthesizedRelease = generateLifetimeOperation(releaseClangFn);
+  if (!synthesizedRetain || !synthesizedRelease)
+    return std::make_pair(retainResult, releaseResult);
+
+  // Add attributes to class.
+  clangDecl->addAttr(clang::SwiftAttrAttr::Create(
+      clangCtx,
+      context.AllocateCopy("retain:." + synthesizedRetain->getNameAsString())));
+  clangDecl->addAttr(clang::SwiftAttrAttr::Create(
+      clangCtx, context.AllocateCopy("release:." +
+                                     synthesizedRelease->getNameAsString())));
+
+  // Update the Swift type
+  auto importRefCountOp = [&](const clang::CXXMethodDecl *op) {
+    auto importedOp =
+        cast<ValueDecl>(context.getClangModuleLoader()->importDeclDirectly(op));
+    ImporterImpl.markMemberSynthesizedPerType(importedOp);
+    decl->addMember(importedOp);
+    decl->addMemberToLookupTable(importedOp);
+  };
+  importRefCountOp(synthesizedRetain);
+  importRefCountOp(synthesizedRelease);
+
+  return std::make_pair(retainResult, releaseResult);
 }
 
 FuncDecl *SwiftDeclSynthesizer::makeAvailabilityDomainPredicate(

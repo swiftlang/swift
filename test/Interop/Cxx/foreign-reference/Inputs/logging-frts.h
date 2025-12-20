@@ -85,3 +85,10 @@ private:
   explicit Payload(int value) : m_value(value) {}
   int m_value;
 };
+
+struct FirstBase {
+  int a, b, c;
+  virtual ~FirstBase() {}
+};
+
+struct DerivedFRT : FirstBase, SharedFRT {};
