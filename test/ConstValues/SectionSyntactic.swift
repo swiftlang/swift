@@ -93,6 +93,14 @@ extension Q { @section("mysection") static let invalidFuncRef8: (Int)->() = stat
 struct W {
   @section("mysection") static let closure7: @convention(c) (Int) -> Int = { x in x * 2 } // ok
 }
+func g() {
+    @Sendable func f() { }
+    @Sendable func h() async { }
+    enum E {
+        @section("mysection") static let record: @convention(c) () -> () = { f() } // ok
+        @section("mysection") static let record2: @convention(c) () -> () = { _ = h } // ok
+    }
+}
 
 let capturedVar = 10
 class TestClass {}
