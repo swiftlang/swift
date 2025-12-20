@@ -112,8 +112,8 @@ struct StaticRetainRelease {
 } SWIFT_SHARED_REFERENCE(.staticRetain, .staticRelease);
 
 struct DerivedStaticRetainRelease : StaticRetainRelease {
-// expected-error@-1 {{cannot find retain function '.staticRetain' for reference type 'DerivedStaticRetainRelease'}}
-// expected-error@-2 {{cannot find release function '.staticRelease' for reference type 'DerivedStaticRetainRelease'}}
+// expected-error@-1 {{specified release function '.staticRelease' is a static function; expected an instance function}}
+// expected-error@-2 {{specified retain function '.staticRetain' is a static function; expected an instance function}}
   int secondValue = 1;
   DerivedStaticRetainRelease(int value, int secondValue)
       : StaticRetainRelease(value), secondValue(secondValue) {}

@@ -48,6 +48,7 @@
 #include "clang/Serialization/ModuleFileExtension.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallBitVector.h"
@@ -692,6 +693,7 @@ private:
 
   // Map all cloned methods back to the original member
   llvm::DenseMap<ValueDecl *, ValueDecl *> clonedMembers;
+  llvm::DenseSet<const ValueDecl *> membersSynthesizedPerType;
 
   // Keep track of methods that are unavailale in each class.
   // We need this set because these methods will be imported lazily. We don't
@@ -714,6 +716,8 @@ public:
                                   ClangInheritanceInfo inheritance);
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
+  bool isMemberSynthesizedPerType(const ValueDecl *decl);
+  void markMemberSynthesizedPerType(const ValueDecl *decl);
 
   static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
 
@@ -2227,6 +2231,11 @@ getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
   }
   return nullptr;
 }
+
+/// Find a unique base class that is annotated as SHARED_REFERENCE if any.
+const clang::RecordDecl *
+getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
+                   ClangImporter::Implementation *importerImpl);
 
 } // end namespace importer
 } // end namespace swift

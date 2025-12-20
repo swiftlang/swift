@@ -109,8 +109,8 @@ __attribute__((swift_attr("release:immortal"))) ImmortalRefType {};
 ImmortalRefType *returnImmortalRefType() { return new ImmortalRefType(); }
 
 struct DerivedFromImmortalRefType : ImmortalRefType {};
-DerivedFromImmortalRefType *returnDerivedFromImmortalRefType() { // expected-note {{annotate 'returnDerivedFromImmortalRefType()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
-    return new DerivedFromImmortalRefType();
+DerivedFromImmortalRefType *returnDerivedFromImmortalRefType() {
+  return new DerivedFromImmortalRefType();
 };
 
 } // namespace ImmortalRefereceExample
