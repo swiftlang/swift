@@ -63,14 +63,14 @@ struct BaseStruct<T> {
   var unavailableSetter: T {
     get { fatalError() }
     @available(*, unavailable)
-    set { fatalError() } // expected-note 33 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 34 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
   }
 
   var unavailableGetterAndSetter: T {
     @available(*, unavailable)
     get { fatalError() } // expected-note 71 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
     @available(*, unavailable)
-    set { fatalError() } // expected-note 33 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    set { fatalError() } // expected-note 34 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
   }
 
   var deprecatedGetter: T {
@@ -579,17 +579,11 @@ func testKeyPathArguments_Struct() {
   takesSendableKeyPath(x, \.deprecatedSetter)
 
   func takesWritableKeyPath<T, U>(_ t: inout T, _ keyPath: WritableKeyPath<T, U>) -> () { }
-  // expected-note@-1 2 {{in call to function 'takesWritableKeyPath'}}
 
   takesWritableKeyPath(&x, \.available)
   takesWritableKeyPath(&x, \.unavailableGetter) // expected-error {{getter for 'unavailableGetter' is unavailable}}
-  // FIXME: Ideally we would diagnose the unavailability of the setter instead
-  // of simply indicating that a conversion to WritableKeyPath is not possible
-  // (rdar://157249275)
-  takesWritableKeyPath(&x, \.unavailableSetter) // expected-error {{cannot convert value of type 'KeyPath<BaseStruct<StructValue>, StructValue>' to expected argument type 'WritableKeyPath<BaseStruct<StructValue>, U>'}}
-  // expected-error@-1 {{generic parameter 'U' could not be inferred}}
-  takesWritableKeyPath(&x, \.unavailableGetterAndSetter) // expected-error {{cannot convert value of type 'KeyPath<BaseStruct<StructValue>, StructValue>' to expected argument type 'WritableKeyPath<BaseStruct<StructValue>, U>'}}
-  // expected-error@-1 {{generic parameter 'U' could not be inferred}}
+  takesWritableKeyPath(&x, \.unavailableSetter) // expected-error {{setter for 'unavailableSetter' is unavailable}}
+  takesWritableKeyPath(&x, \.unavailableGetterAndSetter) // expected-error {{setter for 'unavailableGetterAndSetter' is unavailable}}
   takesWritableKeyPath(&x, \.deprecatedGetter) // expected-warning {{getter for 'deprecatedGetter' is deprecated: reading not recommended}}
   takesWritableKeyPath(&x, \.deprecatedSetter) // expected-warning {{setter for 'deprecatedSetter' is deprecated: writing not recommended}}
 

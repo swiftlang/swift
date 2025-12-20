@@ -16,6 +16,7 @@
 
 #include "CSDiagnostics.h"
 #include "MiscDiagnostics.h"
+#include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
@@ -47,6 +48,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <string>
 
 using namespace swift;
@@ -2628,6 +2630,9 @@ bool ContextualFailure::diagnoseAsError() {
     }
   }
 
+  if (diagnoseKeyPathLiteralMutabilityMismatch())
+    return true;
+
   if (diagnoseConversionToNil())
     return true;
 
@@ -2992,6 +2997,48 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
     return diag::cannot_convert_condition_value_nil;
   }
   llvm_unreachable("Unhandled ContextualTypePurpose in switch");
+}
+
+bool ContextualFailure::diagnoseKeyPathLiteralMutabilityMismatch() const {
+  auto fromType = getFromType();
+  auto toType = getToType();
+
+  if (!(fromType->isKeyPath() &&
+        (toType->isWritableKeyPath() || toType->isReferenceWritableKeyPath())))
+    return false;
+
+  auto keyPathLiteral = getAsExpr<KeyPathExpr>(getAnchor());
+  if (!keyPathLiteral)
+    return false;
+
+  auto &S = getSolution();
+  for (unsigned i : indices(keyPathLiteral->getComponents())) {
+    auto &component = keyPathLiteral->getComponents()[i];
+
+    auto *componentLoc = getConstraintLocator(
+        keyPathLiteral, LocatorPathElt::KeyPathComponent(i));
+
+    auto overload = S.getCalleeOverloadChoiceIfAvailable(componentLoc);
+    if (!overload)
+      continue;
+
+    auto *storageDecl =
+        dyn_cast_or_null<AbstractStorageDecl>(overload->choice.getDeclOrNull());
+    if (!storageDecl)
+      continue;
+
+    if (auto *setter = storageDecl->getOpaqueAccessor(AccessorKind::Set)) {
+      if (getUnsatisfiedAvailabilityConstraint(setter, S.getDC(),
+                                               component.getLoc())) {
+        auto where =
+            ExportContext::forFunctionBody(S.getDC(), component.getLoc());
+        return diagnoseDeclAvailability(setter, component.getLoc(),
+                                        /*call=*/nullptr, where);
+      }
+    }
+  }
+
+  return false;
 }
 
 bool ContextualFailure::diagnoseConversionToNil() const {
@@ -7461,6 +7508,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (paramType->hasOpenedExistential()) {
     return false;
   }
+
+  if (diagnoseKeyPathLiteralMutabilityMismatch())
+    return true;
 
   if (diagnoseMisplacedMissingArgument())
     return true;
