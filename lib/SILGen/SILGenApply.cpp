@@ -1502,7 +1502,7 @@ public:
     SILType loweredResultTy;
     auto selfMetaTy = selfValue.getType().getAs<AnyMetatypeType>();
     if (selfMetaTy) {
-      loweredResultTy = SILType::getPrimitiveObjectType(
+      loweredResultTy = SGF.getLoweredLoadableType(
         CanMetatypeType::get(resultTy, selfMetaTy->getRepresentation()));
     } else {
       loweredResultTy = SGF.getLoweredLoadableType(resultTy);
