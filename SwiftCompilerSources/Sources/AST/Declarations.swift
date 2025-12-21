@@ -203,6 +203,7 @@ final public class EnumElementDecl: ValueDecl {
   public var hasAssociatedValues: Bool { bridged.EnumElementDecl_hasAssociatedValues() }
   public var parameterList: ParameterList { ParameterList(bridged: bridged.EnumElementDecl_getParameterList()) }
   public var name: StringRef { StringRef(bridged: bridged.EnumElementDecl_getNameStr()) }
+  public var parentEnum: EnumDecl { self.parentDeclContext as! EnumDecl }
 
   public static func create(
     declContext: DeclContext,
