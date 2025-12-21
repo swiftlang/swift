@@ -2301,11 +2301,11 @@ void IRGenerator::emitEntryPointInfo() {
   IGM.addUsedGlobal(var);
 }
 
-static IRLinkage
-getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
-             SILLinkage linkage, ForDefinition_t isDefinition,
-             bool isWeakImported, bool isKnownLocal,
-             bool hasNonUniqueDefinition) {
+static IRLinkage getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
+                              SILLinkage linkage, ForDefinition_t isDefinition,
+                              bool isWeakImported, bool isKnownLocal,
+                              bool hasNonUniqueDefinition,
+                              bool privateMeansPrivate) {
 #define RESULT(LINKAGE, VISIBILITY, DLL_STORAGE)                               \
   IRLinkage{llvm::GlobalValue::LINKAGE##Linkage,                               \
             llvm::GlobalValue::VISIBILITY##Visibility,                         \
@@ -2367,12 +2367,15 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
   case SILLinkage::Private: {
     if (info.forcePublicDecls() && !isDefinition)
       return getIRLinkage(name, info, SILLinkage::PublicExternal, isDefinition,
-                          isWeakImported, isKnownLocal, hasNonUniqueDefinition);
+                          isWeakImported, isKnownLocal, hasNonUniqueDefinition,
+                          privateMeansPrivate);
 
-    auto linkage = info.needLinkerToMergeDuplicateSymbols()
-                       ? llvm::GlobalValue::LinkOnceODRLinkage
-                       : llvm::GlobalValue::InternalLinkage;
-    auto visibility = info.shouldAllPrivateDeclsBeVisibleFromOtherFiles()
+    auto linkage =
+        info.needLinkerToMergeDuplicateSymbols() && !privateMeansPrivate
+            ? llvm::GlobalValue::LinkOnceODRLinkage
+            : llvm::GlobalValue::InternalLinkage;
+    auto visibility = info.shouldAllPrivateDeclsBeVisibleFromOtherFiles() &&
+                              !privateMeansPrivate
                           ? llvm::GlobalValue::HiddenVisibility
                           : llvm::GlobalValue::DefaultVisibility;
     return {linkage, visibility, llvm::GlobalValue::DefaultStorageClass};
@@ -2423,8 +2426,8 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
   auto IRL =
       getIRLinkage(global->hasName() ? global->getName() : StringRef(),
                    linkInfo, entity.getLinkage(ForDefinition), ForDefinition,
-                   weakImported, isKnownLocal,
-                   entity.hasNonUniqueDefinition());
+                   weakImported, isKnownLocal, entity.hasNonUniqueDefinition(),
+                   entity.privateMeansPrivate());
   ApplyIRLinkage(IRL).to(global);
 
   LinkInfo link = LinkInfo::get(IGM, entity, ForDefinition);
@@ -2475,10 +2478,10 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   }
 
   bool weakImported = entity.isWeakImported(swiftModule);
-  result.IRL = getIRLinkage(result.Name, linkInfo,
-                            entity.getLinkage(isDefinition), isDefinition,
-                            weakImported, isKnownLocal,
-                            entity.hasNonUniqueDefinition());
+  result.IRL = getIRLinkage(
+      result.Name, linkInfo, entity.getLinkage(isDefinition), isDefinition,
+      weakImported, isKnownLocal, entity.hasNonUniqueDefinition(),
+      entity.privateMeansPrivate());
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -2490,7 +2493,8 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
   result.Name += name;
   result.IRL = getIRLinkage(name, linkInfo, linkage, isDefinition,
                             isWeakImported, linkInfo.Internalize,
-                            /*hasNonUniqueDefinition=*/false);
+                            /*hasNonUniqueDefinition=*/false,
+                            /*privateMeansPrivate=*/false);
   result.ForDefinition = isDefinition;
   return result;
 }
