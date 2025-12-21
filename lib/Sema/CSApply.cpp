@@ -9344,7 +9344,6 @@ applySolutionToForEachStmtPreamble(ForEachStmt *stmt,
 
   // Simplify the various types.
   info.sequenceType = solution.simplifyType(info.sequenceType);
-  info.elementType = solution.simplifyType(info.elementType);
   info.initType = solution.simplifyType(info.initType);
 
   auto sequenceTarget = *cs.getTargetFor(parsedSequence);

@@ -4730,7 +4730,6 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                      elementLocator);
 
   // Populate all of the information for a for-each loop.
-  sequenceIterationInfo.elementType = elementType;
   sequenceIterationInfo.initType = initType;
 
   return sequenceIterationInfo;

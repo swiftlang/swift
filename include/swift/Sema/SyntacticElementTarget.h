@@ -36,9 +36,6 @@ struct SequenceIterationInfo {
   /// The type of the sequence.
   Type sequenceType;
 
-  /// The type of an element in the sequence.
-  Type elementType;
-
   /// The type of the pattern that matches the elements.
   Type initType;
 };
