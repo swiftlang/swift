@@ -180,6 +180,12 @@ private func tryEliminate(copy: CopyLikeInstruction, _ context: FunctionPassCont
       use.set(to: copy.destinationAddress, context)
     }
   }
+
+  // Salvage the debug variable attribute, if present.
+  if let debugVariable = allocStack.debugVariable {
+    let builder = Builder(before: firstUseOfAllocStack, location: allocStack.location, context)
+    builder.createDebugValue(value: copy.destinationAddress, debugVariable: debugVariable)
+  }
   context.erase(instruction: allocStack)
   context.erase(instructionIncludingAllUsers: copy.loadingInstruction)
 }

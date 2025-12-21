@@ -41,6 +41,7 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SIL/SILConstants.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -3219,6 +3220,10 @@ void BridgedContext::moveInstructionBefore(BridgedInstruction inst, BridgedInstr
 
 void BridgedContext::copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
   inst.unbridged()->clone(beforeInst.unbridged());
+}
+
+void BridgedContext::salvageDebugInfo(BridgedInstruction inst) {
+  swift::salvageDebugInfo(inst.unbridged());
 }
 
 OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef name) const {
