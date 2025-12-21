@@ -1925,7 +1925,7 @@ TypeExpr *PreCheckTarget::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   // CSGen will diagnose cases that appear outside of pack expansion
   // expressions.
   options |= TypeResolutionFlags::AllowPackReferences;
-  const auto BaseTy = TypeResolution::resolveContextualType(
+  auto BaseTy = TypeResolution::resolveContextualType(
       InnerTypeRepr, DC, options,
       [](auto unboundTy) {
         // FIXME: Don't let unbound generic types escape type resolution.
@@ -1937,6 +1937,10 @@ TypeExpr *PreCheckTarget::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
       PlaceholderType::get,
       // TypeExpr pack elements are opened in CSGen.
       /*packElementOpener*/ nullptr);
+
+  // Unwrap DynamicSelfType, because Self.Foo is the same as MyClass.Foo.
+  if (auto *SelfTy = BaseTy->getAs<DynamicSelfType>())
+    BaseTy = SelfTy->getSelfType();
 
   if (BaseTy->mayHaveMembers()) {
     // See if there is a member type with this name.
