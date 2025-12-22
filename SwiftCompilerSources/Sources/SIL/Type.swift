@@ -241,17 +241,13 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   }
 }
 
-extension Type: Equatable, Hashable, Comparable {
+extension Type: Equatable, Hashable {
   public static func ==(lhs: Type, rhs: Type) -> Bool { 
     lhs.bridged.opaqueValue == rhs.bridged.opaqueValue
   }
 
   public func hash(into hasher: inout Hasher) {
     hasher.combine(bridged.opaqueValue)
-  }
-
-  public static func < (lhs: Type, rhs: Type) -> Bool {
-    return "\(lhs)" < "\(rhs)"
   }
 }
 

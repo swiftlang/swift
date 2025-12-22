@@ -1258,7 +1258,10 @@ let specializeBranchTracingEnums = FunctionTest("autodiff_specialize_branch_trac
   print("Specialized branch tracing enum dict for VJP \(function.name) contains \(specializedBTEDict.count) elements:")
 
   var keys = [Type](specializedBTEDict.keys)
-  keys.sort()
+
+  func compareTypes(lhs: Type, rhs: Type) -> Bool { "\(lhs)" < "\(rhs)" }
+  keys.sort(by: compareTypes)
+
   for (idx, key) in keys.enumerated() {
     print("non-specialized BTE \(idx): \(key.nominal!.description)")
     print("specialized BTE \(idx): \(specializedBTEDict[key]!.nominal!.description)")
