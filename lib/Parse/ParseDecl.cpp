@@ -8861,6 +8861,48 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
                  Attributes.hasAttribute<ConstValAttr>() ||
                  Attributes.hasAttribute<ExternAttr>();
 
+  auto isPackageWorkaround = [&]() {
+    auto filePath = SF.getFilename();
+    auto fileName = llvm::sys::path::filename(filePath);
+    if (fileName != "Package.swift" && !fileName.starts_with("Package@"))
+      return false;
+
+    if (filePath.contains("swift-collections")) {
+      if (isIdentifier(Tok, "defines") || isIdentifier(Tok, "_settings"))
+        return true;
+    }
+    if (filePath.contains("swift-testing")) {
+      if (isIdentifier(Tok, "git") ||
+          isIdentifier(Tok, "buildingForDevelopment") ||
+          isIdentifier(Tok, "buildingForEmbedded"))
+        return true;
+    }
+    if (filePath.contains("swift-syntax")) {
+      if (isIdentifier(Tok, "buildDynamicLibrary") ||
+          isIdentifier(Tok, "rawSyntaxValidation") ||
+          isIdentifier(Tok, "buildScriptEnvironment") ||
+          isIdentifier(Tok, "swiftParserSwiftSettings") ||
+          isIdentifier(Tok, "alternateTokenIntrospection") ||
+          isIdentifier(Tok, "swiftSyntaxBuilderSwiftSettings") ||
+          isIdentifier(Tok, "swiftSyntaxSwiftSettings"))
+        return true;
+    }
+    if (filePath.contains("swift-tools-protocols")) {
+      if (isIdentifier(Tok, "lspLoggingSwiftSettings") ||
+          isIdentifier(Tok, "useLocalDependencies") ||
+          isIdentifier(Tok, "hasEnvironmentVariable") ||
+          isIdentifier(Tok, "buildOnlyTests") ||
+          isIdentifier(Tok, "dependencies") ||
+          isIdentifier(Tok, "forceNonDarwinLogger"))
+        return true;
+    }
+    return false;
+  }();
+
+  if (isPackageWorkaround && peekToken().is(tok::equal)) {
+    Attributes.add(NonisolatedAttr::createImplicit(Context, NonIsolatedModifier::Unsafe));
+  }
+
   // If this is a var in the top-level of script/repl source file, wrap the
   // PatternBindingDecl in a TopLevelCodeDecl, since it represents executable
   // code.  The VarDecl and any accessor decls (for computed properties) go in
@@ -8868,7 +8910,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
   // We follow the same rule for @_extern.
   TopLevelCodeDecl *topLevelDecl = nullptr;
   if (allowTopLevelCode() && CurDeclContext->isModuleScopeContext() &&
-      !IsConst && !Attributes.hasAttribute<AccessControlAttr>()) {
+      !IsConst && !Attributes.hasAttribute<AccessControlAttr>() &&
+      !isPackageWorkaround) {
     // The body of topLevelDecl will get set later.
     topLevelDecl = new (Context) TopLevelCodeDecl(CurDeclContext);
   }
