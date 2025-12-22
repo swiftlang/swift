@@ -2497,9 +2497,13 @@ public:
       flags |= DeclAvailabilityFlag::
           AllowPotentiallyUnavailableAtOrBelowDeploymentTarget;
 
+    ExportabilityReason reason =
+      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
+        ExportabilityReason::ImplicitlyPublicInheritance :
+        ExportabilityReason::Inheritance;
     for (TypeLoc inherited : nominal->getInherited().getEntries()) {
       checkType(inherited.getType(), inherited.getTypeRepr(), nominal,
-                ExportabilityReason::Inheritance,
+                reason,
                 flags | DeclAvailabilityFlag::DisableUnsafeChecking);
     }
   }
@@ -2563,8 +2567,12 @@ public:
   void visitEnumElementDecl(EnumElementDecl *EED) {
     if (!EED->hasAssociatedValues())
       return;
+    ExportabilityReason reason =
+      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
+        ExportabilityReason::ImplicitlyPublicAssociatedValue :
+        ExportabilityReason::AssociatedValue;
     for (auto &P : *EED->getParameterList())
-      checkType(P->getInterfaceType(), P->getTypeRepr(), EED);
+      checkType(P->getInterfaceType(), P->getTypeRepr(), EED, reason);
   }
 
   void visitMacroDecl(MacroDecl *MD) {
@@ -2601,9 +2609,13 @@ public:
     // must be exported.
     DeclAvailabilityFlags flags = DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
     flags |= DeclAvailabilityFlag::DisableUnsafeChecking;
+    ExportabilityReason inheritanceReason =
+      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
+        ExportabilityReason::ImplicitlyPublicInheritance :
+        ExportabilityReason::Inheritance;
     for (TypeLoc inherited : ED->getInherited().getEntries()) {
       checkType(inherited.getType(), inherited.getTypeRepr(), ED,
-                ExportabilityReason::Inheritance, flags);
+                inheritanceReason, flags);
     }
 
     auto wasWhere = Where;
