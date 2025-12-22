@@ -772,7 +772,7 @@ Generate a backtrace for the parent process.
     }
   }
 
-  #if os(Linux) || os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if os(Linux) || os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
   static func setRawMode() -> termios {
     var oldAttrs = termios()
     tcgetattr(0, &oldAttrs)
