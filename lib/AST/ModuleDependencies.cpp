@@ -760,6 +760,10 @@ bool ModuleDependenciesCache::hasSwiftDependency(StringRef moduleName) const {
   return findSwiftDependency(moduleName).has_value();
 }
 
+bool ModuleDependenciesCache::hasNegativeSwiftDependency(StringRef moduleName) const {
+  return negativeSwiftDependencyCache.contains(moduleName);
+}
+
 int ModuleDependenciesCache::numberOfClangDependencies() const {
   return ModuleDependenciesMap.at(ModuleDependencyKind::Clang).size();
 }
@@ -767,7 +771,6 @@ int ModuleDependenciesCache::numberOfSwiftDependencies() const {
   return ModuleDependenciesMap.at(ModuleDependencyKind::SwiftInterface).size() +
          ModuleDependenciesMap.at(ModuleDependencyKind::SwiftBinary).size();
 }
-
 void ModuleDependenciesCache::recordDependency(
     StringRef moduleName, ModuleDependencyInfo dependency) {
   auto dependenciesKind = dependency.getKind();
@@ -944,6 +947,11 @@ void ModuleDependenciesCache::addVisibleClangModules(
   auto updatedDependencyInfo = dependencyInfo;
   updatedDependencyInfo.addVisibleClangModules(moduleNames);
   updateDependency(moduleID, updatedDependencyInfo);
+}
+
+void ModuleDependenciesCache::recordFailedSwiftDependencyLookup(
+    StringRef moduleIdentifier) {
+  negativeSwiftDependencyCache.insert(moduleIdentifier);
 }
 
 llvm::StringSet<> &ModuleDependenciesCache::getVisibleClangModules(
