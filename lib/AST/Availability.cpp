@@ -1047,20 +1047,22 @@ bool swift::hasConformancesToPublicProtocols(const ExtensionDecl *ED) {
 
 ExportedLevel swift::isExported(const ExtensionDecl *ED) {
   // An extension can only be exported if it extends an exported type.
+  ExportedLevel exported = ExportedLevel::None;
   if (auto *NTD = ED->getExtendedNominal()) {
-    if (isExported(NTD) == ExportedLevel::None)
-      return ExportedLevel::None;
+    exported = isExported(NTD);
+    if (exported == ExportedLevel::None)
+      return exported;
   }
 
   // If the extension declares a conformance to a public protocol then the
   // extension is exported.
   if (hasConformancesToPublicProtocols(ED))
-    return ExportedLevel::Exported;
+    return exported;
 
   // If there are any exported members then the extension is exported.
-  ExportedLevel exported = ExportedLevel::None;
+  ExportedLevel membersExported = ExportedLevel::None;
   for (const Decl *D : ED->getMembers())
-    exported = std::max(exported, isExported(D));
+    membersExported = std::max(membersExported, isExported(D));
 
-  return exported;
+  return membersExported;
 }

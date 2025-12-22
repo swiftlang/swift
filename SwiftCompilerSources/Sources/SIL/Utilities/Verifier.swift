@@ -190,7 +190,7 @@ extension BeginAccessInst : VerifiableInstruction {
       return
     }
 
-    if address.type.isMoveOnly && enforcement == .static {
+    if enforcement == .static {
       // This is a workaround for a bug in the move-only checker: rdar://151841926.
       // The move-only checker sometimes inserts destroy_addr within read-only static access scopes.
       // TODO: remove this once the bug is fixed.
