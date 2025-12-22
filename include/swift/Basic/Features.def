@@ -464,9 +464,6 @@ EXPERIMENTAL_FEATURE(ManualOwnership, false)
 /// Enable the @extractConstantsFromMembers attribute.
 EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
 
-// Group Main Actor Isolation Errors by Scope
-EXPERIMENTAL_FEATURE(GroupActorErrors, true)
-
 // Enable explicit isolation of closures.
 EXPERIMENTAL_FEATURE(ClosureIsolation, true)
 
