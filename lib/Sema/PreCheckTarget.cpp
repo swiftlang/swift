@@ -392,6 +392,7 @@ static bool isMemberChainTail(Expr *expr, Expr *parent, MemberChainKind kind) {
   return !parent || getMemberChainSubExpr(parent, kind) != expr;
 }
 
+// TODO: We could eliminate this now
 static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
                                     ValueDecl *&localDeclAfterUse) {
   // Only VarDecls require declaration before use.
@@ -403,6 +404,11 @@ static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
   auto *varDC = VD->getDeclContext();
   if (!varDC->isLocalContext() || VD->isDebuggerVar())
     return true;
+
+  if (isa<TopLevelCodeDecl>(varDC)) {
+    localDeclAfterUse = VD;
+    return false;
+  }
 
   // Check to see if the VarDecl is in a parent local context. We allow cases
   // where there's e.g an intermediate type context since we have a custom

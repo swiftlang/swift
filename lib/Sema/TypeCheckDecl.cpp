@@ -1860,7 +1860,7 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
         FD->addAttribute(new (C) FinalAttr(/*IsImplicit=*/true));
       }
     }
-  } else if (!dc->isModuleScopeContext()) {
+  } else if (!dc->isModuleScopeContext() && !dyn_cast<TopLevelCodeDecl>(dc)) {
     FD->diagnose(diag::operator_in_local_scope);
   }
 

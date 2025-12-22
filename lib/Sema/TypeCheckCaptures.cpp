@@ -355,7 +355,7 @@ public:
       // We have an intervening nominal type context that is not the
       // declaration context, and the declaration context is not global.
       // This is not supported since nominal types cannot capture values.
-      if (auto NTD = dyn_cast<NominalTypeDecl>(TmpDC)) {
+      if (auto NTD = TmpDC->getSelfNominalTypeDecl()) {
         // Allow references to local functions from inside methods of a
         // local type, because if the local function has captures, we'll
         // diagnose them in SILGen. It's a bit unfortunate that we can't

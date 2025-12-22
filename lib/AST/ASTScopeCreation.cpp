@@ -374,6 +374,32 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
 namespace swift {
 namespace ast_scope {
 
+static void collectLocalDecls(BraceStmt *bs,
+                              SmallVectorImpl<ValueDecl *> &localFuncsAndTypes,
+                              SmallVectorImpl<VarDecl *> &localVars) {
+  auto addDecl = [&](ValueDecl *vd) {
+    if (isa<FuncDecl>(vd)  || isa<TypeDecl>(vd)) {
+      localFuncsAndTypes.push_back(vd);
+    } else if (auto *var = dyn_cast<VarDecl>(vd)) {
+      localVars.push_back(var);
+    }
+  };
+
+  // All types and functions are visible anywhere within a brace statement
+  // scope. When ordering matters (i.e. var decl) we will have split the brace
+  // statement into nested scopes.
+  for (auto braceElement : bs->getElements()) {
+    if (auto localBinding = braceElement.dyn_cast<Decl *>()) {
+      if (auto *vd = dyn_cast<ValueDecl>(localBinding)) {
+        addDecl(vd);
+        auto abiRole = ABIRoleInfo(vd);
+        if (!abiRole.providesABI())
+          addDecl(abiRole.getCounterpart());
+      }
+    }
+  }
+}
+
 class NodeAdder
     : public ASTVisitor<NodeAdder, ASTScopeImpl *,
                         ASTScopeImpl *, ASTScopeImpl *,
@@ -518,28 +544,7 @@ public:
 
     SmallVector<ValueDecl *, 2> localFuncsAndTypes;
     SmallVector<VarDecl *, 2> localVars;
-
-    auto addDecl = [&](ValueDecl *vd) {
-      if (isa<FuncDecl>(vd)  || isa<TypeDecl>(vd)) {
-        localFuncsAndTypes.push_back(vd);
-      } else if (auto *var = dyn_cast<VarDecl>(vd)) {
-        localVars.push_back(var);
-      }
-    };
-
-    // All types and functions are visible anywhere within a brace statement
-    // scope. When ordering matters (i.e. var decl) we will have split the brace
-    // statement into nested scopes.
-    for (auto braceElement : bs->getElements()) {
-      if (auto localBinding = braceElement.dyn_cast<Decl *>()) {
-        if (auto *vd = dyn_cast<ValueDecl>(localBinding)) {
-          addDecl(vd);
-          auto abiRole = ABIRoleInfo(vd);
-          if (!abiRole.providesABI())
-            addDecl(abiRole.getCounterpart());
-        }
-      }
-    }
+    collectLocalDecls(bs, localFuncsAndTypes, localVars);
 
     SourceLoc endLocForBraceStmt = bs->getEndLoc();
     if (endLoc.has_value())
@@ -800,6 +805,7 @@ CREATES_NEW_INSERTION_POINT(GenericTypeOrExtensionScope)
 CREATES_NEW_INSERTION_POINT(BraceStmtScope)
 CREATES_NEW_INSERTION_POINT(ConditionalClausePatternUseScope)
 CREATES_NEW_INSERTION_POINT(ABIAttributeScope)
+CREATES_NEW_INSERTION_POINT(TopLevelScope)
 
 NO_NEW_INSERTION_POINT(TopLevelCodeScope)
 NO_NEW_INSERTION_POINT(FunctionBodyScope)
@@ -846,6 +852,19 @@ ASTSourceFileScope::expandAScopeThatCreatesANewInsertionPoint(
   SourceLoc endLoc = getSourceRangeOfThisASTNode().End;
 
   ASTScopeImpl *insertionPoint = this;
+  if (SF->isScriptMode()) {
+    SmallVector<ValueDecl *, 2> localFuncsAndTypes;
+    SmallVector<VarDecl *, 2> localVars;
+    for (auto *D : SF->getTopLevelDecls()) {
+      auto *TLCD = dyn_cast<TopLevelCodeDecl>(D);
+      if (!TLCD)
+        continue;
+      collectLocalDecls(TLCD->getBody(), localFuncsAndTypes, localVars);
+    }
+    auto &ctx = getASTContext();
+    auto range = getSourceRangeOfThisASTNode();
+    insertionPoint = scopeCreator.constructExpandAndInsert<TopLevelScope>(this, range, ctx.AllocateCopy(localFuncsAndTypes), ctx.AllocateCopy(localVars));
+  }
   for (auto node : SF->getTopLevelItems()) {
     insertionPoint = scopeCreator.addToScopeTreeAndReturnInsertionPoint(
       node, insertionPoint, endLoc);
@@ -1281,8 +1300,10 @@ void CustomAttributeScope::
 
 void TopLevelCodeScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  insertionPoint = scopeCreator.addToScopeTreeAndReturnInsertionPoint(decl->getBody(), this,
-                                                     std::nullopt);
+  insertionPoint = this;
+  for (auto N : decl->getBody()->getElements()) {
+    insertionPoint = scopeCreator.addToScopeTreeAndReturnInsertionPoint(N, insertionPoint, decl->getEndLoc());
+  }
 }
 
 #pragma mark expandScope

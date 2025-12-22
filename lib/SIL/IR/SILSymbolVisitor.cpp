@@ -908,6 +908,13 @@ public:
       visitDefaultArguments(EED, PL);
   }
 
+  void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
+    for (auto N : TLCD->getBody()->getElements()) {
+      if (auto *ED = dyn_cast_or_null<ExtensionDecl>(N.dyn_cast<Decl *>()))
+        visit(ED);
+    }
+  }
+
 #define UNINTERESTING_DECL(CLASS)                                              \
   void visit##CLASS##Decl(CLASS##Decl *) {}
 
@@ -919,7 +926,6 @@ public:
   UNINTERESTING_DECL(Operator)
   UNINTERESTING_DECL(PatternBinding)
   UNINTERESTING_DECL(PrecedenceGroup)
-  UNINTERESTING_DECL(TopLevelCode)
   UNINTERESTING_DECL(Value)
   UNINTERESTING_DECL(Using)
 

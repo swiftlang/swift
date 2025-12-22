@@ -6351,11 +6351,25 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
     MayNeedOverrideCompletion = true;
   };
 
+  TopLevelCodeDecl *topLevelDecl = nullptr;
+  std::optional<ContextChange> topLevelScope;
+  auto parseInTopLevelIfNeeded = [&]() {
+    if (!allowTopLevelCode() || !CurDeclContext->isModuleScopeContext())
+      return;
+
+    if (Attributes.hasAttribute<AccessControlAttr>())
+      return;
+
+    topLevelDecl = new (Context) TopLevelCodeDecl(CurDeclContext);
+    topLevelScope.emplace(*this, topLevelDecl);
+  };
+
   switch (Tok.getKind()) {
   case tok::kw_import:
     DeclResult = parseDeclImport(Flags, Attributes);
     break;
   case tok::kw_extension:
+    parseInTopLevelIfNeeded();
     DeclResult = parseDeclExtension(Flags, Attributes);
     break;
   case tok::kw_let:
@@ -6364,6 +6378,7 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
     break;
   }
   case tok::kw_typealias:
+    parseInTopLevelIfNeeded();
     DeclResult = parseDeclTypeAlias(Flags, Attributes);
     MayNeedOverrideCompletion = true;
     break;
@@ -6371,6 +6386,7 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
     DeclResult = parseDeclAssociatedType(Flags, Attributes);
     break;
   case tok::kw_enum:
+    parseInTopLevelIfNeeded();
     DeclResult = parseDeclEnum(Flags, Attributes);
     break;
   case tok::kw_case: {
@@ -6384,9 +6400,11 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
     break;
   }
   case tok::kw_class:
+    parseInTopLevelIfNeeded();
     DeclResult = parseDeclClass(Flags, Attributes);
     break;
   case tok::kw_struct:
+    parseInTopLevelIfNeeded();
     DeclResult = parseDeclStruct(Flags, Attributes);
     break;
   case tok::kw_init:
@@ -6402,9 +6420,11 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
     DeclResult = parseDeclPrecedenceGroup(Flags, Attributes);
     break;
   case tok::kw_protocol:
+    parseInTopLevelIfNeeded();
     DeclResult = parseDeclProtocol(Flags, Attributes);
     break;
   case tok::kw_func:
+    parseInTopLevelIfNeeded();
     parseFunc(/*HasFuncKeyword=*/true);
     break;
   case tok::kw_subscript: {
@@ -6638,6 +6658,12 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
 
   if (DeclResult.isNonNull()) {
     Decl *D = DeclResult.get();
+    if (topLevelScope) {
+      topLevelDecl->setBody(BraceStmt::createImplicit(Context, ASTNode(D)));
+      D = topLevelDecl;
+      DeclResult = makeParserResult(ParserStatus(DeclResult), D);
+    }
+
     if (!HandlerAlreadyCalled)
       Handler(D);
   }
@@ -7400,7 +7426,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     // anything about it either.  But propagate the error bit.
   }
   ext->setBraces({LBLoc, RBLoc});
-  if (!DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
+  if (!DCC.movedToTopLevel() && !CurDeclContext->canBeParentOfExtension()) {
     diagnose(ExtensionLoc, diag::decl_inner_scope);
     status.setIsParseError();
 

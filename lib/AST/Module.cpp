@@ -301,6 +301,12 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range items,
       }
     }
 
+    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      addToUnqualifiedLookupCache(TLCD->getBody()->getElements(),
+                                  /*onlyOperators*/ true,
+                                  /*onlyDerivatives*/ false);
+    }
+
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
       bool onlyOperatorsArg =
           (!NTD->hasUnparsedMembers() || NTD->maybeHasOperatorDeclarations());

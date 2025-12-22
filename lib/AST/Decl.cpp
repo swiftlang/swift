@@ -5329,6 +5329,9 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
           access = std::min(access, nominalAccess);
         }
       }
+      // Extensions in top level code are weird.
+      if (isa<TopLevelCodeDecl>(resultDC->getParent()))
+        resultDC = resultDC->getParent();
 
     } else {
       llvm_unreachable("unknown DeclContext kind");

@@ -141,6 +141,7 @@ class ASTScopeImpl : public ASTAllocated<ASTScopeImpl> {
   friend class GenericTypeOrExtensionWherePortion;
   friend class IterableTypeBodyPortion;
   friend class TopLevelCodeScope;
+  friend class ExtensionScope;
   friend class ScopeCreator;
   friend class ASTSourceFileScope;
   friend class ABIAttributeScope;
@@ -383,11 +384,6 @@ protected:
   // Consume the generic parameters in the context and its outer contexts
   static bool lookInGenericParametersOf(NullablePtr<const GenericParamList>,
                                         DeclConsumer);
-
-  NullablePtr<const ASTScopeImpl> parentIfNotChildOfTopScope() const {
-    const auto *p = getParent().get();
-    return p->getParent().isNonNull() ? p : nullptr;
-  }
 
 public:
   /// The tree is organized by source location and for most nodes this is also
@@ -1234,6 +1230,46 @@ public:
 
   static bool classof(const ASTScopeImpl *scope) {
     return scope->getKind() == ScopeKind::TopLevelCode;
+  }
+};
+
+class TopLevelScope final : public ASTScopeImpl {
+  SourceRange range;
+
+  /// Declarations which are in scope from the beginning of the statement.
+  ArrayRef<ValueDecl *> localFuncsAndTypes;
+
+  /// Declarations that are normally in scope only after their
+  /// definition.
+  ArrayRef<VarDecl *> localVars;
+
+public:
+  TopLevelScope(SourceRange range,
+                ArrayRef<ValueDecl *> localFuncsAndTypes,
+                ArrayRef<VarDecl *> localVars)
+      : ASTScopeImpl(ScopeKind::TopLevel), range(range),
+  localFuncsAndTypes(localFuncsAndTypes), localVars(localVars) {}
+  virtual ~TopLevelScope() {}
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+
+  bool lookupLocalsOrMembers(DeclConsumer) const override;
+
+private:
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &) {
+    return {this, ""};
+  }
+
+public:
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override {
+    return range;
+  }
+
+  static bool classof(const ASTScopeImpl *scope) {
+    return scope->getKind() == ScopeKind::TopLevel;
   }
 };
 
