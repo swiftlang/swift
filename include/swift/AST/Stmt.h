@@ -1022,7 +1022,7 @@ public:
               SourceLoc AwaitLoc, SourceLoc UnsafeLoc, Pattern *Pat,
               SourceLoc InLoc, Expr *Sequence,
               SourceLoc WhereLoc, Expr *WhereExpr, BraceStmt *Body,
-              DeclContext* DC, std::optional<bool> implicit = std::nullopt)
+              DeclContext *DC, std::optional<bool> implicit = std::nullopt)
       : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                     LabelInfo),
         ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc), UnsafeLoc(UnsafeLoc),
