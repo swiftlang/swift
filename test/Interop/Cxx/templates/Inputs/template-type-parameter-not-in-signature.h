@@ -16,7 +16,19 @@ struct Struct {
 };
 
 template <typename T>
-void templateTypeParamNotUsedInSignature() {}
+struct is_bool {
+  constexpr static bool value = false;
+};
+
+template <>
+struct is_bool<bool> {
+  constexpr static bool value = true;
+};
+
+template <typename T>
+bool templateTypeParamNotUsedInSignature() {
+  return is_bool<T>::value;
+}
 
 template <typename T, typename U>
 void multiTemplateTypeParamNotUsedInSignature() {}
