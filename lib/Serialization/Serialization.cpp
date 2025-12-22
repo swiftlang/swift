@@ -4040,6 +4040,7 @@ private:
     case PatternKind::OptionalSome:
     case PatternKind::Bool:
     case PatternKind::Expr:
+    case PatternKind::Opaque:
       llvm_unreachable("Refutable patterns cannot be serialized");
 
     case PatternKind::Binding: {
@@ -4051,10 +4052,6 @@ private:
       writePattern(var->getSubPattern());
       break;
     }
-
-    case PatternKind::Opaque:
-      writePattern(cast<OpaquePattern>(pattern)->getSubPattern());
-      break;
     }
   }
 

@@ -3605,9 +3605,11 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
   stmts.push_back(whileStmt);
 
   auto *braceStmt = BraceStmt::create(ctx, stmt->getStartLoc(), stmts, stmt->getEndLoc());
+
   StmtChecker checker(stmt->getDeclContext());
-  // FIXME: do I wanna check the output?
-  checker.typeCheckStmt(braceStmt);
+  if (!checker.typeCheckStmt(braceStmt))
+    return nullptr;
+
   return braceStmt;
 }
 
