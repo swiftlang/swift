@@ -9831,7 +9831,7 @@ ConstraintSystem::simplifyForEachElementConstraint(
                                            Type first, Type second,
                                            TypeMatchOptions flags,
                                            ConstraintLocatorBuilder locator) {
-  Type seqTy = getFixedTypeRecursive(first, flags, /*wantRValue=*/false);
+  Type seqTy = getFixedTypeRecursive(first, flags, /*wantRValue=*/true);
 
   if (seqTy->isTypeVariableOrMember()) {
     if (flags.contains(TMF_GenerateConstraints)) {
@@ -9845,10 +9845,10 @@ ConstraintSystem::simplifyForEachElementConstraint(
   }
 
   auto *externalSequenceType = createTypeVariable(
-     locator.getBaseLocator(), TVO_PrefersSubtypeBinding);
+     getConstraintLocator(locator), TVO_PrefersSubtypeBinding);
 
   addConstraint(ConstraintKind::Bind, externalSequenceType, seqTy,
-                locator.getBaseLocator());
+                locator);
 
   bool isAsync = false;
   auto anchor = locator.getAnchor();
@@ -9873,14 +9873,15 @@ ConstraintSystem::simplifyForEachElementConstraint(
     resultElementType = typeEraseOpenedExistentialReference(
             elementType, seqTy, externalSequenceType,
             TypePosition::Covariant);
-    if (!resultElementType || resultElementType->isPlaceholder()){
+    if (!resultElementType) {
       recordPotentialHole(externalSequenceType);
       resultElementType = PlaceholderType::get(Context, externalSequenceType);
+      increaseScore(SK_Hole, locator);
     }
   }
 
     addConstraint(ConstraintKind::Conversion, resultElementType, second,
-                     locator.getBaseLocator());
+                     locator);
     return SolutionKind::Solved;
 }
 

@@ -1007,7 +1007,7 @@ class ForEachStmt : public LabeledStmt {
   SourceLoc WhereLoc;
   Expr *WhereExpr = nullptr;
   BraceStmt *Body;
-  DeclContext* DC = nullptr;
+  DeclContext *DC = nullptr;
 
   // Set by Sema:
   ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();

@@ -5022,7 +5022,7 @@ private:
       DeclContext *useDC, FunctionRefInfo functionRefInfo,
       TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
-  /// Attempt to simplify the ForEachElemenr constraint.
+  /// Attempt to simplify the ForEachElement constraint.
   SolutionKind simplifyForEachElementConstraint(
                                           Type first, Type second,
                                           TypeMatchOptions flags,

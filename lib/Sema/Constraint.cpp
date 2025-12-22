@@ -466,7 +466,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
       skipSecond = true;
       break;
   case ConstraintKind::ForEachElement:
-      Out << " for each element"; break;
+      Out << " for each element "; break;
   case ConstraintKind::OptionalObject:
       Out << " optional with object type "; break;
   case ConstraintKind::BindOverload: {

@@ -2759,7 +2759,7 @@ namespace {
     }
 
     Expr *visitOpaqueExpr(OpaqueExpr *expr) {
-      // Do nothing with error expressions.
+      // Do nothing with opaque expressions.
       return expr;
     }
 
