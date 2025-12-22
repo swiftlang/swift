@@ -4667,7 +4667,6 @@ static std::optional<SequenceIterationInfo>
 generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                                ForEachStmt *stmt, Pattern *typeCheckedPattern,
                                bool shouldBindPatternVarsOneWay) {
-  ASTContext &ctx = cs.getASTContext();
   bool isAsync = stmt->getAwaitLoc().isValid();
   auto *sequenceExpr = stmt->getParsedSequence();
 
@@ -4703,13 +4702,6 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   // type-checked by introducing a `TVO_PrefersSubtypeBinding` type
   // variable that would make sure that result of `.makeIterator` would
   // get ranked standalone.
-  auto *externalSequenceType = cs.createTypeVariable(
-      cs.getConstraintLocator(sequenceExpr), TVO_PrefersSubtypeBinding);
-
-  cs.addConstraint(ConstraintKind::Equal, externalSequenceType,
-                   seqType,
-                   externalSequenceType->getImpl().getLocator());
-
   cs.addConstraint(ConstraintKind::ConformsTo, seqType,
                    sequenceProto->getDeclaredInterfaceType(),
                    contextualLocator);
@@ -4723,14 +4715,10 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
   if (!initType)
     return std::nullopt;
 
-  // Add a conversion constraint between the element type of the sequence
-  // and the type of the element pattern.
-  auto* elementType = DependentMemberType::get(externalSequenceType, sequenceProto->getAssociatedType(ctx.Id_Element));
-  cs.addConstraint(ConstraintKind::Conversion, elementType, initType,
-                     elementLocator);
-
-  // Populate all of the information for a for-each loop.
   sequenceIterationInfo.initType = initType;
+
+  cs.addConstraint(ConstraintKind::ForEachElement, seqType, initType,
+      cs.getConstraintLocator(stmt));
 
   return sequenceIterationInfo;
 }

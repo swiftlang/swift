@@ -2186,6 +2186,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
@@ -2550,6 +2551,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
@@ -3283,6 +3285,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
@@ -7361,6 +7364,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::LiteralConformsTo:
+    case ConstraintKind::ForEachElement:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueMember:
@@ -9820,6 +9824,64 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   }
 
   llvm_unreachable("Unhandled CheckedCastKind in switch.");
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyForEachElementConstraint(
+                                           Type first, Type second,
+                                           TypeMatchOptions flags,
+                                           ConstraintLocatorBuilder locator) {
+  Type seqTy = getFixedTypeRecursive(first, flags, /*wantRValue=*/false);
+
+  if (seqTy->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::ForEachElement, first,
+                           second, getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  }
+
+  auto *externalSequenceType = createTypeVariable(
+     locator.getBaseLocator(), TVO_PrefersSubtypeBinding);
+
+  addConstraint(ConstraintKind::Bind, externalSequenceType, seqTy,
+                locator.getBaseLocator());
+
+  bool isAsync = false;
+  auto anchor = locator.getAnchor();
+  if (auto *stmt = getAsStmt<ForEachStmt>(anchor)) {
+    isAsync = stmt->getAwaitLoc().isValid();
+  }
+
+  auto sequenceProto = isAsync
+      ? Context.getProtocol(KnownProtocolKind::AsyncSequence)
+      : Context.getProtocol(KnownProtocolKind::Sequence);
+
+  if (!sequenceProto) {
+    return SolutionKind::Error;
+  }
+
+  auto *elementAssocType = sequenceProto->getAssociatedType(Context.Id_Element);
+  auto elementType = DependentMemberType::get(externalSequenceType, elementAssocType);
+
+  Type resultElementType = elementType;
+  if (seqTy->isExistentialType())
+  {
+    resultElementType = typeEraseOpenedExistentialReference(
+            elementType, seqTy, externalSequenceType,
+            TypePosition::Covariant);
+    if (!resultElementType || resultElementType->isPlaceholder()){
+      recordPotentialHole(externalSequenceType);
+      resultElementType = PlaceholderType::get(Context, externalSequenceType);
+    }
+  }
+
+    addConstraint(ConstraintKind::Conversion, resultElementType, second,
+                     locator.getBaseLocator());
+    return SolutionKind::Solved;
 }
 
 ConstraintSystem::SolutionKind
@@ -16304,6 +16366,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::CheckedCast:
     return simplifyCheckedCastConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::ForEachElement:
+    return simplifyForEachElementConstraint(first, second, subflags, locator);
+
   case ConstraintKind::OptionalObject:
     return simplifyOptionalObjectConstraint(first, second, subflags, locator);
 
@@ -16941,6 +17006,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     }
     return result;
   }
+
+  case ConstraintKind::ForEachElement:
+    return simplifyForEachElementConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::OptionalObject:
     return simplifyOptionalObjectConstraint(
