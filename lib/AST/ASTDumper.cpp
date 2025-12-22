@@ -3258,7 +3258,7 @@ public:
   }
 
   void visitOpaqueStmt(OpaqueStmt *S, Label label){
-    visitBraceStmt(S->getUnderlyingStmt(), label);
+    visit(S->getUnderlyingStmt(), label);
   }
 
   void visitBraceStmt(BraceStmt *S, Label label) {
@@ -3341,14 +3341,10 @@ public:
       printRec(S->getWhere(), Label::always("where"));
     }
     printRec(S->getParsedSequence(), Label::optional("parsed_sequence"));
-    if (S->getConvertElementExpr()) {
-      printRec(S->getConvertElementExpr(),
-               Label::optional("convert_element_expr"));
-    }
 
     printRec(S->getBody(), Label::optional("body"));
 
-    printRec(S->getDesugaredStmt(), Label::optional("desugared_loop"));
+    printRec(S->getCachedDesugaredStmt(), Label::optional("desugared_loop"));
 
     printFoot();
   }

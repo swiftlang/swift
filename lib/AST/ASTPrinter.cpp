@@ -5637,13 +5637,11 @@ void PrintAST::visitTypeValueExpr(TypeValueExpr *expr) {
 }
 
 void PrintAST::visitOpaqueExpr(OpaqueExpr *expr) {
-  // FIXME: unsure about this, maybe do nothing?
   visit(expr->getOriginalExpr());
 }
 
 void PrintAST::visitOpaqueStmt(OpaqueStmt *stmt) {
-  // FIXME: unsure about this, maybe do nothing?
-  printBraceStmt(stmt->getUnderlyingStmt());
+  visit(stmt->getUnderlyingStmt());
 }
 
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {

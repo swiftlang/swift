@@ -2896,7 +2896,7 @@ void IsCustomAvailabilityDomainPermanentlyEnabled::cacheResult(
 //----------------------------------------------------------------------------//
 std::optional<BraceStmt *> DesugarForEachStmtRequest::getCachedResult() const {
   auto *fes = std::get<0>(getStorage());
-  auto* desugaredStmt = fes->getDesugaredStmt();
+  auto* desugaredStmt = fes->getCachedDesugaredStmt();
   if (!desugaredStmt){
     return std::nullopt;
   }

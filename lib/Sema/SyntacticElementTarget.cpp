@@ -275,7 +275,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   case CTP_WrappedProperty:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
-  case CTP_ForEachElement:
     return false;
   }
   llvm_unreachable("invalid contextual type");

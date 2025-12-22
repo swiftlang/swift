@@ -596,7 +596,6 @@ public:
     case CTP_Initialization:
     case CTP_ForEachSequence:
     case CTP_ExprPattern:
-    case CTP_ForEachElement:
       break;
     default:
       assert(false && "Unexpected contextual type purpose");

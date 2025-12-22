@@ -1405,7 +1405,7 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
 }
 
 void StmtEmitter::visitOpaqueStmt(OpaqueStmt *S) {
-  visitBraceStmt(S->getUnderlyingStmt());
+  visit(S->getUnderlyingStmt());
 }
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
@@ -1446,7 +1446,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
     return;
   }
 
-  auto* braceStmt = S->getDesugaredStmt();
+  auto* braceStmt = S->getCachedDesugaredStmt();
   if (braceStmt)
     visitBraceStmt(braceStmt);
 }

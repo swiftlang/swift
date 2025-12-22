@@ -1010,10 +1010,7 @@ class ForEachStmt : public LabeledStmt {
   DeclContext *DC = nullptr;
 
   // Set by Sema:
-  ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
-  Type sequenceType;
   BraceStmt *desugaredStmt = nullptr;
-  Expr *convertElementExpr = nullptr;
   LabeledStmt *continueTarget = nullptr;
   LabeledStmt *breakTarget = nullptr;
 
@@ -1029,19 +1026,6 @@ public:
         Pat(nullptr), InLoc(InLoc), Sequence(Sequence), WhereLoc(WhereLoc),
         WhereExpr(WhereExpr), Body(Body) {
     setPattern(Pat);
-  }
-
-  void setConvertElementExpr(Expr *expr) { convertElementExpr = expr; }
-  Expr *getConvertElementExpr() const { return convertElementExpr; }
-
-  void setSequenceConformance(Type type,
-                              ProtocolConformanceRef conformance) {
-    sequenceType = type;
-    sequenceConformance = conformance;
-  }
-  Type getSequenceType() const { return sequenceType; }
-  ProtocolConformanceRef getSequenceConformance() const {
-    return sequenceConformance;
   }
 
   /// getForLoc - Retrieve the location of the 'for' keyword.
@@ -1086,8 +1070,8 @@ public:
     return S->getKind() == StmtKind::ForEach;
   }
 
-  BraceStmt* desugar();
-  BraceStmt* getDesugaredStmt() const { return desugaredStmt; }
+  BraceStmt* getDesugaredStmt();
+  BraceStmt* getCachedDesugaredStmt() const { return desugaredStmt; }
   void setDesugaredStmt(BraceStmt* newStmt) { desugaredStmt = newStmt; }
 
   void setContinueTarget(LabeledStmt *target) { continueTarget = target; }
@@ -1553,18 +1537,17 @@ public:
 class OpaqueStmt final : public Stmt {
   SourceLoc StartLoc;
   SourceLoc EndLoc;
-  BraceStmt *Body; // FIXME: should I just use Stmt * so that this is more versatile?
-                   // If not, should the class be renamed to be more specific?
+  Stmt *Body;
+
   public:
-    OpaqueStmt(BraceStmt* body, SourceLoc startLoc, SourceLoc endLoc)
+    OpaqueStmt(Stmt* body, SourceLoc startLoc, SourceLoc endLoc)
     : Stmt(StmtKind::Opaque, true /*always implicit*/),
       StartLoc(startLoc), EndLoc(endLoc), Body(body) {}
 
-  SourceLoc getLoc() const { return StartLoc; }
-  SourceLoc getStartLoc() const { return StartLoc; }
-  SourceLoc getEndLoc() const { return EndLoc; }
+  SourceLoc getStartLoc() const { return Stmt::getStartLoc(); }
+  SourceLoc getEndLoc() const { return Stmt::getEndLoc(); }
 
-  BraceStmt* getUnderlyingStmt() { return Body; }
+  Stmt* getUnderlyingStmt() { return Body; }
 
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Opaque;

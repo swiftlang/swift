@@ -9369,8 +9369,6 @@ applySolutionToForEachStmtPreamble(ForEachStmt *stmt,
   auto sequenceConformance = checkConformance(type, sequenceProto);
   assert(!sequenceConformance.isInvalid() &&
          "Couldn't find sequence conformance");
-  stmt->setSequenceConformance(type, sequenceConformance);
-
   return info;
 }
 
@@ -9506,7 +9504,6 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     case CTP_Condition:
     case CTP_WrappedProperty:
     case CTP_SingleValueStmtBranch:
-    case CTP_ForEachElement:
       result.setExpr(rewrittenExpr);
       break;
     }

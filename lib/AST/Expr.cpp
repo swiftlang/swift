@@ -841,7 +841,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
 
   case ExprKind::MacroExpansion:
   case ExprKind::CurrentContextIsolation:
-  case ExprKind::Opaque: /* FIXME: unsure about this */
+  case ExprKind::Opaque: /* This one should never occur */
     return true;
   }
 

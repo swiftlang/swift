@@ -140,7 +140,7 @@ namespace {
       if (auto *FES = dyn_cast<ForEachStmt>(S))
       {
         FES->setDeclContext(ParentDC);
-            FES->desugar();
+        FES->getDesugaredStmt();
       }
 
       return Action::Continue(S);

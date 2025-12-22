@@ -2087,13 +2087,6 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  if (auto IteratorNext = S->getConvertElementExpr()) {
-    if ((IteratorNext = doIt(IteratorNext)))
-      S->setConvertElementExpr(IteratorNext);
-    else
-      return nullptr;
-  }
-
   if (Stmt *Body = S->getBody()) {
     if ((Body = doIt(Body)))
       S->setBody(cast<BraceStmt>(Body));
@@ -2101,7 +2094,7 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  if (Stmt *Desugared = S->getDesugaredStmt()) {
+  if (Stmt *Desugared = S->getCachedDesugaredStmt()) {
     if ((Desugared = doIt(Desugared)))
       S->setDesugaredStmt(cast<BraceStmt>(Desugared));
     else

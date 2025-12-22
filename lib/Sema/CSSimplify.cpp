@@ -9850,11 +9850,9 @@ ConstraintSystem::simplifyForEachElementConstraint(
   addConstraint(ConstraintKind::Bind, externalSequenceType, seqTy,
                 locator);
 
-  bool isAsync = false;
   auto anchor = locator.getAnchor();
-  if (auto *stmt = getAsStmt<ForEachStmt>(anchor)) {
-    isAsync = stmt->getAwaitLoc().isValid();
-  }
+  auto *stmt = castToStmt<ForEachStmt>(anchor);
+  auto isAsync = stmt->getAwaitLoc().isValid();
 
   auto sequenceProto = isAsync
       ? Context.getProtocol(KnownProtocolKind::AsyncSequence)
@@ -9874,7 +9872,6 @@ ConstraintSystem::simplifyForEachElementConstraint(
             elementType, seqTy, externalSequenceType,
             TypePosition::Covariant);
     if (!resultElementType) {
-      recordPotentialHole(externalSequenceType);
       resultElementType = PlaceholderType::get(Context, externalSequenceType);
       increaseScore(SK_Hole, locator);
     }
@@ -16772,7 +16769,6 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_WrappedProperty:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
-  case CTP_ForEachElement:
     break;
   }
 

@@ -48,7 +48,6 @@ enum : unsigned { NumPatternKindBits =
   countBitsUsed(static_cast<unsigned>(PatternKind::Last_Pattern)) };
 
 enum class DescriptivePatternKind : uint8_t {
-  Opaque,
   Paren,
   Tuple,
   Named,

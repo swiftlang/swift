@@ -50,7 +50,8 @@ DescriptivePatternKind Pattern::getDescriptiveKind() const {
     TRIVIAL_PATTERN_KIND(OptionalSome);
     TRIVIAL_PATTERN_KIND(Bool);
     TRIVIAL_PATTERN_KIND(Expr);
-    TRIVIAL_PATTERN_KIND(Opaque);
+    case PatternKind::Opaque:
+      return cast<OpaquePattern>(this)->getSubPattern()->getDescriptiveKind();
 
   case PatternKind::Binding:
     switch (cast<BindingPattern>(this)->getIntroducer()) {
@@ -92,7 +93,6 @@ StringRef Pattern::getDescriptivePatternKindName(DescriptivePatternKind K) {
     ENTRY(Expr, "expression pattern");
     ENTRY(Var, "'var' binding pattern");
     ENTRY(Let, "'let' binding pattern");
-    ENTRY(Opaque, "opaque pattern");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptivePatternKind");
