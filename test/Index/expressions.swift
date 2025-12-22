@@ -57,3 +57,21 @@ func castExpr(x: Any) {
     // CHECK: [[@LINE+1]]:15 | struct/Swift | S1 | [[S1_USR]] | Ref
     _ = x as? S1
 }
+
+// Test that initializers are indexed when called through Self.NestedType
+
+// CHECK: [[@LINE+1]]:7 | class(internal)/Swift | Container | [[Container_USR:.*]] | Def
+class Container {
+    // CHECK: [[@LINE+1]]:11 | class(internal)/Swift | NestedType | [[NestedType_USR:.*]] | Def
+    class NestedType {
+        // CHECK: [[@LINE+1]]:9 | constructor(internal)/Swift | init(value:) | [[NestedType_init_USR:.*]] | Def
+        init(value: Int) {}
+    }
+
+    func someFunc() {
+        // CHECK: [[@LINE+3]]:13 | class/Swift | Container | [[Container_USR]] | Ref
+        // CHECK: [[@LINE+2]]:18 | class/Swift | NestedType | [[NestedType_USR]] | Ref
+        // CHECK: [[@LINE+1]]:18 | constructor/Swift | init(value:) | [[NestedType_init_USR]] | Ref,Call
+        _ = Self.NestedType(value: 1)
+    }
+}

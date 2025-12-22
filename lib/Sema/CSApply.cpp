@@ -1047,8 +1047,7 @@ namespace {
         // "T.init(...)" -- pretend it has two argument lists like
         // a real '.' call.
         if (isa<ConstructorDecl>(member) &&
-            isa<CallExpr>(prev) &&
-            isa<TypeExpr>(cast<CallExpr>(prev)->getFn())) {
+            isa<CallExpr>(prev)) {
           assert(maxArgCount == 2);
           return 2;
         }
