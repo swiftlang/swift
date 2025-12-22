@@ -66,7 +66,8 @@ protected:
                 SpecialTypeInfoKind stik = SpecialTypeInfoKind::Fixed)
       : TypeInfo(type, align, pod, bt, copy, alwaysFixedSize, isABIAccessible, stik),
         SpareBits(std::move(spareBits)) {
-    assert(SpareBits.size() == size.getValueInBits());
+    // SpareBits implementation is limited to 32bits.
+    assert(SpareBits.size() == (size.getValueInBits() & 0xFFFFFFFF));
     assert(isFixedSize());
     Bits.FixedTypeInfo.Size = size.getValue();
     assert(Bits.FixedTypeInfo.Size == size.getValue() && "truncation");

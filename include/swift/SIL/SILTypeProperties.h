@@ -128,6 +128,13 @@ enum MayHaveCustomDeinit_t : bool {
   MayHaveCustomDeinit = true,
 };
 
+/// Is this a very large type whose expansion into SSA values is likely
+/// detrimential i.e should be kept indirect.
+enum IsVeryLargeType_t : bool {
+  IsNotVeryLargeType = false,
+  IsVeryLargeType = true
+};
+
 class SILTypeProperties {
   // These are chosen so that bitwise-or merges the flags properly.
   //
@@ -145,6 +152,7 @@ class SILTypeProperties {
     AddressableForDependenciesFlag = 1 << 9,
     HasRawLayoutFlag               = 1 << 10,
     CustomDeinitFlag               = 1 << 11,
+    IsVeryLargeTypeFlag            = 1 << 12,
   };
   // clang-format on
 
@@ -164,7 +172,8 @@ public:
       IsLexical_t isLexical = IsNotLexical, HasPack_t hasPack = HasNoPack,
       IsAddressableForDependencies_t isAFD = IsNotAddressableForDependencies,
       HasRawLayout_t hasRawLayout = DoesNotHaveRawLayout,
-      MayHaveCustomDeinit_t customDeinit = HasOnlyDefaultDeinit)
+      MayHaveCustomDeinit_t customDeinit = HasOnlyDefaultDeinit,
+      IsVeryLargeType_t largeType = IsNotVeryLargeType )
       : Flags((isTrivial ? 0U : NonTrivialFlag) |
               (isFixedABI ? 0U : NonFixedABIFlag) |
               (isAddressOnly ? AddressOnlyFlag : 0U) |
@@ -175,7 +184,8 @@ public:
               (hasPack ? HasPackFlag : 0U) |
               (isAFD ? AddressableForDependenciesFlag : 0U) |
               (hasRawLayout ? HasRawLayoutFlag : 0U) |
-              (customDeinit ? CustomDeinitFlag : 0U)) {}
+              (customDeinit ? CustomDeinitFlag : 0U) |
+              (largeType ? IsVeryLargeTypeFlag : 0U)) {}
 
   constexpr bool operator==(SILTypeProperties p) const {
     return Flags == p.Flags;
@@ -261,6 +271,9 @@ public:
   MayHaveCustomDeinit_t mayHaveCustomDeinit() const {
     return MayHaveCustomDeinit_t((Flags & CustomDeinitFlag) != 0);
   }
+  IsVeryLargeType_t isVeryLargeType() const {
+    return IsVeryLargeType_t((Flags & IsVeryLargeTypeFlag) != 0);
+  }
 
   void setNonTrivial() { Flags |= NonTrivialFlag; }
   void setIsOrContainsRawPointer() { Flags |= HasRawPointerFlag; }
@@ -287,6 +300,7 @@ public:
     Flags = (Flags & ~CustomDeinitFlag)
       | (hasCustomDeinit ? CustomDeinitFlag : 0);
   }
+  void setVeryLargeType() { Flags |= IsVeryLargeTypeFlag; }
 };
 
 } // end namespace swift

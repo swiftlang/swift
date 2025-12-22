@@ -404,6 +404,7 @@ namespace {
           && (!fixedSize.has_value()
               || *fixedSize > BuiltinFixedArrayType::MaximumLoadableSize)) {
         props.setAddressOnly();
+        props.setVeryLargeType();
       }
       return props;
     }
