@@ -57,7 +57,7 @@ import SwiftShims
 ///
 /// The description implementation has the following requirements:
 ///
-/// * The body of the description implementation must a single string
+/// * The body of the description implementation must be a single string
 ///   expression. String concatenation is not supported, use string interpolation
 ///   instead.
 /// * String interpolation can reference stored properties only, functions calls
