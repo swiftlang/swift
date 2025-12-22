@@ -1214,9 +1214,10 @@ class TopLevelCodeScope final : public ASTScopeImpl {
 public:
   TopLevelCodeDecl *const decl;
   ASTScopeImpl *insertionPoint = nullptr;
+  SourceLoc endLoc;
 
-  TopLevelCodeScope(TopLevelCodeDecl *e)
-      : ASTScopeImpl(ScopeKind::TopLevelCode), decl(e) {}
+  TopLevelCodeScope(TopLevelCodeDecl *e, SourceLoc endLoc)
+      : ASTScopeImpl(ScopeKind::TopLevelCode), decl(e), endLoc(endLoc) {}
   virtual ~TopLevelCodeScope() {}
 
 protected:
@@ -1225,7 +1226,8 @@ protected:
   NullablePtr<const ASTScopeImpl> getLookupParent() const override;
 
 private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   SourceRange

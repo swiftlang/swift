@@ -127,6 +127,8 @@ SourceRange FunctionBodyScope::getSourceRangeOfThisASTNode(
 
 SourceRange TopLevelCodeScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
+  if (decl->isInPackageDotSwift())
+    return SourceRange(decl->getStartLoc(), endLoc);
   return decl->getSourceRange();
 }
 

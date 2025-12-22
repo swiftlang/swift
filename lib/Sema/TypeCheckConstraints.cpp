@@ -836,14 +836,17 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                 initializer, DC, patternType, pattern,
                 /*bindPatternVarsOneWay=*/false);
   if (PBD) {
-    auto pbdIsTopLevel = isa<TopLevelCodeDecl>(PBD->getDeclContext());
-    for (auto idx : range(PBD->getNumPatternEntries())) {
-      if (auto *P = PBD->getPattern(idx)) {
-        P->forEachVariable([&](VarDecl *VD) {
-          auto varIsTopLevel = isa<TopLevelCodeDecl>(PBD->getDeclContext());
-          ASSERT(pbdIsTopLevel == varIsTopLevel &&
-                 "Must have consistent top-level context");
-        });
+    auto *SF = PBD->getDeclContext()->getParentSourceFile();
+    if (!SF || !SF->isPackageDotSwift()) {
+      auto pbdIsTopLevel = isa<TopLevelCodeDecl>(PBD->getDeclContext());
+      for (auto idx : range(PBD->getNumPatternEntries())) {
+        if (auto *P = PBD->getPattern(idx)) {
+          P->forEachVariable([&](VarDecl *VD) {
+            auto varIsTopLevel = isa<TopLevelCodeDecl>(PBD->getDeclContext());
+            ASSERT(pbdIsTopLevel == varIsTopLevel &&
+                   "Must have consistent top-level context");
+          });
+        }
       }
     }
   }

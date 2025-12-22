@@ -2975,6 +2975,10 @@ SourceLoc PatternBindingDecl::getEqualLoc(unsigned i) const {
   return entry.getEqualLoc();
 }
 
+bool TopLevelCodeDecl::isInPackageDotSwift() const {
+  return getParentSourceFile()->isPackageDotSwift();
+}
+
 TopLevelCodeDecl *TopLevelCodeDecl::getPrevious() const {
   if (Previous)
     return Previous.value();
@@ -8218,8 +8222,9 @@ VarDecl::mutability(const DeclContext *UseDC,
   }
 
   if (isa<TopLevelCodeDecl>(UseDC) &&
-      isa<TopLevelCodeDecl>(getDeclContext()) &&
-      getDeclContext()->getParent() == UseDC->getParent())
+      ((isa<TopLevelCodeDecl>(getDeclContext()) &&
+        getDeclContext()->getParent() == UseDC->getParent()) ||
+       UseDC->getParent() == getDeclContext()))
     return StorageMutability::Initializable;
 
   return StorageMutability::Immutable;
@@ -8243,6 +8248,11 @@ bool VarDecl::isLazilyInitializedGlobal() const {
   // @_extern declarations are not initialized.
   if (getAttrs().hasAttribute<ExternAttr>())
     return false;
+
+  if (auto *PBD = getParentPatternBinding()) {
+    if (PBD->getDeclContext()->isLocalContext())
+      return false;
+  }
 
   return true;
 }

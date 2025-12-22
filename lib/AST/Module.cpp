@@ -3633,6 +3633,11 @@ ArrayRef<Decl *> SourceFile::getHoistedDecls() const {
   return Hoisted;
 }
 
+bool SourceFile::isPackageDotSwift() const {
+  auto fileName = llvm::sys::path::filename(getFilename());
+  return fileName == "Package.swift" || fileName.starts_with("Package@");
+}
+
 void *SourceFile::getExportedSourceFile() const {
   auto &eval = getASTContext().evaluator;
   return evaluateOrDefault(eval, ExportedSourceFileRequest{this}, nullptr);

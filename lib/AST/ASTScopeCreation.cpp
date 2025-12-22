@@ -483,7 +483,7 @@ public:
   ASTScopeImpl *visitTopLevelCodeDecl(TopLevelCodeDecl *d,
                                       ASTScopeImpl *p,
                                       ScopeCreator &scopeCreator) {
-    return scopeCreator.constructExpandAndInsert<TopLevelCodeScope>(p, d);
+    return scopeCreator.constructExpandAndInsert<TopLevelCodeScope>(p, d, endLoc.value());
   }
 
 #pragma mark special-case creation
@@ -800,8 +800,8 @@ CREATES_NEW_INSERTION_POINT(GenericTypeOrExtensionScope)
 CREATES_NEW_INSERTION_POINT(BraceStmtScope)
 CREATES_NEW_INSERTION_POINT(ConditionalClausePatternUseScope)
 CREATES_NEW_INSERTION_POINT(ABIAttributeScope)
+CREATES_NEW_INSERTION_POINT(TopLevelCodeScope)
 
-NO_NEW_INSERTION_POINT(TopLevelCodeScope)
 NO_NEW_INSERTION_POINT(FunctionBodyScope)
 NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
 NO_NEW_INSERTION_POINT(CustomAttributeScope)
@@ -1279,10 +1279,14 @@ void CustomAttributeScope::
   }
 }
 
-void TopLevelCodeScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
+AnnotatedInsertionPoint
+TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   insertionPoint = scopeCreator.addToScopeTreeAndReturnInsertionPoint(decl->getBody(), this,
                                                      std::nullopt);
+  if (decl->isInPackageDotSwift())
+    return {this, ""};
+  return {getParent().get(), ""};
 }
 
 #pragma mark expandScope
