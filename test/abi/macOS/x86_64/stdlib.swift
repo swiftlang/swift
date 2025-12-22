@@ -1167,3 +1167,6 @@ Added: _$sSS9UTF16ViewV20isTriviallyIdentical2toSbAB_tF
 Added: _$sSs17UnicodeScalarViewV20isTriviallyIdentical2toSbAB_tF
 Added: _$sSs8UTF8ViewV20isTriviallyIdentical2toSbAB_tF
 Added: _$sSs9UTF16ViewV20isTriviallyIdentical2toSbAB_tF
+
+// SE-NNNN: CommandLine.executablePath
+Added: _$ss11CommandLineO14executablePathSSvpZMV
