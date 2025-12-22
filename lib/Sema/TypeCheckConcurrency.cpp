@@ -2389,16 +2389,6 @@ namespace {
     /// an expression or function.
     llvm::SmallDenseMap<const DeclContext *, ActorIsolation> requiredIsolation;
 
-    using ActorRefKindPair = std::pair<ReferencedActor::Kind, ActorIsolation>;
-
-    using IsolationPair = std::pair<ActorIsolation, ActorIsolation>;
-
-    using DiagnosticList = std::vector<IsolationError>;
-
-    llvm::DenseMap<ActorRefKindPair, DiagnosticList> refErrors;
-
-    llvm::DenseMap<IsolationPair, DiagnosticList> applyErrors;
-
     /// Keeps track of the capture context of variables that have been
     /// explicitly captured in closures.
     llvm::SmallDenseMap<VarDecl *, TinyPtrVector<const DeclContext *>>
@@ -2463,77 +2453,6 @@ namespace {
         }
       }
       return false;
-    }
-
-  public:
-    bool diagnoseIsolationErrors() {
-      bool diagnosedError = false;
-
-      for (auto list : refErrors) {
-        ActorRefKindPair key = list.getFirst();
-        DiagnosticList errors = list.getSecond();
-        ActorIsolation isolation = key.second;
-
-        auto behavior = DiagnosticBehavior::Warning;
-        // Upgrade behavior if @preconcurrency not detected
-        if (llvm::any_of(errors, [&](IsolationError error) {
-          return !error.preconcurrency;
-        })) {
-          behavior = DiagnosticBehavior::Error;
-        }
-
-        // Add Fix-it for missing @SomeActor annotation
-        if (isolation.isGlobalActor()) {
-          if (missingGlobalActorOnContext(
-                  const_cast<DeclContext *>(getDeclContext()),
-                  isolation.getGlobalActor(), behavior) &&
-              errors.size() > 1) {
-            behavior = DiagnosticBehavior::Note;
-          }
-        }
-
-        for (IsolationError error : errors) {
-          // Diagnose actor_isolated_non_self_reference as note
-          // if there are multiple of these diagnostics
-          ctx.Diags.diagnose(error.loc, error.diag)
-              .limitBehaviorUntilLanguageMode(behavior, 6);
-        }
-      }
-
-      for (auto list : applyErrors) {
-        IsolationPair key = list.getFirst();
-        DiagnosticList errors = list.getSecond();
-        ActorIsolation isolation = key.first;
-
-        auto behavior = DiagnosticBehavior::Warning;
-        // Upgrade behavior if @preconcurrency not detected
-        if (llvm::any_of(errors, [&](IsolationError error) {
-          return !error.preconcurrency;
-        })) {
-          behavior = DiagnosticBehavior::Error;
-        }
-
-
-        // Add Fix-it for missing @SomeActor annotation
-        if (isolation.isGlobalActor()) {
-          if (missingGlobalActorOnContext(
-                  const_cast<DeclContext *>(getDeclContext()),
-                  isolation.getGlobalActor(), behavior) &&
-              errors.size() > 1) {
-            behavior = DiagnosticBehavior::Note;
-          }
-        }
-
-        for (IsolationError error : errors) {
-          // Diagnose actor_isolated_call as note if
-          // if there are multiple actor-isolated function calls
-          // from outside the actor
-          ctx.Diags.diagnose(error.loc, error.diag)
-              .limitBehaviorUntilLanguageMode(behavior, 6);
-        }
-      }
-
-      return diagnosedError;
     }
 
   private:
@@ -4263,37 +4182,24 @@ namespace {
             /*args*/*unsatisfiedIsolation, getContextIsolation()
           );
 
-        if (ctx.LangOpts.hasFeature(Feature::GroupActorErrors)) {
-          IsolationError mismatch(apply->getLoc(), preconcurrency, diagnostic);
-          auto key = std::make_pair(
-              unsatisfiedIsolation->withPreconcurrency(false),
-              getContextIsolation());
-          if (applyErrors.find(key) == applyErrors.end()) {
-            applyErrors.insert(std::make_pair(key, DiagnosticList()));
-          }
+        ctx.Diags
+            .diagnose(apply->getLoc(), diagnostic.getID(), diagnostic.getArgs())
+            .limitBehaviorIf(preconcurrency, DiagnosticBehavior::Warning);
 
-          applyErrors[key].push_back(mismatch);
-        } else {
-          ctx.Diags
-              .diagnose(apply->getLoc(), diagnostic.getID(),
-                        diagnostic.getArgs())
-              .limitBehaviorIf(preconcurrency, DiagnosticBehavior::Warning);
-
-          if (calleeDecl) {
-            auto calleeIsolation = getInferredActorIsolation(calleeDecl);
-            calleeDecl->diagnose(diag::actor_isolated_sync_func, calleeDecl);
-            if (calleeIsolation.source.isInferred()) {
-              calleeDecl->diagnose(diag::actor_isolation_source,
-                                   calleeIsolation.isolation,
-                                   calleeIsolation.source);
-            }
+        if (calleeDecl) {
+          auto calleeIsolation = getInferredActorIsolation(calleeDecl);
+          calleeDecl->diagnose(diag::actor_isolated_sync_func, calleeDecl);
+          if (calleeIsolation.source.isInferred()) {
+            calleeDecl->diagnose(diag::actor_isolation_source,
+                                 calleeIsolation.isolation,
+                                 calleeIsolation.source);
           }
+        }
 
-          if (unsatisfiedIsolation->isGlobalActor()) {
-            missingGlobalActorOnContext(
-                                        const_cast<DeclContext *>(getDeclContext()),
-                                        unsatisfiedIsolation->getGlobalActor(), DiagnosticBehavior::Note);
-          }
+        if (unsatisfiedIsolation->isGlobalActor()) {
+          missingGlobalActorOnContext(
+              const_cast<DeclContext *>(getDeclContext()),
+              unsatisfiedIsolation->getGlobalActor(), DiagnosticBehavior::Note);
         }
 
         return true;
@@ -4836,51 +4742,33 @@ namespace {
           }
         }
 
-        if (ctx.LangOpts.hasFeature(Feature::GroupActorErrors)) {
-          IsolationError mismatch = IsolationError(loc,
-              preconcurrencyContext,
-              Diagnostic(diag::actor_isolated_non_self_reference,
-                  decl, useKind, refKind + 1, refGlobalActor,
-                  result.isolation));
+        {
+          auto diagnostic = ctx.Diags.diagnose(
+              loc, diag::actor_isolated_non_self_reference, decl, useKind,
+              refKind + 1, refGlobalActor, result.isolation);
 
-          auto iter = refErrors.find(std::make_pair(refKind,result.isolation));
-          if (iter != refErrors.end()) {
-            iter->second.push_back(mismatch);
-          } else {
-            DiagnosticList list;
-            list.push_back(mismatch);
-            auto keyPair = std::make_pair(refKind,result.isolation);
-            refErrors.insert(std::make_pair(keyPair, list));
-          }
-        } else {
-          {
-            auto diagnostic = ctx.Diags.diagnose(
-                loc, diag::actor_isolated_non_self_reference, decl, useKind,
-                refKind + 1, refGlobalActor, result.isolation);
+          // For compatibility downgrades - the error is downgraded until
+          // Swift 6, for preconcurrency - always.
+          if (shouldDowngradeToWarning)
+            diagnostic.limitBehaviorWithPreconcurrency(
+                DiagnosticBehavior::Warning, preconcurrencyContext);
+        }
 
-            // For compatibility downgrades - the error is downgraded until
-            // Swift 6, for preconcurrency - always.
-            if (shouldDowngradeToWarning)
-              diagnostic.limitBehaviorWithPreconcurrency(
-                  DiagnosticBehavior::Warning, preconcurrencyContext);
-          }
+        maybeNoteMutatingMethodSuggestion(
+            ctx, decl, loc, getDeclContext(), result.isolation,
+            kindOfUsage(decl, context).value_or(VarRefUseEnv::Read));
 
-          maybeNoteMutatingMethodSuggestion(
-              ctx, decl, loc, getDeclContext(), result.isolation,
-              kindOfUsage(decl, context).value_or(VarRefUseEnv::Read));
+        if (derivedConformanceType) {
+          auto *decl = dyn_cast<ValueDecl>(getDeclContext()->getAsDecl());
+          ctx.Diags.diagnose(loc, diag::in_derived_witness, decl,
+                             requirementName, derivedConformanceType);
+        }
 
-          if (derivedConformanceType) {
-            auto *decl = dyn_cast<ValueDecl>(getDeclContext()->getAsDecl());
-            ctx.Diags.diagnose(loc, diag::in_derived_witness, decl,
-                               requirementName, derivedConformanceType);
-          }
-
-          noteIsolatedActorMember(decl, context);
-          if (result.isolation.isGlobalActor()) {
-            missingGlobalActorOnContext(
-                const_cast<DeclContext *>(getDeclContext()),
-                result.isolation.getGlobalActor(), DiagnosticBehavior::Note);
-          }
+        noteIsolatedActorMember(decl, context);
+        if (result.isolation.isGlobalActor()) {
+          missingGlobalActorOnContext(
+              const_cast<DeclContext *>(getDeclContext()),
+              result.isolation.getGlobalActor(), DiagnosticBehavior::Note);
         }
 
         return true;
@@ -5147,13 +5035,9 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
   if (decl->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>())
     return;
 
-  auto &ctx = decl->getASTContext();
   ActorIsolationChecker checker(decl);
   if (auto body = decl->getBody()) {
     body->walk(checker);
-    if (ctx.LangOpts.hasFeature(Feature::GroupActorErrors)) {
-      checker.diagnoseIsolationErrors();
-    }
   }
   if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
     if (auto superInit = ctor->getSuperInitCall())

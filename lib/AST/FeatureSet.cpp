@@ -143,7 +143,6 @@ static bool usesFeatureInlineArrayTypeSugar(Decl *D) {
 UNINTERESTING_FEATURE(StaticExclusiveOnly)
 UNINTERESTING_FEATURE(ManualOwnership)
 UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
-UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(SendingArgsAndResults)
 UNINTERESTING_FEATURE(CheckImplementationOnly)
