@@ -788,12 +788,6 @@ private extension EnumInst {
   }
 }
 
-extension EnumCase : Equatable {
-  public static func ==(lhs: Self, rhs: Self) -> Bool {
-    return lhs.enumElementDecl == rhs.enumElementDecl
-  }
-}
-
 private extension Function {
   var effectAllowsSpecialization: Bool {
     switch self.effectAttribute {
@@ -1255,13 +1249,6 @@ private func specializeBranchTracingEnumBBArgInVJP(
   let newType = specializedBTEDict[arg.type]!
   return bb.insertPhiArgument(
     atPosition: arg.index, type: newType, ownership: arg.ownership, context)
-}
-
-// Use this to make test output predictable
-extension Type: Comparable {
-  public static func < (lhs: SIL.`Type`, rhs: SIL.`Type`) -> Bool {
-    return "\(lhs)" < "\(rhs)"
-  }
 }
 
 let specializeBranchTracingEnums = FunctionTest("autodiff_specialize_branch_tracing_enums") {
