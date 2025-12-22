@@ -829,6 +829,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
   // honored, we iterate over them in reverse order.
   std::vector<StringRef> psuedoFeatures;
   llvm::SmallSet<Feature, 8> seenFeatures;
+  bool shouldEnableEmbeddedExistentialsPerDefault = false;
   for (const Arg *A : Args.filtered_reverse(
            OPT_enable_experimental_feature, OPT_disable_experimental_feature,
            OPT_enable_upcoming_feature, OPT_disable_upcoming_feature)) {
@@ -944,6 +945,21 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     if (!seenFeatures.insert(*feature).second)
       continue;
 
+    // "Embedded" enables "EmbeddedExistentials" per default except if
+    // EmbeddedExistentials is explicitly disabled.
+    // "Embedded" enables "EmbeddedExistentials" if we have not yet seen
+    // explicit feature handling of "EmbeddedExistentials".
+    // Because we can see "Embedded" before (parsing in reverse) we see explict
+    // disabling of "EmbeddedExistentials" we delay default enablement so that a
+    // later (when viewed in reverse as this loop's logic does) explicit
+    // disablement can take place.
+    if (*feature == Feature::Embedded &&
+        isEnableFeatureFlag &&
+        !seenFeatures.contains(Feature::EmbeddedExistentials))
+      shouldEnableEmbeddedExistentialsPerDefault = true;
+    else if (*feature == Feature::EmbeddedExistentials && !isEnableFeatureFlag)
+      shouldEnableEmbeddedExistentialsPerDefault = false;
+
     bool forMigration = featureMode.has_value();
 
     // Enable the feature if requested.
@@ -999,6 +1015,10 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       auto modules = featureName->split("=").second;
       modules.split(Opts.ModulesRequiringObjC, ",");
     }
+  }
+
+  if (shouldEnableEmbeddedExistentialsPerDefault) {
+    Opts.enableFeature(Feature::EmbeddedExistentials);
   }
 
   // Map historical flags over to experimental features. We do this for all
@@ -1832,11 +1852,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
             .Default(ConcurrencyModel::Standard);
   }
   Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
-
-  // Enable support for existentials in embedded per default.
-  if (Opts.hasFeature(Feature::Embedded) &&
-      !Args.hasArg(OPT_disable_embedded_existentials))
-    Opts.enableFeature(Feature::EmbeddedExistentials);
 
   if (Opts.hasFeature(Feature::EmbeddedExistentials) &&
       !Opts.hasFeature(Feature::Embedded)) {
