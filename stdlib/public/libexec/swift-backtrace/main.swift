@@ -708,7 +708,7 @@ Generate a backtrace for the parent process.
         backtraceFormatter.writeCrashLog(now: formatISO8601(now))
     }
 
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
     // On Darwin, if Developer Mode is turned off, or we can't tell if it's
     // on or not, disable interactivity
     var developerMode: Int32 = 0
