@@ -7975,7 +7975,6 @@ AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
     name = preferredName;
   return VarDecl::getDefaultObjCGetterSelector(ctx, name);
 }
-
 ObjCSelector
 AbstractStorageDecl::getObjCSetterSelector(Identifier preferredName) const {
    auto abiRole = ABIRoleInfo(this);
@@ -10585,6 +10584,7 @@ AbstractFunctionDecl::getBodyFingerprintIncludingLocalTypeMembers() const {
 }
 
 ObjCSelector
+//TODO: if it's a function, this is what we need
 AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
                                       bool skipIsObjCResolution) const {
    auto abiRole = ABIRoleInfo(this);
@@ -10607,7 +10607,8 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
   StringRef baseNameStr;
   if (auto destructor = dyn_cast<DestructorDecl>(this)) {
     return destructor->getObjCSelector();
-  } else if (auto func = dyn_cast<FuncDecl>(this)) {
+  }
+  if (auto func = dyn_cast<FuncDecl>(this)) {
     // Otherwise cast this to be able to access getName()
     baseNameStr = func->getBaseIdentifier().str();
   } else if (isa<ConstructorDecl>(this)) {
