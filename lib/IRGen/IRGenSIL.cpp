@@ -746,9 +746,19 @@ public:
                                    getEarliestInsertionPoint()->getIterator());
     // No debug location is how LLVM marks prologue instructions.
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
-    ZeroInitBuilder.CreateMemSet(
-        AI, llvm::ConstantInt::get(IGM.Int8Ty, 0),
-        Size, llvm::MaybeAlign(AI->getAlign()));
+    // note that this memset is before lifetime.start which is Undefined
+    // Behaviour in LLVM
+    llvm::CallInst *Memset =
+        ZeroInitBuilder.CreateMemSet(AI, llvm::ConstantInt::get(IGM.Int8Ty, 0),
+                                     Size, llvm::MaybeAlign(AI->getAlign()));
+
+    // memtag-stack tagging needs to use this metadata to determine whether to
+    // delay tagging until after the memset. This can be removed if the memset
+    // is removed or moved after the lifetime.start
+    llvm::LLVMContext *Ctx = &Memset->getContext();
+    llvm::MDNode *Meta =
+        llvm::MDNode::get(*Ctx, llvm::MDString::get(*Ctx, "true"));
+    Memset->setMetadata("Swift.isSwiftLLDBpreinit", Meta);
   }
 
   /// Try to emit an inline assembly gadget which extends the lifetime of
