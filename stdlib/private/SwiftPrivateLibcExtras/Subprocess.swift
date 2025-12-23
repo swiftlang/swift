@@ -185,7 +185,7 @@ public func posixWaitpid(_ pid: pid_t) -> ProcessTerminationStatus {
 
 // FIXME: Come up with a better way to deal with APIs that are pointers on some
 // platforms but not others.
-#if os(Linux)
+#if !os(Linux)
 typealias _stdlib_posix_spawn_file_actions_t = posix_spawn_file_actions_t
 #else
 typealias _stdlib_posix_spawn_file_actions_t = posix_spawn_file_actions_t?

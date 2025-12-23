@@ -38,6 +38,36 @@ char *_swift_backtrace_demangle(const char *rawName,
                                 char *outputBuffer,
                                 size_t *outputBufferSize);
 
+// Demangle the given Swift mangled identifier.
+// 
+// An output buffer must be passed into which the demangled string will be written.
+//
+// The demangled result string is NOT null-terminated. 
+// The demangled string length is indicated through the outputBufferSize parameter.
+//
+// If the demangled result is truncated, the returned number will be greater than the
+// initialized count written into the outputBufferSize.
+// 
+// Introduced in Swift 6.3.
+size_t _swift_runtime_demangle(
+  const char *rawName, size_t rawNameLength,
+  char *outputBuffer, size_t *outputBufferSize,
+  size_t flags
+);
+
+// Demangle the given Swift mangled identifier.
+// This function always allocates a new buffer for the result to be returned.
+
+// The demangled result string is NOT null-terminated.
+// The demangled string length is indicated through the outputBufferSize parameter.
+//
+// Introduced in Swift 6.3.
+char *_swift_runtime_demangle_allocate(
+  const char *rawName, size_t rawNameLength,
+  size_t *outputBufferSize,
+  size_t flags
+);
+
 #ifdef __cplusplus
 }
 #endif
