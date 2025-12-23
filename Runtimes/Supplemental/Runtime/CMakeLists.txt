@@ -115,6 +115,7 @@ add_library(swiftRuntime
   Backtrace.swift
   Backtrace+Codable.swift
   BacktraceFormatter.swift
+  BacktraceJSONFormatter.swift
   Base64.swift
   ByteSwapping.swift
   CachingMemoryReader.swift
@@ -123,6 +124,8 @@ add_library(swiftRuntime
   Compression.swift
   Context.swift
   CoreSymbolication.swift
+  CrashLog.swift
+  CrashLogCapture.swift
   Dwarf.swift
   EightByteBuffer.swift
   Elf.swift
