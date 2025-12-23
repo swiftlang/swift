@@ -5453,7 +5453,7 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
     // Make sure any associated type witnesses don't make reference to a
     // type we can't emit metadata for, or we're going to have trouble at
     // runtime.
-    checkTypeMetadataAvailability(type, typeDecl->getLoc(),
+    checkTypeMetadataAvailability(type, getLocForDiagnosingWitness(conformance, typeDecl),
                                   where.getDeclContext());
 
     return false;
