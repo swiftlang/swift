@@ -4106,7 +4106,7 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
 
   // Lifetimes must be completed inside out (bottom-up in the CFG).
   PostOrderFunctionInfo *postOrder = poa->get(fn);
-  OSSACompleteLifetime completion(fn, domTree, *deadEndBlocksAnalysis->get(fn));
+  OSSACompleteLifetime completion(fn, *deadEndBlocksAnalysis->get(fn));
   for (auto *block : postOrder->getPostOrder()) {
     for (SILInstruction &inst : reverse(*block)) {
       for (auto result : inst.getResults()) {

@@ -123,7 +123,7 @@ void MoveOnlyChecker::checkObjects() {
 void MoveOnlyChecker::completeObjectLifetimes(
     ArrayRef<MarkUnresolvedNonCopyableValueInst *> insts) {
   // TODO: Delete once OSSACompleteLifetime is run as part of SILGenCleanup.
-  OSSACompleteLifetime completion(fn, domTree, *deba->get(fn));
+  OSSACompleteLifetime completion(fn, *deba->get(fn));
 
   // Collect all values derived from each mark_unresolved_non_copyable_value
   // instruction via ownership instructions and phis.

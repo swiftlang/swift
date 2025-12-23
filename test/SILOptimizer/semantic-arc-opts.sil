@@ -55,6 +55,10 @@ final class Klass {
   let baseLet: Klass
 }
 
+struct Wrapper {
+  let _k: Klass
+}
+
 extension Klass : MyFakeAnyObject {
   func myFakeMethod()
 }
@@ -1640,5 +1644,28 @@ bb3(%11 : @reborrow $FakeOptional<Klass>, %12 : @owned $FakeOptional<Klass>):
   destroy_value %12
   %16 = tuple ()
   return %16
+}
+
+sil [ossa] @borrow_accessor : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass {
+bb0(%0 : $*Wrapper):
+  %1 = struct_element_addr %0, #Wrapper._k
+  %2 = load_borrow %1
+  return_borrow %2 from_scopes (%2)
+}
+
+sil [ossa] @call_borrow_accessor : $@convention(thin) (@guaranteed Wrapper) -> () {
+bb0(%0 : @guaranteed $Wrapper):
+  %stk = alloc_stack $Wrapper
+  %sbi = store_borrow %0 to %stk
+  %func = function_ref @borrow_accessor : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
+  %k = apply %func(%sbi) : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
+  %copy = copy_value %k
+  end_borrow %sbi
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %copy
+  dealloc_stack %stk
+  %r = tuple ()
+  return %r
 }
 

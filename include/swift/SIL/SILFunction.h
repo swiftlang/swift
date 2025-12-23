@@ -1564,7 +1564,7 @@ public:
     return std::find_if(begin(), end(),
       [](const SILBasicBlock &BB) -> bool {
         const TermInst *TI = BB.getTerminator();
-        return isa<ReturnInst>(TI);
+        return isa<ReturnInst>(TI) || isa<ReturnBorrowInst>(TI);
     });
   }
 
@@ -1574,7 +1574,7 @@ public:
     return std::find_if(begin(), end(),
       [](const SILBasicBlock &BB) -> bool {
         const TermInst *TI = BB.getTerminator();
-        return isa<ReturnInst>(TI);
+        return isa<ReturnInst>(TI) || isa<ReturnBorrowInst>(TI);
     });
   }
 

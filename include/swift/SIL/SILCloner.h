@@ -1377,6 +1377,15 @@ void SILCloner<ImplClass>::visitLoadInst(LoadInst *Inst) {
                                       LoadOwnershipQualifier::Unqualified));
   }
 
+  if (getOpValue(Inst->getOperand())
+          ->getType()
+          .isTrivial(getBuilder().getFunction())) {
+    return recordClonedInstruction(
+        Inst, getBuilder().createLoad(getOpLocation(Inst->getLoc()),
+                                      getOpValue(Inst->getOperand()),
+                                      LoadOwnershipQualifier::Trivial));
+  }
+
   return recordClonedInstruction(
       Inst, getBuilder().createLoad(getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
@@ -1394,6 +1403,15 @@ void SILCloner<ImplClass>::visitLoadBorrowInst(LoadBorrowInst *Inst) {
                                       LoadOwnershipQualifier::Unqualified));
   }
 
+  if (getOpValue(Inst->getOperand())
+          ->getType()
+          .isTrivial(getBuilder().getFunction())) {
+    return recordClonedInstruction(
+        Inst, getBuilder().createLoad(getOpLocation(Inst->getLoc()),
+                                      getOpValue(Inst->getOperand()),
+                                      LoadOwnershipQualifier::Trivial));
+  }
+
   recordClonedInstruction(
       Inst, getBuilder().createLoadBorrow(getOpLocation(Inst->getLoc()),
                                           getOpValue(Inst->getOperand())));
@@ -1402,7 +1420,10 @@ void SILCloner<ImplClass>::visitLoadBorrowInst(LoadBorrowInst *Inst) {
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitBeginBorrowInst(BeginBorrowInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  if (!getBuilder().hasOwnership()) {
+  if (!getBuilder().hasOwnership() ||
+      getOpValue(Inst->getOperand())
+          ->getType()
+          .isTrivial(getBuilder().getFunction())) {
     return recordFoldedValue(Inst, getOpValue(Inst->getOperand()));
   }
 
@@ -1416,7 +1437,10 @@ void SILCloner<ImplClass>::visitBeginBorrowInst(BeginBorrowInst *Inst) {
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitBorrowedFromInst(BorrowedFromInst *bfi) {
   getBuilder().setCurrentDebugScope(getOpScope(bfi->getDebugScope()));
-  if (!getBuilder().hasOwnership()) {
+  if (!getBuilder().hasOwnership() ||
+      getOpValue(bfi->getBorrowedValue())
+          ->getType()
+          .isTrivial(getBuilder().getFunction())) {
     return recordFoldedValue(bfi, getOpValue(bfi->getBorrowedValue()));
   }
 
@@ -1456,6 +1480,16 @@ void SILCloner<ImplClass>::visitStoreInst(StoreInst *Inst) {
                                        StoreOwnershipQualifier::Unqualified));
   }
 
+  if (getOpValue(Inst->getSrc())
+          ->getType()
+          .isTrivial(getBuilder().getFunction())) {
+    return recordClonedInstruction(
+        Inst, getBuilder().createStore(getOpLocation(Inst->getLoc()),
+                                       getOpValue(Inst->getSrc()),
+                                       getOpValue(Inst->getDest()),
+                                       StoreOwnershipQualifier::Trivial));
+  }
+
   recordClonedInstruction(
       Inst, getBuilder().createStore(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
@@ -1473,6 +1507,16 @@ void SILCloner<ImplClass>::visitStoreBorrowInst(StoreBorrowInst *Inst) {
     return;
   }
 
+  if (getOpValue(Inst->getDest())
+          ->getType()
+          .isTrivial(getBuilder().getFunction())) {
+    getBuilder().createStore(
+        getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
+        getOpValue(Inst->getDest()), StoreOwnershipQualifier::Trivial);
+    mapValue(Inst, getOpValue(Inst->getDest()));
+    return;
+  }
+
   recordClonedInstruction(
       Inst, getBuilder().createStoreBorrow(getOpLocation(Inst->getLoc()),
                                            getOpValue(Inst->getSrc()),
@@ -1484,7 +1528,10 @@ void SILCloner<ImplClass>::visitEndBorrowInst(EndBorrowInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
 
   // Do not clone any end_borrow.
-  if (!getBuilder().hasOwnership())
+  if (!getBuilder().hasOwnership() ||
+      getOpValue(Inst->getOperand())
+          ->getType()
+          .isTrivial(getBuilder().getFunction()))
     return;
 
   recordClonedInstruction(
@@ -2314,7 +2361,13 @@ void SILCloner<ImplClass>::visitDestroyValueInst(DestroyValueInst *Inst) {
         return;
       }
     }
-  
+
+    if (getOpValue(Inst->getOperand())
+            ->getType()
+            .isTrivial(getBuilder().getFunction())) {
+      return;
+    }
+
     return recordClonedInstruction(
         Inst, getBuilder().createReleaseValue(
                   getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
@@ -3330,6 +3383,7 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDestroyAddrInst(DestroyAddrInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+
   recordClonedInstruction(
       Inst, getBuilder().createDestroyAddr(getOpLocation(Inst->getLoc()),
                                            getOpValue(Inst->getOperand())));

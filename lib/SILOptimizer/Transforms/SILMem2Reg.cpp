@@ -1831,7 +1831,7 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   // complete their lifetimes with `end_lifetime` instead of `destroy_value`.
   // This is especially important for embedded swift where we are not allowed
   // to insert destroys which were not there before.
-  OSSACompleteLifetime completion(function, domInfo,
+  OSSACompleteLifetime completion(function,
                                   *deadEndBlocksAnalysis->get(function),
                                   OSSACompleteLifetime::IgnoreTrivialVariable,
                                   /*forceLivenessVerification=*/false,
@@ -2116,7 +2116,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     // We may have incomplete lifetimes for enum locations on trivial paths.
     // After promoting them, complete lifetime here.
     ASSERT(asi->getElementType().isOrHasEnum());
-    OSSACompleteLifetime completion(function, domInfo, *deadEndBlocks,
+    OSSACompleteLifetime completion(function, *deadEndBlocks,
                                     OSSACompleteLifetime::IgnoreTrivialVariable,
                                     /*forceLivenessVerification=*/false,
                                     /*nonDestroyingEnd=*/true);
