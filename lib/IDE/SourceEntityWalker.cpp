@@ -387,6 +387,23 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return Action::Stop();
     }
     return Action::Continue(E);
+  } else if (auto *CE = dyn_cast<CallExpr>(E)) {
+    // Handle CallExpr where the function reference is implicit
+    // (e.g., appendInterpolation calls in string interpolation).
+    // The implicit DeclRefExpr would normally be skipped, so we index it here.
+    if (CE->getFn()->isImplicit()) {
+      auto fnRef = ide::getReferencedDecl(CE->getFn());
+      auto *D = fnRef.second.getDecl();
+      // Skip constructors - they're handled via CtorRefs
+      if (auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(D)) {
+        if (!isa<ConstructorDecl>(FD)) {
+          ReferenceMetaData data(SemaReferenceKind::DeclMemberRef, OpAccess);
+          if (!passReference(FD, CE->getType(), CE->getLoc(),
+                             CE->getSourceRange(), data))
+            return Action::Stop();
+        }
+      }
+    }
   } else if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
       if (!passReference(ModuleEntity(module),
