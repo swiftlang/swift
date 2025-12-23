@@ -788,12 +788,6 @@ private extension EnumInst {
   }
 }
 
-extension EnumCase : Equatable {
-  public static func ==(lhs: Self, rhs: Self) -> Bool {
-    return lhs.enumElementDecl == rhs.enumElementDecl
-  }
-}
-
 private extension Function {
   var effectAllowsSpecialization: Bool {
     switch self.effectAttribute {
@@ -1257,13 +1251,6 @@ private func specializeBranchTracingEnumBBArgInVJP(
     atPosition: arg.index, type: newType, ownership: arg.ownership, context)
 }
 
-// Use this to make test output predictable
-extension Type: Comparable {
-  public static func < (lhs: SIL.`Type`, rhs: SIL.`Type`) -> Bool {
-    return "\(lhs)" < "\(rhs)"
-  }
-}
-
 let specializeBranchTracingEnums = FunctionTest("autodiff_specialize_branch_tracing_enums") {
   function, arguments, context in
   let autodiffSpecializationInfo = AutoDiffSpecializationInfo(vjp: function, context)
@@ -1271,7 +1258,10 @@ let specializeBranchTracingEnums = FunctionTest("autodiff_specialize_branch_trac
   print("Specialized branch tracing enum dict for VJP \(function.name) contains \(specializedBTEDict.count) elements:")
 
   var keys = [Type](specializedBTEDict.keys)
-  keys.sort()
+
+  func compareTypes(lhs: Type, rhs: Type) -> Bool { "\(lhs)" < "\(rhs)" }
+  keys.sort(by: compareTypes)
+
   for (idx, key) in keys.enumerated() {
     print("non-specialized BTE \(idx): \(key.nominal!.description)")
     print("specialized BTE \(idx): \(specializedBTEDict[key]!.nominal!.description)")

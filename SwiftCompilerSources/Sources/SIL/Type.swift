@@ -294,11 +294,15 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
   }
 }
 
-public struct EnumCase {
+public struct EnumCase : Equatable {
   public let enumElementDecl : EnumElementDecl
   public let payload: Type?
   public let index: Int
   public var name: StringRef { enumElementDecl.name }
+
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    return lhs.enumElementDecl == rhs.enumElementDecl
+  }
 }
 
 public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
