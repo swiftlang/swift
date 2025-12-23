@@ -3649,12 +3649,13 @@ SwiftDeclSynthesizer::addRefCountOperations(
               const_cast<clang::CXXMethodDecl *>(calledMethod),
               clang::AS_public),
           /*HadMultipleCandidates=*/false, calledMethod->getNameInfo(),
-          methodType, clang::VK_PRValue, clang::OK_Ordinary);
-      auto memberCall = clang::CXXMemberCallExpr::Create(
-          clangCtx, memberExpr, {}, clangCtx.VoidTy, clang::VK_PRValue, loc,
-          clang::FPOptionsOverride());
+          clangCtx.BoundMemberTy, clang::VK_PRValue, clang::OK_Ordinary);
+      auto memberCall =
+          clangSema.BuildCallExpr(nullptr, memberExpr, clang::SourceLocation(),
+                                  {}, clang::SourceLocation());
+      ASSERT(memberCall.isUsable());
       method->setBody(clang::CompoundStmt::Create(
-          clangCtx, {memberCall}, clang::FPOptionsOverride(), loc, loc));
+          clangCtx, {memberCall.get()}, clang::FPOptionsOverride(), loc, loc));
     } else {
       clang::Expr *fnExpr = clang::DeclRefExpr::Create(
           clangCtx, clang::NestedNameSpecifierLoc(), clang::SourceLocation(),
