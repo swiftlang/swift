@@ -1910,6 +1910,8 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
       setOption(ProtocolConformanceFlags::Preconcurrency);
     if (typeRepr->findAttrLoc(TypeAttrKind::Nonisolated).isValid())
       setOption(ProtocolConformanceFlags::Nonisolated);
+    if (typeRepr->findAttrLoc(TypeAttrKind::Reparented).isValid())
+      setOption(ProtocolConformanceFlags::Reparented);
 
     // Dig out the custom attribute that should be the global actor isolation.
     if (auto customAttr = typeRepr->findCustomAttr()) {

@@ -57,6 +57,7 @@ extension ASTGenVisitor {
         .Async,
         .Sendable,
         .Retroactive,
+        .Reparented,
         .Unchecked,
         .Unsafe,
         .Preconcurrency,
