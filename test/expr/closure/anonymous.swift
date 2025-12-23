@@ -33,3 +33,10 @@ func variadic() {
   takesVariadicIntInt({_ = $0; takesIntArray($1)})
   takesVariadicIntInt({_ = $0; let _: [Int] = $1})
 }
+
+// https://github.com/swiftlang/swift/issues/54030
+if $0 {} // expected-error {{anonymous closure argument not contained in a closure}}
+
+#if false
+if $0 {}
+#endif
