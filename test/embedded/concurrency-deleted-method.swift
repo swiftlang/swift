@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -disable-embedded-existentials -enable-experimental-feature Embedded -parse-as-library -module-name main %s -emit-ir | %FileCheck --check-prefix=CHECK-IR %s
-// RUN: %target-swift-frontend -disable-embedded-existentials -enable-experimental-feature Embedded -parse-as-library -module-name main %s -c -o %t/a.o
+// RUN: %target-swift-frontend -disable-experimental-feature EmbeddedExistentials -enable-experimental-feature Embedded -parse-as-library -module-name main %s -emit-ir | %FileCheck --check-prefix=CHECK-IR %s
+// RUN: %target-swift-frontend -disable-experimental-feature EmbeddedExistentials -enable-experimental-feature Embedded -parse-as-library -module-name main %s -c -o %t/a.o
 // RUN: %target-clang %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 

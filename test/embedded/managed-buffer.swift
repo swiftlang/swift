@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir -disable-embedded-existentials %s -module-name=main -enable-experimental-feature Embedded | %FileCheck %s
+// RUN: %target-swift-emit-ir -disable-experimental-feature EmbeddedExistentials %s -module-name=main -enable-experimental-feature Embedded | %FileCheck %s
 // RUN: %target-swift-emit-ir  %s -module-name=main -enable-experimental-feature Embedded | %FileCheck %s --check-prefix=EXIST
 
 // REQUIRES: swift_in_compiler
