@@ -266,6 +266,8 @@ func check(length: Int) {
       """
       Inconsistent word boundaries in stateful vs stateless iteration:
         input: \(str.debugDescription) (\(str.scalarDescriptions))
+         fast breaks: \(fastBreaks)
+         slow breaks: \(slowBreaks)
       """)
 
     let safeBreaks = str.safeWordBreaks()
@@ -273,7 +275,9 @@ func check(length: Int) {
       safeBreaks.isMonotonicSubsequence(of: fastBreaks),
       """
       Inconsistent safe word boundaries:
-        input: \(str.debugDescription) (\(str.scalarDescriptions))")
+         input: \(str.debugDescription) (\(str.scalarDescriptions))")
+         safe breaks: \(safeBreaks)
+         fast breaks: \(fastBreaks)
       """)
 
     let randomAccessBreaks = str.randomAccessWordBreaks()

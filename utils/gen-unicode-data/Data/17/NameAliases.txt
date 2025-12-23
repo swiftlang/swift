@@ -1,6 +1,6 @@
-# NameAliases-16.0.0.txt
-# Date: 2024-04-24
-# © 2024 Unicode®, Inc.
+# NameAliases-17.0.0.txt
+# Date: 2025-04-23
+# © 2025 Unicode®, Inc.
 # Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
 # For terms of use and license, see https://www.unicode.org/terms_of_use.html
 #
@@ -323,6 +323,10 @@ FEFF;ZWNBSP;abbreviation
 122D5;CUNEIFORM SIGN NU11 OVER NU11 BUR OVER BUR;correction
 12327;CUNEIFORM SIGN KALAM;correction
 1680B;BAMUM LETTER PHASE-A MAEMGBIEE;correction
+16881;BAMUM LETTER PHASE-B PUNGGAAM;correction
+1688E;BAMUM LETTER PHASE-B NGGOM;correction
+168DC;BAMUM LETTER PHASE-C SHETFON;correction
+1697D;BAMUM LETTER PHASE-E NGGOP;correction
 16E56;MEDEFAIDRIN CAPITAL LETTER H;correction
 16E57;MEDEFAIDRIN CAPITAL LETTER NG;correction
 16E76;MEDEFAIDRIN SMALL LETTER H;correction

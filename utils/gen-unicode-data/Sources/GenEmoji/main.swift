@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2021 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,18 +12,32 @@
 
 import GenUtils
 
-func getNameAliases(from data: String, into result: inout [(UInt32, String)]) {
+func getEmojiData(
+  for path: String
+) -> [ClosedRange<UInt32>] {
+  let data = readFile(path)
+
+  var unflattened: [ClosedRange<UInt32>] = []
+
   for line in data.split(separator: "\n") {
     // Skip comments
     guard !line.hasPrefix("#") else {
       continue
     }
 
-    let info = line.split(separator: "#")
-    let components = info[0].split(separator: ";")
+    // Each line in this file is broken up into two sections:
+    // 1: Either the singular scalar or a range of scalars who conform to said
+    //    grapheme break property.
+    // 2: The grapheme break property that said scalar(s) conform to (with
+    //    additional comments noting the character category, name and amount of
+    //    scalars the range represents).
+    let components = line.split(separator: ";")
 
-    // Name aliases are only found with correction attribute.
-    guard components[2] == "correction" else {
+    // Get the property first because it may be one we don't care about.
+    let splitProperty = components[1].split(separator: "#")
+    let filteredProperty = splitProperty[0].filter { !$0.isWhitespace }
+
+    guard filteredProperty == "Extended_Pictographic" else {
       continue
     }
 
@@ -43,13 +57,16 @@ func getNameAliases(from data: String, into result: inout [(UInt32, String)]) {
       scalars = scalar ... scalar
     }
 
-    let nameAlias = String(components[1])
-
-    result.append((scalars.lowerBound, nameAlias))
+    unflattened.append(scalars)
   }
+
+  return flatten(unflattened)
 }
 
-func emitNameAliases(_ data: [(UInt32, String)], into result: inout String) {
+func emitEmojiData(
+  _ data: [ClosedRange<UInt32>],
+  into result: inout String
+) {
   // 64 bit arrays * 8 bytes = .512 KB
   var bitArrays: [BitArray] = .init(repeating: .init(size: 64), count: 64)
 
@@ -65,7 +82,7 @@ func emitNameAliases(_ data: [(UInt32, String)], into result: inout String) {
     let bit = i % 64
 
     for scalar in lower ... upper {
-      if data.contains(where: { $0.0 == scalar }) {
+      if data.contains(where: { $0.contains(UInt32(scalar)) }) {
         chunks.append(i)
 
         bitArrays[idx][bit] = true
@@ -107,29 +124,21 @@ func emitNameAliases(_ data: [(UInt32, String)], into result: inout String) {
   size.words = [UInt64(bitArrays.count)]
   bitArrays.insert(size, at: 0)
 
-  var nameAliasData: [String] = []
-
   for chunk in chunks {
     var chunkBA = BitArray(size: chunkSize)
 
     let lower = chunk * chunkSize
     let upper = lower + chunkSize
 
-    let chunkDataIdx = UInt64(nameAliasData.endIndex)
+    let chunkDataIdx = UInt64(dataIndices.endIndex)
 
     // Insert our chunk's data index in the upper bits of the last word of our
     // bit array.
     chunkBA.words[chunkBA.words.endIndex - 1] |= chunkDataIdx << 16
 
     for scalar in lower ..< upper {
-      if data.contains(where: { $0.0 == scalar }) {
+      if data.contains(where: { $0.contains(UInt32(scalar)) }) {
         chunkBA[scalar % chunkSize] = true
-
-        let data = data[data.firstIndex {
-          $0.0 == scalar
-        }!].1
-
-        nameAliasData.append(data)
       }
     }
 
@@ -156,23 +165,14 @@ func emitNameAliases(_ data: [(UInt32, String)], into result: inout String) {
   }
 
   emitCollection(
-    nameAliasData,
-    name: "_swift_stdlib_nameAlias_data",
-    type: "char * const",
-    into: &result
-  ) {
-    "\"\($0)\""
-  }
-
-  emitCollection(
     ranks,
-    name: "_swift_stdlib_nameAlias_ranks",
+    name: "_swift_stdlib_emojiData_ranks",
     into: &result
   )
 
   emitCollection(
     bitArrays,
-    name: "_swift_stdlib_nameAlias",
+    name: "_swift_stdlib_emojiData",
     type: "__swift_uint64_t",
     into: &result
   ) {
@@ -181,12 +181,20 @@ func emitNameAliases(_ data: [(UInt32, String)], into result: inout String) {
   }
 }
 
-func generateNameAliasProp(into result: inout String) {
-  let nameAliases = readFile("Data/17/NameAliases.txt")
+// Main entry point into the word break generator.
+func generateEmoji() {
+  var result = readFile("Input/EmojiData.h")
 
-  var data: [(UInt32, String)] = []
+  let emojiData = getEmojiData(for: "Data/17/emoji-data.txt")
 
-  getNameAliases(from: nameAliases, into: &data)
+  emitEmojiData(emojiData, into: &result)
 
-  emitNameAliases(data, into: &result)
+  result += """
+  #endif // #ifndef EMOJI_DATA_H
+
+  """
+
+  write(result, to: "Output/Common/EmojiData.h")
 }
+
+generateEmoji()

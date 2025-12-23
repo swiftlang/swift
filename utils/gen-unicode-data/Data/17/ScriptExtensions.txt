@@ -1,6 +1,6 @@
-# ScriptExtensions-16.0.0.txt
-# Date: 2024-07-30, 19:38:00 GMT
-# © 2024 Unicode®, Inc.
+# ScriptExtensions-17.0.0.txt
+# Date: 2025-08-01, 21:42:00 GMT
+# © 2025 Unicode®, Inc.
 # Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
 # For terms of use and license, see https://www.unicode.org/terms_of_use.html
 #
@@ -38,9 +38,9 @@
 0303          ; Glag Latn Sunu Syrc Thai       # Mn      COMBINING TILDE
 0304          ; Aghb Cher Copt Cyrl Goth Grek Latn Osge Syrc Tfng Todr #Mn COMBINING MACRON
 0305          ; Copt Elba Glag Goth Kana Latn  # Mn      COMBINING OVERLINE
-0306          ; Cyrl Grek Latn Perm            # Mn      COMBINING BREVE
+0306          ; Cyrl Grek Latn Perm Tfng       # Mn      COMBINING BREVE
 0307          ; Copt Dupl Hebr Latn Perm Syrc Tale Tfng Todr #Mn COMBINING DOT ABOVE
-0308          ; Armn Cyrl Dupl Goth Grek Hebr Latn Perm Syrc Tale #Mn COMBINING DIAERESIS
+0308          ; Armn Cyrl Dupl Goth Grek Hebr Latn Perm Syrc Tale Tfng #Mn COMBINING DIAERESIS
 0309          ; Latn Tfng                      # Mn      COMBINING HOOK ABOVE
 030A          ; Dupl Latn Syrc                 # Mn      COMBINING RING ABOVE
 030B          ; Cher Cyrl Latn Osge            # Mn      COMBINING DOUBLE ACUTE ACCENT
@@ -50,14 +50,13 @@
 0310          ; Latn Sunu                      # Mn      COMBINING CANDRABINDU
 0311          ; Cyrl Latn Todr                 # Mn      COMBINING INVERTED BREVE
 0313          ; Grek Latn Perm Todr            # Mn      COMBINING COMMA ABOVE
-0320          ; Latn Syrc                      # Mn      COMBINING MINUS SIGN BELOW
-0323          ; Cher Dupl Kana Latn Syrc       # Mn      COMBINING DOT BELOW
+0323          ; Cher Dupl Kana Latn Syrc Tfng  # Mn      COMBINING DOT BELOW
 0324          ; Cher Dupl Latn Syrc            # Mn      COMBINING DIAERESIS BELOW
 0325          ; Latn Syrc                      # Mn      COMBINING RING BELOW
 032D          ; Latn Sunu Syrc                 # Mn      COMBINING CIRCUMFLEX ACCENT BELOW
 032E          ; Latn Syrc                      # Mn      COMBINING BREVE BELOW
 0330          ; Cher Latn Syrc                 # Mn      COMBINING TILDE BELOW
-0331          ; Aghb Cher Goth Latn Sunu Thai  # Mn      COMBINING MACRON BELOW
+0331          ; Aghb Cher Goth Latn Sunu Syrc Thai #Mn   COMBINING MACRON BELOW
 0342          ; Grek                           # Mn      COMBINING GREEK PERISPOMENI
 0345          ; Grek                           # Mn      COMBINING GREEK YPOGEGRAMMENI
 0358          ; Latn Osge                      # Mn      COMBINING DOT ABOVE RIGHT
@@ -79,8 +78,8 @@
 0660..0669    ; Arab Thaa Yezi                 # Nd [10] ARABIC-INDIC DIGIT ZERO..ARABIC-INDIC DIGIT NINE
 0670          ; Arab Syrc                      # Mn      ARABIC LETTER SUPERSCRIPT ALEF
 06D4          ; Arab Rohg                      # Po      ARABIC FULL STOP
-0951          ; Beng Deva Gran Gujr Guru Knda Latn Mlym Orya Shrd Taml Telu Tirh #Mn DEVANAGARI STRESS SIGN UDATTA
-0952          ; Beng Deva Gran Gujr Guru Knda Latn Mlym Orya Taml Telu Tirh #Mn DEVANAGARI STRESS SIGN ANUDATTA
+0951          ; Beng Deva Gran Gujr Guru Knda Latn Mlym Nand Newa Orya Shrd Taml Telu Tirh #Mn DEVANAGARI STRESS SIGN UDATTA
+0952          ; Beng Deva Gran Gujr Guru Knda Latn Mlym Newa Orya Taml Telu Tirh #Mn DEVANAGARI STRESS SIGN ANUDATTA
 0964          ; Beng Deva Dogr Gong Gonm Gran Gujr Guru Knda Mahj Mlym Nand Onao Orya Sind Sinh Sylo Takr Taml Telu Tirh #Po DEVANAGARI DANDA
 0965          ; Beng Deva Dogr Gong Gonm Gran Gujr Gukh Guru Knda Limb Mahj Mlym Nand Onao Orya Sind Sinh Sylo Takr Taml Telu Tirh #Po DEVANAGARI DOUBLE DANDA
 0966..096F    ; Deva Dogr Kthi Mahj            # Nd [10] DEVANAGARI DIGIT ZERO..DEVANAGARI DIGIT NINE
@@ -102,9 +101,10 @@
 1CD2          ; Beng Deva Gran Knda            # Mn      VEDIC TONE PRENKHA
 1CD3          ; Deva Gran Knda                 # Po      VEDIC SIGN NIHSHVASA
 1CD4          ; Deva                           # Mn      VEDIC SIGN YAJURVEDIC MIDLINE SVARITA
-1CD5..1CD6    ; Beng Deva                      # Mn  [2] VEDIC TONE YAJURVEDIC AGGRAVATED INDEPENDENT SVARITA..VEDIC TONE YAJURVEDIC INDEPENDENT SVARITA
-1CD7          ; Deva Shrd                      # Mn      VEDIC TONE YAJURVEDIC KATHAKA INDEPENDENT SVARITA
-1CD8          ; Beng Deva                      # Mn      VEDIC TONE CANDRA BELOW
+1CD5          ; Beng Deva Newa Telu Tirh       # Mn      VEDIC TONE YAJURVEDIC AGGRAVATED INDEPENDENT SVARITA
+1CD6          ; Beng Deva Telu                 # Mn      VEDIC TONE YAJURVEDIC INDEPENDENT SVARITA
+1CD7          ; Deva Newa Shrd                 # Mn      VEDIC TONE YAJURVEDIC KATHAKA INDEPENDENT SVARITA
+1CD8          ; Beng Deva Newa Telu            # Mn      VEDIC TONE CANDRA BELOW
 1CD9          ; Deva Shrd                      # Mn      VEDIC TONE YAJURVEDIC KATHAKA INDEPENDENT SVARITA SCHROEDER
 1CDA          ; Deva Knda Mlym Orya Taml Telu  # Mn      VEDIC TONE DOUBLE SVARITA
 1CDB          ; Deva                           # Mn      VEDIC TONE TRIPLE SVARITA
@@ -112,11 +112,13 @@
 1CDE..1CDF    ; Deva                           # Mn  [2] VEDIC TONE TWO DOTS BELOW..VEDIC TONE THREE DOTS BELOW
 1CE0          ; Deva Shrd                      # Mn      VEDIC TONE RIGVEDIC KASHMIRI INDEPENDENT SVARITA
 1CE1          ; Beng Deva                      # Mc      VEDIC TONE ATHARVAVEDIC INDEPENDENT SVARITA
-1CE2..1CE8    ; Deva                           # Mn  [7] VEDIC SIGN VISARGA SVARITA..VEDIC SIGN VISARGA ANUDATTA WITH TAIL
-1CE9          ; Deva Nand                      # Lo      VEDIC SIGN ANUSVARA ANTARGOMUKHA
-1CEA          ; Beng Deva                      # Lo      VEDIC SIGN ANUSVARA BAHIRGOMUKHA
-1CEB..1CEC    ; Deva                           # Lo  [2] VEDIC SIGN ANUSVARA VAMAGOMUKHA..VEDIC SIGN ANUSVARA VAMAGOMUKHA WITH TAIL
-1CED          ; Beng Deva                      # Mn      VEDIC SIGN TIRYAK
+1CE2          ; Deva Newa Tirh                 # Mn      VEDIC SIGN VISARGA SVARITA
+1CE3..1CE8    ; Deva                           # Mn  [6] VEDIC SIGN VISARGA UDATTA..VEDIC SIGN VISARGA ANUDATTA WITH TAIL
+1CE9          ; Deva Nand Newa                 # Lo      VEDIC SIGN ANUSVARA ANTARGOMUKHA
+1CEA          ; Beng Deva Shrd                 # Lo      VEDIC SIGN ANUSVARA BAHIRGOMUKHA
+1CEB          ; Deva Newa                      # Lo      VEDIC SIGN ANUSVARA VAMAGOMUKHA
+1CEC          ; Deva                           # Lo      VEDIC SIGN ANUSVARA VAMAGOMUKHA WITH TAIL
+1CED          ; Beng Deva Newa Shrd            # Mn      VEDIC SIGN TIRYAK
 1CEE..1CF1    ; Deva                           # Lo  [4] VEDIC SIGN HEXIFORM LONG ANUSVARA..VEDIC SIGN ANUSVARA UBHAYATO MUKHA
 1CF2          ; Beng Deva Gran Knda Mlym Nand Orya Sinh Telu Tirh Tutg #Lo VEDIC SIGN ARDHAVISARGA
 1CF3          ; Deva Gran                      # Lo      VEDIC SIGN ROTATED ARDHAVISARGA

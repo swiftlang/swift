@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -221,7 +221,7 @@ extension _StringGuts {
         return 1
       }
     }
-    
+
     return _opaqueComplexCharacterStride(startingAt: i)
   }
 
@@ -733,12 +733,12 @@ extension _GraphemeBreakingState {
     }
 
     let x = Unicode._GraphemeBreakProperty(from: scalar1)
-    
+
     // GB4 handled here because we don't need to know `y` for this case
     if x == .control {
       return true
     }
-    
+
     // This variable and the defer statement help toggle the isInEmojiSequence
     // state variable to false after every decision of 'shouldBreak'. If we
     // happen to see a rhs .extend or .zwj, then it's a signal that we should
@@ -752,7 +752,7 @@ extension _GraphemeBreakingState {
       isInEmojiSequence = enterEmojiSequence
       isInIndicSequence = enterIndicSequence
     }
-    
+
     let y = Unicode._GraphemeBreakProperty(from: scalar2)
 
     switch (x, y) {
@@ -800,7 +800,7 @@ extension _GraphemeBreakingState {
       // sequence; the sequence continues through subsequent extend/extend and
       // extend/zwj pairs.
       if (
-        x == .extendedPictographic || (isInEmojiSequence && x == .extend)
+        scalar1._isExtendedPictographic || (isInEmojiSequence && x == .extend)
       ) {
         enterEmojiSequence = true
       }
@@ -859,7 +859,7 @@ extension _GraphemeBreakingState {
       return false
 
     // GB11
-    case (.zwj, .extendedPictographic):
+    case (.zwj, _) where scalar2._isExtendedPictographic:
       return !isInEmojiSequence
 
     // GB12 & GB13
@@ -952,7 +952,7 @@ fileprivate func _shouldBreakWithLookback(
     return false
 
   // GB11
-  case (.zwj, .extendedPictographic):
+  case (.zwj, _) where scalar2._isExtendedPictographic:
     return !_checkIfInEmojiSequence(at: index, with: previousScalar)
 
   // GB12 & GB13
@@ -1030,14 +1030,11 @@ fileprivate func _checkIfInEmojiSequence(
     i = prev.start
     let gbp = Unicode._GraphemeBreakProperty(from: prev.scalar)
 
-    switch gbp {
-    case .extend:
+    if gbp == .extend {
       continue
-    case .extendedPictographic:
-      return true
-    default:
-      return false
     }
+
+    return prev.scalar._isExtendedPictographic
   }
   return false
 }

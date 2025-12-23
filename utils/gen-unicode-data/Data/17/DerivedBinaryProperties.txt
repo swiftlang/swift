@@ -1,6 +1,6 @@
-# DerivedBinaryProperties-16.0.0.txt
-# Date: 2024-04-30, 21:48:15 GMT
-# © 2024 Unicode®, Inc.
+# DerivedBinaryProperties-17.0.0.txt
+# Date: 2025-01-27, 18:09:10 GMT
+# © 2025 Unicode®, Inc.
 # Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
 # For terms of use and license, see https://www.unicode.org/terms_of_use.html
 #

@@ -15,7 +15,7 @@
 // RUN: %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -o %t/a.out
 
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out %S/Inputs/NormalizationTest.txt %S/Inputs/NormalizationTest16.txt
+// RUN: %target-run %t/a.out %S/Inputs/NormalizationTest.txt %S/Inputs/NormalizationTest17.txt
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: optimized_stdlib
