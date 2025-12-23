@@ -8861,8 +8861,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
                  Attributes.hasAttribute<ConstValAttr>() ||
                  Attributes.hasAttribute<ExternAttr>();
 
-  auto inSwiftPackage = SF.isPackageDotSwift();
-
   // If this is a var in the top-level of script/repl source file, wrap the
   // PatternBindingDecl in a TopLevelCodeDecl, since it represents executable
   // code.  The VarDecl and any accessor decls (for computed properties) go in
@@ -8875,7 +8873,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     topLevelDecl = new (Context) TopLevelCodeDecl(CurDeclContext);
   }
   std::optional<ContextChange> topLevelParser;
-  if (topLevelDecl && !inSwiftPackage)
+  if (topLevelDecl)
     topLevelParser.emplace(*this, topLevelDecl);
 
   bool HasAccessors = false;  // Syntactically has accessor {}'s.
@@ -8886,7 +8884,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
   // In var/let decl with multiple patterns, accumulate them all in this list
   // so we can build our singular PatternBindingDecl at the end.
   SmallVector<PatternBindingEntry, 4> PBDEntries;
-  DeclContext *const BindingContext = topLevelDecl ? topLevelDecl : CurDeclContext;
+  DeclContext *const BindingContext = CurDeclContext;
 
   // No matter what error path we take, make sure the
   // PatternBindingDecl/TopLevel code block are added.
@@ -8910,19 +8908,11 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     if (topLevelDecl) {
       auto range = PBD->getSourceRangeIncludingAttrs();
       SmallVector<ASTNode, 4> Nodes;
-      for (auto *D : NewDecls) {
-        if (!inSwiftPackage || isa<PatternBindingDecl>(D))
-          Nodes.push_back(D);
-      }
+      for (auto *D : NewDecls)
+        Nodes.push_back(D);
       topLevelDecl->setBody(BraceStmt::create(Context, range.Start,
                                               Nodes, range.End, true));
       Decls.push_back(topLevelDecl);
-      if (inSwiftPackage) {
-        for (auto *D : NewDecls) {
-          if (isa<VarDecl>(D))
-            Decls.push_back(D);
-        }
-      }
       return makeParserResult(Status, PBD);
     }
 
@@ -8983,10 +8973,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
         assert(!initContext && "There cannot be an init context yet");
         initContext = PatternBindingInitializer::create(BindingContext);
       }
-
-      std::optional<ContextChange> topLevelParser;
-      if (topLevelDecl && inSwiftPackage)
-        topLevelParser.emplace(*this, topLevelDecl);
 
       // If we're using a local context (either a TopLevelCodeDecl or a
       // PatternBindingContext) install it now so that CurDeclContext is set

@@ -300,8 +300,6 @@ public:
   /// code for it. Note this method returns \c false in WMO.
   bool isPrimary() const { return IsPrimary; }
 
-  bool isPackageDotSwift() const;
-
   /// Retrieve the \c ExportedSourceFile instance produced by ASTGen, which
   /// includes the SourceFileSyntax node corresponding to this source file.
   void *getExportedSourceFile() const;

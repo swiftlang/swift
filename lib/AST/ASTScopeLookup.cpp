@@ -354,11 +354,9 @@ ConditionalClauseInitializerScope::getLookupParent() const {
 }
 
 NullablePtr<const ASTScopeImpl> TopLevelCodeScope::getLookupParent() const {
-  if (decl->isInPackageDotSwift())
-    return getParent();
-
-  auto fileScope = cast<ASTSourceFileScope>(getParent().get());
+  auto parent = getParent().get();
   if (auto *prev = decl->getPrevious()) {
+    auto *fileScope = cast<ASTSourceFileScope>(parent);
     auto prevScope = fileScope->findChildContaining(prev->getEndLoc(), getSourceManager());
     if (auto *prevTopLevel = dyn_cast<TopLevelCodeScope>(prevScope.getPtrOrNull())) {
       if (!prevTopLevel->getWasExpanded())
@@ -366,7 +364,7 @@ NullablePtr<const ASTScopeImpl> TopLevelCodeScope::getLookupParent() const {
       return prevTopLevel->insertionPoint;
     }
   }
-  return fileScope;
+  return parent;
 }
 
 #pragma mark looking in locals or members - locals

@@ -2889,8 +2889,6 @@ public:
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *b) { Body = b; }
 
-  bool isInPackageDotSwift() const;
-
   TopLevelCodeDecl *getPrevious() const;
 
   SourceLoc getStartLoc() const;

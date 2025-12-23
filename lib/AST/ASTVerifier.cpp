@@ -2647,12 +2647,9 @@ public:
       for (auto idx : range(binding->getNumPatternEntries()))
         if (auto *P = binding->getPattern(idx))
           P->forEachVariable([&](VarDecl *VD) {
-            auto *SF = VD->getDeclContext()->getParentSourceFile();
-            if (!SF || !SF->isPackageDotSwift()) {
-              auto varIsTopLevel = isa<TopLevelCodeDecl>(VD->getDeclContext());
-              ASSERT(isTopLevel == varIsTopLevel &&
-                     "Must have consistent top-level context");
-            }
+            auto varIsTopLevel = isa<TopLevelCodeDecl>(VD->getDeclContext());
+            ASSERT(isTopLevel == varIsTopLevel &&
+                   "Must have consistent top-level context");
             // ParamDecls never get PBD's.
             assert(!isa<ParamDecl>(VD) && "ParamDecl has a PatternBindingDecl?");
           });
