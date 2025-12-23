@@ -483,6 +483,8 @@ bool swift::visitGuaranteedForwardingPhisForSSAValue(
   // Transitively, collect GuaranteedForwarding uses.
   for (unsigned i = 0; i < guaranteedForwardingOps.size(); i++) {
     for (auto val : guaranteedForwardingOps[i]->getUser()->getResults()) {
+      if (val->getOwnershipKind() == OwnershipKind::None)
+        continue;
       for (auto *valUse : val->getUses()) {
         if (valUse->getOperandOwnership() ==
             OperandOwnership::GuaranteedForwarding) {

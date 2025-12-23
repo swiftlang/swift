@@ -18,6 +18,12 @@ struct Wrapper2 {
 struct TStruct {
 }
 
+struct KlassAndInt {
+  let c: Klass
+  let i: Int
+}
+
+
 sil @use_superklass : $@convention(thin) (@guaranteed SuperKlass) -> ()
 sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 
@@ -395,3 +401,20 @@ bb3(%14 : @reborrow $Klass, %15 : @reborrow $Klass):
   %20 = tuple ()
   return %20
 }
+
+sil [ossa] @dont_follow_trivial_field_to_phi : $@convention(thin) (@owned KlassAndInt, @guaranteed Klass) -> () {
+bb0(%0 : @owned $KlassAndInt, %1 : @guaranteed $Klass):
+  %2 = begin_borrow %0
+  %3 = struct_extract %2 , #KlassAndInt.i
+  end_borrow %2
+  destroy_value %0
+  %6 = struct $KlassAndInt (%1, %3)
+  br bb2(%6)
+
+bb2(%8 : @guaranteed $KlassAndInt):
+  %9 = borrowed %8 from (%1)
+  %10 = apply undef(%9) : $@convention(thin) (@guaranteed KlassAndInt) -> ()
+  %r = tuple ()
+  return %r
+}
+
