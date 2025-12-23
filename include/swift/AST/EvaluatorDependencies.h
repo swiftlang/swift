@@ -32,12 +32,6 @@ namespace swift {
 class SourceFile;
 
 namespace evaluator {
-
-namespace detail {
-// Remove this when the compiler bumps to C++17.
-template <typename...> using void_t = void;
-} // namespace detail
-
 // A \c DependencySource is currently defined to be a primary source file.
 //
 // The \c SourceFile instance is an artifact of the current dependency system,

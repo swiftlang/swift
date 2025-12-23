@@ -19,6 +19,8 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
+#include <tuple>
+#include <type_traits>
 
 #ifndef SWIFT_AST_REQUEST_CACHE_H
 #define SWIFT_AST_REQUEST_CACHE_H
@@ -28,10 +30,6 @@ namespace swift {
 namespace evaluator {
 
 namespace detail {
-
-// Remove this when the compiler bumps to C++17.
-template <typename...> using void_t = void;
-template<typename T, typename = void_t<>>
 
 struct TupleHasDenseMapInfo {};
 
