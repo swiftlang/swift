@@ -7,8 +7,9 @@
 // EmbeddedExistentials is the default.
 // RUN: %target-run-simple-swift( -enable-experimental-feature Embedded -parse-as-library -wmo) | %FileCheck %s --check-prefix=OUTPUT
 
-// Test -disable-embedded-existentials
-// RUN: not %target-swift-frontend -disable-embedded-existentials -enable-experimental-feature Embedded -parse-as-library -wmo -emit-sil %s 2>&1 | %FileCheck --check-prefix=ERRMSG2 %s
+// Test -disable-experimental-feature EmbeddedExistentials
+// RUN: not %target-swift-frontend -disable-experimental-feature EmbeddedExistentials -enable-experimental-feature Embedded -parse-as-library -wmo -emit-sil %s 2>&1 | %FileCheck --check-prefix=ERRMSG2 %s
+// RUN: not %target-swift-frontend -enable-experimental-feature Embedded -disable-experimental-feature EmbeddedExistentials -parse-as-library -wmo -emit-sil %s 2>&1 | %FileCheck --check-prefix=ERRMSG2 %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
@@ -19,7 +20,7 @@
 // EmbeddedExistentials requires Embedded
 // ERRMSG: error: EmbeddedExistentials requires enabling embedded Swift.
 
-// Test -disable-embedded-existentials
+// -disable-experimental-feature EmbeddedExistentials
 // ERRMSG2: error: cannot use a value of protocol type 'Any' in embedded Swift
 
 class CP {

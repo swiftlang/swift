@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -verify %s -parse-stdlib -enable-experimental-feature Embedded -wmo -disable-embedded-existentials
+// RUN: %target-swift-frontend -emit-ir -verify %s -parse-stdlib -enable-experimental-feature Embedded -wmo -disable-experimental-feature EmbeddedExistentials
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
