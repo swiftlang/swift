@@ -140,9 +140,19 @@ public:
   }
 
   const char* getIdentityDebugName() const {
-    return isMainExecutor() ? " (MainActorExecutor)"
-           : isGeneric()    ? (isForSynchronousStart() ? " (GenericExecutor/SynchronousStart)" : " (GenericExecutor)")
-                            : "";
+    if (isMainExecutor()) {
+      return " (MainActorExecutor)";
+    }
+    if (isDefaultActor()) {
+      return " (DefaultActor)";
+    }
+    if (isGeneric()) {
+      if (isForSynchronousStart()) {
+        return " (GenericExecutor/SynchronousStart)";
+      } 
+      return " (GenericExecutor)";
+    }
+    return "";
   }
 
   /// Is this the generic executor reference?
@@ -184,12 +194,6 @@ public:
     assert(hasSerialExecutorWitnessTable());
     auto table = Implementation & WitnessTableMask;
     return reinterpret_cast<const SerialExecutorWitnessTable*>(table);
-  }
-
-  /// Do we have to do any work to start running as the requested
-  /// executor?
-  bool mustSwitchToRun(SerialExecutorRef newExecutor) const {
-    return Identity != newExecutor.Identity;
   }
 
   /// Is this executor the main executor?

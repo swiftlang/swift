@@ -89,7 +89,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
     // install a willChange continuation into the set of continuations
     // this must take a locally unique id (to the active calls of next)
     static func willChange(isolation iterationIsolation: isolated (any Actor)? = #isolation, state: _ManagedCriticalState<State>, id: Int) async {
-      return await withUnsafeContinuation(isolation: iterationIsolation) { continuation in
+      return await withUnsafeContinuation { continuation in
         state.withCriticalRegion { state in
           defer { state.dirty = false }
           switch state.continuations[id] {
