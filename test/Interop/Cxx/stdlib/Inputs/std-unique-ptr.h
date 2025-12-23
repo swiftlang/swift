@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 struct NonCopyable {
@@ -92,6 +93,15 @@ inline std::unique_ptr<CountCopies> getCopyCountedUniquePtr() { return std::make
 struct HasUniqueIntVector {
   HasUniqueIntVector() = default;
   std::vector<std::unique_ptr<int>> x;
+};
+
+struct HasUnorderedMap {
+  HasUnorderedMap() = default;
+  HasUnorderedMap(const HasUnorderedMap &) = default;
+  HasUnorderedMap(HasUnorderedMap &&) = default;
+  std::unordered_map<int,
+                     std::vector<std::unique_ptr<int>>>
+      field;
 };
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_UNIQUE_PTR_H
