@@ -576,6 +576,13 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     // Any heuristics we might add would go here.
     Opts.UseModuleSelectors = false;
   }
+
+  if (Opts.PreserveTypesAsWritten && Opts.UseModuleSelectors) {
+    Opts.PreserveTypesAsWritten = false;
+    diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
+                   "-module-interface-preserve-types-as-written",
+                   "-enable-module-selectors-in-module-interface");
+  }
 }
 
 /// Checks if an arg is generally allowed to be included

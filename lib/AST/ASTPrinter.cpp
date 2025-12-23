@@ -6139,11 +6139,15 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
 
   bool isMemberOfGenericParameter(TypeBase *T) {
     Type parent = nullptr;
-    if (auto alias = dyn_cast<TypeAliasType>(T))
+    if (auto alias = dyn_cast<TypeAliasType>(T))    // don't desugar
       parent = alias->getParent();
     else if (auto generic = T->getAs<AnyGenericType>())
       parent = generic->getParent();
-    return parent && parent->isTypeParameter();
+    else if (T->is<DependentMemberType>())
+      // Parent is always a generic parameter.
+      return true;
+    return parent && (parent->is<SubstitutableType>() ||
+                        isMemberOfGenericParameter(parent.getPointer()));
   }
 
   bool shouldPrintModuleSelector(TypeBase *T) {
