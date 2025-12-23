@@ -15,7 +15,11 @@
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func constInBase() -> UnsafePointer<CChar>!
 // CHECK-NEXT:   @discardableResult
-// CHECK-NEXT:   public func rvalueThisInBase() -> UnsafePointer<CChar>!
+// CHECK-NEXT:   public consuming func rvalueThisInBase() -> UnsafePointer<CChar>!
+// CHECK-NEXT:   public mutating func refQualifierOverloadsMutating()
+// CHECK-NEXT:   public func refQualifierOverloads()
+// CHECK-NEXT:   public consuming func refQualifierOverloadsMutatingConsuming()
+// CHECK-NEXT:   public consuming func refQualifierOverloadsConsuming()
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func takesArgsInBase(_ a: Int32, _ b: Int32, _ c: Int32) -> UnsafePointer<CChar>!
 // CHECK-NEXT:   @discardableResult
@@ -54,6 +58,8 @@
 // CHECK-NEXT:   public mutating func mutatingInBase() -> UnsafePointer<CChar>?
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func constInBase() -> UnsafePointer<CChar>?
+// CHECK-NEXT:   public mutating func refQualifierOverloadsMutating()
+// CHECK-NEXT:   public func refQualifierOverloads()
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func takesArgsInBase(_ a: Int32, _ b: Int32, _ c: Int32) -> UnsafePointer<CChar>?
 // CHECK-NEXT:   @discardableResult
@@ -84,6 +90,8 @@
 // CHECK-NEXT:   public mutating func mutatingInBase() -> UnsafePointer<CChar>?
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func constInBase() -> UnsafePointer<CChar>?
+// CHECK-NEXT:   public mutating func refQualifierOverloadsMutating()
+// CHECK-NEXT:   public func refQualifierOverloads()
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func takesArgsInBase(_ a: Int32, _ b: Int32, _ c: Int32) -> UnsafePointer<CChar>?
 // CHECK-NEXT:   @discardableResult
