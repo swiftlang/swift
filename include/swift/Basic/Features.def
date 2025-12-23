@@ -587,6 +587,9 @@ EXPERIMENTAL_FEATURE(CheckImplementationOnlyStrict, false)
 /// Check that use sites have the required @_spi import for operators.
 EXPERIMENTAL_FEATURE(EnforceSPIOperatorGroup, true)
 
+/// Allows an existing protocol to refine a new one, without ABI break.
+EXPERIMENTAL_FEATURE(Reparenting, true)
+
 /// Enable source-level warning control with `@warn`
 EXPERIMENTAL_FEATURE(SourceWarningControl, true)
 

@@ -1936,6 +1936,9 @@ public:
   bool isNonisolated() const {
     return getOptions().contains(ProtocolConformanceFlags::Nonisolated);
   }
+  bool isReparented() const {
+    return getOptions().contains(ProtocolConformanceFlags::Reparented);
+  }
 
   TypeExpr *getGlobalActorIsolationType() const {
     return globalActorIsolationType;

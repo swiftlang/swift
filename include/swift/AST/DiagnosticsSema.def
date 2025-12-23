@@ -1802,6 +1802,10 @@ ERROR(attribute_requires_operator_identifier,none,
 ERROR(attribute_requires_single_argument,none,
       "%0 requires a function with one argument", (DeclAttribute))
 
+ERROR(attribute_requires_experimental_feature,none,
+      "'%0' is an experimental feature; use '-enable-experimental-feature %1'",
+      (DeclAttribute, StringRef))
+
 ERROR(nominal_type_not_attribute,none,
       "%kind0 cannot be used as an attribute", (const ValueDecl *))
 
@@ -6072,9 +6076,15 @@ ERROR(typeattr_not_inheritance_clause,none,
 ERROR(typeattr_not_extension_inheritance_clause,none,
       "%0 only applies in inheritance clauses in extensions",
       (const TypeAttribute *))
+ERROR(typeattr_not_protocol_inheritance_clause,none,
+      "%0 only applies in inheritance clauses of protocols",
+      (const TypeAttribute *))
 ERROR(typeattr_not_existential,none,
       "%0 cannot apply to non-protocol type %1",
       (const TypeAttribute *, Type))
+ERROR(typeattr_reparented_requires_reparentable_protocol,none,
+      "%0 cannot apply to %1 unless it is declared to be '@reparentable'",
+      (const TypeAttribute *, const TypeDecl *))
 
 WARNING(unchecked_conformance_not_special,none,
       "'@unchecked' conformance to %0 has no meaning", (Type))

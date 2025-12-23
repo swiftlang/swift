@@ -405,6 +405,7 @@ public:
   void visitNSCopyingAttr(NSCopyingAttr *attr);
   void visitRequiredAttr(RequiredAttr *attr);
   void visitRethrowsAttr(RethrowsAttr *attr);
+  void visitReparentableAttr(ReparentableAttr *attr);
 
   void checkApplicationMainAttribute(DeclAttribute *attr,
                                      Identifier Id_ApplicationDelegate,
@@ -3482,6 +3483,14 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
 
   diagnose(attr->getLocation(), diag::rethrows_without_throwing_parameter);
   attr->setInvalid();
+}
+
+void AttributeChecker::visitReparentableAttr(ReparentableAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::Reparenting)) {
+    Ctx.Diags.diagnose(attr->getLocation(),
+                       diag::attribute_requires_experimental_feature, attr,
+                       "Reparenting");
+  }
 }
 
 /// Ensure that the requirements provided by the @_specialize attribute
