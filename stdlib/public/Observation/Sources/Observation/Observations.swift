@@ -240,7 +240,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
           }, onCancel: {
             // ensure to clean out our continuation uon cancellation
             State.cancel(state, id: id)
-          }, isolation: iterationIsolation)
+          })
           return try await trackEmission(isolation: iterationIsolation, state: state, id: id)
         }
       } catch {
