@@ -98,7 +98,6 @@ where Base: _SwiftNewtypeWrapper & Hashable, Base.RawValue: Hashable {
   }
 }
 
-#if _runtime(_ObjC)
 extension _SwiftNewtypeWrapper where Self.RawValue: _ObjectiveCBridgeable {
   // Note: This is the only default typealias for _ObjectiveCType, because
   // constrained extensions aren't allowed to define types in different ways.
@@ -173,5 +172,3 @@ extension _SwiftNewtypeWrapper where Self.RawValue: AnyObject {
     return Self(rawValue: source!)!
   }
 }
-#endif
-
