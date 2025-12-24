@@ -1,5 +1,5 @@
 // REQUIRES: concurrency
-// RUN: %batch-code-completion
+// RUN: %batch-code-completion -parse-as-library
 
 class MyNonSendable {}
 struct MySendable {}

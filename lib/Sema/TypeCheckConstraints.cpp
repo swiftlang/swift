@@ -835,6 +835,35 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
           : SyntacticElementTarget::forInitialization(
                 initializer, DC, patternType, pattern,
                 /*bindPatternVarsOneWay=*/false);
+  if (PBD) {
+    auto pbdIsTopLevel = isa<TopLevelCodeDecl>(PBD->getDeclContext());
+    for (auto idx : range(PBD->getNumPatternEntries())) {
+      if (auto *P = PBD->getPattern(idx)) {
+        P->forEachVariable([&](VarDecl *VD) {
+          auto varIsTopLevel = isa<TopLevelCodeDecl>(PBD->getDeclContext());
+          ASSERT(pbdIsTopLevel == varIsTopLevel &&
+                 "Must have consistent top-level context");
+        });
+      }
+    }
+  }
+
+  // Bindings cannot be type-checked independently from their context in a
+  // closure, make sure we don't ever attempt to do this. If we want to be able
+  // to lazily type-check these we'll need to type-check the entire surrounding
+  // expression.
+  if (auto *CE = dyn_cast<ClosureExpr>(DC)) {
+    if (!PBD || !isPlaceholderVar(PBD)) {
+      // Completion may trigger lazy type-checking as part of fallback
+      // unqualified lookup, just decline to type-check.
+      auto &ctx = CE->getASTContext();
+      if (ctx.SourceMgr.hasIDEInspectionTargetBuffer()) {
+        target.markInvalid();
+        return true;
+      }
+      ABORT("Cannot type-check PatternBindingDecl without closure context");
+    }
+  }
 
   // Type-check the initializer.
   auto resultTarget = typeCheckExpression(target, options);

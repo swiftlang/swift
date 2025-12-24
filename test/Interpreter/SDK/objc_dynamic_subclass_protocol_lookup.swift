@@ -23,7 +23,7 @@ class Model2 : NSObject, Q {
 
 extension Supermodel: P { }
 
-var kvoContext = 0
+internal var kvoContext = 0
 
 class Observer: NSObject {
   let model1 = Model1()

@@ -1,4 +1,4 @@
-// RUN: %batch-code-completion
+// RUN: %batch-code-completion -parse-as-library
 
 // WITH_GETSET: Keyword/None:                       get; name=get
 // WITH_GETSET: Keyword/None:                       set; name=set

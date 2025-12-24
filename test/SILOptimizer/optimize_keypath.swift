@@ -37,7 +37,7 @@ struct GenStruct<T : P> : P {
 }
 
 #if !swift(>=6)
-var numGenClassObjs = 0
+internal var numGenClassObjs = 0
 #endif
 
 final class GenClass<T : P> : P {

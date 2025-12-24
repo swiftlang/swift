@@ -334,7 +334,7 @@ ASTContext &ASTScopeImpl::getASTContext() const {
 
 #pragma mark getSourceFile
 
-const SourceFile *ASTScopeImpl::getSourceFile() const {
+SourceFile *ASTScopeImpl::getSourceFile() const {
   if (auto sourceFileScope = dyn_cast<ASTSourceFileScope>(this))
     return sourceFileScope->SF;
 

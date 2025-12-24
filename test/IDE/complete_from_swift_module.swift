@@ -78,7 +78,7 @@ func testQualifyingModulesNotSuggested() {
   // ALREADY_QUALIFIED-NOT: name=Type
 }
 
-var hiddenImport : Int
+internal var hiddenImport : Int
 // TOP_LEVEL_1_NEGATIVE-NOT: hiddenImport()
 
 func testCompleteModuleQualified1() {

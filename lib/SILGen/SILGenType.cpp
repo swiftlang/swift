@@ -1582,6 +1582,15 @@ public:
 
 } // end anonymous namespace
 
+void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
+  // Extensions can be nested within a TopLevelCodeDecl, but not in arbitrary
+  // local contexts, so handle them here.
+  for (auto N : TLCD->getBody()->getElements()) {
+    if (auto *ED = dyn_cast_or_null<ExtensionDecl>(N.dyn_cast<Decl *>()))
+      visit(ED);
+  }
+}
+
 void SILGenModule::visitNominalTypeDecl(NominalTypeDecl *ntd) {
   SILGenType(*this, ntd).emitType();
 }

@@ -672,7 +672,7 @@ bool DeclContext::mayContainMembersAccessedByDynamicLookup() const {
 }
 
 bool DeclContext::canBeParentOfExtension() const {
-  return isa<SourceFile>(this);
+  return isa<SourceFile>(this) || isa<TopLevelCodeDecl>(this);
 }
 
 bool DeclContext::walkContext(ASTWalker &Walker) {

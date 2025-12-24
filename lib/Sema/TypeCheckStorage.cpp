@@ -89,15 +89,10 @@ static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
   if (dc->isTypeContext())
     return false;
   
-  // Global variable decls must bind variables, except in scripts.
-  if (dc->isModuleScopeContext()) {
-    if (dc->getParentSourceFile()
-        && dc->getParentSourceFile()->isScriptMode())
-      return true;
-    
+  // Global variable decls must bind variables.
+  if (dc->isModuleScopeContext())
     return false;
-  }
-  
+
   return true;
 }
 

@@ -7,7 +7,7 @@
 // This test needs a Swift 5.9 runtime or newer.
 // UNSUPPORTED: back_deployment_runtime
 
-var counter = 0
+internal var counter = 0
 
 final class Entry<Results> {
     var isEmpty: Bool { true }

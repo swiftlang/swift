@@ -1,7 +1,8 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
-var foo: Int {
+// FIXME: Should computed always be global?
+internal var foo: Int {
   get {
     print("foo gotten")
     return 219
@@ -198,8 +199,8 @@ protocol rdar38514252_ProtocolWithArray {
   var arrayOfInt: [Int] { get set }
 }
 
-var rdar38514252_flag = false
-var rdar38514252_questionSet: rdar38514252_ProtocolWithArray? {
+internal var rdar38514252_flag = false
+internal var rdar38514252_questionSet: rdar38514252_ProtocolWithArray? {
   didSet {
     rdar38514252_flag = true
   }
@@ -260,7 +261,7 @@ assert(HasStaticVar.i == DerivesHasStaticVar.i)
 HasStaticVar.i = 2020
 assert(HasStaticVar.i == DerivesHasStaticVar.i)
 
-var _x: Int = 0
+internal var _x: Int = 0
 
 class HasClassVar {
   class var x: Int {

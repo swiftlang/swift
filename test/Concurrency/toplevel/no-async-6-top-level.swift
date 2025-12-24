@@ -4,7 +4,7 @@
 // asynchronous context. `a` is just a normal top-level global variable with no
 // actor isolation.
 
-var a = 10 // expected-note 2 {{var declared here}}
+internal var a = 10 // expected-note 2 {{var declared here}}
 // expected-note@-1 2{{mutation of this var is only permitted within the actor}}
 
 // expected-note@+1 3{{add '@MainActor' to make global function 'nonIsolatedSync()' part of global actor 'MainActor'}}

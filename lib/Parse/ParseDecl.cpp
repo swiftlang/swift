@@ -3519,9 +3519,13 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       // FIXME: Do we need to reparent these decls to match their counterparts?
       //        Feels like there might be more to do here.
       if (auto tlcd = dyn_cast<TopLevelCodeDecl>(D)) {
-        ASSERT(tlcd->getBody()->getNumElements() == 1
-                  && "TopLevelCodeDecl with != 1 element?");
-        D = tlcd->getBody()->getElements().front().dyn_cast<Decl *>();
+        auto elts = tlcd->getBody()->getElements();
+        ASSERT(!elts.empty());
+
+        auto *firstDecl = elts.front().dyn_cast<Decl *>();
+        ASSERT(isa_and_nonnull<PatternBindingDecl>(firstDecl) ||
+               elts.size() == 1 && "TopLevelCodeDecl with != 1 element?");
+        D = firstDecl;
         if (!D)
           return;
       }
@@ -6347,11 +6351,25 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
     MayNeedOverrideCompletion = true;
   };
 
+  TopLevelCodeDecl *topLevelDecl = nullptr;
+  std::optional<ContextChange> topLevelScope;
+  auto parseInTopLevelIfNeeded = [&]() {
+    if (!allowTopLevelCode() || !CurDeclContext->isModuleScopeContext())
+      return;
+
+    if (Attributes.hasAttribute<AccessControlAttr>())
+      return;
+
+    topLevelDecl = new (Context) TopLevelCodeDecl(CurDeclContext);
+    topLevelScope.emplace(*this, topLevelDecl);
+  };
+
   switch (Tok.getKind()) {
   case tok::kw_import:
     DeclResult = parseDeclImport(Flags, Attributes);
     break;
   case tok::kw_extension:
+    parseInTopLevelIfNeeded();
     DeclResult = parseDeclExtension(Flags, Attributes);
     break;
   case tok::kw_let:
@@ -6360,6 +6378,7 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
     break;
   }
   case tok::kw_typealias:
+    parseInTopLevelIfNeeded();
     DeclResult = parseDeclTypeAlias(Flags, Attributes);
     MayNeedOverrideCompletion = true;
     break;
@@ -6367,6 +6386,7 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
     DeclResult = parseDeclAssociatedType(Flags, Attributes);
     break;
   case tok::kw_enum:
+    parseInTopLevelIfNeeded();
     DeclResult = parseDeclEnum(Flags, Attributes);
     break;
   case tok::kw_case: {
@@ -6380,9 +6400,11 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
     break;
   }
   case tok::kw_class:
+    parseInTopLevelIfNeeded();
     DeclResult = parseDeclClass(Flags, Attributes);
     break;
   case tok::kw_struct:
+    parseInTopLevelIfNeeded();
     DeclResult = parseDeclStruct(Flags, Attributes);
     break;
   case tok::kw_init:
@@ -6398,9 +6420,11 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
     DeclResult = parseDeclPrecedenceGroup(Flags, Attributes);
     break;
   case tok::kw_protocol:
+    parseInTopLevelIfNeeded();
     DeclResult = parseDeclProtocol(Flags, Attributes);
     break;
   case tok::kw_func:
+    parseInTopLevelIfNeeded();
     parseFunc(/*HasFuncKeyword=*/true);
     break;
   case tok::kw_subscript: {
@@ -6634,6 +6658,12 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
 
   if (DeclResult.isNonNull()) {
     Decl *D = DeclResult.get();
+    if (topLevelScope) {
+      topLevelDecl->setBody(BraceStmt::createImplicit(Context, ASTNode(D)));
+      D = topLevelDecl;
+      DeclResult = makeParserResult(ParserStatus(DeclResult), D);
+    }
+
     if (!HandlerAlreadyCalled)
       Handler(D);
   }
@@ -7396,7 +7426,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     // anything about it either.  But propagate the error bit.
   }
   ext->setBraces({LBLoc, RBLoc});
-  if (!DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
+  if (!DCC.movedToTopLevel() && !CurDeclContext->canBeParentOfExtension()) {
     diagnose(ExtensionLoc, diag::decl_inner_scope);
     status.setIsParseError();
 
@@ -8537,8 +8567,7 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
                            SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling,
                            SourceLoc VarLoc, bool hasInitializer,
-                           const DeclAttributes &Attributes,
-                           SmallVectorImpl<Decl *> &Decls) {
+                           const DeclAttributes &Attributes) {
   bool Invalid = false;
 
   auto *pattern = entry.getPattern();
@@ -8858,6 +8887,48 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
                  Attributes.hasAttribute<ConstValAttr>() ||
                  Attributes.hasAttribute<ExternAttr>();
 
+  auto isPackageWorkaround = [&]() {
+    auto filePath = SF.getFilename();
+    auto fileName = llvm::sys::path::filename(filePath);
+    if (fileName != "Package.swift" && !fileName.starts_with("Package@"))
+      return false;
+
+    if (filePath.contains("swift-collections")) {
+      if (isIdentifier(Tok, "defines") || isIdentifier(Tok, "_settings"))
+        return true;
+    }
+    if (filePath.contains("swift-testing")) {
+      if (isIdentifier(Tok, "git") ||
+          isIdentifier(Tok, "buildingForDevelopment") ||
+          isIdentifier(Tok, "buildingForEmbedded"))
+        return true;
+    }
+    if (filePath.contains("swift-syntax")) {
+      if (isIdentifier(Tok, "buildDynamicLibrary") ||
+          isIdentifier(Tok, "rawSyntaxValidation") ||
+          isIdentifier(Tok, "buildScriptEnvironment") ||
+          isIdentifier(Tok, "swiftParserSwiftSettings") ||
+          isIdentifier(Tok, "alternateTokenIntrospection") ||
+          isIdentifier(Tok, "swiftSyntaxBuilderSwiftSettings") ||
+          isIdentifier(Tok, "swiftSyntaxSwiftSettings"))
+        return true;
+    }
+    if (filePath.contains("swift-tools-protocols")) {
+      if (isIdentifier(Tok, "lspLoggingSwiftSettings") ||
+          isIdentifier(Tok, "useLocalDependencies") ||
+          isIdentifier(Tok, "hasEnvironmentVariable") ||
+          isIdentifier(Tok, "buildOnlyTests") ||
+          isIdentifier(Tok, "dependencies") ||
+          isIdentifier(Tok, "forceNonDarwinLogger"))
+        return true;
+    }
+    return false;
+  }();
+
+  if (isPackageWorkaround && peekToken().is(tok::equal)) {
+    Attributes.add(NonisolatedAttr::createImplicit(Context, NonIsolatedModifier::Unsafe));
+  }
+
   // If this is a var in the top-level of script/repl source file, wrap the
   // PatternBindingDecl in a TopLevelCodeDecl, since it represents executable
   // code.  The VarDecl and any accessor decls (for computed properties) go in
@@ -8865,20 +8936,24 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
   // We follow the same rule for @_extern.
   TopLevelCodeDecl *topLevelDecl = nullptr;
   if (allowTopLevelCode() && CurDeclContext->isModuleScopeContext() &&
-      !IsConst) {
+      !IsConst && !Attributes.hasAttribute<AccessControlAttr>() &&
+      !isPackageWorkaround) {
     // The body of topLevelDecl will get set later.
     topLevelDecl = new (Context) TopLevelCodeDecl(CurDeclContext);
   }
+  std::optional<ContextChange> topLevelParser;
+  if (topLevelDecl)
+    topLevelParser.emplace(*this, topLevelDecl);
 
   bool HasAccessors = false;  // Syntactically has accessor {}'s.
   ParserStatus Status;
 
-  unsigned NumDeclsInResult = Decls.size();
-  
+  SmallVector<Decl *, 4> NewDecls;
+
   // In var/let decl with multiple patterns, accumulate them all in this list
   // so we can build our singular PatternBindingDecl at the end.
   SmallVector<PatternBindingEntry, 4> PBDEntries;
-  DeclContext *BindingContext = topLevelDecl ? topLevelDecl : CurDeclContext;
+  DeclContext *const BindingContext = CurDeclContext;
 
   // No matter what error path we take, make sure the
   // PatternBindingDecl/TopLevel code block are added.
@@ -8894,22 +8969,26 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     // pattern/initializer pairs.
     auto *PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
                                            VarLoc, PBDEntries, BindingContext);
+    NewDecls.insert(NewDecls.begin(), PBD);
 
     // If we're setting up a TopLevelCodeDecl, configure it by setting up the
     // body that holds PBD and we're done.  The TopLevelCodeDecl is already set
     // up in Decls to be returned to caller.
     if (topLevelDecl) {
       auto range = PBD->getSourceRangeIncludingAttrs();
+      SmallVector<ASTNode, 4> Nodes;
+      for (auto *D : NewDecls)
+        Nodes.push_back(D);
       topLevelDecl->setBody(BraceStmt::create(Context, range.Start,
-                                              ASTNode(PBD), range.End, true));
-      Decls.insert(Decls.begin()+NumDeclsInResult, topLevelDecl);
+                                              Nodes, range.End, true));
+      Decls.push_back(topLevelDecl);
       return makeParserResult(Status, PBD);
     }
 
     // Otherwise return the PBD in "Decls" to the caller.  We add it at a
     // specific spot to get it in before any accessors, which SILGen seems to
     // want.
-    Decls.insert(Decls.begin()+NumDeclsInResult, PBD);
+    Decls.append(NewDecls.begin(), NewDecls.end());
 
     // Always return the result for PBD.
     return makeParserResult(Status, PBD);
@@ -8943,9 +9022,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->attachParsedAttrs(Attributes);
-      VD->setTopLevelGlobal(topLevelDecl);
-
-      Decls.push_back(VD);
+      NewDecls.push_back(VD);
     });
 
     // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
@@ -8961,18 +9038,15 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       // If we have no local context to parse the initial value into, create one
       // for the PBD we'll eventually create.  This allows us to have reasonable
       // DeclContexts for any closures that may live inside of initializers.
-      if (!CurDeclContext->isLocalContext() && !topLevelDecl) {
+      if (!BindingContext->isLocalContext()) {
         assert(!initContext && "There cannot be an init context yet");
-        initContext = PatternBindingInitializer::create(CurDeclContext);
+        initContext = PatternBindingInitializer::create(BindingContext);
       }
 
       // If we're using a local context (either a TopLevelCodeDecl or a
       // PatternBindingContext) install it now so that CurDeclContext is set
       // right when parsing the initializer.
       std::optional<ParseFunctionBody> initParser;
-      std::optional<ContextChange> topLevelParser;
-      if (topLevelDecl)
-        topLevelParser.emplace(*this, topLevelDecl);
       if (initContext)
         initParser.emplace(*this, initContext);
       
@@ -9030,7 +9104,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
         HasAccessors = true;
         auto boundVar = parseDeclVarGetSet(
             PBDEntries.back(), Flags, StaticLoc, StaticSpelling, VarLoc,
-            PatternInit != nullptr, Attributes, Decls);
+            PatternInit != nullptr, Attributes);
         if (boundVar.hasCodeCompletion())
           return makeResult(makeParserCodeCompletionStatus());
       }

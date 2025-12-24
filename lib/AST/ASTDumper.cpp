@@ -2620,7 +2620,6 @@ namespace {
       printFlag(VD->isDebuggerVar(), "debugger_var", DeclModifierColor);
       printFlag(VD->isLazyStorageProperty(), "lazy_storage_property",
                 DeclModifierColor);
-      printFlag(VD->isTopLevelGlobal(), "top_level_global", DeclModifierColor);
       printFlag(VD->isLazyStorageProperty(), "lazy_storage_property",
                 DeclModifierColor);
 

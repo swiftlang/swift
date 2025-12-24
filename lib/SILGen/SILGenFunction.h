@@ -2870,6 +2870,10 @@ public:
     // No lowering support needed.
   }
 
+  void visitExtensionDecl(ExtensionDecl *D) {
+    // No lowering support needed.
+  }
+
   void visitTypeAliasDecl(TypeAliasDecl *D) {
     // No lowering support needed.
   }

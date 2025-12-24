@@ -1,5 +1,5 @@
 // REQUIRES: swift_swift_parser
-// RUN: %batch-code-completion
+// RUN: %batch-code-completion -parse-as-library
 
 let globalVar = 1
 macro expect(file: Int = #^DEFAULT_ARG^#) = #externalMacro(module: "MyModule", type: "MyMacro")

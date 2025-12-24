@@ -17,7 +17,7 @@ class C: P {
   }
 }
 
-let c = C()
+internal let c = C()
 
 public func test_PartialApplyDynamicType() -> Int {
   var result = 0

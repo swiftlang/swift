@@ -43,7 +43,7 @@ let maxInlineRC32 = (1 as UInt32) << 22
 // Maximum unowned count that fits inline on 32-bit.
 let maxInlineURC32 = (1 as UInt32) << 7
 
-var didDeinit = false
+internal var didDeinit = false
 
 class C {
   deinit {

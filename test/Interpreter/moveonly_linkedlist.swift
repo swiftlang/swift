@@ -79,7 +79,7 @@ struct ListEntry<T> : ~Copyable {
 }
 
 let target = "ogyfbssvlh"
-let strings = [
+internal let strings = [
   "nulbhqylps",
   "hpdovhuybl",
   "bjjvpakqbm",

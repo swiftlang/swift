@@ -86,18 +86,18 @@ public func singleFuncWithDuplicates(_ fake: Bool) {
 }
 
 public let singleClosure: () -> () = {
-  // CHECK-DAG: 10LocalTypesyycfU_19SingleClosureStructL_V
+  // CHECK-DAG: 10LocalTypes13singleClosureyycvpfiyycfU_06SingleD6StructL_V
   struct SingleClosureStruct {
     let scsi: Int
   }
-  // CHECK-DAG: 10LocalTypesyycfU_18SingleClosureClassL_C
+  // CHECK-DAG: 10LocalTypes13singleClosureyycvpfiyycfU_06SingleD5ClassL_C
   class SingleClosureClass {
     let sccs: String
     init(s: String) {
       self.sccs = s
     }
   }
-  // CHECK-DAG: 10LocalTypesyycfU_17SingleClosureEnumL_O
+  // CHECK-DAG: 10LocalTypes13singleClosureyycvpfiyycfU_06SingleD4EnumL_O
   enum SingleClosureEnum {
     case SCEI(Int)
   }
@@ -169,18 +169,18 @@ public func doubleFunc() {
 
 public let doubleClosure: () -> () = {
   let singleClosure: () -> () = {
-    // CHECK-DAG: 10LocalTypesyycfU0_yycfU_19DoubleClosureStructL_V
+    // CHECK-DAG: 10LocalTypes13doubleClosureyycvpfiyycfU_yycfU_06DoubleD6StructL_V
     struct DoubleClosureStruct {
       let dcsi: Int
     }
-    // CHECK-DAG: 10LocalTypesyycfU0_yycfU_18DoubleClosureClassL_C
+    // CHECK-DAG: 10LocalTypes13doubleClosureyycvpfiyycfU_yycfU_06DoubleD5ClassL_C
     class DoubleClosureClass {
       let dccs: String
       init(s: String) {
         self.dccs = s
       }
     }
-    // CHECK-DAG: 10LocalTypesyycfU0_yycfU_17DoubleClosureEnumL_O
+    // CHECK-DAG: 10LocalTypes13doubleClosureyycvpfiyycfU_yycfU_06DoubleD4EnumL_O
     enum DoubleClosureEnum {
       case DCEI(Int)
     }

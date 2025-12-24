@@ -422,18 +422,7 @@ GlobalActorAttributeRequest::evaluate(
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
     // Subscripts and properties are fine...
     if (auto var = dyn_cast<VarDecl>(storage)) {
-
-      // ... but not if it's an async-context top-level global
-      if (var->isTopLevelGlobal() &&
-          (var->getDeclContext()->isAsyncContext() ||
-           var->getASTContext().LangOpts.StrictConcurrencyLevel >=
-             StrictConcurrency::Complete)) {
-        var->diagnose(diag::global_actor_top_level_var)
-            .highlight(globalActorAttr->getRangeWithAt());
-        return std::nullopt;
-      }
-
-      // ... and not if it's local property
+      // ... but not if it's local var
       if (var->getDeclContext()->isLocalContext()) {
         var->diagnose(diag::global_actor_on_local_variable, var->getName())
             .highlight(globalActorAttr->getRangeWithAt());
@@ -6474,18 +6463,39 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
 
   if (auto var = dyn_cast<VarDecl>(value)) {
     auto &ctx = var->getASTContext();
-    if (!ctx.LangOpts.isConcurrencyModelTaskToThread() &&
-        var->isTopLevelGlobal() &&
-        (ctx.LangOpts.StrictConcurrencyLevel >=
-             StrictConcurrency::Complete ||
-         var->getDeclContext()->isAsyncContext())) {
-      if (Type mainActor = var->getASTContext().getMainActorType())
-        return {
-          inferredIsolation(
-            ActorIsolation::forGlobalActor(mainActor))
-              .withPreconcurrency(var->preconcurrency()),
-          IsolationSource(/*source*/nullptr, IsolationSource::TopLevelCode)
-        };
+
+    // FIXME: Do we still want this?
+    auto getMainActorForTopLevelVar = [&]() -> Type {
+      Type mainActor = ctx.getMainActorType();
+      if (!mainActor)
+        return Type();
+
+      if (ctx.LangOpts.isConcurrencyModelTaskToThread())
+        return Type();
+
+      auto *DC = var->getDeclContext();
+      if (!DC->isModuleScopeContext())
+        return Type();
+
+      if (ctx.LangOpts.StrictConcurrencyLevel < StrictConcurrency::Complete &&
+          !DC->isAsyncContext()) {
+        return Type();
+      }
+
+      auto varLoc = var->getLoc(/*SerializedOK*/ false);
+      auto *SF = DC->getParentModule()->getSourceFileContainingLocation(varLoc);
+      if (!SF || !SF->isScriptMode())
+        return Type();
+
+      return mainActor;
+    };
+    if (auto mainActor = getMainActorForTopLevelVar()) {
+      return {
+        inferredIsolation(
+                          ActorIsolation::forGlobalActor(mainActor))
+        .withPreconcurrency(var->preconcurrency()),
+        IsolationSource(/*source*/nullptr, IsolationSource::TopLevelCode)
+      };
     }
     if (auto isolation = getActorIsolationFromWrappedProperty(var)) {
       return {

@@ -14,7 +14,7 @@
 
 import _Concurrency
 
-let max = 1000
+internal nonisolated let max = 1000
 
 func bar(x: Int, cc: CheckedContinuation<Void, Never>) {
   Task.immediate {

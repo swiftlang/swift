@@ -5,7 +5,7 @@
 
 import Foundation
 
-var kvoContext = 0
+internal var kvoContext = 0
 
 class Model : NSObject {
   @objc dynamic var name = ""

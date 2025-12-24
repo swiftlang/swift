@@ -1,4 +1,4 @@
-// RUN: %batch-code-completion
+// RUN: %batch-code-completion -parse-as-library
 
 // LOCAL_STRING_TESTVALUE-NOT: name=testValue
 // LOCAL_STRING_TESTVALUE:     Decl[LocalVar]/Local: testValue[#String#]; name=testValue

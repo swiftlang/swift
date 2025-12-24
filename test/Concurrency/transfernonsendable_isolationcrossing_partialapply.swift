@@ -29,7 +29,7 @@ func useValue<T>(_ t: T) {}
 @MainActor func transferToMain<T>(_ t: T) {}
 @CustomActor func transferToCustom<T>(_ t: T) {}
 
-var boolValue: Bool { false }
+internal var boolValue: Bool { false }
 
 /////////////////
 // MARK: Tests //

@@ -7,7 +7,7 @@ import protocol_reorder_requirements
 
 var ProtocolReorderRequirementsTest = TestSuite("ProtocolReorderRequirements")
 
-var log = [String]()
+internal var log = [String]()
 
 struct MyBassinet : Bed {
   func squiggle() {

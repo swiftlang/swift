@@ -454,7 +454,7 @@ print("\n\n==== ----------------------------------------------------------------
 print("call_taskImmediate_taskExecutor()")
 
 @TaskLocal
-nonisolated(unsafe) var niceTaskLocalValueYouGotThere: String = ""
+nonisolated(unsafe) internal var niceTaskLocalValueYouGotThere: String = ""
 
 // FIXME: rdar://155596073 Task executors execution may not always hop as expected
 func call_taskImmediate_taskExecutor(taskExecutor: NaiveQueueExecutor) async {

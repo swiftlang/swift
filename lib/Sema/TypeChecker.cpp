@@ -217,7 +217,14 @@ BindExtensionsRequest::evaluate(Evaluator &evaluator, ModuleDecl *M) const {
     if (!SF)
       continue;
 
-    auto visitTopLevelDecl = [&](Decl *D) {
+    std::function<void(Decl *)> visitTopLevelDecl;
+    visitTopLevelDecl = [&](Decl *D) {
+      if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+        for (auto N : TLCD->getBody()->getElements()) {
+          if (auto *SubD = N.dyn_cast<Decl *>())
+            visitTopLevelDecl(SubD);
+        }
+      }
       if (auto ED = dyn_cast<ExtensionDecl>(D))
         if (!tryBindExtension(ED))
           worklist.push_back(ED);;

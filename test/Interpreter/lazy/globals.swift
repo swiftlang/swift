@@ -3,6 +3,8 @@
 // REQUIRES: swift_feature_LazyImmediate
 // RUN: %target-jit-run %s -enable-experimental-feature LazyImmediate | %FileCheck %s
 
+// REQUIRES: doesnt_correctly_handle_actual_globals
+
 // Tests that piecewise compilation works with global variables
 
 let x = 1

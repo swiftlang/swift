@@ -1,9 +1,9 @@
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -typecheck -verify %s
 
-var a = 10 // expected-note{{var declared here}}
+internal var a = 10 // expected-note{{var declared here}}
 
 @MainActor
-var b = 15 // expected-error{{top-level code variables cannot have a global actor}}
+var b = 15 // expected-error{{local variable 'b' cannot have a global actor}}
 
 func unsafeAccess() { // expected-note{{add '@MainActor' to make global function 'unsafeAccess()' part of global actor 'MainActor'}}
     print(a) // expected-error@:11{{main actor-isolated var 'a' can not be referenced from a nonisolated context}}

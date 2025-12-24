@@ -256,7 +256,7 @@ class CustomActorIsolated {
   }
 }
 
-var global = 0
+internal var global = 0
 
 func onMain() async {
   await withTaskGroup { group in

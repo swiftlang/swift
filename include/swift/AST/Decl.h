@@ -520,14 +520,15 @@ protected:
     /// Whether this is the backing storage for a property wrapper.
     IsPropertyWrapperBackingProperty : 1,
 
-    /// Whether this is a lazily top-level global variable from the main file.
-    IsTopLevelGlobal : 1,
-
     /// Whether this variable has no attached property wrappers.
     NoAttachedPropertyWrappers : 1,
 
     /// Whether this variable has no property wrapper auxiliary variables.
-    NoPropertyWrapperAuxiliaryVariables : 1
+    NoPropertyWrapperAuxiliaryVariables : 1,
+
+    /// Whether this variable is a placeholder that is introducing during
+    /// type-checking that has its type inferred from its use.
+    IsPlaceholderVar : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1+2+NumDefaultArgumentKindBits,
@@ -2875,6 +2876,8 @@ private:
 /// global variables.
 class TopLevelCodeDecl : public DeclContext, public Decl {
   BraceStmt *Body;
+  std::optional<TopLevelCodeDecl *> Previous;
+
   SourceLoc getLocFromSource() const { return getStartLoc(); }
   friend class Decl;
 public:
@@ -2885,6 +2888,8 @@ public:
 
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *b) { Body = b; }
+
+  TopLevelCodeDecl *getPrevious() const;
 
   SourceLoc getStartLoc() const;
   SourceRange getSourceRange() const;
@@ -6800,12 +6805,17 @@ public:
   /// \c nullptr.
   VarDecl *getOriginalVarForBackingStorage() const;
 
+  /// Whether this variable is a placeholder that is introducing during
+  /// type-checking that has its type inferred from its use.
+  bool isPlaceholderVar() const {
+    return Bits.VarDecl.IsPlaceholderVar;
+  }
+  void setIsPlaceholderVar() {
+    Bits.VarDecl.IsPlaceholderVar = true;
+  }
+
   /// Retrieve the backing storage property for a lazy property.
   VarDecl *getLazyStorageProperty() const;
-
-  /// True if this is a top-level global variable from the main source file.
-  bool isTopLevelGlobal() const { return Bits.VarDecl.IsTopLevelGlobal; }
-  void setTopLevelGlobal(bool b) { Bits.VarDecl.IsTopLevelGlobal = b; }
 
   /// True if this is any storage of static duration (global scope or static).
   bool isGlobalStorage() const;

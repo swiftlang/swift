@@ -18,7 +18,7 @@ import StdlibUnittest
 
 var GenericSubscriptTestSuite = TestSuite("GenericSubscriptStatic")
 
-var ts: [ObjectIdentifier: Any] = [:]
+internal var ts: [ObjectIdentifier: Any] = [:]
 
 struct S<T> : P {
   typealias Element = T

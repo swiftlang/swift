@@ -3605,8 +3605,7 @@ void LValue::addNonMemberVarComponent(
         address = SGF.emitGlobalVariableRef(Loc, Storage, ActorIso);
         isLazyInitializedGlobal = Storage->isLazilyInitializedGlobal();
       } else {
-        assert((!ActorIso || Storage->isTopLevelGlobal()) &&
-               "local var should not be actor isolated!");
+        assert(!ActorIso && "local var should not be actor isolated!");
       }
 
       if (!address.isLValue()) {

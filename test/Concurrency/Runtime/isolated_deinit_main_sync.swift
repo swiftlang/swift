@@ -5,7 +5,7 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-var isDead: Bool = false
+internal var isDead: Bool = false
 
 public class Foo {
   @MainActor

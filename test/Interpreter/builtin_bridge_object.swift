@@ -20,38 +20,38 @@ class C {
 #if _pointerBitWidth(_32)
 
 // We have no ObjC tagged pointers, and two low spare bits due to alignment.
-let NATIVE_SPARE_BITS: UInt = 0x0000_0003
-let OBJC_TAGGED_POINTER_BITS: UInt = 0
+internal let NATIVE_SPARE_BITS: UInt = 0x0000_0003
+internal let OBJC_TAGGED_POINTER_BITS: UInt = 0
 
 #elseif arch(x86_64)
 
 // We have ObjC tagged pointers in the lowest and highest bit
-let NATIVE_SPARE_BITS: UInt = 0x7F00_0000_0000_0006
-let OBJC_TAGGED_POINTER_BITS: UInt = 0x8000_0000_0000_0001
+internal let NATIVE_SPARE_BITS: UInt = 0x7F00_0000_0000_0006
+internal let OBJC_TAGGED_POINTER_BITS: UInt = 0x8000_0000_0000_0001
 
 #elseif arch(arm64)
 
 // We have ObjC tagged pointers in the highest bit
-let NATIVE_SPARE_BITS: UInt = 0x7000_0000_0000_0007
-let OBJC_TAGGED_POINTER_BITS: UInt = 0x8000_0000_0000_0000
+internal let NATIVE_SPARE_BITS: UInt = 0x7000_0000_0000_0007
+internal let OBJC_TAGGED_POINTER_BITS: UInt = 0x8000_0000_0000_0000
 
 #elseif arch(powerpc64) || arch(powerpc64le)
 
 // We have no ObjC tagged pointers, and three low spare bits due to alignment.
-let NATIVE_SPARE_BITS: UInt = 0x0000_0000_0000_0007
-let OBJC_TAGGED_POINTER_BITS: UInt = 0
+internal let NATIVE_SPARE_BITS: UInt = 0x0000_0000_0000_0007
+internal let OBJC_TAGGED_POINTER_BITS: UInt = 0
 
 #elseif arch(s390x)
 
 // We have no ObjC tagged pointers, and three low spare bits due to alignment.
-let NATIVE_SPARE_BITS: UInt = 0x0000_0000_0000_0007
-let OBJC_TAGGED_POINTER_BITS: UInt = 0
+internal let NATIVE_SPARE_BITS: UInt = 0x0000_0000_0000_0007
+internal let OBJC_TAGGED_POINTER_BITS: UInt = 0
 
 #elseif arch(riscv64)
 
 // We have no ObjC tagged pointers, and three low spare bits due to alignment.
-let NATIVE_SPARE_BITS: UInt = 0x0000_0000_0000_0007
-let OBJC_TAGGED_POINTER_BITS: UInt = 0
+internal let NATIVE_SPARE_BITS: UInt = 0x0000_0000_0000_0007
+internal let OBJC_TAGGED_POINTER_BITS: UInt = 0
 
 #endif
 

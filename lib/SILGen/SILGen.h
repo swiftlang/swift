@@ -278,7 +278,7 @@ public:
 
   void visitFuncDecl(FuncDecl *fd);
   void visitPatternBindingDecl(PatternBindingDecl *vd);
-  void visitTopLevelCodeDecl(TopLevelCodeDecl *td) {}
+  void visitTopLevelCodeDecl(TopLevelCodeDecl *td);
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);

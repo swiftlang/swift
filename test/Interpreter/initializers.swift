@@ -4,7 +4,7 @@
 // REQUIRES: executable_test
 
 // Test initialization and initializer inheritance.
-var depth = 0
+internal var depth = 0
 
 func printAtDepth(_ s: String) {
   for i in 0..<depth { print("*", terminator: "") }

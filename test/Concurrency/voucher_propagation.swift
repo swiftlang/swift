@@ -161,23 +161,23 @@ func lookup<T>(_ name: String) -> T {
 
 // We'll use os_activity calls to make our test vouchers. The calls aren't in
 // the headers so we need to look them up dynamically.
-let _os_activity_create = lookup("_os_activity_create")
+internal let _os_activity_create = lookup("_os_activity_create")
     as @convention(c) (UnsafeRawPointer, UnsafePointer<CChar>, UnsafeRawPointer,
                        UInt32) -> voucher_t?
-let OS_ACTIVITY_NONE = lookup("_os_activity_none") as UnsafeRawPointer
-let OS_ACTIVITY_FLAG_DETACHED = 1 as UInt32
+internal let OS_ACTIVITY_NONE = lookup("_os_activity_none") as UnsafeRawPointer
+internal let OS_ACTIVITY_FLAG_DETACHED = 1 as UInt32
 
 // Look up the voucher calls we'll be using. Vouchers are ObjC objects, but we
 // want total control over their memory management, so we'll treat them as raw
 // pointers instead, and manually manage their memory.
 typealias voucher_t = UnsafeMutableRawPointer
-let voucher_copy = lookup("voucher_copy") as @convention(c) () -> voucher_t?
-let voucher_adopt = lookup("voucher_adopt") as @convention(c) (voucher_t?)
+internal let voucher_copy = lookup("voucher_copy") as @convention(c) () -> voucher_t?
+internal let voucher_adopt = lookup("voucher_adopt") as @convention(c) (voucher_t?)
     -> voucher_t?
-let os_retain = lookup("os_retain") as @convention(c) (voucher_t?) -> voucher_t?
-let os_release = lookup("os_release") as @convention(c) (voucher_t?) -> Void
+internal let os_retain = lookup("os_retain") as @convention(c) (voucher_t?) -> voucher_t?
+internal let os_release = lookup("os_release") as @convention(c) (voucher_t?) -> Void
 
-let isCurrentExecutor = lookup("swift_task_isCurrentExecutor") as @convention(thin) (UnownedSerialExecutor) -> Bool
+internal let isCurrentExecutor = lookup("swift_task_isCurrentExecutor") as @convention(thin) (UnownedSerialExecutor) -> Bool
 
 // Run some async code with test vouchers. Wait for the async code to complete,
 // then verify that the vouchers aren't leaked.

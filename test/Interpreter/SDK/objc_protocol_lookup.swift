@@ -41,7 +41,7 @@ check(D()) // CHECK: true true
 // Make sure partial application of methods with @autoreleased
 // return values works
 
-var count = 0
+internal var count = 0
 
 class Juice : NSObject {
   override init() {

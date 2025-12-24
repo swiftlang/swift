@@ -660,8 +660,7 @@ func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable 
 
 // defer bodies inherit global actor-ness
 @MainActor
-var statefulThingy: Bool = false // expected-minimal-targeted-note {{var declared here}}
-// expected-complete-error @-1 {{top-level code variables cannot have a global actor}}
+internal var statefulThingy: Bool = false // expected-minimal-targeted-note {{var declared here}}
 
 @MainActor
 func useFooInADefer() -> String { // expected-minimal-targeted-note {{calls to global function 'useFooInADefer()' from outside of its actor context are implicitly asynchronous}}

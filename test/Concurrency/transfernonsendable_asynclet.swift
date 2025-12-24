@@ -68,7 +68,7 @@ func transferToNonIsolated<T>(_ t: T) async {}
 func transferToNonIsolatedInt<T>(_ t: T) async -> Int { 5 }
 func transferToNonIsolatedIntOpt<T>(_ t: T) async -> Int? { 5 }
 
-var booleanFlag: Bool { false }
+internal var booleanFlag: Bool { false }
 
 struct SingleFieldKlassBox {
   var k = NonSendableKlass()

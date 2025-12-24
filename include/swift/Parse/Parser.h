@@ -1299,8 +1299,7 @@ public:
                                            StaticSpellingKind StaticSpelling,
                                            SourceLoc VarLoc,
                                            bool hasInitializer,
-                                           const DeclAttributes &Attributes,
-                                           SmallVectorImpl<Decl *> &Decls);
+                                           const DeclAttributes &Attributes);
   ParserStatus parseGetEffectSpecifier(ParsedAccessors &accessors,
                                        SourceLoc &asyncLoc,
                                        SourceLoc &throwsLoc,

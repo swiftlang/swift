@@ -78,8 +78,11 @@ extension MyStruct {
   }
 }
 
+// CHECK: <lvar>var <name>lvar</name> : <type>Int</type> = 0</lvar>
+var lvar : Int = 0
+
 // CHECK: <gvar>var <name>gvar</name> : <type>Int</type> = 0</gvar>
-var gvar : Int = 0
+internal var gvar : Int = 0
 
 // CHECK: <ffunc>func <name>ffoo()</name> {}</ffunc>
 func ffoo() {}
@@ -113,13 +116,13 @@ switch v {
   default: break;
 }
 
-// CHECK: <gvar>let <name>myArray</name> = <array>[<elem-expr>1</elem-expr>, <elem-expr>2</elem-expr>, <elem-expr>3</elem-expr>]</array></gvar>
+// CHECK: <lvar>let <name>myArray</name> = <array>[<elem-expr>1</elem-expr>, <elem-expr>2</elem-expr>, <elem-expr>3</elem-expr>]</array></lvar>
 let myArray = [1, 2, 3]
-// CHECK: <gvar>let <name>myDict</name> = <dictionary>[<elem-expr>1</elem-expr>:<elem-expr>1</elem-expr>, <elem-expr>2</elem-expr>:<elem-expr>2</elem-expr>, <elem-expr>3</elem-expr>:<elem-expr>3</elem-expr>]</dictionary></gvar>
+// CHECK: <lvar>let <name>myDict</name> = <dictionary>[<elem-expr>1</elem-expr>:<elem-expr>1</elem-expr>, <elem-expr>2</elem-expr>:<elem-expr>2</elem-expr>, <elem-expr>3</elem-expr>:<elem-expr>3</elem-expr>]</dictionary></lvar>
 let myDict = [1:1, 2:2, 3:3]
-// CHECK: <gvar>let <name>myArray2</name> = <array>[<elem-expr>1</elem-expr>]</array></gvar>
+// CHECK: <lvar>let <name>myArray2</name> = <array>[<elem-expr>1</elem-expr>]</array></lvar>
 let myArray2 = [1]
-// CHECK: <gvar>let <name>myDict2</name> = <dictionary>[<elem-expr>1</elem-expr>:<elem-expr>1</elem-expr>]</dictionary></gvar>
+// CHECK: <lvar>let <name>myDict2</name> = <dictionary>[<elem-expr>1</elem-expr>:<elem-expr>1</elem-expr>]</dictionary></lvar>
 let myDict2 = [1:1]
 
 // CHECK: <foreach>for <brace>{}</brace></foreach>
@@ -135,7 +138,7 @@ func <#test1#> () {
   for <#name#> in <#items#> {}
 }
 
-// CHECK: <gvar>let <name>myArray</name> = <array>[<elem-expr><#item1#></elem-expr>, <elem-expr><#item2#></elem-expr>]</array></gvar>
+// CHECK: <lvar>let <name>myArray</name> = <array>[<elem-expr><#item1#></elem-expr>, <elem-expr><#item2#></elem-expr>]</array></lvar>
 let myArray = [<#item1#>, <#item2#>]
 
 // CHECK: <ffunc>func <name>test1()</name> {

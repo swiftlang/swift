@@ -17,7 +17,7 @@ struct FooStruct {
   // Add more stuff as needed.
 }
 
-var fooObject : FooStruct
+internal var fooObject : FooStruct
 
 func fooFunc1() {}
 func fooFunc2(_ a: Int, _ b: Double) {}

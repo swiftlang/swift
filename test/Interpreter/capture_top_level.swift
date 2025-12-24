@@ -10,13 +10,16 @@
 
 // REQUIRES: executable_test
 
+internal var x = {
 #if VAR_UPDATE
-guard var x = Optional(0) else { fatalError() }
+  guard var x = Optional(0) else { fatalError() }
 #elseif VAR
-guard var x = Optional(42) else { fatalError() }
+  guard var x = Optional(42) else { fatalError() }
 #else
-guard let x = Optional(42) else { fatalError() }
+  guard let x = Optional(42) else { fatalError() }
 #endif
+  return x
+}()
 
 _ = 0 // intervening code
 

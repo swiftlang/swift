@@ -4,7 +4,7 @@
 // context. Variables are declared with `@_predatesConcurrency @MainActor`, and
 // the top-level is run on the main actor.
 
-var a = 10 // expected-note {{mutation of this var is only permitted within the actor}}
+internal var a = 10 // expected-note {{mutation of this var is only permitted within the actor}}
 
 func nonIsolatedSync() {
     // Okay because `a` is '@_predatesConcurrency'

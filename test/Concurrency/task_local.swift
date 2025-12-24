@@ -30,7 +30,7 @@ struct TL {
 }
 
 @TaskLocal
-var global: Int = 0
+internal var global: Int = 0
 
 class NotSendable {}
 

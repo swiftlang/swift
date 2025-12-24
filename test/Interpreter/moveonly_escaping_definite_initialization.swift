@@ -11,8 +11,8 @@ struct MO: ~Copyable {
     deinit { print("destroying \(value)") }
 }
 
-var closure: () -> () = {}
-var counter = 42
+internal var closure: () -> () = {}
+internal var counter = 42
 
 func foo(goUp: Bool) {
     let mo: MO

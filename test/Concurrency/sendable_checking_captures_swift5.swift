@@ -5,7 +5,7 @@ class NonSendable {} // expected-complete-note 3{{class 'NonSendable' does not c
 
 func callee(_: @Sendable () -> NonSendable) {}
 
-var testLocalCaptures: Int {
+internal var testLocalCaptures: Int {
   let ns = NonSendable()
 
   @Sendable func localFunc() -> NonSendable {

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -target %target-swift-5.1-abi-triple -swift-version 6 %s -verify
 
-var a = 10
+internal var a = 10
 // expected-note@-1 2 {{var declared here}}
 // expected-note@-2 2 {{mutation of this var is only permitted within the actor}}
 

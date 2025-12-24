@@ -53,25 +53,25 @@ extension NoValues: CaseIterable {}
 
 // Cache some values, and make them all have the same width (within a type) for
 // formatting niceness.
-let SIOne = SInt(x: 1)
-let SITwo = SInt(x: 2)
+internal let SIOne = SInt(x: 1)
+internal let SITwo = SInt(x: 2)
 
-let SFOne = SFloat(y: 1.0)
-let SFTwo = SFloat(y: 2.0)
-let SFInf = SFloat(y: .infinity)
-let SFNan = SFloat(y: .nan)
+internal let SFOne = SFloat(y: 1.0)
+internal let SFTwo = SFloat(y: 2.0)
+internal let SFInf = SFloat(y: .infinity)
+internal let SFNan = SFloat(y: .nan)
 
-let SGOneOne = SGeneric(t: SIOne, u: SFOne)
-let SGTwoOne = SGeneric(t: SITwo, u: SFOne)
-let SGTwoTwo = SGeneric(t: SITwo, u: SFTwo)
-let SGOneInf = SGeneric(t: SIOne, u: SFInf)
-let SGOneNan = SGeneric(t: SIOne, u: SFNan)
+internal let SGOneOne = SGeneric(t: SIOne, u: SFOne)
+internal let SGTwoOne = SGeneric(t: SITwo, u: SFOne)
+internal let SGTwoTwo = SGeneric(t: SITwo, u: SFTwo)
+internal let SGOneInf = SGeneric(t: SIOne, u: SFInf)
+internal let SGOneNan = SGeneric(t: SIOne, u: SFNan)
 
-let EGaOne: EGeneric<SInt> = .a(SIOne)
-let EGaTwo: EGeneric<SInt> = .a(SITwo)
-let EGbOne: EGeneric<SInt> = .b(1)
-let EGbTwo: EGeneric<SInt> = .b(2)
-let EGc___: EGeneric<SInt> = .c
+internal let EGaOne: EGeneric<SInt> = .a(SIOne)
+internal let EGaTwo: EGeneric<SInt> = .a(SITwo)
+internal let EGbOne: EGeneric<SInt> = .b(1)
+internal let EGbTwo: EGeneric<SInt> = .b(2)
+internal let EGc___: EGeneric<SInt> = .c
 
 
 func debugDescription<T>(_ value: T) -> String {

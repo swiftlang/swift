@@ -5,7 +5,7 @@
 struct FooStruct {
 }
 
-var fooObject : FooStruct
+internal var fooObject : FooStruct
 
 func fooFunc() -> FooStruct {
   return fooObject

@@ -127,7 +127,7 @@ SourceRange FunctionBodyScope::getSourceRangeOfThisASTNode(
 
 SourceRange TopLevelCodeScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  return SourceRange(decl->getStartLoc(), endLoc);
+  return decl->getSourceRange();
 }
 
 SourceRange SubscriptDeclScope::getSourceRangeOfThisASTNode(

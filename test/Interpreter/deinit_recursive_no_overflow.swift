@@ -6,7 +6,7 @@ class Node {
   var next: Node?
 }
 
-var first: Node? = nil
+internal var first: Node? = nil
 for _ in 1...3_000_000 {
     let next = Node()
     next.next = first

@@ -5671,12 +5671,6 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
     if (!VD->hasStorageOrWrapsStorage())
       return std::nullopt;
 
-    // Do not permit potential availability of script-mode global variables;
-    // their initializer expression is not lazily evaluated, so this would
-    // not be safe.
-    if (VD->isTopLevelGlobal())
-      return diag::availability_global_script_no_potential;
-
     // Globals and statics are lazily initialized, so they are safe
     // for potential unavailability.
     if (!VD->isStatic() && !DC->isModuleScopeContext())
@@ -5757,11 +5751,6 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D,
     // might have been declared @_spi_available in source.
     if (D->getDeclContext()->isInSwiftinterface())
       return std::nullopt;
-
-    // Do not permit unavailable script-mode global variables; their initializer
-    // expression is not lazily evaluated, so this would not be safe.
-    if (VD->isTopLevelGlobal())
-      return diag::availability_global_script_no_unavailable;
 
     // Globals and statics are lazily initialized, so they are safe for
     // unavailability.

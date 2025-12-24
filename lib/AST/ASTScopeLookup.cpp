@@ -353,6 +353,19 @@ ConditionalClauseInitializerScope::getLookupParent() const {
   return parent->getLookupParent();
 }
 
+NullablePtr<const ASTScopeImpl> TopLevelCodeScope::getLookupParent() const {
+  auto parentScope = getParent().get();
+  if (auto *prev = decl->getPrevious()) {
+    auto prevScope = parentScope->findChildContaining(prev->getEndLoc(), getSourceManager());
+    if (auto *prevTopLevel = dyn_cast<TopLevelCodeScope>(prevScope.getPtrOrNull())) {
+      if (!prevTopLevel->getWasExpanded())
+        prevTopLevel->expandAndBeCurrent(const_cast<TopLevelCodeScope *>(this)->getScopeCreator());
+      return prevTopLevel->insertionPoint;
+    }
+  }
+  return parentScope;
+}
+
 #pragma mark looking in locals or members - locals
 
 bool GenericParamScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
@@ -448,6 +461,16 @@ bool BraceStmtScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   return false;
 }
 
+bool TopLevelScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
+  if (consumer.consume(localFuncsAndTypes))
+    return true;
+
+  if (consumer.consumePossiblyNotInScope(localVars))
+    return true;
+
+  return false;
+}
+
 bool PatternEntryInitializerScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
   // 'self' is available within the pattern initializer of a 'lazy' variable.
@@ -537,9 +560,13 @@ NominalTypeScope::getLookupLimitForDecl() const {
 }
 
 NullablePtr<const ASTScopeImpl> ExtensionScope::getLookupLimitForDecl() const {
-  // Extensions can only be legally nested in a SourceFile,
-  // so any other kind of Decl is illegal
-  return parentIfNotChildOfTopScope();
+  // Extensions can only be legally nested in a SourceFile or TopLevelCodeDecl,
+  // so any other kind of Decl is illegal.
+  auto parent = getParent().getPtrOrNull();
+  while (isa_and_nonnull<TopLevelCodeScope, TopLevelScope>(parent))
+    parent = parent->getParent().getPtrOrNull();
+
+  return parent->getParent().isNonNull() ? parent : nullptr;
 }
 
 NullablePtr<const ASTScopeImpl> ASTScopeImpl::ancestorWithDeclSatisfying(

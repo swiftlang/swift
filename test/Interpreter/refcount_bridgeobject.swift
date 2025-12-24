@@ -21,7 +21,7 @@ func wrapper_swift_bridgeObjectRelease(_ obj: UnsafeMutableRawPointer?)
 
 let RefcountBridgeObjectTests = TestSuite("RefcountBridgeObject")
 
-var didDeinit = false
+internal var didDeinit = false
 
 class C {
   deinit {

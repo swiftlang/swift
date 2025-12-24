@@ -3,7 +3,7 @@
 // There are no `await`s made from the top-level, so it is not an async context.
 // `a` is just a normal top-level global variable with no actor isolation.
 
-var a = 10
+internal var a = 10
 
 func nonIsolatedSync() {
     print(a)

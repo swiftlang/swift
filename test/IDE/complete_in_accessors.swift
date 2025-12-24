@@ -1,4 +1,5 @@
-// RUN: %batch-code-completion
+// FIXME: Shouldn't need parse-as-library (https://github.com/swiftlang/swift/issues/84785)
+// RUN: %batch-code-completion -parse-as-library
 
 //===--- Helper types that are used in this test
 
