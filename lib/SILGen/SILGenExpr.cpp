@@ -477,6 +477,8 @@ namespace {
     RValue visitCollectionUpcastConversionExpr(
              CollectionUpcastConversionExpr *E,
              SGFContext C);
+    ClosureExpr *synthesizeConversionClosure(
+        CollectionUpcastConversionExpr::ConversionPair pair);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
     RValue visitPackExpansionExpr(PackExpansionExpr *E, SGFContext C);
     RValue visitPackElementExpr(PackElementExpr *E, SGFContext C);
@@ -1533,12 +1535,10 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
   return RValue(SGF, E, ManagedValue::forObjectRValueWithoutOwnership(upcast));
 }
 
-RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
-                                                FuncDecl *fn,
-                                                CanType fromCollection,
-                                                CanType toCollection,
-                                                ManagedValue mv,
-                                                SGFContext C) {
+RValue SILGenFunction::emitCollectionConversion(
+    SILLocation loc, FuncDecl *fn, CanType fromCollection, CanType toCollection,
+    ManagedValue mv, ClosureExpr *keyConversion, ClosureExpr *valueConversion,
+    SGFContext C) {
   SmallVector<Type, 4> replacementTypes;
 
   auto fromArgs = cast<BoundGenericType>(fromCollection)->getGenericArgs();
@@ -1553,7 +1553,104 @@ RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
   auto subMap =
     SubstitutionMap::get(genericSig, replacementTypes,
                          LookUpConformanceInModule());
-  return emitApplyOfLibraryIntrinsic(loc, fn, subMap, {mv}, C);
+
+  SmallVector<ManagedValue, 3> args = { mv };
+  unsigned argIndex = 1;
+  for (ClosureExpr *closure : {keyConversion, valueConversion}) {
+    if (!closure) {
+      continue;
+    }
+
+    CanType origParamType = fn->getParameters()
+                                ->get(argIndex)
+                                ->getInterfaceType()
+                                ->getCanonicalType();
+    CanType substParamType = origParamType.subst(subMap)->getCanonicalType();
+
+    // Ensure that the closure has the appropriate type.
+    AbstractionPattern origParam(
+        fn->getGenericSignature().getCanonicalSignature(), origParamType);
+
+    auto paramConversion = Conversion::getSubstToOrig(
+        origParam, substParamType, getLoweredType(closure->getType()),
+        getLoweredType(origParam, substParamType));
+
+    auto value = emitConvertedRValue(closure, paramConversion);
+    args.push_back(value);
+    argIndex++;
+  }
+
+  return emitApplyOfLibraryIntrinsic(loc, fn, subMap, args, C);
+}
+
+static bool
+needsCustomConversion(CollectionUpcastConversionExpr::ConversionPair const & pair) {
+  assert(pair);
+
+  if (auto conv = dyn_cast<ImplicitConversionExpr>(pair.Conversion)) {
+    if (isa<ForeignObjectConversionExpr>(conv)) {
+      if (auto B2O = dyn_cast<BridgeToObjCExpr>(conv->getSubExpr())) {
+        conv = B2O;
+      }
+    }
+    if (conv->getSubExpr() == pair.OrigValue) {
+      switch (conv->getKind()) {
+        case ExprKind::Erasure:
+        case ExprKind::DerivedToBase:
+        case ExprKind::AnyHashableErasure:
+        case ExprKind::MetatypeConversion:
+        case ExprKind::BridgeToObjC:
+        case ExprKind::InjectIntoOptional:
+          return false;
+        case ExprKind::FunctionConversion:
+          return true;
+        case ExprKind::CollectionUpcastConversion: {
+          auto upcast = cast<CollectionUpcastConversionExpr>(conv);
+          if (upcast->getKeyConversion() && needsCustomConversion(upcast->getKeyConversion())) {
+            return true;
+          }
+          return needsCustomConversion(upcast->getValueConversion());
+        }
+        case ExprKind::Load:
+        case ExprKind::ABISafeConversion:
+        case ExprKind::DestructureTuple:
+        case ExprKind::CovariantFunctionConversion:
+        case ExprKind::CovariantReturnConversion:
+        case ExprKind::BridgeFromObjC:
+        case ExprKind::ConditionalBridgeFromObjC:
+        case ExprKind::ArchetypeToSuper:
+        case ExprKind::ClassMetatypeToObject:
+        case ExprKind::ExistentialMetatypeToObject:
+        case ExprKind::ProtocolMetatypeToObject:
+        case ExprKind::InOutToPointer:
+        case ExprKind::ArrayToPointer:
+        case ExprKind::StringToPointer:
+        case ExprKind::PointerToPointer:
+        case ExprKind::ForeignObjectConversion:
+        case ExprKind::UnevaluatedInstance:
+        case ExprKind::UnderlyingToOpaque:
+        case ExprKind::Unreachable:
+        case ExprKind::DifferentiableFunction:
+        case ExprKind::LinearFunction:
+        case ExprKind::DifferentiableFunctionExtractOriginal:
+        case ExprKind::LinearFunctionExtractOriginal:
+        case ExprKind::LinearToDifferentiableFunction:
+        case ExprKind::ActorIsolationErasure:
+        case ExprKind::UnsafeCast:
+          conv->dump(llvm::errs());
+          llvm::errs() << "\n";
+          assert(false && "TODO");
+        default:
+          break;
+      }
+    }
+  }
+  if (auto OE = dyn_cast<OpenExistentialExpr>(pair.Conversion)) {
+    if (OE->getExistentialValue() == pair.OrigValue) {
+      return false;
+    }
+  }
+  return true;
 }
 
 RValue RValueEmitter::
@@ -1571,18 +1668,187 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
 
   // Get the intrinsic function.
   FuncDecl *fn = nullptr;
+  ClosureExpr *keyConversion = nullptr;
+  ClosureExpr *valueConversion = nullptr;
   if (fromCollection->isArray()) {
-    fn = SGF.SGM.getArrayForceCast(loc);
+    if (needsCustomConversion(E->getValueConversion())) {
+      fn = SGF.SGM.getArrayWitnessCast(loc);
+      valueConversion = synthesizeConversionClosure(E->getValueConversion());
+    } else {
+      fn = SGF.SGM.getArrayForceCast(loc);
+    }
   } else if (fromCollection->isDictionary()) {
-    fn = SGF.SGM.getDictionaryUpCast(loc);
+    if (needsCustomConversion(E->getKeyConversion()) ||
+        needsCustomConversion(E->getValueConversion())) {
+      fn = SGF.SGM.getDictionaryWitnessCast(loc);
+      keyConversion = synthesizeConversionClosure(E->getKeyConversion());
+      valueConversion = synthesizeConversionClosure(E->getValueConversion());
+    } else {
+      fn = SGF.SGM.getDictionaryUpCast(loc);
+    }
   } else if (fromCollection->isSet()) {
-    fn = SGF.SGM.getSetUpCast(loc);
+    if (needsCustomConversion(E->getValueConversion())) {
+      fn = SGF.SGM.getSetWitnessCast(loc);
+      valueConversion = synthesizeConversionClosure(E->getValueConversion());
+    } else {
+      fn = SGF.SGM.getSetUpCast(loc);
+    }
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
 
-  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection,
-                                      mv, C);
+  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection, mv,
+                                      keyConversion, valueConversion, C);
+}
+
+namespace {
+class ConversionClosureEmitter: public Lowering::ExprVisitor<ConversionClosureEmitter, Expr*> {
+  ASTContext &Context;
+  OpaqueValueExpr *OrigValue;
+  ParamDecl *Param;
+public:
+  ConversionClosureEmitter(ASTContext &Context, OpaqueValueExpr *origValue, ParamDecl *param)
+    : Context(Context), OrigValue(origValue), Param(param)
+  {}
+
+  /*
+   case ExprKind:::
+     return false;
+   case ExprKind::FunctionConversion:
+   */
+
+  Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) {
+    if (E == OrigValue) {
+      return new (Context) DeclRefExpr(Param, DeclNameLoc(), true, AccessSemantics::Ordinary, OrigValue->getType());
+    }
+    // Other opaque values are possible, e.g. intrudced by the OpenExistentialExpr
+    return nullptr;
+  }
+
+  Expr *visitErasureExpr(ErasureExpr *E) {
+    Expr* subExpr = visit(E->getSubExpr());
+    if (!subExpr) return E;
+    return ErasureExpr::create(Context, subExpr, E->getType(),
+                               E->getConformances(),
+                               E->getArgumentConversions());
+  }
+
+  Expr *visitDerivedToBaseExpr(DerivedToBaseExpr *E) {
+    Expr* subExpr = visit(E->getSubExpr());
+    if (!subExpr) return E;
+    return new (Context) DerivedToBaseExpr(subExpr, E->getType());
+  }
+
+  Expr *visitAnyHashableErasureExpr(AnyHashableErasureExpr *E) {
+    Expr* subExpr = visit(E->getSubExpr());
+    if (!subExpr) return E;
+    return new (Context) AnyHashableErasureExpr(subExpr, E->getType(), E->getConformance());
+  }
+
+  Expr *visitMetatypeConversionExpr(MetatypeConversionExpr *E) {
+    Expr* subExpr = visit(E->getSubExpr());
+    if (!subExpr) return E;
+    return new (Context) MetatypeConversionExpr(subExpr, E->getType());
+  }
+
+  Expr *visitBridgeToObjCExpr(BridgeToObjCExpr *E) {
+    Expr* subExpr = visit(E->getSubExpr());
+    if (!subExpr) return E;
+    return new (Context) BridgeToObjCExpr(subExpr, E->getType());
+  }
+
+  Expr *visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E) {
+    Expr* subExpr = visit(E->getSubExpr());
+    if (!subExpr) return E;
+    return new (Context) InjectIntoOptionalExpr(subExpr, E->getType());
+  }
+
+  Expr *visitFunctionConversionExpr(FunctionConversionExpr *E) {
+    Expr* subExpr = visit(E->getSubExpr());
+    if (!subExpr) return E;
+    return new (Context) FunctionConversionExpr(subExpr, E->getType());
+  }
+
+  Expr *visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E) {
+    Expr* subExpr = visit(E->getSubExpr());
+    if (!subExpr) return E;
+    return new (Context) CollectionUpcastConversionExpr(subExpr, E->getType(), E->getKeyConversion(), E->getValueConversion());
+  }
+
+  Expr *visitOpenExistentialExpr(OpenExistentialExpr *E) {
+    Expr* existential = visit(E->getExistentialValue());
+    Expr* subExpr = visit(E->getSubExpr());
+    if (!existential && !subExpr) return E;
+    return new (Context) OpenExistentialExpr(
+      existential ? existential : E->getExistentialValue(),
+      E->getOpaqueValue(),
+      subExpr ? subExpr : E->getSubExpr(),
+      subExpr->getType());
+  }
+
+  Expr *visitExpr(Expr *E) {
+    E->dump(llvm::errs());
+    llvm::errs() << "\n";
+    llvm_unreachable("unimplemented conversion expr");
+  }
+};
+} // namespace
+
+ClosureExpr *RValueEmitter::synthesizeConversionClosure(
+    CollectionUpcastConversionExpr::ConversionPair pair) {
+  ASTContext &Context = SGF.getASTContext();
+  DeclContext *declContext = SGF.FunctionDC;
+
+  DeclAttributes attributes;
+  SourceRange bracketRange;
+  SmallVector<CaptureListEntry, 2> captureList;
+  VarDecl *capturedSelfDecl = nullptr;
+  SourceLoc asyncLoc;
+  SourceLoc throwsLoc;
+  TypeExpr *thrownType = nullptr;
+  SourceLoc arrowLoc;
+  TypeExpr *explicitResultType = nullptr;
+  SourceLoc inLoc;
+
+  ClosureExpr *closure = new (Context) ClosureExpr(
+    attributes, bracketRange, capturedSelfDecl, nullptr, asyncLoc, throwsLoc,
+    thrownType, arrowLoc, inLoc, explicitResultType, declContext
+  );
+
+
+  Identifier ident = Context.getDollarIdentifier(0);
+  ParamDecl* param = new (Context) ParamDecl(SourceLoc(), SourceLoc(),
+            Identifier(), SourceLoc(), ident, closure);
+
+  param->setSpecifier(ParamSpecifier::Default);
+  param->setInterfaceType(pair.OrigValue->getType());
+  param->setImplicit();
+
+  ParameterList *params = ParameterList::create(Context, SourceLoc(), ArrayRef(param), SourceLoc());
+  closure->setParameterList(params);
+
+  ConversionClosureEmitter emitter(Context, pair.OrigValue, param);
+  Expr *result = emitter.visit(pair.Conversion);
+  auto *RS = ReturnStmt::createImplicit(Context, result);
+  ASTNode bodyNode(RS);
+  auto *BS = BraceStmt::createImplicit(Context, ArrayRef(bodyNode));
+  closure->setBody(BS);
+
+  auto closureParam = AnyFunctionType::Param(pair.OrigValue->getType());
+  auto extInfo = FunctionType::ExtInfo()
+    .withNoEscape()
+    .withSendable()
+    .withoutIsolation();
+  auto *fnTy = FunctionType::get(ArrayRef(closureParam), pair.Conversion->getType(), extInfo);
+  closure->setType(fnTy);
+
+  closure->setCaptureInfo(CaptureInfo::empty());
+
+  auto discriminator = Context.getNextDiscriminator(declContext);
+  closure->setDiscriminator(discriminator++);
+  Context.setMaxAssignedDiscriminator(declContext, discriminator);
+
+  return closure;
 }
 
 RValue
