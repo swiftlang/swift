@@ -2014,10 +2014,10 @@ public:
           PotentialEffectReason::forApply()));
     }
 
-    // Merge the thrown result from the next/nextElement call.
+    result.merge(classifyStmt(stmt->getDesugaredStmt(), EffectKind::Async));
+
     result.merge(classifyStmt(stmt->getDesugaredStmt(), EffectKind::Throws));
 
-    // Merge unsafe effect from the next/nextElement call.
     result.merge(classifyStmt(stmt->getDesugaredStmt(), EffectKind::Unsafe));
 
     return result;
