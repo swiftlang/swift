@@ -2158,6 +2158,9 @@ Type YieldsTypeRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
   if (const auto *const funcDecl = dyn_cast<FuncDecl>(decl)) {
     yieldTyRepr = funcDecl->getYieldTypeRepr();
 
+    if (funcDecl->isCoroutine() && !yieldTyRepr)
+      return ErrorType::get(ctx);
+
     assert(funcDecl->isCoroutine() && yieldTyRepr);
 
     auto options = TypeResolutionOptions(TypeResolverContext::FunctionResult);

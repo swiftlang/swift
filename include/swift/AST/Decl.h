@@ -8528,7 +8528,7 @@ public:
   static FuncDecl *createDeserialized(ASTContext &Context,
                                       StaticSpellingKind StaticSpelling,
                                       DeclName Name, bool Async, bool Throws,
-                                      Type ThrownType,
+                                      Type ThrownType, Type YieldType,
                                       GenericParamList *GenericParams,
                                       Type FnRetType, DeclContext *Parent);
 

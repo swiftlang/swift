@@ -1392,6 +1392,12 @@ namespace decls_block {
                      BCFixed<1>               // addressable
                      >;
 
+  using FunctionYieldLayout =
+      BCRecordLayout<FUNCTION_YIELD,
+                     TypeIDField,             // type
+                     ParamDeclSpecifierField // inout, shared or owned?
+                     >;
+
   TYPE_LAYOUT(MetatypeTypeLayout,
     METATYPE_TYPE,
     TypeIDField,                // instance type
@@ -1790,6 +1796,8 @@ namespace decls_block {
     BCFixed<1>,   // async?
     BCFixed<1>,   // throws?
     TypeIDField,  // thrown error
+    TypeIDField,  // yield value type
+    BCFixed<1>,   // inout yield?
     GenericSignatureIDField, // generic environment
     TypeIDField,  // result interface type
     BCFixed<1>,   // IUO result?

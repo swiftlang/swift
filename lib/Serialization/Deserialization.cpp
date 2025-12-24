@@ -35,6 +35,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
@@ -4370,6 +4371,7 @@ public:
     uint8_t rawAccessorKind;
     bool isObjC, hasForcedStaticDispatch, async, throws;
     TypeID thrownTypeID;
+    TypeID yieldTypeID; bool isInoutYield = false;
     unsigned numNameComponentsBiased;
     GenericSignatureID genericSigID;
     TypeID resultInterfaceTypeID;
@@ -4390,6 +4392,7 @@ public:
                                           rawMutModifier,
                                           hasForcedStaticDispatch,
                                           async, throws, thrownTypeID,
+                                          yieldTypeID, isInoutYield,
                                           genericSigID,
                                           resultInterfaceTypeID,
                                           isIUO,
@@ -4533,10 +4536,17 @@ public:
       return thrownTypeOrError.takeError();
     const auto thrownType = thrownTypeOrError.get();
 
+    auto yieldTypeOrError = MF.getTypeChecked(yieldTypeID);
+    if (!yieldTypeOrError)
+      return yieldTypeOrError.takeError();
+    auto yieldType = yieldTypeOrError.get();
+    if (isInoutYield)
+      yieldType = InOutType::get(yieldType);
+
     FuncDecl *fn;
     if (!isAccessor) {
       fn = FuncDecl::createDeserialized(ctx, staticSpelling.value(), name,
-                                        async, throws, thrownType,
+                                        async, throws, thrownType, yieldType,
                                         genericParams, resultType, DC);
     } else {
       auto *accessor =
@@ -7445,9 +7455,6 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   if (!resultTy)
     return resultTy.takeError();
 
-  assert(!info.isCoroutine() && "NYU");
-  SmallVector<AnyFunctionType::Yield, 1> yields;
-
   SmallVector<AnyFunctionType::Param, 8> params;
   while (true) {
     BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
@@ -7492,6 +7499,39 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            isCompileTimeLiteral, isSending,
                                            isAddressable, isConstValue),
                         MF.getIdentifier(internalLabelID));
+  }
+
+  SmallVector<AnyFunctionType::Yield, 1> yields;
+  while (true) {
+    BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
+    llvm::BitstreamEntry entry =
+        MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+    unsigned recordID = MF.fatalIfUnexpected(
+        MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+    if (recordID != decls_block::FUNCTION_YIELD)
+      break;
+
+    restoreOffset.reset();
+
+    TypeID typeID;
+    unsigned rawOwnership;
+    decls_block::FunctionYieldLayout::readRecord(
+        scratch, typeID, rawOwnership);
+
+    auto ownership = getActualParamDeclSpecifier(
+      (serialization::ParamDeclSpecifier)rawOwnership);
+    if (!ownership)
+      return MF.diagnoseFatal();
+
+    auto yieldTy = MF.getTypeChecked(typeID);
+    if (!yieldTy)
+      return yieldTy.takeError();
+
+    yields.emplace_back(yieldTy.get(), *ownership);
   }
 
   SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
