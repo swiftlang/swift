@@ -1975,7 +1975,7 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
 
 Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
                                      TypeAliasDecl *typeAlias) const {
-  TypeResolutionOptions options((typeAlias->getGenericParams()
+  TypeResolutionOptions options((typeAlias->hasParsedGenericParamList()
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));
 
