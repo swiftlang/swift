@@ -7020,64 +7020,70 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
   } else {
     // TODO: Only do this for result builders
     unboundTyOpener = [attr, dc](UnboundGenericType* unbound) -> Type {
-      Decl *owningDecl = attr->owner.getAsDecl();
+      Decl *owningDecl = attr->getOwner().getAsDecl();
       
-      if (auto builder = dyn_cast_or_null<NominalTypeDecl>(unbound->getDecl())) {
-        // TODO: In this prototype we only support unbound result builders with a single generic parameter.
-        // A final implementation would support both.
-        if (builder->getGenericParams()->size() != 1) {
-          return unbound;
-        }
-        
-        auto genericParam = builder->getGenericParams()->getParams()[0];
-          
-        if (auto varDecl = dyn_cast_or_null<VarDecl>(owningDecl)) {
-          // Inspect the generic types of the ResultBuilder component and return of the attached function
-          auto resultType = varDecl->getInterfaceType();
-          
-          auto componentType = inferResultBuilderComponentType(builder)
-            ->getAs<BoundGenericType>();
-          
-          using namespace constraints;
-          ConstraintSystem cs(dc, std::nullopt);
+      auto builder = dyn_cast_or_null<NominalTypeDecl>(unbound->getNominalDecl());
+      ASSERT(builder);
+      
+      if (auto varDecl = dyn_cast_or_null<VarDecl>(owningDecl)) {
+        using namespace constraints;
+        ConstraintSystem cs(dc, std::nullopt);
 
-          // Replace any `GenericTypeParamType`s in the component type with a type variable
+        // Create a type variable for each of the result builder's generic params
+        auto genericSig = builder->getGenericSignature();
+
+        // Pre-create type variables for all generic parameters
+        llvm::SmallVector<Type, 8> typeVarReplacements;
+        llvm::SmallVector<TypeVariableType*, 8> typeVars;
+        for (unsigned i = 0; i < genericSig.getGenericParams().size(); ++i) {
           auto locator = cs.getConstraintLocator(builder);
           auto typeVar = cs.createTypeVariable(locator, TVO_CanBindToHole);
-  
-          // TODO: Support multiple args by creating a type variable for each `GenericTypeParamType`
-          auto componentTypeWithTypeVar = BoundGenericType::get(
-            componentType->getDecl(), componentType->getParent(), {typeVar});
-          
-//          auto componentTypeArgs = componentType->getGenericArgs()
-//          llvm::SmallVector<Type, 8> componentArgsWithTypeVariables;
-//          componentArgsWithTypeVariables.reserve(args.size());
-//
-//          for (const Type &t : componentTypeArgs) {
-//            if (is generic type...) {
-//              copied.push_back(type var...);
-//            } else {
-//              copied.push_back(t);
-//            }
-//          }
-          
-          // The result builder result type should be equal to the return type of the attached declaration
-          cs.addConstraint(ConstraintKind::Equal,
-                           resultType,
-                           componentTypeWithTypeVar,
-                           /*preparedOverload:*/ nullptr);
-
-          auto solution = cs.solveSingle();
-          
-          // Replace the type vars with the solved result
-          auto genericArgs = {solution->typeBindings[typeVar]};
-          return BoundGenericType::get(builder, unbound->getParent(), genericArgs);
+          typeVarReplacements.push_back(typeVar);
+          typeVars.push_back(typeVar);
         }
+
+        // Retrieve the generic types of the ResultBuilder component and return type
+        // of the attached function, replacing any reference to the ResultBuilder's
+        // generic arguments with the corresponding type vars.
+        auto subMap = SubstitutionMap::get(
+          genericSig,
+          typeVarReplacements,
+          LookUpConformanceInModule());
+
+        auto resultType = varDecl->getInterfaceType();
+        auto componentType = inferResultBuilderComponentType(builder).subst(subMap);
+
+        // The result builder result type should be equal to the return type of the attached declaration
+        cs.addConstraint(ConstraintKind::Equal,
+                         resultType,
+                         componentType,
+                         /*preparedOverload:*/ nullptr);
+
+        auto solution = cs.solveSingle();
+
+        if (!solution) {
+          dc->getASTContext().Diags.diagnose(
+            attr->getTypeExpr()->getLoc(),
+            diag::result_builder_generic_inference_failed,
+            builder->getName());
+          return ErrorType::get(dc->getASTContext());
+        }
+
+        // Bind the result builder type to the solved type parameters
+        llvm::SmallVector<Type, 8> solvedReplacements;
+        for (auto typeVar : typeVars) {
+          solvedReplacements.push_back(solution->typeBindings[typeVar]);
+        }
+
+        return BoundGenericType::get(builder, unbound->getParent(), solvedReplacements);
       }
-    
-      // Could infer component type using `inferResultBuilderComponentType`?
       
-      return unbound;
+      dc->getASTContext().Diags.diagnose(
+        attr->getTypeExpr()->getLoc(),
+        diag::result_builder_generic_inference_failed,
+        builder->getName());
+      
+      return ErrorType::get(dc->getASTContext());
     };
     
     placeholderHandler = PlaceholderType::get;
