@@ -338,20 +338,17 @@ extension _SmallString {
     let totalCount = base.count + other.count
     guard totalCount <= _SmallString.capacity else { return nil }
 
-    func convert(_ s: _SmallString) -> _UInt128 {
-      let bits = s.zeroTerminatedRawCodeUnits
-      return .init(_low: bits.0.littleEndian, _high: bits.1.littleEndian)
+    let bitPattern = unsafe _withUnprotectedUnsafeTemporaryAllocation(
+      byteCount: 2*MemoryLayout<_SmallString.RawBitPattern>.size, alignment: 1
+    ) { [baseCount = base.count] bytes -> _SmallString.RawBitPattern in
+      unsafe bytes.storeBytes(of: base._storage, as: RawBitPattern.self)
+      unsafe bytes.storeBytes(
+        of: other._storage, toByteOffset: baseCount, as: RawBitPattern.self
+      )
+      return unsafe bytes.loadUnaligned(as: _SmallString.self).zeroTerminatedRawCodeUnits
     }
 
-    var resultInt = convert(other)
-    resultInt &*= (1 << (8 &* base.count))
-    resultInt &+= convert(base)
-
-    self.init(
-      leading: resultInt._low.littleEndian,
-      trailing: resultInt._high.littleEndian,
-      count: totalCount
-    )
+    self.init(leading: bitPattern.0, trailing: bitPattern.1, count: totalCount)
   }
 }
 
