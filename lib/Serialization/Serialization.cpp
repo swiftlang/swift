@@ -4957,6 +4957,13 @@ public:
 
     uint8_t rawAccessLevel = getRawStableAccessLevel(fn->getFormalAccess());
 
+    bool isInoutYield = false;
+    auto yieldType = fn->getYieldsInterfaceType();
+    if (auto inoutYieldType = yieldType->getAs<InOutType>()) {
+      isInoutYield = true;
+      yieldType = inoutYieldType->getObjectType();
+    }
+    
     Type ty = fn->getInterfaceType();
     for (auto dependency : collectDependenciesFromType(ty->getCanonicalType()))
       nameComponentsAndDependencies.push_back(S.addTypeRef(dependency));
@@ -4973,6 +4980,7 @@ public:
                            fn->hasAsync(),
                            fn->hasThrows(),
                            S.addTypeRef(fn->getThrownInterfaceType()),
+                           S.addTypeRef(yieldType), isInoutYield,
                            S.addGenericSignatureRef(
                                                   fn->getGenericSignature()),
                            S.addTypeRef(fn->getResultInterfaceType()),
@@ -6066,6 +6074,19 @@ public:
     }
   }
 
+  void serializeFunctionTypeYields(const AnyFunctionType *fnTy) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionYieldLayout::Code];
+    for (auto &yield : fnTy->getYields()) {
+      auto paramFlags = yield.getFlags();
+      auto rawOwnership =
+          getRawStableParamDeclSpecifier(paramFlags.getOwnershipSpecifier());
+      FunctionYieldLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          S.addTypeRef(yield.getType()), rawOwnership);
+    }
+  }
+
   TypeID encodeIsolation(swift::FunctionTypeIsolation isolation) {
     switch (isolation.getKind()) {
     case swift::FunctionTypeIsolation::Kind::NonIsolated:
@@ -6124,6 +6145,7 @@ public:
         fnTy->isCoroutine());
 
     serializeFunctionTypeParams(fnTy);
+    serializeFunctionTypeYields(fnTy);
 
     auto lifetimeDependencies = fnTy->getLifetimeDependencies();
     if (!lifetimeDependencies.empty()) {
@@ -6147,6 +6169,7 @@ public:
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
+    serializeFunctionTypeYields(fnTy);
 
     auto lifetimeDependencies = fnTy->getLifetimeDependencies();
     if (!lifetimeDependencies.empty()) {
@@ -6545,6 +6568,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<TupleTypeEltLayout>();
   registerDeclTypeAbbr<FunctionTypeLayout>();
   registerDeclTypeAbbr<FunctionParamLayout>();
+  registerDeclTypeAbbr<FunctionYieldLayout>();
   registerDeclTypeAbbr<MetatypeTypeLayout>();
   registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
   registerDeclTypeAbbr<PrimaryArchetypeTypeLayout>();
