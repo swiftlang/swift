@@ -98,3 +98,34 @@ func makeTuple<each T>(_ t: repeat each T) -> (repeat each T) {
 public func makeOne<T>(_ t: T) -> T {
   return makeTuple(t)
 }
+
+// https://github.com/swiftlang/swift/issues/69028, comment from June 11th, 2024
+// We were not handling vanishing tuples properly when binding parameters under
+// an abstraction pattern.
+
+public func takeFunctionWithVariadicTupleParam<each Input, Output>(operation: @escaping ((repeat each Input)) -> Output) {}
+
+public func passSingleParamClosure() {
+  takeFunctionWithVariadicTupleParam(operation: { (num: Int) in num })
+}
+// CHECK-LABEL: sil private [ossa] @$s4main22passSingleParamClosureyyFS2icfU_ : $@convention(thin) @substituted <each τ_0_0, τ_0_1> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @out τ_0_1 for <Pack{Int}, Int> {
+// CHECK:       bb0(%0 : $*Int, %1 : $*Pack{Int}):
+// CHECK-NEXT:    [[PI:%.*]] = scalar_pack_index 0 of $Pack{Int}
+// CHECK-NEXT:    [[ARGPTR:%.*]] = pack_element_get [[PI]] of %1
+// CHECK-NEXT:    [[ARG:%.*]] = load [trivial] [[ARGPTR]]
+// CHECK-NEXT:    debug_value [[ARG]] : $Int, let, name "num"
+// CHECK-NEXT:    store [[ARG]] to [trivial] %0
+
+// Same thing but with non-trivial ownership
+public func passSingleStringClosure() {
+  takeFunctionWithVariadicTupleParam(operation: { (str: String) in str })
+}
+// CHECK-LABEL: sil private [ossa] @$s4main23passSingleStringClosureyyFS2ScfU_ : $@convention(thin) @substituted <each τ_0_0, τ_0_1> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @out τ_0_1 for <Pack{String}, String> {
+// CHECK:       bb0(%0 : $*String, %1 : $*Pack{String}):
+// CHECK-NEXT:    [[PI:%.*]] = scalar_pack_index 0 of $Pack{String}
+// CHECK-NEXT:    [[ARGPTR:%.*]] = pack_element_get [[PI]] of %1
+// CHECK-NEXT:    [[ARG:%.*]] = load_borrow [[ARGPTR]]
+// CHECK-NEXT:    debug_value [[ARG]] : $String, let, name "str"
+// CHECK-NEXT:    [[ARGCOPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT:    store [[ARGCOPY]] to [init] %0
+// CHECK-NEXT:    end_borrow [[ARG]]
