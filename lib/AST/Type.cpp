@@ -1230,6 +1230,22 @@ bool ExistentialLayout::containsNonMarkerProtocols() const {
   return false;
 }
 
+bool ExistentialLayout::isABICompatibleWith(
+    ExistentialLayout const &other) const {
+  /// All non-marker protocols are expected to have witness tables.
+  auto hasWitnessTable = [](ProtocolDecl const *proto) {
+    return !proto->isMarkerProtocol();
+  };
+  auto selfProtos = make_filter_range(getProtocols(), hasWitnessTable);
+  auto otherProtos = make_filter_range(other.getProtocols(), hasWitnessTable);
+
+  // Ensure the number of non-marker protocols are the same and that they're
+  // the same ProtocolDecl* according to operator==.
+  //
+  // We rely on the relative order of protocols being canonical.
+  return llvm::equal(selfProtos, otherProtos);
+}
+
 LayoutConstraint ExistentialLayout::getLayoutConstraint() const {
   if (hasExplicitAnyObject) {
     return LayoutConstraint::getLayoutConstraint(
