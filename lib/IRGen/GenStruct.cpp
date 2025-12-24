@@ -562,7 +562,7 @@ namespace {
         return nullptr;
       for (auto ctor : cxxRecordDecl->ctors()) {
         if (ctor->isMoveConstructor() &&
-            // FIXME: Support default arguments (rdar://142414553)
+            // FIXME: Support default arguments
             ctor->getNumParams() == 1 &&
             ctor->getAccess() == clang::AS_public && !ctor->isDeleted() &&
             !ctor->isIneligibleOrNotSelected())

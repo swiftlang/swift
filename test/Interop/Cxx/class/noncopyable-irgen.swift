@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST2- -D TEST2
 // RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST3- -D TEST3
 // RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST4- -D TEST4 -Xcc -std=c++20
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST5- -D TEST5
 
 //--- Inputs/module.modulemap
 module Test {
@@ -17,8 +18,15 @@ module Test {
 
 struct NonCopyable {
     NonCopyable() = default;
-    NonCopyable(const NonCopyable& other) = delete; // expected-note {{'NonCopyable' has been explicitly marked deleted here}}
+    NonCopyable(int x) : number(x) {}
+    NonCopyable(const NonCopyable& other) = delete; 
+    // expected-TEST1-note@-1 {{'NonCopyable' has been explicitly marked deleted here}}
+    // expected-TEST2-note@-2 {{'NonCopyable' has been explicitly marked deleted here}}
+    // expected-TEST3-note@-3 {{'NonCopyable' has been explicitly marked deleted here}}
+    // expected-TEST4-note@-4 {{'NonCopyable' has been explicitly marked deleted here}}
     NonCopyable(NonCopyable&& other) = default;
+
+    int number = 0;
 };
 
 template <typename T>
@@ -73,6 +81,11 @@ template <typename T> struct Requires {
 using RequiresOwnsNonCopyable = Requires<OwnsT<NonCopyable>>;
 #endif
 
+struct HasSubscript {
+    NonCopyable &operator[](int idx) { return nc; }
+    NonCopyable nc;
+};
+
 //--- test.swift
 import Test
 import CxxStdlib
@@ -109,4 +122,13 @@ func requires() {
     takeCopyable(s)
 }
 
+#elseif TEST5
+func useSubscript() {
+    var obj = HasSubscript(nc: NonCopyable(5))
+    let _ = obj[42] // expected-TEST5-error {{'obj.subscript' is borrowed and cannot be consumed}}
+    // expected-TEST5-note@-1 {{consumed here}}
+    
+    func borrow(_ x: borrowing NonCopyable) -> Int32 { return x.number; }
+    let _ = borrow(obj[42])
+}
 #endif
