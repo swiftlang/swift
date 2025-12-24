@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-silgen -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-silgen -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-experimental-feature CoroutineFunctions | %FileCheck %s
+
+// REQUIRES: swift_feature_CoroutineFunctions
 
 // rdar://15763213
 // Make sure that we can parse SILDeclRef to an overloaded member.
