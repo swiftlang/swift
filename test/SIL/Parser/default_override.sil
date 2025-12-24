@@ -1,9 +1,11 @@
 // RUN: %target-sil-opt %s \
 // RUN:   -enable-library-evolution \
 // RUN:   -enable-experimental-feature CoroutineAccessors \
+// RUN:   -enable-experimental-feature CoroutineFunctions \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_feature_CoroutineAccessors
+// REQUIRES: swift_feature_CoroutineFunctions
 
 sil_stage canonical
 

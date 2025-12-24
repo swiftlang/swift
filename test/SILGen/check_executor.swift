@@ -1,7 +1,9 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 5  -target %target-swift-5.1-abi-triple -enable-actor-data-race-checks | %FileCheck --enable-var-scope %s --check-prefix=CHECK-RAW
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 5  -target %target-swift-5.1-abi-triple -enable-actor-data-race-checks > %t.sil
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %t.sil -lower-hop-to-actor  | %FileCheck --enable-var-scope %s --check-prefix=CHECK-CANONICAL
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %t.sil -lower-hop-to-actor -enable-experimental-feature CoroutineFunctions | %FileCheck --enable-var-scope %s --check-prefix=CHECK-CANONICAL
+
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_CoroutineFunctions
 
 import Swift
 import _Concurrency

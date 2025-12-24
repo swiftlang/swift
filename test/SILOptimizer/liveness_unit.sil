@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -test-runner -enable-experimental-feature CoroutineFunctions %s -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_CoroutineFunctions
 
 sil_stage canonical
 

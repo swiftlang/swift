@@ -4,10 +4,12 @@
 // RUN:     -module-name Library \
 // RUN:     -emit-ir \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
+// RUN:     -enable-experimental-feature CoroutineFunctions \
 // RUN:     -enable-library-evolution \
 // RUN: | %IRGenFileCheck %s
 
 // REQUIRES: swift_feature_CoroutineAccessors
+// REQUIRES: swift_feature_CoroutineFunctions
 
 sil_stage canonical
 

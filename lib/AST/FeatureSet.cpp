@@ -398,6 +398,13 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
   }
 }
 
+static bool usesFeatureCoroutineFunctions(Decl *decl) {
+  if (auto *FD = dyn_cast<FuncDecl>(decl))
+    return FD->isCoroutine() && !isa<AccessorDecl>(FD);
+  
+  return false;
+}
+
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
 UNINTERESTING_FEATURE(CustomAvailability)
 

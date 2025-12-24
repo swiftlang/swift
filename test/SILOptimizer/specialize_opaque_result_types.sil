@@ -1,8 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/opaque_result_types.swift -module-name External -emit-module -emit-module-path %t/External.swiftmodule
-// RUN: %target-sil-opt -sil-print-types -I %t -enable-sil-verify-all %s -generic-specializer | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -I %t -enable-sil-verify-all %s -generic-specializer -enable-experimental-feature CoroutineFunctions | %FileCheck %s
 
 // REQUIRES: PTRSIZE=64
+// REQUIRES: swift_feature_CoroutineFunctions
 
 import Builtin
 import Swift

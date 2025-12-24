@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt  %s
+// RUN: %target-sil-opt  -enable-experimental-feature CoroutineFunctions %s
 
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_CoroutineFunctions
 
 // This test ensures that the SILVerifier does not enforce that concurrent
 // functions must have non-box parameters in raw SIL.
