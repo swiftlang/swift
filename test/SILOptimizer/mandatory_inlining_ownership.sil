@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-inlining  -enable-experimental-feature CoroutineFunctions | %FileCheck %s
+
+// REQUIRES: swift_feature_CoroutineFunctions
 
 sil_stage raw
 

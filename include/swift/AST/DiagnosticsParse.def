@@ -337,6 +337,8 @@ ERROR(accessor_requires_borrow_and_mutate_accessors,none,
 ERROR(borrow_mutate_pair_restrict,none,
       "A '%0' accessor can only be defined along with a '%1' accessor",
       (StringRef, StringRef))
+ERROR(yields_requires_coroutine_functions,none,
+      "`yields` requires '-enable-experimental-feature CoroutineFunctions'", ())
 
 // Import
 ERROR(decl_expected_module_name,none,
@@ -1724,6 +1726,11 @@ ERROR(expected_rparen_after_thrown_error_type,none,
       "expected ')' after thrown error type", ())
 ERROR(rethrows_with_thrown_error,none,
       "'rethrows' cannot be combined with a specific thrown error type", ())
+
+ERROR(expected_yield_type,none,
+      "expected yield type after 'yields('", ())
+ERROR(expected_rparen_after_yield_type,none,
+      "expected ')' after yield type", ())
 
 ERROR(attr_isolated_expected_lparen,none,
       "expected '(' after '@isolated'; did you mean the 'isolated' modifier?",

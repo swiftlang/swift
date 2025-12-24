@@ -415,19 +415,24 @@ ParserStatus Parser::parseYield(SourceLoc &yieldLoc, TypeRepr *&yieldType) {
 
   if (!Tok.isContextualKeyword("yields"))
     return makeParserSuccess();
+
+  if (!Context.LangOpts.hasFeature(Feature::CoroutineFunctions))
+    diagnose(Tok, diag::yields_requires_coroutine_functions);
+  
   yieldLoc = consumeToken();
 
   // Parse the yield type.
   SourceLoc lParenLoc;
   if (consumeIf(tok::l_paren, lParenLoc)) {
-    ParserResult<TypeRepr> parsedYieldTy =
-        parseType(diag::expected_thrown_error_type);
+    ParserResult<TypeRepr> parsedYieldTy = parseType(diag::expected_yield_type);
     yieldType = parsedYieldTy.getPtrOrNull();
     status |= parsedYieldTy;
 
+    // TODO: Validate parsed yield type.
+    
     SourceLoc rParenLoc;
     parseMatchingToken(tok::r_paren, rParenLoc,
-                       diag::expected_rparen_after_thrown_error_type,
+                       diag::expected_rparen_after_yield_type,
                        lParenLoc);
   }
 

@@ -2,11 +2,13 @@
 // RUN:     -module-name Swift \
 // RUN:     -enable-experimental-feature LifetimeDependence \
 // RUN:     -enable-experimental-feature AddressableTypes \
+// RUN:     -enable-experimental-feature CoroutineFunctions \
 // RUN:     -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_AddressableTypes
+// REQUIRES: swift_feature_CoroutineFunctions
 
 sil_stage raw
 

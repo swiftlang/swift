@@ -519,6 +519,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 /// error, but no longer has any effect.
 EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
 
+/// normal coroutines (as functions)
+EXPERIMENTAL_FEATURE(CoroutineFunctions, false)
+
 EXPERIMENTAL_FEATURE(AddressableParameters, true)
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
 
