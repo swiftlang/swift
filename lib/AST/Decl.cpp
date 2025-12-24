@@ -11509,10 +11509,11 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
 FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                                        StaticSpellingKind StaticSpelling,
                                        DeclName Name, bool Async, bool Throws,
-                                       Type ThrownType,
+                                       Type ThrownType, Type YieldType,
                                        GenericParamList *GenericParams,
                                        Type FnRetType, DeclContext *Parent) {
   assert(FnRetType && "Deserialized result type must not be null");
+  assert(YieldType && "Deserialized yield type must not be null");
   auto *const FD =
       FuncDecl::createImpl(Context, SourceLoc(), StaticSpelling, SourceLoc(),
                            Name, SourceLoc(), Async, SourceLoc(), Throws,
@@ -11520,6 +11521,7 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                            GenericParams, Parent,
                            ClangNode());
   FD->setResultInterfaceType(FnRetType);
+  FD->setYieldInterfaceType(YieldType);
   return FD;
 }
 
