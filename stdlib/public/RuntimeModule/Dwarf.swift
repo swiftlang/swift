@@ -2006,6 +2006,7 @@ struct DwarfLineNumberInfo {
 // .. Testing ..................................................................
 
 @_spi(DwarfTest)
+@available(Backtracing 6.2, *)
 public func testDwarfReaderFor(path: String) -> Bool {
   guard let source = try? ImageSource(path: path) else {
     print("\(path) was not accessible")

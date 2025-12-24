@@ -164,6 +164,7 @@ extension FixedWidthInteger {
   ///
   /// This initializer will return nil if the address width is larger than the
   /// type you are attempting to convert into.
+  @available(Backtracing 6.2, *)
   public init?(_ address: Backtrace.Address) {
     guard let result = address.toFixedWidth(type: Self.self) else {
       return nil

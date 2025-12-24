@@ -17,6 +17,7 @@
 import Swift
 
 @_spi(Unwinders)
+@available(Backtracing 6.2, *)
 public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, IteratorProtocol {
   public typealias Context = C
   public typealias MemoryReader = M
