@@ -1973,6 +1973,44 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
   return result;
 }
 
+Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
+                                     TypeAliasDecl *typeAlias) const {
+  TypeResolutionOptions options((typeAlias->getGenericParams()
+                                     ? TypeResolverContext::GenericTypeAliasDecl
+                                     : TypeResolverContext::TypeAliasDecl));
+
+  auto parentDC = typeAlias->getDeclContext();
+  auto &ctx = parentDC->getASTContext();
+
+  auto underlyingTypeRepr = typeAlias->getUnderlyingTypeRepr();
+
+  // This can happen when code completion is attempted inside
+  // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
+  if (!underlyingTypeRepr) {
+    typeAlias->setInvalid();
+    return ErrorType::get(ctx);
+  }
+
+  auto result = TypeResolution::forStructural(typeAlias, options,
+                                              /*unboundTyOpener*/ nullptr,
+                                              /*placeholderHandler*/ nullptr,
+                                              /*packElementOpener*/ nullptr)
+                    .resolveType(underlyingTypeRepr);
+
+  Type parent;
+  if (parentDC->isTypeContext())
+    parent = parentDC->getSelfInterfaceType();
+
+  SmallVector<Type, 2> genericArgs;
+  if (auto *params = typeAlias->getGenericParams()) {
+    for (auto *param : *params) {
+      genericArgs.push_back(param->getDeclaredInterfaceType());
+    }
+  }
+
+  return TypeAliasType::get(typeAlias, parent, genericArgs, result);
+}
+
 /// Bind the given function declaration, which declares an operator, to the
 /// corresponding operator declaration.
 OperatorDecl *
