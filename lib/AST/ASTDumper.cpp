@@ -2001,6 +2001,11 @@ namespace {
       printField(P->getValue(), Label::always("value"));
       printFoot();
     }
+    void visitOpaquePattern(OpaquePattern *P, Label label){
+      printCommon(P, "pattern_opaque", label);
+      printRec(P->getSubPattern(), Label::optional("sub_pattern"));
+      printFoot();
+    }
 
   };
 
@@ -3252,6 +3257,10 @@ public:
     printFlag(S->TrailingSemiLoc.isValid(), "trailing_semi");
   }
 
+  void visitOpaqueStmt(OpaqueStmt *S, Label label){
+    visit(S->getUnderlyingStmt(), label);
+  }
+
   void visitBraceStmt(BraceStmt *S, Label label) {
     printCommon(S, "brace_stmt", label);
     printList(S->getElements(), [&](auto &Elt, Label label) {
@@ -3332,20 +3341,11 @@ public:
       printRec(S->getWhere(), Label::always("where"));
     }
     printRec(S->getParsedSequence(), Label::optional("parsed_sequence"));
-    if (S->getIteratorVar()) {
-      printRec(S->getIteratorVar(), Label::optional("iterator_var"));
-    }
-    if (S->getNextCall()) {
-      printRec(S->getNextCall(), Label::optional("next_call"));
-    }
-    if (S->getConvertElementExpr()) {
-      printRec(S->getConvertElementExpr(),
-               Label::optional("convert_element_expr"));
-    }
-    if (S->getElementExpr()) {
-      printRec(S->getElementExpr(), Label::optional("element_expr"));
-    }
+
     printRec(S->getBody(), Label::optional("body"));
+
+    printRec(S->getDesugaredStmt(), Label::optional("desugared_loop"));
+
     printFoot();
   }
   void visitBreakStmt(BreakStmt *S, Label label) {
@@ -4235,6 +4235,10 @@ public:
     printCommon(E, "opaque_value_expr", label);
     printPointerField(static_cast<void *>(E), Label::optional("identity"));
     printFoot();
+  }
+
+  void visitOpaqueExpr(OpaqueExpr *E, Label label){
+    visit(E->getOriginalExpr(), label);
   }
 
   void visitPropertyWrapperValuePlaceholderExpr(

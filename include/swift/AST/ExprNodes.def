@@ -218,8 +218,9 @@ EXPR(Tap, Expr)
 UNCHECKED_EXPR(TypeJoin, Expr)
 EXPR(MacroExpansion, Expr)
 EXPR(TypeValue, Expr)
+EXPR(Opaque, Expr)
 // Don't forget to update the LAST_EXPR below when adding a new Expr here.
-LAST_EXPR(TypeValue)
+LAST_EXPR(Opaque)
 
 #undef EXPR_RANGE
 #undef LITERAL_EXPR

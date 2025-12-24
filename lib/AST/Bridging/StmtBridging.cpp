@@ -191,11 +191,11 @@ BridgedForEachStmt BridgedForEachStmt_createParsed(
     SourceLoc forLoc, SourceLoc tryLoc, SourceLoc awaitLoc, SourceLoc unsafeLoc,
     BridgedPattern cPat, SourceLoc inLoc, BridgedExpr cSequence,
     SourceLoc whereLoc, BridgedNullableExpr cWhereExpr,
-    BridgedBraceStmt cBody) {
+    BridgedBraceStmt cBody, BridgedDeclContext cDeclContext) {
   return new (cContext.unbridged())
       ForEachStmt(cLabelInfo.unbridged(), forLoc, tryLoc, awaitLoc, unsafeLoc,
                   cPat.unbridged(), inLoc, cSequence.unbridged(), whereLoc,
-                  cWhereExpr.unbridged(), cBody.unbridged());
+                  cWhereExpr.unbridged(), cBody.unbridged(), cDeclContext.unbridged());
 }
 
 BridgedGuardStmt BridgedGuardStmt_createParsed(BridgedASTContext cContext,

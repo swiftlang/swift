@@ -612,6 +612,7 @@ namespace {
     RValue visitMacroExpansionExpr(MacroExpansionExpr *E, SGFContext C);
     RValue visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E, SGFContext C);
     RValue visitTypeValueExpr(TypeValueExpr *E, SGFContext C);
+    RValue visitOpaqueExpr(OpaqueExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -6080,6 +6081,7 @@ namespace {
     USE_SUBPATTERN(Paren)
     USE_SUBPATTERN(Typed)
     USE_SUBPATTERN(Binding)
+    USE_SUBPATTERN(Opaque)
 #undef USE_SUBPATTERN
 
 #define PATTERN(Kind, Parent)
@@ -6736,6 +6738,10 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   RValue rvalue = visitSubExpr(borrowedClosure, false /* isClosureConsumable */);
 
   return rvalue;
+}
+
+RValue RValueEmitter::visitOpaqueExpr(OpaqueExpr *E, SGFContext C) {
+  return visit(E->getOriginalExpr());
 }
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {

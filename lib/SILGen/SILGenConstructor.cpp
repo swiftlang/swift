@@ -1457,6 +1457,9 @@ emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, Pattern *pattern) {
     return emitMemberInit(SGF, selfDecl,
                           cast<BindingPattern>(pattern)->getSubPattern());
 
+  case PatternKind::Opaque:
+    return emitMemberInit(SGF, selfDecl,
+                          cast<OpaquePattern>(pattern)->getSubPattern());
 #define PATTERN(Name, Parent)
 #define REFUTABLE_PATTERN(Name, Parent) case PatternKind::Name:
 #include "swift/AST/PatternNodes.def"

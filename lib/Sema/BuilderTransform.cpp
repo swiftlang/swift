@@ -735,7 +735,7 @@ protected:
                     forEachStmt->getParsedSequence(),
                     forEachStmt->getWhereLoc(), forEachStmt->getWhere(),
                     cloneBraceWith(forEachStmt->getBody(), newBody),
-                    forEachStmt->isImplicit());
+                    forEachStmt->getDeclContext(), forEachStmt->isImplicit());
 
     // For a body of new `do` statement that holds updated `for-in` loop
     // and epilog that consists of a call to `buildArray` that forms the
@@ -771,6 +771,7 @@ protected:
   UNSUPPORTED_STMT(Fail)
   UNSUPPORTED_STMT(PoundAssert)
   UNSUPPORTED_STMT(Case)
+  UNSUPPORTED_STMT(Opaque)
 
 #undef UNSUPPORTED_STMT
 

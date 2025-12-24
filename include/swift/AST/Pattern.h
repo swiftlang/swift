@@ -255,6 +255,24 @@ public:
   Pattern *walk(ASTWalker &&walker) { return walk(walker); }
 };
 
+class OpaquePattern : public Pattern {
+  Pattern* SubPattern = nullptr;
+
+public:
+  OpaquePattern(Pattern *p)
+    : Pattern(PatternKind::Opaque), SubPattern(p) {}
+
+  SourceLoc getLoc() const { return SubPattern->getLoc(); }
+  SourceRange getSourceRange() const { return SubPattern->getSourceRange(); }
+
+  Pattern* getSubPattern() const { return SubPattern; }
+  void setSubPattern(Pattern *p) { SubPattern = p; }
+
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::Opaque;
+  }
+};
+
 /// A pattern consisting solely of grouping parentheses around a
 /// different pattern.
 class ParenPattern : public Pattern {
@@ -870,6 +888,8 @@ inline Pattern *Pattern::getSemanticsProvidingPattern() {
     return tp->getSubPattern()->getSemanticsProvidingPattern();
   if (auto *vp = dyn_cast<BindingPattern>(this))
     return vp->getSubPattern()->getSemanticsProvidingPattern();
+  if (auto *op = dyn_cast<OpaquePattern>(this))
+    return op->getSubPattern()->getSemanticsProvidingPattern();
   return this;
 }
 

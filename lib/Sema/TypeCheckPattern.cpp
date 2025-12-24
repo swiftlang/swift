@@ -310,6 +310,10 @@ public:
   ALWAYS_RESOLVED_PATTERN(Bool)
 #undef ALWAYS_RESOLVED_PATTERN
 
+  Pattern *visitOpaquePattern(OpaquePattern *P) {
+    return P;
+  }
+
   Pattern *visitBindingPattern(BindingPattern *P) {
     // Keep track of the fact that we're inside of a var/let pattern.  This
     // affects how unqualified identifiers are processed.
@@ -824,12 +828,16 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
   case PatternKind::Paren:
-  case PatternKind::Binding: {
+  case PatternKind::Binding:
+  case PatternKind::Opaque: {
     Pattern *SP;
     if (auto *PP = dyn_cast<ParenPattern>(P))
       SP = PP->getSubPattern();
+    else if (auto* BP = dyn_cast<BindingPattern>(P))
+      SP = BP->getSubPattern();
     else
-      SP = cast<BindingPattern>(P)->getSubPattern();
+      SP = cast<OpaquePattern>(P)->getSubPattern();
+
     Type subType = TypeChecker::typeCheckPattern(
         pattern.forSubPattern(SP, /*retainTopLevel=*/true));
     if (subType->hasError())
@@ -1150,10 +1158,26 @@ Pattern *TypeChecker::coercePatternToType(
     PP->setType(sub->getType());
     return P;
   }
+
+  case PatternKind::Opaque: {
+    auto VP = cast<OpaquePattern>(P);
+    auto sub = VP->getSubPattern();
+
+    sub = coercePatternToType(
+        pattern.forSubPattern(sub, /*retainTopLevel=*/false), type, subOptions,
+        tryRewritePattern);
+    if (!sub)
+      return nullptr;
+    VP->setSubPattern(sub);
+    if (sub->hasType())
+      VP->setType(sub->getType());
+    return P;
+  }
+
   case PatternKind::Binding: {
     auto VP = cast<BindingPattern>(P);
+    auto sub = VP->getSubPattern();
 
-    Pattern *sub = VP->getSubPattern();
     sub = coercePatternToType(
         pattern.forSubPattern(sub, /*retainTopLevel=*/false), type, subOptions,
         tryRewritePattern);

@@ -4198,6 +4198,8 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
           // Don't try to suggest 'var' -> 'let' conversion
           // in case of 'for' loop because it's an implicitly
           // immutable context.
+          // FIXME: need to find out if the stmt is part of a foreach's
+          // desugared
           suggestLet = !isa<ForEachStmt>(stmt);
         }
 

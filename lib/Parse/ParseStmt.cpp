@@ -2506,7 +2506,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
       new (Context) ForEachStmt(LabelInfo, ForLoc, TryLoc, AwaitLoc, UnsafeLoc,
                                 pattern.get(), InLoc,
                                 Container.get(), WhereLoc, Where.getPtrOrNull(),
-                                Body.get()));
+                                Body.get(), CurDeclContext));
 }
 
 ///
