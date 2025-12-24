@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -sil-print-types -sil-combine %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-experimental-feature CoroutineFunctions -sil-print-types -sil-combine %s | %FileCheck %s
+
+// REQUIRES: swift_feature_CoroutineFunctions
 
 // Tests for when the mandatory combiner is running with optimizations
 // enabled. Only put tests here for functionality that only occurs when the

@@ -4,9 +4,11 @@
 // RUN:     %s \
 // RUN:     -enable-sil-verify-all \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
+// RUN:     -enable-experimental-feature CoroutineFunctions \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_feature_CoroutineAccessors
+// REQUIRES: swift_feature_CoroutineFunctions
 
 import Builtin
 
