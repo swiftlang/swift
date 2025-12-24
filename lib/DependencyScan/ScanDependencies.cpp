@@ -1405,13 +1405,13 @@ performModuleScanImpl(
     }
   }
 
-  auto scanner = ModuleDependencyScanner(
-      service, cache, instance->getInvocation(), instance->getSILOptions(),
-      instance->getASTContext(), *instance->getDependencyTracker(),
-      instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
-      instance->getDiags(),
-      instance->getInvocation().getFrontendOptions().ParallelDependencyScan,
-      instance->getInvocation().getFrontendOptions().EmitDependencyScannerRemarks);
+  auto expectedScannerPtr =
+      ModuleDependencyScanner::create(service, instance, cache);
+
+  if (!expectedScannerPtr)
+    return expectedScannerPtr.getError();
+
+  auto &scanner = **expectedScannerPtr;
 
   // Identify imports of the main module and add an entry for it
   // to the dependency graph.
@@ -1458,13 +1458,13 @@ static llvm::ErrorOr<swiftscan_import_set_t> performModulePrescanImpl(
     ModuleDependenciesCache &cache,
     DepScanInMemoryDiagnosticCollector *diagnosticCollector) {
   // Setup the scanner
-  auto scanner = ModuleDependencyScanner(
-      service, cache, instance->getInvocation(), instance->getSILOptions(),
-      instance->getASTContext(), *instance->getDependencyTracker(),
-      instance->getSharedCASInstance(), instance->getSharedCacheInstance(),
-      instance->getDiags(),
-      instance->getInvocation().getFrontendOptions().ParallelDependencyScan,
-      instance->getInvocation().getFrontendOptions().EmitDependencyScannerRemarks);
+  auto expectedScannerPtr =
+      ModuleDependencyScanner::create(service, instance, cache);
+
+  if (!expectedScannerPtr)
+    return expectedScannerPtr.getError();
+
+  auto &scanner = **expectedScannerPtr;
 
   // Execute import prescan, and write JSON output to the output stream
   auto mainDependencies =

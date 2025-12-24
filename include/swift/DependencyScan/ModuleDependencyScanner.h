@@ -114,6 +114,19 @@ public:
       llvm::PrefixMapper *mapper);
 
 private:
+  /// Initialize/finalize the clang compiler scanning tool.
+  /// Behind the scenes, the clang scanning tool maintains
+  /// a single clang compiler instance to perform all by-name
+  /// dependency scans. initializeClangScanningTool() initializes
+  /// the clang compiler instance, and returns an error if the
+  /// initialization fails. Once successfully initialized,
+  /// the same clang compiler instance is reused whenever
+  /// scanFilesystemForClangModuleDependency is called,
+  /// throughout the lifetime of the ModuleDependencyScanningWorker
+  /// instance.
+  llvm::Error initializeClangScanningTool();
+  llvm::Error finalizeClangScanningTool();
+
   /// Query dependency information for a named Clang module
   ///
   /// \param moduleName moduel identifier for the query
@@ -241,16 +254,11 @@ private:
 
 class ModuleDependencyScanner {
 public:
-  ModuleDependencyScanner(SwiftDependencyScanningService &ScanningService,
-                          ModuleDependenciesCache &Cache,
-                          const CompilerInvocation &ScanCompilerInvocation,
-                          const SILOptions &SILOptions,
-                          ASTContext &ScanASTContext,
-                          DependencyTracker &DependencyTracker,
-                          std::shared_ptr<llvm::cas::ObjectStore> CAS,
-                          std::shared_ptr<llvm::cas::ActionCache> ActionCache,
-                          DiagnosticEngine &Diagnostics, bool ParallelScan,
-                          bool EmitScanRemarks);
+  static llvm::ErrorOr<std::unique_ptr<ModuleDependencyScanner>>
+  create(SwiftDependencyScanningService &service, CompilerInstance *instance,
+         ModuleDependenciesCache &cache);
+
+  ~ModuleDependencyScanner();
 
   /// Identify the scanner invocation's main module's dependencies
   llvm::ErrorOr<ModuleDependencyInfo>
@@ -292,6 +300,20 @@ public:
   }
 
 private:
+  // Private methods that create, initialize and finalize the scanner.
+  ModuleDependencyScanner(SwiftDependencyScanningService &ScanningService,
+                          ModuleDependenciesCache &Cache,
+                          const CompilerInvocation &ScanCompilerInvocation,
+                          const SILOptions &SILOptions,
+                          ASTContext &ScanASTContext,
+                          DependencyTracker &DependencyTracker,
+                          std::shared_ptr<llvm::cas::ObjectStore> CAS,
+                          std::shared_ptr<llvm::cas::ActionCache> ActionCache,
+                          DiagnosticEngine &Diagnostics, bool ParallelScan,
+                          bool EmitScanRemarks);
+  llvm::Error initializeWorkerClangScanningTool();
+  llvm::Error finalizeWorkerClangScanningTool();
+
   /// Main routine that computes imported module dependency transitive
   /// closure for the given module.
   /// 1. Swift modules imported directly or via another Swift dependency
