@@ -3566,7 +3566,7 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     else
       ty = resolveASTFunctionType(fnRepr, options, &attrs);
 
-  // Boxes 
+  // Boxes
   } else if (auto boxRepr = dyn_cast<SILBoxTypeRepr>(repr)) {
     ty = resolveSILBoxType(boxRepr, options, &attrs);
 
@@ -6975,20 +6975,117 @@ void TypeChecker::checkExistentialTypes(
   checker.checkRequirements(genericParams->getRequirements());
 }
 
+// copied from elsewhere, to unify later
+Type inferResultBuilderComponentType(NominalTypeDecl *builder) {
+  Type componentType;
+
+  SmallVector<ValueDecl *, 4> potentialMatches;
+  ASTContext &ctx = builder->getASTContext();
+  bool supportsBuildBlock = TypeChecker::typeSupportsBuilderOp(
+      builder->getDeclaredInterfaceType(), builder, ctx.Id_buildBlock,
+      /*argLabels=*/{}, &potentialMatches);
+  if (supportsBuildBlock) {
+    for (auto decl : potentialMatches) {
+      auto func = dyn_cast<FuncDecl>(decl);
+      if (!func || !func->isStatic())
+        continue;
+
+      // If we haven't seen a component type before, gather it.
+      if (!componentType) {
+        componentType = func->getResultInterfaceType();
+        continue;
+      }
+
+      // If there are inconsistent component types, bail out.
+      if (!componentType->isEqual(func->getResultInterfaceType())) {
+        componentType = Type();
+        break;
+      }
+    }
+  }
+
+  return componentType;
+}
+
 Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
                                      DeclContext *dc,
                                      CustomAttrTypeKind typeKind) const {
   const TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
+  HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
   // Property delegates allow their type to be an unbound generic.
   if (typeKind == CustomAttrTypeKind::PropertyWrapper) {
     unboundTyOpener = TypeResolution::defaultUnboundTypeOpener;
+  } else {
+    // TODO: Only do this for result builders
+    unboundTyOpener = [attr, dc](UnboundGenericType* unbound) -> Type {
+      Decl *owningDecl = attr->owner.getAsDecl();
+      
+      if (auto builder = dyn_cast_or_null<NominalTypeDecl>(unbound->getDecl())) {
+        // TODO: In this prototype we only support unbound result builders with a single generic parameter.
+        // A final implementation would support both.
+        if (builder->getGenericParams()->size() != 1) {
+          return unbound;
+        }
+        
+        auto genericParam = builder->getGenericParams()->getParams()[0];
+          
+        if (auto varDecl = dyn_cast_or_null<VarDecl>(owningDecl)) {
+          // Inspect the generic types of the ResultBuilder component and return of the attached function
+          auto resultType = varDecl->getInterfaceType();
+          
+          auto componentType = inferResultBuilderComponentType(builder)
+            ->getAs<BoundGenericType>();
+          
+          using namespace constraints;
+          ConstraintSystem cs(dc, std::nullopt);
+
+          // Replace any `GenericTypeParamType`s in the component type with a type variable
+          auto locator = cs.getConstraintLocator(builder);
+          auto typeVar = cs.createTypeVariable(locator, TVO_CanBindToHole);
+  
+          // TODO: Support multiple args by creating a type variable for each `GenericTypeParamType`
+          auto componentTypeWithTypeVar = BoundGenericType::get(
+            componentType->getDecl(), componentType->getParent(), {typeVar});
+          
+//          auto componentTypeArgs = componentType->getGenericArgs()
+//          llvm::SmallVector<Type, 8> componentArgsWithTypeVariables;
+//          componentArgsWithTypeVariables.reserve(args.size());
+//
+//          for (const Type &t : componentTypeArgs) {
+//            if (is generic type...) {
+//              copied.push_back(type var...);
+//            } else {
+//              copied.push_back(t);
+//            }
+//          }
+          
+          // The result builder result type should be equal to the return type of the attached declaration
+          cs.addConstraint(ConstraintKind::Equal,
+                           resultType,
+                           componentTypeWithTypeVar,
+                           /*preparedOverload:*/ nullptr);
+
+          auto solution = cs.solveSingle();
+          
+          // Replace the type vars with the solved result
+          auto genericArgs = {solution->typeBindings[typeVar]};
+          return BoundGenericType::get(builder, unbound->getParent(), genericArgs);
+        }
+      }
+    
+      // Could infer component type using `inferResultBuilderComponentType`?
+      
+      return unbound;
+    };
+    
+    placeholderHandler = PlaceholderType::get;
   }
 
   const auto type = TypeResolution::resolveContextualType(
       attr->getTypeRepr(), dc, options, unboundTyOpener,
-      /*placeholderHandler*/ nullptr, /*packElementOpener*/ nullptr);
+      placeholderHandler, /*packElementOpener*/ nullptr);
 
   // We always require the type to resolve to a nominal type. If the type was
   // not a nominal type, we should have already diagnosed an error via
