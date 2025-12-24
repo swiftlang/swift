@@ -4,10 +4,12 @@
 // RUN:     -module-name Library \
 // RUN:     -emit-ir \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
+// RUN:     -enable-experimental-feature CoroutineFunctions \
 // RUN:     -enable-library-evolution \
 // RUN: | %IRGenFileCheck %s
 
 // REQUIRES: swift_feature_CoroutineAccessors
+// REQUIRES: swift_feature_CoroutineFunctions
 
 // The old (legacy) accessor vtable/default-override slots this test exercises
 // on the concrete resilient class B are additively present only on an

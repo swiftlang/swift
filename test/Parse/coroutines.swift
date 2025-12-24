@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature CoroutineFunctions
+// REQUIRES: swift_feature_CoroutineFunctions
 
 @yield_once func coro(_ x : inout Float) yields (inout Float) -> () {
   var _x = Float(0.0)

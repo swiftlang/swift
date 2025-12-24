@@ -1,8 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enforce-exclusivity=none -Xllvm -sil-print-types -emit-sil -Onone %s -o %t/Onone.sil
-// RUN: %target-sil-opt -sil-print-types -parse-serialized-sil %t/Onone.sil -inline -o %t/inlined.sil
+// RUN: %target-sil-opt -sil-print-types -parse-serialized-sil %t/Onone.sil -inline -enable-experimental-feature CoroutineFunctions -o %t/inlined.sil
 // RUN: %FileCheck %s --check-prefix=INLINE < %t/inlined.sil
-// RUN: %target-sil-opt -sil-print-types -parse-serialized-sil -enable-sil-verify-all %t/inlined.sil -enforce-exclusivity=unchecked -diagnose-static-exclusivity -o /dev/null
+// RUN: %target-sil-opt -sil-print-types -parse-serialized-sil -enable-sil-verify-all %t/inlined.sil -enforce-exclusivity=unchecked -diagnose-static-exclusivity -enable-experimental-feature CoroutineFunctions -o /dev/null
+
+// REQUIRES: swift_feature_CoroutineFunctions
 
 public protocol SomeP {
   var someV: Int { get set }

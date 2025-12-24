@@ -1,6 +1,8 @@
-// RUN: %target-sil-opt -sil-print-types -address-lowering -enable-sil-opaque-values -emit-sorted-sil -module-name Swift -sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -address-lowering -enable-sil-opaque-values -emit-sorted-sil -module-name Swift  -enable-experimental-feature CoroutineFunctions -sil-verify-all %s | %FileCheck %s
 //
 // The module name must be Swift so that declarations like Error are parsed as the correct loadable type.
+
+// REQUIRES: swift_feature_CoroutineFunctions
 
 import Builtin
 
