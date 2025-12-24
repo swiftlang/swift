@@ -1024,7 +1024,7 @@ public:
                     LabelInfo),
         ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc), UnsafeLoc(UnsafeLoc),
         Pat(nullptr), InLoc(InLoc), Sequence(Sequence), WhereLoc(WhereLoc),
-        WhereExpr(WhereExpr), Body(Body) {
+        WhereExpr(WhereExpr), Body(Body), DC(DC) {
     setPattern(Pat);
   }
 

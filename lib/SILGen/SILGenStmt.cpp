@@ -1446,7 +1446,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
     return;
   }
 
-  auto* braceStmt = S->getCachedDesugaredStmt();
+  auto* braceStmt = S->getDesugaredStmt();
   if (braceStmt)
     visitBraceStmt(braceStmt);
 }

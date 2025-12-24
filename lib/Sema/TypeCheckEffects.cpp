@@ -2000,7 +2000,7 @@ public:
   /// Check to see if the given for-each statement to determine if it
   /// throws or is async.
   Classification classifyForEach(ForEachStmt *stmt) {
-    if (!stmt->getCachedDesugaredStmt())
+    if (!stmt->getDesugaredStmt())
       return Classification::forInvalidCode();
 
     // If there is an 'await', the for-each loop is always async.
@@ -4590,7 +4590,7 @@ private:
     if (S->getWhere())
       S->getWhere()->walk(*this);
 
-    if (S->getDesugaredStmt())
+    if (S->getCachedDesugaredStmt())
       S->getCachedDesugaredStmt()->walk(*this);
 
     auto classification = getApplyClassifier().classifyForEach(S);
