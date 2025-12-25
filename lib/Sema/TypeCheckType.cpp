@@ -7030,14 +7030,23 @@ Type openUnboundResultBuilderType(UnboundGenericType* unboundTy,
   Type owningDeclResultType;
   Decl *owningDecl = attr->getOwner().getAsDecl();
   
-  // TODO: Handle functions, closures, non-computed properties
   if (auto varDecl = dyn_cast_or_null<VarDecl>(owningDecl)) {
-    owningDeclResultType = varDecl->getInterfaceType();
+    if (auto closureResultType = varDecl->getInterfaceType()->getAs<FunctionType>()) {
+      owningDeclResultType = closureResultType->getResult();
+    } else {
+      owningDeclResultType = varDecl->getInterfaceType();
+    }
   } else if (auto funcDecl = dyn_cast_or_null<FuncDecl>(owningDecl)) {
     owningDeclResultType = funcDecl->getResultInterfaceType();
   }
   
   if (!owningDeclResultType) {
+    return invalidResultBuilderType(unboundTy, attr, dc);
+  }
+  
+  // Retrieve the result type of the result builder itself
+  auto componentType = inferResultBuilderComponentType(builder);
+  if (!componentType) {
     return invalidResultBuilderType(unboundTy, attr, dc);
   }
   
@@ -7064,12 +7073,12 @@ Type openUnboundResultBuilderType(UnboundGenericType* unboundTy,
     typeVarReplacements,
     LookUpConformanceInModule());
 
-  auto componentType = inferResultBuilderComponentType(builder).subst(subMap);
+  auto componentTypeWithTypeVars = componentType.subst(subMap);
 
   // The result builder result type should be equal to the return type of the attached declaration
   cs.addConstraint(ConstraintKind::Equal,
                    owningDeclResultType,
-                   componentType,
+                   componentTypeWithTypeVars,
                    /*preparedOverload:*/ nullptr);
 
   auto solution = cs.solveSingle();
