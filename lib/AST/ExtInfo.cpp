@@ -14,8 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ExtInfo.h"
+#include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 
 #include "clang/AST/Type.h"
@@ -155,6 +156,8 @@ void ASTExtInfoBuilder::checkInvariants() const {
     error.value().dump();
     llvm_unreachable("Ill-formed ASTExtInfoBuilder.");
   }
+  if (sendableDependentType)
+    ASSERT(!isSendable() && sendableDependentType->hasTypeVariable());
 }
 
 // MARK: - ASTExtInfo
