@@ -565,6 +565,8 @@ Type Decl::getResolvedCustomAttrType(CustomAttr *attr) const {
     kind = CustomAttrTypeKind::GlobalActor;
   } else if (nominal->getAttrs().hasAttribute<PropertyWrapperAttr>()) {
     kind = CustomAttrTypeKind::PropertyWrapper;
+  } else if (nominal->getAttrs().hasAttribute<ResultBuilderAttr>()) {
+    kind = CustomAttrTypeKind::ResultBuilder;
   } else {
     kind = CustomAttrTypeKind::NonGeneric;
   }
