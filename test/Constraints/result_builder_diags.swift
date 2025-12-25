@@ -1157,5 +1157,54 @@ func testInferResultBuilderGenerics() {
     ("foo", 1) // expected-warning {{expression of type '(String, Int)' is unused}}
     ("bar", 2) // expected-warning {{expression of type '(String, Int)' is unused}}
   }
+  
+  @resultBuilder
+  enum ComplexListBuilder<Element> {
+    static func buildBlock(_ elements: Element...) -> [Element] {
+      elements
+    }
+    
+    static func buildFinalResult(_ component: [Element]) -> Set<Element> where Element: Hashable {
+      Set(component)
+    }
+    
+    static func buildFinalResult(_ component: [Element]) -> ContiguousArray<Element> {
+      ContiguousArray(component)
+    }
+  }
 
+  @ComplexListBuilder
+  var stringSetFromBuildFinalResult: Set<String> {
+    "foo"
+    "bar"
+  }
+
+  @ComplexListBuilder
+  var contiguousStringsFromBuildFinalResult: ContiguousArray<String> {
+    "foo"
+    "bar"
+  }
+
+  @ComplexListBuilder
+  var stringArrayFromBuildFinalResult: [String] { // expected-error {{cannot convert return expression of type 'Set<String>' to return type '[String]'}}
+    "foo"
+    "bar"
+  }
+
+  @resultBuilder
+  enum PartialArrayBuilder<Element> {
+    static func buildPartialBlock(first: Element) -> [Element] {
+      [first]
+    }
+
+    static func buildPartialBlock(accumulated: [Element], next: Element) -> [Element] {
+      accumulated + [next]
+    }
+  }
+
+  @PartialArrayBuilder
+  var stringArrayFromBuildPartial: [String] {
+    "foo"
+    "bar"
+  }
 }
