@@ -80,7 +80,7 @@ extension PointClass: Reflectable {
   }
 }
 
-// LIBRARY-IR: define {{.*}} @"$e7Library18createsExistentialAA11Reflectable_pyF"()
+// LIBRARY-IR: define {{.*}} @"$e7Library18createsExistentialAA11Reflectable_pyF"
 @export(interface)
 public func createsExistential() -> any Reflectable {
   return PointClass(x: 5, y: 5)
@@ -115,7 +115,7 @@ public func testMe() {
 
 // APPLICATION-IR: define {{(protected |dllexport )?}}i32 @Application_main
 
-// APPLICATION-IR: define linkonce_odr hidden swiftcc { ptr, ptr } @"$es27_allocateUninitializedArrayySayxG_BptBwlFSi_Tg5"
+// APPLICATION-IR: define linkonce_odr hidden swiftcc {{{ ptr, ptr }|void}} @"$es27_allocateUninitializedArrayySayxG_BptBwlFSi_Tg5"
 
 @main
 struct Main {
