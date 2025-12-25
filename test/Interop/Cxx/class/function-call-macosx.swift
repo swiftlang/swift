@@ -18,7 +18,7 @@ public func testARCWeak() {
 }
 
 // CHECK: sil [ossa] @$s4main26testARCWeakFunctionPointeryyF : $@convention(thin) () -> () {
-// CHECK: %[[V0:.*]] = function_ref @$sSo9getFnPtr2ySo7ARCWeakVXCyFTo : $@convention(c) () -> @convention(c) (@in ARCWeak) -> ()
+// CHECK: %[[V0:.*]] = function_ref @$sSo9getFnPtr2ySo7ARCWeakVXzC18_ZTSPDoFv7ARCWeakEyFTo : $@convention(c) () -> @convention(c) (@in ARCWeak) -> ()
 // CHECK: %[[V1:.*]] = apply %[[V0]]() : $@convention(c) () -> @convention(c) (@in ARCWeak) -> ()
 // CHECK: %[[MV1:.*]] = move_value [var_decl] %[[V1]] : $@convention(c) (@in ARCWeak) -> ()
 // CHECK: %[[V3:.*]] = alloc_stack $ARCWeak

@@ -33,7 +33,7 @@ extern int simple(int x, int y);
 
 extern void primitiveTypes(ptrdiff_t i, int ci, long l, char c, float f, double d, bool b);
 
-extern void sameName();
+extern void sameName(void);
 
 __attribute__((swift_name("renamed_swiftSide(_:)")))
 extern void renamed_clangSide(ptrdiff_t arg);
