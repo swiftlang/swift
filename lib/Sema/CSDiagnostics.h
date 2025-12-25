@@ -1376,16 +1376,19 @@ class AllowTypeOrInstanceMemberFailure final : public MemberReferenceFailure {
   Type BaseType;
   ValueDecl *Member;
   DeclNameRef Name;
+  Expr *BaseExpr;
 
 public:
   AllowTypeOrInstanceMemberFailure(const Solution &solution, Type baseType,
                                    ValueDecl *member, DeclNameRef name,
+                                   Expr *baseExpr,
                                    ConstraintLocator *locator)
       : MemberReferenceFailure(solution, locator),
-        BaseType(baseType->getRValueType()), Member(member), Name(name) {
+        BaseType(baseType->getRValueType()), Member(member), Name(name), BaseExpr(baseExpr) {
     assert(member);
   }
 
+  StringRef getInstanceNameFromBaseExpr() const;
   bool diagnoseAsError() override;
 };
 
