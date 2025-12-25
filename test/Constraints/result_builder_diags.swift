@@ -1079,3 +1079,83 @@ func testNoDuplicateStmtDiags() {
     }
   }
 }
+
+func testInferResultBuilderGenerics() {
+  @resultBuilder
+  struct SimpleArrayBuilder<Element> {
+    static func buildBlock(_ elements: Element...) -> [Element] {
+      elements
+    }
+  }
+
+  @SimpleArrayBuilder
+  var stringArray: [String] {
+    "foo"
+    "bar"
+  }
+
+  @SimpleArrayBuilder
+  func makeStringArray() -> Array<String> {
+    "foo"
+    "bar"
+  }
+
+  func takesClosure(@SimpleArrayBuilder _ makeArray: () -> [String]) {
+    print(makeArray())
+  }
+
+  @SimpleArrayBuilder // expected-error{{unable to infer generic parameters for result builder 'SimpleArrayBuilder'}}
+  var string: String {
+    "foo"
+  }
+
+  struct MyValue {
+    @SimpleArrayBuilder var array1: [String]
+    @SimpleArrayBuilder var array2: () -> [String]
+  }
+
+  _ = MyValue(
+    array1: {
+      "foo"
+      "bar"
+    },
+    array2: {
+      "bar"
+      "baaz"
+    },
+  )
+
+  @SimpleArrayBuilder
+  var makeStringArrayClosure: () -> [String] { // expected-error {{cannot convert return expression of type '[String]' to return type '() -> [String]'}}
+    { // expected-error {{cannot convert value of type '() -> [String]' to expected argument type 'String'}}
+      ["foo"]
+    }
+  }
+
+  @resultBuilder
+  struct TupleArrayBuilder<One, Two> {
+    static func buildBlock(_ elements: (One, Two)...) -> [(One, Two)] {
+      elements
+    }
+  }
+
+  @TupleArrayBuilder
+  var tupleArray: [(String, Int)] {
+    ("foo", 1)
+    ("bar", 2)
+  }
+
+  @resultBuilder
+  struct TooManyArgsBuilder<One, Two, Three> {
+    static func buildBlock(_ elements: (One, Two)...) -> [(One, Two)] {
+      elements
+    }
+  }
+
+  @TooManyArgsBuilder // expected-error {{unable to infer generic parameters for result builder 'TooManyArgsBuilder'}}
+  var invalidTupleArray: [(String, Int)] {
+    ("foo", 1) // expected-warning {{expression of type '(String, Int)' is unused}}
+    ("bar", 2) // expected-warning {{expression of type '(String, Int)' is unused}}
+  }
+
+}
