@@ -6521,6 +6521,40 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
 
   if (!ctx.LangOpts.DisableAvailabilityChecking)
     diagnoseStmtAvailability(S, const_cast<DeclContext*>(DC));
+
+  if (auto *doCatchStmt = dyn_cast<DoCatchStmt>(S)) {
+    for (auto *catchStmt : doCatchStmt->getCatches()) {
+      auto *body = dyn_cast_or_null<BraceStmt>(catchStmt->getBody());
+      if (!body)
+        continue;
+
+      bool isEffectivelyEmpty = body->empty();
+
+      if (body->getNumElements() == 1) {
+        if (auto *exprStmt = body->getFirstElement().dyn_cast<Expr *>()) {
+          if (auto *assign = dyn_cast<AssignExpr>(exprStmt)) {
+            if (isa<DiscardAssignmentExpr>(assign->getDest())) {
+              if (auto *declRefExpr = dyn_cast<DeclRefExpr>(assign->getSrc())) {
+                if (declRefExpr->getDecl()->getName().isSimpleName("error")) {
+                  isEffectivelyEmpty = false;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (isEffectivelyEmpty) {
+        auto diag = ctx.Diags.diagnose(catchStmt->getStartLoc(),
+                                       diag::empty_catch_block);
+        SourceLoc lBrace = body->getLBraceLoc();
+        if (lBrace.isValid()) {
+          diag.fixItInsert(body->getLBraceLoc().getAdvancedLoc(1),
+                           " _ = error ");
+        }
+      }
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
