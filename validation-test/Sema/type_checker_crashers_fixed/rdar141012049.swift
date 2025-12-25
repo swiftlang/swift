@@ -1,12 +1,12 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 func test(_ v: [Int]) {
-  let result = v.filter { }.flatMap(\.wrong) {
+  let result = v.filter { }.flatMap(\.wrong) { // expected-note {{'result' declared here}}
     // expected-error@-1 {{type for closure argument list expects 1 argument, which cannot be implicitly ignored}}
     // expected-error@-2 {{cannot convert value of type '()' to closure result type 'Bool'}}
     // expected-error@-3 {{value of type 'Int' has no member 'wrong'}}
     // expected-error@-4 {{extra trailing closure passed in call}}
-    print(result)
+    print(result) // expected-error {{use of local variable 'result' before its declaration}}
   }
 
   let otherResult = v.filter { _ in false }.flatMap(\.wrong, { $0 }, 42)
