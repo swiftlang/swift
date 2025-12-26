@@ -117,24 +117,31 @@ private:
   BindingKind Kind;
   Type BindingType;
   bool Viable;
-  PrintableBinding(BindingKind kind, Type bindingType, bool viable)
-      : Kind(kind), BindingType(bindingType), Viable(viable) {}
+  TypeVariableType *Originator;
+
+  PrintableBinding(BindingKind kind, Type bindingType, bool viable,
+                   TypeVariableType *originator)
+      : Kind(kind), BindingType(bindingType), Viable(viable),
+        Originator(originator) {}
 
 public:
-  static PrintableBinding supertypesOf(Type binding) {
-    return PrintableBinding{BindingKind::Supertypes, binding, true};
+  static PrintableBinding supertypesOf(Type binding,
+                                       TypeVariableType *originator) {
+    return PrintableBinding{BindingKind::Supertypes, binding, true, originator};
   }
 
-  static PrintableBinding subtypesOf(Type binding) {
-    return PrintableBinding{BindingKind::Subtypes, binding, true};
+  static PrintableBinding subtypesOf(Type binding,
+                                     TypeVariableType *originator) {
+    return PrintableBinding{BindingKind::Subtypes, binding, true, originator};
   }
 
-  static PrintableBinding exact(Type binding) {
-    return PrintableBinding{BindingKind::Exact, binding, true};
+  static PrintableBinding exact(Type binding, TypeVariableType *originator) {
+    return PrintableBinding{BindingKind::Exact, binding, true, originator};
   }
 
-  static PrintableBinding literalDefaultType(Type binding, bool viable) {
-    return PrintableBinding{BindingKind::Literal, binding, viable};
+  static PrintableBinding literalDefaultType(Type binding, bool viable,
+                                             TypeVariableType *originator) {
+    return PrintableBinding{BindingKind::Literal, binding, viable, originator};
   }
 
   void print(llvm::raw_ostream &out, const PrintOptions &PO,
@@ -156,6 +163,11 @@ public:
       BindingType.print(out, PO);
     if (!Viable)
       out << " [literal not viable]";
+    if (Originator) {
+      out << " [transitive from ";
+      Originator->print(out, PO);
+      out << "]";
+    }
   }
 };
 
@@ -165,13 +177,13 @@ void PotentialBinding::print(llvm::raw_ostream &out,
                              const PrintOptions &PO) const {
   switch (Kind) {
   case AllowedBindingKind::Exact:
-    PrintableBinding::exact(BindingType).print(out, PO);
+    PrintableBinding::exact(BindingType, Originator).print(out, PO);
     break;
   case AllowedBindingKind::Supertypes:
-    PrintableBinding::supertypesOf(BindingType).print(out, PO);
+    PrintableBinding::supertypesOf(BindingType, Originator).print(out, PO);
     break;
   case AllowedBindingKind::Subtypes:
-    PrintableBinding::subtypesOf(BindingType).print(out, PO);
+    PrintableBinding::subtypesOf(BindingType, Originator).print(out, PO);
     break;
   }
 }
@@ -2629,24 +2641,24 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   for (const auto &binding : Bindings) {
     switch (binding.Kind) {
     case AllowedBindingKind::Exact:
-      potentialBindings.push_back(PrintableBinding::exact(binding.BindingType));
+      potentialBindings.push_back(
+          PrintableBinding::exact(binding.BindingType, binding.Originator));
       break;
     case AllowedBindingKind::Supertypes:
-      potentialBindings.push_back(
-          PrintableBinding::supertypesOf(binding.BindingType));
+      potentialBindings.push_back(PrintableBinding::supertypesOf(
+          binding.BindingType, binding.Originator));
       break;
     case AllowedBindingKind::Subtypes:
-      potentialBindings.push_back(
-          PrintableBinding::subtypesOf(binding.BindingType));
+      potentialBindings.push_back(PrintableBinding::subtypesOf(
+          binding.BindingType, binding.Originator));
       break;
     }
   }
   for (const auto &literal : Literals) {
     potentialBindings.push_back(PrintableBinding::literalDefaultType(
-        literal.hasDefaultType()
-        ? literal.getDefaultType()
-        : Type(),
-        literal.viableAsBinding()));
+        literal.hasDefaultType() ? literal.getDefaultType() : Type(),
+        literal.viableAsBinding(),
+        /*originator=*/nullptr));
   }
   if (potentialBindings.empty()) {
     out << "<none>";
@@ -2663,8 +2675,8 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     interleave(
         Defaults,
         [&](Constraint *constraint) {
-          auto defaultBinding =
-              PrintableBinding::exact(constraint->getSecondType());
+          auto defaultBinding = PrintableBinding::exact(
+              constraint->getSecondType(), /*originator=*/nullptr);
           defaultBinding.print(out, PO);
         },
         [&] { out << ", "; });
