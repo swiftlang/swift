@@ -2830,12 +2830,14 @@ namespace {
             }
 
             case FunctionTypeIsolation::Kind::NonIsolated: {
-              // nonisolated synchronous <-> @concurrent
-              if (fromFnType->isAsync() != toFnType->isAsync()) {
-                diagnoseNonSendableParametersAndResult(
-                    toFnType,
-                    version::Version::getFutureMajorLanguageVersion());
-              }
+              // At this point we know that `fromFnType` is `@Sendable` because
+              // otherwise we should have returned early to defer to RBI.
+              ASSERT(fromFnType->isSendable() && "Expected @Sendable function");
+
+              // Since neither the source nor result of the conversion involves
+              // actor isolation (inherited or otherwise), converting from sync
+              // -> async or dropping @Sendable are okay because the original
+              // function was safe to call anywhere.
               break;
             }
             }
