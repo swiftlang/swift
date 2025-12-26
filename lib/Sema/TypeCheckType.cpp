@@ -6976,147 +6976,158 @@ void TypeChecker::checkExistentialTypes(
   checker.checkRequirements(genericParams->getRequirements());
 }
 
-/// Retrieves the valid result types of the result builder
-/// (the return types of `buildFinalResult` / `buildBlock` /
-/// `buildPartialResult`).
-llvm::SmallVector<Type, 4>
-retrieveResultBuilderResultTypes(NominalTypeDecl *builder) {
-  ASTContext &ctx = builder->getASTContext();
-  llvm::SmallVector<Type, 4> resultTypes;
-
-  Identifier methodIds[] = {ctx.Id_buildFinalResult, ctx.Id_buildBlock,
-                            ctx.Id_buildPartialBlock};
-
-  for (auto methodId : methodIds) {
-    SmallVector<ValueDecl *, 4> potentialMatches;
-    bool supportsMethod = TypeChecker::typeSupportsBuilderOp(
-        builder->getDeclaredInterfaceType(), builder, methodId,
-        /*argLabels=*/{}, &potentialMatches);
-
-    if (!supportsMethod)
-      continue;
-
-    for (auto decl : potentialMatches) {
-      auto func = dyn_cast<FuncDecl>(decl);
-      if (!func || !func->isStatic())
-        continue;
-
-      auto resultType = func->getResultInterfaceType();
-      if (!resultType || resultType->hasError())
-        continue;
-
-      // Add the result type if we haven't seen it before
-      bool isDuplicate = false;
-      for (auto existingType : resultTypes) {
-        if (existingType->isEqual(resultType)) {
-          isDuplicate = true;
-          break;
-        }
-      }
-
-      if (!isDuplicate) {
-        resultTypes.push_back(resultType);
-      }
-    }
-  }
-
-  return resultTypes;
-}
-
-Type invalidResultBuilderType(UnboundGenericType* unboundTy,
-                              CustomAttr *attr, DeclContext *dc) {
-  dc->getASTContext().Diags.diagnose(
-    attr->getTypeExpr()->getLoc(),
-    diag::result_builder_generic_inference_failed,
-    unboundTy->getDecl()->getName());
-  
-  return ErrorType::get(dc->getASTContext());
-}
-
 /// Opens a result builder `UnboundGenericType` into a `BoundGenericType`
 /// by creating and solving a constraint between the result builder's
 /// result type and the return type of the attached declaration.
-Type openUnboundResultBuilderType(UnboundGenericType* unboundTy,
-                                  CustomAttr *attr, DeclContext *dc) {
-  auto resultBuilderDecl =
-      dyn_cast_or_null<NominalTypeDecl>(unboundTy->getDecl());
-  if (!resultBuilderDecl) {
-    return invalidResultBuilderType(unboundTy, attr, dc);
-  }
+struct ResultBuilderUnboundTypeOpener {
+  DeclContext *dc;
+  CustomAttr *attr;
 
-  // Retrieve the return type of the owning declaration that
-  // provides type inference for the result builder type.
-  Type owningDeclResultType;
-  Decl *owningDecl = attr->getOwner().getAsDecl();
-  
-  if (auto varDecl = dyn_cast_or_null<VarDecl>(owningDecl)) {
-    if (auto closureResultType = varDecl->getInterfaceType()->getAs<FunctionType>()) {
-      owningDeclResultType = closureResultType->getResult();
-    } else {
-      owningDeclResultType = varDecl->getInterfaceType();
-    }
-  } else if (auto funcDecl = dyn_cast_or_null<FuncDecl>(owningDecl)) {
-    owningDeclResultType = funcDecl->getResultInterfaceType();
-  }
-  
-  if (!owningDeclResultType) {
-    return invalidResultBuilderType(unboundTy, attr, dc);
-  }
-
-  // Retrieve the supported result types of the result builder.
-  auto resultTypes = retrieveResultBuilderResultTypes(resultBuilderDecl);
-  if (resultTypes.empty()) {
-    return invalidResultBuilderType(unboundTy, attr, dc);
-  }
-
-  auto genericSig = resultBuilderDecl->getGenericSignature();
-
-  for (auto componentType : resultTypes) {
-    using namespace constraints;
-    ConstraintSystem cs(dc, std::nullopt);
-
-    // Create a type variable for each of the result builder's generic params
-    llvm::SmallVector<Type, 8> typeVarReplacements;
-    llvm::SmallVector<TypeVariableType *, 8> typeVars;
-    for (unsigned i = 0; i < genericSig.getGenericParams().size(); ++i) {
-      auto locator = cs.getConstraintLocator(
-          resultBuilderDecl, {ConstraintLocator::GenericArgument, i});
-      auto typeVar = cs.createTypeVariable(locator, TVO_CanBindToHole);
-      typeVarReplacements.push_back(typeVar);
-      typeVars.push_back(typeVar);
+  Type operator()(UnboundGenericType *unboundTy) const {
+    auto resultBuilderDecl =
+        dyn_cast_or_null<NominalTypeDecl>(unboundTy->getDecl());
+    if (!resultBuilderDecl ||
+        !resultBuilderDecl->getAttrs().hasAttribute<ResultBuilderAttr>()) {
+      return invalidResultBuilderType(unboundTy);
     }
 
-    // Replace any references to the result builder's generic params
-    // in the result type with the corresponding type variables.
-    auto subMap = SubstitutionMap::get(genericSig, typeVarReplacements,
-                                       LookUpConformanceInModule());
+    Decl *owningDecl = attr->getOwner().getAsDecl();
+    if (!owningDecl) {
+      return invalidResultBuilderType(unboundTy);
+    }
 
-    auto componentTypeWithTypeVars = componentType.subst(subMap);
+    // Retrieve the return type of the owning declaration that
+    // provides type inference for the result builder type.
+    Type owningDeclResultType;
+    if (auto varDecl = dyn_cast<VarDecl>(owningDecl)) {
+      if (auto closureResultType =
+              varDecl->getInterfaceType()->getAs<FunctionType>()) {
+        owningDeclResultType = closureResultType->getResult();
+      } else {
+        owningDeclResultType = varDecl->getInterfaceType();
+      }
+    } else if (auto funcDecl = dyn_cast<FuncDecl>(owningDecl)) {
+      owningDeclResultType = funcDecl->getResultInterfaceType();
+    }
 
-    // The result builder result type should be equal to the return type of the
-    // attached declaration.
-    cs.addConstraint(ConstraintKind::Equal, owningDeclResultType,
-                     componentTypeWithTypeVars,
-                     /*preparedOverload:*/ nullptr);
+    if (!owningDeclResultType) {
+      return invalidResultBuilderType(unboundTy);
+    }
 
-    auto solution = cs.solveSingle();
+    // Retrieve the supported result types of the result builder.
+    auto resultTypes = retrieveResultBuilderResultTypes(resultBuilderDecl);
+    if (resultTypes.empty()) {
+      return invalidResultBuilderType(unboundTy);
+    }
 
-    // If a solution exists, bind the result builder's generic params to the
-    // solved types.
-    if (solution) {
-      llvm::SmallVector<Type, 8> solvedReplacements;
-      for (auto typeVar : typeVars) {
-        solvedReplacements.push_back(solution->typeBindings[typeVar]);
+    auto genericSig = resultBuilderDecl->getGenericSignature();
+
+    // Try each result type and return the first one that produces a valid
+    // solution
+    for (auto componentType : resultTypes) {
+      using namespace constraints;
+      ConstraintSystem cs(dc, std::nullopt);
+
+      // Create a type variable for each of the result builder's generic params
+      llvm::SmallVector<Type, 8> typeVarReplacements;
+      llvm::SmallVector<TypeVariableType *, 8> typeVars;
+      for (unsigned i = 0; i < genericSig.getGenericParams().size(); ++i) {
+        auto locator = cs.getConstraintLocator(
+            resultBuilderDecl, {ConstraintLocator::GenericArgument, i});
+        auto typeVar = cs.createTypeVariable(locator, TVO_CanBindToHole);
+        typeVarReplacements.push_back(typeVar);
+        typeVars.push_back(typeVar);
       }
 
-      return BoundGenericType::get(resultBuilderDecl, unboundTy->getParent(),
-                                   solvedReplacements);
+      // Replace any references to the result builder's generic params
+      // in the result type with the corresponding type variables.
+      auto subMap = SubstitutionMap::get(genericSig, typeVarReplacements,
+                                         LookUpConformanceInModule());
+
+      auto componentTypeWithTypeVars = componentType.subst(subMap);
+
+      // The result builder result type should be equal to the return type of
+      // the attached declaration.
+      cs.addConstraint(ConstraintKind::Equal, owningDeclResultType,
+                       componentTypeWithTypeVars,
+                       /*preparedOverload:*/ nullptr);
+
+      auto solution = cs.solveSingle();
+
+      // If a solution exists, bind the result builder's generic params to the
+      // solved types.
+      if (solution) {
+        llvm::SmallVector<Type, 8> solvedReplacements;
+        for (auto typeVar : typeVars) {
+          solvedReplacements.push_back(solution->typeBindings[typeVar]);
+        }
+
+        return BoundGenericType::get(resultBuilderDecl, unboundTy->getParent(),
+                                     solvedReplacements);
+      }
     }
+
+    // No result type produced a valid solution
+    return invalidResultBuilderType(unboundTy);
   }
 
-  // No result type produced a valid solution
-  return invalidResultBuilderType(unboundTy, attr, dc);
-}
+private:
+  Type invalidResultBuilderType(UnboundGenericType *unboundTy) const {
+    dc->getASTContext().Diags.diagnose(
+        attr->getTypeExpr()->getLoc(),
+        diag::result_builder_generic_inference_failed,
+        unboundTy->getDecl()->getName());
+
+    return ErrorType::get(dc->getASTContext());
+  }
+
+  /// Retrieves the valid result types of the result builder
+  /// (the return types of `buildFinalResult` / `buildBlock` /
+  /// `buildPartialBlock`).
+  llvm::SmallVector<Type, 4>
+  retrieveResultBuilderResultTypes(NominalTypeDecl *builder) const {
+    ASTContext &ctx = builder->getASTContext();
+    llvm::SmallVector<Type, 4> resultTypes;
+
+    Identifier methodIds[] = {ctx.Id_buildFinalResult, ctx.Id_buildBlock,
+                              ctx.Id_buildPartialBlock};
+
+    for (auto methodId : methodIds) {
+      SmallVector<ValueDecl *, 4> potentialMatches;
+      bool supportsMethod = TypeChecker::typeSupportsBuilderOp(
+          builder->getDeclaredInterfaceType(), builder, methodId,
+          /*argLabels=*/{}, &potentialMatches);
+
+      if (!supportsMethod)
+        continue;
+
+      for (auto decl : potentialMatches) {
+        auto func = dyn_cast<FuncDecl>(decl);
+        if (!func || !func->isStatic())
+          continue;
+
+        auto resultType = func->getResultInterfaceType();
+        if (!resultType || resultType->hasError())
+          continue;
+
+        // Add the result type if we haven't seen it before
+        bool isDuplicate = false;
+        for (auto existingType : resultTypes) {
+          if (existingType->isEqual(resultType)) {
+            isDuplicate = true;
+            break;
+          }
+        }
+
+        if (!isDuplicate) {
+          resultTypes.push_back(resultType);
+        }
+      }
+    }
+
+    return resultTypes;
+  }
+};
 
 Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
                                      DeclContext *dc,
@@ -7124,21 +7135,19 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
   const TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
-  
-  // Property delegates allow their type to be an unbound generic.
+
+  // Property wrappers and result builders allow their type to be an unbound
+  // generic.
   if (typeKind == CustomAttrTypeKind::PropertyWrapper) {
     unboundTyOpener = TypeResolution::defaultUnboundTypeOpener;
-  }
-  
-  /// Result builder types can have their generics parameters inferred
-  /// from the attached declaration.
-  else if (typeKind == CustomAttrTypeKind::ResultBuilder){
-    unboundTyOpener = [attr, dc](UnboundGenericType* unboundTy) -> Type {
-      return openUnboundResultBuilderType(unboundTy, attr, dc);
-    };
+  } else if (typeKind == CustomAttrTypeKind::ResultBuilder) {
+    auto &ctx = dc->getASTContext();
+    void *mem = ctx.Allocate(sizeof(ResultBuilderUnboundTypeOpener),
+                             alignof(ResultBuilderUnboundTypeOpener));
+    unboundTyOpener = *new (mem) ResultBuilderUnboundTypeOpener{dc, attr};
   }
 
-  const auto type = TypeResolution::resolveContextualType(
+  auto type = TypeResolution::resolveContextualType(
       attr->getTypeRepr(), dc, options, unboundTyOpener,
       /*placeholderHandler*/ nullptr, /*packElementOpener*/ nullptr);
 
