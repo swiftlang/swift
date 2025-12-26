@@ -646,7 +646,7 @@ void *swift::swift_nonatomic_unknownObjectRetain(void *object) {
 void swift::swift_nonatomic_unknownObjectRelease(void *object) {
   if (isObjCTaggedPointerOrNull(object)) return;
   if (objectUsesNativeSwiftReferenceCounting(object))
-    return swift_release(static_cast<HeapObject *>(object));
+    return swift_nonatomic_release(static_cast<HeapObject *>(object));
   return objc_release(static_cast<id>(object));
 }
 
