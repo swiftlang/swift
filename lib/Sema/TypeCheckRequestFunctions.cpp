@@ -443,7 +443,7 @@ Type ResultBuilderTypeRequest::evaluate(Evaluator &evaluator,
   auto &ctx = dc->getASTContext();
   Type type = evaluateOrDefault(
       evaluator,
-      CustomAttrTypeRequest{mutableAttr, dc, CustomAttrTypeKind::NonGeneric},
+      CustomAttrTypeRequest{mutableAttr, dc, CustomAttrTypeKind::ResultBuilder},
       Type());
   if (!type || type->hasError()) return Type();
 

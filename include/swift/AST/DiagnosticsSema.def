@@ -7797,6 +7797,8 @@ NOTE(result_builder_infer_add_return, none,
 NOTE(result_builder_infer_pick_specific, none,
      "apply result builder %0 (inferred from %select{protocol|dynamic replacement of}1 %2)",
      (Type, unsigned, DeclName))
+ERROR(result_builder_generic_inference_failed, none,
+      "unable to infer generic parameters for result builder %0", (DeclName))
 GROUPED_WARNING(result_builder_missing_limited_availability,
         ResultBuilderMethods, none,
         "result builder %0 does not implement 'buildLimitedAvailability'; "
