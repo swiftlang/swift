@@ -268,7 +268,7 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
-// CHECK-NEXT:        "line": 27,
+// CHECK-NEXT:        "line": 28,
 // CHECK-NEXT:        "valueKind": "RawLiteral",
 // CHECK-NEXT:        "value": "First \"string\"\nSecond \\ string"
 // CHECK-NEXT:      },
@@ -320,7 +320,7 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
-// CHECK-NEXT:        "line": 39,
+// CHECK-NEXT:        "line": 38,
 // CHECK-NEXT:        "valueKind": "InitCall",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:          "type": "ExtractLiterals.Buffered<Swift.String>",
@@ -328,6 +328,8 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "wrappedValue",
 // CHECK-NEXT:              "type": "Swift.String",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:              "line": 39,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "Hello"
 // CHECK-NEXT:            }
@@ -341,7 +343,7 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
-// CHECK-NEXT:        "line": 42,
+// CHECK-NEXT:        "line": 41,
 // CHECK-NEXT:        "valueKind": "InitCall",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:          "type": "ExtractLiterals.Clamping<Swift.Int>",
@@ -349,18 +351,24 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "wrappedValue",
 // CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:              "line": 42,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "128"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "min",
 // CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:              "line": 41,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "0"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "max",
 // CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:              "line": 41,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "255"
 // CHECK-NEXT:            }
@@ -374,7 +382,7 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
-// CHECK-NEXT:        "line": 45,
+// CHECK-NEXT:        "line": 44,
 // CHECK-NEXT:        "valueKind": "InitCall",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:          "type": "ExtractLiterals.Buffered<ExtractLiterals.Clamping<Swift.Int>>",
@@ -382,6 +390,8 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "wrappedValue",
 // CHECK-NEXT:              "type": "ExtractLiterals.Clamping<Swift.Int>",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:              "line": 44,
 // CHECK-NEXT:              "valueKind": "InitCall",
 // CHECK-NEXT:              "value": {
 // CHECK-NEXT:                "type": "ExtractLiterals.Clamping<Swift.Int>",
@@ -389,18 +399,24 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:                  {
 // CHECK-NEXT:                    "label": "wrappedValue",
 // CHECK-NEXT:                    "type": "Swift.Int",
+// CHECK-NEXT:                    "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:                    "line": 45,
 // CHECK-NEXT:                    "valueKind": "RawLiteral"
 // CHECK-NEXT:                    "value": "128"
 // CHECK-NEXT:                  },
 // CHECK-NEXT:                  {
 // CHECK-NEXT:                    "label": "min",
 // CHECK-NEXT:                    "type": "Swift.Int",
+// CHECK-NEXT:                    "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:                    "line": 44,
 // CHECK-NEXT:                    "valueKind": "RawLiteral",
 // CHECK-NEXT:                    "value": "0"
 // CHECK-NEXT:                  },
 // CHECK-NEXT:                  {
 // CHECK-NEXT:                    "label": "max",
 // CHECK-NEXT:                    "type": "Swift.Int",
+// CHECK-NEXT:                    "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:                    "line": 44,
 // CHECK-NEXT:                    "valueKind": "RawLiteral",
 // CHECK-NEXT:                    "value": "255"
 // CHECK-NEXT:                  }
@@ -427,7 +443,7 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
-// CHECK-NEXT:        "line": 39,
+// CHECK-NEXT:        "line": 38,
 // CHECK-NEXT:        "valueKind": "InitCall",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:          "type": "ExtractLiterals.Buffered<Swift.String>",
@@ -435,6 +451,8 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "wrappedValue",
 // CHECK-NEXT:              "type": "Swift.String",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:              "line": 39,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "Hello"
 // CHECK-NEXT:            }
@@ -466,7 +484,7 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
-// CHECK-NEXT:        "line": 42,
+// CHECK-NEXT:        "line": 41,
 // CHECK-NEXT:        "valueKind": "InitCall",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:          "type": "ExtractLiterals.Clamping<Swift.Int>",
@@ -474,18 +492,24 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "wrappedValue",
 // CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:              "line": 42,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "128"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "min",
 // CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:              "line": 41,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "0"
 // CHECK-NEXT:            },
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "max",
 // CHECK-NEXT:              "type": "Swift.Int",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:              "line": 41,
 // CHECK-NEXT:              "valueKind": "RawLiteral",
 // CHECK-NEXT:              "value": "255"
 // CHECK-NEXT:            }
@@ -500,12 +524,16 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:              {
 // CHECK-NEXT:                "label": "min",
 // CHECK-NEXT:                "type": "Swift.Int",
+// CHECK-NEXT:                "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:                "line": 41,
 // CHECK-NEXT:                "valueKind": "RawLiteral",
 // CHECK-NEXT:                "value": "0"
 // CHECK-NEXT:              },
 // CHECK-NEXT:              {
 // CHECK-NEXT:                "label": "max",
 // CHECK-NEXT:                "type": "Swift.Int",
+// CHECK-NEXT:                "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:                "line": 41,
 // CHECK-NEXT:                "valueKind": "RawLiteral",
 // CHECK-NEXT:                "value": "255"
 // CHECK-NEXT:              }
@@ -520,7 +548,7 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
-// CHECK-NEXT:        "line": 45,
+// CHECK-NEXT:        "line": 44,
 // CHECK-NEXT:        "valueKind": "InitCall",
 // CHECK-NEXT:        "value": {
 // CHECK-NEXT:          "type": "ExtractLiterals.Buffered<ExtractLiterals.Clamping<Swift.Int>>",
@@ -528,6 +556,8 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:            {
 // CHECK-NEXT:              "label": "wrappedValue",
 // CHECK-NEXT:              "type": "ExtractLiterals.Clamping<Swift.Int>",
+// CHECK-NEXT:              "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:              "line": 44,
 // CHECK-NEXT:              "valueKind": "InitCall",
 // CHECK-NEXT:              "value": {
 // CHECK-NEXT:                "type": "ExtractLiterals.Clamping<Swift.Int>",
@@ -535,18 +565,24 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:                  {
 // CHECK-NEXT:                    "label": "wrappedValue",
 // CHECK-NEXT:                    "type": "Swift.Int",
+// CHECK-NEXT:                    "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:                    "line": 45,
 // CHECK-NEXT:                    "valueKind": "RawLiteral",
 // CHECK-NEXT:                    "value": "128"
 // CHECK-NEXT:                  },
 // CHECK-NEXT:                  {
 // CHECK-NEXT:                    "label": "min",
 // CHECK-NEXT:                    "type": "Swift.Int",
+// CHECK-NEXT:                    "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:                    "line": 44,
 // CHECK-NEXT:                    "valueKind": "RawLiteral",
 // CHECK-NEXT:                    "value": "0"
 // CHECK-NEXT:                  },
 // CHECK-NEXT:                  {
 // CHECK-NEXT:                    "label": "max",
 // CHECK-NEXT:                    "type": "Swift.Int",
+// CHECK-NEXT:                    "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:                    "line": 44,
 // CHECK-NEXT:                    "valueKind": "RawLiteral",
 // CHECK-NEXT:                    "value": "255"
 // CHECK-NEXT:                  }
@@ -570,12 +606,16 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:              {
 // CHECK-NEXT:                "label": "min",
 // CHECK-NEXT:                "type": "Swift.Int",
+// CHECK-NEXT:                "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:                "line": 44,
 // CHECK-NEXT:                "valueKind": "RawLiteral",
 // CHECK-NEXT:                "value": "0"
 // CHECK-NEXT:              },
 // CHECK-NEXT:              {
 // CHECK-NEXT:                "label": "max",
 // CHECK-NEXT:                "type": "Swift.Int",
+// CHECK-NEXT:                "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
+// CHECK-NEXT:                "line": 44,
 // CHECK-NEXT:                "valueKind": "RawLiteral",
 // CHECK-NEXT:                "value": "255"
 // CHECK-NEXT:              }
@@ -667,7 +707,7 @@ public struct Optionals: MyProto {
 // CHECK-NEXT:        "isStatic": "true",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractLiterals.swift",
-// CHECK-NEXT:       "line": 100,
+// CHECK-NEXT:        "line": 100,
 // CHECK-NEXT:        "valueKind": "NilLiteral"
 // CHECK-NEXT:      }
 // CHECK-NEXT:    ]
