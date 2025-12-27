@@ -145,9 +145,8 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
 
       // Make another pass to retain the copied objects
       var result = unsafe target
-      for _ in bounds {
-        unsafe result.initialize(to: result.pointee)
-        unsafe result += 1
+      for i in 0..<bounds.count {
+        _ = Builtin.retain(UnsafePointer<AnyObject>(target + i).pointee)
       }
       return unsafe result
     }
