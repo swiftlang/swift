@@ -89,6 +89,14 @@ public:
     return Potential;
   }
 
+  ArrayRef<TypeVariableType *> supertypeOf() const {
+    return SupertypeOf.getArrayRef();
+  }
+
+  ArrayRef<TypeVariableType *> subtypeOf() const {
+    return SubtypeOf.getArrayRef();
+  }
+
   void initBindingSet();
 
   inference::BindingSet &getBindingSet() {
@@ -104,13 +112,13 @@ public:
     Set.reset();
   }
 
-private:
   /// Determines whether the type variable associated with this node
   /// is a representative of an equivalence class.
   ///
   /// Note: The smallest equivalence class is of just one variable - itself.
   bool forRepresentativeVar() const;
 
+private:
   /// Retrieve all of the type variables in the same equivalence class
   /// as this type variable.
   ArrayRef<TypeVariableType *> getEquivalenceClassUnsafe() const;
@@ -180,8 +188,25 @@ private:
   /// Notify all of the type variables referenced by this one about a change.
   void notifyReferencedVars(
       llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
+
+public: // public to enable unit tests.
+  /// Notify all of the type variables that are in a direct subtype relationship
+  /// with this one.
+  ///
+  /// For example, consider $T1 <: $T2 <: $T3, if current type variable is
+  /// $T3 this method would notify _only_ $T2.
+  void notifyDirectSubtypes(
+      llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
+
+  /// Notify all of the type variables that are in a supertype relationship
+  /// with this one.
+  /// For example, consider $T1 <: $T2 <: $T3, if current type variable is
+  /// $T1 this method would notify _only_ $T2.
+  void notifyDirectSupertypes(
+      llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
   /// }
 
+private:
   /// If the given constraint represents a subtype/supertype relationship
   /// between this type variable and some other one, let's note that in the
   /// node.

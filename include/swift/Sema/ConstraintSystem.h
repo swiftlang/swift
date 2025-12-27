@@ -2533,6 +2533,7 @@ private:
     }
   };
 
+public:
   /// Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs,
@@ -2617,6 +2618,7 @@ private:
     SmallVector<Constraint *, 4> activeConstraints;
   };
 
+private:
   class CacheExprTypes : public ASTWalker {
     Expr *RootExpr;
     ConstraintSystem &CS;
