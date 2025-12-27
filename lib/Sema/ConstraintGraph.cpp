@@ -15,19 +15,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSTrail.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
-#include <memory>
-#include <numeric>
 
 using namespace swift;
 using namespace constraints;
@@ -284,6 +281,63 @@ void ConstraintGraphNode::notifyReferencedVars(
     if (!repr->getImpl().getFixedType(/*record=*/nullptr))
       notification(CG[repr]);
   }
+}
+
+namespace {
+
+enum class ChainDirection : uint8_t { Subtypes, Supertypes };
+
+static void
+notifyDirect(ConstraintGraph &CG, const ConstraintGraphNode &node,
+             ChainDirection direction,
+             llvm::function_ref<void(ConstraintGraphNode &)> notification) {
+  auto *typeVar = node.getTypeVariable();
+
+  if (typeVar->getImpl().getFixedType(/*trail=*/nullptr))
+    return;
+
+  if (!node.forRepresentativeVar()) {
+    notifyDirect(CG,
+                 CG[typeVar->getImpl().getRepresentative(/*trail=*/nullptr)],
+                 direction, notification);
+    return;
+  }
+
+  SmallPtrSet<TypeVariableType *, 2> notified({typeVar});
+  for (auto *eqMember : node.getEquivalenceClass()) {
+    ArrayRef<TypeVariableType *> chain;
+    switch (direction) {
+    case ChainDirection::Subtypes:
+      chain = CG[eqMember].supertypeOf();
+      break;
+    case ChainDirection::Supertypes:
+      chain = CG[eqMember].subtypeOf();
+      break;
+    }
+
+    for (auto *member : chain) {
+      auto *repr = member->getImpl().getRepresentative(/*trail=*/nullptr);
+
+      // If member is bound, it represents a cut in the chain.
+      if (repr->getImpl().getFixedType(/*trail=*/nullptr))
+        continue;
+
+      if (notified.insert(repr).second)
+        notification(CG[repr]);
+    }
+  }
+}
+
+} // end namespace
+
+void ConstraintGraphNode::notifyDirectSubtypes(
+    llvm::function_ref<void(ConstraintGraphNode &)> notification) const {
+  notifyDirect(CG, *this, ChainDirection::Subtypes, notification);
+}
+
+void ConstraintGraphNode::notifyDirectSupertypes(
+    llvm::function_ref<void(ConstraintGraphNode &)> notification) const {
+  notifyDirect(CG, *this, ChainDirection::Supertypes, notification);
 }
 
 void ConstraintGraphNode::addToEquivalenceClass(
