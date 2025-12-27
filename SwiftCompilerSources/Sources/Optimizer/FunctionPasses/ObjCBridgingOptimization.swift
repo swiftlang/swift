@@ -200,7 +200,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
   let subst = bridgeToObjcCall.substitutionMap
   let emptySwiftValue = noneBuilder.createApply(
         function: bridgeToSwiftCall.callee,
-        bridgeToSwiftCall.substitutionMap, arguments: Array(bridgeToSwiftCall.arguments))
+        subst, arguments: Array(bridgeToSwiftCall.arguments))
   // ... and bridge that to ObjectiveC.
   let emptyObjCValue = noneBuilder.createApply(
         function: noneBuilder.createFunctionRef(bridgeToObjcCall.referencedFunction!),
