@@ -307,57 +307,57 @@ func _prespecializeIndexingIterator<Elements>(_ x: IndexingIterator<Elements>) w
 // =============================================================================
 
 func prespecializeCollections<T>(_ element: T) {
-  var umbp = UnsafeMutableBufferPointer<T>.allocate(capacity: 1)
-  let cmp = { (_: T, _: T) in return false }
-  unsafe umbp._prespecializeMutableBirectionalCollection(range: 0..<0)
-  unsafe umbp._prespecializeMutableBirectionalCollection(range: 0..<0, cmp: cmp)
-  unsafe umbp._prespecializeMutableBirectionalCollection(range: 0..<0, end: 0, cmp: cmp)
-  try! unsafe umbp._prespecializeMutableRandomAccessCollection(cmp: cmp)
-
-  let _: (Array<T>, Builtin.RawPointer) = _prespecializeArray(0._builtinWordValue)
-
-  var array = Array<T>()
-  array._prespecializeArray()
-  array._prespecializeMutableArray()
-  array._prespecializeArray(index: 0, flag: false)
-  array._prespecializeArray(index: 0, flag: false, token: _DependenceToken())
-  array._prespecializeArray(arrayLiteral: element)
-  unsafe array._prespecializeArray(capacity: 0) { (_: inout UnsafeMutableBufferPointer<T>, _: inout Int) in return }
-  array._prespecializeArray(flag: false)
-  array._prespecializeArray(index: 0)
-  array._prespecializeArray(index: 0, element: element)
-  array._prespecializeArray(element: element, index: 0)
-  array._prespecializeArray(range: 0..<0, collection: EmptyCollection())
-  unsafe array._prespecializeArray(with: { (_: inout UnsafeMutableBufferPointer<T>) -> Optional<()> in return () })
-  array._prespecializeBidirectionalCollection()
-  array._prespecializeRandomAccessCollection()
-  try! array._prespecializeMutableRandomAccessCollection(cmp: cmp)
-
-  let cab = _ContiguousArrayBuffer<T>()
-  cab._prespecializeContiguousArrayBuffer()
-  unsafe cab._prespecializeContiguousArrayBuffer(range: (0..<0), pointer: umbp.baseAddress!)
-  cab._prespecializeContiguousArrayBuffer(count: 0, capacity: 0)
-  cab._prespecializeContiguousArrayBuffer(buffer: cab, index: 0)
-
-#if _runtime(_ObjC)
-  let ab = _ArrayBuffer<T>()
-  ab._prespecializeArrayBuffer()
-  ab._prespecializeArrayBuffer(index: 0)
-  ab._prespecializeArrayBuffer(range: (0..<0))
-  unsafe ab._prespecializeArrayBuffer(range: (0..<0), pointer: umbp.baseAddress!)
-  ab._prespecializeArrayBuffer(index: 0, flag: false)
-  ab._prespecializeArrayBuffer(buffer: cab, index: 0)
-  ab._prespecializeRandomAccessCollection(after: 0)
-  ab._prespecializeRandomAccessCollection()
-  ab._prespecializeCollection(index: 0, range: (0..<0))
-#endif // ObjC
-
-  var ca = ContiguousArray<T>()
-  ca._prespecializeRandomAccessCollection()
-  try! ca._prespecializeMutableRandomAccessCollection(cmp: cmp)
-
-  let cb = _ContiguousArrayBuffer<T>()
-  cb._prespecializeRandomAccessCollection()
+//  var umbp = UnsafeMutableBufferPointer<T>.allocate(capacity: 1)
+//  let cmp = { (_: T, _: T) in return false }
+//  unsafe umbp._prespecializeMutableBirectionalCollection(range: 0..<0)
+//  unsafe umbp._prespecializeMutableBirectionalCollection(range: 0..<0, cmp: cmp)
+//  unsafe umbp._prespecializeMutableBirectionalCollection(range: 0..<0, end: 0, cmp: cmp)
+//  try! unsafe umbp._prespecializeMutableRandomAccessCollection(cmp: cmp)
+//
+//  let _: (Array<T>, Builtin.RawPointer) = _prespecializeArray(0._builtinWordValue)
+//
+//  var array = Array<T>()
+//  array._prespecializeArray()
+//  array._prespecializeMutableArray()
+//  array._prespecializeArray(index: 0, flag: false)
+//  array._prespecializeArray(index: 0, flag: false, token: _DependenceToken())
+//  array._prespecializeArray(arrayLiteral: element)
+//  unsafe array._prespecializeArray(capacity: 0) { (_: inout UnsafeMutableBufferPointer<T>, _: inout Int) in return }
+//  array._prespecializeArray(flag: false)
+//  array._prespecializeArray(index: 0)
+//  array._prespecializeArray(index: 0, element: element)
+//  array._prespecializeArray(element: element, index: 0)
+//  array._prespecializeArray(range: 0..<0, collection: EmptyCollection())
+//  unsafe array._prespecializeArray(with: { (_: inout UnsafeMutableBufferPointer<T>) -> Optional<()> in return () })
+//  array._prespecializeBidirectionalCollection()
+//  array._prespecializeRandomAccessCollection()
+//  try! array._prespecializeMutableRandomAccessCollection(cmp: cmp)
+//
+//  let cab = _ContiguousArrayBuffer<T>()
+//  cab._prespecializeContiguousArrayBuffer()
+//  unsafe cab._prespecializeContiguousArrayBuffer(range: (0..<0), pointer: umbp.baseAddress!)
+//  cab._prespecializeContiguousArrayBuffer(count: 0, capacity: 0)
+//  cab._prespecializeContiguousArrayBuffer(buffer: cab, index: 0)
+//
+//#if _runtime(_ObjC)
+//  let ab = _ArrayBuffer<T>()
+//  ab._prespecializeArrayBuffer()
+//  ab._prespecializeArrayBuffer(index: 0)
+//  ab._prespecializeArrayBuffer(range: (0..<0))
+//  unsafe ab._prespecializeArrayBuffer(range: (0..<0), pointer: umbp.baseAddress!)
+//  ab._prespecializeArrayBuffer(index: 0, flag: false)
+//  ab._prespecializeArrayBuffer(buffer: cab, index: 0)
+//  ab._prespecializeRandomAccessCollection(after: 0)
+//  ab._prespecializeRandomAccessCollection()
+//  ab._prespecializeCollection(index: 0, range: (0..<0))
+//#endif // ObjC
+//
+//  var ca = ContiguousArray<T>()
+//  ca._prespecializeRandomAccessCollection()
+//  try! ca._prespecializeMutableRandomAccessCollection(cmp: cmp)
+//
+//  let cb = _ContiguousArrayBuffer<T>()
+//  cb._prespecializeRandomAccessCollection()
 }
 
 func prespecializeRanges() {
