@@ -338,15 +338,19 @@ extension _SmallString {
     let totalCount = base.count + other.count
     guard totalCount <= _SmallString.capacity else { return nil }
 
-    let bitPattern = unsafe _withUnprotectedUnsafeTemporaryAllocation(
-      byteCount: 2*MemoryLayout<_SmallString.RawBitPattern>.size, alignment: 1
-    ) { [baseCount = base.count] bytes -> _SmallString.RawBitPattern in
-      unsafe bytes.storeBytes(of: base._storage, as: RawBitPattern.self)
-      unsafe bytes.storeBytes(
-        of: other._storage, toByteOffset: baseCount, as: RawBitPattern.self
-      )
-      return unsafe bytes.loadUnaligned(as: _SmallString.self).zeroTerminatedRawCodeUnits
-    }
+    var ss: _InlineArray = [base._storage, (0,0)]
+    var span = ss.mutableSpan
+    var bytes = span.mutableBytes
+
+    unsafe bytes.storeBytes(
+        of: other._storage,
+        toUncheckedByteOffset: base.count,
+        as: _SmallString.RawBitPattern.self
+    )
+
+    let bitPattern = unsafe bytes
+                       .unsafeLoad(as: _SmallString.self)
+                       .zeroTerminatedRawCodeUnits
 
     self.init(leading: bitPattern.0, trailing: bitPattern.1, count: totalCount)
   }
