@@ -17,19 +17,22 @@ imports for TMP_DIR/test.swift:
 	_SwiftConcurrencyShims
 	_Concurrency
 	A
-	B
-	C
-imports for __ObjC.foo:
+imports for A.foo:
 imports for @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:
-	__ObjC
 	Swift
+	__ObjC
+	lifetimebound
+	ptrcheck
+	_StringProcessing
+	_SwiftConcurrencyShims
+	_Concurrency
 
 //--- macro-expansions.expected
 @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func foo(_ p: Span<a_t>, _ x: UnsafeMutablePointer<no_module_record_t>!) {
-    let len = no_module_t(exactly: p.count)!
+@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func foo(_ p: Span<Int32>, _ x: UnsafeMutablePointer<no_module_record_t>!) {
+    let len = Int32(exactly: p.count)!
     return unsafe p.withUnsafeBufferPointer { _pPtr in
       return unsafe foo(len, _pPtr.baseAddress!, x)
     }
@@ -38,63 +41,31 @@ imports for @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:
 
 //--- test.swift
 import A
-import B
-import C
 
 func test(s: Span<a_t>, x: UnsafeMutablePointer<no_module_record_t>) {
   unsafe foo(s, x)
 }
 
-func test2(p: UnsafeMutablePointer<CInt>, len: CInt, y: UnsafeMutablePointer<b_t>) {
-  unsafe bar(len, p, y)
-}
-
-func test3(p: UnsafeMutablePointer<CInt>, len: CInt, z: UnsafeMutablePointer<c_t>) {
-  unsafe baz(len, p, z)
-}
-
 //--- bridging.h
-#include <ptrcheck.h>
-#include <lifetimebound.h>
-
+// claim this header as part of bridging header, making it not belong to a module
 #include "no-module.h"
-#include "a.h"
-#include "c.h"
-
-struct no_module_record_t;
-void foo(no_module_t len, const a_t * __counted_by(len) p __noescape, struct no_module_record_t *x);
-
-struct b_t;
-void bar(int len, const int * __counted_by(len) p __noescape, struct b_t *y);
-
-void baz(int len, const int * __counted_by(len) p __noescape, struct c_t *z);
 
 //--- no-module.h
+#pragma once
 typedef int no_module_t;
 struct no_module_record_t {
   int placeholder;
 };
 
 //--- a.h
+#include <ptrcheck.h>
+#include <lifetimebound.h>
+// this module header now depends on a decl with no module
+#include "no-module.h"
 typedef int a_t;
-
-//--- b.h
-struct b_t {
-  int placeholder;
-};
-
-//--- c.h
-struct c_t {
-  int placeholder;
-};
+void foo(int len, const int * __counted_by(len) p __noescape, struct no_module_record_t *x);
 
 //--- module.modulemap
 module A {
   header "a.h"
-}
-module B {
-  header "b.h"
-}
-module C {
-  header "c.h"
 }
