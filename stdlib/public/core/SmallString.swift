@@ -338,18 +338,17 @@ extension _SmallString {
     let totalCount = base.count + other.count
     guard totalCount <= _SmallString.capacity else { return nil }
 
-    // TODO(SIMD): The below can be replaced with just be a couple vector ops
-
-    var result = base
-    var writeIdx = base.count
-    for readIdx in 0..<other.count {
-      result[writeIdx] = other[readIdx]
-      writeIdx &+= 1
+    let bitPattern = unsafe _withUnprotectedUnsafeTemporaryAllocation(
+      byteCount: 2*MemoryLayout<_SmallString.RawBitPattern>.size, alignment: 1
+    ) { [baseCount = base.count] bytes -> _SmallString.RawBitPattern in
+      unsafe bytes.storeBytes(of: base._storage, as: RawBitPattern.self)
+      unsafe bytes.storeBytes(
+        of: other._storage, toByteOffset: baseCount, as: RawBitPattern.self
+      )
+      return unsafe bytes.loadUnaligned(as: _SmallString.self).zeroTerminatedRawCodeUnits
     }
-    _internalInvariant(writeIdx == totalCount)
 
-    let (leading, trailing) = result.zeroTerminatedRawCodeUnits
-    self.init(leading: leading, trailing: trailing, count: totalCount)
+    self.init(leading: bitPattern.0, trailing: bitPattern.1, count: totalCount)
   }
 }
 
