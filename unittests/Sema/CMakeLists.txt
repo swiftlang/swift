@@ -3,6 +3,7 @@ add_swift_unittest(swiftSemaTests
   SemaFixture.cpp
   BindingInferenceTests.cpp
   ConstraintGenerationTests.cpp
+  ConstraintGraphTests.cpp
   ConstraintSimplificationTests.cpp
   ConstraintSystemDumpTests.cpp
   UnresolvedMemberLookupTests.cpp
