@@ -133,12 +133,10 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
                            waitingTask, this);
       _swift_tsan_acquire(static_cast<Job *>(this));
       if (suspendedWaiter) {
-        // This will always return zero because we were just
+        // This is safe to call because we were just
         // running this Task so its BasePriority (which is
         // immutable) should've already been set on the thread.
-        [[maybe_unused]]
-        uint32_t opaque = waitingTask->flagAsRunning();
-        assert(opaque == 0);
+        waitingTask->flagAsRunningImmediately();
       }
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
@@ -1666,11 +1664,9 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
   // we try to tail-call.
   } while (false);
 #else
-  // This will always return zero because we were just running this Task so its
+  // This is safe to call because we were just running this Task so its
   // BasePriority (which is immutable) should've already been set on the thread.
-  [[maybe_unused]]
-  uint32_t opaque = task->flagAsRunning();
-  assert(opaque == 0);
+  task->flagAsRunningImmediately();
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 
   if (context->isExecutorSwitchForced())
