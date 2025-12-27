@@ -181,7 +181,7 @@ internal func spawn(_ path: String, args: [String]) throws {
     free(arg)
   }
   if result != 0 {
-    throw PosixError(errno: errno)
+    throw PosixError(errno: result)
   }
 }
 
