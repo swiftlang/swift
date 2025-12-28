@@ -338,21 +338,18 @@ extension _SmallString {
     let totalCount = base.count + other.count
     guard totalCount <= _SmallString.capacity else { return nil }
 
-    var ss: _InlineArray = [base._storage, (0,0)]
-    var span = ss.mutableSpan
-    var bytes = span.mutableBytes
+    func convert(_ s: _SmallString) -> _UInt128 {
+      let bits = s.zeroTerminatedRawCodeUnits
+      return .init(_low: bits.0.littleEndian, _high: bits.1.littleEndian)
+    }
 
-    unsafe bytes.storeBytes(
-        of: other._storage,
-        toUncheckedByteOffset: base.count,
-        as: _SmallString.RawBitPattern.self
+    let resultInt = (convert(other) << (8 &* base.count)) &+ convert(base)
+
+    self.init(
+      leading: resultInt._low.littleEndian,
+      trailing: resultInt._high.littleEndian,
+      count: totalCount
     )
-
-    let bitPattern = unsafe bytes
-                       .unsafeLoad(as: _SmallString.self)
-                       .zeroTerminatedRawCodeUnits
-
-    self.init(leading: bitPattern.0, trailing: bitPattern.1, count: totalCount)
   }
 }
 
