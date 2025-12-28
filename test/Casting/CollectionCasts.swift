@@ -688,6 +688,46 @@ ArrayCasts.testSync("Preconcurrency") {
   expectNil(d)
 }
 
+ArrayCasts.testSync("Tuple Re-labelling") {
+  typealias X = [(foo: Int, bar: String)]
+  typealias Y = [(Int, String)]
+
+  let a: X = [
+    (42, "abc"),
+    (37, "xyz"),
+    (-1, "ijk")
+  ]
+
+  let b = a as Y
+  expectEqual(b.count, 3)
+  expectEqual(b[0].0, 42)
+  expectEqual(b[0].1, "abc")
+  expectEqual(b[1].0, 37)
+  expectEqual(b[1].1, "xyz")
+  expectEqual(b[2].0, -1)
+  expectEqual(b[2].1, "ijk")
+  
+  // Despite the warning saying that this cast always succeeds, it actually fails
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Array<(foo: Int, bar: String)>') to 'Y' (aka 'Array<(Int, String)>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectEqual(c![0].0, 42)
+  expectEqual(c![0].1, "abc")
+  expectEqual(c![1].0, 37)
+  expectEqual(c![1].1, "xyz")
+  expectEqual(c![2].0, -1)
+  expectEqual(c![2].1, "ijk")
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectEqual(d![0].0, 42)
+  expectEqual(d![0].1, "abc")
+  expectEqual(d![1].0, 37)
+  expectEqual(d![1].1, "xyz")
+  expectEqual(d![2].0, -1)
+  expectEqual(d![2].1, "ijk")
+}
+
 let DictionaryCasts = TestSuite("DictionaryCasts")
 
 DictionaryCasts.testSync("Derived to Base") {
@@ -737,7 +777,7 @@ DictionaryCasts.testSync("Funtion Conversion: covariant result") {
   expectEqual(b["b"]!().k, -1)
   expectEqual(b["c"]!().k, 37)
 
-  // Despite the warning saying that this cast always succeeds, it actually fails
+  // Indeed succeeds
   // expected-warning@+1 {{conditional cast from 'X' (aka 'Dictionary<String, () -> Derived>') to 'Y' (aka 'Dictionary<String, () -> Base>') always succeeds}}
   let c = a as? Y
   expectNil(c)
