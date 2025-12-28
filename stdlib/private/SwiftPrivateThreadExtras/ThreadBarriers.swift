@@ -57,6 +57,12 @@ public struct _stdlib_thread_barrier_t {
   /// This shared variable is protected by `mutex`.
   var numThreadsWaiting: CUnsignedInt = 0
 
+  /// Generation count to handle spurious wakeups.
+  /// Incremented each time the barrier is released.
+  ///
+  /// This shared variable is protected by `mutex`.
+  var generation: CUnsignedInt = 0
+
   public init() {}
 }
 
@@ -144,19 +150,24 @@ public func _stdlib_thread_barrier_wait(
   }
 #endif
   barrier.pointee.numThreadsWaiting += 1
+  let myGeneration = barrier.pointee.generation
   if barrier.pointee.numThreadsWaiting < barrier.pointee.count {
-    // Put the thread to sleep.
+    // Put the thread to sleep until the generation changes.
 #if os(Windows)
-    if !SleepConditionVariableSRW(barrier.pointee.cond!, barrier.pointee.mutex!,
-                                  INFINITE, 0) {
-      return -1
+    while barrier.pointee.generation == myGeneration {
+      if !SleepConditionVariableSRW(barrier.pointee.cond!, barrier.pointee.mutex!,
+                                    INFINITE, 0) {
+        return -1
+      }
     }
     ReleaseSRWLockExclusive(barrier.pointee.mutex!)
 #elseif os(WASI)
   // WASI environment has a only single thread
 #else
-    if pthread_cond_wait(barrier.pointee.cond!, barrier.pointee.mutex!) != 0 {
-      return -1
+    while barrier.pointee.generation == myGeneration {
+      if pthread_cond_wait(barrier.pointee.cond!, barrier.pointee.mutex!) != 0 {
+        return -1
+      }
     }
     if pthread_mutex_unlock(barrier.pointee.mutex!) != 0 {
       return -1
@@ -164,8 +175,9 @@ public func _stdlib_thread_barrier_wait(
 #endif
     return 0
   } else {
-    // Reset thread count.
+    // Reset thread count and advance generation.
     barrier.pointee.numThreadsWaiting = 0
+    barrier.pointee.generation &+= 1
 
     // Wake up all threads.
 #if os(Windows)
