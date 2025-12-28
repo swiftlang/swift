@@ -1611,9 +1611,11 @@ needsCustomConversion(CollectionUpcastConversionExpr::ConversionPair const & pai
           }
           return needsCustomConversion(upcast->getValueConversion());
         }
+        case ExprKind::DestructureTuple: {
+          return false;
+        }
         case ExprKind::Load:
         case ExprKind::ABISafeConversion:
-        case ExprKind::DestructureTuple:
         case ExprKind::CovariantFunctionConversion:
         case ExprKind::CovariantReturnConversion:
         case ExprKind::BridgeFromObjC:
