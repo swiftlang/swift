@@ -333,7 +333,7 @@ reportOnCrash(uint32_t flags, const char *message)
     current = nullptr;
 
     if (previous)
-      swift_asprintf(&current, "%s%s", current, message);
+      swift_asprintf(&current, "%s%s", previous, message);
     else
 #if defined(_WIN32)
       current = ::_strdup(message);
