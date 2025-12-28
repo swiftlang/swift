@@ -335,7 +335,18 @@ extension _SmallString {
 
   @usableFromInline // @testable
   internal init?(_ base: _SmallString, appending other: _SmallString) {
-    let totalCount = base.count + other.count
+    let otherCount = other.count
+    let baseCount = base.count
+
+    if otherCount == 0 {
+      self = base
+      return
+    } else if baseCount == 0 {
+      self = other
+      return
+    }
+
+    let totalCount = baseCount + otherCount
     guard totalCount <= _SmallString.capacity else { return nil }
 
     func convert(_ s: _SmallString) -> _UInt128 {
