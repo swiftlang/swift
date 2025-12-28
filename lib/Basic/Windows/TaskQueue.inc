@@ -151,7 +151,7 @@ private:
             Cbs.TaskFinished(T->PI.Pid, T->PI.ReturnCode, StdoutContents,
                              StderrContents, TPI, T->Context);
         ErrorOccurred = (Response == TaskFinishedResponse::StopExecution);
-      } else if (Crashed) {
+      } else if (T->PI.ReturnCode != 0) {
         ErrorOccurred = true;
       }
     }
