@@ -1,32 +1,52 @@
 // RUN: %target-typecheck-verify-swift
 
-func canThrow() throws {}
+func something() throws {}
 
-func test() {
-  // 1. Should warn and suggest Fix-it
+func testStrictCatch() {
+  // 1. Standard Empty -> WARN
   do {
-    try canThrow()
-  } catch { // expected-warning {{catch block is empty, errors will silently be ignored}} {{12-12= _ = error }}
+    try something()
+  } catch { // expected-warning {{empty catch block silently ignores errors; consider using 'try?' or 'catch _' to explicitly ignore}}
   }
 
-  // 2. Should NOT warn (User used the Fix-it)
+  // 2. Comment Only -> WARN
   do {
-    try canThrow()
+    try something()
+  } catch { // expected-warning {{empty catch block silently ignores errors; consider using 'try?' or 'catch _' to explicitly ignore}}
+    // Comments do not silence warnings
+  }
+
+  // 3. Redundant Assignment (Implicit error) -> WARN
+  do {
+    try something()
   } catch {
-    _ = error
+    _ = error // expected-warning {{explicit error capture is redundant; use 'catch _' instead}}
   }
 
-  // 3. Should NOT warn (User has other logic)
+  // 4. Redundant Assignment (Explicit 'let e') -> WARN
   do {
-    try canThrow()
-  } catch {
-    print("Logged")
+    try something()
+  } catch let e {
+    _ = e // expected-warning {{explicit error capture is redundant; use 'catch _' instead}}
   }
 
-  // 4. Test case mentioned in the issue
+  // 5. Wildcard -> PASS
   do {
-    try canThrow()
-  } catch { // expected-warning {{catch block is empty, errors will silently be ignored}} {{12-12= _ = error }}
-    /* do nothing */
+    try something()
+  } catch _ {
+    // This is the correct way to ignore errors
   }
 }
+
+// 6. Partial Handling -> PASS
+func testPartial() {
+  do {
+    try something()
+  } catch MyError.bad {
+    print("bad")
+  } catch _ {
+    // Correctly ignores everything else
+  }
+}
+
+enum MyError: Error { case bad }

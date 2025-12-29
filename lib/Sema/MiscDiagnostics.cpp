@@ -6525,18 +6525,37 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
   if (auto *doCatchStmt = dyn_cast<DoCatchStmt>(S)) {
     for (auto *catchStmt : doCatchStmt->getCatches()) {
       auto *body = dyn_cast_or_null<BraceStmt>(catchStmt->getBody());
-      if (!body)
-        continue;
+      if (!body) continue;
 
-      bool isEffectivelyEmpty = body->empty();
+      auto *pattern = catchStmt->getCaseLabelItems().front().getPattern();
+      if (isa<AnyPattern>(pattern->getSemanticsProvidingPattern())) continue;
+
+      Identifier boundErrorName;
+      catchStmt->getCaseLabelItems().front().getPattern()->forEachVariable([&](VarDecl *V) {
+        boundErrorName = V->getName();
+      });
+
+      if (boundErrorName.empty()) {
+        boundErrorName = ctx.getIdentifier("error");
+      }
 
       if (body->getNumElements() == 1) {
-        if (auto *exprStmt = body->getFirstElement().dyn_cast<Expr *>()) {
-          if (auto *assign = dyn_cast<AssignExpr>(exprStmt)) {
+        if (auto *expr = body->getFirstElement().dyn_cast<Expr *>()) {
+          if (auto *assign = dyn_cast<AssignExpr>(expr)) {
             if (isa<DiscardAssignmentExpr>(assign->getDest())) {
               if (auto *declRefExpr = dyn_cast<DeclRefExpr>(assign->getSrc())) {
-                if (declRefExpr->getDecl()->getName().isSimpleName("error")) {
-                  isEffectivelyEmpty = false;
+                if (declRefExpr->getDecl()->getBaseIdentifier() == boundErrorName) {
+                  auto diag = ctx.Diags.diagnose(assign->getLoc(), diag::redundant_error_capture); // Redundant
+                  diag.fixItRemove(assign->getSourceRange());
+                  auto *pattern = catchStmt->getCaseLabelItems().front().getPattern();
+                  if (pattern->isImplicit()) {
+                    auto catchEnd = Lexer::getLocForEndOfToken(ctx.SourceMgr,
+                                                               catchStmt->getStartLoc());
+                    diag.fixItInsert(catchEnd, " _");
+                  } else {
+                    diag.fixItReplace(pattern->getSourceRange(), "_");
+                  }
+                  continue;
                 }
               }
             }
@@ -6544,14 +6563,11 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
         }
       }
 
-      if (isEffectivelyEmpty) {
-        auto diag = ctx.Diags.diagnose(catchStmt->getStartLoc(),
-                                       diag::empty_catch_block);
-        SourceLoc lBrace = body->getLBraceLoc();
-        if (lBrace.isValid()) {
-          diag.fixItInsert(body->getLBraceLoc().getAdvancedLoc(1),
-                           " _ = error ");
-        }
+      if (body->empty()) {
+        auto diag = ctx.Diags.diagnose(catchStmt->getLoc(), diag::empty_catch_block);
+        if (catchStmt->getCaseLabelItems().size() == 1 &&
+            catchStmt->getCaseLabelItems().front().getPattern()->isImplicit()) {
+          diag.fixItInsertAfter(catchStmt->getStartLoc(), " _");}
       }
     }
   }
