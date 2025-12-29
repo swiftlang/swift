@@ -6172,6 +6172,14 @@ public:
   SILLayout *getLayout() const { return Layout; }
   SubstitutionMap getSubstitutions() const { return Substitutions; }
 
+
+  /// Returns a SILBoxType that is the same as the current box type but with the
+  /// mutability of each field specified via index in \p
+  /// fieldIndexMutabilityUpdatePairs to have its mutability be the index's
+  /// associated bool pair.
+  CanSILBoxType withMutable(ASTContext &ctx,
+                            std::initializer_list<std::pair<unsigned, bool>>
+                                fieldIndexMutabilityUpdatePairs) const;
   // TODO: SILBoxTypes should be explicitly constructed in terms of specific
   // layouts. As a staging mechanism, we expose the old single-boxed-type
   // interface.
