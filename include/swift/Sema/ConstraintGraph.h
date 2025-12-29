@@ -158,6 +158,22 @@ private:
   /// to a type variable.
   void retractFromInference();
 
+  /// Remove the potential transitive bindings matching the given source
+  /// constraint from the current node and all of its supertypes.
+  void retractTransitiveBindingsFrom(Constraint *constraint);
+
+  /// Remove the potential transitive bindings matching the given
+  /// originator type variable from the current node and all of its
+  /// supertypes.
+  void retractTransitiveBindingsFrom(
+      llvm::SmallPtrSetImpl<TypeVariableType *> &typeVars);
+
+  /// Remove the potential transitive bindings matching the given predicate
+  /// from the current node and all of its supertypes.
+  void retractTransitiveBindings(
+      llvm::function_ref<bool(const inference::PotentialBinding &binding)>
+          matching);
+
   /// Attempt to infer bindings from the constraint. The inferred bindings
   /// would have to be removed once the constraint gets retracted from the
   /// graph.
@@ -172,6 +188,10 @@ private:
   /// a conformance lookup), so inference has to be delayed until its clear that
   /// type variable has been bound to a valid type and solver can make progress.
   void introduceToInference(Type fixedType);
+
+  /// Add the potential binding that was transitively inferred from
+  /// one the current node's subtypes and propagate it up the supertype chain.
+  void introduceTransitiveSupertype(inference::PotentialBinding binding);
 
   /// Notify all of the type variables that have this one (or any member of
   /// its equivalence class) referenced in their fixed type.
