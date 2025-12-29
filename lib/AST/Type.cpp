@@ -525,6 +525,10 @@ bool TypeBase::canBeIsolatedTo() {
   // Optional<Builtin.ImplicitActor> since we shouldn't ever see that.
   if (auto ty = getOptionalObjectType())
     return ty->isAnyActorType();
+  // Look through unowned storage types, since the referent is what matters.
+  if (is<UnownedStorageType>())
+    return getReferenceStorageReferent()->isAnyActorType();
+
   return isAnyActorType();
 }
 

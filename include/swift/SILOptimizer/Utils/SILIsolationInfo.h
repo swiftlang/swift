@@ -244,7 +244,7 @@ private:
              actorInstance->getType()
                  .getASTType()
                  ->lookThroughAllOptionalTypes()
-                 ->getAnyActor())) &&
+                 ->canBeIsolatedTo())) &&
            "actorInstance must be an actor if it is non-empty");
     assert((getKind() != Disconnected || isolatedConformance == nullptr) &&
         "isolated conformance cannot be introduced with disconnected region");

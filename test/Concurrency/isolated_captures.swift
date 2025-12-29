@@ -98,3 +98,11 @@ class NotSendable {
     }
   }
 }
+
+// https://github.com/swiftlang/swift/issues/77447
+
+actor GH77447 {
+  func f() {
+    _ = { [unowned self] in _ = self }
+  }
+}
