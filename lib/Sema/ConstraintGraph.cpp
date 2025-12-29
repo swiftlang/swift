@@ -407,6 +407,34 @@ void ConstraintGraphNode::retractFromInference() {
       });
 }
 
+void ConstraintGraphNode::retractTransitiveBindingsFrom(
+    Constraint *constraint) {
+  retractTransitiveBindings([&constraint](const auto &binding) {
+    return binding.BindingSource.getOpaqueValue() == constraint;
+  });
+}
+
+void ConstraintGraphNode::retractTransitiveBindingsFrom(
+    llvm::SmallPtrSetImpl<TypeVariableType *> &typeVars) {
+  retractTransitiveBindings([&typeVars](const auto &binding) {
+    return typeVars.count(binding.Originator);
+  });
+}
+
+void ConstraintGraphNode::retractTransitiveBindings(
+    llvm::function_ref<bool(const PotentialBinding &binding)> matching) {
+  Potential.Bindings.erase(
+      llvm::remove_if(Potential.Bindings,
+                      [&](const PotentialBinding &binding) {
+                        return binding.isTransitive() && matching(binding);
+                      }),
+      Potential.Bindings.end());
+
+  notifyDirectSupertypes([&matching](ConstraintGraphNode &node) {
+    node.retractTransitiveBindings(matching);
+  });
+}
+
 void ConstraintGraphNode::introduceToInference(Constraint *constraint) {
   getPotentialBindings().infer(constraint);
 }
@@ -443,6 +471,17 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
         node.introduceToInference(constraint);
     }
   }
+}
+
+void ConstraintGraphNode::introduceTransitiveSupertype(
+    PotentialBinding binding) {
+  ASSERT(binding.isTransitive());
+
+  getPotentialBindings().addPotentialBinding(TypeVar, binding);
+
+  notifyDirectSupertypes([&](ConstraintGraphNode &node) {
+    node.introduceTransitiveSupertype(binding);
+  });
 }
 
 #pragma mark Graph mutation
