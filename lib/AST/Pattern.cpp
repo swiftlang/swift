@@ -178,7 +178,7 @@ SourceLoc Pattern::getLoc() const {
 }
 
 void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
-  forEachVariable([&](VarDecl *VD) { variables.push_back(VD); });
+  forEachVariable([&](VarDecl *VD) { variables.push_back(VD); }, /*shouldVisitOpaque=*/ true);
 }
 
 VarDecl *Pattern::getSingleVar() const {
@@ -246,7 +246,7 @@ void Expr::forEachUnresolvedVariable(llvm::function_ref<void(VarDecl *)> f) cons
 
 /// apply the specified function to all variables referenced in this
 /// pattern.
-void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn) const {
+void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn, bool shouldVisitOpaque) const {
   switch (getKind()) {
   case PatternKind::Any:
   case PatternKind::Bool:
@@ -261,10 +261,15 @@ void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn) const {
     fn(cast<NamedPattern>(this)->getDecl());
     return;
 
+  case PatternKind::Opaque:
+    if (shouldVisitOpaque)
+      return getSemanticsProvidingPattern()->forEachVariable(fn);
+    else
+      return;
+
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Binding:
-  case PatternKind::Opaque:
     return getSemanticsProvidingPattern()->forEachVariable(fn);
 
   case PatternKind::Tuple:

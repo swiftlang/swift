@@ -194,12 +194,12 @@ public:
 
   /// Apply the specified function to all variables referenced in this
   /// pattern.
-  void forEachVariable(llvm::function_ref<void(VarDecl *)> f) const;
+  void forEachVariable(llvm::function_ref<void(VarDecl *)> f, bool shouldVisitOpaque = false) const;
 
   /// Returns true if \p vd is in the pattern.
   bool containsVarDecl(const VarDecl *inputVD) const {
     bool result = false;
-    forEachVariable([&](VarDecl *vd) { result |= inputVD == vd; });
+    forEachVariable([&](VarDecl *vd) { result |= inputVD == vd; }, /*shouldVisitOpaque=*/ true);
     return result;
   }
 
