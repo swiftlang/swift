@@ -1599,6 +1599,7 @@ needsCustomConversion(CollectionUpcastConversionExpr::ConversionPair const & pai
         case ExprKind::DerivedToBase:
         case ExprKind::AnyHashableErasure:
         case ExprKind::MetatypeConversion:
+        case ExprKind::BridgeFromObjC:
         case ExprKind::BridgeToObjC:
         case ExprKind::InjectIntoOptional:
           return false;
@@ -1618,7 +1619,6 @@ needsCustomConversion(CollectionUpcastConversionExpr::ConversionPair const & pai
         case ExprKind::ABISafeConversion:
         case ExprKind::CovariantFunctionConversion:
         case ExprKind::CovariantReturnConversion:
-        case ExprKind::BridgeFromObjC:
         case ExprKind::ConditionalBridgeFromObjC:
         case ExprKind::ArchetypeToSuper:
         case ExprKind::ClassMetatypeToObject:
@@ -1786,6 +1786,12 @@ public:
       E->getOpaqueValue(),
       subExpr ? subExpr : E->getSubExpr(),
       subExpr->getType());
+  }
+  
+  Expr *visitBridgeFromObjCExpr(BridgeFromObjCExpr *E) {
+    Expr* subExpr = visit(E->getSubExpr());
+    if (!subExpr) return E;
+    return new (Context) BridgeFromObjCExpr(subExpr, E->getType());
   }
 
   Expr *visitExpr(Expr *E) {
