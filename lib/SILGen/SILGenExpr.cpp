@@ -1586,6 +1586,10 @@ RValue SILGenFunction::emitCollectionConversion(
 static bool
 needsCustomConversion(CollectionUpcastConversionExpr::ConversionPair const & pair) {
   assert(pair);
+  
+  if (pair.Conversion == pair.OrigValue) {
+    return false;
+  }
 
   if (auto conv = dyn_cast<ImplicitConversionExpr>(pair.Conversion)) {
     if (isa<ForeignObjectConversionExpr>(conv)) {
@@ -1597,6 +1601,7 @@ needsCustomConversion(CollectionUpcastConversionExpr::ConversionPair const & pai
       switch (conv->getKind()) {
         case ExprKind::Erasure:
         case ExprKind::DerivedToBase:
+        case ExprKind::ArchetypeToSuper:
         case ExprKind::AnyHashableErasure:
         case ExprKind::MetatypeConversion:
         case ExprKind::BridgeFromObjC:
@@ -1620,7 +1625,6 @@ needsCustomConversion(CollectionUpcastConversionExpr::ConversionPair const & pai
         case ExprKind::CovariantFunctionConversion:
         case ExprKind::CovariantReturnConversion:
         case ExprKind::ConditionalBridgeFromObjC:
-        case ExprKind::ArchetypeToSuper:
         case ExprKind::ClassMetatypeToObject:
         case ExprKind::ExistentialMetatypeToObject:
         case ExprKind::ProtocolMetatypeToObject:

@@ -118,6 +118,27 @@ ArrayCasts.testSync("Derived to Base") {
   expectEqual(d![2].k, 37)
 }
 
+private func arrayUpCast<Ct: Base>(_ arr: [Ct]) -> [Base] {
+  return arr
+}
+
+ArrayCasts.testSync("Archetype To Super") {
+  typealias X = [Derived]
+  typealias Y = [Base]
+
+  let a: X = [
+    Derived(42),
+    Derived(-1),
+    Derived(37)
+  ]
+
+  let b: Y = arrayUpCast(a)
+  expectEqual(b.count, 3)
+  expectEqual(b[0].k, 42)
+  expectEqual(b[1].k, -1)
+  expectEqual(b[2].k, 37)
+}
+
 ArrayCasts.testSync("Funtion Conversion: covariant result") {
   typealias X = [() -> Derived]
   typealias Y = [() -> Base]
@@ -848,6 +869,47 @@ DictionaryCasts.testSync("Derived to Base") {
   expectEqual(d!["c"]!.k, 37)
 }
 
+private func dictValueUpCast<Ct: Base>(_ dict: [String: Ct]) -> [String: Base] {
+  return dict
+}
+
+private func dictKeyUpCast<Ct: Base>(_ dict: [Ct: Int]) -> [Base: Int] {
+  return dict
+}
+
+DictionaryCasts.testSync("Archetype To Super [Value]") {
+  typealias X = [String: Derived]
+  typealias Y = [String: Base]
+
+  let a: X = [
+    "a": Derived(42),
+    "b": Derived(-1),
+    "c": Derived(37)
+  ]
+
+  let b: Y = dictValueUpCast(a)
+  expectEqual(b.count, 3)
+  expectEqual(b["a"]!.k, 42)
+  expectEqual(b["b"]!.k, -1)
+  expectEqual(b["c"]!.k, 37)
+}
+
+DictionaryCasts.testSync("Archetype To Super [Key]") {
+  typealias X = [Derived: Int]
+  typealias Y = [Base: Int]
+
+  let i = Derived(42)
+  let j = Derived(-1)
+  let k = Derived(37)
+  let a: X = [i: 1, j: 2, k: 3]
+
+  let b: Y = dictKeyUpCast(a)
+  expectEqual(b.count, 3)
+  expectEqual(b[i], 1)
+  expectEqual(b[j], 2)
+  expectEqual(b[k], 3)
+}
+
 DictionaryCasts.testSync("Funtion Conversion: covariant result") {
   typealias X = [String: () -> Derived]
   typealias Y = [String: () -> Base]
@@ -1551,6 +1613,27 @@ SetCasts.testSync("Derived to Base") {
   expectTrue(d!.contains(x))
   expectTrue(d!.contains(y))
   expectTrue(d!.contains(z))
+}
+
+private func setUpCast<Ct: Base>(_ set: Set<Ct>) -> Set<Base> {
+  return set
+}
+
+DictionaryCasts.testSync("Archetype To Super") {
+  typealias X = Set<Derived>
+  typealias Y = Set<Base>
+
+  let x = Derived(42)
+  let y = Derived(-1)
+  let z = Derived(37)
+
+  let a: X = [x, y, z]
+
+  let b: Y = setUpCast(a)
+  expectEqual(b.count, 3)
+  expectTrue(b.contains(x))
+  expectTrue(b.contains(y))
+  expectTrue(b.contains(z))
 }
 
 SetCasts.testSync("AnyHashable erasure") {
