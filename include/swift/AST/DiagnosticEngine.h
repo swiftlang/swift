@@ -292,7 +292,10 @@ namespace swift {
   /// for a transaction.
   struct ActiveDiagnostic {
     Diagnostic Diag;
-    SmallVector<DiagnosticInfo, 2> WrappedDiagnostics;
+
+    // NOTE: The `unique_ptr` here is important since we use a DiagnosticInfo
+    // pointer as the diagnostic argument for `Diag` when wrapping.
+    SmallVector<std::unique_ptr<DiagnosticInfo>, 2> WrappedDiagnostics;
     SmallVector<std::vector<DiagnosticArgument>, 4> WrappedDiagnosticArgs;
 
     ActiveDiagnostic(Diagnostic diag) : Diag(std::move(diag)) {}

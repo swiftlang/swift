@@ -520,12 +520,12 @@ InFlightDiagnostic::wrapIn(const Diagnostic &wrapper) {
   llvm::SaveAndRestore<DiagnosticBehavior> limit(
       Diag.BehaviorLimit, DiagnosticBehavior::Unspecified);
 
-  ActiveDiag.WrappedDiagnostics.push_back(*Engine->diagnosticInfoForDiagnostic(
-      Diag, /* includeDiagnosticName= */ false));
+  ActiveDiag.WrappedDiagnostics.push_back(std::make_unique<DiagnosticInfo>(
+      Engine->diagnosticInfoForDiagnostic(Diag, /*diagName*/ false).value()));
 
   Engine->state.swap(tempState);
 
-  auto &wrapped = ActiveDiag.WrappedDiagnostics.back();
+  auto &wrapped = *ActiveDiag.WrappedDiagnostics.back();
 
   // Copy and update its arg list.
   ActiveDiag.WrappedDiagnosticArgs.emplace_back(wrapped.FormatArgs);
