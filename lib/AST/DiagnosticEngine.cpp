@@ -1865,6 +1865,17 @@ void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
   }
 }
 
+DiagnosticQueue::DiagnosticQueue(DiagnosticEngine &engine,
+                                 bool emitOnDestruction)
+    : UnderlyingEngine(engine), QueueEngine(engine.SourceMgr),
+      EmitOnDestruction(emitOnDestruction) {
+  // Open a transaction to avoid emitting any diagnostics for the temporary
+  // engine.
+  QueueEngine.TransactionCount++;
+
+  QueueEngine.setLanguageVersion(engine.languageVersion);
+}
+
 void DiagnosticQueue::forEach(
     llvm::function_ref<void(const Diagnostic &)> body) const {
   for (auto &activeDiag : QueueEngine.TentativeDiagnostics)
