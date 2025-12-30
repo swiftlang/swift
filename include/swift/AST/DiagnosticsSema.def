@@ -1420,6 +1420,11 @@ ERROR(if_expr_must_be_syntactically_exhaustive,none,
 ERROR(do_catch_expr_must_be_syntactically_exhaustive,none,
       "'do catch' must have an unconditional 'catch' to be used as expression",
       ())
+
+WARNING(empty_catch_block,NoUsage,
+        "empty catch block silences errors; use 'try?' or 'catch _' to explicitly ignore",
+        ())
+
 ERROR(single_value_stmt_branch_empty,none,
       "expected expression in branch of '%0' expression",
       (StmtKind))
@@ -9059,9 +9064,6 @@ ERROR(unsafe_self_dependent_result_attr_on_invalid_decl,none,
       "invalid use of @_unsafeSelfDependentResult", ())
 
 REMARK(macro_expansion_line, none, "macro content: |%0|", (StringRef))
-
-WARNING(empty_catch_block, none, "empty catch block silently ignores errors; consider using 'try?' or 'catch _' to explicitly ignore", ())
-WARNING(redundant_error_capture, none, "explicit error capture is redundant; use 'catch _' instead", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

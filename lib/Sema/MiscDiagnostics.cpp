@@ -6539,30 +6539,6 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
         boundErrorName = ctx.getIdentifier("error");
       }
 
-      if (body->getNumElements() == 1) {
-        if (auto *expr = body->getFirstElement().dyn_cast<Expr *>()) {
-          if (auto *assign = dyn_cast<AssignExpr>(expr)) {
-            if (isa<DiscardAssignmentExpr>(assign->getDest())) {
-              if (auto *declRefExpr = dyn_cast<DeclRefExpr>(assign->getSrc())) {
-                if (declRefExpr->getDecl()->getBaseIdentifier() == boundErrorName) {
-                  auto diag = ctx.Diags.diagnose(assign->getLoc(), diag::redundant_error_capture); // Redundant
-                  diag.fixItRemove(assign->getSourceRange());
-                  auto *pattern = catchStmt->getCaseLabelItems().front().getPattern();
-                  if (pattern->isImplicit()) {
-                    auto catchEnd = Lexer::getLocForEndOfToken(ctx.SourceMgr,
-                                                               catchStmt->getStartLoc());
-                    diag.fixItInsert(catchEnd, " _");
-                  } else {
-                    diag.fixItReplace(pattern->getSourceRange(), "_");
-                  }
-                  continue;
-                }
-              }
-            }
-          }
-        }
-      }
-
       if (body->empty()) {
         auto diag = ctx.Diags.diagnose(catchStmt->getLoc(), diag::empty_catch_block);
         if (catchStmt->getCaseLabelItems().size() == 1 &&
