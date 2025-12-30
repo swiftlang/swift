@@ -487,6 +487,93 @@ ArrayCasts.testSync("Bridge To ObjC 3") {
 }
 #endif
 
+ArrayCasts.testSync("Bridge From ObjC 1") {
+  typealias X = [AnyObject]
+  typealias Y = [String]
+
+  let a: X = [
+    "abc" as AnyObject,
+    "xyz" as AnyObject,
+    "ijk" as AnyObject
+  ]
+
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectEqual(c![0], "abc")
+  expectEqual(c![1], "xyz")
+  expectEqual(c![2], "ijk")
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectEqual(d![0], "abc")
+  expectEqual(d![1], "xyz")
+  expectEqual(d![2], "ijk")
+}
+
+#if _runtime(_ObjC)
+ArrayCasts.testSync("Bridge From ObjC 2") {
+  typealias X = [NSString]
+  typealias Y = [String]
+
+  let a: X = [
+    "abc" as NSString,
+    "xyz" as NSString,
+    "ijk" as NSString
+  ]
+
+  let b = a as Y
+  expectEqual(b.count, 3)
+  expectEqual(b[0], "abc")
+  expectEqual(b[1], "xyz")
+  expectEqual(b[2], "ijk")
+
+  // Indeed succeeds
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Array<NSString>') to 'Y' (aka 'Array<String>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectEqual(c![0], "abc")
+  expectEqual(c![1], "xyz")
+  expectEqual(c![2], "ijk")
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectEqual(d![0], "abc")
+  expectEqual(d![1], "xyz")
+  expectEqual(d![2], "ijk")
+}
+
+ArrayCasts.testSync("Bridge From ObjC 3") {
+  typealias X = [CFString]
+  typealias Y = [String]
+
+  let a: X = [
+    "abc" as CFString,
+    "xyz" as CFString,
+    "ijk" as CFString
+  ]
+
+  let b = a as Y
+  expectEqual(b.count, 3)
+  expectEqual(b[0], "abc")
+  expectEqual(b[1], "xyz")
+  expectEqual(b[2], "ijk")
+
+  // Indeed succeeds
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Array<CFString>') to 'Y' (aka 'Array<String>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectEqual(c![0], "abc")
+  expectEqual(c![1], "xyz")
+  expectEqual(c![2], "ijk")
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectEqual(d![0], "abc")
+  expectEqual(d![1], "xyz")
+  expectEqual(d![2], "ijk")
+}
+#endif
+
 ArrayCasts.testSync("Metatype to AnyObject 1") {
   typealias X = [String.Type]
   typealias Y = [AnyObject]
@@ -1130,6 +1217,93 @@ DictionaryCasts.testSync("Bridge To ObjC 3") {
 }
 #endif
 
+DictionaryCasts.testSync("Bridge From ObjC 1") {
+  typealias X = [AnyHashable: AnyObject]
+  typealias Y = [String: String]
+
+  let a: X = [
+    "a": "abc" as AnyObject,
+    "b": "xyz" as AnyObject,
+    "c": "ijk" as AnyObject
+  ]
+
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectEqual(c!["a"]!, "abc")
+  expectEqual(c!["b"]!, "xyz")
+  expectEqual(c!["c"]!, "ijk")
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectEqual(d!["a"]!, "abc")
+  expectEqual(d!["b"]!, "xyz")
+  expectEqual(d!["c"]!, "ijk")
+}
+
+#if _runtime(_ObjC)
+DictionaryCasts.testSync("Bridge From ObjC 2") {
+  typealias X = [String: NSString]
+  typealias Y = [AnyHashable: String]
+
+  let a: X = [
+    "a": "abc" as NSString,
+    "b": "xyz" as NSString,
+    "c": "ijk" as NSString
+  ]
+
+  let b = a as Y
+  expectEqual(b.count, 3)
+  expectEqual(b["a"]!, "abc")
+  expectEqual(b["b"]!, "xyz")
+  expectEqual(b["c"]!, "ijk")
+
+  // Indeed succeeds
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Dictionary<String, NSString>') to 'Y' (aka 'Dictionary<AnyHashable, String>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectEqual(c!["a"]!, "abc")
+  expectEqual(c!["b"]!, "xyz")
+  expectEqual(c!["c"]!, "ijk")
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectEqual(d!["a"]!, "abc")
+  expectEqual(d!["b"]!, "xyz")
+  expectEqual(d!["c"]!, "ijk")
+}
+
+DictionaryCasts.testSync("Bridge From ObjC 3") {
+  typealias X = [String: CFString]
+  typealias Y = [AnyHashable: String]
+
+  let a: X = [
+    "a": "abc" as CFString,
+    "b": "xyz" as CFString,
+    "c": "ijk" as CFString
+  ]
+
+  let b = a as Y
+  expectEqual(b.count, 3)
+  expectEqual(b["a"]!, "abc")
+  expectEqual(b["b"]!, "xyz")
+  expectEqual(b["c"]!, "ijk")
+
+  // Indeed succeeds
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Dictionary<String, CFString>') to 'Y' (aka 'Dictionary<AnyHashable, String>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectEqual(c!["a"]!, "abc")
+  expectEqual(c!["b"]!, "xyz")
+  expectEqual(c!["c"]!, "ijk")
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectEqual(d!["a"]!, "abc")
+  expectEqual(d!["b"]!, "xyz")
+  expectEqual(d!["c"]!, "ijk")
+}
+#endif
+
 DictionaryCasts.testSync("Metatype to AnyObject 1") {
   typealias X = [String: String.Type]
   typealias Y = [String: AnyObject]
@@ -1502,6 +1676,93 @@ SetCasts.testSync("Bridge To ObjC 3") {
   expectTrue(d!.contains("abc" as CFString))
   expectTrue(d!.contains("xyz" as CFString))
   expectTrue(d!.contains("ijk" as CFString))
+}
+#endif
+
+SetCasts.testSync("Bridge From ObjC 1") {
+  typealias X = Set<NSObject>
+  typealias Y = Set<String>
+
+  let a: X = [
+    "abc" as NSObject,
+    "xyz" as NSObject,
+    "ijk" as NSObject
+  ]
+
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectTrue(c!.contains("abc"))
+  expectTrue(c!.contains("xyz"))
+  expectTrue(c!.contains("ijk"))
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectTrue(d!.contains("abc"))
+  expectTrue(d!.contains("xyz"))
+  expectTrue(d!.contains("ijk"))
+}
+
+#if _runtime(_ObjC)
+SetCasts.testSync("Bridge From ObjC 2") {
+  typealias X = Set<NSString>
+  typealias Y = Set<String>
+
+  let a: X = [
+    "abc" as NSString,
+    "xyz" as NSString,
+    "ijk" as NSString
+  ]
+
+  let b = a as Y
+  expectEqual(b.count, 3)
+  expectTrue(b.contains("abc"))
+  expectTrue(b.contains("xyz"))
+  expectTrue(b.contains("ijk"))
+
+  // Indeed succeeds
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Set<NSString>') to 'Y' (aka 'Set<String>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectTrue(c!.contains("abc"))
+  expectTrue(c!.contains("xyz"))
+  expectTrue(c!.contains("ijk"))
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectTrue(d!.contains("abc"))
+  expectTrue(d!.contains("xyz"))
+  expectTrue(d!.contains("ijk"))
+}
+
+SetCasts.testSync("Bridge From ObjC 3") {
+  typealias X = Set<CFString>
+  typealias Y = Set<String>
+
+  let a: X = [
+    "abc" as CFString,
+    "xyz" as CFString,
+    "ijk" as CFString
+  ]
+
+  let b = a as Y
+  expectEqual(b.count, 3)
+  expectTrue(b.contains("abc"))
+  expectTrue(b.contains("xyz"))
+  expectTrue(b.contains("ijk"))
+
+  // Indeed succeeds
+  // expected-warning@+1 {{conditional cast from 'X' (aka 'Set<CFString>') to 'Y' (aka 'Set<String>') always succeeds}}
+  let c = a as? Y
+  expectEqual(c!.count, 3)
+  expectTrue(c!.contains("abc"))
+  expectTrue(c!.contains("xyz"))
+  expectTrue(c!.contains("ijk"))
+
+  let d = (a as Any) as? Y
+  expectEqual(d!.count, 3)
+  expectTrue(d!.contains("abc"))
+  expectTrue(d!.contains("xyz"))
+  expectTrue(d!.contains("ijk"))
 }
 #endif
 
