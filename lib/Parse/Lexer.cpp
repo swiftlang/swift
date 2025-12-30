@@ -452,6 +452,8 @@ static bool skipToEndOfSlashStarComment(const char *&CurPtr,
     case '/':
       // Check for a '/*'
       if (*CurPtr == '*') {
+        if (CurPtr[1] == '/')
+          continue;
         ++CurPtr;
         ++Depth;
       }
