@@ -69,7 +69,6 @@ public struct _FDInputStream {
     var bufferFree = _buffer.count - _offset
     if bufferFree < minFree {
       let toAdd = minFree - bufferFree
-      _buffer.reserveCapacity(_buffer.count + toAdd)
       _buffer.append(contentsOf: repeatElement(0, count: toAdd))
       bufferFree = minFree
     }
@@ -125,7 +124,6 @@ public struct _FDInputStream {
     var bufferFree = _buffer.count - _bufferUsed
     if bufferFree < minFree {
       let toAdd = minFree - bufferFree
-      _buffer.reserveCapacity(_buffer.count + toAdd)
       _buffer.append(contentsOf: repeatElement(0, count: toAdd))
       bufferFree = minFree
     }
