@@ -4586,6 +4586,7 @@ private:
 
     // Walk everything
     S->getParsedSequence()->walk(*this);
+    S->getPattern()->walk(*this);
     S->getBody()->walk(*this);
     if (S->getWhere())
       S->getWhere()->walk(*this);

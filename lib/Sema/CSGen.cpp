@@ -2721,7 +2721,12 @@ namespace {
       case PatternKind::Opaque: {
         auto *opaque = cast<OpaquePattern>(pattern);
         auto *ogPattern = opaque->getSubPattern();
-        auto underlyingType = ogPattern->getType();
+        // Recursively handle the sub-pattern to ensure it gets properly
+        // registered in the constraint system
+        auto underlyingType = getTypeForPattern(
+            ogPattern,
+            locator.withPathElement(LocatorPathElt::PatternMatch(ogPattern)),
+            bindPatternVarsOneWay, patternBinding, patternBindingIndex);
         return setType(underlyingType);
 
       }

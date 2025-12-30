@@ -1544,8 +1544,8 @@ class OpaqueStmt final : public Stmt {
     : Stmt(StmtKind::Opaque, true /*always implicit*/),
       StartLoc(startLoc), EndLoc(endLoc), Body(body) {}
 
-  SourceLoc getStartLoc() const { return Stmt::getStartLoc(); }
-  SourceLoc getEndLoc() const { return Stmt::getEndLoc(); }
+  SourceLoc getStartLoc() const { return StartLoc; }
+  SourceLoc getEndLoc() const { return EndLoc; }
 
   Stmt* getUnderlyingStmt() { return Body; }
 

@@ -3606,8 +3606,8 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
 
   auto *braceStmt = BraceStmt::create(ctx, stmt->getStartLoc(), stmts, stmt->getEndLoc());
 
-  StmtChecker checker(stmt->getDeclContext());
-  if (!checker.typeCheckStmt(braceStmt))
+  bool HadError = StmtChecker(stmt->getDeclContext()).typeCheckStmt(braceStmt);
+  if (HadError)
     return nullptr;
 
   return braceStmt;

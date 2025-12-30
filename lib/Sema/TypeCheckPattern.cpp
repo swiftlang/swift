@@ -1163,6 +1163,16 @@ Pattern *TypeChecker::coercePatternToType(
     auto VP = cast<OpaquePattern>(P);
     auto sub = VP->getSubPattern();
 
+    // If the sub-pattern is an ExprPattern that's already been type-checked,
+    // we can't re-type-check it. Just set the appropriate type on the OpaquePattern.
+    if (auto *EP = dyn_cast<ExprPattern>(sub)) {
+      if (EP->isResolved() && EP->hasType()) {
+        // The ExprPattern is already resolved, just use its type
+        VP->setType(type);
+        return P;
+      }
+    }
+
     sub = coercePatternToType(
         pattern.forSubPattern(sub, /*retainTopLevel=*/false), type, subOptions,
         tryRewritePattern);
