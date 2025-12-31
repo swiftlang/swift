@@ -327,6 +327,20 @@ SolverTrail::Change::RetiredConstraint(ConstraintList::iterator where,
 }
 
 SolverTrail::Change
+SolverTrail::Change::AddedBinding(TypeVariableType *typeVar,
+                                  inference::PotentialBinding binding) {
+  Change result;
+  result.Kind = ChangeKind::AddedBinding;
+  result.Binding.TypeVar = typeVar;
+  result.Binding.BindingType = binding.BindingType;
+  result.Binding.BindingSource = binding.BindingSource;
+  result.Binding.Originator = binding.Originator;
+  result.Options = unsigned(binding.Kind);
+
+  return result;
+}
+
+SolverTrail::Change
 SolverTrail::Change::RetractedBinding(TypeVariableType *typeVar,
                                       inference::PotentialBinding binding) {
   Change result;
@@ -579,6 +593,24 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
                                    BindingRelation.Constraint);
     break;
 
+  case ChangeKind::AddedBinding: {
+    PotentialBinding binding(Binding.BindingType, AllowedBindingKind(Options),
+                             Binding.BindingSource, Binding.Originator);
+
+    auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();
+    bindings.Bindings.erase(
+        llvm::remove_if(
+            bindings.Bindings,
+            [&binding](const auto &existing) {
+              return existing.BindingType->isEqual(binding.BindingType) &&
+                     existing.Kind == binding.Kind &&
+                     existing.BindingSource == binding.BindingSource &&
+                     existing.Originator == binding.Originator;
+            }),
+        bindings.Bindings.end());
+    break;
+  }
+
   case ChangeKind::RetractedBinding: {
     PotentialBinding binding(Binding.BindingType, AllowedBindingKind(Options),
                              Binding.BindingSource, Binding.Originator);
@@ -803,6 +835,14 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     Retiree.Constraint->print(out, &cs.getASTContext().SourceMgr,
                               indent + 2);
     out << ")\n";
+    break;
+
+  case ChangeKind::AddedBinding:
+    out << "(AddedBinding ";
+    Binding.TypeVar->print(out, PO);
+    out << " with type ";
+    Binding.BindingType->print(out, PO);
+    out << " and kind " << Options << ")\n";
     break;
 
   case ChangeKind::RetractedBinding:

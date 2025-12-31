@@ -254,6 +254,11 @@ public:
     static Change RetiredConstraint(llvm::ilist<Constraint>::iterator where,
                                     Constraint *constraint);
 
+    /// Create a change that added a binding to a type variable's potential
+    /// bindings. This could be caused by direct or transitive inference.
+    static Change AddedBinding(TypeVariableType *typeVar,
+                               inference::PotentialBinding binding);
+
     /// Create a change that removed a binding from a type variable's potential
     /// bindings.
     static Change RetractedBinding(TypeVariableType *typeVar,

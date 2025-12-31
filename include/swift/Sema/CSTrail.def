@@ -109,6 +109,7 @@ CHANGE(RecordedPotentialThrowSite)
 CHANGE(RecordedIsolatedParam)
 CHANGE(RecordedKeyPath)
 CHANGE(RetiredConstraint)
+CHANGE(AddedBinding)
 CHANGE(RetractedBinding)
 
 LAST_CHANGE(RetractedBinding)
