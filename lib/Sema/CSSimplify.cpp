@@ -9868,12 +9868,28 @@ ConstraintSystem::simplifyForEachElementConstraint(
   Type resultElementType = elementType;
   if (seqTy->isExistentialType())
   {
-    resultElementType = typeEraseOpenedExistentialReference(
-            elementType, seqTy, externalSequenceType,
-            TypePosition::Covariant);
-    if (!resultElementType) {
-      resultElementType = PlaceholderType::get(Context, externalSequenceType);
-      increaseScore(SK_Hole, locator);
+    // For parameterized existential types like 'any Sequence<Int>',
+    // extract the element type from the parameterized protocol args
+    if (auto existential = seqTy->getAs<ExistentialType>()) {
+      auto constraint = existential->getConstraintType();
+      if (auto parameterized = constraint->getAs<ParameterizedProtocolType>()) {
+        auto args = parameterized->getArgs();
+        // For Sequence/AsyncSequence, Element is the first (and only) generic arg
+        if (!args.empty()) {
+          resultElementType = args[0];
+        }
+      }
+    }
+
+    // Fall back to type erasure if we couldn't extract from parameterized type
+    if (resultElementType.getPointer() == elementType) {
+      resultElementType = typeEraseOpenedExistentialReference(
+              elementType, seqTy, externalSequenceType,
+              TypePosition::Covariant);
+      if (!resultElementType) {
+        resultElementType = PlaceholderType::get(Context, externalSequenceType);
+        increaseScore(SK_Hole, locator);
+      }
     }
   }
 

@@ -4694,7 +4694,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                                  CTP_ForEachSequence);
   cs.setContextualInfo(sequenceExpr, contextInfo);
 
-  auto seqExprTarget = SyntacticElementTarget(sequenceExpr, 
+  auto seqExprTarget = SyntacticElementTarget(sequenceExpr,
       dc, contextInfo, false);
 
   if (cs.generateConstraints(seqExprTarget))
