@@ -453,6 +453,9 @@ public:
       OrphanedConstraints.push_back(orphaned);
   }
 
+  /// Check whether transitive binding feature is enabled for this graph.
+  bool supportsTransitiveInference() const;
+
   /// Print the graph.
   void print(ArrayRef<TypeVariableType *> typeVars, llvm::raw_ostream &out);
   void dump(llvm::raw_ostream &out);
