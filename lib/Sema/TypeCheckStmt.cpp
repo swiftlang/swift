@@ -3596,7 +3596,7 @@ static BraceStmt *desugarForEachStmt(ForEachStmt* stmt){
       nullptr, /*implicit*/ true, ctx);
   }
 
-  auto* whileStmt = new (ctx) WhileStmt(stmt->getLabelInfo(), SourceLoc(), ctx.AllocateCopy(cond), whileBody, true);
+  auto* whileStmt = new (ctx) WhileStmt(LabeledStmtInfo {.Loc = SourceLoc(), .Name = stmt->getLabelInfo().Name}, SourceLoc(), ctx.AllocateCopy(cond), whileBody, true);
   stmt->setBreakTarget(whileStmt);
   stmt->setContinueTarget(whileStmt);
 
