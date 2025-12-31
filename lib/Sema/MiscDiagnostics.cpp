@@ -6539,7 +6539,7 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
         boundErrorName = ctx.getIdentifier("error");
       }
 
-      if (body->empty()) {
+      if (body->empty() && doCatchStmt->getCatches().size() == 1) {
         auto diag = ctx.Diags.diagnose(catchStmt->getLoc(), diag::empty_catch_block);
         if (catchStmt->getCaseLabelItems().size() == 1 &&
             catchStmt->getCaseLabelItems().front().getPattern()->isImplicit()) {

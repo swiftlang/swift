@@ -42,11 +42,12 @@ func testStrictCatch() {
 }
 
 func testCatchChain() {
-  // 6. Catch-All in a Chain -> WARN
+  // 6. Catch-All in a Chain -> PASS
   do {
     try something()
   } catch MyError.bad {
     print("bad")
-  } catch { // expected-warning {{empty catch block silences errors; use 'try?' or 'catch _' to explicitly ignore}}
+  } catch {
+        // Valid: implicitly ignore the rest
   }
 }
