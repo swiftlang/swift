@@ -1127,6 +1127,10 @@ void ConstraintGraph::incrementConstraintsPerContractionCounter() {
   }
 }
 
+bool ConstraintGraph::supportsTransitiveInference() const {
+  return CS.Options.contains(ConstraintSystemFlags::EnableTransitiveInference);
+}
+
 #pragma mark Debugging output
 
 void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
