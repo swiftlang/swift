@@ -37,6 +37,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclVisitor.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
@@ -50,6 +51,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
@@ -326,6 +328,11 @@ enum class FactoryAsInitKind {
   AsClassMethod,
   /// Treat as an initializer.
   AsInitializer
+};
+
+enum class PropertyFromOperator {
+  pointee,
+  successor,
 };
 
 namespace importer {
@@ -680,9 +687,6 @@ public:
                                  std::map<SmallVector<TypeBase *>, unsigned>>>
       cxxSubscripts;
 
-  llvm::MapVector<NominalTypeDecl *, std::pair<FuncDecl *, FuncDecl *>>
-      cxxDereferenceOperators;
-
   llvm::SmallPtrSet<const clang::Decl *, 1> synthesizedAndAlwaysVisibleDecls;
 
 private:
@@ -700,6 +704,17 @@ private:
   // the method is finally generated, we check if it's present here
   llvm::DenseSet<std::pair<const clang::CXXRecordDecl *, DeclName>>
       unavailableMethods;
+
+public:
+  /// Import a synthetic property that overlays C++ operators under the hood.
+  ValueDecl *importPropertyFromOperator(PropertyFromOperator Prop,
+                                        NominalTypeDecl *Record);
+
+private:
+  llvm::DenseMap<
+      llvm::PointerIntPair<NominalTypeDecl *, 1, PropertyFromOperator>,
+      ValueDecl *>
+      PropertyFromOperatorCache;
 
 public:
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
@@ -1098,15 +1113,6 @@ public:
   /// Create attribute with given text and attach it to decl, creating or
   /// retrieving a chached source file as needed.
   void importNontrivialAttribute(Decl *MappedDecl, StringRef attributeText);
-
-  /// Utility function to import Clang attributes from a source Swift decl to
-  /// synthesized Swift decl.
-  ///
-  /// \param SourceDecl The Swift decl to copy the atteribute from.
-  /// \param SynthesizedDecl The synthesized Swift decl to attach attributes to.
-  void
-  importAttributesFromClangDeclToSynthesizedSwiftDecl(Decl *SourceDecl,
-                                                      Decl *SynthesizedDecl);
 
   /// Import attributes from the given Clang declaration to its Swift
   /// equivalent.

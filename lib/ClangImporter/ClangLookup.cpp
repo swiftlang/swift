@@ -34,6 +34,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Version.h"
@@ -44,10 +45,12 @@
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/CXXInheritance.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclBase.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/AST/DeclarationName.h"
 #include "clang/AST/Mangle.h"
 #include "clang/AST/TemplateBase.h"
 #include "clang/AST/Type.h"
@@ -59,6 +62,7 @@
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Rewrite/Frontend/Rewriters.h"
 #include "clang/Sema/DelayedDiagnostic.h"
+#include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
@@ -1171,6 +1175,218 @@ size_t ClangImporter::Implementation::getImportedBaseMemberDeclArity(
   return 0;
 }
 
+static std::optional<PropertyFromOperator>
+classifyPropertyFromOperator(DeclName name) {
+  if (name.isSimpleName("pointee"))
+    return {PropertyFromOperator::pointee};
+  if (name.isSimpleName("successor"))
+    return {PropertyFromOperator::successor};
+  return std::nullopt;
+}
+
+ValueDecl *ClangImporter::Implementation::importPropertyFromOperator(
+    PropertyFromOperator Prop, NominalTypeDecl *Record) {
+
+  const auto *CXXRecord =
+      dyn_cast<clang::CXXRecordDecl>(Record->getClangDecl());
+
+  if (!CXXRecord || isa<ClassDecl>(Record))
+    // Do not synthesize property if this is not a C++ record, or if it is
+    // a foreign reference type (we need to make copy values of this type in our
+    // synthesized members).
+    return nullptr;
+
+  auto cached = PropertyFromOperatorCache.find({Record, Prop});
+  if (cached != PropertyFromOperatorCache.end())
+    return cached->second;
+
+  // If we exit early because we did not successfully synthesize the property
+  // cache the negative result.
+  bool success = false;
+  SWIFT_DEFER {
+    if (!success)
+      PropertyFromOperatorCache[{Record, Prop}] = nullptr;
+  };
+
+  auto &Ctx = getClangASTContext();
+  auto &Sema = getClangSema();
+
+  clang::OverloadedOperatorKind opKind;
+  switch (Prop) {
+  case PropertyFromOperator::pointee:
+    opKind = clang::OverloadedOperatorKind::OO_Star;
+    break;
+  case PropertyFromOperator::successor:
+    opKind = clang::OverloadedOperatorKind::OO_PlusPlus;
+    break;
+  }
+
+  auto name = Ctx.DeclarationNames.getCXXOperatorName(opKind);
+  auto R = clang::LookupResult(Sema, name, clang::SourceLocation(),
+                               clang::Sema::LookupMemberName);
+  R.suppressDiagnostics();
+  // NOTE: this will not find free-standing operator decl, i.e. not a member
+  Sema.LookupQualifiedName(R, const_cast<clang::CXXRecordDecl *>(CXXRecord));
+
+  switch (R.getResultKind()) {
+  case clang::LookupResultKind::Found:
+  case clang::LookupResultKind::FoundOverloaded:
+    break;
+  default:
+    return nullptr; // Lookup didn't yield any results
+  }
+
+  // If the lookup was successful, R should contain one or more overloods.
+  // We loop through these results looking for what to import, skipping over
+  // volatile and r-value ref overloads, as well as overloads that have the
+  // wrong number of arguments.
+  //
+  // ref-qualified overloads cannot co-exist with non-ref overloads, so there
+  // are only two possible overload candidates (which are both l-value ref or
+  // non-ref): const and non-const. These are used to synthesize the property.
+  const clang::CXXMethodDecl *CXXConstOverload = nullptr,
+                             *CXXNonConstOverload = nullptr;
+  clang::AccessSpecifier CXXConstAccess = clang::AS_none,
+                         CXXNonConstAccess = clang::AS_none;
+
+  for (auto it = R.begin(); it != R.end(); ++it) {
+    auto *nd = it.getDecl();
+
+    if (auto *sud = dyn_cast<clang::UsingShadowDecl>(nd))
+      nd = sud->getTargetDecl();
+
+    auto *fn = dyn_cast<clang::CXXMethodDecl>(nd);
+
+    if (!fn || fn->isStatic() || fn->isVolatile() ||
+        fn->getMinRequiredArguments() != 0 ||
+        fn->getRefQualifier() == clang::RQ_RValue)
+      continue;
+
+    if (fn->isConst()) {
+      CXXConstOverload = fn;
+      CXXConstAccess = fn->getDeclContext() == CXXRecord
+                           ? clang::AS_none  // not inherited
+                           : it.getAccess(); // inherited
+    } else {
+      CXXNonConstOverload = fn;
+      CXXNonConstAccess = fn->getDeclContext() == CXXRecord
+                              ? clang::AS_none  // not inherited
+                              : it.getAccess(); // inherited
+    }
+  }
+
+  if (!CXXConstOverload && !CXXNonConstOverload)
+    return nullptr; // Didn't find any suitable overloads
+
+  if (CXXConstAccess == clang::AS_private ||
+      CXXConstAccess == clang::AS_protected ||
+      CXXNonConstAccess == clang::AS_private ||
+      CXXNonConstAccess == clang::AS_protected)
+    return nullptr; // Found overloads, but they cannot be accessed
+
+  auto importUnavailableMethod =
+      [&](const clang::CXXMethodDecl *method, clang::AccessSpecifier access,
+          StringRef unavailabilityMsg) -> FuncDecl * {
+    auto *func = dyn_cast_or_null<FuncDecl>(importDecl(method, CurrentVersion));
+    if (!func)
+      return nullptr;
+    if (auto inheritance = ClangInheritanceInfo(access))
+      func = dyn_cast_or_null<FuncDecl>(
+          importBaseMemberDecl(func, Record, inheritance));
+    if (!func)
+      return nullptr;
+    markUnavailable(func, unavailabilityMsg);
+    return func;
+  };
+
+  ValueDecl *property;
+
+  switch (Prop) {
+  case PropertyFromOperator::pointee: {
+    FuncDecl *getter = nullptr, *setter = nullptr;
+    // Whether we an overload is const- vs non-const-qualified is orthogonal to
+    // whether we use it as a getter or setter.
+    //
+    // A setter is anything that returns a mutable reference; anything else is
+    // a getter.
+    auto isSetter = [&](const clang::CXXMethodDecl *method) -> bool {
+      auto retTy = method->getReturnType();
+      return retTy->isReferenceType() &&
+             !retTy->getPointeeType().isConstQualified();
+    };
+
+    // We need to pick getters and setters from among the const and non-const
+    // overloads. Try the non-const overload first, since that will be imported
+    // as a non-mutating getter/setter that is "easier" to call in Swift.
+    // Note that importUnavailableMethod does not do anything if its inout
+    // (first) parameter is already set.
+    if (CXXConstOverload) {
+      if (isSetter(CXXConstOverload)) {
+        setter = importUnavailableMethod(CXXConstOverload, CXXConstAccess,
+                                         "use .pointee property");
+        if (!setter)
+          return nullptr;
+        getter = setter; // ensure we don't pick the non-const overload as
+                         // a mutating getter
+      } else {
+        getter = importUnavailableMethod(CXXConstOverload, CXXConstAccess,
+                                         "use .pointee property");
+        if (!getter)
+          return nullptr;
+      }
+    }
+
+    // Now we consider the non-const overload, but only select it if we haven't
+    // already selected the CXXConst
+    if (CXXNonConstOverload) {
+      if (!setter && isSetter(CXXNonConstOverload)) {
+        setter = importUnavailableMethod(CXXNonConstOverload, CXXNonConstAccess,
+                                         "use .pointee property");
+        if (!setter)
+          return nullptr;
+      } else if (!getter && !isSetter(CXXNonConstOverload)) {
+        getter = importUnavailableMethod(CXXNonConstOverload, CXXNonConstAccess,
+                                         "use .pointee property");
+        if (!getter)
+          return nullptr;
+      }
+    }
+
+    SwiftDeclSynthesizer synth{*this};
+    property = synth.makeDereferencedPointeeProperty(getter, setter);
+
+    importAttributes(CXXConstOverload ? CXXConstOverload : CXXNonConstOverload,
+                     property);
+  } break;
+
+  case PropertyFromOperator::successor: {
+    // FIXME: we currently only support non-const overloads of operator++,
+    // so bail if we didn't find that. In the future, we should be able to
+    // synthesize a nonmutating .successor() function from a const overload,
+    // but that requires some work.
+    if (!CXXNonConstOverload)
+      return nullptr;
+
+    FuncDecl *incrFunc = importUnavailableMethod(
+        CXXNonConstOverload, CXXNonConstAccess, "use .successor()");
+    if (!incrFunc)
+      return nullptr;
+
+    SwiftDeclSynthesizer synth{*this};
+    property = synth.makeSuccessorFunc(incrFunc);
+    importAttributes(CXXNonConstOverload, property);
+    // cloneImportedAttributes(incrFunc, property);
+  } break;
+  }
+
+  if (property) {
+    Record->addMember(property);
+    PropertyFromOperatorCache[{Record, Prop}] = property;
+    success = true;
+  }
+  return property;
+}
+
 TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
   NominalTypeDecl *recordDecl = desc.recordDecl;
@@ -1179,6 +1395,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   ClangInheritanceInfo inheritance = desc.inheritance;
 
   auto &ctx = recordDecl->getASTContext();
+  auto &Importer = *static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
   // Whether to skip non-public members. Feature::ImportNonPublicCxxMembers says
   // to import all non-public members by default; if that is disabled, we only
@@ -1321,6 +1538,15 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
           collector.add(foundInBase);
         }
       }
+    }
+  }
+
+  if (result.empty() && !inheritance) {
+    if (auto kind = classifyPropertyFromOperator(name)) {
+      auto *prop =
+          Importer.Impl.importPropertyFromOperator(*kind, inheritingDecl);
+      if (prop)
+        result.push_back(prop);
     }
   }
 

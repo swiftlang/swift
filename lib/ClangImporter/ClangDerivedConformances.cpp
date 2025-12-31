@@ -545,10 +545,10 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
     }
   }
 
-  // Check if present: `var pointee: Pointee { get }`
-  auto pointeeId = ctx.getIdentifier("pointee");
-  auto pointee = lookupDirectSingleWithoutExtensions<VarDecl>(decl, pointeeId);
-  if (!pointee || pointee->isGetterMutating() || pointee->getTypeInContext()->hasError())
+  auto *pointee = dyn_cast_or_null<VarDecl>(
+      impl.importPropertyFromOperator(PropertyFromOperator::pointee, decl));
+  if (!pointee || pointee->isGetterMutating() ||
+      pointee->getTypeInContext()->hasError())
     return;
 
   // Check if `var pointee: Pointee` is settable. This is required for the
@@ -556,10 +556,8 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   // UnsafeCxxInputIterator.
   bool pointeeSettable = pointee->isSettable(nullptr);
 
-  // Check if present: `func successor() -> Self`
-  auto successorId = ctx.getIdentifier("successor");
-  auto successor =
-      lookupDirectSingleWithoutExtensions<FuncDecl>(decl, successorId);
+  auto *successor = dyn_cast_or_null<FuncDecl>(
+      impl.importPropertyFromOperator(PropertyFromOperator::successor, decl));
   if (!successor || successor->isMutating())
     return;
   auto successorTy = successor->getResultInterfaceType();
@@ -714,6 +712,9 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
   auto *Wrapped = dyn_cast_or_null<TypeAliasDecl>(
       impl.importDecl(value_type, impl.CurrentVersion));
   if (!Wrapped)
+    return;
+
+  if (!impl.importPropertyFromOperator(PropertyFromOperator::pointee, decl))
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"),

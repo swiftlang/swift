@@ -536,7 +536,7 @@ struct ClassWithOperatorStarAvailable {
   int value;
 
 public:
-  int &operator*() { return value; }
+  const int &operator*() const { return value; }
 };
 
 struct DerivedClassWithOperatorStarAvailable : ClassWithOperatorStarAvailable {
@@ -546,7 +546,8 @@ struct ClassWithOperatorStarUnavailable {
   int value;
 
 public:
-  int &operator*() __attribute__((availability(swift, unavailable))) {
+  const int &operator*() const
+      __attribute__((availability(swift, unavailable))) {
     return value;
   }
 };
