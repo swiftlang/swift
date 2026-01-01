@@ -28,6 +28,8 @@ import SubE
 // CHECK-REMARK-SAVE: remark: Incremental module scan: Serializing module scanning dependency cache to:
 
 // CHECK-REMARK-LOAD: remark: Incremental module scan: Re-using serialized module scanning dependency cache from:
+// 'SwiftShims', 'C' and 'B' are Clang modules which are directly imorted from Swift code in this test, without a corresponding Swift overlay module. Because we do not serialize negative Swift dependency lookup results, resolving a dependency on these modules involves a query for whether a Swift module under this name can be found. This query fails and the subsequent query for this identifier as a Clang dependency is then able to re-use the loaded serialized cache.
+// CHECK-REMARK-LOAD: remark: Number of Swift module queries: '3'
 // FIXME: Today, we do not serialize dependencies of the main source module which results in a lookup for 'C' even though
 // it is fully redundant.
 // CHECK-REMARK-LOAD: remark: Number of named Clang module queries: '1'
