@@ -46,5 +46,6 @@ extension AStruct.BStruct.CStruct where Thing: Equatable {
 // NESTED-NOT: BStruct
 // NESTED-NOT: CStruct
 // NESTED-NOT: "swift.extension"
+// NESTEDATA-DAG: "extended": "A"
 // NESTEDATA-DAG: "precise": "s:1A7AStructV1BE7BStructV16NestedExtensionsE7CStructV"
 // NESTEDATA-DAG: "precise": "s:e:s:1A7AStructV1BE7BStructV16NestedExtensionsE7CStructV"
