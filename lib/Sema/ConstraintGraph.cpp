@@ -398,13 +398,13 @@ void ConstraintGraphNode::retractFromInference() {
   // Notify all of the type variables that reference this one.
   //
   // Since this type variable is going to be replaced with a fixed type
-  // all of the concrete types that reference it are going to change,
-  // which means that all of the not-yet-attempted bindings should
-  // change as well.
-  return notifyReferencingVars(
-      [](ConstraintGraphNode &node, Constraint *constraint) {
-        node.getPotentialBindings().retract(constraint);
-      });
+  // or a representative all of the concrete types that reference it
+  // are going to change, which means that all of the not-yet-attempted
+  // bindings should change as well.
+  notifyReferencingVars([](ConstraintGraphNode &node,
+                              Constraint *constraint) {
+    node.getPotentialBindings().retract(constraint);
+  });
 }
 
 void ConstraintGraphNode::retractTransitiveBindingsFrom(
@@ -592,12 +592,7 @@ void ConstraintGraph::mergeNodesPre(TypeVariableType *typeVar2) {
   auto &nonRepNode = (*this)[typeVar2];
 
   for (auto *newMember : nonRepNode.getEquivalenceClassUnsafe()) {
-    auto &node = (*this)[newMember];
-
-    node.notifyReferencingVars(
-        [&](ConstraintGraphNode &node, Constraint *constraint) {
-          node.getPotentialBindings().retract(constraint);
-        });
+    (*this)[newMember].retractFromInference();
   }
 }
 
