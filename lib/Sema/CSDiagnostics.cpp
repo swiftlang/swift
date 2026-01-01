@@ -5286,7 +5286,11 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   // foo(bar) // `() -> Void` vs. `(Int) -> Void`
   // ```
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
-    auto info = *(getFunctionArgApplyInfo(locator));
+    auto info_ptr = getFunctionArgApplyInfo(locator);
+    if (!info_ptr)
+      return false;
+
+    auto info = *info_ptr;
 
     auto *argExpr = info.getArgExpr();
     emitDiagnosticAt(argExpr->getLoc(), diag::cannot_convert_argument_value,

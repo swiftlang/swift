@@ -4246,7 +4246,9 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   } else {
     // If we didn't resolve an overload for the callee, we should be dealing
     // with a call of an arbitrary function expr.
-    auto *call = castToExpr<CallExpr>(anchor);
+    auto *call = getAsExpr<CallExpr>(anchor);
+    if (!call)
+      return std::nullopt;
     rawFnType = getType(call->getFn());
 
     // If callee couldn't be resolved due to expression
