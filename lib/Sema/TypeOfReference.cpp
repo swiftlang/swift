@@ -1402,8 +1402,12 @@ static void bindArchetypesFromContext(
     auto genericSig = parentDC->getGenericSignatureOfContext();
     for (auto *paramTy : genericSig.getGenericParams()) {
       Type contextTy = cs.DC->mapTypeIntoEnvironment(paramTy);
-      if (paramTy->isParameterPack())
-        contextTy = PackType::getSingletonPackExpansion(contextTy);
+      // For pack parameters, we bind directly to the pack archetype rather
+      // than wrapping in a singleton pack expansion. The pack expansion
+      // structure is handled separately when opening pack expansion types.
+      // This ensures that when same-type requirements with pack expansions
+      // are checked, the pattern types match correctly (e.g., 'each T' matches
+      // the opened type variable bound to the pack archetype 'each T').
       bindPrimaryArchetype(paramTy, contextTy);
     }
 
