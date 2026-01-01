@@ -4246,26 +4246,55 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   } else {
     // If we didn't resolve an overload for the callee, we should be dealing
     // with a call of an arbitrary function expr.
-    auto *call = getAsExpr<CallExpr>(anchor);
-    if (!call)
-      return std::nullopt;
-    rawFnType = getType(call->getFn());
+    if (auto *call = getAsExpr<CallExpr>(anchor)) {
+      rawFnType = getType(call->getFn());
 
-    // If callee couldn't be resolved due to expression
-    // issues e.g. it's a reference to an invalid member
-    // let's just return here.
-    if (simplifyType(rawFnType)->is<ErrorType>())
-      return std::nullopt;
-
-    // A tuple construction is spelled in the AST as a function call, but
-    // is really more like a tuple conversion.
-    if (auto metaTy = simplifyType(rawFnType)->getAs<MetatypeType>()) {
-      if (metaTy->getInstanceType()->is<TupleType>())
+      // If callee couldn't be resolved due to expression
+      // issues e.g. it's a reference to an invalid member
+      // let's just return here.
+      if (simplifyType(rawFnType)->is<ErrorType>())
         return std::nullopt;
-    }
 
-    assert(!shouldHaveDirectCalleeOverload(call) &&
+      // A tuple construction is spelled in the AST as a function call, but
+      // is really more like a tuple conversion.
+      if (auto metaTy = simplifyType(rawFnType)->getAs<MetatypeType>()) {
+        if (metaTy->getInstanceType()->is<TupleType>())
+          return std::nullopt;
+      }
+
+      assert(!shouldHaveDirectCalleeOverload(call) &&
              "Should we have resolved a callee for this?");
+    } else if (auto *keyPath = getAsExpr<KeyPathExpr>(anchor)) {
+       // FIX for #85942: Handle KeyPath application diagnostics.
+       auto path = locator->getPath();
+
+       for (const auto &elt : path) {
+         if (auto componentElt = elt.getAs<LocatorPathElt::KeyPathComponent>()) {
+           auto componentIndex = componentElt->getIndex();
+           auto &component = keyPath->getComponents()[componentIndex];
+
+           argList = component.getArgs();
+
+           if (!argList)
+             return std::nullopt;
+
+           auto *componentLoc = getConstraintLocator(
+               anchor, path.take_front((&elt - path.begin()) + 1));
+
+           if (auto selected = getOverloadChoiceIfAvailable(componentLoc)) {
+             choice = selected->choice;
+             rawFnType = selected->adjustedOpenedType;
+           }
+
+           break;
+         }
+       }
+
+       if (!rawFnType || !argList)
+         return std::nullopt;
+    } else {
+      return std::nullopt;
+    }
   }
 
   // Try to resolve the function type by loading lvalues and looking through

@@ -5286,17 +5286,16 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   // foo(bar) // `() -> Void` vs. `(Int) -> Void`
   // ```
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
-    auto info_ptr = getFunctionArgApplyInfo(locator);
-    if (!info_ptr)
-      return false;
+    // FIX: Added safety check
+    if (auto info = getFunctionArgApplyInfo(locator)) {
+      auto *argExpr = info->getArgExpr();
+      emitDiagnosticAt(argExpr->getLoc(), diag::cannot_convert_argument_value,
+                     info->getArgType(), info->getParamType());
+      // TODO: It would be great so somehow point out which arguments are missing.
+      return true;
+    }
 
-    auto info = *info_ptr;
-
-    auto *argExpr = info.getArgExpr();
-    emitDiagnosticAt(argExpr->getLoc(), diag::cannot_convert_argument_value,
-                     info.getArgType(), info.getParamType());
-    // TODO: It would be great so somehow point out which arguments are missing.
-    return true;
+    return false;
   }
 
   // Function type has fewer arguments than expected by context:
