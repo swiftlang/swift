@@ -11,5 +11,5 @@
 
 # CHECK: --- Extracting symbols ---
 # CHECK: { "command": "dsymutil", "start": "
-# CHECK: xargs -t -n 1 -P 1 {{.*}}dsymutil{{$}}
+# CHECK: xargs -t -n 1 -P 1 {{.*}}dsymutil --verify-dwarf=none{{$}}
 # CHECK: { "command": "dsymutil", "end": "
