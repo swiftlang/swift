@@ -437,13 +437,13 @@ MemberwiseInitMaxAccessLevel::evaluate(Evaluator &evaluator,
                               /*minAccess*/ AccessLevel::Private, props);
 
   // The memberwise initializer is only ever internal at most, and is limited
-  // by the access of the enclosing decl. A 'private' decl or a decl in a local
-  // context is implicitly 'fileprivate'.
-  auto nominalAccess = nominal->getFormalAccess();
-  if (nominal->getLocalContext() || nominalAccess == AccessLevel::Private)
-    nominalAccess = AccessLevel::FilePrivate;
-
-  auto maxAccess = std::min(nominalAccess, AccessLevel::Internal);
+  // by the access of the enclosing nominal. The only case that matters here is
+  // if the nominal is private or fileprivate, the memberwise initializer is
+  // effectively at most fileprivate in both cases.
+  auto nominalAccess = nominal->getFormalAccessScope();
+  auto maxAccess = nominalAccess.isPrivate() || nominalAccess.isFileScope()
+                       ? AccessLevel::FilePrivate
+                       : AccessLevel::Internal;
   if (props.empty())
     return maxAccess;
 
