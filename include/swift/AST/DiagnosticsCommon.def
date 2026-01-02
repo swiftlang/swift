@@ -169,7 +169,7 @@ NOTE(note_explain_two_files_same_name,none,
 // MARK: Circular reference diagnostics
 //------------------------------------------------------------------------------
 ERROR(circular_reference, none,
-      "circular reference", ())
+      "%0: circular reference", (StringRef))
 
 NOTE(circular_reference_through, none,
      "through reference here", ())
