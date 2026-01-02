@@ -189,46 +189,46 @@ func testtFreeFunctionsTemplated(frt : FRTStruct, nonFrt: NonFRTStruct) {
     let frtLocalVar1 : Int = 1;
 
     let frtLocalVar2 = global_templated_function_returning_FRT(frtLocalVar1)
-    // CHECK: function_ref @$sSo39global_templated_function_returning_FRTySo9FRTStructVSiFTo : $@convention(c) (Int) -> FRTStruct
+    // CHECK: function_ref @$sSo84__swift_specializedThunk__Z39global_templated_function_returning_FRTIlEP9FRTStructT_ySo0J0VSiFTo : $@convention(c) (Int) -> FRTStruct
 
     let frtLocalVar3 = global_templated_function_returning_FRT_copy(frtLocalVar1)
-    // CHECK: function_ref @$sSo44global_templated_function_returning_FRT_copyySo9FRTStructVSiFTo : $@convention(c) (Int) -> @owned FRTStruct
+    // CHECK: function_ref @$sSo89__swift_specializedThunk__Z44global_templated_function_returning_FRT_copyIlEP9FRTStructT_ySo0L0VSiFTo : $@convention(c) (Int) -> @owned FRTStruct
 
     let frtLocalVar4 = global_templated_function_returning_FRT_create(frtLocalVar1)
-    // CHECK: function_ref @$sSo46global_templated_function_returning_FRT_createySo9FRTStructVSiFTo : $@convention(c) (Int) -> @owned FRTStruct
+    // CHECK: function_ref @$sSo91__swift_specializedThunk__Z46global_templated_function_returning_FRT_createIlEP9FRTStructT_ySo0L0VSiFTo : $@convention(c) (Int) -> @owned FRTStruct
 
     let frtLocalVar5 = global_templated_function_returning_FRT_init(frtLocalVar1)
-    // CHECK: function_ref @$sSo44global_templated_function_returning_FRT_initySo9FRTStructVSiFTo : $@convention(c) (Int) -> FRTStruct
+    // CHECK: function_ref @$sSo89__swift_specializedThunk__Z44global_templated_function_returning_FRT_initIlEP9FRTStructT_ySo0L0VSiFTo : $@convention(c) (Int) -> FRTStruct
 
     let frtLocalVar6 = global_templated_function_returning_FRT_clone(frtLocalVar1)
-    // CHECK: function_ref @$sSo45global_templated_function_returning_FRT_cloneySo9FRTStructVSiFTo : $@convention(c) (Int) -> FRTStruct
+    // CHECK: function_ref @$sSo90__swift_specializedThunk__Z45global_templated_function_returning_FRT_cloneIlEP9FRTStructT_ySo0L0VSiFTo : $@convention(c) (Int) -> FRTStruct
 
     let frtLocalVar7 = global_templated_function_returning_FRT_with_attr_returns_retained(frtLocalVar1)
-    // CHECK: function_ref @$sSo66global_templated_function_returning_FRT_with_attr_returns_retainedySo9FRTStructVSiFTo : $@convention(c) (Int) -> @owned FRTStruct
+    // CHECK: function_ref @$sSo111__swift_specializedThunk__Z66global_templated_function_returning_FRT_with_attr_returns_retainedIlEP9FRTStructT_ySo0O0VSiFTo : $@convention(c) (Int) -> @owned FRTStruct
 
     let frtLocalVar8 = global_templated_function_returning_FRT_copy_with_attr_returns_retained(frtLocalVar1)
-    // CHECK: function_ref @$sSo71global_templated_function_returning_FRT_copy_with_attr_returns_retainedySo9FRTStructVSiFTo : $@convention(c) (Int) -> @owned FRTStruct
+    // CHECK: function_ref @$sSo116__swift_specializedThunk__Z71global_templated_function_returning_FRT_copy_with_attr_returns_retainedIlEP9FRTStructT_ySo0P0VSiFTo : $@convention(c) (Int) -> @owned FRTStruct
 
     let frtLocalVar9 = global_templated_function_returning_FRT_create_with_attr_returns_retained(frtLocalVar1)
-    // CHECK: function_ref @$sSo73global_templated_function_returning_FRT_create_with_attr_returns_retainedySo9FRTStructVSiFTo : $@convention(c) (Int) -> @owned FRTStruct
+    // CHECK: function_ref @$sSo118__swift_specializedThunk__Z73global_templated_function_returning_FRT_create_with_attr_returns_retainedIlEP9FRTStructT_ySo0P0VSiFTo : $@convention(c) (Int) -> @owned FRTStruct
 
     let frtLocalVar10 = global_templated_function_returning_FRT_with_attr_returns_unretained(frtLocalVar1)
-    // CHECK: function_ref @$sSo68global_templated_function_returning_FRT_with_attr_returns_unretainedySo9FRTStructVSiFTo : $@convention(c) (Int) -> FRTStruct
+    // CHECK: function_ref @$sSo113__swift_specializedThunk__Z68global_templated_function_returning_FRT_with_attr_returns_unretainedIlEP9FRTStructT_ySo0O0VSiFTo : $@convention(c) (Int) -> FRTStruct
 
     let frtLocalVar11 = global_templated_function_returning_FRT_copy_with_attr_returns_unretained(frtLocalVar1)
-    // CHECK: function_ref @$sSo73global_templated_function_returning_FRT_copy_with_attr_returns_unretainedySo9FRTStructVSiFTo : $@convention(c) (Int) -> FRTStruct
+    // CHECK: function_ref @$sSo118__swift_specializedThunk__Z73global_templated_function_returning_FRT_copy_with_attr_returns_unretainedIlEP9FRTStructT_ySo0P0VSiFTo : $@convention(c) (Int) -> FRTStruct
 
     let frtLocalVar12 = global_templated_function_returning_FRT_create_with_attr_returns_unretained(frtLocalVar1)
-    // CHECK: function_ref @$sSo75global_templated_function_returning_FRT_create_with_attr_returns_unretainedySo9FRTStructVSiFTo : $@convention(c) (Int) -> FRTStruct
+    // CHECK: function_ref @$sSo120__swift_specializedThunk__Z75global_templated_function_returning_FRT_create_with_attr_returns_unretainedIlEP9FRTStructT_ySo0P0VSiFTo : $@convention(c) (Int) -> FRTStruct
 
     let frtLocalVar13 = global_function_returning_templated_retrun_frt(frt)
-    // CHECK: function_ref @$sSo46global_function_returning_templated_retrun_frtySo9FRTStructVACFTo : $@convention(c) (FRTStruct) -> FRTStruct
+    // CHECK: function_ref @$sSo93__swift_specializedThunk__Z46global_function_returning_templated_retrun_frtIP9FRTStructET_S2_ySo0K0VACFTo : $@convention(c) (FRTStruct) -> FRTStruct
 
     let frtLocalVar14 = global_function_returning_templated_retrun_frt_owned(frt)
-    // CHECK: function_ref @$sSo52global_function_returning_templated_retrun_frt_ownedySo9FRTStructVACFTo : $@convention(c) (FRTStruct) -> @owned FRTStruct
+    // CHECK: function_ref @$sSo99__swift_specializedThunk__Z52global_function_returning_templated_retrun_frt_ownedIP9FRTStructET_S2_ySo0L0VACFTo : $@convention(c) (FRTStruct) -> @owned FRTStruct
 
     let nonFrtLocalVar1 = global_function_returning_templated_retrun_frt_owned(nonFrt)
-    // CHECK: function_ref @$sSo52global_function_returning_templated_retrun_frt_ownedySo12NonFRTStructVACFTo : $@convention(c) (NonFRTStruct) -> NonFRTStruct
+    // CHECK: function_ref @$sSo102__swift_specializedThunk__Z52global_function_returning_templated_retrun_frt_ownedI12NonFRTStructET_S1_ySo0lM0VACFTo : $@convention(c) (NonFRTStruct) -> NonFRTStruct
 }
 
 func testVirtualMethods(base: Base, derived: Derived) {
