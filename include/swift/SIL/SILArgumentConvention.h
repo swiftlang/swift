@@ -167,7 +167,7 @@ struct SILArgumentConvention {
   }
 
   /// Returns true if \p Value is a non-aliasing indirect parameter.
-  bool isExclusiveIndirectParameter() {
+  bool isExclusiveIndirectParameter() const {
     switch (Value) {
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_Out:
@@ -190,7 +190,7 @@ struct SILArgumentConvention {
   }
 
   /// Returns true if \p Value is an indirect-out parameter.
-  bool isIndirectOutParameter() {
+  bool isIndirectOutParameter() const {
     switch (Value) {
     case SILArgumentConvention::Indirect_Out:
     case SILArgumentConvention::Pack_Out:
@@ -207,6 +207,29 @@ struct SILArgumentConvention {
     case SILArgumentConvention::Pack_Inout:
     case SILArgumentConvention::Pack_Owned:
     case SILArgumentConvention::Pack_Guaranteed:
+      return false;
+    }
+    llvm_unreachable("covered switch isn't covered?!");
+  }
+
+  /// Returns true if \p Value is a pack parameter.
+  bool isPackParameter() const {
+    switch (Value) {
+    case SILArgumentConvention::Pack_Inout:
+    case SILArgumentConvention::Pack_Owned:
+    case SILArgumentConvention::Pack_Guaranteed:
+    case SILArgumentConvention::Pack_Out:
+      return true;
+
+    case SILArgumentConvention::Indirect_Out:
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Indirect_In_CXX:
+    case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Direct_Guaranteed:
+    case SILArgumentConvention::Direct_Owned:
       return false;
     }
     llvm_unreachable("covered switch isn't covered?!");

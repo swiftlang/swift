@@ -3207,6 +3207,22 @@ public:
                               SILValue packExpansionIndex, SILValue packIndex)>
           emitBody);
 
+  /// Emit an operation for each element of a pack expansion component of
+  /// a pack, automatically projecting and managing ownership of it properly
+  /// for each iteration.
+  ///
+  /// The projection and management does not itself generate control flow and
+  /// so can be safely composed with further projection and management.
+  void emitPackForEach(SILLocation loc,
+                       ManagedValue inputPackAddr,
+                       CanPackType inputFormalPackType,
+                       unsigned inputComponentIndex,
+                       GenericEnvironment *openedElementEnv,
+                       SILType inputEltTy,
+                       llvm::function_ref<void(SILValue indexWithinComponent,
+                                               SILValue expansionPackIndex,
+                                               ManagedValue input)> emitBody);
+
   /// Emit a transform on each element of a pack-expansion component
   /// of a pack, write the result into a pack-expansion component of
   /// another pack.

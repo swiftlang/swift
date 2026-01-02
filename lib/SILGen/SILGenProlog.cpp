@@ -17,6 +17,7 @@
 #include "ManagedValue.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
+#include "TupleGenerators.h"
 
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -99,6 +100,8 @@ struct LoweredParamGenerator {
   bool isNoImplicitCopy = false;
   LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None;
   bool isImplicitParameter = false;
+  SILArgumentConvention currentConvention
+    = SILArgumentConvention::Direct_Guaranteed; // will be overwritten
 
   void configureParamData(ParamDecl *paramDecl, bool isNoImplicitCopy,
                           LifetimeAnnotation lifetimeAnnotation) {
@@ -131,7 +134,19 @@ struct LoweredParamGenerator {
     ManagedValue mv = SGF.B.createInputFunctionArgument(
         paramType, paramDecl, isNoImplicitCopy, lifetimeAnnotation,
         /*isClosureCapture*/ false, isFormalParameterPack, isImplicitParameter);
+    currentConvention =
+      cast<SILFunctionArgument>(SGF.F.begin()->getArguments().back())
+        ->getArgumentConvention();
     return mv;
+  }
+
+  SILArgumentConvention getCurrentConvention() const {
+    // This is only actually called after building a pack parameter.
+    assert(currentConvention.isPackParameter());
+    return currentConvention;
+  }
+  void finishCurrent(ManagedValue packAddr) {
+    // Ignore: we don't care about residual cleanups on the pack.
   }
 
   std::optional<SILParameterInfo> peek() const {
@@ -186,11 +201,7 @@ struct WritebackReabstractedInoutCleanup final : Cleanup {
   }
 };
 
-class EmitBBArguments : public CanTypeVisitor<EmitBBArguments,
-                                              /*RetTy*/ ManagedValue,
-                                              /*ArgTys...*/ AbstractionPattern,
-                                              Initialization *>
-{
+class EmitBBArguments {
 public:
   SILGenFunction &SGF;
   SILLocation loc;
@@ -216,7 +227,26 @@ public:
                           /*emitInto*/ nullptr,
                           /*inout*/ false, /*addressable*/ true);
     }
-    return visit(substType, origType, /*emitInto*/ nullptr);
+    // The client handles pack expansions when there's a meaningful
+    // abstraction pattern, but for now, at least, we can also end up
+    // here when there's an unabstracted pack expansion type. Fortunately,
+    // the lack of abstraction means we can just bind the parameter pack
+    // directly as the argument value.
+    if (isa<PackExpansionType>(substType)) {
+      return handleScalar(origType,
+                          CanPackType::get(SGF.getASTContext(), {substType}),
+                          /*emitInto*/ nullptr);
+    }
+
+    return handleValue(origType, substType, /*emitInto*/ nullptr);
+  }
+
+  ManagedValue handleValue(AbstractionPattern origType, CanType substType,
+                           Initialization *emitInto) {
+    if (origType.isTuple()) {
+      return handleExpansion(origType, substType, emitInto);
+    }
+    return handleScalar(origType, substType, emitInto);
   }
 
   ManagedValue handlePackComponent(FunctionInputGenerator &formalParam) {
@@ -287,8 +317,8 @@ public:
     });
   }
 
-  ManagedValue visitType(CanType t, AbstractionPattern orig,
-                         Initialization *emitInto) {
+  ManagedValue handleScalar(AbstractionPattern orig, CanType t,
+                            Initialization *emitInto) {
     auto mv = claimNextParameter();
     return handleScalar(mv, orig, t, emitInto,
                         /*inout*/ false,
@@ -406,219 +436,234 @@ public:
     return mv;
   }
 
-  ManagedValue visitPackExpansionType(CanPackExpansionType t,
-                                      AbstractionPattern orig,
-                                      Initialization *emitInto) {
-    // Pack expansions in the formal parameter list are made
-    // concrete as packs.
-    return visitType(PackType::get(SGF.getASTContext(), {t})
-                       ->getCanonicalType(),
-                     orig, emitInto);
+  static bool shouldForceIntoTemporary(const TypeLowering &tl) {
+    // If the type is loadable, we never need this.
+    if (tl.isLoadable()) return false;
+
+
+    // Otherwise, we have an address-only type.
+    return false;
   }
 
-  ManagedValue visitTupleType(CanTupleType t, AbstractionPattern orig,
-                              Initialization *emitInto) {
-    // Only destructure if the abstraction pattern is also a tuple.
-    if (!orig.isTuple())
-      return visitType(t, orig, emitInto);
+  ManagedValue handleExpansion(AbstractionPattern origType, CanType substType,
+                               Initialization *init) {
+    assert(origType.isTuple());
 
-    auto &tl = SGF.SGM.Types.getTypeLowering(t, SGF.getTypeExpansionContext());
+    auto &substTL =
+      SGF.SGM.Types.getTypeLowering(substType, SGF.getTypeExpansionContext());
 
-    // If the tuple contains pack expansions, and we're not emitting
-    // into an initialization already, create a temporary so that we're
-    // always emitting into an initialization.
-    if (t.containsPackExpansionType() && !emitInto) {
-      auto temporary = SGF.emitTemporary(loc, tl);
+    ExpandedTupleInputGenerator expansion(SGF.getASTContext(), parameters,
+                                          origType, substType);
 
-      auto result = expandTuple(orig, t, tl, temporary.get());
-      assert(result.isInContext()); (void) result;
+    // If the original tuple vanishes, the type lowering and initialization
+    // are actually for its surviving element.
+    bool tupleVanishes = expansion.doesOrigTupleVanish();
 
-      return temporary->getManagedAddress();
+    // If we're not already emitting into an initialization, there are
+    // several situations where we want to do so.
+    bool emitIntoTemporary = [&] {
+      if (init) return false;
+
+      // We don't need to do this if the orig tuple vanishes. (It may end up
+      // being a tuple in the substituted type, but we should defer the decision
+      // to create a temporary; the tuple might end up being passed as a single
+      // pack element.)
+      if (tupleVanishes) return false;
+
+      // All of the situations that want a temporary are exclusive with
+      // having a loadable tuple.
+      if (substTL.isLoadable()) return false;
+
+      // If the substituted type contains pack expansions, we always need a
+      // a temporary (even with SIL opaque values) because we currently have
+      // no way of directly generating scalar tuples that contain expansions.
+      if (auto tupleTy = substTL.getLoweredType().getAs<TupleType>()) {
+        if (tupleTy.containsPackExpansionType())
+          return true;
+      }
+
+      // If SIL opaque values are disabled, we always need a temporary to
+      // reconstitute an address-only tuple.
+      if (SGF.silConv.useLoweredAddresses())
+        return true;
+
+      // Otherwise, we don't need a temporary.
+      return false;
+    }();
+
+    TemporaryInitializationPtr temporary;
+    if (emitIntoTemporary) {
+      temporary = SGF.emitTemporary(loc, substTL);
+      init = temporary.get();
     }
 
-    return expandTuple(orig, t, tl, emitInto);
-  }
-
-  ManagedValue expandTuple(AbstractionPattern orig, CanTupleType t,
-                           const TypeLowering &tl, Initialization *init) {
-    assert((!t.containsPackExpansionType() || init) &&
-           "should always have an emission context when expanding "
-           "a tuple containing pack expansions");
-
-    bool canBeGuaranteed = tl.isLoadable();
-
-    // We only use specific initializations here that can always be split.
+    // If we're emitting into an initialization, and the tuple doesn't
+    // vanish, split the tuple initialization. We're only ever given
+    // specific kinds of initialization that can always be split.
     SmallVector<InitializationPtr, 8> eltInitsBuffer;
     MutableArrayRef<InitializationPtr> eltInits;
-    if (init) {
+    if (init && !tupleVanishes) {
       assert(init->canSplitIntoTupleElements());
-      eltInits = init->splitIntoTupleElements(SGF, loc, t, eltInitsBuffer);
+      eltInits = init->splitIntoTupleElements(SGF, loc, substType,
+                                              eltInitsBuffer);
     }
 
-    // Collect the exploded elements.
-    //
-    // Reabstraction can give us original types that are pack
-    // expansions without having pack expansions in the result.
-    // In this case, we do not need to force emission into a pack
-    // expansion.
-    SmallVector<ManagedValue, 4> elements;
-    orig.forEachTupleElement(t, [&](TupleElementGenerator &elt) {
-      auto origEltType = elt.getOrigType();
-      auto substEltTypes = elt.getSubstTypes();
-      if (!elt.isOrigPackExpansion()) {
-        auto eltValue =
-          visit(substEltTypes[0], origEltType,
-                init ? eltInits[elt.getSubstIndex()].get() : nullptr);
-        assert((init != nullptr) == (eltValue.isInContext()));
-        if (!eltValue.isInContext())
-          elements.push_back(eltValue);
+    // Iterate over the elements in order, either emitting them into the
+    // initialization or collecting scalar values from them.
+    auto expectedNumElts = (init ? 0 :
+                            tupleVanishes ? 1 :
+                            cast<TupleType>(substType)->getNumElements());
+    SmallVector<ManagedValue, 4> eltMVs;
+    eltMVs.reserve(expectedNumElts);
 
-        if (eltValue.hasCleanup())
-          canBeGuaranteed = false;
-      } else {
-        assert(init);
-        expandPack(origEltType, substEltTypes, elt.getSubstIndex(),
-                   eltInits.slice(elt.getSubstIndex(), substEltTypes.size()),
-                   elements);
-      }
-    });
+    // Remember if we saw anything that would force us to copy in order to
+    // form the tuple:
+    // - if any of the scalar components have cleanups, since we can't mix
+    //   owned and guaranteed values in the tuple, or
+    // - if the tuple overall is address-only, since that's a representation
+    //   change that the address lowering can't reliably eliminate without
+    //   ownership.
+    // This is only used in the path where we construct a tuple.
+    bool tupleValueCanBeGuaranteed = substTL.isLoadable();
 
-    // If we emitted into a context, we're done.
-    if (init) {
-      init->finishInitialization(SGF);
-      return ManagedValue::forInContext();
-    }
-
-    if (tl.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
-      SmallVector<SILValue, 4> elementValues;
-      if (canBeGuaranteed) {
-        // If all of the elements were guaranteed, we can form a guaranteed tuple.
-        for (auto element : elements)
-          elementValues.push_back(element.getUnmanagedValue());
-      } else {
-        // Otherwise, we need to move or copy values into a +1 tuple.
-        for (auto element : elements) {
-          SILValue value = element.hasCleanup()
-            ? element.forward(SGF)
-            : element.copyUnmanaged(SGF, loc).forward(SGF);
-          elementValues.push_back(value);
+    for (; !expansion.isFinished(); expansion.advance()) {
+      Initialization *componentInit = nullptr;
+      if (init) {
+        if (tupleVanishes) {
+          componentInit = init;
+        } else {
+          componentInit = eltInits[expansion.getSubstElementIndex()].get();
         }
       }
-      auto tupleValue = SGF.B.createTuple(loc, tl.getLoweredType(),
-                                          elementValues);
-      if (tupleValue->getOwnershipKind() == OwnershipKind::None)
-        return ManagedValue::forObjectRValueWithoutOwnership(tupleValue);
-      return canBeGuaranteed ? ManagedValue::forBorrowedObjectRValue(tupleValue)
-                             : SGF.emitManagedRValueWithCleanup(tupleValue);
-    } else {
-      // If the type is address-only, we need to move or copy the elements into
-      // a tuple in memory.
-      // TODO: It would be a bit more efficient to use a preallocated buffer
-      // in this case.
-      auto buffer = SGF.emitTemporaryAllocation(loc, tl.getLoweredType());
-      for (auto i : indices(elements)) {
-        auto element = elements[i];
-        auto elementBuffer = SGF.B.createTupleElementAddr(loc, buffer,
-                                        i, element.getType().getAddressType());
-        if (element.hasCleanup())
-          element.forwardInto(SGF, loc, elementBuffer);
-        else
-          element.copyInto(SGF, loc, elementBuffer);
-      }
-      return SGF.emitManagedRValueWithCleanup(buffer);
-    }
-  }
 
-  void expandPack(AbstractionPattern origExpansionType,
-                  CanTupleEltTypeArrayRef substEltTypes,
-                  size_t firstSubstEltIndex,
-                  MutableArrayRef<InitializationPtr> eltInits,
-                  SmallVectorImpl<ManagedValue> &eltMVs) {
-    assert(substEltTypes.size() == eltInits.size());
+      // If the original element is not from a pack expansion, just
+      // recursively collect it.
+      if (!expansion.isOrigPackExpansion()) {
+        auto eltResult =
+          handleValue(expansion.getOrigType(), expansion.getSubstType(),
+                      componentInit);
+        assert((init != nullptr) == (eltResult.isInContext()));
 
-    // The next parameter is a pack which corresponds to some number of
-    // components in the tuple.  Some of them may be pack expansions.
-    // Either copy/move them into the tuple (necessary if there are any
-    // pack expansions) or collect them in eltMVs.
+        if (!eltResult.isInContext()) {
+          eltMVs.push_back(eltResult);
+          if (eltResult.hasCleanup())
+            tupleValueCanBeGuaranteed = false;
+        }
 
-    // Claim the next parameter, remember whether it was +1, and forward
-    // the cleanup.  We can get away with just forwarding the cleanup
-    // up front, not destructuring it, because we assume that the work
-    // we're doing here won't ever unwind.
-    ManagedValue packAddrMV = claimNextParameter();
-    CleanupCloner cloner(SGF, packAddrMV);
-    SILValue packAddr = packAddrMV.forward(SGF);
-    auto packTy = packAddr->getType().castTo<SILPackType>();
-
-    auto origPatternType = origExpansionType.getPackExpansionPatternType();
-
-    auto inducedPackType =
-      CanPackType::get(SGF.getASTContext(), substEltTypes);
-
-    for (auto packComponentIndex : indices(substEltTypes)) {
-      CanType substComponentType = substEltTypes[packComponentIndex];
-      Initialization *componentInit =
-        eltInits.empty() ? nullptr : eltInits[packComponentIndex].get();
-      auto packComponentTy = packTy->getSILElementType(packComponentIndex);
-
-      auto substExpansionType =
-        dyn_cast<PackExpansionType>(substComponentType);
-
-      // In the scalar case, project out the element address from the
-      // pack and use the normal scalar path to trigger initialization.
-      if (!substExpansionType) {
-        auto packIndex =
-          SGF.B.createScalarPackIndex(loc, packComponentIndex, inducedPackType);
-        auto eltAddr =
-          SGF.B.createPackElementGet(loc, packIndex, packAddr,
-                                     packComponentTy);
-        auto eltAddrMV = cloner.clone(eltAddr);
-        auto result = handleScalar(eltAddrMV, origPatternType,
-                                   substComponentType, componentInit,
-                                   /*inout*/ false,
-                                   /*addressable*/ false);
-        assert(result.isInContext() == (componentInit != nullptr));
-        if (!result.isInContext())
-          eltMVs.push_back(result);
         continue;
       }
 
-      // In the pack-expansion case, do the exact same thing,
-      // but in a pack loop.
+      // Otherwise, we're starting with a pack parameter. Project out
+      // the substituted component.
+      auto componentMV = expansion.projectPackComponent(SGF, loc);
+
+      // If the substituted element type is not a pack expansion,
+      // we can just use the substituted component in the scalar path.
+      if (!expansion.isSubstPackExpansion()) {
+        auto eltResult = handleScalar(componentMV, expansion.getOrigType(),
+                                      expansion.getSubstType(), componentInit,
+                                      /*inout*/ false,
+                                      /*addressable*/ false);
+        assert((init != nullptr) == (eltResult.isInContext()));
+
+        if (!eltResult.isInContext()) {
+          eltMVs.push_back(eltResult);
+          if (eltResult.hasCleanup())
+            tupleValueCanBeGuaranteed = false;
+        }
+
+        continue;
+      }
+
+      // Otherwise, we need to emit a pack loop over the expansion
+      // component. Since the substituted type always contains a pack
+      // expansion, we should've forced the existence of an init earlier.
       assert(componentInit);
       assert(componentInit->canPerformPackExpansionInitialization());
+
+      auto packComponentIndex = expansion.getPackComponentIndex();
+      auto packComponentTy = expansion.getPackComponentType();
+      auto substComponentType = expansion.getSubstType();
 
       SILType eltTy;
       CanType substEltType;
       auto openedEnv =
         SGF.createOpenedElementValueEnvironment({packComponentTy},
                                                 {&eltTy},
-                                                {substExpansionType},
+                                                {substComponentType},
                                                 {&substEltType});
 
-      SGF.emitDynamicPackLoop(loc, inducedPackType, packComponentIndex,
-                              openedEnv,
-                              []() -> SILBasicBlock * { return nullptr; },
-                              [&](SILValue indexWithinComponent,
-                                  SILValue expansionPackIndex,
-                                  SILValue packIndex) {
+      auto inducedPackType = expansion.getFormalPackType();
+
+      SGF.emitPackForEach(loc, componentMV, inducedPackType,
+                          packComponentIndex, openedEnv, eltTy,
+                          [&](SILValue indexWithinComponent,
+                              SILValue expansionPackIndex,
+                              ManagedValue eltAddrMV) {
         componentInit->performPackExpansionInitialization(SGF, loc,
                                             indexWithinComponent,
                                             [&](Initialization *eltInit) {
-          // Project out the pack element and enter a managed value for it.
-          auto eltAddr =
-            SGF.B.createPackElementGet(loc, packIndex, packAddr, eltTy);
-          auto eltAddrMV = cloner.clone(eltAddr);
-
-          auto result = handleScalar(eltAddrMV, origPatternType, substEltType,
-                                     eltInit,
-                                     /*inout*/ false,
-                                     /*addressable*/ false);
-          assert(result.isInContext()); (void) result;
+          auto eltResult = handleScalar(eltAddrMV, expansion.getOrigType(),
+                                        substEltType, eltInit,
+                                        /*inout*/ false,
+                                        /*addressable*/ false);
+          assert(eltResult.isInContext()); (void) eltResult;
         });
       });
       componentInit->finishInitialization(SGF);
     }
+    expansion.finish();
+
+    // If we emitted into an initialization, we're done.
+    if (init) {
+      // Make sure we finish the tuple initialization if we split it before.
+      if (!tupleVanishes)
+        init->finishInitialization(SGF);
+
+      // If we created the initialization ourselves, return the managed
+      // address.
+      if (emitIntoTemporary)
+        return temporary->getManagedAddress();
+
+      // Otherwise, signal that we emitted into the provided intialization.
+      return ManagedValue::forInContext();
+    }
+
+    // Okay, there's no initialization, so we have to return a scalar value.
+
+    // If the tuple pattern vanishes, the loop above should have produced a
+    // single "element".
+    if (tupleVanishes) {
+      assert(eltMVs.size() == 1);
+      return eltMVs[0];
+    }
+
+    // If the tuple doesn't vanish, we need to build the scalar element
+    // values into a scalar tuple values.
+    SmallVector<SILValue, 4> eltValues;
+    eltValues.reserve(eltMVs.size());
+
+    // If all of the elements were guaranteed, we can form a guaranteed tuple.
+    if (tupleValueCanBeGuaranteed) {
+      for (auto element : eltMVs) {
+        eltValues.push_back(element.getUnmanagedValue());
+      }
+
+    // Otherwise, we need to move or copy values into a +1 tuple.
+    } else {
+      for (auto element : eltMVs) {
+        SILValue value = element.hasCleanup()
+          ? element.forward(SGF)
+          : element.copyUnmanaged(SGF, loc).forward(SGF);
+        eltValues.push_back(value);
+      }
+    }
+    auto tupleValue = SGF.B.createTuple(loc, substTL.getLoweredType(), eltValues);
+    if (tupleValue->getOwnershipKind() == OwnershipKind::None)
+      return ManagedValue::forObjectRValueWithoutOwnership(tupleValue);
+    return tupleValueCanBeGuaranteed
+             ? ManagedValue::forBorrowedObjectRValue(tupleValue)
+             : SGF.emitManagedRValueWithCleanup(tupleValue);
   }
 };
 
