@@ -5360,14 +5360,14 @@ void ASTMangler::appendConstrainedExistential(Type base, GenericSignature sig,
   auto layout = base->getExistentialLayout();
   appendExistentialLayout(layout, sig, forDecl);
 
-  assert(!base->is<ProtocolType>() &&
+  ASSERT(!base->is<ProtocolType>() &&
          "plain protocol type constraint has no generalization structure");
 
   SmallVector<Requirement, 4> requirements;
   SmallVector<InverseRequirement, NumInvertibleProtocols> inverses;
   gatherExistentialRequirements(requirements, inverses, base);
 
-  assert(requirements.size() + inverses.size() > 0 &&
+  ASSERT(requirements.size() + inverses.size() > 0 &&
          "Unconstrained existential?");
 
   // Sort the requirements to canonicalize their order.
