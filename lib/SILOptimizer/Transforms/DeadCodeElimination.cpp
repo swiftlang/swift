@@ -148,7 +148,6 @@ class DCE {
   BasicBlockSet LiveBlocks;
   llvm::SmallVector<SILInstruction *, 64> Worklist;
   PostDominanceInfo *PDT;
-  DominanceInfo *DT;
   DeadEndBlocks *deadEndBlocks;
   llvm::DenseMap<SILBasicBlock *, ControllingInfo> ControllingInfoMap;
   SmallBlotSetVector<SILValue, 8> valuesToComplete;
@@ -223,7 +222,7 @@ public:
   DCE(SILFunction *F, PostDominanceInfo *PDT, DominanceInfo *DT,
       DeadEndBlocks *deadEndBlocks)
       : F(F), LiveArguments(F), LiveInstructions(F), LiveBlocks(F), PDT(PDT),
-        DT(DT), deadEndBlocks(deadEndBlocks) {}
+        deadEndBlocks(deadEndBlocks) {}
 
   /// The entry point to the transformation.
   bool run() {
@@ -839,7 +838,7 @@ bool DCE::removeDead() {
     }
   }
 
-  OSSACompleteLifetime completion(F, DT, *deadEndBlocks);
+  OSSACompleteLifetime completion(F, *deadEndBlocks);
   for (auto value : valuesToComplete) {
     if (!value.has_value())
       continue;
