@@ -807,7 +807,8 @@ protected:
   void appendLifetimeDependence(LifetimeDependenceInfo info);
 
   void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
-                                     ParameterizedProtocolType *PPT) const;
+                                     SmallVectorImpl<InverseRequirement> &inverses,
+                                     Type base) const;
 
   /// Extracts a list of inverse requirements from a PCT serving as the
   /// constraint type of an existential.
