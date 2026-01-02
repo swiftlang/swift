@@ -275,6 +275,7 @@ public:
     return IsVeryLargeType_t((Flags & IsVeryLargeTypeFlag) != 0);
   }
 
+  void setTrivial() { Flags &= ~NonTrivialFlag; }
   void setNonTrivial() { Flags |= NonTrivialFlag; }
   void setIsOrContainsRawPointer() { Flags |= HasRawPointerFlag; }
 
