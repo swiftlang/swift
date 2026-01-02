@@ -783,8 +783,12 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
       llvm_unreachable("Not implemented by CSGen");
       break;
     case ComponentKind::UnresolvedApply:
-    case ComponentKind::Apply:
-      return getConstraintLocator(anchor, *componentElt);
+    case ComponentKind::Apply: {
+      // The callee is the previous component
+      auto componentIndex = componentElt->getIndex();
+      assert(componentIndex > 0 && "Apply component at index 0?");
+      return getConstraintLocator(anchor, LocatorPathElt::KeyPathComponent(componentIndex-1));
+    }
     case ComponentKind::Invalid:
     case ComponentKind::OptionalForce:
     case ComponentKind::OptionalChain:
@@ -4225,14 +4229,25 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto *argLocator = getConstraintLocator(anchor, argPath);
 
   auto *argExpr = castToExpr(simplifyLocatorToAnchor(argLocator));
-
-  // If we were unable to simplify down to the argument expression, we don't
-  // know what this is.
-  if (!argExpr)
-    return std::nullopt;
-
   auto *argList = getArgumentList(argLocator);
-  if (!argList)
+
+  if (!argList) {
+    if (auto *kp = getAsExpr<KeyPathExpr>(anchor)) {
+      if (auto componentElt =
+              argLocator->findLast<LocatorPathElt::KeyPathComponent>()) {
+        auto &component = kp->getComponents()[componentElt->getIndex()];
+        argList = component.getArgs();
+
+        if (argList && !argExpr) {
+          argExpr = kp;
+        }
+      }
+    }
+  }
+
+  // If we were unable to simplify down to the argument expression or find the
+  // argument list, we don't know what this is.
+  if (!argExpr || !argList)
     return std::nullopt;
 
   std::optional<OverloadChoice> choice;
@@ -4264,34 +4279,6 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
 
       assert(!shouldHaveDirectCalleeOverload(call) &&
              "Should we have resolved a callee for this?");
-    } else if (auto *keyPath = getAsExpr<KeyPathExpr>(anchor)) {
-       // FIX for #85942: Handle KeyPath application diagnostics.
-       auto path = locator->getPath();
-
-       for (const auto &elt : path) {
-         if (auto componentElt = elt.getAs<LocatorPathElt::KeyPathComponent>()) {
-           auto componentIndex = componentElt->getIndex();
-           auto &component = keyPath->getComponents()[componentIndex];
-
-           argList = component.getArgs();
-
-           if (!argList)
-             return std::nullopt;
-
-           auto *componentLoc = getConstraintLocator(
-               anchor, path.take_front((&elt - path.begin()) + 1));
-
-           if (auto selected = getOverloadChoiceIfAvailable(componentLoc)) {
-             choice = selected->choice;
-             rawFnType = selected->adjustedOpenedType;
-           }
-
-           break;
-         }
-       }
-
-       if (!rawFnType || !argList)
-         return std::nullopt;
     } else {
       return std::nullopt;
     }
@@ -4342,7 +4329,6 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
 
   auto argIdx = applyArgElt->getArgIdx();
   auto paramIdx = applyArgElt->getParamIdx();
-
   return FunctionArgApplyInfo::get(argList, argExpr, argIdx,
                                    simplifyType(getType(argExpr)), paramIdx,
                                    fnInterfaceType, fnType, callee);
