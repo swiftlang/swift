@@ -259,3 +259,18 @@ do {
 }
 
 func nonexistentSelfInFunctionType(f: @_lifetime(copy self) () -> NE) {} // expected-error{{invalid lifetime dependence specifier on non-existent self}}
+
+// rdar://166912068 (Incorrect error when passing a local function with a non-escapable parameter)
+struct NEWithSpan {
+  var span: RawSpan
+
+  @_lifetime(copy span)
+  init(span: RawSpan) {
+    self.span = span
+  }
+}
+func takeBody(body: (inout NEWithSpan) -> Void) {}
+func checkNestedFunctions() {
+  func doIt(ne: inout NEWithSpan) {}
+  takeBody(body: doIt)
+}
