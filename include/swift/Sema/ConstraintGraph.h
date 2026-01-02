@@ -341,7 +341,7 @@ public:
   ///
   /// This records graph changes that must be undone after the merge has
   /// been undone.
-  void mergeNodesPre(TypeVariableType *typeVar2);
+  void mergeNodesPre(TypeVariableType *repr, TypeVariableType *member);
 
   /// Merge the two nodes for the two given type variables.
   ///
