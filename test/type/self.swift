@@ -381,3 +381,16 @@ protocol P {
   func foo() -> Self<Int>
   // expected-error@-1 {{cannot specialize non-generic type 'Self'}}
 }
+
+// https://github.com/peripheryapp/periphery/issues/676
+
+class Container {
+  class NestedType {
+    init(value: Int) {}
+  }
+
+  func someFunc() {
+    let _ = [Container.NestedType]()  // ok
+    let _ = [Self.NestedType]()  // ok
+  }
+}
