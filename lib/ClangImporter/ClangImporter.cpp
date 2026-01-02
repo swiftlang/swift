@@ -8416,7 +8416,7 @@ const clang::CXXConstructorDecl *
 importer::findCopyConstructor(const clang::CXXRecordDecl *decl) {
   for (auto ctor : decl->ctors()) {
     if (ctor->isCopyConstructor() &&
-        // FIXME: Support default arguments (rdar://142414553)
+        // FIXME: Support default arguments (https://github.com/swiftlang/swift/issues/86260)
         ctor->getNumParams() == 1 && ctor->getAccess() == clang::AS_public &&
         !ctor->isDeleted() && !ctor->isIneligibleOrNotSelected())
       return ctor;
@@ -8431,7 +8431,7 @@ static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
   return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
     return ctor->isMoveConstructor() && !ctor->isDeleted() &&
            !ctor->isIneligibleOrNotSelected() &&
-           // FIXME: Support default arguments (rdar://142414553)
+           // FIXME: Support default arguments (https://github.com/swiftlang/swift/issues/86260)
            ctor->getNumParams() == 1 &&
            ctor->getAccess() == clang::AS_public;
   });
@@ -8460,7 +8460,7 @@ static bool
 hasConstructorWithUnsupportedDefaultArgs(const clang::CXXRecordDecl *decl) {
   return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
     return (ctor->isCopyConstructor() || ctor->isMoveConstructor()) &&
-           // FIXME: Support default arguments (rdar://142414553)
+           // FIXME: Support default arguments (https://github.com/swiftlang/swift/issues/86260)
            ctor->getNumParams() != 1;
   });
 }
