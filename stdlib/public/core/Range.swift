@@ -213,7 +213,8 @@ public struct Range<Bound: Comparable> {
   }
 }
 
-extension Range: Sequence
+// FIXME: Explicit BorrowingSequence conformance is a source break
+extension Range: Sequence, BorrowingSequence
 where Bound: Strideable, Bound.Stride: SignedInteger {
   public typealias Element = Bound
   public typealias Iterator = IndexingIterator<Range<Bound>>
@@ -689,7 +690,8 @@ extension PartialRangeFrom: RangeExpression {
   }
 }
 
-extension PartialRangeFrom: Sequence
+// FIXME: Explicit BorrowingSequence conformance is a source break
+extension PartialRangeFrom: Sequence, BorrowingSequence
   where Bound: Strideable, Bound.Stride: SignedInteger
 {
   public typealias Element = Bound
