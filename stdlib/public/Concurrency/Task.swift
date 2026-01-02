@@ -30,9 +30,9 @@ import Swift
 /// you give up the ability
 /// to wait for that task's result or cancel the task.
 ///
-/// To support operations on the current task,
-/// which can be either a detached task or child task,
-/// `Task` also exposes class methods like `yield()`.
+/// To support operations on the current task, `Task` also exposes class methods
+/// like `yield()`. The current task can be either an unstructured `Task`, a
+/// detached unstructured `Task`, or a child task (an `async let` or a task group).
 /// Because these methods are asynchronous,
 /// they're always invoked as part of an existing task.
 ///
@@ -46,6 +46,11 @@ import Swift
 /// These periods of execution are represented by instances of `PartialAsyncTask`.
 /// Unless you're implementing a custom executor,
 /// you don't directly interact with partial tasks.
+///
+/// Asynchronous work modeled with `Task` is unstructured concurrency.
+/// Don't use an unstructured task if it's possible to model the operation
+/// using structured concurrency features like child tasks (such as `async let`
+/// or task groups).
 ///
 /// For information about the language-level concurrency model that `Task` is part of,
 /// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
@@ -76,6 +81,12 @@ import Swift
 /// like the reason for cancellation.
 /// This reflects the fact that a task can be canceled for many reasons,
 /// and additional reasons can accrue during the cancellation process.
+///
+/// An instance of `Task` becomes cancelled only when its ``Task/cancel()`` 
+/// method is explicitly invoked. No other mechanism can cancel a `Task`, 
+/// including any instance of `Task` created within the scope of another 
+/// cancelled task. To propagate cancellation from an enclosing task, provide a 
+/// cancellation handler via ``withTaskCancellationHandler(operation:onCancel:isolation:)``.
 ///
 /// ### Task closure lifetime
 /// Tasks are initialized by passing a closure containing the code that will be executed by a given task.
@@ -200,9 +211,15 @@ extension Task {
   ///
   /// - It flags the task as canceled.
   /// - It causes any active cancellation handlers on the task to run, once.
-  /// - It cancels any child tasks and task groups of the task, including
-  ///   those created in the future. If those tasks have cancellation handlers,
-  ///   they also are triggered.
+  /// - It cancels any child tasks (`async let` and other forms of structured
+  ///   concurrency, not other `Task` instances) and task groups of the task,
+  ///   including those created in the future. If those tasks have cancellation
+  ///   handlers, they also are triggered.
+  ///
+  /// Cancelling a `Task` does not cancel other instances of `Task` that were
+  /// or will be created during its operation. Those other instances will not
+  /// become cancelled until and unless they are explicitly cancelled via
+  /// their `cancel()` methods being called on them.
   ///
   /// Task cancellation is cooperative and idempotent.
   ///
@@ -671,8 +688,8 @@ extension Task where Success == Never, Failure == Never {
 /// and save it for long-term use.
 /// To query the current task without saving a reference to it,
 /// use properties like `currentPriority`.
-/// If you need to store a reference to a task,
-/// create an unstructured task using `Task.detached(priority:operation:)` instead.
+/// If you need to store a reference to a task, create an unstructured task using
+/// ``Task.init(name:priority:operation:)`` or ``Task.detached(priority:operation:)`` instead.
 ///
 /// - Parameters:
 ///   - body: A closure that takes an `UnsafeCurrentTask` parameter.
