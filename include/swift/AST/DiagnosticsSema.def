@@ -3877,9 +3877,12 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
       "in an extension with public or '@usableFromInline' members|" \
       "in an extension with conditional conformances|" \
       "in a public or '@usableFromInline' conformance|" \
+      "in a conformance on a type not marked '@_implementationOnly'|" \
       "in an '@available' attribute here|" \
       "in a property declaration marked public or in a '@frozen' or '@usableFromInline' context|" \
-      "in a property declaration member of a type not marked '@_implementationOnly'}"
+      "in a property declaration member of a type not marked '@_implementationOnly'|" \
+      "in an associated value of a public or '@usableFromInline' enum|" \
+      "in an associated value of an enum not marked '@_implementationOnly'}"
 
 ERROR(decl_from_hidden_module,none,
       "cannot use %kind0 %" EXPORTABILITY_REASON_SELECT "1; "
@@ -3980,9 +3983,6 @@ ERROR(implementation_only_override_import_without_attr,none,
       "override of %kindonly0 imported as implementation-only must be declared "
       "'@_implementationOnly'",
       (const ValueDecl *))
-ERROR(implementation_only_on_types_feature,none,
-      "'@_implementationOnly' on a type requires "
-      "'-enable-experimental-feature CheckImplementationOnly'", ())
 
 ERROR(import_attr_conflict,none,
       "%0 inconsistently imported with %1",

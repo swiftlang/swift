@@ -244,10 +244,9 @@ bool ExportContext::canReferenceOrigin(DisallowedOriginKind originKind) const {
   // than the library-evolution ones. Implicitly always emit into client code
   // in embedded mode and implicitly exported layouts in non-library-evolution
   // mode can reference SPIs and non-public dependencies.
-  auto reason = getExportabilityReason();
   if (getFragileFunctionKind().kind ==
         FragileFunctionKind::EmbeddedAlwaysEmitIntoClient ||
-      (reason && *reason == ExportabilityReason::ImplicitlyPublicVarDecl)) {
+      getExportedLevel() == ExportedLevel::ImplicitlyExported) {
     switch (originKind) {
     case DisallowedOriginKind::None:
     case DisallowedOriginKind::NonPublicImport:

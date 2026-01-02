@@ -82,9 +82,12 @@ enum class ExportabilityReason : unsigned {
   ExtensionWithPublicMembers,
   ExtensionWithConditionalConformances,
   Inheritance,
+  ImplicitlyPublicInheritance,
   AvailableAttribute,
   PublicVarDecl,
   ImplicitlyPublicVarDecl,
+  AssociatedValue,
+  ImplicitlyPublicAssociatedValue,
 };
 
 /// A description of the restrictions on what declarations can be referenced

@@ -1,5 +1,5 @@
 // RUN: %target-swift-emit-sil %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -wmo | %FileCheck %s --check-prefix CHECK-SIL
-// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -wmo -disable-embedded-existentials | %FileCheck %s --check-prefix CHECK-IR
+// RUN: %target-swift-emit-ir %s -parse-stdlib -disable-experimental-feature EmbeddedExistentials -enable-experimental-feature Embedded -target arm64e-apple-none -wmo | %FileCheck %s --check-prefix CHECK-IR
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -wmo | %FileCheck %s --check-prefix CHECK-IR-EXIST
 
 // UNSUPPORTED: CPU=wasm32
