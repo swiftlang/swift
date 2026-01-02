@@ -299,6 +299,17 @@
 #define SWIFT_PRIVATE_FILEID(_fileID) \
   __attribute__((swift_attr("private_fileid:" _fileID)))
 
+/// A type or function annotated with SWIFT_UNSAFE will be imported as an unsafe
+/// declaration into Swift. Using these declarations will trigger a warning in
+/// strictly memory safe Swift. The 'unsafe' keyword can be used to suppress
+/// these warnings.
+#define SWIFT_UNSAFE __attribute__((swift_attr("unsafe")))
+
+/// A type or function annotated with SWIFT_SAFE safely encapsulates some
+/// unsafe behavior. Such declarations will be considered safe even if they have
+/// unsafe constituents.
+#define SWIFT_SAFE __attribute__((swift_attr("safe")))
+
 #else  // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 
 // Empty defines for compilers that don't support `attribute(swift_attr)`.
@@ -322,6 +333,8 @@
 #define SWIFT_RETURNS_RETAINED
 #define SWIFT_RETURNS_UNRETAINED
 #define SWIFT_PRIVATE_FILEID(_fileID)
+#define SWIFT_UNSAFE
+#define SWIFT_SAFE
 
 #endif // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 
