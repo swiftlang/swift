@@ -7,9 +7,6 @@
 // REQUIRES: swift_feature_ExcludePrivateFromMemberwiseInit
 // REQUIRES: swift7
 
-// This file uses alphabetic prefixes on its declarations because swift-ide-test
-// sorts decls in a module before printing them.
-
 // - CHECK matches before, during, and after adoption of the feature
 // - CHECK-COMPAT matches before and during the feature
 // - CHECK-NEW matches during and after the feature
@@ -295,6 +292,32 @@ func locals() {
 
 #if FORCE
   func forceEmission() { _ = Self.init(x:y:) }
+#endif
+  }
+}
+
+// CHECK-LABEL: private enum TestNested {
+private enum TestNested {
+  // CHECK-LABEL: struct A {
+  struct A {
+    fileprivate var x: Int?
+    var y: Int
+    // CHECK: fileprivate init(x: Int? = nil, y: Int)
+
+#if FORCE
+    func forceEmission() { _ = Self.init(x:y:) }
+#endif
+  }
+
+  // CHECK-LABEL: struct B {
+  struct B {
+    private var x: Int?
+    var y: Int
+    // CHECK-COMPAT: private init(x: Int? = nil, y: Int)
+    // CHECK-NEW: internal init(y: Int)
+
+#if FORCE
+    func forceEmission() { _ = Self.init(x:y:) }
 #endif
   }
 }
