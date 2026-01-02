@@ -130,6 +130,10 @@ struct PotentialBinding {
 
   Constraint *getSource() const { return cast<Constraint *>(BindingSource); }
 
+  PotentialBinding withKind(AllowedBindingKind kind) const {
+    return {BindingType, kind, BindingSource, Originator};
+  }
+
   PotentialBinding withType(Type type) const {
     return {type, Kind, BindingSource, Originator};
   }
@@ -144,6 +148,10 @@ struct PotentialBinding {
   }
 
   bool isTransitive() const { return bool(Originator); }
+
+  bool isTransitiveSupertype() const {
+    return Kind == AllowedBindingKind::Supertypes && isTransitive();
+  }
 
   /// Determine whether this binding could be a viable candidate
   /// to be "joined" with some other binding. It has to be at least

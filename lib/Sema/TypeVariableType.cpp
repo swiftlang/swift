@@ -231,7 +231,7 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
   if (typeVar1->getImpl().getID() > typeVar2->getImpl().getID())
     std::swap(typeVar1, typeVar2);
 
-  CG.mergeNodesPre(typeVar2);
+  CG.mergeNodesPre(typeVar1, typeVar2);
   typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getTrail());
   CG.mergeNodes(typeVar1, typeVar2);
 

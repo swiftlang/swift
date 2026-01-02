@@ -394,8 +394,19 @@ bool BindingSet::isPotentiallyIncomplete() const {
           Info.EquivalentTo,
           [&](const std::pair<TypeVariableType *, Constraint *> &equivalence) {
             auto *constraint = equivalence.second;
-            return constraint->getKind() == ConstraintKind::BindParam &&
-                   constraint->getSecondType()->isEqual(TypeVar);
+            if (constraint->getKind() == ConstraintKind::BindParam) {
+              if (constraint->getSecondType()->isEqual(TypeVar))
+                return true;
+              // Left-hand side of the bind constraint is an interface
+              // parameter type. If there are no direct bindings,
+              // it's not sufficiently resolved yet.
+              if (!Bindings.empty() &&
+                  llvm::all_of(Bindings, [](const auto &binding) {
+                    return binding.isTransitive();
+                  }))
+                return true;
+            }
+            return false;
           }))
     return true;
 
@@ -676,6 +687,9 @@ void BindingSet::inferTransitiveSupertypeBindings() {
 
     // TODO: We shouldn't need this in the future.
     if (entry.second->getKind() != ConstraintKind::Subtype)
+      continue;
+
+    if (CS.Options.contains(ConstraintSystemFlags::EnableTransitiveInference))
       continue;
 
     for (auto &binding : bindings.Bindings) {

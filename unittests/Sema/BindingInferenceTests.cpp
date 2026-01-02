@@ -15,8 +15,10 @@
 #include "swift/Sema/BindingProducer.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/TypeVariableType.h"
+#include "clang-c/Index.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include <iterator>
 
 using namespace swift;
 using namespace swift::unittest;
@@ -122,7 +124,10 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
 
     // Make sure that there are no direct bindings or protocol requirements.
 
-    ASSERT_EQ(bindings.Bindings.size(), (unsigned)0);
+    ASSERT_EQ(llvm::count_if(
+                  bindings.Bindings,
+                  [](const auto &binding) { return !binding.isTransitive(); }),
+              (unsigned)0);
     ASSERT_EQ(bindings.Literals.size(), (unsigned)0);
 
     cs.getConstraintGraph()[floatLiteralTy].initBindingSet();
@@ -445,4 +450,426 @@ TEST_F(SemaTest, TestSupertypeInferenceWithDefaults) {
                             /*parent=*/Type(), {getStdlibType("String")})));
   ASSERT_TRUE(inferredTypes[2]->isEqual(getStdlibType("AnyKeyPath")));
   ASSERT_TRUE(inferredTypes[3]->isEqual(Context.TheAnyType));
+}
+
+static void checkExpectedTransitiveSupertypeBindings(
+    PotentialBindings &bindings,
+    ArrayRef<std::pair<Type, TypeVariableType *>> expected) {
+  SmallSetVector<std::pair<Type, TypeVariableType *>, 2> transitive;
+  for (const auto &binding : bindings.Bindings) {
+    if (!(binding.Kind == AllowedBindingKind::Supertypes &&
+          binding.isTransitive()))
+      continue;
+    transitive.insert(std::make_pair(binding.BindingType, binding.Originator));
+  }
+
+  ASSERT_EQ(transitive.size(), expected.size());
+
+  for (unsigned i = 0; i != expected.size(); ++i)
+    ASSERT_TRUE(transitive.contains(expected[i]));
+}
+
+/// Establish subtype/supertype relationship between two type variables
+/// and make sure that bindings are propagated the chain.
+TEST_F(SemaTest, TestSimpleTransitiveInference) {
+  ConstraintSystem cs(DC, ConstraintSystemFlags::EnableTransitiveInference);
+
+  auto &cg = cs.getConstraintGraph();
+
+  auto stringTy = getStdlibType("String");
+  auto intTy = getStdlibType("Int");
+
+  ConstraintSystem::SolverState state(cs, FreeTypeVariableBinding::Disallow);
+
+  {
+    ConstraintSystem::SolverScope scope(cs);
+
+    auto *loc = cs.getConstraintLocator({});
+
+    auto *T0 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T1 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T2 = cs.createTypeVariable(loc, /*options=*/0);
+
+    // $T0 <: $T1
+    cs.addConstraint(ConstraintKind::Subtype, T0, T1, loc);
+
+    {
+      ConstraintSystem::SolverScope inner(cs);
+
+      // $T1 <: T2
+      cs.addConstraint(ConstraintKind::Subtype, T1, T2, loc);
+
+      // String <: $T1 (results in "supertypes of" bindings for $T1)
+      cs.addConstraint(ConstraintKind::Conversion, stringTy, T1, loc);
+
+      // No transitive bindings for $T1 yet
+      checkExpectedTransitiveSupertypeBindings(cg[T1].getPotentialBindings(),
+                                               {});
+
+      // $T2 should get a transitive supertype binding from $T1
+      checkExpectedTransitiveSupertypeBindings(cg[T2].getPotentialBindings(),
+                                               std::make_pair(stringTy, T1));
+
+      // Int <: $T0 (results in "supertypes of" bindings for $T0)
+      cs.addConstraint(ConstraintKind::Conversion, intTy, T0, loc);
+
+      // $T1 gets a transitive binding from $T0.
+      checkExpectedTransitiveSupertypeBindings(cg[T1].getPotentialBindings(),
+                                               std::make_pair(intTy, T0));
+
+      // $T2 now has two bindings (from $T0 and $T1)
+      checkExpectedTransitiveSupertypeBindings(
+          cg[T2].getPotentialBindings(),
+          {std::make_pair(stringTy, T1), std::make_pair(intTy, T0)});
+
+      {
+        ConstraintSystem::SolverScope bindT0(cs);
+
+        // $T0 := String should cut the chain and remove bindings from $T1 but
+        // $T2 still gets two bindings albeit from $T1 now.
+        cs.addConstraint(ConstraintKind::Equal, intTy, T0, loc);
+
+        checkExpectedTransitiveSupertypeBindings(cg[T1].getPotentialBindings(),
+                                                 {});
+        checkExpectedTransitiveSupertypeBindings(
+            cg[T2].getPotentialBindings(),
+            {std::make_pair(stringTy, T1), std::make_pair(intTy, T1)});
+      }
+
+      // ! - $T0 binding got retracted, so we should be back to the original
+      // state.
+
+      // $T1 gets a transitive binding from $T0.
+      checkExpectedTransitiveSupertypeBindings(cg[T1].getPotentialBindings(),
+                                               std::make_pair(intTy, T0));
+
+      // $T2 now has two bindings (from $T0 and $T1)
+      checkExpectedTransitiveSupertypeBindings(
+          cg[T2].getPotentialBindings(),
+          {std::make_pair(stringTy, T1), std::make_pair(intTy, T0)});
+
+      {
+        ConstraintSystem::SolverScope bindT1(cs);
+
+        // $T1 := String should cut the chain and remove bindings from $T2
+        cs.addConstraint(ConstraintKind::Equal, stringTy, T1, loc);
+
+        checkExpectedTransitiveSupertypeBindings(cg[T1].getPotentialBindings(),
+                                                 {});
+        checkExpectedTransitiveSupertypeBindings(cg[T2].getPotentialBindings(),
+                                                 {});
+      }
+
+      // ! - $T1 binding got retracted, so we should be back to the original
+      // state.
+
+      // $T1 gets a transitive binding from $T0.
+      checkExpectedTransitiveSupertypeBindings(cg[T1].getPotentialBindings(),
+                                               std::make_pair(intTy, T0));
+
+      // $T2 now has two bindings (from $T0 and $T1)
+      checkExpectedTransitiveSupertypeBindings(
+          cg[T2].getPotentialBindings(),
+          {std::make_pair(stringTy, T1), std::make_pair(intTy, T0)});
+
+      {
+        ConstraintSystem::SolverScope bindT1T2(cs);
+
+        // $T1 := String should cut the chain and remove bindings from $T2
+        cs.addConstraint(ConstraintKind::Equal, stringTy, T1, loc);
+        // $T0 := Int should cut the chain and remove bindings from $T1, $T2
+        cs.addConstraint(ConstraintKind::Equal, intTy, T0, loc);
+
+        checkExpectedTransitiveSupertypeBindings(cg[T1].getPotentialBindings(),
+                                                 {});
+        checkExpectedTransitiveSupertypeBindings(cg[T2].getPotentialBindings(),
+                                                 {});
+      }
+
+      // ! - $T0, $T1 binding got retracted, so we should be back to the
+      // original state.
+
+      // $T1 gets a transitive binding from $T0.
+      checkExpectedTransitiveSupertypeBindings(cg[T1].getPotentialBindings(),
+                                               std::make_pair(intTy, T0));
+
+      // $T2 now has two bindings (from $T0 and $T1)
+      checkExpectedTransitiveSupertypeBindings(
+          cg[T2].getPotentialBindings(),
+          {std::make_pair(stringTy, T1), std::make_pair(intTy, T0)});
+    }
+
+    // once the scope ends there shouldn't be any transitive bindings left.
+    for (auto *typeVar : {T0, T1, T2}) {
+      checkExpectedTransitiveSupertypeBindings(
+          cg[typeVar].getPotentialBindings(), {});
+    }
+  }
+}
+
+/// Form a chain and propagate transitive bindings. Introduce a new equivalence
+/// class representative and make sure that it gets all the bindings from the
+/// members and maintains correct subtype/supertype relationships.
+///
+/// String conv $T1
+/// $T1 subtype $T2 ($T2 gets a transitive binding from $T1)
+/// --
+/// $T0 equal $T2 (important that new variable has a lower ID)
+/// --
+/// $T0 should get `String` from `$T1`.
+TEST_F(SemaTest, TestTransitiveInferenceWithEquivalenceClass) {
+  ConstraintSystem cs(DC, ConstraintSystemFlags::EnableTransitiveInference);
+
+  auto &cg = cs.getConstraintGraph();
+
+  auto stringTy = getStdlibType("String");
+  auto intTy = getStdlibType("Int");
+
+  ConstraintSystem::SolverState state(cs, FreeTypeVariableBinding::Disallow);
+
+  {
+    ConstraintSystem::SolverScope scope(cs);
+
+    auto *loc = cs.getConstraintLocator({});
+
+    auto *T0 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T1 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T2 = cs.createTypeVariable(loc, /*options=*/0);
+
+    // String conv $T1
+    cs.addConstraint(ConstraintKind::Conversion, stringTy, T1, loc);
+    // $T1 <: $T2
+    cs.addConstraint(ConstraintKind::Subtype, T1, T2, loc);
+
+    {
+      ConstraintSystem::SolverScope eqScope(cs);
+
+      // $T0 == $T2
+      cs.addConstraint(ConstraintKind::Equal, T0, T2, loc);
+
+      // Make sure that the representative gets the transitive bindings once the
+      // equivalence is established.
+      checkExpectedTransitiveSupertypeBindings(cg[T0].getPotentialBindings(),
+                                               std::make_pair(stringTy, T1));
+
+      // Check that transitive bindings are propagated through equivalence.
+      {
+        ConstraintSystem::SolverScope propagationScope(cs);
+
+        // Int <: $T1
+        cs.addConstraint(ConstraintKind::Conversion, intTy, T1, loc);
+
+        checkExpectedTransitiveSupertypeBindings(
+            cg[T0].getPotentialBindings(),
+            {std::make_pair(stringTy, T1), std::make_pair(intTy, T1)});
+      }
+
+      // end of `propagationScope` means the `Int` binding is retracted.
+      checkExpectedTransitiveSupertypeBindings(cg[T0].getPotentialBindings(),
+                                               std::make_pair(stringTy, T1));
+    }
+
+    // end of `eqScope` means that $T0 == $T2 is retracted.
+    checkExpectedTransitiveSupertypeBindings(cg[T0].getPotentialBindings(), {});
+    checkExpectedTransitiveSupertypeBindings(cg[T2].getPotentialBindings(),
+                                             std::make_pair(stringTy, T1));
+  }
+}
+
+/// Make sure that removal of a member in the middle of the chain removes all
+/// of the transitive bindings inferred from its subtypes as well.
+TEST_F(SemaTest, TestTransitiveBindingRemoval) {
+  ConstraintSystem cs(DC, ConstraintSystemFlags::EnableTransitiveInference);
+
+  auto &cg = cs.getConstraintGraph();
+
+  auto stringTy = getStdlibType("String");
+  auto intTy = getStdlibType("Int");
+
+  ConstraintSystem::SolverState state(cs, FreeTypeVariableBinding::Disallow);
+
+  {
+    ConstraintSystem::SolverScope scope(cs);
+
+    auto *loc = cs.getConstraintLocator({});
+
+    auto *T0 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T1 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T2 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T3 = cs.createTypeVariable(loc, /*options=*/0);
+
+    cs.addConstraint(ConstraintKind::Subtype, T0, T1, loc);
+    cs.addConstraint(ConstraintKind::Conversion, stringTy, T0, loc);
+
+    checkExpectedTransitiveSupertypeBindings(cg[T1].getPotentialBindings(),
+                                             std::make_pair(stringTy, T0));
+    checkExpectedTransitiveSupertypeBindings(cg[T2].getPotentialBindings(), {});
+    checkExpectedTransitiveSupertypeBindings(cg[T3].getPotentialBindings(), {});
+
+    // Form a complete chain $T0 <: $T1 <: $T2 <: $T3
+    {
+      ConstraintSystem::SolverScope fullyConnected(cs);
+
+      cs.addConstraint(ConstraintKind::Subtype, T1, T2, loc);
+      cs.addConstraint(ConstraintKind::Subtype, T2, T3, loc);
+
+      for (auto *typeVar : {T1, T2, T3}) {
+        checkExpectedTransitiveSupertypeBindings(
+            cg[typeVar].getPotentialBindings(), std::make_pair(stringTy, T0));
+      }
+
+      cs.addConstraint(ConstraintKind::Conversion, intTy, T1, loc);
+
+      for (auto *typeVar : {T2, T3}) {
+        checkExpectedTransitiveSupertypeBindings(
+            cg[typeVar].getPotentialBindings(),
+            {std::make_pair(stringTy, T0), std::make_pair(intTy, T1)});
+      }
+    }
+
+    // end of `fullyConnected` scope means that T2 and T3 are disconnected
+    // again.
+    checkExpectedTransitiveSupertypeBindings(cg[T1].getPotentialBindings(),
+                                             std::make_pair(stringTy, T0));
+    checkExpectedTransitiveSupertypeBindings(cg[T2].getPotentialBindings(), {});
+    checkExpectedTransitiveSupertypeBindings(cg[T3].getPotentialBindings(), {});
+
+    // Let's reform the chain but add equivalence class in the mix as well.
+
+    {
+      ConstraintSystem::SolverScope fullyConnectedWithEq(cs);
+
+      // $T1 == $T2
+      cs.addConstraint(ConstraintKind::Equal, T1, T2, loc);
+
+      // $T2 (aka $T1) <: $T3
+      cs.addConstraint(ConstraintKind::Subtype, T2, T3, loc);
+
+      checkExpectedTransitiveSupertypeBindings(cg[T3].getPotentialBindings(),
+                                               std::make_pair(stringTy, T0));
+
+      // Add a conversion to an equivalence class member and check that $T3 gets
+      // it.
+      {
+        ConstraintSystem::SolverScope conversionForT2(cs);
+
+        cs.addConstraint(ConstraintKind::Conversion, intTy, T2, loc);
+
+        checkExpectedTransitiveSupertypeBindings(
+            cg[T3].getPotentialBindings(),
+            {std::make_pair(stringTy, T0), std::make_pair(intTy, T1)});
+      }
+
+      // Retracting `Int <: $T2` results in $T3 back to one transitive binding.
+      checkExpectedTransitiveSupertypeBindings(cg[T3].getPotentialBindings(),
+                                               std::make_pair(stringTy, T0));
+    }
+  }
+
+  {
+    ConstraintSystem::SolverScope scope(cs);
+
+    auto *loc = cs.getConstraintLocator({});
+
+    auto *T0 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T1 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T2 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T3 = cs.createTypeVariable(loc, /*options=*/0);
+
+    // String <: $T1
+    cs.addConstraint(ConstraintKind::Conversion, stringTy, T1, loc);
+    // Int <: $T2
+    cs.addConstraint(ConstraintKind::Conversion, intTy, T2, loc);
+
+    // $T2 (aka $T0) <: $T3
+    cs.addConstraint(ConstraintKind::Subtype, T2, T3, loc);
+
+    checkExpectedTransitiveSupertypeBindings(cg[T3].getPotentialBindings(),
+                                             std::make_pair(intTy, T2));
+
+    {
+      ConstraintSystem::SolverScope subtypeThroughEqMember(cs);
+
+      // $T0 == $T1 == $T2 ($T0 is now a representative).
+      cs.addConstraint(ConstraintKind::Equal, T1, T2, loc);
+      cs.addConstraint(ConstraintKind::Equal, T0, T1, loc);
+
+      // Make sure that the binding from $T2 is replaced with one from $T0.
+      checkExpectedTransitiveSupertypeBindings(
+          cg[T3].getPotentialBindings(),
+          {std::make_pair(stringTy, T0), std::make_pair(intTy, T0)});
+
+      // Bind $T0
+      {
+        ConstraintSystem::SolverScope bindT0(cs);
+
+        cs.addConstraint(ConstraintKind::Equal, stringTy, T0, loc);
+
+        checkExpectedTransitiveSupertypeBindings(cg[T3].getPotentialBindings(),
+                                                 {});
+      }
+
+      // ! - Once `$T0 := String` gets retracted, the transitive bindings should
+      // be back.
+      // Make sure that the binding from $T2 is replaced with one from $T0.
+      checkExpectedTransitiveSupertypeBindings(
+          cg[T3].getPotentialBindings(),
+          {std::make_pair(stringTy, T0), std::make_pair(intTy, T0)});
+    }
+
+    checkExpectedTransitiveSupertypeBindings(cg[T3].getPotentialBindings(),
+                                             std::make_pair(intTy, T2));
+  }
+}
+
+TEST_F(SemaTest, TestTransitiveLoop) {
+  ConstraintSystem cs(DC, ConstraintSystemFlags::EnableTransitiveInference);
+
+  auto &cg = cs.getConstraintGraph();
+
+  auto stringTy = getStdlibType("String");
+
+  ConstraintSystem::SolverState state(cs, FreeTypeVariableBinding::Disallow);
+
+  {
+    ConstraintSystem::SolverScope scope(cs);
+
+    auto *loc = cs.getConstraintLocator({});
+
+    auto *T0 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T1 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T2 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T3 = cs.createTypeVariable(loc, /*options=*/0);
+
+    cs.addConstraint(ConstraintKind::Conversion, OptionalType::get(T2), T0,
+                     loc);
+    cs.addConstraint(ConstraintKind::Subtype, T0, T1, loc);
+    cs.addConstraint(ConstraintKind::Subtype, T3, T2, loc);
+    cs.addConstraint(ConstraintKind::Conversion, stringTy, T3, loc);
+
+    checkExpectedTransitiveSupertypeBindings(
+        cg[T1].getPotentialBindings(),
+        std::make_pair(Type(OptionalType::get(T2)), T0));
+
+    checkExpectedTransitiveSupertypeBindings(cg[T2].getPotentialBindings(),
+                                             std::make_pair(stringTy, T3));
+    // Bind $T1 := $T2, we need to make sure that $T1 doesn't keep the binding
+    // to $T2?
+    {
+      ConstraintSystem::SolverScope bindT1(cs);
+
+      cs.addConstraint(ConstraintKind::Equal, T1, T2, loc);
+
+      checkExpectedTransitiveSupertypeBindings(cg[T1].getPotentialBindings(),
+                                               std::make_pair(stringTy, T3));
+    }
+
+    // ! - Retracting $T1 := $T2 should bring $T2? binding back to $T1.
+    checkExpectedTransitiveSupertypeBindings(
+        cg[T1].getPotentialBindings(),
+        std::make_pair(Type(OptionalType::get(T2)), T0));
+
+    checkExpectedTransitiveSupertypeBindings(cg[T2].getPotentialBindings(),
+                                             std::make_pair(stringTy, T3));
+  }
 }
