@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <climits>
 #include <cstdarg>
@@ -38,6 +39,10 @@
 #include <Windows.h>
 #include <shellapi.h>
 #pragma comment(lib, "shell32.lib")
+#endif
+
+#if defined(__OpenBSD__)
+#include <unistd.h>
 #endif
 
 // Backing storage for overrides of `Swift.CommandLine.arguments`.
@@ -534,3 +539,169 @@ static char **swift::getUnsafeArgvArgc(int *outArgLen) {
 template <typename F>
 static void swift::enumerateUnsafeArgv(const F& body) { }
 #endif
+
+#pragma mark - CommandLine.executablePath
+
+namespace swift {
+/// A platform-specific implementation of `_swift_stdlib_copyExecutablePath()`.
+///
+/// - Returns: The path to the current executable according to the operating
+///   system as a UTF-8 C string. The caller is responsible for freeing this
+///   string when done with it.
+static char *copyExecutablePath(void);
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+char *_swift_stdlib_copyExecutablePath(void) {
+  return copyExecutablePath();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_stdlib_deallocExecutablePath(char *path) {
+  free(path);
+}
+
+#if defined(__APPLE__) && false
+// CommandLine.executablePath is implemented in Swift on Darwin so it can be
+// back-deployed. Here is a reference C implementation.
+extern "C" int _NSGetExecutablePath(char *buf, uint32_t *bufsize);
+
+char *copyExecutablePath(void) {
+  // _NSGetExecutablePath() returns non-zero if the provided buffer is too small
+  // and updates its *bufsize argument to the required value, so we can just set
+  // a reasonable initial value, then loop and try again on failure.
+  uint32_t byteCount = PATH_MAX;
+  while (true) {
+    auto result = static_cast<char *>(malloc(byteCount));
+    if (0 == _NSGetExecutablePath(result, &byteCount)) {
+      return result;
+    }
+    free(result);
+  }
+}
+#elif defined(__linux__) || defined(__ANDROID__)
+char *copyExecutablePath(void) {
+  size_t byteCount = PATH_MAX;
+  while (true) {
+    auto result = static_cast<char *>(malloc(byteCount));
+    ssize_t byteCountRead = readlink("/proc/self/exe", result, byteCount);
+    if (byteCountRead < 0) {
+      swift::fatalError(
+        0,
+        "Fatal error: Could not get the path to the current executable: %d\n",
+        errno
+      );
+    } else if (static_cast<size_t>(byteCountRead) < byteCount) {
+      result[byteCountRead] = '\0';
+      return result;
+    }
+    free(result);
+    byteCount += PATH_MAX; // add more space and try again
+  }
+}
+#elif defined(_WIN32)
+char *copyExecutablePath(void) {
+  DWORD byteCount = MAX_PATH;
+  while (true) {
+    auto wresult = static_cast<WCHAR *>(calloc(byteCount, sizeof(WCHAR)));
+    SetLastError(ERROR_SUCCESS);
+    (void)GetModuleFileNameW(nullptr, wresult, byteCount);
+    DWORD errorCode = GetLastError();
+    switch (errorCode) {
+    case ERROR_SUCCESS:
+      if (char *result = _swift_win32_copyUTF8FromWide(wresult)) {
+        free(wresult);
+        return result;
+      } else {
+        swift::fatalError(0,
+          "Fatal error: Unable to convert executable path '%ls' to "
+          "UTF-8: %lx, %d.\n",
+          wresult, errorCode, errno);
+      }
+      break;
+    case ERROR_INSUFFICIENT_BUFFER:
+      free(wresult);
+      byteCount += MAX_PATH; // add more space and try again
+      break;
+    default:
+      swift::fatalError(
+        0,
+        "Fatal error: Could not get the path to the current executable: %lx\n",
+        errorCode
+      );
+    }
+  }
+}
+#elif defined(__FreeBSD__)
+char *copyExecutablePath(void) {
+  int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1 };
+  size_t bufferCount = 0;
+  if (0 == sysctl(mib, std::size(mib), nullptr, &bufferCount, nullptr, 0)) {
+    auto result = static_cast<char *>(malloc(bufferCount));
+    if (0 == sysctl(mib, std::size(mib), result, &bufferCount, nullptr, 0)) {
+      return result;
+    }
+  }
+  swift::fatalError(
+    0,
+    "Fatal error: Could not get the path to the current executable: %d\n",
+    errno
+  );
+}
+#elif defined(__OpenBSD__)
+/// Storage for ``captureEarlyCWD()``.
+static std::atomic<const char *> earlyCWD { nullptr };
+
+/// At process start (before `main()` is called), capture the current working
+/// directory.
+///
+/// This function is necessary on OpenBSD so that we can (as correctly as
+/// possible) resolve the executable path when the first argument is a relative
+/// path (which can occur when manually invoking the test executable.)
+__attribute__((__constructor__(101), __used__))
+static void captureEarlyCWD(void) {
+  if (const char *cwd = getcwd(nullptr, 0)) {
+    earlyCWD.store(cwd);
+  }
+}
+
+char *copyExecutablePath(void) {
+  int argc = 0;
+  char **argv = getUnsafeArgvArgc(&argc);
+  if (argv && argc > 0) {
+    // OpenBSD does not have API to get a path to the running executable. Use
+    // argv[0]. We do a basic sniff test for a path-like string.
+    const char *slash = strchr(argv[0], '/');
+    if (slash && slash > argv[0]) {
+      // There's a slash _after_ the first character. Assume it's a relative
+      // path and prepend it with the early CWD.
+      if (const char *cwd = earlyCWD.load()) {
+        size_t byteCount = strlen(cwd) + 1 + strlen(argv[0]) + 1;
+        auto result = static_cast<char *>(malloc(byteCount));
+        snprintf(result, byteCount, "%s/%s", cwd, argv[0]);
+        return result;
+      }
+      swift::fatalError(
+        0,
+        "Fatal error: "
+        "Could not get the current working directory at process start\n"
+      );
+    }
+
+    // Either the first character was a slash (in which case we'll treat argv[0]
+    // as an absolute path) there was no slash at all (in which case there's
+    // not much we can do other than return the string as-is.)
+    return strdup(argv[0]);
+  }
+  swift::fatalError(
+    0,
+    "Fatal error: Could not get the path to the current executable\n"
+  );
+}
+#else // Add your favorite OS's executable path getter here.
+char *copyExecutablePath(void) {
+  swift::fatalError(
+      0,
+      "Fatal error: Executable path not available on this platform.\n");
+}
+#endif
+}
