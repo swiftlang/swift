@@ -8057,6 +8057,7 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
   Bits.VarDecl.IsTopLevelGlobal = false;
   Bits.VarDecl.NoAttachedPropertyWrappers = false;
   Bits.VarDecl.NoPropertyWrapperAuxiliaryVariables = false;
+  Bits.VarDecl.IsPlaceholderVar = false;
 }
 
 Type VarDecl::getTypeInContext() const {
