@@ -560,10 +560,8 @@ static ImportedType rectifySubscriptTypes(Type getterType, bool getterIsIUO,
     return {nullptr, false};
 
   // Unwrap one level of optionality from each.
-  if (Type getterObjectType = getterType->getOptionalObjectType())
-    getterType = getterObjectType;
-  if (Type setterObjectType = setterType->getOptionalObjectType())
-    setterType = setterObjectType;
+  getterType = getterType->lookThroughSingleOptionalType();
+  setterType = setterType->lookThroughSingleOptionalType();
 
   // If they are still different, fail.
   // FIXME: We could produce the greatest common supertype of the
@@ -818,9 +816,7 @@ classImplementsProtocol(const clang::ObjCInterfaceDecl *constInterface,
 static void
 applyPropertyOwnership(VarDecl *prop,
                        clang::ObjCPropertyAttribute::Kind attrs) {
-  Type ty = prop->getInterfaceType();
-  if (auto innerTy = ty->getOptionalObjectType())
-    ty = innerTy;
+  Type ty = prop->getInterfaceType()->lookThroughSingleOptionalType();
   if (!ty->is<GenericTypeParamType>() && !ty->isAnyClassReferenceType())
     return;
 
@@ -2925,12 +2921,10 @@ namespace {
         Type paramType;
         NominalTypeDecl *paramDecl = nullptr;
         if (!operationFn->isInstanceMember()) {
-          paramType =
-              operationFn->getParameters()->get(0)->getInterfaceType();
-          // Unwrap if paramType is an OptionalType
-          if (Type optionalType = paramType->getOptionalObjectType()) {
-            paramType = optionalType;
-          }
+          paramType = operationFn->getParameters()
+                          ->get(0)
+                          ->getInterfaceType()
+                          ->lookThroughSingleOptionalType();
 
           paramDecl = paramType->getAnyNominal();
         } else {
@@ -6787,8 +6781,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   if (!storedUnderlyingType)
     return nullptr;
 
-  if (auto objTy = storedUnderlyingType->getOptionalObjectType())
-    storedUnderlyingType = objTy;
+  storedUnderlyingType = storedUnderlyingType->lookThroughSingleOptionalType();
 
   // If the type is Unmanaged, that is it is not CF ARC audited,
   // we will store the underlying type and leave it up to the use site
@@ -6804,8 +6797,8 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   auto computedPropertyUnderlyingType = Impl.importTypeIgnoreIUO(
       decl->getUnderlyingType(), ImportTypeKind::Property, addImportDiag,
       isInSystemModule(dc), Bridgeability::Full, ImportTypeAttrs(), OTK_None);
-  if (auto objTy = computedPropertyUnderlyingType->getOptionalObjectType())
-    computedPropertyUnderlyingType = objTy;
+  computedPropertyUnderlyingType =
+      computedPropertyUnderlyingType->lookThroughSingleOptionalType();
 
   bool isBridged =
       !storedUnderlyingType->isEqual(computedPropertyUnderlyingType);
