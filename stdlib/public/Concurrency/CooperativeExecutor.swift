@@ -304,6 +304,7 @@ extension CooperativeExecutor: RunLoopExecutor {
       // Now run any queued jobs
       var runQ = runQueue.take()
       while let job = runQ.pop() {
+        // FIXME: this seems to be using the wrong run method, missing to pass the task executor.
         unsafe ExecutorJob(job).runSynchronously(
           on: self.asUnownedSerialExecutor()
         )
