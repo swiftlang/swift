@@ -7,6 +7,9 @@
 // Needed to verify the legacy ABI
 // REQUIRES: swift_feature_Extern
 
+// Swift earlier than 5.3 fails many of these tests
+// UNSUPPORTED: use_os_stdlib
+
 import StdlibUnittest
 
 let tests = TestSuite("FloatingPointParsing")
