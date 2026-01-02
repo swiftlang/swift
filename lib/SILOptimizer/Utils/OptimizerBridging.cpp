@@ -477,8 +477,7 @@ bool BridgedPassContext::completeLifetime(BridgedValue value) const {
   SILValue v = value.getSILValue();
   SILFunction *f = v->getFunction();
   DeadEndBlocks *deb = invocation->getPassManager()->getAnalysis<DeadEndBlocksAnalysis>()->get(f);
-  DominanceInfo *domInfo = invocation->getPassManager()->getAnalysis<DominanceAnalysis>()->get(f);
-  OSSACompleteLifetime completion(f, domInfo, *deb);
+  OSSACompleteLifetime completion(f, *deb);
   auto result = completion.completeOSSALifetime(
       v, OSSACompleteLifetime::Boundary::Availability);
   return result == LifetimeCompletion::WasCompleted;
