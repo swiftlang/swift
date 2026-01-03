@@ -281,7 +281,11 @@ extension ASTGenVisitor {
       deferLoc: deferLoc
     )
     self.withDeclContext(stmt.tempDecl.asDeclContext) {
-      stmt.tempDecl.setParsedBody(self.generate(codeBlock: node.body))
+      let body = self.generate(codeBlock: node.body)
+      stmt.tempDecl.setParsedBody(body)
+      if body.hasAsyncNode() {
+        stmt.makeAsync(ctx)
+      }
     }
     return stmt
   }
