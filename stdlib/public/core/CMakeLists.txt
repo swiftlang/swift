@@ -29,13 +29,14 @@ split_embedded_sources(
 
   ### "ESSENTIAL" SOURCES
   ### -- PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
-  # Some files can't be sorted alphabetically, see notes in the list below.
+  EMBEDDED _InlineArray.swift
   EMBEDDED Algorithm.swift
+  EMBEDDED AnyHashable.swift
+  EMBEDDED Array.swift
   EMBEDDED ArrayBody.swift
   EMBEDDED ArrayBuffer.swift
   EMBEDDED ArrayBufferProtocol.swift
   EMBEDDED ArrayCast.swift
-  EMBEDDED Array.swift
   EMBEDDED ArrayShared.swift
   EMBEDDED ArraySlice.swift
   EMBEDDED ArrayType.swift
@@ -51,17 +52,17 @@ split_embedded_sources(
   EMBEDDED Builtin.swift
   EMBEDDED BuiltinMath.swift
   EMBEDDED Character.swift
+  EMBEDDED CharacterProperties.swift
+  EMBEDDED ClosedRange.swift
     NORMAL CocoaArray.swift
     NORMAL Codable.swift
   EMBEDDED Collection.swift
   EMBEDDED CollectionAlgorithms.swift
   EMBEDDED Comparable.swift
   EMBEDDED CompilerProtocols.swift
-  EMBEDDED Sendable.swift
   EMBEDDED ContiguousArray.swift
-  EMBEDDED ContiguouslyStored.swift
-  EMBEDDED ClosedRange.swift
   EMBEDDED ContiguousArrayBuffer.swift
+  EMBEDDED ContiguouslyStored.swift
   EMBEDDED CString.swift
   EMBEDDED CTypes.swift
     NORMAL DebuggerSupport.swift
@@ -84,17 +85,12 @@ split_embedded_sources(
   EMBEDDED Flatten.swift
   EMBEDDED FloatingPoint.swift
   EMBEDDED Hashable.swift
-  # WORKAROUND: This file name is not sorted alphabetically in the list because
-  # if we do so, the compiler crashes.
-  EMBEDDED AnyHashable.swift
-  # END WORKAROUND
   EMBEDDED Hasher.swift
     NORMAL Hashing.swift
   EMBEDDED HashTable.swift
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
   EMBEDDED InlineArray.swift
-  EMBEDDED _InlineArray.swift
   EMBEDDED InputStream.swift
   EMBEDDED IntegerParsing.swift
   EMBEDDED Integers.swift
@@ -109,7 +105,7 @@ split_embedded_sources(
   EMBEDDED ManagedBuffer.swift
   EMBEDDED Map.swift
   EMBEDDED MemoryLayout.swift
-  EMBEDDED UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
+  EMBEDDED MigrationSupport.swift
     NORMAL Mirrors.swift
   EMBEDDED Misc.swift
   EMBEDDED MutableCollection.swift
@@ -141,7 +137,7 @@ split_embedded_sources(
   EMBEDDED Reverse.swift
   EMBEDDED Runtime.swift
     NORMAL RuntimeFunctionCounters.swift
-  EMBEDDED SipHash.swift
+  EMBEDDED Sendable.swift
   EMBEDDED Sequence.swift
   EMBEDDED SequenceAlgorithms.swift
   EMBEDDED Set.swift
@@ -154,6 +150,7 @@ split_embedded_sources(
   EMBEDDED SetVariant.swift
   EMBEDDED ShadowProtocols.swift
     NORMAL Shims.swift
+  EMBEDDED SipHash.swift
   EMBEDDED Slice.swift
   EMBEDDED SmallString.swift
   EMBEDDED Sort.swift
@@ -163,10 +160,9 @@ split_embedded_sources(
   EMBEDDED Span/OutputSpan.swift
   EMBEDDED Span/RawSpan.swift
   EMBEDDED Span/Span.swift
-  EMBEDDED StaticString.swift
   EMBEDDED StaticPrint.swift
+  EMBEDDED StaticString.swift
   EMBEDDED Stride.swift
-  EMBEDDED StringHashable.swift  # ORDER DEPENDENCY: Must precede String.swift
   EMBEDDED String.swift
   EMBEDDED StringBreadcrumbs.swift
   EMBEDDED StringBridge.swift
@@ -174,17 +170,19 @@ split_embedded_sources(
   EMBEDDED StringComparable.swift
   EMBEDDED StringComparison.swift
   EMBEDDED StringCreate.swift
+  EMBEDDED StringGraphemeBreaking.swift
   EMBEDDED StringGuts.swift
-  EMBEDDED StringGutsSlice.swift
   EMBEDDED StringGutsRangeReplaceable.swift
-  EMBEDDED StringObject.swift
-  EMBEDDED StringProtocol.swift
+  EMBEDDED StringGutsSlice.swift
+  EMBEDDED StringHashable.swift
   EMBEDDED StringIndex.swift
   EMBEDDED StringIndexConversions.swift
   EMBEDDED StringIndexValidation.swift
   EMBEDDED StringInterpolation.swift
   EMBEDDED StringLegacy.swift
   EMBEDDED StringNormalization.swift
+  EMBEDDED StringObject.swift
+  EMBEDDED StringProtocol.swift
   EMBEDDED StringRangeReplaceableCollection.swift
   EMBEDDED StringStorage.swift
   EMBEDDED StringStorageBridge.swift
@@ -192,8 +190,8 @@ split_embedded_sources(
   EMBEDDED StringTesting.swift
   EMBEDDED StringUnicodeScalarView.swift
   EMBEDDED StringUTF16View.swift
-  EMBEDDED StringUTF8View.swift
   EMBEDDED StringUTF8Validation.swift
+  EMBEDDED StringUTF8View.swift
   EMBEDDED StringWordBreaking.swift
   EMBEDDED Substring.swift
   EMBEDDED SwiftNativeNSArray.swift
@@ -201,20 +199,22 @@ split_embedded_sources(
     NORMAL ThreadLocalStorage.swift
   EMBEDDED UIntBuffer.swift
   EMBEDDED UnavailableStringAPIs.swift
+  EMBEDDED Unicode.swift
+  EMBEDDED UnicodeBreakProperty.swift
   EMBEDDED UnicodeData.swift
   EMBEDDED UnicodeEncoding.swift
-  EMBEDDED UnicodeBreakProperty.swift
   EMBEDDED UnicodeHelpers.swift
   EMBEDDED UnicodeParser.swift
+  EMBEDDED UnicodeScalar.swift
   EMBEDDED UnicodeScalarProperties.swift
-  EMBEDDED CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
   EMBEDDED UnicodeSPI.swift
   EMBEDDED Unmanaged.swift
   EMBEDDED UnmanagedOpaqueString.swift
   EMBEDDED UnmanagedString.swift
   EMBEDDED UnsafePointer.swift
   EMBEDDED UnsafeRawPointer.swift
-  EMBEDDED UTFEncoding.swift
+  EMBEDDED UTF16.swift
+  EMBEDDED UTF32.swift
   EMBEDDED UTF8.swift
   EMBEDDED UTF8EncodingError.swift
   EMBEDDED UTF8Span.swift
@@ -223,13 +223,9 @@ split_embedded_sources(
   EMBEDDED UTF8SpanFundamentals.swift
   EMBEDDED UTF8SpanInternalHelpers.swift
   EMBEDDED UTF8SpanIterators.swift
-  EMBEDDED UTF16.swift
-  EMBEDDED UTF32.swift
-  EMBEDDED Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
-  EMBEDDED StringGraphemeBreaking.swift # ORDER DEPENDENCY: Must follow UTF16.swift
+  EMBEDDED UTFEncoding.swift
   EMBEDDED ValidUTF8Buffer.swift
   EMBEDDED WriteBackMutableSlice.swift
-  EMBEDDED MigrationSupport.swift
 
     ### "NON-ESSENTIAL" SOURCES, LAYERED ON TOP OF THE "ESSENTIAL" ONES
     ### -- PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
