@@ -6984,47 +6984,33 @@ struct ResultBuilderUnboundTypeOpener {
   CustomAttr *attr;
 
   Type operator()(UnboundGenericType *unboundTy) const {
-    auto resultBuilderDecl =
+    auto resultBuilderDecl = attr->getNominalDecl();
+    if (!resultBuilderDecl) {
+      return invalidResultBuilderType();
+    }
+
+    auto unboundTyDecl =
         dyn_cast_or_null<NominalTypeDecl>(unboundTy->getDecl());
-    if (!resultBuilderDecl ||
-        !resultBuilderDecl->getAttrs().hasAttribute<ResultBuilderAttr>()) {
-      return invalidResultBuilderType(unboundTy);
+    if (!resultBuilderDecl) {
+      return invalidResultBuilderType();
     }
 
-    Decl *owningDecl = attr->getOwner().getAsDecl();
-    if (!owningDecl) {
-      return invalidResultBuilderType(unboundTy);
-    }
-
-    // Retrieve the return type of the owning declaration that
-    // provides type inference for the result builder type.
-    Type owningDeclResultType;
-    if (auto varDecl = dyn_cast<VarDecl>(owningDecl)) {
-      if (auto closureResultType =
-              varDecl->getInterfaceType()->getAs<FunctionType>()) {
-        owningDeclResultType = closureResultType->getResult();
-      } else {
-        owningDeclResultType = varDecl->getInterfaceType();
-      }
-    } else if (auto funcDecl = dyn_cast<FuncDecl>(owningDecl)) {
-      owningDeclResultType = funcDecl->getResultInterfaceType();
-    }
-
-    if (!owningDeclResultType) {
-      return invalidResultBuilderType(unboundTy);
+    auto owningDeclReturnType = getOwningDeclReturnType();
+    if (!owningDeclReturnType) {
+      return invalidResultBuilderType();
     }
 
     // Retrieve the supported result types of the result builder.
-    auto resultTypes = retrieveResultBuilderResultTypes(resultBuilderDecl);
+    auto resultTypes = getResultBuilderResultTypes(resultBuilderDecl);
     if (resultTypes.empty()) {
-      return invalidResultBuilderType(unboundTy);
+      return invalidResultBuilderType();
     }
 
-    auto genericSig = resultBuilderDecl->getGenericSignature();
+    auto genericSig = unboundTyDecl->getGenericSignature();
 
     // Try each result type and return the first one that
     // produces a valid solution.
-    for (auto componentType : resultTypes) {
+    for (auto resultType : resultTypes) {
       using namespace constraints;
 
       // Avoid recording failed constraints, which are not used here.
@@ -7038,7 +7024,7 @@ struct ResultBuilderUnboundTypeOpener {
       llvm::SmallVector<TypeVariableType *, 8> typeVars;
       for (unsigned i = 0; i < genericSig.getGenericParams().size(); ++i) {
         auto locator = cs.getConstraintLocator(
-            resultBuilderDecl, {ConstraintLocator::GenericArgument, i});
+            unboundTyDecl, {ConstraintLocator::GenericArgument, i});
         auto typeVar = cs.createTypeVariable(locator, TVO_CanBindToHole);
         typeVarReplacements.push_back(typeVar);
         typeVars.push_back(typeVar);
@@ -7049,12 +7035,12 @@ struct ResultBuilderUnboundTypeOpener {
       auto subMap = SubstitutionMap::get(genericSig, typeVarReplacements,
                                          LookUpConformanceInModule());
 
-      auto componentTypeWithTypeVars = componentType.subst(subMap);
+      auto resultTypeWithTypeVars = resultType.subst(subMap);
 
       // The result builder result type should be equal to the return type of
       // the attached declaration.
-      cs.addConstraint(ConstraintKind::Equal, owningDeclResultType,
-                       componentTypeWithTypeVars,
+      cs.addConstraint(ConstraintKind::Equal, owningDeclReturnType,
+                       resultTypeWithTypeVars,
                        /*preparedOverload:*/ nullptr);
 
       auto solution = cs.solveSingle();
@@ -7067,30 +7053,52 @@ struct ResultBuilderUnboundTypeOpener {
           solvedReplacements.push_back(solution->typeBindings[typeVar]);
         }
 
-        return BoundGenericType::get(resultBuilderDecl, unboundTy->getParent(),
+        return BoundGenericType::get(unboundTyDecl, unboundTy->getParent(),
                                      solvedReplacements);
       }
     }
 
     // No result type produced a valid solution
-    return invalidResultBuilderType(unboundTy);
+    return invalidResultBuilderType();
   }
 
 private:
-  Type invalidResultBuilderType(UnboundGenericType *unboundTy) const {
+  Type invalidResultBuilderType() const {
     dc->getASTContext().Diags.diagnose(
         attr->getTypeExpr()->getLoc(),
-        diag::result_builder_generic_inference_failed,
-        unboundTy->getDecl()->getName());
+        diag::result_builder_generic_inference_failed, attr);
 
     return ErrorType::get(dc->getASTContext());
+  }
+
+  /// Retrieve the return type of the owning declaration that
+  /// provides type inference for the result builder type.
+  Type getOwningDeclReturnType() const {
+    Decl *owningDecl = attr->getOwner().getAsDecl();
+    if (!owningDecl) {
+      return nullptr;
+    }
+
+    Type owningDeclReturnType;
+    if (auto varDecl = dyn_cast<VarDecl>(owningDecl)) {
+      if (auto closureResultType =
+              varDecl->getInterfaceType()->getAs<FunctionType>()) {
+        owningDeclReturnType = closureResultType->getResult();
+      } else {
+        owningDeclReturnType = varDecl->getInterfaceType();
+      }
+    } else if (auto funcDecl = dyn_cast<FuncDecl>(owningDecl)) {
+      owningDeclReturnType = funcDecl->getResultInterfaceType();
+    }
+
+    return owningDeclReturnType;
   }
 
   /// Retrieves the valid result types of the result builder
   /// (the return types of `buildFinalResult` / `buildBlock` /
   /// `buildPartialBlock`).
   llvm::SmallVector<Type, 4>
-  retrieveResultBuilderResultTypes(NominalTypeDecl *builder) const {
+  getResultBuilderResultTypes(NominalTypeDecl *builder) const {
     ASTContext &ctx = builder->getASTContext();
     llvm::SmallVector<Type, 4> resultTypes;
 
