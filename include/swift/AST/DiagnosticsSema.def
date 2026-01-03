@@ -1703,6 +1703,8 @@ ERROR(extra_trailing_closure_in_call,none,
 ERROR(closure_bad_param,none,
       "%select{|trailing }1closure passed to parameter of type %0 that does not "
       "accept a closure", (Type, bool))
+ERROR(anon_closure_arg_not_in_closure,none,
+      "anonymous closure argument not contained in a closure", ())
 GROUPED_WARNING(unlabeled_trailing_closure_deprecated,
         TrailingClosureMatching,Deprecation,
         "backward matching of the unlabeled trailing closure is deprecated; label the argument with %0 to suppress this warning",
