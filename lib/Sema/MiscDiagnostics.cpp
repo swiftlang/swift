@@ -6521,6 +6521,29 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
 
   if (!ctx.LangOpts.DisableAvailabilityChecking)
     diagnoseStmtAvailability(S, const_cast<DeclContext*>(DC));
+
+  if (auto *doCatchStmt = dyn_cast<DoCatchStmt>(S)) {
+    for (auto *catchStmt : doCatchStmt->getCatches()) {
+      auto *body = dyn_cast_or_null<BraceStmt>(catchStmt->getBody());
+      if (!body) continue;
+
+      auto *pattern = catchStmt->getCaseLabelItems().front().getPattern();
+      if (isa<AnyPattern>(pattern->getSemanticsProvidingPattern())) continue;
+
+      Identifier boundErrorName;
+      catchStmt->getCaseLabelItems().front().getPattern()->forEachVariable([&](VarDecl *V) {
+        boundErrorName = V->getName();
+      });
+
+      if (boundErrorName.empty()) {
+        boundErrorName = ctx.getIdentifier("error");
+      }
+
+      if (body->empty() && doCatchStmt->getCatches().size() == 1) {
+        auto diag = ctx.Diags.diagnose(catchStmt->getLoc(), diag::empty_catch_block);
+      }
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
