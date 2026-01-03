@@ -158,7 +158,7 @@ private:
   }
 
 public:
-  void printTypeName(const ASTContext &Context, raw_ostream &os) const {
+  void printTypeName(ASTContext &Context, raw_ostream &os) const {
     ClangSyntaxPrinter(Context, os).printClangTypeReference(typeDecl);
   }
 
@@ -169,7 +169,7 @@ public:
                         bodyOfReturn);
   }
 
-  void printReturnScaffold(const ASTContext &Context, raw_ostream &os,
+  void printReturnScaffold(ASTContext &Context, raw_ostream &os,
                            llvm::function_ref<void(StringRef)> bodyOfReturn) {
     std::string fullQualifiedType;
     std::string typeName;
