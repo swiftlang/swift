@@ -7022,11 +7022,16 @@ struct ResultBuilderUnboundTypeOpener {
 
     auto genericSig = resultBuilderDecl->getGenericSignature();
 
-    // Try each result type and return the first one that produces a valid
-    // solution
+    // Try each result type and return the first one that
+    // produces a valid solution.
     for (auto componentType : resultTypes) {
       using namespace constraints;
-      ConstraintSystem cs(dc, std::nullopt);
+
+      // Avoid recording failed constraints, which are not used here.
+      ConstraintSystemOptions options;
+      options |= ConstraintSystemFlags::DisableRecordFailedConstraint;
+
+      ConstraintSystem cs(dc, options);
 
       // Create a type variable for each of the result builder's generic params
       llvm::SmallVector<Type, 8> typeVarReplacements;
