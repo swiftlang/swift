@@ -1119,7 +1119,7 @@ func testInferResultBuilderGenerics() {
     print(makeArray())
   }
 
-  @SimpleArrayBuilder // expected-error{{unable to infer generic parameters for result builder 'SimpleArrayBuilder'}}
+  @SimpleArrayBuilder // expected-error{{unable to infer generic parameters for result builder @SimpleArrayBuilder}}
   var string: String {
     "foo"
   }
@@ -1167,7 +1167,7 @@ func testInferResultBuilderGenerics() {
     }
   }
 
-  @TooManyArgsBuilder // expected-error {{unable to infer generic parameters for result builder 'TooManyArgsBuilder'}}
+  @TooManyArgsBuilder // expected-error {{unable to infer generic parameters for result builder @TooManyArgsBuilder}}
   var invalidTupleArray: [(String, Int)] {
     ("foo", 1) // expected-warning {{expression of type '(String, Int)' is unused}}
     ("bar", 2) // expected-warning {{expression of type '(String, Int)' is unused}}
@@ -1235,7 +1235,7 @@ func testInferResultBuilderGenerics() {
       "d"
   }
   
-  @CollectionBuilder // expected-error {{unable to infer generic parameters for result builder 'CollectionBuilder'}}
+  @CollectionBuilder // expected-error {{unable to infer generic parameters for result builder @CollectionBuilder}}
   var contiguousArray: ContiguousArray<String> {
       "c" // expected-warning {{string literal is unused}}
       "d" // expected-warning {{string literal is unused}}
@@ -1255,7 +1255,7 @@ extension Array {
       self = build3()
   }
   
-  init(@SimpleArrayBuilder build3: () -> ContiguousArray<Element>) { // expected-error {{unable to infer generic parameters for result builder 'SimpleArrayBuilder'}}
+  init(@SimpleArrayBuilder build3: () -> ContiguousArray<Element>) { // expected-error {{unable to infer generic parameters for result builder @SimpleArrayBuilder}}
       self = Array(build3())
   }
 }
@@ -1269,7 +1269,51 @@ extension Set {
     self = Set(build2())
   }
   
-  init(@SimpleArrayBuilder build3: () -> Self) { // expected-error {{unable to infer generic parameters for result builder 'SimpleArrayBuilder'}}
+  init(@SimpleArrayBuilder build3: () -> Self) { // expected-error {{unable to infer generic parameters for result builder @SimpleArrayBuilder}}
     self = build3()
+  }
+}
+
+extension Array {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock(_ elements: Element...) -> [Element] {
+      elements
+    }
+  }
+}
+
+extension Dictionary {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock(_ elements: (Key, Value)...) -> Dictionary {
+      Dictionary(elements, uniquingKeysWith: { $1 })
+    }
+  }
+}
+
+func testNonGenericResultBuildersInGenericTypeExtensions() {
+  @Array.Builder
+  var elements: [String] {
+    "foo"
+    "bar"
+  }
+  
+  @Array.Builder // expected-error {{unable to infer generic parameters for result builder @Array.Builder}}
+  var set: Set<String> {
+    "foo" // expected-warning {{string literal is unused}}
+    "bar" // expected-warning {{string literal is unused}}
+  }
+  
+  @Dictionary.Builder
+  var dictionary: [String: String] {
+    ("foo", "bar")
+    ("baaz", "quux")
+  }
+  
+  @Dictionary.Builder // expected-error {{unable to infer generic parameters for result builder @Dictionary.Builder}}
+  var dictionary2: [(String, String)] {
+    ("foo", "bar") // expected-warning {{expression of type '(String, String)' is unused}}
+    ("baaz", "quux") // expected-warning {{expression of type '(String, String)' is unused}}
   }
 }
