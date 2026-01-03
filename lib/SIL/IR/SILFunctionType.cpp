@@ -4213,7 +4213,22 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
+    auto silRep = extInfoBuilder.getRepresentation();
     auto clangType = func->getType().getTypePtr();
+
+    if (shouldStoreClangType(silRep) && clangType) {
+      // According to [NOTE: ClangTypeInfo-contents], we need to wrap a function
+      // type in an additional clang::PointerType.
+      if (clangType->isFunctionType()) {
+        clangType =
+          static_cast<ClangImporter *>(TC.Context.getClangModuleLoader())
+            ->getClangASTContext()
+              .getPointerType(clang::QualType(clangType, 0))
+              .getTypePtr();
+      }
+      extInfoBuilder = extInfoBuilder.withClangFunctionType(clangType);
+    }
+
     AbstractionPattern origPattern =
         foreignInfo.self.isImportAsMember()
             ? AbstractionPattern::getCFunctionAsMethod(origType, clangType,
@@ -5516,9 +5531,15 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
     auto param1 = getParameters()[i];
     auto param2 = other->getParameters()[i];
 
-    if (param1.getConvention() != param2.getConvention())
+    // Special case for C++: it's OK to pass things to an @in_guaranteed
+    // function where @in_cxx would be OK, since the callee behaves in
+    // a compatible manner.
+    if (param1.getConvention() != param2.getConvention()
+        && (param1.getConvention() != ParameterConvention::Indirect_In_CXX
+            || (param2.getConvention()
+                != ParameterConvention::Indirect_In_Guaranteed)))
       return {ABICompatibilityCheckResult::DifferingParameterConvention, i};
-    // Note that the diretionality here is reversed from the other cases
+    // Note that the directionality here is reversed from the other cases
     // because of contravariance: parameters of the *second* type will be
     // trivially converted to be parameters of the *first* type.
     if (!areABICompatibleParamsOrReturns(

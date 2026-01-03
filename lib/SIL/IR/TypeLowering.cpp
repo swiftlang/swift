@@ -5174,8 +5174,14 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
 
   for (unsigned i = 0, e = fnTy1->getParameters().size(); i < e; ++i) {
     auto param1 = fnTy1->getParameters()[i], param2 = fnTy2->getParameters()[i];
-    
-    if (param1.getConvention() != param2.getConvention())
+
+    // Special case for C++: it's OK to pass things to an @in_guaranteed
+    // function where @in_cxx would be OK, since the callee behaves in
+    // a compatible manner.
+    if (param1.getConvention() != param2.getConvention()
+        && (param1.getConvention() != ParameterConvention::Indirect_In_CXX
+            || (param2.getConvention()
+                != ParameterConvention::Indirect_In_Guaranteed)))
       return ABIDifference::NeedsThunk;
 
     // Parameters are contravariant and our relation is not symmetric, so

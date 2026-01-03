@@ -238,8 +238,29 @@ class ClangTypeInfo {
   // When used as a part of SILFunctionType, the type is canonical.
   const clang::Type *type;
 
-  constexpr ClangTypeInfo() : type(nullptr) {}
-  constexpr ClangTypeInfo(const clang::Type *type) : type(type) {}
+  // This is a type that is equivalent to the one in `type`.  When the
+  // Clang Importer imports a C function type, it will set this to a
+  // type that is the same as that in `type`, *except* that all unsigned
+  // types are replaced with their signed equivalents.
+  //
+  // The reason for this is so that we can compare function types that
+  // may have had `size_t` or `NSUInteger` arguments mapped to `Int`
+  // (aka `long`).
+  //
+  // Equivalent types are always stored in canonical form; there's no
+  // reason to keep any extra information around for them, as they're
+  // only used for comparison purposes.
+  const clang::Type *equivalentType;
+
+  static const clang::Type *makeCanonical(const clang::Type *type);
+
+  constexpr ClangTypeInfo() : type(nullptr), equivalentType(nullptr) {}
+  constexpr ClangTypeInfo(const clang::Type *type,
+                          const clang::Type *equivType = nullptr)
+    : type(type),
+      equivalentType(equivType ?
+                     equivType : ClangTypeInfo::makeCanonical(type))
+    {}
 
   friend bool operator==(ClangTypeInfo lhs, ClangTypeInfo rhs);
   friend bool operator!=(ClangTypeInfo lhs, ClangTypeInfo rhs);
@@ -248,7 +269,13 @@ class ClangTypeInfo {
 public:
   constexpr const clang::Type *getType() const { return type; }
 
+  constexpr const clang::Type *getEquivalentType() const {
+    return equivalentType;
+  }
+
   constexpr bool empty() const { return !type; }
+
+  bool isEquivalentType(const ClangTypeInfo &other) const;
 
   /// Use the ClangModuleLoader to print the Clang type as a string.
   void printType(ClangModuleLoader *cml, llvm::raw_ostream &os) const;
@@ -744,8 +771,13 @@ public:
         clangTypeInfo, globalActor, thrownError, lifetimeDependencies);
   }
   [[nodiscard]]
-  ASTExtInfoBuilder withClangFunctionType(const clang::Type *type) const {
-    return ASTExtInfoBuilder(bits, ClangTypeInfo(type), globalActor,
+  ASTExtInfoBuilder withClangFunctionType(
+      const clang::Type *type,
+      const clang::Type *equivType = nullptr
+  ) const {
+    return ASTExtInfoBuilder(bits,
+                             ClangTypeInfo(type, equivType),
+                             globalActor,
                              thrownError, lifetimeDependencies);
   }
 
@@ -968,6 +1000,14 @@ public:
   [[nodiscard]] ASTExtInfo withLifetimeDependencies(
       SmallVectorImpl<LifetimeDependenceInfo> lifetimeDependencies) const =
       delete;
+
+  [[nodiscard]]
+  ASTExtInfo withClangFunctionType(
+    const clang::Type *type,
+    const clang::Type *equivType = nullptr
+  ) const {
+    return builder.withClangFunctionType(type, equivType);
+  }
 
   void Profile(llvm::FoldingSetNodeID &ID) const { builder.Profile(ID); }
 
@@ -1267,8 +1307,12 @@ public:
         clangTypeInfo, lifetimeDependencies);
   }
   [[nodiscard]]
-  SILExtInfoBuilder withClangFunctionType(const clang::Type *type) const {
-    return SILExtInfoBuilder(bits, ClangTypeInfo(type).getCanonical(),
+  SILExtInfoBuilder withClangFunctionType(
+      const clang::Type *type,
+      const clang::Type *equivType = nullptr
+  ) const {
+    return SILExtInfoBuilder(bits,
+                             ClangTypeInfo(type, equivType).getCanonical(),
                              lifetimeDependencies);
   }
 
