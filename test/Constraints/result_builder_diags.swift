@@ -1080,14 +1080,29 @@ func testNoDuplicateStmtDiags() {
   }
 }
 
-func testInferResultBuilderGenerics() {
-  @resultBuilder
-  struct SimpleArrayBuilder<Element> {
-    static func buildBlock(_ elements: Element...) -> [Element] {
-      elements
-    }
+@resultBuilder
+enum SimpleArrayBuilder<ElementKind> {
+  static func buildBlock(_ elements: ElementKind...) -> [ElementKind] {
+    elements
   }
+}
 
+@resultBuilder
+enum CollectionBuilder<Element> {
+    static func buildBlock(_ component: Element...) -> [Element] {
+      component
+    }
+
+    static func buildFinalResult(_ component: [Element]) -> [Element] {
+        component
+    }
+
+    static func buildFinalResult(_ component: [Element]) -> Set<Element> where Element: Hashable {
+        Set(component)
+    }
+}
+
+func testInferResultBuilderGenerics() {
   @SimpleArrayBuilder
   var stringArray: [String] {
     "foo"
@@ -1157,7 +1172,7 @@ func testInferResultBuilderGenerics() {
     ("foo", 1) // expected-warning {{expression of type '(String, Int)' is unused}}
     ("bar", 2) // expected-warning {{expression of type '(String, Int)' is unused}}
   }
-  
+
   @resultBuilder
   enum ComplexListBuilder<Element> {
     static func buildBlock(_ elements: Element...) -> [Element] {
@@ -1206,5 +1221,55 @@ func testInferResultBuilderGenerics() {
   var stringArrayFromBuildPartial: [String] {
     "foo"
     "bar"
+  }
+
+  @CollectionBuilder
+  var array: [String] {
+      "a"
+      "b"
+  }
+
+  @CollectionBuilder
+  var set: Set<String> {
+      "c"
+      "d"
+  }
+  
+  @CollectionBuilder // expected-error {{unable to infer generic parameters for result builder 'CollectionBuilder'}}
+  var contiguousArray: ContiguousArray<String> {
+      "c" // expected-warning {{string literal is unused}}
+      "d" // expected-warning {{string literal is unused}}
+  }
+}
+
+extension Array {
+  init(@SimpleArrayBuilder build1: () -> Self) {
+    self = build1()
+  }
+  
+  init(@SimpleArrayBuilder build2: () -> [Element]) {
+      self = build2()
+  }
+  
+  init(@SimpleArrayBuilder build3: () -> Array<Self.Element>) {
+      self = build3()
+  }
+  
+  init(@SimpleArrayBuilder build3: () -> ContiguousArray<Element>) { // expected-error {{unable to infer generic parameters for result builder 'SimpleArrayBuilder'}}
+      self = Array(build3())
+  }
+}
+
+extension Set {
+  init(@CollectionBuilder build: () -> Self) {
+    self = build()
+  }
+  
+  init(@CollectionBuilder build2: () -> [Element]) {
+    self = Set(build2())
+  }
+  
+  init(@SimpleArrayBuilder build3: () -> Self) { // expected-error {{unable to infer generic parameters for result builder 'SimpleArrayBuilder'}}
+    self = build3()
   }
 }
