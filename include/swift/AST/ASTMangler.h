@@ -45,7 +45,7 @@ enum class DestructorKind {
 /// The mangler for AST declarations.
 class ASTMangler : public Mangler {
 protected:
-  const ASTContext &Context;
+  ASTContext &Context;
   ModuleDecl *Mod = nullptr;
 
   /// Optimize out protocol names if a type only conforms to one protocol.
@@ -194,7 +194,7 @@ public:
   };
 
   /// lldb overrides \p DWARFMangling to 'true'.
-  ASTMangler(const ASTContext &Ctx, bool DWARFMangling = false,
+  ASTMangler(ASTContext &Ctx, bool DWARFMangling = false,
              bool UseAPIMangling = false)
       : Context(Ctx) {
     if (DWARFMangling) {
@@ -209,11 +209,11 @@ public:
 
   /// Create an ASTMangler suitable for mangling a USR for use in semantic
   /// functionality.
-  static ASTMangler forUSR(const ASTContext &Ctx) {
+  static ASTMangler forUSR(ASTContext &Ctx) {
     return ASTMangler(Ctx, /*DWARFMangling*/ true, /*UseAPIMangling*/ true);
   }
 
-  const ASTContext &getASTContext() { return Context; }
+  ASTContext &getASTContext() { return Context; }
 
   void addTypeSubstitution(Type type, GenericSignature sig) {
     type = dropProtocolsFromAssociatedTypes(type, sig);
@@ -807,7 +807,8 @@ protected:
   void appendLifetimeDependence(LifetimeDependenceInfo info);
 
   void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
-                                     ParameterizedProtocolType *PPT) const;
+                                     SmallVectorImpl<InverseRequirement> &inverses,
+                                     Type base) const;
 
   /// Extracts a list of inverse requirements from a PCT serving as the
   /// constraint type of an existential.
