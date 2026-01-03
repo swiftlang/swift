@@ -64,6 +64,11 @@ public let benchmarks = [
       runFunction: run_UTF16Decode_InitFromData_ascii_as_ascii,
       tags: [.validation, .api, .String, .skip],
       setUpFunction: setUp),
+    BenchmarkInfo(
+      name: "UTF16Decode.length",
+      runFunction: run_UTF16DecodeLength,
+      tags: [.validation, .api, .String],
+      setUpFunction: setUp),
 ]
 
 typealias CodeUnit = UInt16
@@ -78,6 +83,12 @@ let asciiData: Data = asciiCodeUnits.withUnsafeBytes { Data($0) }
 let russian = "Ру́сский язы́к один из восточнославянских языков, национальный язык русского народа."
 // 3-byte sequences
 let japanese = "日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。"
+
+//Making sure it's long enough to need breadcrumbs
+let longJapanese = "日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。日本語（にほんご、にっぽんご）は、主に日本国内や日本人同士の間で使われている言語である。"
+
+var longJapaneseUTF16Bytes: UnsafeMutableBufferPointer<UInt16>!
+
 // 4-byte sequences
 // Most commonly emoji, which are usually mixed with other text.
 let emoji = "Panda 🐼, Dog 🐶, Cat 🐱, Mouse 🐭."
@@ -96,6 +107,10 @@ func setUp() {
     blackHole(asciiCustomContiguous)
     blackHole(allStringsCustomNoncontiguous)
     blackHole(asciiCustomNoncontiguous)
+    longJapaneseUTF16Bytes = UnsafeMutableBufferPointer<UInt16>.allocate(
+      capacity: longJapanese.utf16.count
+    )
+    _ = longJapaneseUTF16Bytes.initialize(from: longJapanese.utf16)
 }
 
 @inline(never)
@@ -219,5 +234,14 @@ public func run_UTF16Decode_InitFromCustom_noncontiguous(_ N: Int) {
 public func run_UTF16Decode_InitFromCustom_noncontiguous_ascii(_ N: Int) {
   for _ in 0..<10*N {
     blackHole(String(decoding: asciiCustomNoncontiguous, as: UTF16.self))
+  }
+}
+
+@inline(never)
+public func run_UTF16DecodeLength(_ N: Int) {
+  for _ in 0..<10*N {
+    // Round trip time to go utf16 -> utf8 -> utf16 length
+    let str = String(decoding: longJapaneseUTF16Bytes, as: UTF16.self)
+    blackHole(str.utf16.count)
   }
 }
