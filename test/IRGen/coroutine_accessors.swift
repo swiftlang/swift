@@ -248,7 +248,7 @@ public var irm: Int {
 // CHECK-SAME:          )
 // CHECK:               unreachable
 // CHECK:           }
-  read {
+  yielding borrow {
     yield _i
   }
 // CHECK-LABEL:     define{{.*}} { ptr, ptr } @"$s19coroutine_accessors1SV3irmSivx"(
@@ -287,7 +287,7 @@ public var irm: Int {
 // CHECK:               [[REGISTER_8:%[^,]+]] = call i1 @llvm.coro.end(ptr [[HANDLE]], i1 false, token none)
 // CHECK:               unreachable
 // CHECK:           }
-  modify {
+  yielding mutate {
     yield &_i
   }
 } // public var irm
@@ -415,7 +415,7 @@ public var force_yield_once_convention : () {
 }
 
 public var force_yield_once_2_convention : () {
-  read {
+  yielding borrow {
     let nothing: () = ()
     yield nothing
   }
@@ -456,7 +456,7 @@ public var force_yield_once_2_convention : () {
 // CHECK:         call void @llvm.coro.alloca.free.frame(token [[ALLOCATION]])
 // CHECK:       }
   @_silgen_name("increment_irm_yield_once_2")
-  modify {
+  yielding mutate {
     increment(&irm)
 
     var nothing: () = ()

@@ -30,7 +30,7 @@ public var irm: Int {
 // CHECK-SAME:      @yields Int
 // CHECK-SAME:  {
 // CHECK-LABEL: } // end sil function '$s19coroutine_accessors1SV3irmSivy'
-  read {
+  yielding borrow {
     yield _i
   }
 // CHECK-LABEL: sil [ossa] @$s19coroutine_accessors1SV3irmSivx :
@@ -41,7 +41,7 @@ public var irm: Int {
 // CHECK-SAME:      @yields @inout Int
 // CHECK-SAME:  {
 // CHECK-LABEL: } // end sil function '$s19coroutine_accessors1SV3irmSivx'
-  modify {
+  yielding mutate {
     yield &_i
   }
 // CHECK-LABEL: sil{{.*}} [ossa] @$s19coroutine_accessors1SV3irmSivr :
@@ -239,7 +239,7 @@ class OverridableGetter : ReadableTitle {
 class ImplementedReader : ReadableTitle {
   var _title: String = ""
   var title: String {
-    read {
+    yielding borrow {
       yield _title
     }
   }
@@ -278,7 +278,7 @@ protocol GettableTitle {
 class OverridableReader : GettableTitle {
   var _title: String = ""
   var title: String {
-    read {
+    yielding borrow {
       yield _title
     }
   }

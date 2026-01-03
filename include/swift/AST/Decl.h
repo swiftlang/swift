@@ -220,6 +220,8 @@ enum class DescriptiveDeclKind : uint8_t {
   Using,
   BorrowAccessor,
   MutateAccessor,
+  YieldingBorrowAccessor,
+  YieldingMutateAccessor,
 };
 
 /// Describes which spelling was used in the source for the 'static' or 'class'
@@ -8788,6 +8790,8 @@ public:
   bool isCoroutine() const {
     switch (getAccessorKind()) {
 #define COROUTINE_ACCESSOR(ID, KEYWORD) \
+    case AccessorKind::ID: return true;
+#define YIELDING_ACCESSOR(ID, KEYWORD, YIELDING_KEYWORD, FEATURE) \
     case AccessorKind::ID: return true;
 #define ACCESSOR(ID, KEYWORD)                                                  \
     case AccessorKind::ID: return false;

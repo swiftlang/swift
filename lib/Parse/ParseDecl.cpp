@@ -1579,6 +1579,12 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
     const Token &nextToken = P.peekToken();
     if (isAccessorLabel(nextToken).has_value())
       return false;
+    // These are synonyms or parts of compound accessor
+    // labels, so not directly recognized by `isAccessorLabel()`
+    if (nextToken.getText() == "yielding"
+	|| nextToken.getText() == "yielding_mutate"
+	|| nextToken.getText() == "yielding_borrow")
+      return false;
   }
 
   backtrack.cancelBacktrack();
@@ -1638,11 +1644,38 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
   // Currently, we follow (2) because it's more useful in practice.
   if (P.Tok.is(tok::period)) {
     const Token &nextToken = P.peekToken();
-    std::optional<AccessorKind> kind = isAccessorLabel(nextToken);
-    if (kind.has_value()) {
-      original.AccessorKind = kind;
+    auto tokText = nextToken.getText();
+    auto coroutineAccessorsAllowed = P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors);
+    if (tokText == "yielding" && coroutineAccessorsAllowed) {
+      // Support "yielding borrow" and "yielding mutate"
+      auto pos = P.getParserPosition();
       P.consumeIf(tok::period);
       P.consumeIf(tok::identifier);
+      if (P.Tok.getText() == "borrow") {
+	original.AccessorKind = AccessorKind::Read2;
+	P.consumeIf(tok::identifier);
+      } else if (P.Tok.getText() == "mutate") {
+	original.AccessorKind = AccessorKind::Modify2;
+	P.consumeIf(tok::identifier);
+      } else {
+	P.restoreParserPosition(pos);
+      }
+    } else {
+      // Support single-word "yielding_borrow" and "yielding_mutate"
+      // as well as the other single-word accessor forms
+      std::optional<AccessorKind> kind;
+      if (tokText == "yielding_borrow" && coroutineAccessorsAllowed) {
+	kind = AccessorKind::Read2;
+      } else if (tokText == "yielding_mutate" && coroutineAccessorsAllowed) {
+	kind = AccessorKind::Modify2;
+      } else {
+	kind = isAccessorLabel(nextToken);
+      }
+      if (kind.has_value()) {
+	original.AccessorKind = kind;
+	P.consumeIf(tok::period);
+	P.consumeIf(tok::identifier);
+      }
     }
   }
 
@@ -8081,12 +8114,13 @@ static ParserStatus parseAccessorIntroducer(Parser &P,
     return Status;
   }
 #define ACCESSOR_KEYWORD(KEYWORD)
-// Existing source code may have an implicit getter whose first expression is a
-// call to a function named experimental_accessor passing a trailing closure.
-// To maintain compatibility, if the feature corresponding to
-// experimental_accessor is not enabled, do not parse the token as an
-// introducer, so that it can be parsed as such a function call.
-#define EXPERIMENTAL_COROUTINE_ACCESSOR(ID, KEYWORD, FEATURE)                  \
+
+// Support the old `read` and `modify` spellings used before SE-0474 was
+// finalized.  Include a warning guiding people to the final spellings.
+// The complicated condition here is to try to deal gracefully with
+// existing code that has a function called `read` or `modify` that
+// takes a closure and invokes it from within a default getter.
+#define YIELDING_ACCESSOR(ID, KEYWORD, YIELDING_KEYWORD, FEATURE)              \
   else if (P.Tok.getRawText() == #KEYWORD) {                                   \
     if (!P.Context.LangOpts.hasFeature(Feature::FEATURE)) {                    \
       if (featureUnavailable)                                                  \
@@ -8096,6 +8130,8 @@ static ParserStatus parseAccessorIntroducer(Parser &P,
         return Status;                                                         \
       }                                                                        \
     }                                                                          \
+    P.diagnose(P.Tok.getLoc(), diag::old_coroutine_accessor,                   \
+               #YIELDING_KEYWORD, #KEYWORD);                                   \
     Kind = AccessorKind::ID;                                                   \
   }
 #define SINGLETON_ACCESSOR(ID, KEYWORD)                                        \
@@ -8103,6 +8139,24 @@ static ParserStatus parseAccessorIntroducer(Parser &P,
     Kind = AccessorKind::ID;                                                   \
   }
 #include "swift/AST/AccessorKinds.def"
+
+  else if (P.Tok.getRawText() == "yielding") {
+    // If there's a "yielding" token, see if this is
+    // "yielding mutate" or "yielding borrow"
+    Loc = P.consumeToken();
+    // Only expand "yielding mutate" and "yielding borrow"
+#define ACCESSOR(ID, KEYWORD)
+#define YIELDING_ACCESSOR(ID, KEYWORD, YIELDING_KEYWORD, FEATURE)              \
+    if (P.Tok.getRawText() == #YIELDING_KEYWORD) {                             \
+      if (!P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors)) {       \
+        if (featureUnavailable)                                                \
+          *featureUnavailable = true;                                          \
+      }                                                                        \
+      Kind = AccessorKind::ID;                                                 \
+    }
+#include "swift/AST/AccessorKinds.def"
+  }
+
   else {
     Status.setIsParseError();
     return Status;
@@ -8349,10 +8403,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
 
       // parsingLimitedSyntax mode cannot have a body.
       if (parsingLimitedSyntax) {
-        auto diag = Context.LangOpts.hasFeature(Feature::CoroutineAccessors)
-                        ? diag::expected_getreadset_in_protocol
-                        : diag::expected_getset_in_protocol;
-        diagnose(Tok, diag);
+        diagnose(Tok, diag::expected_getreadset_in_protocol);
         Status |= makeParserError();
         break;
       }
@@ -8386,10 +8437,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     // avoid having to deal with them everywhere.
     if (parsingLimitedSyntax && !isAllowedWhenParsingLimitedSyntax(
                                     Kind, SF.Kind == SourceFileKind::SIL)) {
-      auto diag = Context.LangOpts.hasFeature(Feature::CoroutineAccessors)
-                      ? diag::expected_getreadset_in_protocol
-                      : diag::expected_getset_in_protocol;
-      diagnose(Loc, diag);
+      diagnose(Loc, diag::expected_getreadset_in_protocol);
       continue;
     }
 

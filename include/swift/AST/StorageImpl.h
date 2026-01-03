@@ -305,7 +305,7 @@ enum class ReadImplKind {
   /// There's a _read coroutine.
   Read,
 
-  /// There's a read coroutine.
+  /// There's a `yielding borrow` coroutine (originally called `read`).
   Read2,
 
   /// There's a borrow accessor.
@@ -337,7 +337,7 @@ enum class WriteImplKind {
   /// There's a _modify coroutine.
   Modify,
 
-  /// There's a modify coroutine.
+  /// There's a `yielding mutate` coroutine (originally called `modify`).
   Modify2,
 
   /// There's a mutate accessor.

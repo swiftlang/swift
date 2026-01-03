@@ -1,7 +1,10 @@
-// RUN: %target-swift-frontend-typecheck -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s -package-name myPkg
-// RUN: %target-swift-frontend-typecheck -enable-testing -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s -package-name myPkg
+// RUN: %target-swift-frontend-typecheck -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s -package-name myPkg -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature CoroutineAccessors
+// RUN: %target-swift-frontend-typecheck -enable-testing -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s -package-name myPkg -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature CoroutineAccessors
 
 // Swift.AdditiveArithmetic:3:17: note: cannot yet register derivative default implementation for protocol requirements
+
+// REQUIRES: swift_feature_CoroutineAccessors
+// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 import _Differentiation
 
@@ -432,6 +435,14 @@ extension Struct {
     set { x = newValue }
     _modify { yield &x }
   }
+  var computedProperty2: T {
+    yielding borrow { yield x }
+    yielding mutate { yield &x }
+  }
+  var computedProperty3: T {
+    borrow { return x }
+    mutate { return &x }
+  }
 }
 extension Struct where T: Differentiable & AdditiveArithmetic {
   @derivative(of: computedProperty)
@@ -454,6 +465,54 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
   // expected-error @+1 {{cannot register derivative for _modify accessor}}
   @derivative(of: computedProperty._modify)
   mutating func vjpPropertyModify(_ newValue: T) -> (
+    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  ) {
+    fatalError()
+  }
+
+  // expected-error @+1 {{cannot register derivative for yielding borrow accessor}}
+  @derivative(of: computedProperty2.yielding borrow)
+  mutating func vjpPropertyYieldingBorrow(_ newValue: T) -> (
+    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  ) {
+    fatalError()
+  }
+
+  // expected-error @+1 {{cannot register derivative for yielding borrow accessor}}
+  @derivative(of: computedProperty2.yielding_borrow)
+  mutating func vjpPropertyYielding_Borrow(_ newValue: T) -> (
+    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  ) {
+    fatalError()
+  }
+
+  // expected-error @+1 {{cannot register derivative for yielding mutate accessor}}
+  @derivative(of: computedProperty2.yielding mutate)
+  mutating func vjpPropertyYieldingMutate(_ newValue: T) -> (
+    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  ) {
+    fatalError()
+  }
+
+  // expected-error @+1 {{cannot register derivative for yielding mutate accessor}}
+  @derivative(of: computedProperty2.yielding_mutate)
+  mutating func vjpPropertyYielding_Mutate(_ newValue: T) -> (
+    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  ) {
+    fatalError()
+  }
+
+  // expected-error @+1 {{cannot register derivative for borrow accessor}}
+  @derivative(of: computedProperty3.borrow)
+  mutating func vjpPropertyBorrow(_ newValue: T) -> (
+    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  ) {
+    fatalError()
+  }
+
+  // expected-error @+1 {{cannot register derivative for mutate accessor}}
+  @derivative(of: computedProperty3.mutate)
+  mutating func vjpPropertyMutate(_ newValue: T) -> (
     value: (), pullback: (inout TangentVector) -> T.TangentVector
   ) {
     fatalError()

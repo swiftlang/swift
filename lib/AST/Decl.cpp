@@ -409,7 +409,9 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(MacroExpansion, "pound literal");
   ENTRY(Using, "using");
   ENTRY(BorrowAccessor, "borrow accessor");
-  ENTRY(MutateAccessor, "Mutate accessor");
+  ENTRY(MutateAccessor, "mutate accessor");
+  ENTRY(YieldingBorrowAccessor, "yielding borrow accessor");
+  ENTRY(YieldingMutateAccessor, "yielding mutate accessor");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -7646,19 +7648,13 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
   case AccessorKind::MutableAddress:
     return article ? "a mutable addressor" : "mutable addressor";
   case AccessorKind::Read:
-    if (underscored)
-      return article ? "a '_read' accessor" : "'_read' accessor";
-    // Fall through to the non-underscored spelling.
-    LLVM_FALLTHROUGH;
+    return article ? "a '_read' accessor" : "'_read' accessor";
   case AccessorKind::Read2:
-    return article ? "a 'read' accessor" : "'read' accessor";
+    return article ? "a 'yielding borrow' accessor" : "'yielding borrow' accessor";
   case AccessorKind::Modify:
-    if (underscored)
-      return article ? "a '_modify' accessor" : "'_modify' accessor";
-    // Fall through to the non-underscored spelling.
-    LLVM_FALLTHROUGH;
+    return article ? "a '_modify' accessor" : "'_modify' accessor";
   case AccessorKind::Modify2:
-    return article ? "a 'modify' accessor" : "'modify' accessor";
+    return article ? "a 'yielding mutate' accessor" : "'yielding mutate' accessor";
   case AccessorKind::WillSet:
     return "'willSet'";
   case AccessorKind::DidSet:
