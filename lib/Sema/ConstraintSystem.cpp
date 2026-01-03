@@ -783,8 +783,12 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
       llvm_unreachable("Not implemented by CSGen");
       break;
     case ComponentKind::UnresolvedApply:
-    case ComponentKind::Apply:
-      return getConstraintLocator(anchor, *componentElt);
+    case ComponentKind::Apply: {
+      // The callee is the previous component
+      auto componentIndex = componentElt->getIndex();
+      assert(componentIndex > 0 && "Apply component at index 0?");
+      return getConstraintLocator(anchor, LocatorPathElt::KeyPathComponent(componentIndex-1));
+    }
     case ComponentKind::Invalid:
     case ComponentKind::OptionalForce:
     case ComponentKind::OptionalChain:
@@ -4225,14 +4229,25 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto *argLocator = getConstraintLocator(anchor, argPath);
 
   auto *argExpr = castToExpr(simplifyLocatorToAnchor(argLocator));
-
-  // If we were unable to simplify down to the argument expression, we don't
-  // know what this is.
-  if (!argExpr)
-    return std::nullopt;
-
   auto *argList = getArgumentList(argLocator);
-  if (!argList)
+
+  if (!argList) {
+    if (auto *kp = getAsExpr<KeyPathExpr>(anchor)) {
+      if (auto componentElt =
+              argLocator->findLast<LocatorPathElt::KeyPathComponent>()) {
+        auto &component = kp->getComponents()[componentElt->getIndex()];
+        argList = component.getArgs();
+
+        if (argList && !argExpr) {
+          argExpr = kp;
+        }
+      }
+    }
+  }
+
+  // If we were unable to simplify down to the argument expression or find the
+  // argument list, we don't know what this is.
+  if (!argExpr || !argList)
     return std::nullopt;
 
   std::optional<OverloadChoice> choice;
@@ -4246,24 +4261,27 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   } else {
     // If we didn't resolve an overload for the callee, we should be dealing
     // with a call of an arbitrary function expr.
-    auto *call = castToExpr<CallExpr>(anchor);
-    rawFnType = getType(call->getFn());
+    if (auto *call = getAsExpr<CallExpr>(anchor)) {
+      rawFnType = getType(call->getFn());
 
-    // If callee couldn't be resolved due to expression
-    // issues e.g. it's a reference to an invalid member
-    // let's just return here.
-    if (simplifyType(rawFnType)->is<ErrorType>())
-      return std::nullopt;
-
-    // A tuple construction is spelled in the AST as a function call, but
-    // is really more like a tuple conversion.
-    if (auto metaTy = simplifyType(rawFnType)->getAs<MetatypeType>()) {
-      if (metaTy->getInstanceType()->is<TupleType>())
+      // If callee couldn't be resolved due to expression
+      // issues e.g. it's a reference to an invalid member
+      // let's just return here.
+      if (simplifyType(rawFnType)->is<ErrorType>())
         return std::nullopt;
-    }
 
-    assert(!shouldHaveDirectCalleeOverload(call) &&
+      // A tuple construction is spelled in the AST as a function call, but
+      // is really more like a tuple conversion.
+      if (auto metaTy = simplifyType(rawFnType)->getAs<MetatypeType>()) {
+        if (metaTy->getInstanceType()->is<TupleType>())
+          return std::nullopt;
+      }
+
+      assert(!shouldHaveDirectCalleeOverload(call) &&
              "Should we have resolved a callee for this?");
+    } else {
+      return std::nullopt;
+    }
   }
 
   // Try to resolve the function type by loading lvalues and looking through
@@ -4311,7 +4329,6 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
 
   auto argIdx = applyArgElt->getArgIdx();
   auto paramIdx = applyArgElt->getParamIdx();
-
   return FunctionArgApplyInfo::get(argList, argExpr, argIdx,
                                    simplifyType(getType(argExpr)), paramIdx,
                                    fnInterfaceType, fnType, callee);
