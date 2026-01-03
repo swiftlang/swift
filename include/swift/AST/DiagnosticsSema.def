@@ -1422,7 +1422,7 @@ ERROR(do_catch_expr_must_be_syntactically_exhaustive,none,
       ())
 
 WARNING(empty_catch_block,NoUsage,
-        "empty catch block silences errors; use 'try?' or 'catch _' to explicitly ignore",
+        "empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning",
         ())
 
 ERROR(single_value_stmt_branch_empty,none,
