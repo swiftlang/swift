@@ -242,6 +242,10 @@ internal final class AndroidRemoteProcess: LinuxRemoteProcess {
     }
     _ = try ptrace.jump(to: sym)
   }
+
+  override var currentTasks: [(threadID: UInt64, currentTask: swift_addr_t)] {
+    fatalError("thread task pointer lookup is not supported on Android")
+  }
 }
 
 #endif
