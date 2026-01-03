@@ -130,6 +130,9 @@ extension IndexingIterator: IteratorProtocol, Sequence {
   }
 }
 
+extension IndexingIterator: BitwiseCopyable
+  where Elements: BitwiseCopyable, Elements.Index: BitwiseCopyable {}
+
 extension IndexingIterator: Sendable
   where Elements: Sendable, Elements.Index: Sendable { }
 
