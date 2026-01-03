@@ -869,6 +869,24 @@ let ts1 = MyTupleStruct {
 // CHECK: MyTupleStruct<(Int, String, Optional<String>), (Double, String)>(first: (Function), second: (3.14159, "blah"))
 print(ts1)
 
+// CHECK: testStoredProperties
+struct MyTupleStruct2 {
+  @ArrayBuilder<String> let first: () -> [String]
+  @ArrayBuilder<String> let second: [String]
+}
+
+print("testStoredProperties")
+let ts2 = MyTupleStruct2 {
+  "foo"
+  "bar"
+} second: {
+  "baaz"
+  "quux"
+}
+
+// CHECK: MyTupleStruct2(first: (Function), second: ["baaz", "quux"])
+print(ts2)
+
 // Make sure that `weakV` is `Test?` and not `Test??`
 func test_weak_optionality_stays_the_same() {
   class Test {
