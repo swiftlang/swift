@@ -5322,13 +5322,6 @@ std::string ASTMangler::mangleAttachedMacroExpansion(
   return finalize();
 }
 
-void ASTMangler::gatherExistentialRequirements(
-    SmallVectorImpl<Requirement> &reqs, ParameterizedProtocolType *PPT) const {
-  auto protoTy = PPT->getBaseType();
-  ASSERT(!getABIDecl(protoTy->getDecl()) && "need to figure out behavior");
-  PPT->getRequirements(protoTy->getDecl()->getSelfInterfaceType(), reqs);
-}
-
 /// Extracts a list of inverse requirements from a PCT serving as the constraint
 /// type of an existential.
 void ASTMangler::extractExistentialInverseRequirements(
@@ -5337,13 +5330,28 @@ void ASTMangler::extractExistentialInverseRequirements(
   if (!PCT->hasInverse())
     return;
 
-  auto &ctx = PCT->getASTContext();
-
   for (auto ip : PCT->getInverses()) {
-    auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+    auto *proto = Context.getProtocol(getKnownProtocolKind(ip));
     assert(proto);
     ASSERT(!getABIDecl(proto) && "can't use @abi on inverse protocols");
-    inverses.push_back({ctx.TheSelfType, proto, SourceLoc()});
+    inverses.push_back({Context.TheSelfType, proto, SourceLoc()});
+  }
+}
+
+void ASTMangler::gatherExistentialRequirements(
+    SmallVectorImpl<Requirement> &reqs,
+    SmallVectorImpl<InverseRequirement> &inverses,
+    Type base) const {
+  if (auto *paramTy = base->getAs<ParameterizedProtocolType>()) {
+    auto protoTy = paramTy->getBaseType();
+    ASSERT(!getABIDecl(protoTy->getDecl()) && "need to figure out behavior");
+    paramTy->getRequirements(protoTy->getDecl()->getSelfInterfaceType(), reqs);
+  } else if (auto *compositionTy = base->getAs<ProtocolCompositionType>()) {
+    for (auto memberTy : compositionTy->getMembers())
+      gatherExistentialRequirements(reqs, inverses, memberTy);
+
+    if (AllowInverses)
+      extractExistentialInverseRequirements(inverses, compositionTy);
   }
 }
 
@@ -5351,26 +5359,17 @@ void ASTMangler::appendConstrainedExistential(Type base, GenericSignature sig,
                                               const ValueDecl *forDecl) {
   auto layout = base->getExistentialLayout();
   appendExistentialLayout(layout, sig, forDecl);
-  SmallVector<Requirement, 4> requirements;
-  SmallVector<InverseRequirement, NumInvertibleProtocols> inverses;
+
   assert(!base->is<ProtocolType>() &&
          "plain protocol type constraint has no generalization structure");
-  if (auto *PCT = base->getAs<ProtocolCompositionType>()) {
-    for (auto memberTy : PCT->getMembers()) {
-      if (auto *PPT = memberTy->getAs<ParameterizedProtocolType>())
-        gatherExistentialRequirements(requirements, PPT);
-    }
 
-    if (AllowInverses)
-      extractExistentialInverseRequirements(inverses, PCT);
+  SmallVector<Requirement, 4> requirements;
+  SmallVector<InverseRequirement, NumInvertibleProtocols> inverses;
+  gatherExistentialRequirements(requirements, inverses, base);
 
-  } else {
-    auto *PPT = base->castTo<ParameterizedProtocolType>();
-    gatherExistentialRequirements(requirements, PPT);
-  }
+  assert(requirements.size() + inverses.size() > 0 &&
+         "Unconstrained existential?");
 
-  assert(requirements.size() + inverses.size() > 0
-          && "Unconstrained existential?");
   // Sort the requirements to canonicalize their order.
   llvm::array_pod_sort(
       requirements.begin(), requirements.end(),
