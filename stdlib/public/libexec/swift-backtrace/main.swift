@@ -1498,7 +1498,7 @@ Generate a backtrace for the parent process.
     writeln("")
     writeln("\(theme.register("eflags")) \(hexFlags)  \(status)")
     writeln("")
-    writeln("\(theme.register("es")): \(es) \(theme.register("cs")): \(cs) \(theme.register("ss")): \(ss) \(theme.register("ds")): \(ds) \(theme.register("fs")): \(fs)) \(theme.register("gs")): \(gs)")
+    writeln("\(theme.register("es")): \(es) \(theme.register("cs")): \(cs) \(theme.register("ss")): \(ss) \(theme.register("ds")): \(ds) \(theme.register("fs")): \(fs) \(theme.register("gs")): \(gs)")
   }
 
   static func showRegisters(_ context: ARM64Context) {
