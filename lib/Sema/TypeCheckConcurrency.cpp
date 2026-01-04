@@ -6397,6 +6397,20 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       }
     }
 
+    // When `NonisolatedNonsendingByDefault` feature is enabled and the value is
+    // asynchronous `nonisolated` always means `nonisolated(nonsending)`.
+    if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
+        inferred.isNonisolated() && value->isAsync()) {
+      // Either current module or async variant of an ObjC API.
+      if (value->getModuleContext() == ctx.MainModule ||
+          (value->hasClangNode() &&
+           !isa<ProtocolDecl>(value->getDeclContext()))) {
+        inferred =
+            ActorIsolation::forCallerIsolationInheriting().withPreconcurrency(
+                inferred.preconcurrency());
+      }
+    }
+
     // Add an implicit attribute to capture the actor isolation that was
     // inferred, so that (e.g.) it will be printed and serialized.
     switch (inferred) {
@@ -6608,13 +6622,6 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       if (shouldSelfIsolationOverrideDefault(
               ctx, value->getDeclContext(), selfTypeIsolation.isolation)) {
         auto isolation = selfTypeIsolation.isolation;
-
-        if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
-            value->isAsync() && value->getModuleContext() == ctx.MainModule &&
-            isolation.isNonisolated()) {
-          isolation = ActorIsolation::forCallerIsolationInheriting();
-        }
-
         return {inferredIsolation(isolation, onlyGlobal),
                 selfTypeIsolation.source};
       }
