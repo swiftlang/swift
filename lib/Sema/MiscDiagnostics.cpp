@@ -6525,9 +6525,12 @@ static void checkEmptyCatchBlock(const DoCatchStmt *doCatchStmt, ASTContext &ctx
   if (!catchStmt->hasCaseBodyVariables())
     return;
 
-  auto *body = dyn_cast_or_null<BraceStmt>(catchStmt->getBody());
-  if (body && body->empty()) {
-    ctx.Diags.diagnose(catchStmt->getLoc(), diag::empty_catch_block);
+  // Use scoped-if to keep 'body' local to the check.
+  // getBody() returns BraceStmt*, so no cast is needed.
+  if (auto *body = catchStmt->getBody()) {
+    if (body->empty()) {
+      ctx.Diags.diagnose(catchStmt->getLoc(), diag::empty_catch_block);
+    }
   }
 }
 
