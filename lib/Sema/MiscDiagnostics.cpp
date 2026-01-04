@@ -6506,6 +6506,31 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseCxxFunctionCalls(E, DC);
 }
 
+
+/// Diagnose an empty catch block that silently ignores errors.
+///
+/// This specific diagnostic is limited to 'do-catch' statements with a single
+/// catch clause. If there are multiple catches, an empty catch usually implies
+/// a fallback that intentionally ignores specific errors while handling others.
+static void checkEmptyCatchBlock(const DoCatchStmt *doCatchStmt, ASTContext &ctx) {
+  // We only diagnose if there is a single catch clause.
+  if (doCatchStmt->getCatches().size() != 1)
+    return;
+
+  auto *catchStmt = doCatchStmt->getCatches().front();
+
+  // If the catch block explicitly matches without binding any variables
+  // (e.g. 'catch _'), we treat it as an intentional ignore and do not warn.
+  // A standard 'catch' implicitly binds 'let error', so it has variables.
+  if (!catchStmt->hasCaseBodyVariables())
+    return;
+
+  auto *body = dyn_cast_or_null<BraceStmt>(catchStmt->getBody());
+  if (body && body->empty()) {
+    ctx.Diags.diagnose(catchStmt->getLoc(), diag::empty_catch_block);
+  }
+}
+
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
   auto &ctx = DC->getASTContext();
 
@@ -6523,28 +6548,10 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
     diagnoseStmtAvailability(S, const_cast<DeclContext*>(DC));
 
   if (auto *doCatchStmt = dyn_cast<DoCatchStmt>(S)) {
-    for (auto *catchStmt : doCatchStmt->getCatches()) {
-      auto *body = dyn_cast_or_null<BraceStmt>(catchStmt->getBody());
-      if (!body) continue;
-
-      auto *pattern = catchStmt->getCaseLabelItems().front().getPattern();
-      if (isa<AnyPattern>(pattern->getSemanticsProvidingPattern())) continue;
-
-      Identifier boundErrorName;
-      catchStmt->getCaseLabelItems().front().getPattern()->forEachVariable([&](VarDecl *V) {
-        boundErrorName = V->getName();
-      });
-
-      if (boundErrorName.empty()) {
-        boundErrorName = ctx.getIdentifier("error");
-      }
-
-      if (body->empty() && doCatchStmt->getCatches().size() == 1) {
-        auto diag = ctx.Diags.diagnose(catchStmt->getLoc(), diag::empty_catch_block);
-      }
-    }
+    checkEmptyCatchBlock(doCatchStmt, ctx);
   }
 }
+
 
 //===----------------------------------------------------------------------===//
 // MARK: Utility functions

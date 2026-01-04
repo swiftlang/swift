@@ -8,7 +8,7 @@ func testStrictCatch() {
   // 1. Standard Empty Catch -> WARN
   do {
     try something()
-  } catch { // expected-warning {{empty catch block silences errors; use 'try?' or 'catch _' to explicitly ignore}}
+  } catch { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
   }
 
   // 2. Explicit Ignore -> PASS
@@ -36,7 +36,7 @@ func testStrictCatch() {
   // Even if you bind 'let e', if the body is empty, it's effectively an ignored error.
   do {
     try something()
-  } catch let e { // expected-warning {{empty catch block silences errors; use 'try?' or 'catch _' to explicitly ignore}}
+  } catch let e { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
     // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing i}}
   }
 }
