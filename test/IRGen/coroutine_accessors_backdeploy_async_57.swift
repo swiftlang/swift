@@ -91,10 +91,10 @@ public struct S {
 public var _i: Int = 0
 
 public var i: Int {
-  read {
+  yielding borrow {
     yield _i
   }
-  modify {
+  yielding mutate {
     yield &_i
   }
 }

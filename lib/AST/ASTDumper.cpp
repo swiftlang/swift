@@ -339,8 +339,8 @@ static StringRef getDumpString(ReadImplKind kind) {
     return "addressor";
   case ReadImplKind::Read:
     return "read_coroutine";
-  case ReadImplKind::Read2:
-    return "read2_coroutine";
+  case ReadImplKind::YieldingBorrow:
+    return "yielding_borrow";
   case ReadImplKind::Borrow:
     return "borrow";
   }
@@ -363,8 +363,8 @@ static StringRef getDumpString(WriteImplKind kind) {
     return "mutable_addressor";
   case WriteImplKind::Modify:
     return "modify_coroutine";
-  case WriteImplKind::Modify2:
-    return "modify2_coroutine";
+  case WriteImplKind::YieldingMutate:
+    return "yielding_mutate";
   case WriteImplKind::Mutate:
     return "mutate";
   }
@@ -383,8 +383,8 @@ static StringRef getDumpString(ReadWriteImplKind kind) {
     return "materialize_to_temporary";
   case ReadWriteImplKind::Modify:
     return "modify_coroutine";
-  case ReadWriteImplKind::Modify2:
-    return "modify2_coroutine";
+  case ReadWriteImplKind::YieldingMutate:
+    return "yielding_mutate";
   case ReadWriteImplKind::StoredWithDidSet:
     return "stored_with_didset";
   case ReadWriteImplKind::InheritedWithDidSet:

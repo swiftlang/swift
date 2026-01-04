@@ -333,7 +333,7 @@ public:
   bool MergeableTraps = false;
 
   /// Whether the @yield_once_2 convention is used by accessors added with the
-  /// CoroutineAccessors feature (i.e. read2/modify2).
+  /// CoroutineAccessors feature (i.e. yielding borrow/mutate).
   bool CoroutineAccessorsUseYieldOnce2 = false;
 
   SILOptions() {}

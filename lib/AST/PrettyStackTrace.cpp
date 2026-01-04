@@ -94,11 +94,11 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
         case AccessorKind::Init:
           out << "init";
           break;
-        case AccessorKind::Modify2:
-          out << "modify2";
+        case AccessorKind::YieldingMutate:
+          out << "yielding_mutate";
           break;
-        case AccessorKind::Read2:
-          out << "read2";
+        case AccessorKind::YieldingBorrow:
+          out << "yielding_borrow";
           break;
         case AccessorKind::Borrow:
           out << "borrow";

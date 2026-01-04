@@ -268,7 +268,7 @@ func testNestedRead1(_ s: GenStruct<GenClass<GenStruct<SimpleClass>>>) -> Int {
   return s[keyPath: kp]
 }
 
-// CHECK-LABEL: sil {{.*}}testNestedRead2
+// CHECK-LABEL: sil {{.*}}testNestedYieldingBorrow
 // CHECK: [[R:%[0-9]+]] = struct_extract %1
 // CHECK: [[E1:%[0-9]+]] = ref_element_addr [[R]]
 // CHECK: [[A:%[0-9]+]] = begin_access [read] [dynamic] [no_nested_conflict] [[E1]]
@@ -278,7 +278,7 @@ func testNestedRead1(_ s: GenStruct<GenClass<GenStruct<SimpleClass>>>) -> Int {
 // CHECK: return
 @inline(never)
 @_semantics("optimize.sil.specialize.generic.never")
-func testNestedRead2<T>(_ s: GenStruct<GenClass<GenStruct<T>>>) -> T {
+func testNestedYieldingBorrow<T>(_ s: GenStruct<GenClass<GenStruct<T>>>) -> T {
   let kp = \GenStruct<GenClass<GenStruct<T>>>.st.ct.st
   return s[keyPath: kp]
 }
@@ -652,8 +652,8 @@ func testit() {
   // CHECK-OUTPUT: NestedRead1: 31
   print("NestedRead1: \(testNestedRead1(GenStruct(GenClass(GenStruct(SimpleClass(31))))))")
 
-  // CHECK-OUTPUT: NestedRead2: 32
-  print("NestedRead2: \(testNestedRead2(GenStruct(GenClass(GenStruct(SimpleClass(32))))).i)")
+  // CHECK-OUTPUT: NestedYieldingBorrow: 32
+  print("NestedYieldingBorrow: \(testNestedYieldingBorrow(GenStruct(GenClass(GenStruct(SimpleClass(32))))).i)")
 
   // CHECK-OUTPUT: NestedWrite: 33
   let c2 = GenClass(GenStruct(SimpleClass(0)))

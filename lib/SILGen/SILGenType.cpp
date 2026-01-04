@@ -1162,9 +1162,9 @@ namespace {
 std::optional<AccessorKind>
 originalAccessorKindForReplacementKind(AccessorKind kind) {
   switch (kind) {
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
     return {AccessorKind::Read};
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return {AccessorKind::Modify};
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
@@ -1213,7 +1213,8 @@ public:
     if (!accessor) {
       return std::nullopt;
     }
-    // Specifically, read2 can replace _read and modify2 can replace _modify.
+    // Specifically, `yielding borrow` can replace _read and
+    // `yielding mutate` can replace _modify.
     auto originalKind =
         originalAccessorKindForReplacementKind(accessor->getAccessorKind());
     if (!originalKind) {

@@ -268,11 +268,11 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
       return {Flags::Kind::Setter, false};
     case AccessorKind::Read:
       return {Flags::Kind::ReadCoroutine, false};
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
       return {Flags::Kind::ReadCoroutine, true};
     case AccessorKind::Modify:
       return {Flags::Kind::ModifyCoroutine, false};
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
       return {Flags::Kind::ModifyCoroutine, true};
     case AccessorKind::DistributedGet:
       return {Flags::Kind::Getter, false};

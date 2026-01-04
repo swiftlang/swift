@@ -434,7 +434,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::MethodDescriptor:
   case Node::Kind::MethodLookupFunction:
   case Node::Kind::ModifyAccessor:
-  case Node::Kind::Modify2Accessor:
+  case Node::Kind::YieldingMutateAccessor:
   case Node::Kind::NativeOwningAddressor:
   case Node::Kind::NativeOwningMutableAddressor:
   case Node::Kind::NativePinningAddressor:
@@ -485,7 +485,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::ReabstractionThunkHelperWithSelf:
   case Node::Kind::ReabstractionThunkHelperWithGlobalActor:
   case Node::Kind::ReadAccessor:
-  case Node::Kind::Read2Accessor:
+  case Node::Kind::YieldingBorrowAccessor:
   case Node::Kind::RelatedEntityDeclName:
   case Node::Kind::RepresentationChanged:
   case Node::Kind::RetroactiveConformance:
@@ -2790,15 +2790,15 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::ReadAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "read");
-  case Node::Kind::Read2Accessor:
+  case Node::Kind::YieldingBorrowAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
-                                "read2");
+                                "yielding_borrow");
   case Node::Kind::ModifyAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "modify");
-  case Node::Kind::Modify2Accessor:
+  case Node::Kind::YieldingMutateAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
-                                "modify2");
+                                "yielding_mutate");
   case Node::Kind::InitAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "init");

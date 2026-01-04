@@ -2671,12 +2671,12 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     case ReadImplKind::Read:
       AddAccessorToPrint(AccessorKind::Read);
       break;
-    case ReadImplKind::Read2:
+    case ReadImplKind::YieldingBorrow:
       if (ASD->getAccessor(AccessorKind::Read) &&
           Options.SuppressCoroutineAccessors) {
         AddAccessorToPrint(AccessorKind::Read);
       }
-      AddAccessorToPrint(AccessorKind::Read2);
+      AddAccessorToPrint(AccessorKind::YieldingBorrow);
       break;
     case ReadImplKind::Borrow:
       AddAccessorToPrint(AccessorKind::Borrow);
@@ -2696,7 +2696,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       AddAccessorToPrint(AccessorKind::Set);
       if (!shouldHideModifyAccessor()) {
         AddAccessorToPrint(AccessorKind::Modify);
-        AddAccessorToPrint(AccessorKind::Modify2);
+        AddAccessorToPrint(AccessorKind::YieldingMutate);
       }
       break;
     case WriteImplKind::MutableAddress:
@@ -2707,12 +2707,12 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     case WriteImplKind::Modify:
       AddAccessorToPrint(AccessorKind::Modify);
       break;
-    case WriteImplKind::Modify2:
+    case WriteImplKind::YieldingMutate:
       if (ASD->getAccessor(AccessorKind::Modify) &&
           Options.SuppressCoroutineAccessors) {
         AddAccessorToPrint(AccessorKind::Modify);
       }
-      AddAccessorToPrint(AccessorKind::Modify2);
+      AddAccessorToPrint(AccessorKind::YieldingMutate);
       break;
     case WriteImplKind::Mutate:
       AddAccessorToPrint(AccessorKind::Mutate);
@@ -4269,9 +4269,9 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::DistributedGet:
   case AccessorKind::Address:
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
   case AccessorKind::Borrow:

@@ -31,5 +31,5 @@
 public protocol MutatableAssociatedField {
   associatedtype Assoc
 
-  var field: Assoc { read set }
+  var field: Assoc { yielding borrow set }
 }

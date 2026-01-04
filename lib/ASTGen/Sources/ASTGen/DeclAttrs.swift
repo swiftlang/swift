@@ -683,7 +683,10 @@ extension ASTGenVisitor {
 
     let accessorKind: swift.AccessorKind?
     if let accessorToken = args.accessorSpecifier {
-      accessorKind = self.generate(accessorSpecifier: accessorToken)
+      accessorKind = self.generate(
+        accessorSpecifier: accessorToken,
+        modifiers: []
+      )
     } else {
       accessorKind = nil
     }

@@ -1177,9 +1177,9 @@ protected:
   void inferMutatingAccessor(AccessorDecl *accessor) {
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
       // '_read' and '_modify' are inferred like regular methods. The yielded
       // value depends on the single 'self' parameter. Additionally, '_modify'
       // infers 'self' as an 'inout' parameter.
@@ -1238,9 +1238,9 @@ protected:
     std::optional<AccessorKind> wrappedAccessorKind = std::nullopt;
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
       // read/modify are syntesized as calls to the getter.
       wrappedAccessorKind = AccessorKind::Get;
       break;
