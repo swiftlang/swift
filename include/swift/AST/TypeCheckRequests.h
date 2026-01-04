@@ -4163,8 +4163,8 @@ enum class CustomAttrTypeKind {
   /// have any particularly interesting semantics.
   GlobalActor,
   
-  /// Result builder types can have their generics parameters inferred
-  /// from the attached declaration.
+  /// Result builder types can have their generics arguments
+  /// inferred from the attached declaration.
   ResultBuilder,
 };
 
