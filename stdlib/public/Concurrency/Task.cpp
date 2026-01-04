@@ -133,12 +133,10 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
                            waitingTask, this);
       _swift_tsan_acquire(static_cast<Job *>(this));
       if (suspendedWaiter) {
-        // This will always return zero because we were just
+        // This is safe to call because we were just
         // running this Task so its BasePriority (which is
         // immutable) should've already been set on the thread.
-        [[maybe_unused]]
-        uint32_t opaque = waitingTask->flagAsRunning();
-        assert(opaque == 0);
+        waitingTask->flagAsRunningImmediately();
       }
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
@@ -353,10 +351,25 @@ void AsyncTask::setTaskId() {
   _private().Id = (Fetched >> 32) & 0xffffffff;
 }
 
-uint64_t AsyncTask::getTaskId() {
+uint64_t AsyncTask::getTaskId() const {
   // Reconstitute a full 64-bit task ID from the 32-bit job ID and the upper
   // 32 bits held in _private().
   return ((uint64_t)_private().Id << 32) | (uint64_t)Id;
+}
+
+/// Gets the 32-bit Job ID from the job or the 64-bit
+/// Task ID if this is an AsyncTask or AsyncTaskStealer
+uint64_t Job::getJobTaskId() const {
+  if (auto task = dyn_cast<AsyncTask>(this)) {
+    // TaskID is actually:
+    //   32bits of Job's Id
+    // + 32bits stored in the AsyncTask
+    return task->getTaskId();
+  } else if (auto stealer = dyn_cast<AsyncTaskStealer>(this)) {
+    return stealer->Task->getTaskId();
+  } else {
+    return this->getJobId();
+  }
 }
 
 SWIFT_CC(swift)
@@ -1666,11 +1679,9 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
   // we try to tail-call.
   } while (false);
 #else
-  // This will always return zero because we were just running this Task so its
+  // This is safe to call because we were just running this Task so its
   // BasePriority (which is immutable) should've already been set on the thread.
-  [[maybe_unused]]
-  uint32_t opaque = task->flagAsRunning();
-  assert(opaque == 0);
+  task->flagAsRunningImmediately();
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 
   if (context->isExecutorSwitchForced())
