@@ -571,6 +571,20 @@ extension __CocoaDictionary {
     }
     return result
   }
+
+  @inlinable
+  internal func mapValues<Key: Hashable, Value, T>(
+    _ transform: (Key, Value) throws -> T
+  ) rethrows -> _NativeDictionary<Key, T> {
+    var result = _NativeDictionary<Key, T>(capacity: self.count)
+    for (cocoaKey, cocoaValue) in self {
+      let key = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
+      let old = _forceBridgeFromObjectiveC(cocoaValue, Value.self)
+      let new = try transform(key, old)
+      try result.insertNew(key: key, value: new)
+    }
+    return result
+  }
 }
 
 extension __CocoaDictionary {
