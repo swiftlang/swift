@@ -236,7 +236,7 @@ struct ImageSource {
       guard case let .allocated(count) = kind else {
         fatalError("Cannot append to immutable image source storage")
       }
-      guard mutableBytes.count - count <= bytes else {
+      guard mutableBytes.count - count >= bytes else {
         fatalError("Buffer overrun detected")
       }
       kind = .allocated(count + bytes)
