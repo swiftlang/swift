@@ -335,21 +335,32 @@ extension _SmallString {
 
   @usableFromInline // @testable
   internal init?(_ base: _SmallString, appending other: _SmallString) {
-    let totalCount = base.count + other.count
+    let otherCount = other.count
+    let baseCount = base.count
+
+    if otherCount == 0 {
+      self = base
+      return
+    } else if baseCount == 0 {
+      self = other
+      return
+    }
+
+    let totalCount = baseCount + otherCount
     guard totalCount <= _SmallString.capacity else { return nil }
 
-    // TODO(SIMD): The below can be replaced with just be a couple vector ops
-
-    var result = base
-    var writeIdx = base.count
-    for readIdx in 0..<other.count {
-      result[writeIdx] = other[readIdx]
-      writeIdx &+= 1
+    func convert(_ s: _SmallString) -> _UInt128 {
+      let bits = s.zeroTerminatedRawCodeUnits
+      return .init(_low: bits.0.littleEndian, _high: bits.1.littleEndian)
     }
-    _internalInvariant(writeIdx == totalCount)
 
-    let (leading, trailing) = result.zeroTerminatedRawCodeUnits
-    self.init(leading: leading, trailing: trailing, count: totalCount)
+    let resultInt = (convert(other) << (8 &* base.count)) &+ convert(base)
+
+    self.init(
+      leading: resultInt._low.littleEndian,
+      trailing: resultInt._high.littleEndian,
+      count: totalCount
+    )
   }
 }
 
