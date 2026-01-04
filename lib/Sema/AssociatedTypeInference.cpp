@@ -241,7 +241,8 @@ static bool isAsyncIteratorOrSequenceFailure(AssociatedTypeDecl *assocType) {
 static void recordTypeWitness(NormalProtocolConformance *conformance,
                               AssociatedTypeDecl *assocType,
                               Type type,
-                              TypeDecl *typeDecl) {
+                              TypeDecl *typeDecl,
+                              bool synthesizeTypealias=false) {
   assert(!containsConcreteDependentMemberType(type));
 
   // If we already recoded this type witness, there's nothing to do.
@@ -260,7 +261,7 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
   auto &ctx = dc->getASTContext();
 
   // If there was no type declaration, synthesize one.
-  if (typeDecl == nullptr) {
+  if (typeDecl == nullptr && synthesizeTypealias) {
     Identifier name;
     bool needsImplementsAttr;
     if (isAsyncIteratorOrSequenceFailure(assocType)) {
