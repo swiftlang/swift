@@ -558,6 +558,20 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       (void)eltEnd;
       value = std::move(*elti);
       ++elti;
+
+      // If the stored property has an attached result builder and its
+      // type is not a function type, the argument is a noescape closure
+      // that needs to be called.
+      if (field->getResultBuilderType()) {
+        if (!field->getValueInterfaceType()
+                 ->lookThroughAllOptionalTypes()
+                 ->is<AnyFunctionType>()) {
+          auto resultTy = cast<FunctionType>(value.getType()).getResult();
+          value = SGF.emitMonomorphicApply(
+              Loc, std::move(value).getAsSingleValue(SGF, Loc), {}, resultTy,
+              resultTy, ApplyOptions(), std::nullopt, std::nullopt);
+        }
+      }
     } else {
       // Otherwise, use its initializer.
       // TODO: This doesn't correctly take into account destructuring
