@@ -180,7 +180,7 @@ case mm4 = 33
 case mm5 = 34
 case mm6 = 35
 case mm7 = 36
-  // 36-38 are reserved
+  // 37-38 are reserved
 case mxcsr = 39
 case es = 40
 case cs = 41
@@ -519,7 +519,7 @@ case r14_svc = 165
 
   // 166-191 are reserved
 
-  // Intel wqireless MMX control register
+  // Intel wireless MMX control register
 case wc0 = 192
 case wc1 = 193
 case wc2 = 194
