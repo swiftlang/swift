@@ -1582,8 +1582,8 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
     // These are synonyms or parts of compound accessor
     // labels, so not directly recognized by `isAccessorLabel()`
     if (nextToken.getText() == "yielding"
-	|| nextToken.getText() == "yielding_mutate"
-	|| nextToken.getText() == "yielding_borrow")
+        || nextToken.getText() == "yielding_mutate"
+        || nextToken.getText() == "yielding_borrow")
       return false;
   }
 
@@ -1652,29 +1652,29 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
       P.consumeIf(tok::period);
       P.consumeIf(tok::identifier);
       if (P.Tok.getText() == "borrow") {
-	original.AccessorKind = AccessorKind::YieldingBorrow;
-	P.consumeIf(tok::identifier);
+        original.AccessorKind = AccessorKind::YieldingBorrow;
+        P.consumeIf(tok::identifier);
       } else if (P.Tok.getText() == "mutate") {
-	original.AccessorKind = AccessorKind::YieldingMutate;
-	P.consumeIf(tok::identifier);
+        original.AccessorKind = AccessorKind::YieldingMutate;
+        P.consumeIf(tok::identifier);
       } else {
-	P.restoreParserPosition(pos);
+        P.restoreParserPosition(pos);
       }
     } else {
       // Support single-word "yielding_borrow" and "yielding_mutate"
       // as well as the other single-word accessor forms
       std::optional<AccessorKind> kind;
       if (tokText == "yielding_borrow" && coroutineAccessorsAllowed) {
-	kind = AccessorKind::YieldingBorrow;
+        kind = AccessorKind::YieldingBorrow;
       } else if (tokText == "yielding_mutate" && coroutineAccessorsAllowed) {
-	kind = AccessorKind::YieldingMutate;
+        kind = AccessorKind::YieldingMutate;
       } else {
-	kind = isAccessorLabel(nextToken);
+        kind = isAccessorLabel(nextToken);
       }
       if (kind.has_value()) {
-	original.AccessorKind = kind;
-	P.consumeIf(tok::period);
-	P.consumeIf(tok::identifier);
+        original.AccessorKind = kind;
+        P.consumeIf(tok::period);
+        P.consumeIf(tok::identifier);
       }
     }
   }
