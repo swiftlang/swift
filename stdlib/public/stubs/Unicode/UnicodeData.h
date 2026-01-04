@@ -41,4 +41,12 @@ __swift_intptr_t _swift_stdlib_getScalarBitArrayIdx(__swift_uint32_t scalar,
 } // extern "C"
 #endif
 
+#ifdef __cplusplus
+namespace swift {
+  /// Redeclared from the runtime headers, which we do not want to include here.
+  SWIFT_NORETURN
+  void swift_abortDisabledUnicodeSupport();
+}
+#endif
+
 #endif // SWIFT_STDLIB_SHIMS_UNICODEDATA_H   
