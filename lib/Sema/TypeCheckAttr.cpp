@@ -6122,11 +6122,11 @@ static DescriptiveDeclKind getAccessorDescriptiveDeclKind(AccessorKind kind) {
     return DescriptiveDeclKind::Setter;
   case AccessorKind::Read:
     return DescriptiveDeclKind::ReadAccessor;
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
     return DescriptiveDeclKind::YieldingBorrowAccessor;
   case AccessorKind::Modify:
     return DescriptiveDeclKind::ModifyAccessor;
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return DescriptiveDeclKind::YieldingMutateAccessor;
   case AccessorKind::WillSet:
     return DescriptiveDeclKind::WillSet;

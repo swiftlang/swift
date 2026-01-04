@@ -79,7 +79,7 @@ func use(_ o : borrowing View) {}
 
 // Extend access scopes across chained coroutines.
 //
-// CHECK-LABEL: sil hidden @$s9coroutine20testDoubleNestedRead2ncyAA11NCContainerVn_tF : $@convention(thin) (@owned NCContainer) -> () {
+// CHECK-LABEL: sil hidden @$s9coroutine20testDoubleNestedYieldingBorrowncyAA11NCContainerVn_tF : $@convention(thin) (@owned NCContainer) -> () {
 // CHECK: bb0(%0 : $NCContainer):
 // CHECK:   [[NC:%.*]] = alloc_stack [lexical] [var_decl] $NCContainer, var, name "nc", type $NCContainer
 // CHECK:   store %0 to [[NC]]
@@ -103,7 +103,7 @@ func use(_ o : borrowing View) {}
 // CHECK:   end_apply [[TOKEN1]] as $()
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   destroy_addr [[NC]]
-// CHECK-LABEL: } // end sil function '$s9coroutine20testDoubleNestedRead2ncyAA11NCContainerVn_tF'
+// CHECK-LABEL: } // end sil function '$s9coroutine20testDoubleNestedYieldingBorrowncyAA11NCContainerVn_tF'
 func testDoubleNestedRead(nc: consuming NCContainer) {
   let wrapper = nc.wrapper
   let view = wrapper.view

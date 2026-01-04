@@ -393,10 +393,10 @@ void SILDeclRef::print(raw_ostream &OS) const {
     case AccessorKind::Init:
       OS << "!init";
       break;
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
       OS << "!read2";
       break;
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
       OS << "!modify2";
       break;
     case AccessorKind::Borrow:

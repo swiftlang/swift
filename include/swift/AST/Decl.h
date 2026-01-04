@@ -6036,8 +6036,8 @@ private:
     unsigned RequiresOpaqueAccessors : 1;
     unsigned RequiresOpaqueModifyCoroutineComputed : 1;
     unsigned RequiresOpaqueModifyCoroutine : 1;
-    unsigned RequiresOpaqueModify2CoroutineComputed : 1;
-    unsigned RequiresOpaqueModify2Coroutine : 1;
+    unsigned RequiresOpaqueYieldingMutateCoroutineComputed : 1;
+    unsigned RequiresOpaqueYieldingMutateCoroutine : 1;
   } LazySemanticInfo = { };
 
   /// The implementation info for the accessors.
@@ -6312,7 +6312,7 @@ public:
   bool requiresOpaqueReadCoroutine() const;
 
   /// Does this storage require a 'read' accessor in its opaque-accessors set?
-  bool requiresOpaqueRead2Coroutine() const;
+  bool requiresOpaqueYieldingBorrowCoroutine() const;
 
   /// Does this storage require a 'set' accessor in its opaque-accessors set?
   bool requiresOpaqueSetter() const;
@@ -6323,7 +6323,7 @@ public:
 
   /// Does this storage require a 'modify' accessor in its opaque-accessors
   /// set?
-  bool requiresOpaqueModify2Coroutine() const;
+  bool requiresOpaqueYieldingMutateCoroutine() const;
 
   /// Given that CoroutineAccessors is enabled, is _read/_modify required for
   /// ABI stability?
@@ -8837,8 +8837,9 @@ public:
   bool doesAccessorHaveBody() const;
 
   /// Whether this accessor is a protocol requirement for which a default
-  /// implementation must be provided for back-deployment.  For example, read2
-  /// and modify2 requirements with early enough availability.
+  /// implementation must be provided for back-deployment.  For example,
+  /// yielding borrow and yielding mutate requirements with early enough
+  /// availability.
   bool isRequirementWithSynthesizedDefaultImplementation() const;
 
   static bool classof(const Decl *D) {

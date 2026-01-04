@@ -146,9 +146,9 @@ static StringRef getCodeForAccessorKind(AccessorKind kind) {
     return "au";
   case AccessorKind::Init:
     return "i";
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return "x";
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
     return "y";
   case AccessorKind::Borrow:
     return "b";

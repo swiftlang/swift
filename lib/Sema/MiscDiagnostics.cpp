@@ -4963,9 +4963,9 @@ public:
           case AccessorKind::Address:
           case AccessorKind::MutableAddress:
           case AccessorKind::Read:
-          case AccessorKind::Read2:
+          case AccessorKind::YieldingBorrow:
           case AccessorKind::Modify:
-          case AccessorKind::Modify2:
+          case AccessorKind::YieldingMutate:
           case AccessorKind::Init:
           case AccessorKind::Borrow:
           case AccessorKind::Mutate:

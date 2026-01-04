@@ -336,7 +336,7 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
   case AccessorKind::Get: {
     auto readImpl = storage->getReadImpl();
     if (!isObjC &&
-        (readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2 ||
+        (readImpl == ReadImplKind::Read || readImpl == ReadImplKind::YieldingBorrow ||
          readImpl == ReadImplKind::Address))
       return false;
     return storage->isDynamic();
@@ -347,7 +347,7 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
   case AccessorKind::Set: {
     auto writeImpl = storage->getWriteImpl();
     if (!isObjC && (writeImpl == WriteImplKind::Modify ||
-                    writeImpl == WriteImplKind::Modify2 ||
+                    writeImpl == WriteImplKind::YieldingMutate ||
                     writeImpl == WriteImplKind::MutableAddress ||
                     writeImpl == WriteImplKind::StoredWithObservers))
       return false;
@@ -357,8 +357,8 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
     if (!isObjC && storage->getReadImpl() == ReadImplKind::Read)
       return storage->isDynamic();
     return false;
-  case AccessorKind::Read2:
-    if (!isObjC && storage->getReadImpl() == ReadImplKind::Read2)
+  case AccessorKind::YieldingBorrow:
+    if (!isObjC && storage->getReadImpl() == ReadImplKind::YieldingBorrow)
       return storage->isDynamic();
     return false;
   case AccessorKind::Modify: {
@@ -366,8 +366,8 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
       return storage->isDynamic();
     return false;
   }
-  case AccessorKind::Modify2: {
-    if (!isObjC && storage->getWriteImpl() == WriteImplKind::Modify2)
+  case AccessorKind::YieldingMutate: {
+    if (!isObjC && storage->getWriteImpl() == WriteImplKind::YieldingMutate)
       return storage->isDynamic();
     return false;
   }
@@ -1649,7 +1649,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Borrow:
       break;
 
@@ -1657,7 +1657,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::MutableAddress:
     case AccessorKind::Set:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
     case AccessorKind::Mutate:
       if (AD->isInstanceMember() && AD->getDeclContext()->hasValueSemantics())
         return SelfAccessKind::Mutating;
@@ -2070,9 +2070,9 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     // Coroutine accessors don't mention the value type directly.
     // If we add yield types to the function type, we'll need to update this.
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
       return TupleType::getEmpty(ctx);
     }
   }

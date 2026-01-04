@@ -50,8 +50,8 @@ enum class OpaqueReadOwnership : uint8_t {
 
 inline bool requiresFeatureCoroutineAccessors(AccessorKind kind) {
   switch (kind) {
-  case AccessorKind::Read2:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingBorrow:
+  case AccessorKind::YieldingMutate:
     return true;
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
@@ -78,9 +78,9 @@ inline bool requiresFeatureBorrowAndMutateAccessors(AccessorKind kind) {
   case AccessorKind::DistributedGet:
   case AccessorKind::Set:
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Address:
@@ -93,9 +93,9 @@ inline bool requiresFeatureBorrowAndMutateAccessors(AccessorKind kind) {
 inline bool isYieldingAccessor(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return true;
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
@@ -114,13 +114,13 @@ inline bool isYieldingAccessor(AccessorKind kind) {
 inline bool isYieldingImmutableAccessor(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
     return true;
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Set:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Address:
@@ -135,13 +135,13 @@ inline bool isYieldingImmutableAccessor(AccessorKind kind) {
 inline bool isYieldingMutableAccessor(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return true;
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Set:
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Address:
@@ -306,7 +306,7 @@ enum class ReadImplKind {
   Read,
 
   /// There's a `yielding borrow` coroutine (originally called `read`).
-  Read2,
+  YieldingBorrow,
 
   /// There's a borrow accessor.
   Borrow,
@@ -338,7 +338,7 @@ enum class WriteImplKind {
   Modify,
 
   /// There's a `yielding mutate` coroutine (originally called `modify`).
-  Modify2,
+  YieldingMutate,
 
   /// There's a mutate accessor.
   Mutate,
@@ -363,7 +363,7 @@ enum class ReadWriteImplKind {
   Modify,
 
   /// There's a modify coroutine.
-  Modify2,
+  YieldingMutate,
 
   /// We have a didSet, so we're either going to use
   /// MaterializeOrTemporary or the "simple didSet"
@@ -428,40 +428,40 @@ public:
     case WriteImplKind::Set:
       assert(
           readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
-          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2 ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::YieldingBorrow ||
           readImpl == ReadImplKind::Borrow);
       assert(readWriteImpl == ReadWriteImplKind::MaterializeToTemporary ||
              readWriteImpl == ReadWriteImplKind::Modify ||
-             readWriteImpl == ReadWriteImplKind::Modify2);
+             readWriteImpl == ReadWriteImplKind::YieldingMutate);
       return;
 
     case WriteImplKind::Modify:
       assert(
           readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
-          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2 ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::YieldingBorrow ||
           readImpl == ReadImplKind::Borrow);
       assert(readWriteImpl == ReadWriteImplKind::Modify);
       return;
 
-    case WriteImplKind::Modify2:
+    case WriteImplKind::YieldingMutate:
       assert(
           readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
-          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2 ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::YieldingBorrow ||
           readImpl == ReadImplKind::Borrow);
-      assert(readWriteImpl == ReadWriteImplKind::Modify2);
+      assert(readWriteImpl == ReadWriteImplKind::YieldingMutate);
       return;
 
     case WriteImplKind::MutableAddress:
       assert(
           readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
-          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2 ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::YieldingBorrow ||
           readImpl == ReadImplKind::Borrow);
       assert(readWriteImpl == ReadWriteImplKind::MutableAddress);
       return;
     case WriteImplKind::Mutate:
       assert(
           readImpl == ReadImplKind::Get || readImpl == ReadImplKind::Address ||
-          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2 ||
+          readImpl == ReadImplKind::Read || readImpl == ReadImplKind::YieldingBorrow ||
           readImpl == ReadImplKind::Borrow);
       assert(readWriteImpl == ReadWriteImplKind::Mutate);
       return;

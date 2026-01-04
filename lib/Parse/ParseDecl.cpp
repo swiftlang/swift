@@ -1652,10 +1652,10 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
       P.consumeIf(tok::period);
       P.consumeIf(tok::identifier);
       if (P.Tok.getText() == "borrow") {
-	original.AccessorKind = AccessorKind::Read2;
+	original.AccessorKind = AccessorKind::YieldingBorrow;
 	P.consumeIf(tok::identifier);
       } else if (P.Tok.getText() == "mutate") {
-	original.AccessorKind = AccessorKind::Modify2;
+	original.AccessorKind = AccessorKind::YieldingMutate;
 	P.consumeIf(tok::identifier);
       } else {
 	P.restoreParserPosition(pos);
@@ -1665,9 +1665,9 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
       // as well as the other single-word accessor forms
       std::optional<AccessorKind> kind;
       if (tokText == "yielding_borrow" && coroutineAccessorsAllowed) {
-	kind = AccessorKind::Read2;
+	kind = AccessorKind::YieldingBorrow;
       } else if (tokText == "yielding_mutate" && coroutineAccessorsAllowed) {
-	kind = AccessorKind::Modify2;
+	kind = AccessorKind::YieldingMutate;
       } else {
 	kind = isAccessorLabel(nextToken);
       }
@@ -8012,7 +8012,7 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Set:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
     return true;
 
   case AccessorKind::Address:
@@ -8021,7 +8021,7 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::DidSet:
   case AccessorKind::Read:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return false;
 
   case AccessorKind::Init:
@@ -8062,7 +8062,7 @@ struct Parser::ParsedAccessors {
     if (Init) return Init;
     if (Set) return Set;
     if (Modify) return Modify;
-    if (Modify2) return Modify2;
+    if (YieldingMutate) return YieldingMutate;
     if (MutableAddress) return MutableAddress;
     if (Mutate)
       return Mutate;
@@ -8721,9 +8721,9 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
 static std::optional<AccessorKind>
 getCorrespondingUnderscoredAccessorKind(AccessorKind kind) {
   switch (kind) {
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
     return {AccessorKind::Read};
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return {AccessorKind::Modify};
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
@@ -8804,18 +8804,18 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   // 'get', '_read', 'read' and a non-mutable addressor are all exclusive.
   if (Get) {
     diagnoseConflictingAccessors(P, Get, Read);
-    diagnoseConflictingAccessors(P, Get, Read2);
+    diagnoseConflictingAccessors(P, Get, YieldingBorrow);
     diagnoseConflictingAccessors(P, Get, Address);
     diagnoseConflictingAccessors(P, Get, Borrow);
   } else if (Read) {
-    diagnoseConflictingAccessors(P, Read, Read2);
+    diagnoseConflictingAccessors(P, Read, YieldingBorrow);
     diagnoseConflictingAccessors(P, Read, Address);
     diagnoseConflictingAccessors(P, Read, Borrow);
-  } else if (Read2) {
-    diagnoseConflictingAccessors(P, Read2, Address);
-    diagnoseConflictingAccessors(P, Read2, Borrow);
+  } else if (YieldingBorrow) {
+    diagnoseConflictingAccessors(P, YieldingBorrow, Address);
+    diagnoseConflictingAccessors(P, YieldingBorrow, Borrow);
   } else if (Address) {
-    diagnoseConflictingAccessors(P, Read2, Borrow);
+    diagnoseConflictingAccessors(P, YieldingBorrow, Borrow);
   } else if (Borrow) {
     // Nothing can go wrong.
 
@@ -8826,7 +8826,7 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
       P.diagnose(mutator->getLoc(),
                  // Don't mention the more advanced accessors if the user
                  // only provided a setter without a getter.
-                 (MutableAddress || Modify || Modify2)
+                 (MutableAddress || Modify || YieldingMutate)
                      ? diag::missing_reading_accessor
                  : Mutate ? diag::missing_borrow_accessor
                           : diag::missing_getter,
@@ -8850,7 +8850,7 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     diagnoseConflictingAccessors(P, Set, MutableAddress);
     diagnoseConflictingAccessors(P, Set, Mutate);
   } else if (Modify) {
-    diagnoseConflictingAccessors(P, Modify, Modify2);
+    diagnoseConflictingAccessors(P, Modify, YieldingMutate);
     diagnoseConflictingAccessors(P, Modify, MutableAddress);
   } else if (Mutate) {
     diagnoseConflictingAccessors(P, Mutate, MutableAddress);
