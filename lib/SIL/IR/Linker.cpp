@@ -84,7 +84,12 @@ void SILLinkerVisitor::deserializeAndPushToWorklist(SILFunction *F) {
     Mod.getSILLoader()->lookupSILFunction(F, /*onlyUpdateLinkage*/ false);
   ASSERT(!NewF || NewF == F);
   if (!NewF || F->isExternalDeclaration()) {
-    ASSERT((!hasSharedVisibility(F->getLinkage()) || F->hasForeignBody()) &&
+    // Functions with shared visibility must either have a foreign body
+    // (Clang-generated functions) or be marked as always-emit-into-client
+    // (e.g., SafeInteropWrappers for C++ functions). The latter are expected
+    // to be emitted in the client module and don't have a foreign body.
+    ASSERT((!hasSharedVisibility(F->getLinkage()) || F->hasForeignBody() ||
+            F->markedAsAlwaysEmitIntoClient()) &&
            "cannot deserialize shared function");
     return;
   }
