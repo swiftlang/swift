@@ -372,7 +372,7 @@ const Metadata *SwiftError::getHashableBaseType() const {
       expectedType, hashableBaseType ? hashableBaseType
                                      : reinterpret_cast<const Metadata *>(1),
       std::memory_order_acq_rel);
-  return type;
+  return hashableBaseType;
 }
 
 const HashableWitnessTable *SwiftError::getHashableConformance() const {
