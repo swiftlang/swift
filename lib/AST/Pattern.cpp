@@ -50,6 +50,8 @@ DescriptivePatternKind Pattern::getDescriptiveKind() const {
     TRIVIAL_PATTERN_KIND(OptionalSome);
     TRIVIAL_PATTERN_KIND(Bool);
     TRIVIAL_PATTERN_KIND(Expr);
+    case PatternKind::Opaque:
+      return cast<OpaquePattern>(this)->getSubPattern()->getDescriptiveKind();
 
   case PatternKind::Binding:
     switch (cast<BindingPattern>(this)->getIntroducer()) {
@@ -176,7 +178,7 @@ SourceLoc Pattern::getLoc() const {
 }
 
 void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
-  forEachVariable([&](VarDecl *VD) { variables.push_back(VD); });
+  forEachVariable([&](VarDecl *VD) { variables.push_back(VD); }, /*shouldVisitOpaque=*/ true);
 }
 
 VarDecl *Pattern::getSingleVar() const {
@@ -244,7 +246,7 @@ void Expr::forEachUnresolvedVariable(llvm::function_ref<void(VarDecl *)> f) cons
 
 /// apply the specified function to all variables referenced in this
 /// pattern.
-void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn) const {
+void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn, bool shouldVisitOpaque) const {
   switch (getKind()) {
   case PatternKind::Any:
   case PatternKind::Bool:
@@ -258,6 +260,12 @@ void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn) const {
   case PatternKind::Named:
     fn(cast<NamedPattern>(this)->getDecl());
     return;
+
+  case PatternKind::Opaque:
+    if (shouldVisitOpaque)
+      return getSemanticsProvidingPattern()->forEachVariable(fn);
+    else
+      return;
 
   case PatternKind::Paren:
   case PatternKind::Typed:
@@ -311,6 +319,8 @@ void Pattern::forEachNode(llvm::function_ref<void(Pattern*)> f) {
     return cast<TypedPattern>(this)->getSubPattern()->forEachNode(f);
   case PatternKind::Binding:
     return cast<BindingPattern>(this)->getSubPattern()->forEachNode(f);
+  case PatternKind::Opaque:
+    return cast<OpaquePattern>(this)->getSubPattern()->forEachNode(f);
 
   case PatternKind::Tuple:
     for (auto elt : cast<TuplePattern>(this)->getElements())
@@ -789,6 +799,7 @@ Pattern::getOwnership(
     USE_SUBPATTERN(Paren)
     USE_SUBPATTERN(Typed)
     USE_SUBPATTERN(Binding)
+    USE_SUBPATTERN(Opaque)
 #undef USE_SUBPATTERN
     void visitTuplePattern(TuplePattern *p) {
       for (auto &element : p->getElements()) {

@@ -122,6 +122,9 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK:   [[IND_VAR:%.*]] = load [trivial] [[GET_ELT_STACK]]
 // CHECK:   switch_enum [[IND_VAR]] : $Optional<Int>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
+// CHECK: [[NONE_BB]]:
+// CHECK:   br [[CONT_BLOCK:bb[0-9]+]]
+//
 // CHECK: [[SOME_BB]]([[VAR:%.*]] : $Int):
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
@@ -142,9 +145,6 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK:   [[LOOP_BODY_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[LOOP_BODY_FUNC]]()
 // CHECK:   br [[LOOP_DEST]]
-//
-// CHECK: [[NONE_BB]]:
-// CHECK:   br [[CONT_BLOCK]]
 //
 // CHECK: [[CONT_BLOCK]]
 // CHECK:   destroy_value [[ITERATOR_BOX]] : ${ var IndexingIterator<Array<Int>> }
@@ -213,19 +213,23 @@ func existentialBreak(_ xx: [P]) {
 // CHECK:   store [[ARRAY_COPY:%.*]] to [init] [[BORROWED_ARRAY_STACK]]
 // CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @$sSlss16IndexingIteratorVyxG0B0RtzrlE04makeB0ACyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in τ_0_0) -> @out IndexingIterator<τ_0_0>
 // CHECK:   apply [[MAKE_ITERATOR_FUNC]]<Array<any P>>([[PROJECT_ITERATOR_BOX]], [[BORROWED_ARRAY_STACK]])
-// CHECK:   [[ELT_STACK:%.*]] = alloc_stack $Optional<any P>
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //
 // CHECK: [[LOOP_DEST]]:
+// CHECK:   [[T0:%.*]] = alloc_stack [lexical] [var_decl] $any P, let, name "x"
+// CHECK:   [[ELT_STACK:%.*]] = alloc_stack $Optional<any P>
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<any P>>
 // CHECK:   [[FUNC_REF:%.*]] = function_ref @$ss16IndexingIteratorV4next7ElementQzSgyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (@inout IndexingIterator<τ_0_0>) -> @out Optional<τ_0_0.Element>
 // CHECK:   apply [[FUNC_REF]]<Array<any P>>([[ELT_STACK]], [[WRITE]])
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<any P>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
+// CHECK: [[NONE_BB]]:
+// CHECK:   br [[CONT_BLOCK:bb[0-9]+]]
+//
 // CHECK: [[SOME_BB]]:
-// CHECK:   [[T0:%.*]] = alloc_stack [lexical] [var_decl] $any P, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<any P>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
+// CHECK:   dealloc_stack [[ELT_STACK]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BREAK_END_BLOCK]]:
@@ -252,11 +256,7 @@ func existentialBreak(_ xx: [P]) {
 // CHECK:   dealloc_stack [[T0]]
 // CHECK:   br [[LOOP_DEST]]
 //
-// CHECK: [[NONE_BB]]:
-// CHECK:   br [[CONT_BLOCK]]
-//
 // CHECK: [[CONT_BLOCK]]
-// CHECK:   dealloc_stack [[ELT_STACK]]
 // CHECK:   destroy_value [[ITERATOR_BOX]] : ${ var IndexingIterator<Array<any P>> }
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
@@ -374,19 +374,23 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK:   store [[ARRAY_COPY:%.*]] to [init] [[BORROWED_ARRAY_STACK]]
 // CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @$sSlss16IndexingIteratorVyxG0B0RtzrlE04makeB0ACyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in τ_0_0) -> @out IndexingIterator<τ_0_0>
 // CHECK:   apply [[MAKE_ITERATOR_FUNC]]<Array<GenericStruct<T>>>([[PROJECT_ITERATOR_BOX]], [[BORROWED_ARRAY_STACK]])
-// CHECK:   [[ELT_STACK:%.*]] = alloc_stack $Optional<GenericStruct<T>>
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //
 // CHECK: [[LOOP_DEST]]:
+// CHECK:   [[T0:%.*]] = alloc_stack [lexical] [var_decl] $GenericStruct<T>, let, name "x"
+// CHECK:   [[ELT_STACK:%.*]] = alloc_stack $Optional<GenericStruct<T>>
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<GenericStruct<T>>>
 // CHECK:   [[FUNC_REF:%.*]] = function_ref @$ss16IndexingIteratorV4next7ElementQzSgyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (@inout IndexingIterator<τ_0_0>) -> @out Optional<τ_0_0.Element>
 // CHECK:   apply [[FUNC_REF]]<Array<GenericStruct<T>>>([[ELT_STACK]], [[WRITE]])
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
+// CHECK: [[NONE_BB]]:
+// CHECK:   br [[CONT_BLOCK:bb[0-9]+]]
+//
 // CHECK: [[SOME_BB]]:
-// CHECK:   [[T0:%.*]] = alloc_stack [lexical] [var_decl] $GenericStruct<T>, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
+// CHECK:   dealloc_stack [[ELT_STACK]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BREAK_END_BLOCK]]:
@@ -413,11 +417,7 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK:   dealloc_stack [[T0]]
 // CHECK:   br [[LOOP_DEST]]
 //
-// CHECK: [[NONE_BB]]:
-// CHECK:   br [[CONT_BLOCK]]
-//
 // CHECK: [[CONT_BLOCK]]
-// CHECK:   dealloc_stack [[ELT_STACK]]
 // CHECK:   destroy_value [[ITERATOR_BOX]]
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
@@ -481,19 +481,23 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_LIFETIME]]
 // CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = witness_method $T, #Sequence.makeIterator :
 // CHECK:   apply [[MAKE_ITERATOR_FUNC]]<T>([[PROJECT_ITERATOR_BOX]], [[COLLECTION_COPY:%.*]])
-// CHECK:   [[ELT_STACK:%.*]] = alloc_stack $Optional<T.Element>
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //
 // CHECK: [[LOOP_DEST]]:
+// CHECK:   [[T0:%.*]] = alloc_stack [lexical] [var_decl] $T.Element, let, name "x"
+// CHECK:   [[ELT_STACK:%.*]] = alloc_stack $Optional<T.Element>
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*T.Iterator
 // CHECK:   [[GET_NEXT_FUNC:%.*]] = witness_method $T.Iterator, #IteratorProtocol.next : <Self where Self : IteratorProtocol> (inout Self) -> () -> Self.Element? : $@convention(witness_method: IteratorProtocol) <τ_0_0 where τ_0_0 : IteratorProtocol> (@inout τ_0_0) -> @out Optional<τ_0_0.Element>
 // CHECK:   apply [[GET_NEXT_FUNC]]<T.Iterator>([[ELT_STACK]], [[WRITE]])
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<T.Element>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
+// CHECK: [[NONE_BB]]:
+// CHECK:   br [[CONT_BLOCK:bb[0-9]+]]
+//
 // CHECK: [[SOME_BB]]:
-// CHECK:   [[T0:%.*]] = alloc_stack [lexical] [var_decl] $T.Element, let, name "x"
 // CHECK:   [[ELT_STACK_TAKE:%.*]] = unchecked_take_enum_data_addr [[ELT_STACK]] : $*Optional<T.Element>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[ELT_STACK_TAKE]] to [init] [[T0]]
+// CHECK:   dealloc_stack [[ELT_STACK]]
 // CHECK:   cond_br {{%.*}}, [[LOOP_BREAK_END_BLOCK:bb[0-9]+]], [[CONTINUE_CHECK_BLOCK:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BREAK_END_BLOCK]]:
@@ -520,11 +524,7 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK:   dealloc_stack [[T0]]
 // CHECK:   br [[LOOP_DEST]]
 //
-// CHECK: [[NONE_BB]]:
-// CHECK:   br [[CONT_BLOCK]]
-//
 // CHECK: [[CONT_BLOCK]]
-// CHECK:   dealloc_stack [[ELT_STACK]]
 // CHECK:   end_borrow [[ITERATOR_LIFETIME]]
 // CHECK:   destroy_value [[ITERATOR_BOX]]
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
@@ -578,9 +578,6 @@ func tupleElements(_ xx: [(C, C)]) {
   // CHECK: destroy_value [[A]]
   for (_, _) in xx {}
   // CHECK: bb{{.*}}([[PAYLOAD:%.*]] : @owned $(C, C)):
-  // CHECK: ([[A:%.*]], [[B:%.*]]) = destructure_tuple [[PAYLOAD]]
-  // CHECK: destroy_value [[B]]
-  // CHECK: destroy_value [[A]]
   for  _     in xx {}
 }
 
@@ -621,9 +618,9 @@ func genericFuncWithConversion<T: C>(list : [T]) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach32injectForEachElementIntoOptionalyySaySiGF
 // CHECK: [[NEXT_RESULT:%.*]] = load [trivial] {{.*}} : $*Optional<Int>
-// CHECK: switch_enum [[NEXT_RESULT]] : $Optional<Int>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
-// CHECK: [[BB_SOME]]([[X_PRE_BINDING:%.*]] : $Int):
-// CHECK: [[X_BINDING:%.*]] = enum $Optional<Int>, #Optional.some!enumelt, [[X_PRE_BINDING]] : $Int
+// CHECK: [[X_BINDING:%.*]] = enum $Optional<Optional<Int>>, #Optional.some!enumelt, [[NEXT_RESULT]] : $Optional<Int>
+// CHECK: switch_enum [[X_BINDING]] : $Optional<Optional<Int>>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
+// CHECK: [[BB_SOME]]([[X_BINDING:%.*]] : $Optional<Int>):
 // CHECK: [[MVX_BINDING:%.*]] = move_value [var_decl] [[X_BINDING]] : $Optional<Int>
 // CHECK: debug_value [[MVX_BINDING]] : $Optional<Int>, let, name "x"
 func injectForEachElementIntoOptional(_ xs: [Int]) {
@@ -631,14 +628,14 @@ func injectForEachElementIntoOptional(_ xs: [Int]) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s7foreach32injectForEachElementIntoOptionalyySayxGlF
-// CHECK: copy_addr [take] [[NEXT_RESULT:%.*]] to [init] [[NEXT_RESULT_COPY:%.*]] : $*Optional<T>
-// CHECK: switch_enum_addr [[NEXT_RESULT_COPY]] : $*Optional<T>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
-// CHECK: [[BB_SOME]]:
 // CHECK: [[X_BINDING:%.*]] = alloc_stack [lexical] [var_decl] $Optional<T>, let, name "x"
-// CHECK: [[ADDR:%.*]] = unchecked_take_enum_data_addr [[NEXT_RESULT_COPY]] : $*Optional<T>, #Optional.some!enumelt
-// CHECK: [[X_ADDR:%.*]] = init_enum_data_addr [[X_BINDING]] : $*Optional<T>, #Optional.some!enumelt
-// CHECK: copy_addr [take] [[ADDR]] to [init] [[X_ADDR]] : $*T
-// CHECK: inject_enum_addr [[X_BINDING]] : $*Optional<T>, #Optional.some!enumelt
+// CHECK: [[ADDR:%.*]] = alloc_stack $Optional<Optional<T>>
+// CHECK: [[X_ADDR:%.*]] = init_enum_data_addr [[ADDR]] : $*Optional<Optional<T>>, #Optional.some!enumelt
+// CHECK: inject_enum_addr [[ADDR]] : $*Optional<Optional<T>>, #Optional.some!enumelt
+// CHECK: switch_enum_addr [[ADDR]] : $*Optional<Optional<T>>, case #Optional.some!enumelt: [[BB_SOME:bb.*]], case
+// CHECK: [[BB_SOME]]:
+// CHECK: [[RES:%.*]] = unchecked_take_enum_data_addr [[ADDR]] : $*Optional<Optional<T>>, #Optional.some!enumelt
+// CHECK: copy_addr [take] [[RES:%.*]] to [init] [[RES_COPY:%.*]] : $*Optional<T>
 func injectForEachElementIntoOptional<T>(_ xs: [T]) {
   for x : T? in xs {}
 }

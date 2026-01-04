@@ -389,7 +389,8 @@ extension ASTGenVisitor {
       sequence: self.generate(expr: node.sequence),
       whereLoc: self.generateSourceLoc(node.whereClause?.whereKeyword),
       whereExpr: self.generate(expr: node.whereClause?.condition),
-      body: self.generate(codeBlock: node.body)
+      body: self.generate(codeBlock: node.body),
+      declContext: self.declContext
     )
   }
 

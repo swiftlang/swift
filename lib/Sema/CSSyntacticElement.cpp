@@ -866,6 +866,7 @@ private:
   }
 
   // These statements don't require any type-checking.
+  void visitOpaqueStmt(OpaqueStmt *opaqueStmt) {}
   void visitBreakStmt(BreakStmt *breakStmt) {}
   void visitContinueStmt(ContinueStmt *continueStmt) {}
   void visitDeferStmt(DeferStmt *deferStmt) {}
@@ -1814,6 +1815,10 @@ private:
     // have solutions applied, which is needed by MiscDiagnostics passes such as
     // `diagnoseImplicitSelfUseInClosure`
     rewriter.addLocalDeclToTypeCheck(decl);
+  }
+
+  ASTNode visitOpaqueStmt(OpaqueStmt *opaqueStmt) {
+    return opaqueStmt;
   }
 
   ASTNode visitBreakStmt(BreakStmt *breakStmt) {

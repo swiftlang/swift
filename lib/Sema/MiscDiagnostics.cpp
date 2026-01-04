@@ -1506,11 +1506,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
   // Diagnose uses of collection literals with defaulted types at the top
   // level.
-  if (auto collection =
-          dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
-    if (collection->isTypeDefaulted()) {
-      Walker.checkTypeDefaultedCollectionExpr(
-          const_cast<CollectionExpr *>(collection));
+  if (isExprStmt) {
+    if (auto collection =
+            dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
+      if (collection->isTypeDefaulted()) {
+        Walker.checkTypeDefaultedCollectionExpr(
+            const_cast<CollectionExpr *>(collection));
+      }
     }
   }
 }
@@ -4198,6 +4200,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
           // Don't try to suggest 'var' -> 'let' conversion
           // in case of 'for' loop because it's an implicitly
           // immutable context.
+          // desugared
           suggestLet = !isa<ForEachStmt>(stmt);
         }
 

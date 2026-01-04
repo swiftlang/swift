@@ -4846,6 +4846,15 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
     }
   }
 
+  // Before producing the fallback diagnostic, check if there are any "error"
+  // diagnostics already emitted or delayed conformance errors waiting to be
+  // emitted because they are a better indication of the problem.
+  // FIXME: this is because if the sequence expr's type does not conform to
+  // sequence, we aren't able to properly diagnose the for each stmt.
+  if (DE.hadAnyError()) {
+    return;
+  }
+
   // Emit a poor fallback message.
   auto diag = DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
   if (auto *expr = target.getAsExpr())
