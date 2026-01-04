@@ -238,6 +238,16 @@ void DifferentiableTypeAttr::printImpl(ASTPrinter &printer,
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
+void LifetimeTypeAttr::printImpl(ASTPrinter &printer,
+                                 const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@_lifetime");
+  printer << "(";
+  printer << entry->getString();
+  printer << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
 void ConventionTypeAttr::printImpl(ASTPrinter &printer,
                                    const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
