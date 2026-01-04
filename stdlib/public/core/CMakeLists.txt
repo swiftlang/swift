@@ -27,21 +27,21 @@ split_embedded_sources(
   OUT_LIST_EMBEDDED SWIFTLIB_EMBEDDED_SOURCES
   OUT_LIST_NORMAL SWIFTLIB_SOURCES
 
-  ### "ESSENTIAL" SOURCES
   ### -- PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
-  # Some files can't be sorted alphabetically, see notes in the list below.
+  EMBEDDED ASCII.swift
   EMBEDDED Algorithm.swift
+  EMBEDDED AnyHashable.swift
+  EMBEDDED Array.swift
   EMBEDDED ArrayBody.swift
   EMBEDDED ArrayBuffer.swift
   EMBEDDED ArrayBufferProtocol.swift
   EMBEDDED ArrayCast.swift
-  EMBEDDED Array.swift
   EMBEDDED ArrayShared.swift
   EMBEDDED ArraySlice.swift
   EMBEDDED ArrayType.swift
-  EMBEDDED ASCII.swift
   EMBEDDED Assert.swift
   EMBEDDED AssertCommon.swift
+  EMBEDDED Availability.swift
   EMBEDDED BidirectionalCollection.swift
   EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
@@ -50,20 +50,23 @@ split_embedded_sources(
     NORMAL BridgingBuffer.swift
   EMBEDDED Builtin.swift
   EMBEDDED BuiltinMath.swift
+  EMBEDDED CString.swift
+  EMBEDDED CTypes.swift
   EMBEDDED Character.swift
+  EMBEDDED CharacterProperties.swift
+  EMBEDDED ClosedRange.swift
     NORMAL CocoaArray.swift
     NORMAL Codable.swift
   EMBEDDED Collection.swift
   EMBEDDED CollectionAlgorithms.swift
+  EMBEDDED CollectionDifference.swift
+  EMBEDDED CollectionOfOne.swift
+    NORMAL CommandLine.swift
   EMBEDDED Comparable.swift
   EMBEDDED CompilerProtocols.swift
-  EMBEDDED Sendable.swift
   EMBEDDED ContiguousArray.swift
-  EMBEDDED ContiguouslyStored.swift
-  EMBEDDED ClosedRange.swift
   EMBEDDED ContiguousArrayBuffer.swift
-  EMBEDDED CString.swift
-  EMBEDDED CTypes.swift
+  EMBEDDED ContiguouslyStored.swift
     NORMAL DebuggerSupport.swift
   EMBEDDED Dictionary.swift
   EMBEDDED DictionaryBridging.swift
@@ -71,9 +74,12 @@ split_embedded_sources(
   EMBEDDED DictionaryCasting.swift
   EMBEDDED DictionaryStorage.swift
   EMBEDDED DictionaryVariant.swift
+  EMBEDDED Diffing.swift
   EMBEDDED DiscontiguousSlice.swift
   EMBEDDED DropWhile.swift
     NORMAL Dump.swift
+  EMBEDDED Duration.swift
+  EMBEDDED DurationProtocol.swift
   EMBEDDED EmptyCollection.swift
   EMBEDDED EnumeratedSequence.swift
   EMBEDDED Equatable.swift
@@ -83,19 +89,17 @@ split_embedded_sources(
   EMBEDDED FlatMap.swift
   EMBEDDED Flatten.swift
   EMBEDDED FloatingPoint.swift
+  EMBEDDED FloatingPointRandom.swift
+  EMBEDDED HashTable.swift
   EMBEDDED Hashable.swift
-  # WORKAROUND: This file name is not sorted alphabetically in the list because
-  # if we do so, the compiler crashes.
-  EMBEDDED AnyHashable.swift
-  # END WORKAROUND
   EMBEDDED Hasher.swift
     NORMAL Hashing.swift
-  EMBEDDED HashTable.swift
   EMBEDDED Identifiable.swift
   EMBEDDED Indices.swift
   EMBEDDED InlineArray.swift
-  EMBEDDED _InlineArray.swift
   EMBEDDED InputStream.swift
+  EMBEDDED Instant.swift
+  EMBEDDED Int128.swift
   EMBEDDED IntegerParsing.swift
   EMBEDDED Integers.swift
   EMBEDDED Join.swift
@@ -109,25 +113,28 @@ split_embedded_sources(
   EMBEDDED ManagedBuffer.swift
   EMBEDDED Map.swift
   EMBEDDED MemoryLayout.swift
-  EMBEDDED UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
+  EMBEDDED MigrationSupport.swift
+  EMBEDDED Mirror.swift
     NORMAL Mirrors.swift
   EMBEDDED Misc.swift
   EMBEDDED MutableCollection.swift
+  EMBEDDED NFC.swift
+  EMBEDDED NFD.swift
   EMBEDDED NativeDictionary.swift
   EMBEDDED NativeSet.swift
     NORMAL NewtypeWrapper.swift
-  EMBEDDED NFC.swift
-  EMBEDDED NFD.swift
   EMBEDDED ObjectIdentifier.swift
-  EMBEDDED Optional.swift
   EMBEDDED OptionSet.swift
+  EMBEDDED Optional.swift
   EMBEDDED OutputStream.swift
+    NORMAL PlaygroundDisplay.swift
   EMBEDDED Pointer.swift
   EMBEDDED Policy.swift
   EMBEDDED PrefixWhile.swift
     NORMAL Prespecialize.swift
     NORMAL Print.swift
   EMBEDDED PtrAuth.swift
+    NORMAL REPL.swift
   EMBEDDED Random.swift
   EMBEDDED RandomAccessCollection.swift
   EMBEDDED Range.swift
@@ -136,12 +143,11 @@ split_embedded_sources(
   EMBEDDED RangeSetRanges.swift
     NORMAL ReflectionMirror.swift
   EMBEDDED Repeat.swift
-    NORMAL REPL.swift
   EMBEDDED Result.swift
   EMBEDDED Reverse.swift
   EMBEDDED Runtime.swift
     NORMAL RuntimeFunctionCounters.swift
-  EMBEDDED SipHash.swift
+  EMBEDDED Sendable.swift
   EMBEDDED Sequence.swift
   EMBEDDED SequenceAlgorithms.swift
   EMBEDDED Set.swift
@@ -154,7 +160,9 @@ split_embedded_sources(
   EMBEDDED SetVariant.swift
   EMBEDDED ShadowProtocols.swift
     NORMAL Shims.swift
+  EMBEDDED SipHash.swift
   EMBEDDED Slice.swift
+  EMBEDDED SliceBuffer.swift
   EMBEDDED SmallString.swift
   EMBEDDED Sort.swift
   EMBEDDED Span/MutableRawSpan.swift
@@ -163,10 +171,10 @@ split_embedded_sources(
   EMBEDDED Span/OutputSpan.swift
   EMBEDDED Span/RawSpan.swift
   EMBEDDED Span/Span.swift
-  EMBEDDED StaticString.swift
+  EMBEDDED StaticBigInt.swift
   EMBEDDED StaticPrint.swift
+  EMBEDDED StaticString.swift
   EMBEDDED Stride.swift
-  EMBEDDED StringHashable.swift  # ORDER DEPENDENCY: Must precede String.swift
   EMBEDDED String.swift
   EMBEDDED StringBreadcrumbs.swift
   EMBEDDED StringBridge.swift
@@ -174,47 +182,38 @@ split_embedded_sources(
   EMBEDDED StringComparable.swift
   EMBEDDED StringComparison.swift
   EMBEDDED StringCreate.swift
+  EMBEDDED StringGraphemeBreaking.swift
   EMBEDDED StringGuts.swift
-  EMBEDDED StringGutsSlice.swift
   EMBEDDED StringGutsRangeReplaceable.swift
-  EMBEDDED StringObject.swift
-  EMBEDDED StringProtocol.swift
+  EMBEDDED StringGutsSlice.swift
+  EMBEDDED StringHashable.swift
   EMBEDDED StringIndex.swift
   EMBEDDED StringIndexConversions.swift
   EMBEDDED StringIndexValidation.swift
   EMBEDDED StringInterpolation.swift
   EMBEDDED StringLegacy.swift
   EMBEDDED StringNormalization.swift
+  EMBEDDED StringObject.swift
+  EMBEDDED StringProtocol.swift
   EMBEDDED StringRangeReplaceableCollection.swift
   EMBEDDED StringStorage.swift
   EMBEDDED StringStorageBridge.swift
   EMBEDDED StringSwitch.swift
   EMBEDDED StringTesting.swift
-  EMBEDDED StringUnicodeScalarView.swift
   EMBEDDED StringUTF16View.swift
-  EMBEDDED StringUTF8View.swift
   EMBEDDED StringUTF8Validation.swift
+  EMBEDDED StringUTF8View.swift
+  EMBEDDED StringUnicodeScalarView.swift
   EMBEDDED StringWordBreaking.swift
   EMBEDDED Substring.swift
   EMBEDDED SwiftNativeNSArray.swift
+  EMBEDDED SwiftifyImport.swift
   EMBEDDED TemporaryAllocation.swift
     NORMAL ThreadLocalStorage.swift
+  EMBEDDED UInt128.swift
   EMBEDDED UIntBuffer.swift
-  EMBEDDED UnavailableStringAPIs.swift
-  EMBEDDED UnicodeData.swift
-  EMBEDDED UnicodeEncoding.swift
-  EMBEDDED UnicodeBreakProperty.swift
-  EMBEDDED UnicodeHelpers.swift
-  EMBEDDED UnicodeParser.swift
-  EMBEDDED UnicodeScalarProperties.swift
-  EMBEDDED CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
-  EMBEDDED UnicodeSPI.swift
-  EMBEDDED Unmanaged.swift
-  EMBEDDED UnmanagedOpaqueString.swift
-  EMBEDDED UnmanagedString.swift
-  EMBEDDED UnsafePointer.swift
-  EMBEDDED UnsafeRawPointer.swift
-  EMBEDDED UTFEncoding.swift
+  EMBEDDED UTF16.swift
+  EMBEDDED UTF32.swift
   EMBEDDED UTF8.swift
   EMBEDDED UTF8EncodingError.swift
   EMBEDDED UTF8Span.swift
@@ -223,36 +222,29 @@ split_embedded_sources(
   EMBEDDED UTF8SpanFundamentals.swift
   EMBEDDED UTF8SpanInternalHelpers.swift
   EMBEDDED UTF8SpanIterators.swift
-  EMBEDDED UTF16.swift
-  EMBEDDED UTF32.swift
-  EMBEDDED Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
-  EMBEDDED StringGraphemeBreaking.swift # ORDER DEPENDENCY: Must follow UTF16.swift
-  EMBEDDED ValidUTF8Buffer.swift
-  EMBEDDED WriteBackMutableSlice.swift
-  EMBEDDED MigrationSupport.swift
-
-    ### "NON-ESSENTIAL" SOURCES, LAYERED ON TOP OF THE "ESSENTIAL" ONES
-    ### -- PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
-  EMBEDDED Availability.swift
-  EMBEDDED CollectionDifference.swift
-  EMBEDDED CollectionOfOne.swift
-  EMBEDDED Diffing.swift
-  EMBEDDED Duration.swift
-  EMBEDDED DurationProtocol.swift
-  EMBEDDED FloatingPointRandom.swift
-  EMBEDDED Instant.swift
-  EMBEDDED Int128.swift
-  EMBEDDED Mirror.swift
-    NORMAL PlaygroundDisplay.swift
-  EMBEDDED SwiftifyImport.swift
-    NORMAL CommandLine.swift
-  EMBEDDED SliceBuffer.swift
-  EMBEDDED StaticBigInt.swift
-  EMBEDDED UInt128.swift
+  EMBEDDED UTFEncoding.swift
+  EMBEDDED UnavailableStringAPIs.swift
   EMBEDDED UnfoldSequence.swift
+  EMBEDDED Unicode.swift
+  EMBEDDED UnicodeBreakProperty.swift
+  EMBEDDED UnicodeData.swift
+  EMBEDDED UnicodeEncoding.swift
+  EMBEDDED UnicodeHelpers.swift
+  EMBEDDED UnicodeParser.swift
+  EMBEDDED UnicodeSPI.swift
+  EMBEDDED UnicodeScalar.swift
+  EMBEDDED UnicodeScalarProperties.swift
+  EMBEDDED Unmanaged.swift
+  EMBEDDED UnmanagedOpaqueString.swift
+  EMBEDDED UnmanagedString.swift
   EMBEDDED UnsafeBufferPointerSlice.swift
+  EMBEDDED UnsafePointer.swift
+  EMBEDDED UnsafeRawPointer.swift
+  EMBEDDED ValidUTF8Buffer.swift
     NORMAL VarArgs.swift
+  EMBEDDED WriteBackMutableSlice.swift
   EMBEDDED Zip.swift
+  EMBEDDED _InlineArray.swift
     NORMAL "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
   )
 
