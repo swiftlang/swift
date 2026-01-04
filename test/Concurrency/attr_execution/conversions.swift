@@ -161,4 +161,12 @@ func testNonSendableDiagnostics(
   // expected-error@-1 {{cannot convert value actor-isolated to 'MainActor' to specified type actor-isolated to 'MyActor'}}
   let _: @MyActor () async -> NonSendable = globalActor2
   // expected-error@-1 {{cannot convert value actor-isolated to 'MainActor' to specified type actor-isolated to 'MyActor'}}
+
+  // https://github.com/swiftlang/swift/issues/86203
+  do {
+    let _: @Sendable (NonSendable) async -> Void = nonIsolated1 // sync -> async
+    let _: (NonSendable) async -> Void = nonIsolated2           // drop @Sendable
+    let _: @Sendable () async -> NonSendable = nonIsolated3     // sync -> async
+    let _: @concurrent () async -> NonSendable = nonIsolated3   // drop @Sendable
+  }
 }
