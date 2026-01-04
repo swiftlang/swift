@@ -198,8 +198,9 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
 
-  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, "",
-                                               nullptr, nullptr,
+  IRGenOptions IRGenOpts;
+  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, &IRGenOpts,
+                                               "", nullptr, nullptr,
                                                true),
                          true);
   ModuleDecl *M =
