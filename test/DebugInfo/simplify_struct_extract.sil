@@ -1,0 +1,27 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -simplification -simplify-instruction=struct_extract -sil-print-debuginfo | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+import Builtin
+import Swift
+
+struct T {
+  var x: Builtin.Int32
+}
+
+// This verifies that tryReplaceRedundantInstructionPair in OptUtils.swift
+// salvages debug info attached to the first instruction of the pair,
+// in this case the struct.
+//
+// CHECK-LABEL: sil @redundant_pair : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+// CHECK:       bb0([[VAR:%[0-9]+]] : $Builtin.Int32):
+// CHECK-NEXT:    debug_value [[VAR]] : $Builtin.Int32, let, name "var", type $T, expr op_fragment:#T.x
+// CHECK-NEXT:    return [[VAR]]
+// CHECK-LABEL: } // end sil function 'redundant_pair'
+sil @redundant_pair : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %1 = struct $T(%0)
+  debug_value %1, let, name "var"
+  %2 = struct_extract %1, #T.x
+  return %2
+}
