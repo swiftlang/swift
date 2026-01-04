@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swiftxx-frontend -typecheck %s -I %S/Inputs/custom-modules
+// RUN: %target-swiftxx-frontend -typecheck -verify %s -I %S/Inputs/custom-modules
 
 import CXXInterop
 
@@ -12,6 +12,26 @@ do {
 
 // Namespace lookup
 func namespaceLookup() -> UnsafeMutablePointer<ns.T> {
-  var tmp: UnsafeMutablePointer<ns.T> = ns.doMakeT()!
+  let tmp: UnsafeMutablePointer<ns.T> = ns.doMakeT()!
   return tmp
+}
+
+func unimportedSwiftPrivateDataMember() {
+  let obj = Methods()
+  _ = obj.some_value // Sanity check
+  _ = obj.private_value // expected-error {{value of type 'Methods' has no member 'private_value'}}
+}
+
+func unimportedSwiftPrivateMethod() {
+  var obj = Methods()
+  _ = obj.SimpleMethod(0) // Sanity check
+  _ = obj.PrivateSimpleMethod(0) // expected-error {{value of type 'Methods' has no member 'PrivateSimpleMethod'}}
+}
+
+func unimportedSwiftPrivateFunction() {
+  PrivateFunction() // expected-error {{cannot find 'PrivateFunction' in scope}}
+}
+
+func unimportedSwiftPrivateClass() {
+  _ = PrivateClass() // expected-error {{cannot find 'PrivateClass' in scope}}
 }
