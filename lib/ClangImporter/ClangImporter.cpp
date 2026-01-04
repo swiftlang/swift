@@ -5366,7 +5366,9 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
   return result;
 }
 
-static const llvm::StringMap<std::vector<int>> STLConditionalParams{
+// These conditional "conformances" are used for both escapability and
+// copiability.
+static const llvm::StringMap<SmallVector<int>> STLConditionalParams{
     {"basic_string", {0}},
     {"vector", {0}},
     {"array", {0}},
@@ -5396,10 +5398,17 @@ static const llvm::StringMap<std::vector<int>> STLConditionalParams{
     {"unordered_multimap", {0, 1}},
 };
 
+static const llvm::StringMap<SmallVector<int>> STLConditionalEscapabilityParams{
+    {"unique_ptr", {0}},
+    {"shared_ptr", {0}},
+    {"weak_ptr", {0}},
+    {"auto_ptr", {0}},
+};
+
 template <typename Kind>
 static bool checkConditionalParams(
     const clang::RecordDecl *recordDecl, ClangImporter::Implementation *impl,
-    const std::vector<int> &STLParams, std::set<StringRef> &conditionalParams,
+    llvm::ArrayRef<int> STLParams, std::set<StringRef> &conditionalParams,
     llvm::function_ref<void(const clang::Type *)> maybePushToStack) {
   bool foundErrors = false;
   auto specDecl = cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
@@ -5535,13 +5544,13 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
         return CxxEscapability::NonEscapable;
       if (hasEscapableAttr(recordDecl))
         continue;
-      auto injectedStlAnnotation =
-          recordDecl->isInStdNamespace()
-              ? STLConditionalParams.find(recordDecl->getName())
-              : STLConditionalParams.end();
-      auto STLParams = injectedStlAnnotation != STLConditionalParams.end()
-                           ? injectedStlAnnotation->second
-                           : std::vector<int>();
+      SmallVector<int> STLParams;
+      if (recordDecl->isInStdNamespace()) {
+        STLParams = STLConditionalParams.lookup(recordDecl->getName());
+        if (STLParams.empty())
+          STLParams =
+              STLConditionalEscapabilityParams.lookup(recordDecl->getName());
+      }
       auto conditionalParams = getConditionalEscapableAttrParams(recordDecl);
 
       if (!STLParams.empty() || !conditionalParams.empty()) {
@@ -8585,13 +8594,9 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
     stack.pop_back();
     bool isExplicitlyNonCopyable = hasNonCopyableAttr(recordDecl);
     if (!isExplicitlyNonCopyable) {
-      auto injectedStlAnnotation =
-          recordDecl->isInStdNamespace()
-              ? STLConditionalParams.find(recordDecl->getName())
-              : STLConditionalParams.end();
-      auto STLParams = injectedStlAnnotation != STLConditionalParams.end()
-                           ? injectedStlAnnotation->second
-                           : std::vector<int>();
+      SmallVector<int> STLParams;
+      if (recordDecl->isInStdNamespace())
+        STLParams = STLConditionalParams.lookup(recordDecl->getName());
       auto conditionalParams = getConditionalCopyableAttrParams(recordDecl);
 
       if (!STLParams.empty() || !conditionalParams.empty()) {
