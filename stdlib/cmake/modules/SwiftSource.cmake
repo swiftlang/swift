@@ -649,6 +649,8 @@ function(_compile_swift_files
     list(APPEND swift_flags "-strict-concurrency=complete")
   endif()
 
+  list(APPEND swift_flags "-Werror" "StrictMemorySafety")
+
   if (SWIFT_STDLIB_ENABLE_SIL_OPAQUE_VALUES)
     list(APPEND swift_flags "-Xfrontend" "-enable-sil-opaque-values")
   endif()
