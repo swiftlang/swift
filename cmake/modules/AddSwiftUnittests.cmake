@@ -40,10 +40,8 @@ function(add_swift_unittest test_dirname)
   # *NOTE* The unittests are never built for the target, so we always enable LTO
   # *if we are asked to.
   _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
-  if (_lto_flag_out)
-    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY COMPILE_FLAGS " ${_lto_flag_out} ")
-    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY LINK_FLAGS " ${_lto_flag_out} ")
-  endif()
+  set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY COMPILE_FLAGS " ${_lto_flag_out} ")
+  set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY LINK_FLAGS " ${_lto_flag_out} ")
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     # Add an @rpath to the swift library directory
