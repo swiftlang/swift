@@ -28,6 +28,8 @@ set(SWIFT_SYNCHRONIZATION_SOURCES
   Cell.swift
 )
 
+# EMBEDDED Atomics/AtomicIntegers.swift.gyb
+# EMBEDDED Atomics/AtomicStorage.swift.gyb
 set(SWIFT_SYNCHRONIZATION_GYB_SOURCES
   Atomics/AtomicIntegers.swift.gyb
   Atomics/AtomicStorage.swift.gyb
