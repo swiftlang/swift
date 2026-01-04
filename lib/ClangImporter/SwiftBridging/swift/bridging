@@ -80,7 +80,7 @@
 /// is presumed to be immortal, i.e. the reference to such object is presumed to
 /// always be valid. This annotation lets Swift import such a type as a reference
 /// type in Swift.
-////
+///
 /// This example shows how to use this macro to let Swift know that
 /// a singleton C++ class can be imported as a reference type in Swift:
 ///  ```c++
@@ -322,10 +322,10 @@
 #define SWIFT_NAME(_name)
 #define SWIFT_CONFORMS_TO_PROTOCOL(_moduleName_protocolName)
 #define SWIFT_COMPUTED_PROPERTY
-#define SWIFT_MUTATING 
+#define SWIFT_MUTATING
 #define SWIFT_UNCHECKED_SENDABLE
 #define SWIFT_NONCOPYABLE
-#define SWIDT_NONCOPYABLE_WITH_DESTROY(_destroy)
+#define SWIFT_NONCOPYABLE_WITH_DESTROY(_destroy)
 #define SWIFT_COPYABLE_IF(...)
 #define SWIFT_NONESCAPABLE
 #define SWIFT_ESCAPABLE
