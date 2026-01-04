@@ -668,10 +668,10 @@ private:
           Kind = ".init";
           break;
         case AccessorKind::YieldingMutate:
-          Kind = ".modify2";
+          Kind = ".yielding_mutate";
           break;
         case AccessorKind::YieldingBorrow:
-          Kind = ".read2";
+          Kind = ".yielding_borrow";
           break;
         case AccessorKind::Borrow:
           Kind = ".borrow";
