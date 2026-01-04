@@ -94,7 +94,7 @@ ssize_t safe_read(int fd, void *buf, size_t len) {
   while (ptr < end) {
     ssize_t ret;
     do {
-      ret = read(fd, buf, len);
+      ret = read(fd, ptr, len);
     } while (ret <= 0 && errno == EINTR);
     if (ret <= 0)
       return ret;
@@ -114,7 +114,7 @@ ssize_t safe_write(int fd, const void *buf, size_t len) {
   while (ptr < end) {
     ssize_t ret;
     do {
-      ret = write(fd, buf, len);
+      ret = write(fd, ptr, len);
     } while (ret <= 0 && errno == EINTR);
     if (ret <= 0)
       return ret;
