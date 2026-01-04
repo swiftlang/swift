@@ -167,6 +167,10 @@ struct SWIFT_ESCAPABLE Invalid {
     View v;
 };
 
+// expected-note@+1 {{escapable record 'Invalid2' cannot have non-escapable base 'View'}}
+struct SWIFT_ESCAPABLE Invalid2 : View {
+};
+
 struct SWIFT_NONESCAPABLE NonEscapable {};
 
 using NonEscapableOptional = std::optional<NonEscapable>;
@@ -297,6 +301,9 @@ import CxxStdlib
 
 // expected-error@+1 {{cannot find type 'Invalid' in scope}}
 public func importInvalid(_ x: Invalid) {}
+
+// expected-error@+1 {{cannot find type 'Invalid2' in scope}}
+public func importInvalid(_ x: Invalid2) {}
 
 // expected-LIFETIMES-error@+3 {{a function with a ~Escapable result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+2 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
