@@ -110,6 +110,10 @@ module NewtypeSystem [system] {
   header "NewtypeSystem.h"
 }
 
+module NewtypeFoundation {
+  header "NewtypeFoundation.h"
+}
+
 module ImportAsMember {
   export *
 
