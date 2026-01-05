@@ -378,9 +378,9 @@ NOTE(ptr_to_nonescapable,none,
      "pointer to non-escapable type %0 cannot be imported",
      (const clang::Type*))
 
-NOTE(nonescapable_field_of_escapable, none,
-     "escapable record %0 cannot have non-escapable field '%1'",
-     (const clang::NamedDecl *, StringRef))
+NOTE(nonescapable_member_of_escapable, none,
+     "escapable record %1 cannot have non-escapable %select{field|base}0 '%2'",
+     (bool, const clang::NamedDecl *, StringRef))
 
 NOTE(refcounted_ptr_missing_torawpointer, none,
      "SWIFT_REFCOUNTED_PTR on %0 is missing required "

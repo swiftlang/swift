@@ -2388,6 +2388,16 @@ namespace {
                                  MoveOnlyAttr(/*Implicit=*/true));
       }
 
+      bool isNonEscapable = false;
+      if (evaluateOrDefault(
+              Impl.SwiftContext.evaluator,
+              ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
+              CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
+        result->addAttribute(new (Impl.SwiftContext)
+                                 NonEscapableAttr(/*Implicit=*/true));
+        isNonEscapable = true;
+      }
+
       // FIXME: Figure out what to do with superclasses in C++. One possible
       // solution would be to turn them into members and add conversion
       // functions.
@@ -2397,18 +2407,25 @@ namespace {
             if (auto *baseRecordDecl = base.getType()->getAsCXXRecordDecl()) {
               Impl.importDecl(baseRecordDecl, getVersion());
             }
+
+            if (!isNonEscapable) {
+              if (evaluateOrDefault(Impl.SwiftContext.evaluator,
+                                    ClangTypeEscapability(
+                                        {base.getType().getTypePtr(), &Impl}),
+                                    CxxEscapability::Unknown) ==
+                  CxxEscapability::NonEscapable) {
+                Impl.addImportDiagnostic(
+                    decl,
+                    Diagnostic(diag::nonescapable_member_of_escapable, true,
+                               decl,
+                               Impl.SwiftContext.AllocateCopy(
+                                   base.getType().getAsString())),
+                    base.getBeginLoc());
+                return nullptr;
+              }
+            }
           }
         }
-      }
-
-      bool isNonEscapable = false;
-      if (evaluateOrDefault(
-              Impl.SwiftContext.evaluator,
-              ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
-              CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
-        result->addAttribute(new (Impl.SwiftContext)
-                                 NonEscapableAttr(/*Implicit=*/true));
-        isNonEscapable = true;
       }
 
       // Import each of the members.
@@ -2523,8 +2540,8 @@ namespace {
                 CxxEscapability::NonEscapable) {
               Impl.addImportDiagnostic(
                   decl,
-                  Diagnostic(diag::nonescapable_field_of_escapable, decl,
-                             nd->getName()),
+                  Diagnostic(diag::nonescapable_member_of_escapable, false,
+                             decl, nd->getName()),
                   decl->getLocation());
               return nullptr;
             }
