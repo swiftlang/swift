@@ -2207,3 +2207,27 @@ bb3:
   return %r
 }
 
+// CHECK-LABEL: sil [ossa] @dont_hoist_load_take :
+// CHECK:       bb1:
+// CHECK-NEXT:    load [take]
+// CHECK-LABEL: } // end sil function 'dont_hoist_load_take'
+sil [ossa] @dont_hoist_load_take : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = alloc_stack [dynamic_lifetime] $String
+  store %0 to [init] %1
+  br bb1
+
+bb1:
+  %4 = load [take] %1
+  destroy_value %4
+  cond_br undef, bb3, bb2
+
+bb2:
+  br bb1
+
+bb3:
+  dealloc_stack %1
+  %9 = tuple ()
+  return %9
+}
+
