@@ -150,7 +150,7 @@ func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
 }
 
 @c
-public func swift_coroFrameAlloc(_ size: Int, _ type: UInt) -> UnsafeMutableRawPointer? {
+public func swift_coroFrameAlloc(_ size: Int, _ type: UInt64) -> UnsafeMutableRawPointer? {
   return unsafe alignedAlloc(
     size: size,
     alignment: _swift_MinAllocationAlignment)
