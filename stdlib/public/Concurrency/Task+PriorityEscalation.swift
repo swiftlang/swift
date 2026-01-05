@@ -101,7 +101,9 @@ extension UnsafeCurrentTask {
 /// - Parameters:
 ///   - operation: the operation during which to listen for priority escalation
 ///   - handler: handler to invoke, concurrently to `operation`,
-///              when priority escalation happens
+///              when priority escalation happens.
+///              The first argument is the old priority (before escalation),
+///              and the second argument is the new escalated priority.
 /// - Returns: the value returned by `operation`
 /// - Throws: when the `operation` throws an error
 @available(SwiftStdlib 6.2, *)
@@ -143,7 +145,7 @@ func __withTaskPriorityEscalationHandler0<T, E>(
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_addPriorityEscalationHandler")
 func _taskAddPriorityEscalationHandler(
-  handler: (UInt8, UInt8) -> Void
+  handler: (/* oldPriority: */UInt8, /* newPriority: */UInt8) -> Void
 ) -> UnsafeRawPointer /*EscalationNotificationStatusRecord*/
 
 @usableFromInline
