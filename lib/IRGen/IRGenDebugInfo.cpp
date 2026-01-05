@@ -915,6 +915,8 @@ private:
         CI.getClangPreprocessor().getHeaderSearchInfo().getHeaderSearchOpts();
     StringRef IncludePath =
         HSI.ModuleFileHomeIsCwd ? Opts.DebugCompilationDir : Desc.getPath();
+    StringRef ASTFile =
+        Desc.getCASID().empty() ? Desc.getASTFile() : Desc.getCASID();
 
     // Handle Clang modules.
     if (ClangModule) {
@@ -932,16 +934,16 @@ private:
         ASTSourceDescriptor ParentDescriptor(*ClangModule->Parent);
         Parent = getOrCreateModule(
             {ParentDescriptor.getModuleName(), ParentDescriptor.getPath(),
-             Desc.getASTFile(), Desc.getSignature(), /*CASID=*/""},
+             Desc.getASTFile(), Desc.getSignature(), Desc.getCASID()},
             ClangModule->Parent);
       }
       return getOrCreateModule(ClangModule, Parent, Desc.getModuleName(),
-                               IncludePath, Signature, Desc.getASTFile());
+                               IncludePath, Signature, ASTFile);
     }
     // Handle PCH.
     return getOrCreateModule(Desc.getASTFile().bytes_begin(), nullptr,
                              Desc.getModuleName(), IncludePath, Signature,
-                             Desc.getASTFile());
+                             ASTFile);
   };
 
   static std::optional<ASTSourceDescriptor>
@@ -2657,11 +2659,12 @@ private:
           // Describe the submodule, but substitute the cached ASTFile from
           // the toplevel module. The ASTFile pointer in SubModule may be
           // dangling and cant be trusted.
-          Scope = getOrCreateModule(
-              {SubModuleDesc->getModuleName(), SubModuleDesc->getPath(),
-               TopLevelModuleDesc->getASTFile(),
-               TopLevelModuleDesc->getSignature(), /*CASID=*/""},
-              SubModuleDesc->getModuleOrNull());
+          Scope = getOrCreateModule({SubModuleDesc->getModuleName(),
+                                     SubModuleDesc->getPath(),
+                                     TopLevelModuleDesc->getASTFile(),
+                                     TopLevelModuleDesc->getSignature(),
+                                     TopLevelModuleDesc->getCASID()},
+                                    SubModuleDesc->getModuleOrNull());
         else if (SubModuleDesc->getModuleOrNull() == nullptr)
           // This is (bridging header) PCH.
           Scope = getOrCreateModule(*SubModuleDesc, nullptr);
