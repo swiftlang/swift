@@ -6,8 +6,6 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -I %S/Inputs/custom-modules -o %t %S/Inputs/MoreSwiftNewtypes_conformances.swift %S/Inputs/MoreSwiftNewtypes_tests.swift -module-name MoreSwiftNewtypes
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -I %t %s -verify
 
-// REQUIRES: objc_interop
-
 import Foundation
 import MoreSwiftNewtypes
 
@@ -27,9 +25,12 @@ func testNewTypeWrapper(x: NSNotification.Name, y: NSNotification.Name, z: NSFil
   _ = x == y
   _ = x != y
   _ = x.hashValue
+
+#if _runtime(_ObjC)
   _ = x as NSString
 
   _ = z as NSString
+#endif
 }
 
 
