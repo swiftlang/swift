@@ -115,7 +115,7 @@ split_embedded_sources(
   EMBEDDED MutableCollection.swift
   EMBEDDED NativeDictionary.swift
   EMBEDDED NativeSet.swift
-    NORMAL NewtypeWrapper.swift
+  EMBEDDED NewtypeWrapper.swift
   EMBEDDED NFC.swift
   EMBEDDED NFD.swift
   EMBEDDED ObjectIdentifier.swift
