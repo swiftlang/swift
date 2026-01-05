@@ -2518,6 +2518,16 @@ bool namelookup::isInABIAttr(SourceFile *sourceFile, SourceLoc loc) {
 void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
                                       Identifier moduleSelector,
                                       SmallVectorImpl<ValueDecl *> &decls) {
+  // If we're supposed to remove associated type declarations, do so now.
+  if (options & NL_RemoveAssociatedTypes) {
+    decls.erase(
+      std::remove_if(decls.begin(), decls.end(),
+                     [&](ValueDecl *decl) {
+                       return isa<AssociatedTypeDecl>(decl);
+                     }),
+      decls.end());
+  }
+
   // If we're supposed to remove overridden declarations, do so now.
   if (options & NL_RemoveOverridden)
     removeOverriddenDecls(decls);
