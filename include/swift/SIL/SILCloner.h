@@ -765,8 +765,15 @@ SILCloner<ImplClass>::postProcess(SILInstruction *orig,
   auto origResults = orig->getResults();
   if (origResults.empty()) return;
 
-  // Otherwise, map the results over one-by-one.
   auto clonedResults = cloned->getResults();
+  if (clonedResults.empty()) {
+    // When cloning a store_borrow, we may create a store which does not have
+    // results.
+    ASSERT(isa<StoreBorrowInst>(orig));
+    return;
+  }
+
+  // Otherwise, map the results over one-by-one.
   assert(origResults.size() == clonedResults.size());
   for (auto i : indices(origResults))
     asImpl().mapValue(origResults[i], clonedResults[i]);
@@ -1500,20 +1507,22 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitStoreBorrowInst(StoreBorrowInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   if (!getBuilder().hasOwnership()) {
-    getBuilder().createStore(
+    auto *store = getBuilder().createStore(
         getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
         getOpValue(Inst->getDest()), StoreOwnershipQualifier::Unqualified);
     mapValue(Inst, getOpValue(Inst->getDest()));
+    recordClonedInstruction(Inst, store);
     return;
   }
 
   if (getOpValue(Inst->getDest())
           ->getType()
           .isTrivial(getBuilder().getFunction())) {
-    getBuilder().createStore(
+    auto *store = getBuilder().createStore(
         getOpLocation(Inst->getLoc()), getOpValue(Inst->getSrc()),
         getOpValue(Inst->getDest()), StoreOwnershipQualifier::Trivial);
     mapValue(Inst, getOpValue(Inst->getDest()));
+    recordClonedInstruction(Inst, store);
     return;
   }
 
