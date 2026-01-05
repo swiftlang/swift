@@ -10,11 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if !$Embedded
 /// An implementation detail used to implement support importing
 /// (Objective-)C entities marked with the swift_newtype Clang
 /// attribute.
 public protocol _SwiftNewtypeWrapper
 : RawRepresentable, _HasCustomAnyHashableRepresentation { }
+#else
+/// An implementation detail used to implement support importing
+/// (Objective-)C entities marked with the swift_newtype Clang
+/// attribute.
+public protocol _SwiftNewtypeWrapper
+: RawRepresentable { }
+#endif
 
 extension _SwiftNewtypeWrapper where Self: Hashable, Self.RawValue: Hashable {
   /// The hash value.
@@ -39,6 +47,7 @@ extension _SwiftNewtypeWrapper where Self: Hashable, Self.RawValue: Hashable {
   }
 }
 
+#if !$Embedded
 extension _SwiftNewtypeWrapper {
   public __consuming func _toCustomAnyHashable() -> AnyHashable? {
     return nil
@@ -97,6 +106,7 @@ where Base: _SwiftNewtypeWrapper & Hashable, Base.RawValue: Hashable {
     return false
   }
 }
+#endif
 
 #if _runtime(_ObjC)
 extension _SwiftNewtypeWrapper where Self.RawValue: _ObjectiveCBridgeable {

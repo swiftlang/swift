@@ -122,7 +122,7 @@ split_embedded_sources(
   EMBEDDED NFD.swift
   EMBEDDED NativeDictionary.swift
   EMBEDDED NativeSet.swift
-    NORMAL NewtypeWrapper.swift
+  EMBEDDED NewtypeWrapper.swift
   EMBEDDED ObjectIdentifier.swift
   EMBEDDED OptionSet.swift
   EMBEDDED Optional.swift
