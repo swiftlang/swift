@@ -320,6 +320,14 @@ public:
   }
 };
 
+inline bool isApplySiteOfDifferentiableClosure(FullApplySite applySite) {
+  if (applySite.getKind() != FullApplySiteKind::ApplyInst)
+    return false;
+  auto callee = cast<ApplyInst>(applySite.getInstruction())->getCallee();
+  auto silFunctionType = callee->getType().getAs<SILFunctionType>();
+  return silFunctionType->isSupportedAsDifferentiableClosure();
+}
+
 } // end namespace swift
 
 #endif // SWIFT_SILOPTIMIZER_MANDATORY_DIFFERENTIATION_COMMON_H
