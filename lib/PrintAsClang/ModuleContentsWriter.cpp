@@ -539,6 +539,10 @@ public:
   }
 
   void forwardDeclare(const EnumDecl *ED) {
+    // Optional and Never don't need to be forward-declared.
+    if (ED->isOptionalDecl() || ED->getASTContext().getNeverDecl() == ED)
+      return;
+
     assert(ED->isCCompatibleEnum() || ED->hasClangNode());
     
     forwardDeclare(ED, [&]{

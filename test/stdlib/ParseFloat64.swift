@@ -8,6 +8,9 @@
 // Needed to declare the ABI entry point
 // REQUIRES: swift_feature_Extern
 
+// These tests exercise known bugs in older Swift stdlib
+// UNSUPPORTED: use_os_stdlib
+
 import StdlibUnittest
 
 let tests = TestSuite("FloatingPointParsing")

@@ -53,7 +53,7 @@ void ClangValueTypePrinter::printCxxImplClassName(raw_ostream &os,
 }
 
 void ClangValueTypePrinter::printMetadataAccessAsVariable(
-    const ASTContext &Context,
+    ASTContext &Context,
     raw_ostream &os, StringRef metadataFuncName,
     ArrayRef<GenericRequirement> genericRequirements, int indent,
     StringRef varName) {
@@ -66,7 +66,7 @@ void ClangValueTypePrinter::printMetadataAccessAsVariable(
 }
 
 void ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
-    const ASTContext &Context,
+    ASTContext &Context,
     raw_ostream &os, StringRef metadataFuncName,
     ArrayRef<GenericRequirement> genericRequirements, int indent,
     StringRef metadataVarName, StringRef vwTableVarName) {

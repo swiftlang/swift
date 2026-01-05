@@ -1,6 +1,6 @@
-# CaseFolding-16.0.0.txt
-# Date: 2024-04-30, 21:48:11 GMT
-# © 2024 Unicode®, Inc.
+# CaseFolding-17.0.0.txt
+# Date: 2025-07-30, 23:54:36 GMT
+# © 2025 Unicode®, Inc.
 # Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
 # For terms of use and license, see https://www.unicode.org/terms_of_use.html
 #
@@ -18,15 +18,15 @@
 # The data supports both implementations that require simple case foldings
 # (where string lengths don't change), and implementations that allow full case folding
 # (where string lengths may grow). Note that where they can be supported, the
-# full case foldings are superior: for example, they allow "MASSE" and "Maße" to match.
+# full case foldings are superior: for example, they allow "FUSS" and "Fuß" to match.
 #
 # All code points not listed in this file map to themselves.
 #
 # NOTE: case folding does not preserve normalization formats!
 #
 # For information on case folding, including how to have case folding
-# preserve normalization formats, see Section 3.13 Default Case Algorithms in
-# The Unicode Standard.
+# preserve normalization formats, see the
+# "Conformance" / "Default Case Algorithms" section of the core specification.
 #
 # ================================================================================
 # Format
@@ -1243,7 +1243,10 @@ A7C7; C; A7C8; # LATIN CAPITAL LETTER D WITH SHORT STROKE OVERLAY
 A7C9; C; A7CA; # LATIN CAPITAL LETTER S WITH SHORT STROKE OVERLAY
 A7CB; C; 0264; # LATIN CAPITAL LETTER RAMS HORN
 A7CC; C; A7CD; # LATIN CAPITAL LETTER S WITH DIAGONAL STROKE
+A7CE; C; A7CF; # LATIN CAPITAL LETTER PHARYNGEAL VOICED FRICATIVE
 A7D0; C; A7D1; # LATIN CAPITAL LETTER CLOSED INSULAR G
+A7D2; C; A7D3; # LATIN CAPITAL LETTER DOUBLE THORN
+A7D4; C; A7D5; # LATIN CAPITAL LETTER DOUBLE WYNN
 A7D6; C; A7D7; # LATIN CAPITAL LETTER MIDDLE SCOTS S
 A7D8; C; A7D9; # LATIN CAPITAL LETTER SIGMOID S
 A7DA; C; A7DB; # LATIN CAPITAL LETTER LAMBDA
@@ -1616,6 +1619,31 @@ FF3A; C; FF5A; # FULLWIDTH LATIN CAPITAL LETTER Z
 16E5D; C; 16E7D; # MEDEFAIDRIN CAPITAL LETTER O
 16E5E; C; 16E7E; # MEDEFAIDRIN CAPITAL LETTER AI
 16E5F; C; 16E7F; # MEDEFAIDRIN CAPITAL LETTER Y
+16EA0; C; 16EBB; # BERIA ERFE CAPITAL LETTER ARKAB
+16EA1; C; 16EBC; # BERIA ERFE CAPITAL LETTER BASIGNA
+16EA2; C; 16EBD; # BERIA ERFE CAPITAL LETTER DARBAI
+16EA3; C; 16EBE; # BERIA ERFE CAPITAL LETTER EH
+16EA4; C; 16EBF; # BERIA ERFE CAPITAL LETTER FITKO
+16EA5; C; 16EC0; # BERIA ERFE CAPITAL LETTER GOWAY
+16EA6; C; 16EC1; # BERIA ERFE CAPITAL LETTER HIRDEABO
+16EA7; C; 16EC2; # BERIA ERFE CAPITAL LETTER I
+16EA8; C; 16EC3; # BERIA ERFE CAPITAL LETTER DJAI
+16EA9; C; 16EC4; # BERIA ERFE CAPITAL LETTER KOBO
+16EAA; C; 16EC5; # BERIA ERFE CAPITAL LETTER LAKKO
+16EAB; C; 16EC6; # BERIA ERFE CAPITAL LETTER MERI
+16EAC; C; 16EC7; # BERIA ERFE CAPITAL LETTER NINI
+16EAD; C; 16EC8; # BERIA ERFE CAPITAL LETTER GNA
+16EAE; C; 16EC9; # BERIA ERFE CAPITAL LETTER NGAY
+16EAF; C; 16ECA; # BERIA ERFE CAPITAL LETTER OI
+16EB0; C; 16ECB; # BERIA ERFE CAPITAL LETTER PI
+16EB1; C; 16ECC; # BERIA ERFE CAPITAL LETTER ERIGO
+16EB2; C; 16ECD; # BERIA ERFE CAPITAL LETTER ERIGO TAMURA
+16EB3; C; 16ECE; # BERIA ERFE CAPITAL LETTER SERI
+16EB4; C; 16ECF; # BERIA ERFE CAPITAL LETTER SHEP
+16EB5; C; 16ED0; # BERIA ERFE CAPITAL LETTER TATASOUE
+16EB6; C; 16ED1; # BERIA ERFE CAPITAL LETTER UI
+16EB7; C; 16ED2; # BERIA ERFE CAPITAL LETTER WASSE
+16EB8; C; 16ED3; # BERIA ERFE CAPITAL LETTER AY
 1E900; C; 1E922; # ADLAM CAPITAL LETTER ALIF
 1E901; C; 1E923; # ADLAM CAPITAL LETTER DAALI
 1E902; C; 1E924; # ADLAM CAPITAL LETTER LAAM

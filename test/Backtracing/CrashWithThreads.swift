@@ -70,11 +70,9 @@ while (true) {
 
 // make sure there are no threads before the crashing thread (rdar://164566321)
 
-// we expect the first thread not to be thread 0, it should be the crashing thread instead
-// CHECK-NOT: Thread 0{{( ".*")?}}:
-
-// we expect a crash on a thread other than 0
-// CHECK: Thread {{[1-9][0-9]*}} {{(".*" )?}}crashed:
+// we expect the first thread not to be another thread, it should be the crashing thread instead
+// CHECK-NOT: Thread {{[0-9]+( ".*")?}}:
+// CHECK: Thread {{[0-9]+}} {{(".*" )?}}crashed:
 
 // CHECK: 0                    0x{{[0-9a-f]+}} reallyCrashMe() + {{[0-9]+}} in CrashWithThreads at {{.*}}/CrashWithThreads
 // CHECK-NEXT: 1 [ra]          0x{{[0-9a-f]+}} crashMe() + {{[0-9]+}} in CrashWithThreads at {{.*}}/CrashWithThreads

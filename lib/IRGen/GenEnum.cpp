@@ -1825,11 +1825,6 @@ namespace {
       return cast<LoadableTypeInfo>(*ElementsWithPayload[0].ti);
     }
 
-    llvm::Value *emitPayloadMetadataForLayout(IRGenFunction &IGF,
-                                     SILType T) const {
-      return IGF.emitTypeMetadataRefForLayout(getPayloadType(IGF.IGM, T));
-    }
-
     /// More efficient value semantics implementations for certain enum layouts.
     enum CopyDestroyStrategy {
       /// No special behavior.

@@ -109,6 +109,30 @@ struct IsUnsafe { int *p; };
 struct HasUnsafe : TTake2<PassThru<HasUnsafe>, IsUnsafe> {};
 using AlsoUnsafe = PassThru<HasUnsafe>;
 
+struct SWIFT_UNSAFE ExplicitlyUnsafeStruct {};
+struct HasUnsafeMember {
+  HasUnsafeMember();
+  ExplicitlyUnsafeStruct member;
+};
+
+struct HasUnsafeBase : ExplicitlyUnsafeStruct {
+  HasUnsafeBase();
+};
+
+struct SWIFT_SAFE WrapsUnsafeMember {
+  WrapsUnsafeMember();
+  ExplicitlyUnsafeStruct member;
+};
+
+struct SWIFT_SAFE WrapsUnsafeBase : ExplicitlyUnsafeStruct {
+  WrapsUnsafeBase();
+};
+
+struct SWIFT_SAFE WrapsUnannotatedMember {
+  WrapsUnannotatedMember();
+  Unannotated member;
+};
+
 //--- test.swift
 
 import Test
@@ -228,4 +252,21 @@ func useTTakeUnsafeTuple(x: HasUnsafe) {
 func useTTakeUnsafeTuple(x: AlsoUnsafe) {
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
   _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func explicitlyUnsafeTypes(a: ExplicitlyUnsafeStruct, 
+                           b: HasUnsafeMember,
+                           c: HasUnsafeBase,
+                           d: WrapsUnsafeMember,
+                           e: WrapsUnsafeBase,
+                           f: WrapsUnannotatedMember) {
+ // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+ _ = a // expected-note{{reference to parameter 'a' involves unsafe type}} 
+ // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+ _ = b // expected-note{{reference to parameter 'b' involves unsafe type}}
+ // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+ _ = c // expected-note{{reference to parameter 'c' involves unsafe type}}
+ _ = d
+ _ = e
+ _ = f
 }

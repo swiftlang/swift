@@ -26,7 +26,7 @@
 
 using namespace swift;
 
-static void printKnownStruct(const ASTContext &astContext,
+static void printKnownStruct(ASTContext &astContext,
     PrimitiveTypeMapping &typeMapping, raw_ostream &os, StringRef name,
     const IRABIDetailsProvider::TypeRecordABIRepresentation &typeRecord) {
   assert(typeRecord.getMembers().size() > 1);
@@ -39,7 +39,7 @@ static void printKnownStruct(const ASTContext &astContext,
   os << "};\n";
 }
 
-static void printKnownTypedef(const ASTContext &astContext,
+static void printKnownTypedef(ASTContext &astContext,
     PrimitiveTypeMapping &typeMapping, raw_ostream &os, StringRef name,
     const IRABIDetailsProvider::TypeRecordABIRepresentation &typeRecord) {
   assert(typeRecord.getMembers().size() == 1);
@@ -49,7 +49,7 @@ static void printKnownTypedef(const ASTContext &astContext,
   os << " " << name << ";\n";
 }
 
-static void printKnownType(const ASTContext &astContext,
+static void printKnownType(ASTContext &astContext,
     PrimitiveTypeMapping &typeMapping, raw_ostream &os, StringRef name,
     const IRABIDetailsProvider::TypeRecordABIRepresentation &typeRecord) {
   if (typeRecord.getMembers().size() == 1)
