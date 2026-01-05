@@ -964,7 +964,7 @@ Here is the notation used by the compiler when printing this declaration's SIL f
 (Int, @guaranteed String, @in_guaranteed AddressOnly) -> ()
 \end{verbatim}
 \end{quote}
-The \texttt{Int} parameter does not have a convention annotation, so it is passed directly. The \texttt{Int} type is \index{trivial type}trivial value, so its values can be moved and copied without ownership concerns. The \texttt{String} parameter is also passed directly, but this time, the \verb|@guaranteed| convention indicates that ownership of the string is retained by the caller. Finally, the \texttt{AddressOnly} parameter is address-only, so the \verb|@in_guaranteed| convention is used to pass the value indirectly, and once again, the caller retains ownership of the value. Since \texttt{foo()} does not state a return type, the SIL function type has zero results.
+The \texttt{Int} parameter does not have a convention annotation, so it is passed directly. The \texttt{Int} type is \index{trivial type}trivial, so its values can be moved and copied without ownership concerns. The \texttt{String} parameter is also passed directly, but this time, the \verb|@guaranteed| convention indicates that ownership of the string is retained by the caller. Finally, the \texttt{AddressOnly} parameter is address-only, so the \verb|@in_guaranteed| convention is used to pass the value indirectly, and once again, the caller retains ownership of the value. Since \texttt{foo()} does not state a return type, the SIL function type has zero results.
 \end{example}
 
 \begin{example}
@@ -981,7 +981,7 @@ Here is its SIL function type:
 <T, U> (@in_guaranteed T, @in_guaranteed U) -> (@out U, @out T)
 \end{verbatim}
 \end{quote}
-Both parameters are passed indirectly, with the caller retaining ownership (so in fact the implementation of the function most copy these values). The SIL function type also returns two results indirectly (at the machine level, the caller provides a pair of return buffers, large enough to hold both results.)
+Both parameters are passed indirectly, with the caller retaining ownership (so in fact the implementation of the function must copy these values). The SIL function type also returns two results indirectly (at the machine level, the caller provides a pair of return buffers, large enough to hold both results.)
 \end{example}
 
 \paragraph{Re-abstraction thunks.}
