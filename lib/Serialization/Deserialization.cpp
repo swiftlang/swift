@@ -3113,7 +3113,8 @@ ModuleDecl *ModuleFile::getModule(ImportPath::Module name,
       name.front().Item == getContext().getRealModuleName(parentName)) {
     if (!UnderlyingModule && allowLoading) {
       auto importer = getContext().getClangModuleLoader();
-      assert(importer && "no way to import shadowed module");
+      if (!importer)
+        return nullptr;
       UnderlyingModule =
           importer->loadModule(SourceLoc(), name.getTopLevelPath());
     }
