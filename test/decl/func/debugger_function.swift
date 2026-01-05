@@ -50,7 +50,7 @@ func test2() -> Int {
 @LLDBDebuggerFunction
 func test3() {
   do {
-  } catch {
+  } catch _ {
   }
 }
 
@@ -58,7 +58,7 @@ func test3() {
 func test4() {
   do {
     do {}
-    catch {} // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
-  } catch {
+    catch _ {} // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+  } catch _ {
   }
 }

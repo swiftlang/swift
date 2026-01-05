@@ -25,7 +25,7 @@ func untypedThrowsInBody() {
   // expected-warning@+1{{untyped throws is not available in Embedded Swift; add a thrown error type with '(type)'}}{{12-12=(<#thrown error type#>)}}
   do throws {
     throw MyError.failed
-  } catch {
+  } catch _ {
   }
 
   // expected-warning@+1{{untyped throws is not available in Embedded Swift; add a thrown error type with '(type)'}}{{19-19=(<#thrown error type#>)}}

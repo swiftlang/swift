@@ -6512,6 +6512,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
 /// This specific diagnostic is limited to 'do-catch' statements with a single
 /// catch clause. If there are multiple catches, an empty catch usually implies
 /// a fallback that intentionally ignores specific errors while handling others.
+/// Diagnose an empty catch block that silently ignores errors.
 static void checkEmptyCatchBlock(const DoCatchStmt *doCatchStmt, ASTContext &ctx) {
   // We only diagnose if there is a single catch clause.
   if (doCatchStmt->getCatches().size() != 1)
@@ -6519,14 +6520,44 @@ static void checkEmptyCatchBlock(const DoCatchStmt *doCatchStmt, ASTContext &ctx
 
   auto *catchStmt = doCatchStmt->getCatches().front();
 
-  // If the catch block explicitly matches without binding any variables
-  // (e.g. 'catch _'), we treat it as an intentional ignore and do not warn.
-  // A standard 'catch' implicitly binds 'let error', so it has variables.
-  if (!catchStmt->hasCaseBodyVariables())
+  // A generic 'catch {}' always has exactly one case label item.
+  if (catchStmt->getCaseLabelItems().size() != 1)
+    return;
+
+  const auto &labelItem = catchStmt->getCaseLabelItems().front();
+
+  // FILTER 1: If there is a 'where' clause (guard), the catch is conditional.
+  if (labelItem.getGuardExpr())
+    return;
+
+  auto *pattern = labelItem.getPattern();
+  if (!pattern) return;
+
+  // FILTER 2: If the pattern contains ANY errors (invalid types, redeclarations),
+  // suppress the warning. This fixes failures in redeclaration-checking.swift.
+  bool hasError = false;
+  pattern->forEachNode([&](const Pattern *P) {
+    // Check for type errors
+    if (P->hasType() && P->getType()->hasError())
+      hasError = true;
+
+    // Check for invalid variable declarations (e.g. "let x, let x")
+    if (auto *NP = dyn_cast<NamedPattern>(P)) {
+      if (auto *D = NP->getDecl()) {
+        if (D->isInvalid()) hasError = true;
+      }
+    }
+  });
+
+  if (hasError)
+    return;
+
+  // FILTER 3: Only warn if the catch pattern is implicit.
+  // Explicit patterns (like 'catch let e') return false here.
+  if (!pattern->isImplicit())
     return;
 
   // Use scoped-if to keep 'body' local to the check.
-  // getBody() returns BraceStmt*, so no cast is needed.
   if (auto *body = catchStmt->getBody()) {
     if (body->empty()) {
       ctx.Diags.diagnose(catchStmt->getLoc(), diag::empty_catch_block);

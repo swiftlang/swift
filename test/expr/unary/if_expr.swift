@@ -1172,7 +1172,7 @@ func tryIf13() throws -> Int {
     // Okay.
     do {
       _ = try tryIf4()
-    } catch {}
+    } catch _ {}
 
     print("hello")
     throw Err()
@@ -1218,14 +1218,14 @@ func tryIf18() {
   // Make sure we don't warn here.
   do {
     let _ = if .random() { try tryIf4() } else { 1 }
-  } catch {}
+  } catch _ {}
 }
 
 func tryIf19() {
   // Make sure we don't warn here.
   do {
     let _ = if .random() { throw Err() } else { 1 }
-  } catch {}
+  } catch _ {}
 }
 
 func tryIf19() throws -> Int {

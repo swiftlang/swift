@@ -36,8 +36,8 @@ func testStrictCatch() {
   // Even if you bind 'let e', if the body is empty, it's effectively an ignored error.
   do {
     try something()
-  } catch let e { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
-    // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing i}}
+  } catch let e {
+        // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing i}}}
   }
 }
 

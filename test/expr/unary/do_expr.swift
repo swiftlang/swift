@@ -122,13 +122,13 @@ func testEmpty2() -> Int {
 }
 
 func testEmpty3() -> Int {
-  let _ = do { try throwsError() } catch {}
+  let _ = do { try throwsError() } catch _ {}
   // expected-error@-1 {{expected expression in branch of 'do-catch' expression}}
 }
 
 func testEmpty4() -> Int {
   // Fine, treated as a statement.
-  do { try throwsError() } catch {}
+  do { try throwsError() } catch _ {}
 }
 
 func testNonExhaustive1() throws -> Int {
@@ -271,7 +271,7 @@ func tryDo13() throws -> Int {
     // Okay.
     do {
       _ = try tryDo4()
-    } catch {}
+    } catch _ {}
 
     print("hello")
     throw Err()
@@ -314,14 +314,14 @@ func tryDo18() {
   // Make sure we don't warn here.
   do {
     let _ = do { try tryDo4() }
-  } catch {}
+  } catch _ {}
 }
 
 func tryDo19() {
   // Make sure we don't warn here.
   do {
     let _ = do { throw Err() }
-  } catch {}
+  } catch _ {}
 }
 
 func tryDo19() throws -> Int {
