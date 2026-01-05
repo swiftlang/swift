@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-module-interface(%t/Fancy.swiftinterface) %s -module-name Library
+// RUN: %target-swift-emit-module-interface(%t/Fancy.swiftinterface) %s -module-name Library -DINTERFACE_GEN
 // RUN: %target-swift-typecheck-module-from-interface(%t/Fancy.swiftinterface) -module-name Library
 // RUN: %FileCheck %s < %t/Fancy.swiftinterface
 
@@ -58,3 +58,18 @@ public protocol R<E>: ~Copyable & ~Escapable {
 // CHECK: public typealias E = Swift.Int
 public struct N: R<Int> & B<Float64> & ~Copyable  {
 }
+
+public protocol P1<AT> { // expected-note {{witness 'Int' inferred from protocol 'P1'}}
+  associatedtype AT
+}
+
+public protocol P2<AT> {
+  associatedtype AT
+}
+
+// CHECK-COUNT-1: public typealias AT = Swift.Int
+public struct S1: P1<Int>, P2<Int> {}
+
+#if !INTERFACE_GEN
+public struct S2: P1<Int>, P2<String> {} // expected-error {{conflicting type witnesses for associated type 'AT': 'Int' vs 'String'}}
+#endif

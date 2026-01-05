@@ -481,6 +481,8 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
   // Look for a parameterized protocol type in the conformance context's
   // inheritance clause.
   bool deducedFromParameterizedProtocolType = false;
+  Type firstWitness;
+  ProtocolDecl *firstProtocol = nullptr;
   auto inherited = (isa<NominalTypeDecl>(dc)
                     ? cast<NominalTypeDecl>(dc)->getInherited()
                     : cast<ExtensionDecl>(dc)->getInherited());
@@ -488,7 +490,45 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     if (auto inheritedTy = inherited.getResolvedType(index)) {
       if (auto typeWitness = resolveTypeWitnessViaParameterizedProtocol(
             inheritedTy, assocType)) {
-        recordTypeWitness(conformance, assocType, typeWitness, nullptr);
+        // Check for conflicts with previously resolved witnesses.
+        if (deducedFromParameterizedProtocolType && firstWitness) {
+          if (!typeWitness->isEqual(firstWitness)) {
+            // Conflict detected
+            auto &ctx = conformance->getDeclContext()->getASTContext();
+            ctx.Diags.diagnose(conformance->getLoc(),
+                               diag::ambiguous_witnesses_wrong_type,
+                               assocType->getName(), firstWitness, typeWitness);
+            if (firstProtocol) {
+              ctx.Diags.diagnose(firstProtocol->getLoc(),
+                                 diag::ambiguous_witness_note_protocol,
+                                 firstProtocol->getName(), firstWitness);
+            }
+            return ResolveWitnessResult::ExplicitFailed;
+          }
+          // Witness types match - no need to record again.
+          continue;
+        }
+        // Keeping track of the first witness
+        firstWitness = typeWitness;
+        if (auto *ppt = inheritedTy->getAs<ParameterizedProtocolType>()) {
+          firstProtocol = ppt->getProtocol();
+        }
+        TypeDecl *existingTypeDecl = nullptr;
+        SmallVector<ValueDecl *, 2> candidates;
+        dc->lookupQualified(dc->getSelfNominalTypeDecl(),
+                            assocType->createNameRef(),
+                            dc->getSelfNominalTypeDecl()->getLoc(),
+                            NL_QualifiedDefault | NL_OnlyTypes, candidates);
+        for (auto *candidate : candidates) {
+          if (auto *typeAlias = dyn_cast<TypeAliasDecl>(candidate)) {
+            if (typeAlias->isSynthesized() &&
+                typeAlias->getUnderlyingType()->isEqual(typeWitness)) {
+              existingTypeDecl = typeAlias;
+            }
+          }
+        }
+        recordTypeWitness(conformance, assocType, typeWitness,
+                          existingTypeDecl);
         deducedFromParameterizedProtocolType = true;
       }
     }

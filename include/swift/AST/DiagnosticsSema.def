@@ -3085,6 +3085,11 @@ ERROR(witness_not_as_sendable,none,
 NOTE(less_sendable_reqt_here,none,
      "expected sendability to match requirement here",
      ())
+ERROR(ambiguous_witnesses_wrong_type,none,
+      "conflicting type witnesses for associated type %0: %1 vs %2",
+      (DeclName, Type, Type))
+NOTE(ambiguous_witness_note_protocol,none,
+     "witness %1 inferred from protocol %0", (Identifier, Type))
 WARNING(witness_not_accessible_strict_check,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
