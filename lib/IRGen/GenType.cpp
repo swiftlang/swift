@@ -2323,8 +2323,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
 
   case TypeKind::BuiltinBorrow: {
-    llvm_unreachable("todo");
-    //return convertBuiltinBorrowType(cast<BuiltinBorrowType>(ty));
+    return convertBuiltinBorrowType(cast<BuiltinBorrowType>(ty));
   }
 
   case TypeKind::PrimaryArchetype:
