@@ -6557,6 +6557,11 @@ static void checkEmptyCatchBlock(const DoCatchStmt *doCatchStmt, ASTContext &ctx
   if (!pattern->isImplicit())
     return;
 
+  if (auto *doBody = dyn_cast<BraceStmt>(doCatchStmt->getBody())) {
+    if (doBody->getElements().empty())
+      return;
+  }
+
   // Use scoped-if to keep 'body' local to the check.
   if (auto *body = catchStmt->getBody()) {
     if (body->empty()) {
