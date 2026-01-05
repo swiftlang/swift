@@ -465,7 +465,7 @@ extension Dictionary._Variant {
   }
 
   @inlinable
-  internal func mapValues<T>(
+  internal func mapValuesWithKeys<T>(
     _ transform: (Key, Value) throws -> T
   ) rethrows -> _NativeDictionary<Key, T> {
 #if _runtime(_ObjC)

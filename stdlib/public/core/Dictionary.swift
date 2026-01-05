@@ -944,10 +944,10 @@ extension Dictionary {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the dictionary.
   @inlinable
-  public func mapValues<T>(
+  public func mapValuesWithKeys<T>(
     _ transform: (Key, Value) throws -> T
   ) rethrows -> Dictionary<Key, T> {
-    return try Dictionary<Key, T>(_native: _variant.mapValues(transform))
+    return try Dictionary<Key, T>(_native: _variant.mapValuesWithKeys(transform))
   }
 
   /// Returns a new dictionary containing only the key-value pairs that have

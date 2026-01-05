@@ -2013,9 +2013,9 @@ DictionaryTestSuite.test("mapValues(_:)") {
   }
 }
 
-DictionaryTestSuite.test("mapValues.keycontext") {
+DictionaryTestSuite.test("mapValuesWithKeys") {
   let d1 = [10: 1010, 20: 1020, 30: 1030]
-  let d2 = d1.mapValues { "\($0): \($1)" }
+  let d2 = d1.mapValuesWithKeys { "\($0): \($1)" }
 
   expectEqual(d1.count, d2.count)
   expectEqual(d1.keys.first, d2.keys.first)
@@ -2031,7 +2031,7 @@ DictionaryTestSuite.test("mapValues.keycontext") {
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     MinimalHashableValue.timesHashIntoWasCalled = 0
 
-    let d4 = d3.mapValues { "\($0): \($1)" }
+    let d4 = d3.mapValuesWithKeys { "\($0): \($1)" }
     expectEqual(d4.count, d3.count)
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
     expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
