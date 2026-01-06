@@ -2447,6 +2447,44 @@ synthesizeYieldingMutateCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
 }
 
 static std::pair<BraceStmt *, bool>
+synthesizeBorrowAndMutateAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
+  // TODO: Handle property wrappers, property observers
+  auto storage = accessor->getStorage();
+
+  // Build a reference to the storage.
+  Expr *ref = buildStorageReference(
+      accessor, storage, TargetImpl::Ordinary,
+      /*isUsedForGetAccess=*/true,
+      /*isUsedForSetAccess=*/accessor->getAccessorKind() ==
+          AccessorKind::Mutate,
+      ctx);
+  if (ref != nullptr) {
+    // Wrap it with an `&` marker if this is a mutate.
+    ref = maybeWrapInOutExpr(ref, ctx);
+  }
+
+  SmallVector<ASTNode, 2> body;
+  if (ref != nullptr) {
+    body.push_back(ReturnStmt::createImplicit(ctx, ref));
+  }
+
+  SourceLoc loc =
+      accessor->getLoc().isValid() ? accessor->getLoc() : storage->getLoc();
+  return {BraceStmt::create(ctx, loc, body, loc, true),
+          /*isTypeChecked=*/true};
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeBorrowAccessorBody(AccessorDecl *borrow, ASTContext &ctx) {
+  return synthesizeBorrowAndMutateAccessorBody(borrow, ctx);
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeMutateAccessorBody(AccessorDecl *mutate, ASTContext &ctx) {
+  return synthesizeBorrowAndMutateAccessorBody(mutate, ctx);
+}
+
+static std::pair<BraceStmt *, bool>
 synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   auto *accessor = cast<AccessorDecl>(fn);
   auto &ctx = accessor->getASTContext();
@@ -2474,6 +2512,12 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   case AccessorKind::YieldingMutate:
     return synthesizeYieldingMutateCoroutineBody(accessor, ctx);
 
+  case AccessorKind::Borrow:
+    return synthesizeBorrowAccessorBody(accessor, ctx);
+
+  case AccessorKind::Mutate:
+    return synthesizeMutateAccessorBody(accessor, ctx);
+
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Address:
@@ -2482,12 +2526,6 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
 
   case AccessorKind::Init:
     llvm_unreachable("init accessor not yet implemented");
-
-  case AccessorKind::Borrow:
-    llvm_unreachable("borrow accessor is not yet implemented");
-
-  case AccessorKind::Mutate:
-    llvm_unreachable("mutate accessor is not yet implemented");
   }
   llvm_unreachable("bad synthesized function kind");
 }

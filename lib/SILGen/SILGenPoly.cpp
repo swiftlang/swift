@@ -5305,8 +5305,9 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
                        "reabstraction of returns_inner_pointer function");
       return SGF.emitManagedCopy(Loc, resultValue, resultTL);
     case ResultConvention::GuaranteedAddress:
-    case ResultConvention::Guaranteed:
     case ResultConvention::Inout:
+      return SGF.emitManagedRValueWithCleanup(resultValue, resultTL);
+    case ResultConvention::Guaranteed:
       llvm_unreachable("borrow/mutate accessor is not yet implemented");
     }
     llvm_unreachable("bad result convention!");
