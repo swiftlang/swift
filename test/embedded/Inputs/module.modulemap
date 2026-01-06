@@ -1,0 +1,3 @@
+module StructAsOptionSet {
+  header "struct-as-option-set.h"
+}
