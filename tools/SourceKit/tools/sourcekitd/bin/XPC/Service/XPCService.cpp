@@ -225,13 +225,6 @@ static std::string getSwiftExecutablePath() {
   return path.str().str();
 }
 
-static std::string getDiagnosticDocumentationPath() {
-  llvm::SmallString<128> path;
-  getToolchainPrefixPath(path);
-  llvm::sys::path::append(path, "share", "doc", "swift", "diagnostics");
-  return path.str().str();
-}
-
 static dispatch_queue_t msgHandlingQueue;
 static dispatch_queue_t requestQueue;
 
@@ -291,8 +284,7 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
         } else {
           dispatch_async(requestQueue, handler);
         }
-      } else if (xpc_object_t contents =
-                     xpc_dictionary_get_value(event, "ping")) {
+      } else if (xpc_dictionary_get_value(event, "ping") != nullptr) {
         // Ping back.
         xpc_object_t reply = xpc_dictionary_create_reply(event);
         xpc_release(event);
@@ -341,7 +333,6 @@ static void getInitializationInfo(xpc_connection_t peer) {
 
   assert(xpc_get_type(reply) == XPC_TYPE_DICTIONARY);
   uint64_t Delay = xpc_dictionary_get_uint64(reply, xpc::KeySemaEditorDelay);
-  xpc_release(reply);
 
   if (Delay != 0) {
     llvm::SmallString<4> Buf;
@@ -351,6 +342,23 @@ static void getInitializationInfo(xpc_connection_t peer) {
     }
     setenv("SOURCEKIT_DELAY_SEMA_EDITOR", Buf.c_str(), /*overwrite=*/1);
   }
+
+  // Only call once, in case there is a second connection.
+  static std::once_flag flag;
+  std::call_once(flag, [reply] {
+    std::vector<std::string> registeredPlugins;
+    xpc_object_t plugins = xpc_dictionary_get_value(reply, xpc::KeyPlugins);
+    if (plugins && xpc_get_type(plugins) == XPC_TYPE_ARRAY)
+      for (size_t i = 0, e = xpc_array_get_count(plugins); i < e; ++i)
+        registeredPlugins.push_back(xpc_array_get_string(plugins, i));
+    sourcekitd::PluginInitParams pluginParams(
+        /*isClientOnly=*/false, sourcekitd::pluginRegisterRequestHandler,
+        sourcekitd::pluginRegisterCancellationHandler,
+        sourcekitd::pluginGetOpaqueSwiftIDEInspectionInstance());
+    sourcekitd::loadPlugins(registeredPlugins, pluginParams);
+  });
+
+  xpc_release(reply);
 }
 
 static void sourcekitdServer_event_handler(xpc_connection_t peer) {
@@ -400,7 +408,6 @@ int main(int argc, const char *argv[]) {
         return xpcUIdentFromSKDUID(uid).c_str();
       });
   sourcekitd::initializeService(getSwiftExecutablePath(), getRuntimeLibPath(),
-                                getDiagnosticDocumentationPath(),
                                 postNotification);
 
   // Increase the file descriptor limit.

@@ -111,7 +111,7 @@ public:
   }
 };
 
-/// A set which knowns its size.
+/// A set which knows its size.
 ///
 /// This template adds a size property to a base `Set`.
 template <class Set>

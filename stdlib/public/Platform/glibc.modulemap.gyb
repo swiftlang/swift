@@ -19,7 +19,7 @@
 /// It's not named just Glibc so that it doesn't conflict in the event of a
 /// future official glibc modulemap.
 module SwiftGlibc [system] {
-% if CMAKE_SDK in ["LINUX", "OPENBSD"]:
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "OPENBSD"]:
       link "m"
 % end
 % if CMAKE_SDK in ["LINUX", "FREEBSD", "OPENBSD", "CYGWIN"]:
@@ -48,6 +48,14 @@ module SwiftGlibc [system] {
 
   export *
 }
+
+% if CMAKE_SDK == "FREEBSD":
+module signal_h [system] {
+  config_macros _BSD_VISIBLE, _POSIX_VISIBLE
+  header "signal.h"
+  export *
+}
+% end
 
 module CUUID [system] {
   header "uuid/uuid.h"

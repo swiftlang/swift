@@ -2,13 +2,15 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+import Foundation
 
 extension Dictionary {
   @inline(__always)
@@ -31,6 +33,18 @@ extension Dictionary {
 extension Sequence {
   func sorted<T: Comparable>(by keyPath: KeyPath<Element, T>) -> [Element] {
     sorted(by: { $0[keyPath: keyPath] < $1[keyPath: keyPath] })
+  }
+}
+
+extension Collection where Element: Equatable {
+  func commonPrefix(with other: some Collection<Element>) -> SubSequence {
+    var (i, j) = (self.startIndex, other.startIndex)
+    while i < self.endIndex, j < other.endIndex {
+      guard self[i] == other[j] else { break }
+      self.formIndex(after: &i)
+      other.formIndex(after: &j)
+    }
+    return self[..<i]
   }
 }
 
@@ -78,7 +92,7 @@ extension String {
       let result = scanner.consumeWhole { consumer in
         switch consumer.peek {
         case "\\", "\"":
-          consumer.append(Byte(ascii: "\\"))
+          consumer.append("\\")
         case " ", "$": // $ is potentially a variable reference
           needsQuotes = true
         default:
@@ -131,4 +145,13 @@ extension String {
       return bytes.isUnchanged ? self : String(utf8: bytes)
     }
   }
+}
+
+/// Pattern match by `is` property. E.g. `case \.isNewline: ...`
+func ~= <T>(keyPath: KeyPath<T, Bool>, subject: T) -> Bool {
+  return subject[keyPath: keyPath]
+}
+
+func ~= <T>(keyPath: KeyPath<T, Bool>, subject: T?) -> Bool {
+  return subject?[keyPath: keyPath] == true
 }

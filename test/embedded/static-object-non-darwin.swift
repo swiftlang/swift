@@ -1,9 +1,9 @@
 // RUN: %target-swift-frontend -target armv7em-none-none-eabi -parse-as-library -module-name main -O -emit-ir %s -enable-experimental-feature Embedded -Xllvm -link-embedded-runtime=0 | %FileCheck %s
 // RUN: %target-swift-frontend -target armv7em-none-none-eabi -parse-as-library -module-name main -Osize -emit-ir %s -enable-experimental-feature Embedded -Xllvm -link-embedded-runtime=0 | %FileCheck %s
 
+// UNSUPPORTED: CPU=wasm32
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: CODEGENERATOR=ARM
 // REQUIRES: embedded_stdlib_cross_compiling
 // REQUIRES: swift_feature_Embedded

@@ -8,8 +8,6 @@
 // RUN: %target-swift-frontend -emit-ir -sanitize=address -sanitize-coverage=edge,indirect-calls %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_INDIRECT_CALLS
 // RUN: %target-swift-frontend -emit-ir -sanitize=address -sanitize-coverage=edge,8bit-counters %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_8BIT_COUNTERS
 // RUN: %target-swift-frontend -emit-ir -sanitize=fuzzer %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_TRACE_CMP
-// These sanitizers aren't supported when targeting Wasm.
-// UNSUPPORTED: wasm
 
 #if canImport(Darwin)
   import Darwin
@@ -19,6 +17,8 @@
   import Android
 #elseif os(Windows)
   import CRT
+#elseif os(WASI)
+  import WASILibc
 #else
 #error("Unsupported platform")
 #endif

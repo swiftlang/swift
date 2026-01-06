@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.28)
 
 project(swift-inspect
-  LANGUAGES CXX Swift)
+  LANGUAGES C CXX Swift)
+
+include(FetchContent)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -12,7 +14,19 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-find_package(ArgumentParser CONFIG REQUIRED)
+FetchContent_Declare(ArgumentParser
+  GIT_REPOSITORY  https://github.com/apple/swift-argument-parser
+  GIT_TAG         1.5.0
+  GIT_SHALLOW     TRUE
+  EXCLUDE_FROM_ALL
+  FIND_PACKAGE_ARGS CONFIG)
+
+block(SCOPE_FOR VARIABLES)
+  set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "Build as a shared library")
+  set(BUILD_TESTING OFF CACHE INTERNAL "Skip building ArgumentParser tests")
+  set(BUILD_EXAMPLES OFF CACHE INTERNAL "Skip building ArgumentParser examples")
+  FetchContent_MakeAvailable(ArgumentParser)
+endblock()
 
 add_library(SymbolicationShims INTERFACE)
 target_include_directories(SymbolicationShims INTERFACE
@@ -27,7 +41,17 @@ if(WIN32)
     Sources/SwiftInspectClient/SwiftInspectClient.cpp)
   target_link_libraries(SwiftInspectClient PRIVATE
     SwiftInspectClientInterface)
-elseif(LINUX)
+endif()
+
+if (ANDROID)
+  add_library(AndroidCLib STATIC
+    Sources/AndroidCLib/heap.c)
+  target_include_directories(AndroidCLib PUBLIC
+    Sources/AndroidCLib/include)
+  set_property(TARGET AndroidCLib PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
+
+if(ANDROID OR LINUX)
   add_library(LinuxSystemHeaders INTERFACE)
   target_include_directories(LinuxSystemHeaders INTERFACE
     Sources/SwiftInspectLinux/SystemHeaders)
@@ -38,6 +62,8 @@ elseif(LINUX)
     Sources/SwiftInspectLinux/MemoryMap.swift
     Sources/SwiftInspectLinux/Process.swift
     Sources/SwiftInspectLinux/ProcFS.swift
+    Sources/SwiftInspectLinux/PTrace.swift
+    Sources/SwiftInspectLinux/RegisterSet.swift
     Sources/SwiftInspectLinux/SymbolCache.swift)
   target_compile_options(SwiftInspectLinux PRIVATE
     -Xcc -D_GNU_SOURCE)
@@ -52,6 +78,7 @@ add_executable(swift-inspect
   Sources/swift-inspect/Operations/DumpConformanceCache.swift
   Sources/swift-inspect/Operations/DumpGenericMetadata.swift
   Sources/swift-inspect/Operations/DumpRawMetadata.swift
+  Sources/swift-inspect/AndroidRemoteProcess.swift
   Sources/swift-inspect/Backtrace.swift
   Sources/swift-inspect/DarwinRemoteProcess.swift
   Sources/swift-inspect/LinuxRemoteProcess.swift
@@ -71,7 +98,12 @@ target_link_libraries(swift-inspect PRIVATE
 if(WIN32)
   target_link_libraries(swift-inspect PRIVATE
     SwiftInspectClientInterface)
-elseif(LINUX)
+endif()
+if(ANDROID)
+  target_link_libraries(swift-inspect PRIVATE
+    AndroidCLib)
+endif()
+if(ANDROID OR LINUX)
   target_link_libraries(swift-inspect PRIVATE
     SwiftInspectLinux)
 endif()

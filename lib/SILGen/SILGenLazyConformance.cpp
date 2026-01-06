@@ -110,6 +110,13 @@ void SILGenModule::useConformancesFromType(CanType type) {
     if (isa<ProtocolDecl>(decl))
       return;
 
+    // If this is an imported noncopyable type with a deinitializer, record it.
+    if (decl->hasClangNode() && !decl->canBeCopyable() &&
+        decl->getValueTypeDestructor() &&
+        importedNontrivialNoncopyableTypes.insert(decl).second) {
+      visitImportedNontrivialNoncopyableType(decl);
+    }
+
     auto genericSig = decl->getGenericSignature();
     if (!genericSig)
       return;

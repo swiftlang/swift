@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -41,13 +41,14 @@ extension ASTGenVisitor {
       preconditionFailure("Node not part of the parent?")
     }
 
-    var paramKind: BridgedGenericTypeParamKind = .type
-
-    if node.specifier?.tokenKind == .keyword(.each) {
-      paramKind = .pack
-    } else if node.specifier?.tokenKind == .keyword(.let) {
-      paramKind = .value
-    }
+    let paramKind: swift.GenericTypeParamKind =
+      if node.specifier?.tokenKind == .keyword(.each) {
+        .pack
+      } else if node.specifier?.tokenKind == .keyword(.let) {
+        .value
+      } else {
+        .type
+      }
 
     return .createParsed(
       self.ctx,
@@ -61,26 +62,92 @@ extension ASTGenVisitor {
     )
   }
 
+  func generate(layoutRequirement node: LayoutRequirementSyntax) -> BridgedLayoutConstraint {
+    let id = self.ctx.getIdentifier(node.layoutSpecifier.rawText.bridged)
+    let constraint = BridgedLayoutConstraint.getLayoutConstraint(self.ctx, id: id)
+
+    if constraint.isNull || !constraint.isKnownLayout {
+      fatalError("(compiler bug) invalid layout requirement")
+    }
+
+    if !constraint.isTrivial {
+      guard node.size == nil, node.alignment == nil else {
+        // TODO: Diagnostics.
+        fatalError("(compiler bug) non-trivial layout constraint with arguments")
+      }
+      return constraint
+    }
+
+    guard let sizeToken = node.size else {
+      guard node.alignment == nil else {
+        // TODO: Diagnostics.
+        fatalError("(compiler bug) size is nil, but alignment is not nil?")
+      }
+      return constraint
+    }
+
+    let size: Int
+    guard let parsed = Int(sizeToken.text, radix: 10) else {
+      fatalError("(compiler bug) invalid size integer literal for a layout constraint")
+    }
+    size = parsed
+
+    let alignment: Int?
+    if let alignmentToken = node.alignment {
+      guard let parsed = Int(alignmentToken.text, radix: 10) else {
+        fatalError("(compiler bug) invalid alignment integer literal for a layout constraint")
+      }
+      alignment = parsed
+    } else {
+      alignment = nil
+    }
+
+    return .getLayoutConstraint(
+      self.ctx,
+      kind: constraint.kind,
+      size: size,
+      alignment: alignment ?? 0
+    )
+  }
+
   func generate(genericWhereClause node: GenericWhereClauseSyntax) -> BridgedTrailingWhereClause {
-    let requirements = node.requirements.lazy.map {
-      switch $0.requirement {
+    let requirements  = node.requirements.lazy.map { elem -> BridgedRequirementRepr in
+
+      // Unwrap 'repeat T' to  (isRequirementExpansion: true, type: T)
+      func generateIsExpansionPattern<Node: SyntaxProtocol>(type node: Node) -> (isExpansionPattern: Bool, type: Node) {
+        if let expansion = node.as(PackExpansionTypeSyntax.self) {
+          // Force unwrapping is safe because both 'TypeSyntax' and 'SameTypeRequirementSyntax.LeftType' accept 'TypeSyntax'.
+          return (true, Node(expansion.repetitionPattern)!)
+        }
+        return (false, node)
+      }
+
+      switch elem.requirement {
       case .conformanceRequirement(let conformance):
-        return BridgedRequirementRepr(
-          SeparatorLoc: self.generateSourceLoc(conformance.colon),
-          Kind: .typeConstraint,
-          FirstType: self.generate(type: conformance.leftType),
-          SecondType: self.generate(type: conformance.rightType)
+        let (isExpansionPattern, leftType) = generateIsExpansionPattern(type: conformance.leftType)
+        return .createTypeConstraint(
+          subject: self.generate(type: leftType),
+          colonLoc: self.generateSourceLoc(conformance.colon),
+          constraint: self.generate(type: conformance.rightType),
+          isExpansionPattern: isExpansionPattern
         )
       case .sameTypeRequirement(let sameType):
-        return BridgedRequirementRepr(
-          SeparatorLoc: self.generateSourceLoc(sameType.equal),
-          Kind: .sameType,
-          FirstType: self.generate(sameTypeLeftType: sameType.leftType),
-          SecondType: self.generate(sameTypeRightType: sameType.rightType)
+        let (isExpansionPattern, leftType) = generateIsExpansionPattern(type: sameType.leftType)
+        return .createSameType(
+          firstType: self.generate(sameTypeLeftType: leftType),
+          equalLoc: self.generateSourceLoc(sameType.equal),
+          secondType: self.generate(sameTypeRightType: sameType.rightType),
+          isExpansionPattern: isExpansionPattern
         )
-      case .layoutRequirement(_):
-        // FIXME: Implement layout requirement translation.
-        fatalError("Translation of layout requirements not implemented!")
+      case .layoutRequirement(let layout):
+        let (isExpansionPattern, leftType) = generateIsExpansionPattern(type: layout.type)
+        return .createLayoutConstraint(
+          subject: self.generate(type: leftType),
+          colonLoc: self.generateSourceLoc(layout.colon),
+          layout: self.generate(layoutRequirement: layout),
+          layoutLoc: self.generateSourceLoc(layout.layoutSpecifier),
+          isExpansionPattern: isExpansionPattern
+        )
       }
     }
 
@@ -122,7 +189,7 @@ extension ASTGenVisitor {
   }
 
   func generateIntegerType(expr node: ExprSyntax) -> BridgedIntegerTypeRepr {
-    var minusLoc = BridgedSourceLoc()
+    var minusLoc = SourceLoc()
     let literalExpr: IntegerLiteralExprSyntax
 
     // The only expressions generic argument types support right now are

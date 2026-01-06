@@ -15,6 +15,9 @@ struct DoubleWrapper {
   int getValuePlusArg(int arg) const { return m.getValuePlusArg(arg); }
 };
 
+template <class T>
+struct EmptyWrapper {};
+
 typedef MagicWrapper<int> WrappedMagicInt;
 typedef MagicWrapper<const int> WrappedMagicIntConst;
 typedef MagicWrapper<const long> WrappedMagicLongConst;
@@ -26,6 +29,8 @@ typedef MagicWrapper<long[]> WrappedMagicLongArr;
 typedef MagicWrapper<int[123]> WrappedMagicIntFixedSizeArr1;
 typedef MagicWrapper<int[124]> WrappedMagicIntFixedSizeArr2;
 typedef MagicWrapper<std::nullptr_t> WrappedMagicNullPtr;
+typedef MagicWrapper<const int[]> WrappedMagicConstIntArr;
+typedef EmptyWrapper<volatile int &> WrappedVolatileIntRef;
 
 typedef DoubleWrapper<MagicWrapper<int>> DoubleWrappedInt;
 typedef DoubleWrapper<MagicWrapper<const int>> DoubleWrappedIntConst;
@@ -37,5 +42,20 @@ typedef DoubleWrapper<MagicWrapper<long[]>> DoubleWrappedMagicLongArr;
 typedef DoubleWrapper<MagicWrapper<int[42]>> DoubleWrappedMagicIntFixedSizeArr1;
 typedef DoubleWrapper<MagicWrapper<int[43]>> DoubleWrappedMagicIntFixedSizeArr2;
 typedef DoubleWrapper<MagicWrapper<std::nullptr_t>> DoubleWrappedMagicNullPtr;
+
+typedef DoubleWrapper<const MagicWrapper<int>> DoubleConstWrappedInt;
+typedef DoubleWrapper<const MagicWrapper<const int>> DoubleConstWrappedIntConst;
+typedef DoubleWrapper<const MagicWrapper<const long>> DoubleConstWrappedLongConst;
+typedef DoubleWrapper<const MagicWrapper<int*>> DoubleConstWrappedIntPtr;
+typedef DoubleWrapper<const MagicWrapper<const int*>> DoubleConstWrappedIntConstPtr;
+typedef DoubleWrapper<const MagicWrapper<int[]>> DoubleConstWrappedMagicIntArr;
+typedef DoubleWrapper<const MagicWrapper<long[]>> DoubleConstWrappedMagicLongArr;
+typedef DoubleWrapper<const MagicWrapper<int[42]>> DoubleConstWrappedMagicIntFixedSizeArr1;
+typedef DoubleWrapper<const MagicWrapper<int[43]>> DoubleConstWrappedMagicIntFixedSizeArr2;
+typedef DoubleWrapper<const MagicWrapper<std::nullptr_t>> DoubleConstWrappedMagicNullPtr;
+
+typedef MagicWrapper<volatile int> WrappedVolatileInt;
+typedef MagicWrapper<const volatile int> WrappedConstVolatileInt;
+typedef MagicWrapper<volatile const int> WrappedVolatileConstInt;
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_WITH_PRIMITIVE_ARGUMENT_H

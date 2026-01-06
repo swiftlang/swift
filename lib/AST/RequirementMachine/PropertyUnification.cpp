@@ -221,9 +221,7 @@ void PropertyMap::addLayoutProperty(
 
     props->LayoutRule = ruleID;
   } else {
-    llvm::errs() << "Arbitrary intersection of layout requirements is "
-                 << "supported yet\n";
-    abort();
+    ABORT("Arbitrary intersection of layout requirements isn't supported yet");
   }
 }
 

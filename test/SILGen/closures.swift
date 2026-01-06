@@ -1,8 +1,5 @@
-
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name closures -parse-stdlib -parse-as-library %s -enable-experimental-feature ValueGenerics -disable-availability-checking | %FileCheck %s
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name closures -parse-stdlib -parse-as-library %s -enable-experimental-feature ValueGenerics -disable-availability-checking | %FileCheck %s --check-prefix=GUARANTEED
-
-// REQUIRES: swift_feature_ValueGenerics
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name closures -parse-stdlib -parse-as-library %s -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name closures -parse-stdlib -parse-as-library %s -disable-availability-checking | %FileCheck %s --check-prefix=GUARANTEED
 
 import Swift
 

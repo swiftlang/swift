@@ -313,6 +313,7 @@ extension Mirror {
   public enum DisplayStyle: Sendable {
     case `struct`, `class`, `enum`, tuple, optional, collection
     case dictionary, `set`
+    @available(SwiftStdlib 6.2, *) case foreignReference
   }
 
   internal static func _noSuperclassMirror() -> Mirror? { return nil }
@@ -481,6 +482,7 @@ public struct Mirror {
   public enum DisplayStyle: Sendable {
     case `struct`, `class`, `enum`, tuple, optional, collection
     case dictionary, `set`
+    @available(SwiftStdlib 6.2, *) case foreignReference
   }
   public init<Subject, C: Collection>(
     _ subject: Subject,

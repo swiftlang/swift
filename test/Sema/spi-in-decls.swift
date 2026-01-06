@@ -61,8 +61,8 @@ public struct TestGenericParams<T: BadProto> {} // expected-error {{cannot use p
 public struct TestGenericParamsWhereClause<T> where T: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; it is SPI}}
 
 public enum TestCase {
-  case x(BadStruct) // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-  case y(Int, BadStruct) // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  case x(BadStruct) // expected-error {{cannot use struct 'BadStruct' in an associated value of a public or '@usableFromInline' enum; it is SPI}}
+  case y(Int, BadStruct) // expected-error {{cannot use struct 'BadStruct' in an associated value of a public or '@usableFromInline' enum; it is SPI}}
 }
 
 public func testGenericParams<T: BadProto>(_: T) {} // expected-error {{cannot use protocol 'BadProto' here; it is SPI}}
@@ -118,16 +118,16 @@ public typealias TestGenericParamsAliasWhereClause<T> = T where T: BadProto // e
 
 public typealias TestGenericParamsAlias<T: BadProto> = T // expected-error {{cannot use protocol 'BadProto' here; it is SPI}}
 
-public var testBadType: BadStruct? = nil // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-public var testBadTypeInferred = Optional<BadStruct>.none // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-public var testBadTypePartiallyInferred: Optional = Optional<BadStruct>.none // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+public var testBadType: BadStruct? = nil // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+public var testBadTypeInferred = Optional<BadStruct>.none // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+public var testBadTypePartiallyInferred: Optional = Optional<BadStruct>.none // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 public var (testBadTypeTuple1, testBadTypeTuple2): (BadStruct?, BadClass?) = (nil, nil)
-// expected-error@-1 {{cannot use struct 'BadStruct' here; it is SPI}}
-// expected-error@-2 {{cannot use class 'BadClass' here; it is SPI}}
-public var (testBadTypeTuplePartlyInferred1, testBadTypeTuplePartlyInferred2): (Optional, Optional) = (Optional<Int>.none, Optional<BadStruct>.none) // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-public var (testBadTypeTuplePartlyInferred3, testBadTypeTuplePartlyInferred4): (Optional, Optional) = (Optional<BadStruct>.none, Optional<Int>.none) // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-public var testMultipleBindings1: Int? = nil, testMultipleBindings2: BadStruct? = nil // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-public var testMultipleBindings3: BadStruct? = nil, testMultipleBindings4: Int? = nil // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+// expected-error@-1 {{cannot use class 'BadClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+// expected-error@-2 {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+public var (testBadTypeTuplePartlyInferred1, testBadTypeTuplePartlyInferred2): (Optional, Optional) = (Optional<Int>.none, Optional<BadStruct>.none) // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+public var (testBadTypeTuplePartlyInferred3, testBadTypeTuplePartlyInferred4): (Optional, Optional) = (Optional<BadStruct>.none, Optional<Int>.none) // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+public var testMultipleBindings1: Int? = nil, testMultipleBindings2: BadStruct? = nil // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+public var testMultipleBindings3: BadStruct? = nil, testMultipleBindings4: Int? = nil // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 
 extension BadStruct {
   public func testExtensionOfBadType() {}
@@ -171,39 +171,39 @@ extension Array: TestConstrainedExtensionProto where Element == BadStruct { // e
 //}
 
 @frozen public struct PublicStructStoredProperties {
-  public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
   // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
-  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 }
 
 @frozen @usableFromInline internal struct UFIStructStoredProperties {
-  @usableFromInline var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  @usableFromInline var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
   // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
-  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 }
 
 @_fixed_layout public class PublicClassStoredProperties {
-  public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
-  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
   // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
-  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; it is SPI}}
+  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 }
 
 public typealias NormalProtoAssoc<T: NormalProto> = T.Assoc

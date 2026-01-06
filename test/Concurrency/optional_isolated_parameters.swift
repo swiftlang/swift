@@ -5,6 +5,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: concurrency_runtime
 
 // rdar://124277662
 // XFAIL: freestanding

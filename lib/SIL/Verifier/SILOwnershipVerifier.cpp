@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
@@ -277,10 +278,23 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
 
     // If our scoped operand is not also a borrow introducer, then we know that
     // we do not need to consider guaranteed phis and thus can just add the
-    // initial end scope instructions without any further work.
-    //
-    // Maybe: Is borrow scope non-local?
-    initialScopedOperand.getImplicitUses(nonLifetimeEndingUsers);
+    // initial end scope instructions without any further work. This avoids
+    // cubic complexity in the verifier.
+    auto addLeafUse = [&](Operand *endOp) {
+      nonLifetimeEndingUsers.push_back(endOp);
+      return true;
+    };
+    auto addUnknownUse = [&](Operand *endOp) {
+      // FIXME: This ignores mark_dependence base uses and borrowed_from base
+      // uses. Instead, recursively call gatherUsers.
+      // Note: we may have op == endOp.
+      nonLifetimeEndingUsers.push_back(endOp);
+      return true;
+    };
+    // FIXME: This ignores dead-end blocks. Instead, recursively call
+    // gatherUsers.
+    initialScopedOperand.visitScopeEndingUses(addLeafUse, addUnknownUse);
+
     if (initialScopedOperand.kind == BorrowingOperandKind::BeginBorrow) {
       guaranteedPhiVerifier.verifyReborrows(
           cast<BeginBorrowInst>(op->getUser()));
@@ -331,6 +345,10 @@ bool SILValueOwnershipChecker::gatherUsers(
   while (!uses.empty()) {
     Operand *op = uses.pop_back_val();
     SILInstruction *user = op->getUser();
+
+    if (isa<UncheckedOwnershipInst>(user)) {
+      continue;
+    }
 
     // If this op is a type dependent operand, skip it. It is not interesting
     // from an ownership perspective.
@@ -391,7 +409,21 @@ bool SILValueOwnershipChecker::gatherUsers(
       if (auto scopedOperand = BorrowingOperand(op)) {
         assert(!scopedOperand.isReborrow());
 
-        scopedOperand.getImplicitUses(nonLifetimeEndingUsers);
+        auto addLeafUse = [&](Operand *endOp) {
+          nonLifetimeEndingUsers.push_back(endOp);
+          return true;
+        };
+        auto addUnknownUse = [&](Operand *endOp) {
+          // FIXME: This ignores mark_dependence base uses and borrowed_from
+          // base uses. Instead, recursively call gatherUsers.  Note: we may
+          // have op == endOp.
+          nonLifetimeEndingUsers.push_back(endOp);
+          return true;
+        };
+        // FIXME: This ignores dead-end blocks. Instead, recursively call
+        // gatherUsers.
+        scopedOperand.visitScopeEndingUses(addLeafUse, addUnknownUse);
+
         if (scopedOperand.kind == BorrowingOperandKind::BeginBorrow) {
           guaranteedPhiVerifier.verifyReborrows(
               cast<BeginBorrowInst>(op->getUser()));
@@ -631,6 +663,15 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
     }
   }
 
+  if (auto *uoc = dyn_cast<UncheckedOwnershipConversionInst>(value)) {
+    // When converting from `unowned`, which can happen for ObjectiveC blocks,
+    // we don't require and scope-ending instruction. This falls in the category:
+    // "trust me, I know what I'm doing".
+    if (uoc->getOperand()->getOwnershipKind() == OwnershipKind::Unowned) {
+      return true;
+    }
+  }
+
   // If we have an unowned value, then again there is nothing left to do.
   if (value->getOwnershipKind() == OwnershipKind::Unowned)
     return true;
@@ -829,6 +870,14 @@ void SILInstruction::verifyOperandOwnership(
   if (!getModule().getOptions().VerifyAll)
     return;
 #endif
+
+  if (getModule().getOptions().VerifyNone) {
+    return;
+  }
+
+  if (getFunction()->hasSemanticsAttr(semantics::NO_SIL_VERIFICATION)) {
+    return;
+  }
 
   // If SILOwnership is not enabled, do not perform verification.
   if (!getModule().getOptions().VerifySILOwnership)

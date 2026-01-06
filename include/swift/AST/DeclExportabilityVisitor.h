@@ -24,6 +24,19 @@
 
 namespace swift {
 
+/// How a decl is exported.
+enum class ExportedLevel {
+  /// Not exported.
+  None,
+
+  /// Exported implicitly for types in non-library-evolution mode not marked
+  /// `@_implementationOnly`.
+  ImplicitlyExported,
+
+  /// Explicitly marked as exported with public or `@frozen`.
+  Exported
+};
+
 /// This visitor determines whether a declaration is "exportable", meaning whether
 /// it can be referenced by other modules. For example, a function with a public
 /// access level or with the `@usableFromInline` attribute is exportable.
@@ -102,7 +115,7 @@ public:
   }
 
   bool visitVarDecl(const VarDecl *var) {
-    if (var->isLayoutExposedToClients())
+    if (var->isLayoutExposedToClients() == ExportedLevel::Exported)
       return true;
 
     // Consider all lazy var storage as exportable.
@@ -158,6 +171,7 @@ public:
   UNREACHABLE(MissingMember);
   UNREACHABLE(GenericTypeParam);
   UNREACHABLE(Param);
+  UNREACHABLE(Using);
 
 #undef UNREACHABLE
 
@@ -171,7 +185,6 @@ public:
   bool visit##KIND##Decl(const KIND##Decl *D) { return true; }
   UNINTERESTING(TopLevelCode);
   UNINTERESTING(Import);
-  UNINTERESTING(PoundDiagnostic);
   UNINTERESTING(PrecedenceGroup);
   UNINTERESTING(EnumCase);
   UNINTERESTING(Operator);
@@ -179,6 +192,22 @@ public:
 
 #undef UNINTERESTING
 };
+
+/// Check if a declaration is exported as part of a module's external interface.
+/// This includes public and @usableFromInline decls.
+/// FIXME: This is legacy that should be subsumed by `DeclExportabilityVisitor`
+ExportedLevel isExported(const Decl *D);
+
+/// A specialization of `isExported` for `ValueDecl`.
+ExportedLevel isExported(const ValueDecl *VD);
+
+/// A specialization of `isExported` for `ExtensionDecl`.
+ExportedLevel isExported(const ExtensionDecl *ED);
+
+/// Returns true if the extension declares any protocol conformances that
+/// require the extension to be exported.
+bool hasConformancesToPublicProtocols(const ExtensionDecl *ED);
+
 } // end namespace swift
 
 #endif

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Methods -clang-header-expose-decls=all-public -emit-clang-header-path %t/methods.h
+// RUN: %target-swift-frontend %s -module-name Methods -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/methods.h
 // RUN: %FileCheck %s < %t/methods.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/methods.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
@@ -57,7 +57,7 @@ public struct SmallStruct {
 // CHECK: SWIFT_EXTERN void $s7Methods11SmallStructV6invertyyF(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // invert()
 
 // CHECK: class SWIFT_SYMBOL("s:7Methods11LargeStructV") LargeStruct final {
-// CHECK: SWIFT_INLINE_PRIVATE_HELPER LargeStruct(LargeStruct &&)
+// CHECK: SWIFT_INLINE_THUNK LargeStruct &operator =(const LargeStruct &other) noexcept {
 // CHECK: }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void dump() const SWIFT_SYMBOL("s:7Methods11LargeStructV4dumpyyF");
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void double_() SWIFT_SYMBOL("s:7Methods11LargeStructV6doubleyyF");
@@ -65,7 +65,7 @@ public struct SmallStruct {
 // CHECK-NEXT: private
 
 // CHECK: class SWIFT_SYMBOL("s:7Methods11SmallStructV") SmallStruct final {
-// CHECK:   SWIFT_INLINE_PRIVATE_HELPER SmallStruct(SmallStruct &&)
+// CHECK: SWIFT_INLINE_THUNK SmallStruct &operator =(const SmallStruct &other) noexcept {
 // CHECK: }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void dump() const SWIFT_SYMBOL("s:7Methods11SmallStructV4dumpyyF");
 // CHECK-NEXT:   SWIFT_INLINE_THUNK SmallStruct scale(float y) SWIFT_SYMBOL("s:7Methods11SmallStructV5scaleyACSfF");

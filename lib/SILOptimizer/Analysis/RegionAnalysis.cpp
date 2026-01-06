@@ -93,21 +93,40 @@ regionanalysisimpl::getApplyIsolationCrossing(SILInstruction *inst) {
 
 namespace {
 
-struct UseDefChainVisitor
-    : public AccessUseDefChainVisitor<UseDefChainVisitor, SILValue> {
-  bool isMerge = false;
+/// A visitor that walks from uses -> def attempting to determine an object or
+/// address base for the passed in address.
+///
+/// It also is used to determine if we are assigning into a part of an aggregate
+/// or are assigning over an entire value.
+///
+/// RULES:
+///
+/// 1. We allow for sendable types to be rooted in non-Sendable types. We allow
+/// for our caller to reason about this by placing in our metadata if the entire
+/// search path was just sendable types. If any are non-Sendable except for our
+/// base, we need to be more conservative.
+///
+/// 2. We stop when we find a non-Sendable type rooted in a Sendable type. In
+/// such a case, we want to process the non-Sendable type as if it is rooted in
+/// the Sendable type.
+struct AddressBaseComputingVisitor
+    : public AccessUseDefChainVisitor<AddressBaseComputingVisitor, SILValue> {
+  bool isProjectedFromAggregate = false;
 
-  /// The actor isolation that we found while walking from use->def. Always set
-  /// to the first one encountered.
-  std::optional<ActorIsolation> actorIsolation;
+  SILValue value;
 
   SILValue visitAll(SILValue sourceAddr) {
+    // If our initial value is Sendable, then it is our "value".
+    if (SILIsolationInfo::isSendableType(sourceAddr))
+      value = sourceAddr;
+
     SILValue result = visit(sourceAddr);
     if (!result)
       return sourceAddr;
 
-    while (SILValue nextAddr = visit(result))
+    while (SILValue nextAddr = visit(result)) {
       result = nextAddr;
+    }
 
     return result;
   }
@@ -122,7 +141,16 @@ struct UseDefChainVisitor
     return SILValue();
   }
 
-  SILValue visitNonAccess(SILValue) { return SILValue(); }
+  SILValue visitNonAccess(SILValue value) {
+    // For now since it is late in 6.2, work around vector base addr not being
+    // treated as a projection.
+    if (auto *v = dyn_cast<VectorBaseAddrInst>(value)) {
+      isProjectedFromAggregate = true;
+      return v->getOperand();
+    }
+
+    return SILValue();
+  }
 
   SILValue visitPhi(SILPhiArgument *phi) {
     llvm_unreachable("Should never hit this");
@@ -153,23 +181,24 @@ struct UseDefChainVisitor
         return SILValue();
     }
 
-    // If we do not have an identity cast, mark this as a merge.
-    isMerge |= castType != AccessStorageCast::Identity;
+    // If we do not have an identity cast, mark this as if we are projecting out
+    // of an aggregate that will require us to merge.
+    isProjectedFromAggregate |= castType != AccessStorageCast::Identity;
 
     return sourceAddr->get();
   }
 
-  SILValue visitAccessProjection(SingleValueInstruction *inst,
+  SILValue visitAccessProjection(SingleValueInstruction *projInst,
                                  Operand *sourceAddr) {
     // See if this access projection is into a single element value. If so, we
     // do not want to treat this as a merge.
-    if (auto p = Projection(inst)) {
+    if (auto p = Projection(projInst)) {
       switch (p.getKind()) {
       // Currently if we load and then project_box from a memory location,
       // we treat that as a projection. This follows the semantics/notes in
       // getAccessProjectionOperand.
       case ProjectionKind::Box:
-        return cast<ProjectBoxInst>(inst)->getOperand();
+        return cast<ProjectBoxInst>(projInst)->getOperand();
       case ProjectionKind::Upcast:
       case ProjectionKind::RefCast:
       case ProjectionKind::BlockStorageCast:
@@ -179,44 +208,58 @@ struct UseDefChainVisitor
         llvm_unreachable("Shouldn't see this here");
       case ProjectionKind::Index:
         // Index is always a merge.
-        isMerge = true;
+        isProjectedFromAggregate = true;
         break;
       case ProjectionKind::Enum: {
-        auto op = cast<UncheckedTakeEnumDataAddrInst>(inst)->getOperand();
+        auto op = cast<UncheckedTakeEnumDataAddrInst>(projInst)->getOperand();
 
-        // See if our operand type is a sendable type. In such a case, we do not
-        // want to look through our operand.
-        if (!SILIsolationInfo::isNonSendableType(op->getType(),
-                                                 op->getFunction()))
-          return SILValue();
+        bool isOperandSendable = !SILIsolationInfo::isNonSendableType(
+            op->getType(), op->getFunction());
+
+        // If our operand is Sendable and our field is non-Sendable and we have
+        // not stashed a value yet, stash value.
+        if (!value && isOperandSendable &&
+            SILIsolationInfo::isNonSendableType(projInst->getType(),
+                                                projInst->getFunction())) {
+          value = projInst;
+        }
 
         break;
       }
       case ProjectionKind::Tuple: {
         // These are merges if we have multiple fields.
-        auto op = cast<TupleElementAddrInst>(inst)->getOperand();
+        auto op = cast<TupleElementAddrInst>(projInst)->getOperand();
 
-        if (!SILIsolationInfo::isNonSendableType(op->getType(),
-                                                 op->getFunction()))
-          return SILValue();
+        bool isOperandSendable = !SILIsolationInfo::isNonSendableType(
+            op->getType(), op->getFunction());
 
-        isMerge |= op->getType().getNumTupleElements() > 1;
+        // If our operand is Sendable and our field is non-Sendable, we need to
+        // bail since we want to root the non-Sendable type in the Sendable
+        // type.
+        if (!value && isOperandSendable &&
+            SILIsolationInfo::isNonSendableType(projInst->getType(),
+                                                projInst->getFunction()))
+          value = projInst;
+
+        isProjectedFromAggregate |= op->getType().getNumTupleElements() > 1;
         break;
       }
       case ProjectionKind::Struct:
-        auto op = cast<StructElementAddrInst>(inst)->getOperand();
+        auto op = cast<StructElementAddrInst>(projInst)->getOperand();
 
-        // See if our result type is a sendable type. In such a case, we do not
-        // want to look through the struct_element_addr since we do not want to
-        // identify the sendable type with the non-sendable operand. These we
-        // are always going to ignore anyways since a sendable let/var field of
-        // a struct can always be used.
-        if (!SILIsolationInfo::isNonSendableType(op->getType(),
-                                                 op->getFunction()))
-          return SILValue();
+        bool isOperandSendable = !SILIsolationInfo::isNonSendableType(
+            op->getType(), op->getFunction());
+
+        // If our operand is Sendable and our field is non-Sendable, we need to
+        // bail since we want to root the non-Sendable type in the Sendable
+        // type.
+        if (!value && isOperandSendable &&
+            SILIsolationInfo::isNonSendableType(projInst->getType(),
+                                                projInst->getFunction()))
+          value = projInst;
 
         // These are merges if we have multiple fields.
-        isMerge |= op->getType().getNumNominalFields() > 1;
+        isProjectedFromAggregate |= op->getType().getNumNominalFields() > 1;
         break;
       }
     }
@@ -274,7 +317,10 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::StrongCopyUnmanagedValueInst:
   case SILInstructionKind::RefToUnmanagedInst:
   case SILInstructionKind::UnmanagedToRefInst:
-  case SILInstructionKind::InitExistentialValueInst:
+  case SILInstructionKind::UncheckedEnumDataInst:
+  case SILInstructionKind::StructElementAddrInst:
+  case SILInstructionKind::TupleElementAddrInst:
+  case SILInstructionKind::VectorBaseAddrInst:
     return true;
   case SILInstructionKind::MoveValueInst:
     // Look through if it isn't from a var decl.
@@ -282,31 +328,21 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::BeginBorrowInst:
     // Look through if it isn't from a var decl.
     return !cast<BeginBorrowInst>(inst)->isFromVarDecl();
+  case SILInstructionKind::InitExistentialValueInst:
+    return !SILIsolationInfo::getConformanceIsolation(inst);
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto cast = SILDynamicCastInst::getAs(inst);
     assert(cast);
+
+    // If this cast introduces isolation due to conformances, we cannot look
+    // through it to the source.
+    if (SILIsolationInfo::getConformanceIsolation(inst))
+      return false;
+
     if (cast.isRCIdentityPreserving())
       return true;
     return false;
   }
-  }
-}
-
-static bool isLookThroughIfResultNonSendable(SILInstruction *inst) {
-  switch (inst->getKind()) {
-  default:
-    return false;
-  case SILInstructionKind::RawPointerToRefInst:
-    return true;
-  }
-}
-
-static bool isLookThroughIfOperandNonSendable(SILInstruction *inst) {
-  switch (inst->getKind()) {
-  default:
-    return false;
-  case SILInstructionKind::RefToRawPointerInst:
-    return true;
   }
 }
 
@@ -317,9 +353,10 @@ static bool isLookThroughIfOperandAndResultNonSendable(SILInstruction *inst) {
   case SILInstructionKind::UncheckedTrivialBitCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::UncheckedValueCastInst:
-  case SILInstructionKind::StructElementAddrInst:
-  case SILInstructionKind::TupleElementAddrInst:
-  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::ConvertEscapeToNoEscapeInst:
+  case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::RefToRawPointerInst:
+  case SILInstructionKind::RawPointerToRefInst:
     return true;
   }
 }
@@ -341,6 +378,7 @@ struct TermArgSources {
     switch (cast<TermInst>(inst)->getTermKind()) {
     case TermKind::UnreachableInst:
     case TermKind::ReturnInst:
+    case TermKind::ReturnBorrowInst:
     case TermKind::ThrowInst:
     case TermKind::ThrowAddrInst:
     case TermKind::YieldInst:
@@ -393,9 +431,9 @@ private:
 
 static bool isProjectedFromAggregate(SILValue value) {
   assert(value->getType().isAddress());
-  UseDefChainVisitor visitor;
+  AddressBaseComputingVisitor visitor;
   visitor.visitAll(value);
-  return visitor.isMerge;
+  return visitor.isProjectedFromAggregate;
 }
 
 namespace {
@@ -500,34 +538,23 @@ static bool isAsyncLetBeginPartialApply(PartialApplyInst *pai) {
 
 /// Returns true if this is a function argument that is able to be sent in the
 /// body of our function.
+///
+/// Needs to stay in sync with SILIsolationInfo::get(SILArgument *).
 static bool canFunctionArgumentBeSent(SILFunctionArgument *arg) {
   // Indirect out parameters can never be sent.
   if (arg->isIndirectResult() || arg->isIndirectErrorResult())
     return false;
 
-  // If we have a function argument that is closure captured by a Sendable
-  // closure, allow for the argument to be sent.
-  //
-  // DISCUSSION: The reason that we do this is that in the case of us
-  // having an actual Sendable closure there are two cases we can see:
-  //
-  // 1. If we have an actual Sendable closure, the AST will emit an
-  // earlier error saying that we are capturing a non-Sendable value in a
-  // Sendable closure. So we want to squelch the error that we would emit
-  // otherwise. This only occurs when we are not in swift-6 mode since in
-  // swift-6 mode we will error on the earlier error... but in the case of
-  // us not being in swift 6 mode lets not emit extra errors.
-  //
-  // 2. If we have an async-let based Sendable closure, we want to allow
-  // for the argument to be sent in the async let's statement and
-  // not emit an error.
-  //
-  // TODO: Once the async let refactoring change this will no longer be needed
-  // since closure captures will have sending parameters and be
-  // non-Sendable.
-  if (arg->isClosureCapture() &&
-      arg->getFunction()->getLoweredFunctionType()->isSendable())
-    return true;
+  // If we have a closure capture...
+  if (arg->isClosureCapture()) {
+    // And that closure capture is from an async let, treat it as sending. This
+    // is because we allow for disconnected values to be sent into async let
+    // closures.
+    if (auto declRef = arg->getFunction()->getDeclRef();
+        declRef && declRef.isAsyncLetClosure) {
+      return true;
+    }
+  }
 
   // Otherwise, we only allow for the argument to be sent if it is explicitly
   // marked as a 'sending' parameter.
@@ -621,13 +648,8 @@ RegionAnalysisValueMap::initializeTrackableValue(
   return {{iter.first->first, iter.first->second}, true};
 }
 
-/// If \p isAddressCapturedByPartialApply is set to true, then this value is
-/// an address that is captured by a partial_apply and we want to treat it as
-/// may alias.
-TrackableValue RegionAnalysisValueMap::getTrackableValue(
+TrackableValue RegionAnalysisValueMap::getTrackableValueHelper(
     SILValue value, bool isAddressCapturedByPartialApply) const {
-  auto info = getUnderlyingTrackedValue(value);
-  value = info.value;
 
   auto *self = const_cast<RegionAnalysisValueMap *>(this);
   auto iter = self->equivalenceClassValuesToState.try_emplace(
@@ -665,23 +687,6 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
 
   // Ok, at this point we have a non-Sendable value. First process addresses.
   if (value->getType().isAddress()) {
-    // If we were able to find this was actor isolated from finding our
-    // underlying object, use that. It is never wrong.
-    if (info.actorIsolation) {
-      SILIsolationInfo isolation;
-      if (info.value->getType().isAnyActor()) {
-        isolation = SILIsolationInfo::getActorInstanceIsolated(
-            value, info.value, info.actorIsolation->getActor());
-      } else if (info.actorIsolation->isGlobalActor()) {
-        isolation = SILIsolationInfo::getGlobalActorIsolated(
-            value, info.actorIsolation->getGlobalActor());
-      }
-
-      if (isolation) {
-        iter.first->getSecond().setIsolationRegionInfo(isolation);
-      }
-    }
-
     auto storage = AccessStorageWithBase::compute(value);
     if (storage.storage) {
       // Check if we have a uniquely identified address that was not captured
@@ -702,19 +707,6 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
   // loaded from.
   if (isa<LoadInst, LoadBorrowInst>(iter.first->first.getValue())) {
     auto *svi = cast<SingleValueInstruction>(iter.first->first.getValue());
-
-    // See if we can use get underlying tracked value to find if it is actor
-    // isolated.
-    //
-    // TODO: Instead of using AccessStorageBase, just use our own visitor
-    // everywhere. Just haven't done it due to possible perturbations.
-    auto parentAddrInfo = getUnderlyingTrackedValue(svi);
-    if (parentAddrInfo.actorIsolation) {
-      iter.first->getSecond().setIsolationRegionInfo(
-          SILIsolationInfo::getActorInstanceIsolated(
-              svi, parentAddrInfo.value,
-              parentAddrInfo.actorIsolation->getActor()));
-    }
 
     auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
     if (storage.storage) {
@@ -738,6 +730,25 @@ TrackableValue RegionAnalysisValueMap::getTrackableValue(
   return {iter.first->first, iter.first->second};
 }
 
+/// If \p isAddressCapturedByPartialApply is set to true, then this value is
+/// an address that is captured by a partial_apply and we want to treat it as
+/// may alias.
+TrackableValueLookupResult RegionAnalysisValueMap::getTrackableValue(
+    SILValue inputValue, bool isAddressCapturedByPartialApply) const {
+  auto info = getUnderlyingTrackedValue(inputValue);
+  SILValue value = info.value;
+  SILValue base = info.base;
+
+  auto trackedValue =
+      getTrackableValueHelper(value, isAddressCapturedByPartialApply);
+
+  std::optional<TrackableValue> trackedBase;
+  if (base)
+    trackedBase =
+        getTrackableValueHelper(base, isAddressCapturedByPartialApply);
+  return {trackedValue, trackedBase};
+}
+
 std::optional<TrackableValue>
 RegionAnalysisValueMap::getTrackableValueForActorIntroducingInst(
     SILInstruction *inst) const {
@@ -750,10 +761,11 @@ RegionAnalysisValueMap::getTrackableValueForActorIntroducingInst(
   return {{iter->first, iter->second}};
 }
 
-std::optional<TrackableValue>
+std::optional<TrackableValueLookupResult>
 RegionAnalysisValueMap::tryToTrackValue(SILValue value) const {
   auto state = getTrackableValue(value);
-  if (state.isNonSendable())
+  if (state.value.isNonSendable() ||
+      (state.base && state.base->isNonSendable()))
     return state;
   return {};
 }
@@ -778,7 +790,7 @@ TrackableValue RegionAnalysisValueMap::getActorIntroducingRepresentative(
 }
 
 bool RegionAnalysisValueMap::valueHasID(SILValue value, bool dumpIfHasNoID) {
-  assert(getTrackableValue(value).isNonSendable() &&
+  assert(getTrackableValue(value).value.isNonSendable() &&
          "Can only accept non-Sendable values");
   bool hasID = equivalenceClassValuesToState.count(value);
   if (!hasID && dumpIfHasNoID) {
@@ -790,7 +802,7 @@ bool RegionAnalysisValueMap::valueHasID(SILValue value, bool dumpIfHasNoID) {
 }
 
 Element RegionAnalysisValueMap::lookupValueID(SILValue value) {
-  auto state = getTrackableValue(value);
+  auto state = getTrackableValue(value).value;
   assert(state.isNonSendable() &&
          "only non-Sendable values should be entered in the map");
   return state.getID();
@@ -808,20 +820,93 @@ void RegionAnalysisValueMap::print(llvm::raw_ostream &os) const {
   for (auto p : temp) {
     os << "%%" << p.first << ": ";
     auto value = getValueForId(Element(p.first));
-    value->print(os);
+    value->print(getFunction(), os);
   }
 #endif
 }
 
-static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
-  auto *fn = value->getFunction();
-  SILValue result = value;
-  while (true) {
-    SILValue temp = result;
+namespace {
 
-    if (auto *svi = dyn_cast<SingleValueInstruction>(temp)) {
+/// Walk from use->def looking through instructions. We have two goals here:
+/// determining the actual equivilance class representative for the passed in
+/// value and looking more aggressively up through uses (even Sendable ones) to
+/// see if we are potentially accessing a base address value as a result of our
+/// value being loaded. We explain these two below in more detail.
+///
+/// # Determining the equivalence class representative for our initial value
+///
+/// We want to determine the actual underlying object that is meant to be used
+/// as the underlying object for our initial value. This value must either be
+/// Sendable (in case which we take the first one). Or if it is non-Sendable, we
+/// need to walk back through instructions that we consider look through until
+/// we hit a Sendable value. We want to view the non-Sendable value as rooted in
+/// the Sendable value since that Sendable value will likely be global actor
+/// isolated or unchecked Sendable and we want SILIsolationInfo to infer
+/// isolation from that instruction.
+///
+/// # Determining the "base" for our initial value
+///
+/// While the above process would be enough if we lived just in a world of
+/// objects, we have to consider additionally the possibility that our object
+/// value was loaded from a var, a non-copyable let that was captured, or an
+/// address only type. In that case, even though generally the frontend performs
+/// all transformations before loading:
+///
+/// ```sil
+/// %0 = alloc_stack $Type
+/// %1 = struct_element_addr %0, $Type, #Type.field
+/// %2 = load [copy] %1 : $FieldType
+/// ```
+///
+/// To truly be complete, we need to be able to handle cases where the frontend
+/// has instead emitted the projection on the object:
+///
+/// ```sil
+/// %0 = alloc_stack $Type
+/// %1 = load_borrow %1 : $Type
+/// %2 = struct_extract %1 : $Type, #Type.field
+/// ```
+///
+/// To ensure that we can always find that base, we need to do some work like we
+/// do in the AddressBaseComputingVisitor: namely we look through sendable
+/// object projections (and object projections in general) until we find what I
+/// term an object base (e.x.: a function argument, an apply result, a cast from
+/// a RawPointer) or a load instruction. If we find a load instruction, then our
+/// caller can know to run AddressBaseComputingVisitor to determine if we are
+/// loading from a box in order to grab the value.
+///
+/// NOTE: The author has only seen this happen so far with unchecked_enum_data,
+/// but relying on the frontend to emit code in a specific manner rather than
+/// coming up with a model that works completely in SIL no matter what the
+/// frontend does is the only way to have a coherent, non-brittle
+/// model. Otherwise, there is an implicit contract in between the frontend and
+/// the optimizer where both are following each other making it easy for the two
+/// to get out of sync.
+struct UnderlyingTrackedObjectValueVisitor {
+  SILValue value;
+
+private:
+  /// Visit \p sourceValue returning a load base if we find one. The actual
+  /// underlying object is value.
+  SILValue visit(SILValue sourceValue) {
+    auto *fn = sourceValue->getFunction();
+
+    // If our result is ever Sendable, we record that as our value if we do
+    // not have a value yet. We always want to take the first one.
+    if (SILIsolationInfo::isSendableType(sourceValue->getType(), fn)) {
+      if (!value) {
+        value = sourceValue;
+      }
+    }
+
+    if (auto *svi = dyn_cast<SingleValueInstruction>(sourceValue)) {
       if (isStaticallyLookThroughInst(svi)) {
-        temp = svi->getOperand(0);
+        if (!value && SILIsolationInfo::isSendableType(svi->getOperand(0)) &&
+            SILIsolationInfo::isNonSendableType(svi)) {
+          value = svi;
+        }
+
+        return svi->getOperand(0);
       }
 
       // If we have a cast and our operand and result are non-Sendable, treat it
@@ -830,78 +915,158 @@ static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
         if (SILIsolationInfo::isNonSendableType(svi->getType(), fn) &&
             SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
                                                 fn)) {
-          temp = svi->getOperand(0);
+          return svi->getOperand(0);
         }
-      }
 
-      if (isLookThroughIfResultNonSendable(svi)) {
-        if (SILIsolationInfo::isNonSendableType(svi->getType(), fn)) {
-          temp = svi->getOperand(0);
-        }
-      }
-
-      if (isLookThroughIfOperandNonSendable(svi)) {
-        // If our operand is a non-Sendable type, look through this instruction.
-        if (SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
-                                                fn)) {
-          temp = svi->getOperand(0);
+        if (!value && SILIsolationInfo::isSendableType(svi->getOperand(0)) &&
+            SILIsolationInfo::isNonSendableType(svi)) {
+          value = svi;
         }
       }
     }
 
-    if (auto *inst = temp->getDefiningInstruction()) {
+    if (auto *inst = sourceValue->getDefiningInstruction()) {
       if (isStaticallyLookThroughInst(inst)) {
-        temp = inst->getOperand(0);
+        if (!value && SILIsolationInfo::isSendableType(inst->getOperand(0)) &&
+            SILIsolationInfo::isNonSendableType(sourceValue)) {
+          value = sourceValue;
+        }
+
+        return inst->getOperand(0);
       }
     }
 
-    if (temp != result) {
-      result = temp;
-      continue;
-    }
+    return SILValue();
+  }
+
+public:
+  SILValue visitAll(SILValue sourceValue) {
+    // Before we do anything,
+    if (SILIsolationInfo::isSendableType(sourceValue))
+      value = sourceValue;
+
+    SILValue result = visit(sourceValue);
+    if (!result)
+      return sourceValue;
+
+    while (SILValue nextValue = visit(result))
+      result = nextValue;
 
     return result;
   }
+};
+
+} // namespace
+
+RegionAnalysisValueMap::UnderlyingTrackedValueInfo
+RegionAnalysisValueMap::getUnderlyingTrackedValueHelperObject(
+    SILValue value) const {
+  // Look through all look through values stopping at any Sendable values.
+  UnderlyingTrackedObjectValueVisitor visitor;
+  SILValue baseValue = visitor.visitAll(value);
+  assert(baseValue->getType().isObject());
+
+  if (!visitor.value) {
+    return UnderlyingTrackedValueInfo(baseValue);
+  }
+
+  assert(visitor.value->getType().isObject());
+  if (visitor.value == baseValue)
+    return UnderlyingTrackedValueInfo(visitor.value);
+  return UnderlyingTrackedValueInfo(visitor.value, baseValue);
+}
+
+RegionAnalysisValueMap::UnderlyingTrackedValueInfo
+RegionAnalysisValueMap::getUnderlyingTrackedValueHelperAddress(
+    SILValue value) const {
+  AddressBaseComputingVisitor visitor;
+  SILValue base = visitor.visitAll(value);
+  assert(base);
+
+  // If we have an object base...
+  if (base->getType().isObject()) {
+    // Recurse.
+    //
+    // NOTE: We purposely recurse into getUnderlyingTrackedValueHelper instead
+    // of getUnderlyingTrackedValue since we could cause an invalidation to
+    // occur in the underlying DenseMap that backs getUnderlyingTrackedValue()
+    // if we insert another entry into the DenseMap.
+    if (!visitor.value)
+      return UnderlyingTrackedValueInfo(getUnderlyingTrackedValueHelper(base));
+
+    // TODO: Should we us the base or value from
+    // getUnderlyingTrackedValueHelperObject as our base?
+    return UnderlyingTrackedValueInfo(
+        visitor.value, getUnderlyingTrackedValueHelper(base).value);
+  }
+
+  // Otherwise, we return the actorIsolation that our visitor found.
+  if (!visitor.value)
+    return UnderlyingTrackedValueInfo(base);
+  return UnderlyingTrackedValueInfo(visitor.value, base);
 }
 
 RegionAnalysisValueMap::UnderlyingTrackedValueInfo
 RegionAnalysisValueMap::getUnderlyingTrackedValueHelper(SILValue value) const {
-  // Before a check if the value we are attempting to access is Sendable. In
-  // such a case, just return early.
-  if (!SILIsolationInfo::isNonSendableType(value))
-    return UnderlyingTrackedValueInfo(value);
+  // If we have an address, immediately delegate to the address implementation.
+  if (value->getType().isAddress()) {
+    auto addressInfo = getUnderlyingTrackedValueHelperAddress(value);
 
-  // Look through a project_box, so that we process it like its operand object.
-  if (auto *pbi = dyn_cast<ProjectBoxInst>(value)) {
-    value = pbi->getOperand();
-  }
-
-  if (!value->getType().isAddress()) {
-    SILValue underlyingValue = getUnderlyingTrackedObjectValue(value);
-
-    // If we do not have a load inst, just return the value.
-    if (!isa<LoadInst, LoadBorrowInst>(underlyingValue)) {
-      return UnderlyingTrackedValueInfo(underlyingValue);
+    // See if we are returned a value that is a load or a load_borrow. In that
+    // case, we want to continue.
+    if (isa<LoadInst, LoadBorrowInst>(addressInfo.value)) {
+      return getUnderlyingTrackedValueHelper(
+          cast<SingleValueInstruction>(addressInfo.value)->getOperand(0));
     }
 
-    // If we got an address, lets see if we can do even better by looking at the
-    // address.
-    value = cast<SingleValueInstruction>(underlyingValue)->getOperand(0);
-  }
-  assert(value->getType().isAddress());
+    // If our value is not a load, check if we have a base that is a load. In
+    // such a case, we want to search for a better base.
+    if (llvm::isa_and_nonnull<LoadInst, LoadBorrowInst>(addressInfo.base)) {
+      auto newBase = getUnderlyingTrackedValueHelper(
+          cast<SingleValueInstruction>(addressInfo.base)->getOperand(0));
+      if (newBase.base)
+        return UnderlyingTrackedValueInfo(addressInfo.value, newBase.base);
+      return UnderlyingTrackedValueInfo(addressInfo.value, newBase.value);
+    }
 
-  UseDefChainVisitor visitor;
-  SILValue base = visitor.visitAll(value);
-  assert(base);
-  if (base->getType().isObject()) {
-    // NOTE: We purposely recurse into the cached version of our computation
-    // rather than recurse into getUnderlyingTrackedObjectValueHelper. This is
-    // safe since we know that value was previously an address so if our base is
-    // an object, it cannot be the same object.
-    return {getUnderlyingTrackedValue(base).value, visitor.actorIsolation};
+    return addressInfo;
   }
 
-  return {base, visitor.actorIsolation};
+  // Otherwise, we have an object and need to be a little smarter. First try to
+  // find the underlying value and base.
+  //
+  // NOTE: the base and value are guaranteed by invariant to always be different
+  // values. If they are the same, we just return as if we did not have a
+  // base. This ensures that if we both value/base return the same load,
+  // load_borrow, we process it along the no-base path below.
+  UnderlyingTrackedValueInfo objectInfo =
+      getUnderlyingTrackedValueHelperObject(value);
+  assert(objectInfo.value);
+
+  // If we do not have a base...
+  if (!objectInfo.base) {
+    // If we do not have a load or a load_borrow, just return the value
+    // immediately.
+    if (!isa<LoadInst, LoadBorrowInst>(objectInfo.value))
+      return UnderlyingTrackedValueInfo(objectInfo.value);
+
+    // Otherwise, look through the load/load_borrow and process its address.
+    auto *svi = dyn_cast<SingleValueInstruction>(objectInfo.value);
+    return getUnderlyingTrackedValueHelperAddress(svi->getOperand(0));
+  }
+
+  // Ok, we have a value and a base. First check if our base is not a load or
+  // load_borrow. In such a case, we can just return our value.
+  if (!isa<LoadInst, LoadBorrowInst>(objectInfo.base))
+    return UnderlyingTrackedValueInfo(objectInfo.value);
+
+  // If we have a base that is a load or load_borrow, we need to perform the
+  // address helper to find the true base.
+  auto *svi = dyn_cast<SingleValueInstruction>(objectInfo.base);
+  auto addressInfo = getUnderlyingTrackedValueHelperAddress(svi->getOperand(0));
+  if (addressInfo.base)
+    return UnderlyingTrackedValueInfo(objectInfo.value, addressInfo.base);
+  return UnderlyingTrackedValueInfo(objectInfo.value, addressInfo.value);
 }
 
 //===----------------------------------------------------------------------===//
@@ -956,6 +1121,31 @@ bool TrackableValue::isSendingParameter() const {
 
   // Otherwise, this isn't a consuming parameter.
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+//                      MARK: TrackableValueLookupResult
+//===----------------------------------------------------------------------===//
+
+void TrackableValueLookupResult::print(SILFunction *fn,
+                                       llvm::raw_ostream &os) const {
+  os << "Value:\n";
+  value.print(fn, os);
+  if (base) {
+    os << "Base:\n";
+    base->print(fn, os);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                      MARK: UnderlyingTrackedValueInfo
+//===----------------------------------------------------------------------===//
+
+void RegionAnalysisValueMap::UnderlyingTrackedValueInfo::print(
+    llvm::raw_ostream &os) const {
+  os << "RegionAnalysisValueMap.\nValue: " << value;
+  if (base)
+    os << "Base: " << base;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1081,6 +1271,9 @@ bool PartialApplyReachabilityDataflow::isReachable(SILValue value,
 
   // We were not reachable at entry but are at our exit... walk the block and
   // see if our user is before a gen instruction.
+
+  // To do so, first find the range of pairs in valueToGenInsts that contains
+  // our base value.
   auto genStart = std::lower_bound(
       valueToGenInsts.begin(), valueToGenInsts.end(),
       std::make_pair(baseValue, nullptr),
@@ -1089,20 +1282,29 @@ bool PartialApplyReachabilityDataflow::isReachable(SILValue value,
   if (genStart == valueToGenInsts.end() || genStart->first != baseValue)
     return false;
 
+  // Then determine the end of that range.
   auto genEnd = genStart;
   while (genEnd != valueToGenInsts.end() && genEnd->first == baseValue)
     ++genEnd;
 
   // Walk forward from the beginning of the block to user. If we do not find a
   // gen instruction, then we know the gen occurs after the op.
+  //
+  // NOTE: It is important that we include the user within our range since our
+  // user might also be a gen instruction.
   return llvm::any_of(
-      user->getParent()->getRangeEndingAtInst(user), [&](SILInstruction &inst) {
+      llvm::make_range(user->getParent()->begin(),
+                       std::next(user->getIterator())), [&](SILInstruction &inst) {
+        // Our computation works by computing a lower bound and seeing if we
+        // have (baseValue, inst) within our sorted range.
         auto iter = std::lower_bound(
             genStart, genEnd, std::make_pair(baseValue, &inst),
             [](const std::pair<SILValue, SILInstruction *> &p1,
                const std::pair<SILValue, SILInstruction *> &p2) {
               return p1 < p2;
             });
+
+        // If we did not hit end and found our pair, then we are done.
         return iter != valueToGenInsts.end() && iter->first == baseValue &&
                iter->second == &inst;
       });
@@ -1415,11 +1617,38 @@ struct PartitionOpBuilder {
 
   /// List of partition ops mapped to the current instruction. Used when
   /// generating partition ops.
-  SmallVector<PartitionOp, 8> currentInstPartitionOps;
+  std::vector<PartitionOp> *currentInstPartitionOps = nullptr;
+
+  /// The initial partition op index since the last reset. We use this so that
+  /// we can dump out the partition ops that we generated for a specific
+  /// instruction without needing to waste cycles maintaining a separate
+  /// SmallVector of PartitionOps inside of PartitionOpBuilder.
+  unsigned initialPartitionOpIndex = 0;
+
+  void initialize(std::vector<PartitionOp> &foundPartitionOps) {
+    assert(foundPartitionOps.empty());
+    currentInstPartitionOps = &foundPartitionOps;
+    initialPartitionOpIndex = currentInstPartitionOps->size();
+  }
+
+  SILFunction *getFunction() const {
+    assert(currentInst);
+    return currentInst->getFunction();
+  }
 
   void reset(SILInstruction *inst) {
+    assert(currentInstPartitionOps);
     currentInst = inst;
-    currentInstPartitionOps.clear();
+    initialPartitionOpIndex = currentInstPartitionOps->size();
+  }
+
+  /// Return an ArrayRef containing the PartitionOps associated with the current
+  /// instruction being built.
+  ArrayRef<PartitionOp> getPartitionOpsForCurrentInst() const {
+    assert(currentInstPartitionOps);
+    unsigned numElts =
+        currentInstPartitionOps->size() - initialPartitionOpIndex;
+    return llvm::ArrayRef(*currentInstPartitionOps).take_back(numElts);
   }
 
   Element lookupValueID(SILValue value);
@@ -1427,17 +1656,30 @@ struct PartitionOpBuilder {
 
   Element getActorIntroducingRepresentative(SILIsolationInfo actorIsolation);
 
-  void addAssignFresh(SILValue value) {
-    std::array<Element, 1> values = {lookupValueID(value)};
-    currentInstPartitionOps.emplace_back(
-        PartitionOp::AssignFresh(values, currentInst));
+  void addAssignFresh(TrackableValue value) {
+    if (value.isSendable())
+      return;
+    auto id = lookupValueID(value.getRepresentative().getValue());
+    currentInstPartitionOps->emplace_back(
+        PartitionOp::AssignFresh(id, currentInst));
   }
 
   void addAssignFresh(ArrayRef<SILValue> values) {
-    auto transformedCollection = makeTransformRange(
-        values, [&](SILValue value) { return lookupValueID(value); });
-    currentInstPartitionOps.emplace_back(
-        PartitionOp::AssignFresh(transformedCollection, currentInst));
+    if (values.empty())
+      return;
+
+    auto first = lookupValueID(values.front());
+    currentInstPartitionOps->emplace_back(
+        PartitionOp::AssignFresh(first, currentInst));
+
+    auto transformedCollection =
+        makeTransformRange(values.drop_front(), [&](SILValue value) {
+          return lookupValueID(value);
+        });
+    for (auto id : transformedCollection) {
+      currentInstPartitionOps->emplace_back(
+          PartitionOp::AssignFreshAssign(id, first, currentInst));
+    }
   }
 
   void addAssign(SILValue destValue, Operand *srcOperand) {
@@ -1454,41 +1696,51 @@ struct PartitionOpBuilder {
       return;
     }
 
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::Assign(lookupValueID(destValue),
                             lookupValueID(srcOperand->get()), srcOperand));
   }
 
-  void addSend(SILValue representative, Operand *op) {
+  void addSend(TrackableValue value, Operand *op) {
+    if (value.isSendable())
+      return;
+
+    auto representative = value.getRepresentative().getValue();
     assert(valueHasID(representative) &&
            "sent value should already have been encountered");
 
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::Send(lookupValueID(representative), op));
   }
 
-  void addUndoSend(SILValue representative, SILInstruction *unsendingInst) {
-    assert(valueHasID(representative) &&
-           "value should already have been encountered");
+  void addUndoSend(TrackableValue value, SILInstruction *unsendingInst) {
+    if (value.isSendable())
+      return;
 
-    currentInstPartitionOps.emplace_back(
+    auto representative = value.getRepresentative().getValue();
+    assert(valueHasID(representative) &&
+           "sent value should already have been encountered");
+
+    currentInstPartitionOps->emplace_back(
         PartitionOp::UndoSend(lookupValueID(representative), unsendingInst));
   }
 
-  void addMerge(SILValue destValue, Operand *srcOperand) {
-    assert(valueHasID(destValue, /*dumpIfHasNoID=*/true) &&
+  void addMerge(TrackableValue destValue, Operand *srcOperand) {
+    if (destValue.isSendable())
+      return;
+    auto rep = destValue.getRepresentative().getValue();
+    assert(valueHasID(rep, /*dumpIfHasNoID=*/true) &&
            valueHasID(srcOperand->get(), /*dumpIfHasNoID=*/true) &&
            "merged values should already have been encountered");
 
-    if (lookupValueID(destValue) == lookupValueID(srcOperand->get()))
+    if (lookupValueID(rep) == lookupValueID(srcOperand->get()))
       return;
 
-    currentInstPartitionOps.emplace_back(
-        PartitionOp::Merge(lookupValueID(destValue),
-                           lookupValueID(srcOperand->get()), srcOperand));
+    currentInstPartitionOps->emplace_back(PartitionOp::Merge(
+        lookupValueID(rep), lookupValueID(srcOperand->get()), srcOperand));
   }
 
-  /// Mark \p value artifically as being part of an actor isolated region by
+  /// Mark \p value artifically as being part of an actor-isolated region by
   /// introducing a new fake actor introducing representative and merging them.
   void addActorIntroducingInst(SILValue sourceValue, Operand *sourceOperand,
                                SILIsolationInfo actorIsolation) {
@@ -1496,24 +1748,33 @@ struct PartitionOpBuilder {
            "merged values should already have been encountered");
 
     auto elt = getActorIntroducingRepresentative(actorIsolation);
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::AssignFresh(elt, currentInst));
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::Merge(lookupValueID(sourceValue), elt, sourceOperand));
   }
 
-  void addRequire(SILValue value) {
-    assert(valueHasID(value, /*dumpIfHasNoID=*/true) &&
-           "required value should already have been encountered");
-    currentInstPartitionOps.emplace_back(
-        PartitionOp::Require(lookupValueID(value), currentInst));
+  void addRequire(TrackableValueLookupResult value);
+
+private:
+  void addRequire(TrackableValue value, PartitionOp::Options options = {});
+
+  void addRequire(std::optional<TrackableValue> value,
+                  PartitionOp::Options options = {}) {
+    if (!value)
+      return;
+    addRequire(*value, options);
   }
 
-  void addInOutSendingAtFunctionExit(SILValue value) {
-    assert(valueHasID(value, /*dumpIfHasNoID=*/true) &&
+public:
+  void addInOutSendingAtFunctionExit(TrackableValue value) {
+    if (value.isSendable())
+      return;
+    auto rep = value.getRepresentative().getValue();
+    assert(valueHasID(rep, /*dumpIfHasNoID=*/true) &&
            "required value should already have been encountered");
-    currentInstPartitionOps.emplace_back(
-        PartitionOp::InOutSendingAtFunctionExit(lookupValueID(value),
+    currentInstPartitionOps->emplace_back(
+        PartitionOp::InOutSendingAtFunctionExit(lookupValueID(rep),
                                                 currentInst));
   }
 
@@ -1522,13 +1783,16 @@ struct PartitionOpBuilder {
       llvm::report_fatal_error(
           "RegionIsolation: Aborting on unknown pattern match error");
     }
-    currentInstPartitionOps.emplace_back(
+    currentInstPartitionOps->emplace_back(
         PartitionOp::UnknownPatternError(lookupValueID(value), currentInst));
   }
 
-  void addNonSendableIsolationCrossingResultError(SILValue value) {
-    currentInstPartitionOps.emplace_back(
-        PartitionOp::NonSendableIsolationCrossingResult(lookupValueID(value),
+  void addNonSendableIsolationCrossingResultError(TrackableValue value) {
+    if (value.isSendable())
+      return;
+    auto rep = value.getRepresentative().getValue();
+    currentInstPartitionOps->emplace_back(
+        PartitionOp::NonSendableIsolationCrossingResult(lookupValueID(rep),
                                                         currentInst));
   }
 
@@ -1546,15 +1810,20 @@ struct PartitionOpBuilder {
 namespace {
 
 enum class TranslationSemantics {
-  /// An instruction that does not affect region based state or if it does we
+  /// An instruction that does not affect region-based state or if it does we
   /// would like to error on some other use. An example would be something
   /// like end_borrow, inject_enum_addr, or alloc_global. We do not produce
   /// any partition op.
   Ignored,
 
   /// An instruction whose result produces a completely new region. E.x.:
-  /// alloc_box, alloc_pack, key_path. This results in the translator
-  /// producing a partition op that introduces the new region.
+  /// alloc_box, alloc_pack, key_path, a function without any parameters. This
+  /// results in the translator producing a partition op that introduces the new
+  /// region.
+  ///
+  /// NOTE: This just introduces a new value and must always occur before a
+  /// value is actually used. The isolation of the value is actually determined
+  /// by invoking tryToTrackValue and SILIsolationInfo::get().
   AssignFresh,
 
   /// An instruction that merges together all of its operands regions and
@@ -1698,8 +1967,11 @@ class PartitionOpTranslator {
 
   SILFunction *function;
 
-  /// A cache of argument IDs.
-  std::optional<Partition> functionArgPartition;
+  /// The initial partition of the entry block.
+  ///
+  /// This contains a single region for non-sending parameters as well as
+  /// separate regions for each sending parameter.
+  std::optional<Partition> initialEntryBlockPartition;
 
   /// A builder struct that we use to convert individual instructions into lists
   /// of PartitionOps.
@@ -1741,7 +2013,8 @@ class PartitionOpTranslator {
                 isNonSendableType(val->getType())) {
               auto trackVal = getTrackableValue(val, true);
               (void)trackVal;
-              REGIONBASEDISOLATION_LOG(trackVal.print(llvm::dbgs()));
+              REGIONBASEDISOLATION_LOG(
+                  trackVal.print(val->getFunction(), llvm::dbgs()));
               continue;
             }
             if (auto *pbi = dyn_cast<ProjectBoxInst>(val)) {
@@ -1764,7 +2037,7 @@ public:
   PartitionOpTranslator(SILFunction *function, PostOrderFunctionInfo *pofi,
                         RegionAnalysisValueMap &valueMap,
                         IsolationHistory::Factory &historyFactory)
-      : function(function), functionArgPartition(), builder(),
+      : function(function), initialEntryBlockPartition(),
         partialApplyReachabilityDataflow(function, valueMap, pofi),
         valueMap(valueMap) {
     builder.translator = this;
@@ -1787,8 +2060,8 @@ public:
     auto functionArguments = function->getArguments();
     if (functionArguments.empty()) {
       REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    None.\n");
-      functionArgPartition = Partition::singleRegion(SILLocation::invalid(), {},
-                                                     historyFactory.get());
+      initialEntryBlockPartition = Partition::singleRegion(
+          SILLocation::invalid(), {}, historyFactory.get());
       return;
     }
 
@@ -1796,34 +2069,39 @@ public:
     llvm::SmallVector<Element, 8> nonSendableSeparateIndices;
     for (SILArgument *arg : functionArguments) {
       // This will decide what the isolation region is.
-      if (auto state = tryToTrackValue(arg)) {
+      if (auto lookupResult = tryToTrackValue(arg)) {
+        auto value = lookupResult->value;
+        assert(value.isNonSendable() &&
+               "We should never see a sendable function argument from "
+               "tryToTrackValue since we will never have a non-Sendable base");
+
         // If we can send our parameter, just add it to
         // nonSendableSeparateIndices.
         //
         // NOTE: We do not support today the ability to have multiple parameters
         // send together as part of the same region.
         if (canFunctionArgumentBeSent(cast<SILFunctionArgument>(arg))) {
-          REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    %%" << state->getID()
+          REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    %%" << value.getID()
                                                 << " (sending): " << *arg);
-          nonSendableSeparateIndices.push_back(state->getID());
+          nonSendableSeparateIndices.push_back(value.getID());
           continue;
         }
 
         // Otherwise, it is one of our merged parameters. Add it to the never
         // send list and to the region join list.
         REGIONBASEDISOLATION_LOG(
-            llvm::dbgs() << "    %%" << state->getID() << ": ";
-            state->print(llvm::dbgs()); llvm::dbgs() << *arg);
-        nonSendableJoinedIndices.push_back(state->getID());
+            llvm::dbgs() << "    %%" << value.getID() << ": ";
+            value.print(function, llvm::dbgs()); llvm::dbgs() << *arg);
+        nonSendableJoinedIndices.push_back(value.getID());
       } else {
         REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    Sendable: " << *arg);
       }
     }
 
-    functionArgPartition = Partition::singleRegion(
+    initialEntryBlockPartition = Partition::singleRegion(
         SILLocation::invalid(), nonSendableJoinedIndices, historyFactory.get());
     for (Element elt : nonSendableSeparateIndices) {
-      functionArgPartition->trackNewElement(elt);
+      initialEntryBlockPartition->trackNewElement(elt);
     }
   }
 
@@ -1846,13 +2124,14 @@ private:
     return SILIsolationInfo::isNonSendableType(type, function);
   }
 
-  TrackableValue
+  TrackableValueLookupResult
   getTrackableValue(SILValue value,
                     bool isAddressCapturedByPartialApply = false) {
     return valueMap.getTrackableValue(value, isAddressCapturedByPartialApply);
   }
 
-  std::optional<TrackableValue> tryToTrackValue(SILValue value) const {
+  std::optional<TrackableValueLookupResult>
+  tryToTrackValue(SILValue value) const {
     return valueMap.tryToTrackValue(value);
   }
 
@@ -1891,8 +2170,10 @@ private:
 public:
   /// Return the partition consisting of all function arguments.
   ///
-  /// Used to initialize the entry blocko of our analysis.
-  const Partition &getEntryPartition() const { return *functionArgPartition; }
+  /// Used to initialize the initial partition of the entry block of the CFG.
+  const Partition &getInitialEntryPartition() const {
+    return *initialEntryBlockPartition;
+  }
 
   /// Get the results of an apply instruction.
   ///
@@ -1927,11 +2208,11 @@ public:
   /// the same value.
   template <typename TargetRange, typename SourceRange>
   void
-  translateSILMultiAssign(const TargetRange &resultValues,
+  translateSILMultiAssign(const TargetRange &directResultValues,
                           const SourceRange &sourceValues,
                           SILIsolationInfo resultIsolationInfoOverride = {},
                           bool requireSrcValues = true) {
-    SmallVector<std::pair<Operand *, SILValue>, 8> assignOperands;
+    SmallVector<std::pair<Operand *, TrackableValue>, 8> assignOperands;
     SmallVector<SILValue, 8> assignResults;
 
     // A helper we use to emit an unknown patten error if our merge is
@@ -1945,15 +2226,38 @@ public:
       mergedInfo = SILDynamicMergedIsolationInfo::getDisconnected(false);
     }
 
+    // For each operand...
     for (Operand *srcOperand : sourceValues) {
+      // Grab our value...
       auto src = srcOperand->get();
-      if (auto value = tryToTrackValue(src)) {
-        assignOperands.push_back(
-            {srcOperand, value->getRepresentative().getValue()});
+
+      // Perform our lookup result.
+      if (auto lookupResult = tryToTrackValue(src)) {
+        auto value = lookupResult->value;
+
+        // If our value is non-Sendable require it and if we have a base and
+        // that base is non-Sendable, require that as well.
+        //
+        // DISCUSSION: The reason that this may be useful is for special
+        // instructions like store_borrow. On the one hand, we want store_borrow
+        // to act like a store in the sense that we want to combine the regions
+        // of its src and dest... but at the same time, we do not want to treat
+        // the store itself as a use of its parent value. We want that to be any
+        // subsequent uses of the store_borrow.
+        if (requireSrcValues) {
+          builder.addRequire(*lookupResult);
+        }
+
+        // If our value was actually Sendable, skip it, we do not want to merge
+        // anything.
+        if (value.isSendable())
+          continue;
+
+        assignOperands.push_back({srcOperand, value});
         auto originalMergedInfo = mergedInfo;
         (void)originalMergedInfo;
         if (mergedInfo)
-          mergedInfo = mergedInfo->merge(value->getIsolationRegionInfo());
+          mergedInfo = mergedInfo->merge(value.getIsolationRegionInfo());
 
         // If we fail to merge, then we have an incompatibility in between some
         // of our arguments (consider isolated to different actors) or with the
@@ -1962,14 +2266,15 @@ public:
           REGIONBASEDISOLATION_LOG(
               llvm::dbgs() << "Merge Failure!\n"
                            << "Original Info: ";
-              if (originalMergedInfo)
-                  originalMergedInfo->printForDiagnostics(llvm::dbgs());
+              if (originalMergedInfo) originalMergedInfo->printForDiagnostics(
+                  builder.getFunction(), llvm::dbgs());
               else llvm::dbgs() << "nil";
               llvm::dbgs() << "\nValue Rep: "
-                           << value->getRepresentative().getValue();
+                           << value.getRepresentative().getValue();
               llvm::dbgs() << "Original Src: " << src;
               llvm::dbgs() << "Value Info: ";
-              value->getIsolationRegionInfo().printForDiagnostics(llvm::dbgs());
+              value.getIsolationRegionInfo().printForDiagnostics(
+                  builder.getFunction(), llvm::dbgs());
               llvm::dbgs() << "\n");
           builder.addUnknownPatternError(src);
           continue;
@@ -1977,7 +2282,12 @@ public:
       }
     }
 
-    for (SILValue result : resultValues) {
+    // Merge all srcs.
+    for (unsigned i = 1; i < assignOperands.size(); i++) {
+      builder.addMerge(assignOperands[i - 1].second, assignOperands[i].first);
+    }
+
+    for (SILValue result : directResultValues) {
       // If we had isolation info explicitly passed in... use our
       // resultIsolationInfoError. Otherwise, we want to infer.
       if (resultIsolationInfoOverride) {
@@ -1992,27 +2302,13 @@ public:
               nonSendableValue->first.getRepresentative().getValue());
         }
       } else {
-        if (auto value = tryToTrackValue(result)) {
-          assignResults.push_back(value->getRepresentative().getValue());
+        if (auto lookupResult = tryToTrackValue(result)) {
+          if (lookupResult->value.isSendable())
+            continue;
+          auto value = lookupResult->value;
+          assignResults.push_back(value.getRepresentative().getValue());
         }
       }
-    }
-
-    // Require all srcs if we are supposed to. (By default we do).
-    //
-    // DISCUSSION: The reason that this may be useful is for special
-    // instructions like store_borrow. On the one hand, we want store_borrow to
-    // act like a store in the sense that we want to combine the regions of its
-    // src and dest... but at the same time, we do not want to treat the store
-    // itself as a use of its parent value. We want that to be any subsequent
-    // uses of the store_borrow.
-    if (requireSrcValues)
-      for (auto src : assignOperands)
-        builder.addRequire(src.second);
-
-    // Merge all srcs.
-    for (unsigned i = 1; i < assignOperands.size(); i++) {
-      builder.addMerge(assignOperands[i - 1].second, assignOperands[i].first);
     }
 
     // If we do not have any non sendable results, return early.
@@ -2027,9 +2323,9 @@ public:
       // passed in a specific isolation info unlike earlier when processing
       // actual results.
       if (assignOperands.size() && resultIsolationInfoOverride) {
-        builder.addActorIntroducingInst(assignOperands.back().second,
-                                        assignOperands.back().first,
-                                        resultIsolationInfoOverride);
+        builder.addActorIntroducingInst(
+            assignOperands.back().second.getRepresentative().getValue(),
+            assignOperands.back().first, resultIsolationInfoOverride);
       }
 
       return;
@@ -2065,7 +2361,8 @@ public:
     // Just track the result of the builtin inst as an assign fresh. We do this
     // so we properly track the partial_apply get. We already sent the
     // parameters.
-    builder.addAssignFresh(bi);
+    if (auto lookupResult = tryToTrackValue(bi))
+      builder.addAssignFresh(lookupResult->value);
   }
 
   /// For discussion on how we handle async let, please see the comment on
@@ -2077,7 +2374,7 @@ public:
 
     // If we didn't find a partial_apply, then we must have had a
     // thin_to_thick_function meaning we did not capture anything.
-    if (source->is<ThinToThickFunctionInst *>())
+    if (isa<ThinToThickFunctionInst *>(source.value()))
       return;
 
     // If our partial_apply was Sendable, then Sema should have checked that
@@ -2085,17 +2382,28 @@ public:
     // error earlier.
     assert(bool(source.value()) &&
            "AsyncLet Get should always have a derivable partial_apply");
-    auto *pai = source->get<PartialApplyInst *>();
+    auto *pai = cast<PartialApplyInst *>(source.value());
     if (pai->getFunctionType()->isSendable())
       return;
 
     ApplySite applySite(pai);
+
     // For each of our partial apply operands...
     for (auto pair : llvm::enumerate(applySite.getArgumentOperands())) {
       Operand &op = pair.value();
 
       // If we are tracking the value...
-      if (auto trackedArgValue = tryToTrackValue(op.get())) {
+      if (auto lookupResult = tryToTrackValue(op.get())) {
+        auto trackedArgValue = lookupResult->value;
+
+        // If we see that our arg value was Sendable, continue. We do not need
+        // to consider a base here since when we capture variables, we always
+        // capture them completely by reference meaning we will actually capture
+        // the base.
+        if (trackedArgValue.isSendable()) {
+          assert(!lookupResult->base.has_value() && "Should never have a base");
+          continue;
+        }
 
         // Gather the isolation info from the AST for this operand...
         InferredCallerArgumentTypeInfo typeInfo;
@@ -2116,8 +2424,7 @@ public:
                 }))
           continue;
 
-        builder.addUndoSend(trackedArgValue->getRepresentative().getValue(),
-                            ai);
+        builder.addUndoSend(trackedArgValue, ai);
       }
     }
   }
@@ -2136,14 +2443,15 @@ public:
     // _ = await y
     // useValue(x2)
     for (auto &op : ApplySite(pai).getArgumentOperands()) {
-      if (auto trackedArgValue = tryToTrackValue(op.get())) {
-        builder.addRequire(trackedArgValue->getRepresentative().getValue());
-        builder.addSend(trackedArgValue->getRepresentative().getValue(), &op);
+      if (auto lookupResult = tryToTrackValue(op.get())) {
+        builder.addRequire(*lookupResult);
+        builder.addSend(lookupResult->value, &op);
       }
     }
 
     // Then mark our partial_apply result as being returned fresh.
-    builder.addAssignFresh(pai);
+    if (auto lookupResult = tryToTrackValue(pai))
+      builder.addAssignFresh(lookupResult->value);
   }
 
   /// Handles the semantics for SIL applies that cross isolation.
@@ -2158,11 +2466,11 @@ public:
     // For each argument operand.
     for (auto &op : applySite.getArgumentOperands()) {
       // See if we tracked it.
-      if (auto value = tryToTrackValue(op.get())) {
+      if (auto lookupResult = tryToTrackValue(op.get())) {
         // If we are tracking it, sent it and if it is actor derived, mark
         // our partial apply as actor derived.
-        builder.addRequire(value->getRepresentative().getValue());
-        builder.addSend(value->getRepresentative().getValue(), &op);
+        builder.addRequire(*lookupResult);
+        builder.addSend(lookupResult->value, &op);
       }
     }
 
@@ -2184,7 +2492,7 @@ public:
   void translateSILPartialApply(PartialApplyInst *pai) {
     // First check if our partial apply is Sendable and not global actor
     // isolated. In such a case, we will have emitted an earlier warning in Sema
-    // and can return early. If we have a global actor isolated partial_apply,
+    // and can return early. If we have a global-actor-isolated partial_apply,
     // we can be looser and can use region isolation since we know that the
     // Sendable closure will be executed serially due to the closure having to
     // run on the global actor queue meaning that we do not have to worry about
@@ -2213,7 +2521,8 @@ public:
       }
     }
 
-    if (auto isolationRegionInfo = SILIsolationInfo::get(pai)) {
+    if (auto isolationRegionInfo = SILIsolationInfo::get(pai);
+        isolationRegionInfo && !isolationRegionInfo.isDisconnected()) {
       return translateIsolatedPartialApply(pai, isolationRegionInfo);
     }
 
@@ -2224,10 +2533,9 @@ public:
   }
 
   void translateCreateAsyncTask(BuiltinInst *bi) {
-    if (auto value = tryToTrackValue(bi->getOperand(1))) {
-      builder.addRequire(value->getRepresentative().getValue());
-      builder.addSend(value->getRepresentative().getValue(),
-                      &bi->getAllOperands()[1]);
+    if (auto lookupResult = tryToTrackValue(bi->getOperand(1))) {
+      builder.addRequire(*lookupResult);
+      builder.addSend(lookupResult->value, &bi->getAllOperands()[1]);
     }
   }
 
@@ -2253,57 +2561,52 @@ public:
     // gather our non-sending parameters.
     SmallVector<Operand *, 8> nonSendingParameters;
     SmallVector<Operand *, 8> sendingIndirectResults;
-    if (fas.getNumArguments()) {
-      // NOTE: We want to process indirect parameters as if they are
-      // parameters... so we process them in nonSendingParameters.
-      for (auto &op : fas.getOperandsWithoutSelf()) {
-        // If op is the callee operand, skip it.
-        if (fas.isCalleeOperand(op))
+
+    // NOTE: We want to process indirect parameters as if they are
+    // parameters... so we process them in nonSendingParameters.
+    for (auto &op : fas->getAllOperands()) {
+      // If op is the callee operand or type dependent operand, skip it.
+      if (op.isTypeDependent())
+        continue;
+
+      if (fas.isCalleeOperand(op)) {
+        if (auto calleeResult = tryToTrackValue(op.get())) {
+          builder.addRequire(*calleeResult);
+        }
+        continue;
+      }
+
+      // If our parameter is not sending, just add it to the non-sending
+      // parameters array and continue.
+      if (!fas.isSending(op)) {
+        nonSendingParameters.push_back(&op);
+        continue;
+      }
+
+      // Otherwise, first handle indirect result operands.
+      if (fas.isIndirectResultOperand(op)) {
+        sendingIndirectResults.push_back(&op);
+        continue;
+      }
+
+      // Attempt to lookup the value we are passing as sending. We want to
+      // require/send value if it is non-Sendable and require its base if it
+      // is non-Sendable as well.
+      if (auto lookupResult = tryToTrackValue(op.get())) {
+        builder.addRequire(*lookupResult);
+        builder.addSend(lookupResult->value, &op);
+      }
+    }
+
+    SWIFT_DEFER {
+      for (auto &op : fas->getAllOperands()) {
+        if (!fas.isInOutSending(op))
           continue;
-
-        if (fas.isSending(op)) {
-          if (fas.isIndirectResultOperand(op)) {
-            sendingIndirectResults.push_back(&op);
-            continue;
-          }
-
-          if (auto value = tryToTrackValue(op.get())) {
-            builder.addRequire(value->getRepresentative().getValue());
-            builder.addSend(value->getRepresentative().getValue(), &op);
-            continue;
-          }
-        } else {
-          nonSendingParameters.push_back(&op);
+        if (auto lookupResult = tryToTrackValue(op.get())) {
+          builder.addUndoSend(lookupResult->value, op.getUser());
         }
       }
-    }
-
-    // If our self parameter was sending, send it. Otherwise, just
-    // stick it in the non self operand values array and run multiassign on
-    // it.
-    if (fas.hasSelfArgument()) {
-      auto &selfOperand = fas.getSelfArgumentOperand();
-      if (fas.getArgumentParameterInfo(selfOperand)
-              .hasOption(SILParameterInfo::Sending)) {
-        if (auto value = tryToTrackValue(selfOperand.get())) {
-          builder.addRequire(value->getRepresentative().getValue());
-          builder.addSend(value->getRepresentative().getValue(), &selfOperand);
-        }
-      } else {
-        nonSendingParameters.push_back(&selfOperand);
-      }
-    }
-
-    // Require our callee operand if it is non-Sendable.
-    //
-    // DISCUSSION: Even though we do not include our callee operand in the same
-    // region as our operands/results, we still need to require that it is live
-    // at the point of application. Otherwise, we will not emit errors if the
-    // closure before this function application is already in the same region as
-    // a sent value. In such a case, the function application must error.
-    if (auto value = tryToTrackValue(fas.getCallee())) {
-      builder.addRequire(value->getRepresentative().getValue());
-    }
+    };
 
     SmallVector<SILValue, 8> applyResults;
     getApplyResults(*fas, applyResults);
@@ -2324,15 +2627,15 @@ public:
 
     // Sending direct results.
     for (SILValue result : applyResults) {
-      if (auto value = tryToTrackValue(result)) {
-        builder.addAssignFresh(value->getRepresentative().getValue());
+      if (auto lookupResult = tryToTrackValue(result)) {
+        builder.addAssignFresh(lookupResult->value);
       }
     }
 
     // Sending indirect results.
     for (Operand *op : sendingIndirectResults) {
-      if (auto value = tryToTrackValue(op->get())) {
-        builder.addAssignFresh(value->getRepresentative().getValue());
+      if (auto lookupResult = tryToTrackValue(op->get())) {
+        builder.addAssignFresh(lookupResult->value);
       }
     }
   }
@@ -2372,33 +2675,76 @@ public:
 
   /// Handles the semantics for SIL applies that cross isolation.
   ///
-  /// Semantically this causes all arguments of the applysite to be sent.
+  /// Semantically we are attempting to implement the following:
+  ///
+  /// * Step 1: Require all non-sending parameters and then send those
+  ///   parameters. We perform all of the requires first and the sends second
+  ///   since all of the parameters are getting sent to the same isolation
+  ///   domains and become part of the same region in our callee. So in a
+  ///   certain sense, we are performing a require over the entire merge of the
+  ///   parameter regions and then send each constituant part of the region
+  ///   without requiring again so we do not emit use-after-send diagnostics.
+  ///
+  /// * Step 2: Require/Send each of the sending parameters one by one. This
+  ///   includes both 'sending' and 'inout sending' parameters. We purposely
+  ///   interleave the require/send operations to ensure that if one passes a
+  ///   value twice to different 'sending' or 'inout sending' parameters, we
+  ///   will emit an error.
+  ///
+  /// * Step 3: Unsend each of the unsending parameters. Since our caller
+  ///   ensures that 'inout sending' parameters are disconnected on return and
+  ///   are in different regions from all other parameters, we can just simply
+  ///   unsend the parameter so we can use it again later.
   void translateIsolationCrossingSILApply(FullApplySite applySite) {
-    // Require all operands first before we emit a send.
-    for (auto op : applySite.getArguments())
-      if (auto value = tryToTrackValue(op))
-        builder.addRequire(value->getRepresentative().getValue());
+    SmallVector<TrackableValue, 8> inoutSendingParams;
 
-    auto handleSILOperands = [&](MutableArrayRef<Operand> operands) {
-      for (auto &op : operands) {
-        if (auto value = tryToTrackValue(op.get())) {
-          builder.addSend(value->getRepresentative().getValue(), &op);
-        }
-      }
-    };
-
-    auto handleSILSelf = [&](Operand *self) {
-      if (auto value = tryToTrackValue(self->get())) {
-        builder.addSend(value->getRepresentative().getValue(), self);
-      }
-    };
-
-    if (applySite.hasSelfArgument()) {
-      handleSILOperands(applySite.getOperandsWithoutIndirectResultsOrSelf());
-      handleSILSelf(&applySite.getSelfArgumentOperand());
-    } else {
-      handleSILOperands(applySite.getOperandsWithoutIndirectResults());
+    // First go through and require all of our operands that are not 'sending'
+    for (auto &op : applySite.getArgumentOperands()) {
+      if (applySite.isSending(op))
+        continue;
+      if (auto lookupResult = tryToTrackValue(op.get()))
+        builder.addRequire(*lookupResult);
     }
+
+    // Then go through our operands again and send all of our non-sending
+    // parameters. We do not interleave these sends with our requires since we
+    // are considering these values to be merged into the same region. We could
+    // also merge them in the caller but there is no point in doing so
+    // semantically since the values cannot be used again locally.
+    for (auto &op : applySite.getOperandsWithoutIndirectResults()) {
+      if (applySite.isSending(op))
+        continue;
+      if (auto lookupResult = tryToTrackValue(op.get())) {
+        builder.addSend(lookupResult->value, &op);
+      }
+    };
+
+    // Then go through our 'sending' params and require/send each in sequence.
+    //
+    // We do this interleaved so that if a value is passed to multiple 'sending'
+    // parameters, we emit errors.
+    for (auto &op : applySite.getOperandsWithoutIndirectResults()) {
+      if (!applySite.isSending(op))
+        continue;
+      auto lookupResult = tryToTrackValue(op.get());
+      if (!lookupResult)
+        continue;
+      builder.addRequire(*lookupResult);
+      builder.addSend(lookupResult->value, &op);
+    }
+
+    // Now use a SWIFT_DEFER so that when the function is done executing, we
+    // unsend 'inout sending' params.
+    SWIFT_DEFER {
+      for (auto &op : applySite.getOperandsWithoutIndirectResults()) {
+        if (!applySite.isInOutSending(op))
+          continue;
+        auto lookupResult = tryToTrackValue(op.get());
+        if (!lookupResult)
+          continue;
+        builder.addUndoSend(lookupResult->value, *applySite);
+      }
+    };
 
     // Create a new assign fresh for each one of our values and unless our
     // return value is sending, emit an extra error bit on the results that are
@@ -2433,11 +2779,11 @@ public:
                            .isNonisolated());
 
     for (auto result : applyResults) {
-      if (auto value = tryToTrackValue(result)) {
-        builder.addAssignFresh(value->getRepresentative().getValue());
+      if (auto lookupResult = tryToTrackValue(result)) {
+        builder.addAssignFresh(lookupResult->value);
         if (emitIsolationCrossingResultError)
           builder.addNonSendableIsolationCrossingResultError(
-              value->getRepresentative().getValue());
+              lookupResult->value);
       }
     }
 
@@ -2446,9 +2792,9 @@ public:
     // non-Sendable.
     if (emitIsolationCrossingResultError) {
       for (auto result : applySite.getIndirectSILResults()) {
-        if (auto value = tryToTrackValue(result)) {
+        if (auto lookupResult = tryToTrackValue(result)) {
           builder.addNonSendableIsolationCrossingResultError(
-              value->getRepresentative().getValue());
+              lookupResult->value);
         }
       }
     }
@@ -2456,12 +2802,22 @@ public:
 
   template <typename DestValues>
   void translateSILLookThrough(DestValues destValues, SILValue src) {
-    auto srcID = tryToTrackValue(src);
+    auto srcResult = tryToTrackValue(src);
 
     for (SILValue dest : destValues) {
-      auto destID = tryToTrackValue(dest);
-      assert(((!destID || !srcID) || destID->getID() == srcID->getID()) &&
-             "srcID and dstID are different?!");
+      // If we have a non-Sendable result and a Sendable src, we assign fresh.
+      if (auto destResult = tryToTrackValue(dest)) {
+        if (!srcResult || srcResult->value.isSendable()) {
+          builder.addAssignFresh(destResult->value);
+          continue;
+        }
+
+        // Otherwise, we do a real look through.
+        assert(((!destResult || !srcResult || destResult->value.isSendable() ||
+                 srcResult->value.isSendable()) ||
+                destResult->value.getID() == srcResult->value.getID()) &&
+               "srcID and dstID are different?!");
+      }
     }
   }
 
@@ -2476,18 +2832,37 @@ public:
   /// PartitionOp. Doing such a thing obscures what is actually happening.
   template <>
   void translateSILLookThrough<SILValue>(SILValue dest, SILValue src) {
-    auto srcID = tryToTrackValue(src);
-    auto destID = tryToTrackValue(dest);
-    assert(((!destID || !srcID) || destID->getID() == srcID->getID()) &&
-           "srcID and dstID are different?!");
+    auto srcResult = tryToTrackValue(src);
+
+    if (auto destResult = tryToTrackValue(dest)) {
+      if (!srcResult || srcResult->value.isSendable()) {
+        builder.addAssignFresh(destResult->value);
+        return;
+      }
+
+      // Otherwise, we do a real look through.
+      assert(((!srcResult || destResult->value.isSendable() ||
+               srcResult->value.isSendable()) ||
+              destResult->value.getID() == srcResult->value.getID()) &&
+             "srcID and dstID are different?!");
+    }
   }
 
   void translateSILLookThrough(SingleValueInstruction *svi) {
     assert(svi->getNumRealOperands() == 1);
-    auto srcID = tryToTrackValue(svi->getOperand(0));
-    auto destID = tryToTrackValue(svi);
-    assert(((!destID || !srcID) || destID->getID() == srcID->getID()) &&
-           "srcID and dstID are different?!");
+    auto srcResult = tryToTrackValue(svi->getOperand(0));
+    if (auto destResult = tryToTrackValue(svi)) {
+      if (!srcResult || srcResult->value.isSendable()) {
+        builder.addAssignFresh(destResult->value);
+        return;
+      }
+
+      // Otherwise, we do a real look through.
+      assert(((!srcResult || destResult->value.isSendable() ||
+               srcResult->value.isSendable()) ||
+              destResult->value.getID() == srcResult->value.getID()) &&
+             "srcID and dstID are different?!");
+    }
   }
 
   template <typename Collection>
@@ -2528,72 +2903,77 @@ public:
 
   template <typename Collection>
   void translateSILMerge(SILValue dest, Collection srcCollection,
-                         bool requireOperands = true) {
-    auto trackableDest = tryToTrackValue(dest);
-    if (!trackableDest)
+                         bool requireOperands,
+                         SILIsolationInfo resultIsolationInfoOverride = {}) {
+    auto destResult =  tryToTrackValue(dest);
+    if (!destResult)
       return;
+
+    if (requireOperands) {
+      builder.addRequire(*destResult);
+
+      if (resultIsolationInfoOverride && !srcCollection.empty()) {
+        using std::begin;
+        builder.addActorIntroducingInst(dest, *begin(srcCollection), resultIsolationInfoOverride);
+      }
+    }
+
     for (Operand *op : srcCollection) {
-      if (auto trackableSrc = tryToTrackValue(op->get())) {
+      // If we have a trackable src, we need to require both if asked to and
+      // then merge the dest/src.
+      if (auto srcResult = tryToTrackValue(op->get())) {
         if (requireOperands) {
-          builder.addRequire(trackableSrc->getRepresentative().getValue());
-          builder.addRequire(trackableDest->getRepresentative().getValue());
+          builder.addRequire(*srcResult);
         }
-        builder.addMerge(trackableDest->getRepresentative().getValue(), op);
+
+        if (srcResult->value.isNonSendable())
+          builder.addMerge(destResult->value, op);
       }
     }
   }
 
   template <>
   void translateSILMerge<Operand *>(SILValue dest, Operand *src,
-                                    bool requireOperands) {
+                                    bool requireOperands,
+                                    SILIsolationInfo resultIsolationInfoOverride) {
     return translateSILMerge(dest, TinyPtrVector<Operand *>(src),
-                             requireOperands);
+                             requireOperands, resultIsolationInfoOverride);
   }
 
   void translateSILMerge(MutableArrayRef<Operand> array,
-                         bool requireOperands = true) {
+                         bool requireOperands,
+                         SILIsolationInfo resultIsolationInfoOverride = {}) {
     if (array.size() < 2)
       return;
 
-    auto trackableDest = tryToTrackValue(array.front().get());
-    if (!trackableDest)
+    std::optional<TrackableValueLookupResult> destResult;
+    if (resultIsolationInfoOverride) {
+      if (auto nonSendableValue = initializeTrackedValue(
+              array.front().get(), resultIsolationInfoOverride)) {
+        destResult = TrackableValueLookupResult{
+            nonSendableValue->first, std::nullopt};
+      }
+    } else {
+      destResult = tryToTrackValue(array.front().get());
+    }
+
+    if (!destResult)
       return;
+
+    if (requireOperands) {
+      builder.addRequire(*destResult);
+    }
+
     for (Operand &op : array.drop_front()) {
-      if (auto trackableSrc = tryToTrackValue(op.get())) {
+      if (auto srcResult = tryToTrackValue(op.get())) {
         if (requireOperands) {
-          builder.addRequire(trackableSrc->getRepresentative().getValue());
-          builder.addRequire(trackableDest->getRepresentative().getValue());
+          builder.addRequire(*srcResult);
         }
-        builder.addMerge(trackableDest->getRepresentative().getValue(), &op);
+
+        if (srcResult->value.isNonSendable())
+          builder.addMerge(destResult->value, &op);
       }
     }
-  }
-
-  void translateSILAssignmentToSendingParameter(TrackableValue destRoot,
-                                                Operand *destOperand,
-                                                TrackableValue srcRoot,
-                                                Operand *srcOperand) {
-    assert(isa<AllocStackInst>(destRoot.getRepresentative().getValue()) &&
-           "Destination should always be an alloc_stack");
-
-    // Send src. This ensures that we cannot use src again locally in this
-    // function... which makes sense since its value is now in the 'sending'
-    // parameter.
-    builder.addRequire(srcRoot.getRepresentative().getValue());
-    builder.addSend(srcRoot.getRepresentative().getValue(), srcOperand);
-
-    // Then check if we are assigning into an aggregate projection. In such a
-    // case, we want to ensure that we keep tracking the elements already in the
-    // region of sending. This is more conservative than we need to be
-    // (since we could forget anything reachable from the aggregate
-    // field)... but being more conservative is ok.
-    if (isProjectedFromAggregate(destOperand->get()))
-      return;
-
-    // If we are assigning over the entire value though, we perform an assign
-    // fresh since we are guaranteed that any value that could be referenced via
-    // the old value is gone.
-    builder.addAssignFresh(destRoot.getRepresentative().getValue());
   }
 
   /// If \p dest is known to be unaliased (computed through a combination of
@@ -2601,10 +2981,11 @@ public:
   /// captures by applications), then these can be treated as assignments of \p
   /// dest to src. If the \p dest could be aliased, then we must instead treat
   /// them as merges, to ensure any aliases of \p dest are also updated.
-  void translateSILStore(Operand *dest, Operand *src) {
+  void translateSILStore(Operand *dest, Operand *src,
+                         SILIsolationInfo resultIsolationInfoOverride = {}) {
     SILValue destValue = dest->get();
 
-    if (auto nonSendableDest = tryToTrackValue(destValue)) {
+    if (auto destResult = tryToTrackValue(destValue)) {
       // In the following situations, we can perform an assign:
       //
       // 1. A store to unaliased storage.
@@ -2616,15 +2997,27 @@ public:
       // specifically in this projection... but that is better than
       // miscompiling. For memory like this, we probably need to track it on a
       // per field basis to allow for us to assign.
-      if (nonSendableDest.value().isNoAlias() &&
+      //
+      // TODO: Should this change if we have a Sendable address with a
+      // non-Sendable base.
+      if (destResult.value().value.isNoAlias() &&
+          !resultIsolationInfoOverride &&
           !isProjectedFromAggregate(destValue))
         return translateSILAssign(destValue, src);
 
       // Stores to possibly aliased storage must be treated as merges.
-      return translateSILMerge(destValue, src);
+      return translateSILMerge(destValue, src, /*requireOperand*/true,
+                               resultIsolationInfoOverride);
     }
 
-    // Stores to storage of non-Sendable type can be ignored.
+    // If we reached this point, our destination is something that is Sendable
+    // and is not an address that comes from a non-Sendable base... so we can
+    // ignore the store part. But we still need tosee if our src (which also
+    // must be Sendable) comes from a non-Sendable base. In such a case, we need
+    // to require that.
+    if (auto srcResult = tryToTrackValue(src->get())) {
+      builder.addRequire(*srcResult);
+    }
   }
 
   void translateSILTupleAddrConstructor(TupleAddrConstructorInst *inst) {
@@ -2641,21 +3034,27 @@ public:
       // specifically in this projection... but that is better than
       // miscompiling. For memory like this, we probably need to track it on a
       // per field basis to allow for us to assign.
-      if (nonSendableTgt.value().isNoAlias() && !isProjectedFromAggregate(dest))
+      //
+      // TODO: Should this change if we have a Sendable address with a
+      // non-Sendable base.
+      if (nonSendableTgt.value().value.isNoAlias() &&
+          !isProjectedFromAggregate(dest))
         return translateSILAssign(
             dest, makeOperandRefRange(inst->getElementOperands()));
 
       // Stores to possibly aliased storage must be treated as merges.
       return translateSILMerge(dest,
-                               makeOperandRefRange(inst->getElementOperands()));
+                               makeOperandRefRange(inst->getElementOperands()),
+                               /*requireOperands=*/true);
     }
 
     // Stores to storage of non-Sendable type can be ignored.
   }
 
   void translateSILRequire(SILValue val) {
-    if (auto nonSendableVal = tryToTrackValue(val))
-      return builder.addRequire(nonSendableVal->getRepresentative().getValue());
+    if (auto lookupResult = tryToTrackValue(val)) {
+      builder.addRequire(*lookupResult);
+    }
   }
 
   /// An enum select is just a multi assign.
@@ -2691,10 +3090,12 @@ public:
   // and a pointer to the bb being branches to itself.
   // this is handled as assigning to each possible arg being branched to the
   // merge of all values that could be passed to it from this basic block.
-  void translateSILPhi(TermArgSources &argSources) {
+  void translateSILPhi(TermArgSources &argSources,
+                       SILIsolationInfo resultIsolationInfoOverride = {}) {
     argSources.argSources.setFrozen();
     for (auto pair : argSources.argSources.getRange()) {
-      translateSILMultiAssign(TinyPtrVector<SILValue>(pair.first), pair.second);
+      translateSILMultiAssign(TinyPtrVector<SILValue>(pair.first), pair.second,
+                              resultIsolationInfoOverride);
     }
   }
 
@@ -2702,9 +3103,9 @@ public:
   /// unconditionally and that do not have a result.
   void translateSILSendingNoResult(MutableArrayRef<Operand> values) {
     for (auto &op : values) {
-      if (auto ns = tryToTrackValue(op.get())) {
-        builder.addRequire(ns->getRepresentative().getValue());
-        builder.addSend(ns->getRepresentative().getValue(), &op);
+      if (auto lookupResult = tryToTrackValue(op.get())) {
+        builder.addRequire(*lookupResult);
+        builder.addSend(lookupResult->value, &op);
       }
     }
   }
@@ -2724,13 +3125,13 @@ public:
         basicBlock->printID(llvm::dbgs()); llvm::dbgs() << SEP_STR;
         basicBlock->print(llvm::dbgs());
         llvm::dbgs() << SEP_STR << "Results:\n";);
+
     // Translate each SIL instruction to the PartitionOps that it represents if
     // any.
+    builder.initialize(foundPartitionOps);
     for (auto &instruction : *basicBlock) {
       REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Visiting: " << instruction);
       translateSILInstruction(&instruction);
-      copy(builder.currentInstPartitionOps,
-           std::back_inserter(foundPartitionOps));
     }
   }
 
@@ -2745,9 +3146,8 @@ public:
       auto *fArg = cast<SILFunctionArgument>(arg);
       if (fArg->getArgumentConvention().isInoutConvention() &&
           fArg->getKnownParameterInfo().hasOption(SILParameterInfo::Sending)) {
-        if (auto ns = tryToTrackValue(arg)) {
-          auto rep = ns->getRepresentative().getValue();
-          builder.addInOutSendingAtFunctionExit(rep);
+        if (auto lookupResult = tryToTrackValue(arg)) {
+          builder.addInOutSendingAtFunctionExit(lookupResult->value);
         }
       }
     }
@@ -2780,7 +3180,8 @@ public:
 
     case TranslationSemantics::Assign:
       return translateSILMultiAssign(
-          inst->getResults(), makeOperandRefRange(inst->getAllOperands()));
+          inst->getResults(), makeOperandRefRange(inst->getAllOperands()),
+          SILIsolationInfo::getConformanceIsolation(inst));
 
     case TranslationSemantics::Require:
       for (auto op : inst->getOperandValues())
@@ -2790,8 +3191,6 @@ public:
     case TranslationSemantics::LookThrough:
       assert(inst->getNumRealOperands() == 1);
       assert((isStaticallyLookThroughInst(inst) ||
-              isLookThroughIfResultNonSendable(inst) ||
-              isLookThroughIfOperandNonSendable(inst) ||
               isLookThroughIfOperandAndResultNonSendable(inst)) &&
              "Out of sync... should return true for one of these categories!");
       return translateSILLookThrough(inst->getResults(), inst->getOperand(0));
@@ -2799,7 +3198,8 @@ public:
     case TranslationSemantics::Store:
       return translateSILStore(
           &inst->getAllOperands()[CopyLikeInstruction::Dest],
-          &inst->getAllOperands()[CopyLikeInstruction::Src]);
+          &inst->getAllOperands()[CopyLikeInstruction::Src],
+          SILIsolationInfo::getConformanceIsolation(inst));
 
     case TranslationSemantics::Special:
       return;
@@ -2810,7 +3210,8 @@ public:
     case TranslationSemantics::TerminatorPhi: {
       TermArgSources sources;
       sources.init(inst);
-      return translateSILPhi(sources);
+      return translateSILPhi(
+          sources, SILIsolationInfo::getConformanceIsolation(inst));
     }
 
     case TranslationSemantics::Asserting:
@@ -2853,7 +3254,7 @@ Element PartitionOpBuilder::getActorIntroducingRepresentative(
 
 bool PartitionOpBuilder::valueHasID(SILValue value, bool dumpIfHasNoID) {
   auto v = translator->valueMap.getTrackableValue(value);
-  if (auto m = v.getRepresentative().maybeGetValue())
+  if (auto m = v.value.getRepresentative().maybeGetValue())
     return translator->valueHasID(m, dumpIfHasNoID);
   return true;
 }
@@ -2861,7 +3262,8 @@ bool PartitionOpBuilder::valueHasID(SILValue value, bool dumpIfHasNoID) {
 void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
 #ifndef NDEBUG
   // If we do not have anything to dump, just return.
-  if (currentInstPartitionOps.empty())
+  auto ops = getPartitionOpsForCurrentInst();
+  if (ops.empty())
     return;
 
   // First line.
@@ -2872,8 +3274,6 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
   llvm::dbgs() << " │ └─╼  ";
   currentInst->getLoc().getSourceLoc().printLineAndColumn(
       llvm::dbgs(), currentInst->getFunction()->getASTContext().SourceMgr);
-
-  auto ops = llvm::ArrayRef(currentInstPartitionOps);
 
   // First op on its own line.
   llvm::dbgs() << "\n ├─────╼ ";
@@ -2891,10 +3291,7 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
   SWIFT_DEFER { opsToPrint.clear(); };
   for (const PartitionOp &op : ops) {
     // Now dump our the root value we map.
-    for (unsigned opArg : op.getOpArgs()) {
-      // If we didn't insert, skip this. We only emit this once.
-      opsToPrint.push_back(Element(opArg));
-    }
+    op.getOpArgs(opsToPrint);
   }
   sortUnique(opsToPrint);
   for (Element opArg : opsToPrint) {
@@ -2902,7 +3299,7 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
     auto trackableValue = translator->getValueForId(opArg);
     assert(trackableValue);
     llvm::dbgs() << "State: %%" << opArg << ". ";
-    trackableValue->getValueState().print(llvm::dbgs());
+    trackableValue->getValueState().print(getFunction(), llvm::dbgs());
     llvm::dbgs() << "\n             Rep Value: "
                  << trackableValue->getRepresentative();
     if (auto value = trackableValue->getRepresentative().maybeGetValue()) {
@@ -2910,6 +3307,48 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
     }
   }
 #endif
+}
+
+void PartitionOpBuilder::addRequire(TrackableValue value,
+                                    PartitionOp::Options options) {
+  if (value.isSendable())
+    return;
+  auto silValue = value.getRepresentative().getValue();
+  assert(valueHasID(silValue, /*dumpIfHasNoID=*/true) &&
+         "required value should already have been encountered");
+
+  currentInstPartitionOps->emplace_back(
+      PartitionOp::Require(lookupValueID(silValue), currentInst, options));
+}
+
+void PartitionOpBuilder::addRequire(TrackableValueLookupResult value) {
+  // Call addRequire which will short curcuit if we have a sendable value.
+  addRequire(value.value);
+
+  if (value.value.isSendable()) {
+    auto options = PartitionOp::Options();
+    if (value.base && value.base->isNonSendable()) {
+      // Check if our base was captured by a closure. In such a case, we need to
+      // treat this as a use of the base.
+      auto rep = value.base->getRepresentative().getValue();
+      if (auto boxType = rep->getType().getAs<SILBoxType>()) {
+        // If we are not mutable, we are always safe to access the Sendable
+        // value. The reason why is that we will have copied the non-Sendable
+        // segment by value at +1 when we send it implying that we will
+        if (!boxType->getLayout()->isMutable())
+          return;
+
+        options |= PartitionOp::Flag::RequireOfMutableBaseOfSendableValue;
+      } else if (auto *asi = dyn_cast<AllocStackInst>(rep)) {
+        if (asi->isLet())
+          return;
+
+        options |= PartitionOp::Flag::RequireOfMutableBaseOfSendableValue;
+      }
+
+      addRequire(value.base, options);
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -2939,7 +3378,6 @@ CONSTANT_TRANSLATION(AllocBoxInst, AssignFresh)
 CONSTANT_TRANSLATION(AllocPackInst, AssignFresh)
 CONSTANT_TRANSLATION(AllocRefDynamicInst, AssignFresh)
 CONSTANT_TRANSLATION(AllocRefInst, AssignFresh)
-CONSTANT_TRANSLATION(AllocVectorInst, AssignFresh)
 CONSTANT_TRANSLATION(KeyPathInst, AssignFresh)
 CONSTANT_TRANSLATION(FunctionRefInst, AssignFresh)
 CONSTANT_TRANSLATION(DynamicFunctionRefInst, AssignFresh)
@@ -2953,9 +3391,10 @@ CONSTANT_TRANSLATION(WitnessMethodInst, AssignFresh)
 CONSTANT_TRANSLATION(IntegerLiteralInst, AssignFresh)
 CONSTANT_TRANSLATION(FloatLiteralInst, AssignFresh)
 CONSTANT_TRANSLATION(StringLiteralInst, AssignFresh)
-// Metatypes are Sendable, but AnyObject isn't
-CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, AssignFresh)
-CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, AssignFresh)
+// Metatypes are often, but not always, Sendable, but AnyObject isn't
+CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, Assign)
+CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, Assign)
+CONSTANT_TRANSLATION(MetatypeInst, AssignFresh)
 
 //===---
 // Assign
@@ -2980,8 +3419,6 @@ CONSTANT_TRANSLATION(LoadUnownedInst, Assign)
 // getUnderlyingTrackedObject.
 CONSTANT_TRANSLATION(AddressToPointerInst, Assign)
 CONSTANT_TRANSLATION(BaseAddrForOffsetInst, Assign)
-CONSTANT_TRANSLATION(ConvertEscapeToNoEscapeInst, Assign)
-CONSTANT_TRANSLATION(ConvertFunctionInst, Assign)
 CONSTANT_TRANSLATION(ThunkInst, Assign)
 CONSTANT_TRANSLATION(CopyBlockInst, Assign)
 CONSTANT_TRANSLATION(CopyBlockWithoutEscapingInst, Assign)
@@ -2995,9 +3432,16 @@ CONSTANT_TRANSLATION(TailAddrInst, Assign)
 CONSTANT_TRANSLATION(ThickToObjCMetatypeInst, Assign)
 CONSTANT_TRANSLATION(ThinToThickFunctionInst, Assign)
 CONSTANT_TRANSLATION(UncheckedAddrCastInst, Assign)
-CONSTANT_TRANSLATION(UncheckedEnumDataInst, Assign)
 CONSTANT_TRANSLATION(UncheckedOwnershipConversionInst, Assign)
 CONSTANT_TRANSLATION(IndexRawPointerInst, Assign)
+CONSTANT_TRANSLATION(MarkDependenceAddrInst, Assign)
+CONSTANT_TRANSLATION(ImplicitActorToOpaqueIsolationCastInst, Assign)
+
+CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Assign)
+CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Assign)
+CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, Assign)
+CONSTANT_TRANSLATION(ValueMetatypeInst, Assign)
+CONSTANT_TRANSLATION(ExistentialMetatypeInst, Assign)
 
 // These are used by SIL to aggregate values together in a gep like way. We
 // want to look at uses of structs, not the struct uses itself. So just
@@ -3020,6 +3464,7 @@ CONSTANT_TRANSLATION(BridgeObjectToRefInst, LookThrough)
 CONSTANT_TRANSLATION(CopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(ExplicitCopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(EndCOWMutationInst, LookThrough)
+CONSTANT_TRANSLATION(EndCOWMutationAddrInst, Ignored)
 CONSTANT_TRANSLATION(ProjectBoxInst, LookThrough)
 CONSTANT_TRANSLATION(EndInitLetRefInst, LookThrough)
 CONSTANT_TRANSLATION(InitEnumDataAddrInst, LookThrough)
@@ -3034,6 +3479,7 @@ CONSTANT_TRANSLATION(MoveOnlyWrapperToCopyableBoxInst, LookThrough)
 CONSTANT_TRANSLATION(MoveOnlyWrapperToCopyableAddrInst, LookThrough)
 CONSTANT_TRANSLATION(CopyableToMoveOnlyWrapperAddrInst, LookThrough)
 CONSTANT_TRANSLATION(MarkUninitializedInst, LookThrough)
+CONSTANT_TRANSLATION(UncheckedOwnershipInst, LookThrough)
 // We identify destructured results with their operand's region.
 CONSTANT_TRANSLATION(DestructureTupleInst, LookThrough)
 CONSTANT_TRANSLATION(DestructureStructInst, LookThrough)
@@ -3050,14 +3496,18 @@ CONSTANT_TRANSLATION(StrongCopyWeakValueInst, LookThrough)
 CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, LookThrough)
 CONSTANT_TRANSLATION(RefToUnmanagedInst, LookThrough)
 CONSTANT_TRANSLATION(UnmanagedToRefInst, LookThrough)
-CONSTANT_TRANSLATION(InitExistentialValueInst, LookThrough)
+CONSTANT_TRANSLATION(UncheckedEnumDataInst, LookThrough)
+CONSTANT_TRANSLATION(TupleElementAddrInst, LookThrough)
+CONSTANT_TRANSLATION(StructElementAddrInst, LookThrough)
+CONSTANT_TRANSLATION(VectorBaseAddrInst, LookThrough)
+CONSTANT_TRANSLATION(UncheckedTakeEnumDataAddrInst, LookThrough)
 
 //===---
 // Store
 //
 
 // These are treated as stores - meaning that they could write values into
-// memory. The beahvior of this depends on whether the tgt addr is aliased,
+// memory. The behavior of this depends on whether the tgt addr is aliased,
 // but conservative behavior is to treat these as merges of the regions of
 // the src value and tgt addr
 CONSTANT_TRANSLATION(CopyAddrInst, Store)
@@ -3095,14 +3545,14 @@ CONSTANT_TRANSLATION(ExtendLifetimeInst, Ignored)
 CONSTANT_TRANSLATION(EndUnpairedAccessInst, Ignored)
 CONSTANT_TRANSLATION(HopToExecutorInst, Ignored)
 CONSTANT_TRANSLATION(InjectEnumAddrInst, Ignored)
-CONSTANT_TRANSLATION(IsEscapingClosureInst, Ignored)
-CONSTANT_TRANSLATION(MetatypeInst, Ignored)
+CONSTANT_TRANSLATION(DestroyNotEscapedClosureInst, Ignored)
 CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
 CONSTANT_TRANSLATION(DebugStepInst, Ignored)
 CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Ignored)
 CONSTANT_TRANSLATION(SpecifyTestInst, Ignored)
 CONSTANT_TRANSLATION(TypeValueInst, Ignored)
+CONSTANT_TRANSLATION(IgnoredUseInst, Ignored)
 
 //===---
 // Require
@@ -3120,21 +3570,8 @@ CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Require)
 CONSTANT_TRANSLATION(RebindMemoryInst, Require)
 CONSTANT_TRANSLATION(BindMemoryInst, Require)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Require)
-// Require of the value we extract the metatype from.
-CONSTANT_TRANSLATION(ValueMetatypeInst, Require)
-// Require of the value we extract the metatype from.
-CONSTANT_TRANSLATION(ExistentialMetatypeInst, Require)
 // These can take a parameter. If it is non-Sendable, use a require.
 CONSTANT_TRANSLATION(GetAsyncContinuationAddrInst, Require)
-
-//===---
-// Asserting If Non Sendable Parameter
-//
-
-// Takes metatypes as parameters and metatypes today are always sendable.
-CONSTANT_TRANSLATION(InitExistentialMetatypeInst, AssertingIfNonSendable)
-CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, AssertingIfNonSendable)
-CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, AssertingIfNonSendable)
 
 //===---
 // Terminators
@@ -3257,7 +3694,6 @@ CONSTANT_TRANSLATION(DeallocPackMetadataInst, Asserting)
 // All of these instructions should be removed by DI which runs before us in the
 // pass pipeline.
 CONSTANT_TRANSLATION(AssignInst, Asserting)
-CONSTANT_TRANSLATION(AssignByWrapperInst, Asserting)
 CONSTANT_TRANSLATION(AssignOrInitInst, Asserting)
 
 // We should never hit this since it can only appear as a final instruction in a
@@ -3313,9 +3749,8 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedTrivialBitCastInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedBitwiseCastInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedValueCastInst)
-LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(TupleElementAddrInst)
-LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(StructElementAddrInst)
-LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(UncheckedTakeEnumDataAddrInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(ConvertEscapeToNoEscapeInst)
+LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(ConvertFunctionInst)
 
 #undef LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND
 
@@ -3334,7 +3769,7 @@ PartitionOpTranslator::visitStoreBorrowInst(StoreBorrowInst *sbi) {
   SILValue destValue = sbi->getDest();
 
   auto nonSendableDest = tryToTrackValue(destValue);
-  if (!nonSendableDest)
+  if (!nonSendableDest || nonSendableDest->value.isSendable())
     return TranslationSemantics::Ignored;
 
   // In the following situations, we can perform an assign:
@@ -3348,7 +3783,7 @@ PartitionOpTranslator::visitStoreBorrowInst(StoreBorrowInst *sbi) {
   // specifically in this projection... but that is better than
   // miscompiling. For memory like this, we probably need to track it on a
   // per field basis to allow for us to assign.
-  if (nonSendableDest.value().isNoAlias() &&
+  if (nonSendableDest.value().value.isNoAlias() &&
       !isProjectedFromAggregate(destValue)) {
     translateSILMultiAssign(sbi->getResults(),
                             makeOperandRefRange(sbi->getAllOperands()),
@@ -3408,24 +3843,55 @@ PartitionOpTranslator::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   return TranslationSemantics::LookThrough;
 }
 
-/// LoadInst is technically a statically look through instruction, but we want
-/// to handle it especially in the infrastructure, so we cannot mark it as
-/// such. This makes marking it as a normal lookthrough instruction impossible
-/// since the routine checks that invariant.
-TranslationSemantics PartitionOpTranslator::visitLoadInst(LoadInst *limvi) {
+/// LoadInst has two different semantics:
+///
+/// 1. If the load produces a non-Sendable value, we want to treat it as a
+/// statically look through instruction, but we want to handle it especially in
+/// the infrastructure, so we cannot mark it as such. This makes marking it as a
+/// normal lookthrough instruction impossible since the routine checks that
+/// invariant.
+///
+/// 2. If the load produces a Sendable value, we want to perform a require on
+/// the address so that if we have a load from a non-Sendable base, we properly
+/// require the base.
+TranslationSemantics PartitionOpTranslator::visitLoadInst(LoadInst *li) {
+  if (SILIsolationInfo::isSendableType(li->getOperand())) {
+    translateSILRequire(li->getOperand());
+  }
+
   return TranslationSemantics::Special;
 }
 
-/// LoadBorrowInst is technically a statically look through instruction, but we
-/// want to handle it especially in the infrastructure, so we cannot mark it as
-/// such. This makes marking it as a normal lookthrough instruction impossible
-/// since the routine checks that invariant.
+/// LoadBorrowInst has two different semantics:
+///
+/// 1. If the load produces a non-Sendable value, we want to treat it as a
+/// statically look through instruction, but we want to handle it especially in
+/// the infrastructure, so we cannot mark it as such. This makes marking it as a
+/// normal lookthrough instruction impossible since the routine checks that
+/// invariant.
+///
+/// 2. If the load produces a Sendable value, we want to perform a require on
+/// the address so that if we have a load from a non-Sendable base, we properly
+/// require the base.
 TranslationSemantics
 PartitionOpTranslator::visitLoadBorrowInst(LoadBorrowInst *lbi) {
+  if (SILIsolationInfo::isSendableType(lbi->getOperand())) {
+    translateSILRequire(lbi->getOperand());
+  }
+
   return TranslationSemantics::Special;
 }
 
 TranslationSemantics PartitionOpTranslator::visitReturnInst(ReturnInst *ri) {
+  addEndOfFunctionChecksForInOutSendingParameters(ri);
+  if (ri->getFunction()->getLoweredFunctionType()->hasSendingResult()) {
+    return TranslationSemantics::SendingNoResult;
+  }
+  return TranslationSemantics::Require;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitReturnBorrowInst(ReturnBorrowInst *ri) {
   addEndOfFunctionChecksForInOutSendingParameters(ri);
   if (ri->getFunction()->getLoweredFunctionType()->hasSendingResult()) {
     return TranslationSemantics::SendingNoResult;
@@ -3482,8 +3948,11 @@ PartitionOpTranslator::visitPackElementSetInst(PackElementSetInst *r) {
 
 TranslationSemantics
 PartitionOpTranslator::visitRawPointerToRefInst(RawPointerToRefInst *r) {
-  assert(isLookThroughIfResultNonSendable(r) && "Out of sync");
+  assert(isLookThroughIfOperandAndResultNonSendable(r) && "Out of sync");
   // If our result is non sendable, perform a look through.
+  //
+  // NOTE: From RBI perspective, RawPointer is non-Sendable, so this is really
+  // just look through if operand and result non-Sendable.
   if (isNonSendableType(r->getType()))
     return TranslationSemantics::LookThrough;
 
@@ -3493,9 +3962,12 @@ PartitionOpTranslator::visitRawPointerToRefInst(RawPointerToRefInst *r) {
 
 TranslationSemantics
 PartitionOpTranslator::visitRefToRawPointerInst(RefToRawPointerInst *r) {
-  assert(isLookThroughIfOperandNonSendable(r) && "Out of sync");
+  assert(isLookThroughIfOperandAndResultNonSendable(r) && "Out of sync");
 
   // If our source ref is non sendable, perform a look through.
+  //
+  // NOTE: From RBI perspective, RawPointer is non-Sendable, so this is really
+  // just look through if operand and result non-Sendable.
   if (isNonSendableType(r->getOperand()->getType()))
     return TranslationSemantics::LookThrough;
 
@@ -3529,7 +4001,10 @@ PartitionOpTranslator::visitPointerToAddressInst(PointerToAddressInst *ptai) {
 
 TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
     UnconditionalCheckedCastInst *ucci) {
-  if (SILDynamicCastInst(ucci).isRCIdentityPreserving()) {
+  auto isolation = SILIsolationInfo::getConformanceIsolation(ucci);
+
+  if (!isolation &&
+      SILDynamicCastInst(ucci).isRCIdentityPreserving()) {
     assert(isStaticallyLookThroughInst(ucci) && "Out of sync");
     return TranslationSemantics::LookThrough;
   }
@@ -3624,6 +4099,14 @@ PartitionOpTranslator::visitPartialApplyInst(PartialApplyInst *pai) {
   return TranslationSemantics::Special;
 }
 
+TranslationSemantics
+PartitionOpTranslator::visitInitExistentialValueInst(InitExistentialValueInst *ievi) {
+  if (isStaticallyLookThroughInst(ievi))
+    return TranslationSemantics::LookThrough;
+
+  return TranslationSemantics::Assign;
+}
+
 TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
     CheckedCastAddrBranchInst *ccabi) {
   assert(ccabi->getSuccessBB()->getNumArguments() <= 1);
@@ -3636,7 +4119,8 @@ TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
   // is. For now just keep the current behavior. It is more conservative,
   // but still correct.
   translateSILMultiAssign(ArrayRef<SILValue>(),
-                          makeOperandRefRange(ccabi->getAllOperands()));
+                          makeOperandRefRange(ccabi->getAllOperands()),
+                          SILIsolationInfo::getConformanceIsolation(ccabi));
   return TranslationSemantics::Special;
 }
 
@@ -3676,13 +4160,16 @@ bool BlockPartitionState::recomputeExitFromEntry(
     }
 
     std::optional<Element> getElement(SILValue value) const {
-      return translator.getValueMap().getTrackableValue(value).getID();
+      auto trackableValue = translator.getValueMap().getTrackableValue(value);
+      if (trackableValue.value.isSendable())
+        return {};
+      return trackableValue.value.getID();
     }
 
     SILValue getRepresentative(SILValue value) const {
       return translator.getValueMap()
           .getTrackableValue(value)
-          .getRepresentative()
+          .value.getRepresentative()
           .maybeGetValue();
     }
 
@@ -3752,11 +4239,6 @@ static bool canComputeRegionsForFunction(SILFunction *fn) {
   if (!fn->getASTContext().LangOpts.hasFeature(Feature::RegionBasedIsolation))
     return false;
 
-  assert(fn->getASTContext().LangOpts.StrictConcurrencyLevel ==
-             StrictConcurrency::Complete &&
-         "Need strict concurrency to be enabled for RegionBasedIsolation to be "
-         "enabled as well");
-
   // If this function does not correspond to a syntactic declContext and it
   // doesn't have a parent module, don't check it since we cannot check if a
   // type is sendable.
@@ -3806,7 +4288,7 @@ RegionAnalysisFunctionInfo::RegionAnalysisFunctionInfo(
   }
   // Set our entry partition to have the "entry partition".
   (*blockStates)[fn->getEntryBlock()].entryPartition =
-      translator->getEntryPartition();
+      translator->getInitialEntryPartition();
   runDataflow();
 }
 
@@ -3902,3 +4384,25 @@ void RegionAnalysis::initialize(SILPassManager *pm) {
 SILAnalysis *swift::createRegionAnalysis(SILModule *) {
   return new RegionAnalysis();
 }
+
+//===----------------------------------------------------------------------===//
+//                                MARK: Tests
+//===----------------------------------------------------------------------===//
+
+namespace swift::test {
+
+// Arguments:
+// - SILValue: value to look up isolation for.
+// Dumps:
+// - The inferred isolation.
+static FunctionTest
+    UnderlyingTrackedValue("sil_regionanalysis_underlying_tracked_value",
+                            [](auto &function, auto &arguments, auto &test) {
+                              RegionAnalysisValueMap valueMap(&function);
+                              auto value = arguments.takeValue();
+                              auto trackableValue = valueMap.getTrackableValue(value);
+                              trackableValue.print(&function, llvm::outs());
+                              llvm::outs() << '\n';
+                            });
+
+} // namespace swift::test

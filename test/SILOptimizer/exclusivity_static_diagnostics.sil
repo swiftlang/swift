@@ -1363,10 +1363,9 @@ bb0(%0 : $*Int):
 
   %8 = function_ref @closureForWithoutActuallyEscapingVerify : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
   %9 = apply %8(%6) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
-  %10 = is_escaping_closure %6 : $@callee_guaranteed () -> ()
+  %10 = destroy_not_escaped_closure %6 : $@callee_guaranteed () -> ()
   cond_fail %10 : $Builtin.Int1
   destroy_value %3 : $@callee_guaranteed () -> ()
-  destroy_value %6 : $@callee_guaranteed () -> ()
   %14 = tuple ()
   return %14 : $()
 }
@@ -1494,7 +1493,7 @@ bb0(%0 : $*Builtin.Int64, %1 : $*TestDynamic):
 }
 
 // Dictionary.subscript.modify
-sil [serialized] [always_inline] @$sSD_7defaultq_x_q_yXKtciM : $@yield_once @convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0, @noescape @callee_guaranteed () -> @out τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> @yields @inout τ_0_1
+sil [serialized] [heuristic_always_inline] @$sSD_7defaultq_x_q_yXKtciM : $@yield_once @convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0, @noescape @callee_guaranteed () -> @out τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> @yields @inout τ_0_1
 
 // -----------------------------------------------------------------------------
 // testBeginApplyOfClosure: DiagnoseStaticExclusivity must consider

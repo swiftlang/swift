@@ -1,0 +1,6 @@
+[
+  {
+    "module": "CompatibilitySpan",
+    "install_name": "@rpath/libswiftCompatibilitySpan.dylib"
+  }
+]

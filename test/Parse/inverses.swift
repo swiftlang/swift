@@ -19,7 +19,7 @@ func more() {
   let _: ~AnyObject // expected-error {{type 'AnyObject' cannot be suppressed}}
 }
 
-struct S4: ~(Copyable & Equatable) {} // expected-error {{conformance to 'Equatable' cannot be suppressed}}
+struct S4: ~(Copyable & Equatable) {} // expected-error {{type 'Copyable & Equatable' cannot be suppressed}}
 
 func blah<T>(_ t: borrowing T) where T: ~Copyable,
                                      T: ~Hashable {}  // expected-error@:41 {{type 'Hashable' cannot be suppressed}}
@@ -52,7 +52,9 @@ public struct MoveOnlyS1<T> : ~Copyable { /*deinit {}*/ }
 public struct MoveOnlyS2<T: Equatable> : ~Copyable { /*deinit {}*/ }
 public struct MoveOnlyS3<T: ~Copyable> : ~Copyable { /*deinit {}*/ }
 
-protocol Rope<Element>: Hashable, ~Copyable {  // expected-error {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
+protocol CopyHashable {  }
+
+protocol Rope<Element>: CopyHashable, ~Copyable {  // expected-error {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
   associatedtype Element: ~Copyable
 }
 
@@ -102,8 +104,8 @@ typealias Z4 = ~Rope<Int> // expected-error {{type 'Rope<Int>' cannot be suppres
 typealias Z5 = (~Int) -> Void // expected-error {{type 'Int' cannot be suppressed}}
 typealias Z6 = ~() -> () // expected-error {{single argument function types require parentheses}}
                          // expected-error@-1 {{type '()' cannot be suppressed}}
-typealias Z7 = ~(Copyable & Hashable) // expected-error {{type 'Hashable' cannot be suppressed}}
-typealias Z8 = ~Copyable & Hashable // expected-error {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
+typealias Z7 = ~(Copyable & CopyHashable) // expected-error {{type 'CopyHashable' cannot be suppressed}}
+typealias Z8 = ~Copyable & CopyHashable // expected-error {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
 
 struct NotAProtocol {}
 
@@ -145,7 +147,7 @@ extension Burrito: Alias {} // expected-error {{conformance to 'Copyable' must b
 extension Burrito: Copyable & Edible & P {} // expected-warning {{redundant conformance of 'Burrito<Filling>' to protocol 'Copyable'}}
 
 struct Blah<T: ~Copyable>: ~Copyable {}
-extension Blah: P, Q, Copyable, R {} // expected-error {{generic struct 'Blah' required to be 'Copyable' but is marked with '~Copyable'}}
+extension Blah: P, Q, Copyable, R {} // expected-error{{must explicitly state whether 'T' is required to conform to 'Copyable' or not}} expected-error {{generic struct 'Blah' required to be 'Copyable' but is marked with '~Copyable'}}
 // expected-error@-1 {{conformance to 'Copyable' must be declared in a separate extension}}
 
 enum Hello<Gesture: ~Copyable>: ~Copyable {}

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Foundation
-import System
+public import Foundation
+public import System
 
 public struct AbsolutePath: PathProtocol, Sendable {
   public let storage: FilePath
@@ -52,7 +52,7 @@ public extension AbsolutePath {
     (try? FileManager.default.destinationOfSymbolicLink(atPath: rawPath)) != nil
   }
 
-  var resolvingSymlinks: Self {
+  var realPath: Self {
     guard let resolved = realpath(rawPath, nil) else { return self }
     defer {
       free(resolved)
@@ -100,7 +100,7 @@ extension AbsolutePath: ExpressibleByStringLiteral, ExpressibleByStringInterpola
 }
 
 extension AbsolutePath: Decodable {
-  public init(from decoder: Decoder) throws {
+  public init(from decoder: any Decoder) throws {
     let storage = FilePath(
       try decoder.singleValueContainer().decode(String.self)
     )

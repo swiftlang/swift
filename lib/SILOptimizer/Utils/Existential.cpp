@@ -171,20 +171,6 @@ static SILInstruction *getStackInitInst(SILValue allocStackAddr,
   if (auto *ASI = dyn_cast<AllocStackInst>(CAI->getSrc()))
     return getStackInitInst(ASI, CAI, isCopied);
 
-  // Peek through a stack location holding an Enum.
-  //   %stack_adr = alloc_stack
-  //   %data_adr  = init_enum_data_addr %stk_adr
-  //   %enum_adr  = inject_enum_addr %stack_adr
-  //   %copy_src  = unchecked_take_enum_data_addr %enum_adr
-  // Replace %copy_src with %data_adr and recurse.
-  //
-  // TODO: a general Optional elimination sil-combine could
-  // supersede this check.
-  if (auto *UTEDAI = dyn_cast<UncheckedTakeEnumDataAddrInst>(CAI->getSrc())) {
-    if (InitEnumDataAddrInst *IEDAI = findInitAddressForTrivialEnum(UTEDAI))
-      return getStackInitInst(IEDAI, CAI, isCopied);
-  }
-
   // Check if the CAISrc is a global_addr.
   if (auto *GAI = dyn_cast<GlobalAddrInst>(CAI->getSrc()))
     return findInitExistentialFromGlobalAddr(GAI, CAI);
@@ -217,13 +203,13 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     }
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
-    OpenedArchetype = Open->getType().castTo<OpenedArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<ExistentialArchetypeType>();
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
     return;
   }
   if (auto *Open = dyn_cast<OpenExistentialRefInst>(openedVal)) {
-    OpenedArchetype = Open->getType().castTo<OpenedArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<ExistentialArchetypeType>();
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
     return;
@@ -232,7 +218,7 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     auto Ty = Open->getType().getASTType();
     while (auto Metatype = dyn_cast<MetatypeType>(Ty))
       Ty = Metatype.getInstanceType();
-    OpenedArchetype = cast<OpenedArchetypeType>(Ty);
+    OpenedArchetype = cast<ExistentialArchetypeType>(Ty);
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
   }
@@ -262,8 +248,8 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
 
   ExistentialSubs = SubstitutionMap::get(
       ExistentialSig, [&](SubstitutableType *type) { return ConcreteType; },
-      [&](CanType /*depType*/, Type /*replaceType*/,
-          ProtocolDecl *proto) -> ProtocolConformanceRef {
+      [&](InFlightSubstitution &, Type, ProtocolDecl *proto)
+          -> ProtocolConformanceRef {
         // Directly providing ExistentialConformances to the SubstitutionMap will
         // fail because of the mismatch between opened archetype conformance and
         // existential value conformance. Instead, provide a conformance lookup
@@ -273,7 +259,7 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
         auto iter =
             llvm::find_if(ExistentialConformances,
                           [&](const ProtocolConformanceRef &conformance) {
-                            return conformance.getRequirement() == proto;
+                            return conformance.getProtocol() == proto;
                           });
         assert(iter != ExistentialConformances.end() && "missing conformance");
         return *iter;
@@ -285,7 +271,7 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
 /// ConcreteTypeDef to the definition of that type.
 void ConcreteExistentialInfo::initializeConcreteTypeDef(
     SILInstruction *typeConversionInst) {
-  if (!ConcreteType->isOpenedExistential())
+  if (!isa<ExistentialArchetypeType>(ConcreteType))
     return;
 
   assert(isValid());

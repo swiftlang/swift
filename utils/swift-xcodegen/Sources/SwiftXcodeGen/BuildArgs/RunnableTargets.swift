@@ -2,13 +2,15 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+import System
 
 /// A target that defines a runnable executable.
 struct RunnableTarget: Hashable {
@@ -17,12 +19,12 @@ struct RunnableTarget: Hashable {
   var path: AbsolutePath
 }
 
-struct RunnableTargets {
+struct RunnableTargets: Sendable {
   private var addedPaths: Set<RelativePath> = []
   private var targets: [RunnableTarget] = []
 
   init(from buildDir: RepoBuildDir) throws {
-    for rule in try buildDir.ninjaFile.buildRules {
+    for rule in try buildDir.ninjaFile.buildEdges {
       tryAddTarget(rule, buildDir: buildDir)
     }
   }
@@ -59,7 +61,7 @@ extension RunnableTargets {
   }
 
   private mutating func tryAddTarget(
-    _ rule: NinjaBuildFile.BuildRule, buildDir: RepoBuildDir
+    _ rule: NinjaBuildFile.BuildEdge, buildDir: RepoBuildDir
   ) {
     guard let (name, path) = getRunnablePath(for: rule.outputs),
           addedPaths.insert(path).inserted else { return }

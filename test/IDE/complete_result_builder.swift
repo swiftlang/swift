@@ -102,24 +102,24 @@ struct AnyBuilder {
 }
 
 // IN_RESULT_BUILDER_DECL: Begin completions, 10 items
-// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildBlock(_ components: Any...) -> Any {|}; name=buildBlock(_ components: Any...) -> Any; comment=Required by every
-// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildExpression(_ expression: <#Expression#>) -> Any {|}; name=buildExpression(_ expression: <#Expression#>) -> Any; comment=
-// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildOptional(_ component: Any?) -> Any {|}; name=buildOptional(_ component: Any?) -> Any; comment=
-// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildEither(first component: Any) -> Any {|}; name=buildEither(first component: Any) -> Any; comment=
-// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildEither(second component: Any) -> Any {|}; name=buildEither(second component: Any) -> Any; comment=
-// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildArray(_ components: [Any]) -> Any {|}; name=buildArray(_ components: [Any]) -> Any; comment=
-// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildLimitedAvailability(_ component: Any) -> Any {|}; name=buildLimitedAvailability(_ component: Any) -> Any; comment=
-// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildFinalResult(_ component: Any) -> <#Result#> {|}; name=buildFinalResult(_ component: Any) -> <#Result#>; comment=
-// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildPartialBlock(first: Any) -> Any {|}; name=buildPartialBlock(first: Any) -> Any; comment=
-// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildPartialBlock(accumulated: Any, next: Any) -> Any {|}; name=buildPartialBlock(accumulated: Any, next: Any) -> Any; comment=
+// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildBlock(_ components: Any...) -> Any {|}; name=buildBlock(_ components: Any...) -> Any; briefcomment=Required by every
+// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildExpression(_ expression: <#Expression#>) -> Any {|}; name=buildExpression(_ expression: <#Expression#>) -> Any; briefcomment=
+// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildOptional(_ component: Any?) -> Any {|}; name=buildOptional(_ component: Any?) -> Any; briefcomment=
+// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildEither(first component: Any) -> Any {|}; name=buildEither(first component: Any) -> Any; briefcomment=
+// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildEither(second component: Any) -> Any {|}; name=buildEither(second component: Any) -> Any; briefcomment=
+// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildArray(_ components: [Any]) -> Any {|}; name=buildArray(_ components: [Any]) -> Any; briefcomment=
+// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildLimitedAvailability(_ component: Any) -> Any {|}; name=buildLimitedAvailability(_ component: Any) -> Any; briefcomment=
+// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildFinalResult(_ component: Any) -> <#Result#> {|}; name=buildFinalResult(_ component: Any) -> <#Result#>; briefcomment=
+// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildPartialBlock(first: Any) -> Any {|}; name=buildPartialBlock(first: Any) -> Any; briefcomment=
+// IN_RESULT_BUILDER_DECL: Pattern/CurrNominal:                buildPartialBlock(accumulated: Any, next: Any) -> Any {|}; name=buildPartialBlock(accumulated: Any, next: Any) -> Any; briefcomment=
 
-// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildBlock(_ components: Any...) -> Any {|}; name=static func buildBlock(_ components: Any...) -> Any; comment=Required by every
-// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildExpression(_ expression: <#Expression#>) -> Any {|}; name=static func buildExpression(_ expression: <#Expression#>) -> Any; comment=
-// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildOptional(_ component: Any?) -> Any {|}; name=static func buildOptional(_ component: Any?) -> Any; comment=
-// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildEither(first component: Any) -> Any {|}; name=static func buildEither(first component: Any) -> Any; comment=
-// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildEither(second component: Any) -> Any {|}; name=static func buildEither(second component: Any) -> Any; comment=
-// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildArray(_ components: [Any]) -> Any {|}; name=static func buildArray(_ components: [Any]) -> Any; comment=
-// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildLimitedAvailability(_ component: Any) -> Any {|}; name=static func buildLimitedAvailability(_ component: Any) -> Any; comment=
-// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildFinalResult(_ component: Any) -> <#Result#> {|}; name=static func buildFinalResult(_ component: Any) -> <#Result#>; comment=
-// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildPartialBlock(first: Any) -> Any {|}; name=static func buildPartialBlock(first: Any) -> Any; comment=
-// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildPartialBlock(accumulated: Any, next: Any) -> Any {|}; name=static func buildPartialBlock(accumulated: Any, next: Any) -> Any; comment=
+// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildBlock(_ components: Any...) -> Any {|}; name=static func buildBlock(_ components: Any...) -> Any; briefcomment=Required by every
+// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildExpression(_ expression: <#Expression#>) -> Any {|}; name=static func buildExpression(_ expression: <#Expression#>) -> Any; briefcomment=
+// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildOptional(_ component: Any?) -> Any {|}; name=static func buildOptional(_ component: Any?) -> Any; briefcomment=
+// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildEither(first component: Any) -> Any {|}; name=static func buildEither(first component: Any) -> Any; briefcomment=
+// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildEither(second component: Any) -> Any {|}; name=static func buildEither(second component: Any) -> Any; briefcomment=
+// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildArray(_ components: [Any]) -> Any {|}; name=static func buildArray(_ components: [Any]) -> Any; briefcomment=
+// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildLimitedAvailability(_ component: Any) -> Any {|}; name=static func buildLimitedAvailability(_ component: Any) -> Any; briefcomment=
+// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildFinalResult(_ component: Any) -> <#Result#> {|}; name=static func buildFinalResult(_ component: Any) -> <#Result#>; briefcomment=
+// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildPartialBlock(first: Any) -> Any {|}; name=static func buildPartialBlock(first: Any) -> Any; briefcomment=
+// IN_RESULT_BUILDER_DECL_PREFIX: Pattern/CurrNominal: static func buildPartialBlock(accumulated: Any, next: Any) -> Any {|}; name=static func buildPartialBlock(accumulated: Any, next: Any) -> Any; briefcomment=

@@ -13,6 +13,11 @@
 import Basic
 import SILBridging
 
+public func registerSIL() {
+  registerSILClasses()
+  registerUtilities()
+}
+
 private func register<T: AnyObject>(_ cl: T.Type) {
   "\(cl)"._withBridgedStringRef { nameStr in
     let metatype = unsafeBitCast(cl, to: SwiftMetatype.self)
@@ -20,7 +25,7 @@ private func register<T: AnyObject>(_ cl: T.Type) {
   }
 }
 
-public func registerSILClasses() {
+private func registerSILClasses() {
   Function.register()
   register(BasicBlock.self)
   register(GlobalVariable.self)
@@ -38,7 +43,6 @@ public func registerSILClasses() {
   register(StoreUnownedInst.self)
   register(StoreBorrowInst.self)
   register(AssignInst.self)
-  register(AssignByWrapperInst.self)
   register(AssignOrInitInst.self)
   register(CopyAddrInst.self)
   register(ExplicitCopyAddrInst.self)
@@ -116,8 +120,10 @@ public func registerSILClasses() {
   register(MoveOnlyWrapperToCopyableBoxInst.self)
   register(CopyableToMoveOnlyWrapperAddrInst.self)
   register(MoveOnlyWrapperToCopyableAddrInst.self)
+  register(UncheckedOwnershipInst.self) 
   register(ObjectInst.self)
   register(VectorInst.self)
+  register(VectorBaseAddrInst.self)
   register(TuplePackExtractInst.self)
   register(TuplePackElementAddrInst.self)
   register(PackElementGetInst.self)
@@ -195,6 +201,7 @@ public func registerSILClasses() {
   register(ObjCMetatypeToObjectInst.self)
   register(ValueToBridgeObjectInst.self)
   register(MarkDependenceInst.self)
+  register(MarkDependenceAddrInst.self)
   register(RefToBridgeObjectInst.self)
   register(BridgeObjectToRefInst.self)
   register(BridgeObjectToWordInst.self)
@@ -214,6 +221,7 @@ public func registerSILClasses() {
   register(MoveValueInst.self)
   register(DropDeinitInst.self)
   register(EndCOWMutationInst.self)
+  register(EndCOWMutationAddrInst.self)
   register(ClassifyBridgeObjectInst.self)
   register(PartialApplyInst.self)
   register(ApplyInst.self)
@@ -224,9 +232,8 @@ public func registerSILClasses() {
   register(ObjCSuperMethodInst.self)
   register(WitnessMethodInst.self)
   register(IsUniqueInst.self)
-  register(IsEscapingClosureInst.self)
+  register(DestroyNotEscapedClosureInst.self)
   register(AllocStackInst.self)
-  register(AllocVectorInst.self)
   register(AllocPackInst.self)
   register(AllocPackMetadataInst.self)
   register(AllocRefInst.self)
@@ -241,6 +248,7 @@ public func registerSILClasses() {
 
   register(UnreachableInst.self)
   register(ReturnInst.self)
+  register(ReturnBorrowInst.self)
   register(ThrowInst.self)
   register(ThrowAddrInst.self)
   register(YieldInst.self)
@@ -258,4 +266,11 @@ public func registerSILClasses() {
   register(CheckedCastAddrBranchInst.self)
   register(ThunkInst.self)
   register(MergeIsolationRegionInst.self)
+  register(IgnoredUseInst.self)
+  register(ImplicitActorToOpaqueIsolationCastInst.self)
+}
+
+private func registerUtilities() {
+  registerVerifier()
+  registerPhiUpdater()
 }

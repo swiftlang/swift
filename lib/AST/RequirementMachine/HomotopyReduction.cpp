@@ -291,8 +291,8 @@ RewriteSystem::findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
     {
       // If both are concrete type requirements, prefer to eliminate the
       // one with the more deeply nested type.
-      unsigned ruleNesting = rule.getNesting();
-      unsigned otherRuleNesting = otherRule.getNesting();
+      unsigned ruleNesting = rule.getNestingAndSize().first;
+      unsigned otherRuleNesting = otherRule.getNestingAndSize().first;
 
       if (ruleNesting != otherRuleNesting) {
         if (ruleNesting > otherRuleNesting)
@@ -611,10 +611,11 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
     if (!isInMinimizationDomain(rule.getLHS().getRootProtocol()))
       continue;
 
-    if (!rule.isRedundant() &&
-        !rule.isProtocolTypeAliasRule() &&
-        rule.containsNameSymbols())
-      result |= GenericSignatureErrorFlags::HasInvalidRequirements;
+    if (!rule.isRedundant()) {
+      if (!rule.isProtocolTypeAliasRule() &&
+          rule.containsNameSymbols())
+        result |= GenericSignatureErrorFlags::HasInvalidRequirements;
+    }
 
     if (rule.isRecursive())
       result |= GenericSignatureErrorFlags::HasInvalidRequirements;
@@ -624,12 +625,9 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
         if (property->getKind() == Symbol::Kind::ConcreteConformance)
           result |= GenericSignatureErrorFlags::HasConcreteConformances;
 
-        if (property->hasSubstitutions()) {
-          for (auto t : property->getSubstitutions()) {
-            if (t.containsNameSymbols())
-              result |= GenericSignatureErrorFlags::HasInvalidRequirements;
-          }
-        }
+        if (property->hasSubstitutions() &&
+            property->containsNameSymbols())
+          result |= GenericSignatureErrorFlags::HasInvalidRequirements;
       }
     }
   }
@@ -661,10 +659,20 @@ RewriteSystem::getMinimizedProtocolRules() const {
     if (!isInMinimizationDomain(proto))
       continue;
 
-    if (rule.isProtocolTypeAliasRule())
+    if (rule.isProtocolTypeAliasRule()) {
+      if (auto property = rule.isPropertyRule()) {
+        if (property->containsNameSymbols())
+          continue;
+      } else if (rule.getRHS().containsNameSymbols()) {
+        continue;
+      }
       rules[proto].TypeAliases.push_back(ruleID);
-    else if (!rule.containsNameSymbols())
+    } else {
+      if (rule.containsNameSymbols())
+        continue;
+
       rules[proto].Requirements.push_back(ruleID);
+    }
   }
 
   return rules;
@@ -722,11 +730,11 @@ void RewriteSystem::verifyRedundantConformances(
            "Redundant conformance is not a conformance rule?");
 
     if (!rule.isRedundant()) {
-      llvm::errs() << "Homotopy reduction did not eliminate redundant "
-                   << "conformance?\n";
-      llvm::errs() << "(#" << ruleID << ") " << rule << "\n\n";
-      dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Homotopy reduction did not eliminate redundant conformance?\n";
+        out << "(#" << ruleID << ") " << rule << "\n\n";
+        dump(out);
+      });
     }
   }
 }
@@ -744,10 +752,11 @@ void RewriteSystem::verifyMinimizedRules(
     // Ignore the rewrite rule if it is not part of our minimization domain.
     if (!isInMinimizationDomain(rule.getLHS().getRootProtocol())) {
       if (rule.isRedundant()) {
-        llvm::errs() << "Redundant rule outside minimization domain: "
-                     << rule << "\n\n";
-        dump(llvm::errs());
-        abort();
+        ABORT([&](auto &out) {
+          out << "Redundant rule outside minimization domain: " << rule
+              << "\n\n";
+          dump(out);
+        });
       }
 
       continue;
@@ -757,9 +766,10 @@ void RewriteSystem::verifyMinimizedRules(
     // be redundant.
     if (rule.isPermanent()) {
       if (rule.isRedundant()) {
-        llvm::errs() << "Permanent rule is redundant: " << rule << "\n\n";
-        dump(llvm::errs());
-        abort();
+        ABORT([&](auto &out) {
+          out << "Permanent rule is redundant: " << rule << "\n\n";
+          dump(out);
+        });
       }
 
       continue;
@@ -775,18 +785,20 @@ void RewriteSystem::verifyMinimizedRules(
     if (rule.isLHSSimplified() &&
         !rule.isRedundant() &&
         !rule.isProtocolConformanceRule()) {
-      llvm::errs() << "Simplified rule is not redundant: " << rule << "\n\n";
-      dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Simplified rule is not redundant: " << rule << "\n\n";
+        dump(out);
+      });
     }
 
     // RHS-simplified and substitution-simplified rules should be redundant.
     if ((rule.isRHSSimplified() ||
          rule.isSubstitutionSimplified()) &&
         !rule.isRedundant()) {
-      llvm::errs() << "Simplified rule is not redundant: " << rule << "\n\n";
-      dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Simplified rule is not redundant: " << rule << "\n\n";
+        dump(out);
+      });
     }
 
     if (rule.isRedundant() &&
@@ -795,17 +807,19 @@ void RewriteSystem::verifyMinimizedRules(
         !rule.isSubstitutionSimplified() &&
         !rule.containsNameSymbols() &&
         !redundantConformances.count(ruleID)) {
-      llvm::errs() << "Minimal conformance is redundant: " << rule << "\n\n";
-      dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Minimal conformance is redundant: " << rule << "\n\n";
+        dump(out);
+      });
     }
   }
 
   if (RedundantRules.size() != redundantRuleCount) {
-    llvm::errs() << "Expected " << RedundantRules.size() << " redundant rules "
-                 << "but counted " << redundantRuleCount << "\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Expected " << RedundantRules.size() << " redundant rules "
+          << "but counted " << redundantRuleCount << "\n";
+      dump(out);
+    });
   }
 
   // Replacement paths for redundant rules can only reference other redundant
@@ -815,10 +829,11 @@ void RewriteSystem::verifyMinimizedRules(
   for (const auto &pair : llvm::reverse(RedundantRules)) {
     const auto &rule = getRule(pair.first);
     if (!rule.isRedundant()) {
-      llvm::errs() << "Recorded replacement path for non-redundant rule "
-                   << rule << "\n";
-      dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Recorded replacement path for non-redundant rule " << rule
+            << "\n";
+        dump(out);
+      });
     }
 
     for (const auto &step : pair.second) {
@@ -827,10 +842,11 @@ void RewriteSystem::verifyMinimizedRules(
         const auto &otherRule = getRule(otherRuleID);
         if (otherRule.isRedundant() &&
             !laterRedundantRules.count(otherRuleID)) {
-          llvm::errs() << "Redundant requirement path contains a redundant "
-                          "rule " << otherRule << "\n";
-          dump(llvm::errs());
-          abort();
+          ABORT([&](auto &out) {
+            out << "Redundant requirement path contains a redundant rule "
+                << otherRule << "\n";
+            dump(out);
+          });
         }
       }
     }

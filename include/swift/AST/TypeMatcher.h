@@ -112,16 +112,10 @@ private:
     TRIVIAL_CASE(BuiltinFloatType)
     TRIVIAL_CASE(BuiltinVectorType)
     TRIVIAL_CASE(BuiltinUnboundGenericType)
-    TRIVIAL_CASE(BuiltinFixedArrayType)
+    TRIVIAL_CASE(BuiltinGenericType)
     TRIVIAL_CASE(IntegerType)
 #define SINGLETON_TYPE(SHORT_ID, ID) TRIVIAL_CASE(ID##Type)
 #include "swift/AST/TypeNodes.def"
-
-    bool visitUnresolvedType(CanUnresolvedType firstType, Type secondType,
-                             Type sugaredFirstType) {
-      // Unresolved types never match.
-      return mismatch(firstType.getPointer(), secondType, sugaredFirstType);
-    }
 
     bool visitTupleType(CanTupleType firstTuple, Type secondType,
                         Type sugaredFirstType) {
@@ -310,7 +304,7 @@ private:
         }
       }
 
-      // FIXME: Once OpenedArchetypeType stores substitutions, do something
+      // FIXME: Once ExistentialArchetypeType stores substitutions, do something
       // similar to the above.
 
       if (firstArchetype->isEqual(secondType))
@@ -375,7 +369,8 @@ private:
         if (firstFunc->isNoEscape() != secondFunc->isNoEscape())
           return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
 
-        if (firstFunc->isSendable() != secondFunc->isSendable())
+        if (!Matcher.asDerived().allowSendableFunctionMismatch() &&
+            firstFunc->isSendable() != secondFunc->isSendable())
           return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
 
         auto sugaredFirstFunc = sugaredFirstType->castTo<AnyFunctionType>();
@@ -553,6 +548,8 @@ private:
   };
 
   bool alwaysMismatchTypeParameters() const { return false; }
+
+  bool allowSendableFunctionMismatch() const { return false; }
 
   void pushPosition(Position pos) {}
   void popPosition(Position pos) {}

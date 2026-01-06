@@ -254,6 +254,9 @@ public:
   getPrimarySpecificPathsForAtMostOnePrimary() const;
 
   const PrimarySpecificPaths &
+  getPrimarySpecificPathsForRemaining(unsigned i) const;
+
+  const PrimarySpecificPaths &
       getPrimarySpecificPathsForPrimary(StringRef) const;
 
   bool hasSupplementaryOutputPath(

@@ -1,4 +1,5 @@
-// RUN: %target-build-swift %s
+// RUN: %empty-directory(%t/cache)
+// RUN: %target-build-swift %s -module-cache-path %t/cache
 // REQUIRES: executable_test
 
 // FIXME: iOS does not have Cocoa.framework

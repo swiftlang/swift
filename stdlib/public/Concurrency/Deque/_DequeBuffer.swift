@@ -16,19 +16,19 @@ import Swift
 
 internal class _DequeBuffer<Element>: ManagedBuffer<_DequeBufferHeader, Element> {
   deinit {
-    self.withUnsafeMutablePointers { header, elements in
-      header.pointee._checkInvariants()
+    unsafe self.withUnsafeMutablePointers { header, elements in
+      unsafe header.pointee._checkInvariants()
 
-      let capacity = header.pointee.capacity
-      let count = header.pointee.count
-      let startSlot = header.pointee.startSlot
+      let capacity = unsafe header.pointee.capacity
+      let count = unsafe header.pointee.count
+      let startSlot = unsafe header.pointee.startSlot
 
       if startSlot.position + count <= capacity {
-        (elements + startSlot.position).deinitialize(count: count)
+        unsafe (elements + startSlot.position).deinitialize(count: count)
       } else {
         let firstRegion = capacity - startSlot.position
-        (elements + startSlot.position).deinitialize(count: firstRegion)
-        elements.deinitialize(count: count - firstRegion)
+        unsafe (elements + startSlot.position).deinitialize(count: firstRegion)
+        unsafe elements.deinitialize(count: count - firstRegion)
       }
     }
   }
@@ -36,7 +36,7 @@ internal class _DequeBuffer<Element>: ManagedBuffer<_DequeBufferHeader, Element>
 
 extension _DequeBuffer: CustomStringConvertible {
   internal var description: String {
-    withUnsafeMutablePointerToHeader { "_DequeStorage<\(Element.self)>\($0.pointee)" }
+    unsafe withUnsafeMutablePointerToHeader { "_DequeStorage<\(Element.self)>\(unsafe $0.pointee)" }
   }
 }
 

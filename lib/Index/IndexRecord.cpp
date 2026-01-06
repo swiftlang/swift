@@ -311,9 +311,9 @@ StringRef StdlibGroupsIndexRecordingConsumer::findGroupForSymbol(const IndexSymb
 }
 
 static bool writeRecord(SymbolTracker &record, std::string Filename,
-                        std::string indexStorePath, DiagnosticEngine *diags,
+                        std::string indexStorePath, bool compress, DiagnosticEngine *diags,
                         std::string &outRecordFile) {
-  IndexRecordWriter recordWriter(indexStorePath);
+  IndexRecordWriter recordWriter(indexStorePath, compress);
   std::string error;
   auto result = recordWriter.beginRecord(
       Filename, record.hashRecord(), error, &outRecordFile);
@@ -360,25 +360,25 @@ static bool writeRecord(SymbolTracker &record, std::string Filename,
 
 static std::unique_ptr<IndexRecordingConsumer>
 makeRecordingConsumer(std::string Filename, std::string indexStorePath,
-                      bool includeLocals, DiagnosticEngine *diags,
+                      bool includeLocals, bool compress, DiagnosticEngine *diags,
                       std::string *outRecordFile,
                       bool *outFailed) {
   return std::make_unique<IndexRecordingConsumer>(includeLocals,
                                                   [=](SymbolTracker &record) {
-    *outFailed = writeRecord(record, Filename, indexStorePath, diags,
+    *outFailed = writeRecord(record, Filename, indexStorePath, compress, diags,
                              *outRecordFile);
   });
 }
 
 static bool
 recordSourceFile(SourceFile *SF, StringRef indexStorePath,
-                 bool includeLocals, DiagnosticEngine &diags,
+                 bool includeLocals, bool compress, DiagnosticEngine &diags,
                  llvm::function_ref<void(StringRef, StringRef)> callback) {
   std::string recordFile;
   bool failed = false;
   auto consumer =
       makeRecordingConsumer(SF->getFilename().str(), indexStorePath.str(),
-                            includeLocals, &diags, &recordFile, &failed);
+                            includeLocals, compress, &diags, &recordFile, &failed);
   indexSourceFile(SF, *consumer);
 
   if (!failed && !recordFile.empty())
@@ -418,6 +418,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  bool indexSystemModules,
                                  bool skipStdlib,
                                  bool includeLocals,
+                                 bool compress,
                                  bool explicitModulebuild,
                                  StringRef targetTriple,
                                  const clang::CompilerInstance &clangCI,
@@ -426,205 +427,13 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  const PathRemapper &pathRemapper,
                                  SourceFile *initialFile);
 
-static void
-appendSymbolicInterfaceToIndexStorePath(SmallVectorImpl<char> &resultingPath) {
-  llvm::sys::path::append(resultingPath, "interfaces");
-}
-
-static llvm::Error initSymbolicInterfaceStorePath(StringRef storePath) {
-  SmallString<128> subPath = storePath;
-  appendSymbolicInterfaceToIndexStorePath(subPath);
-  std::error_code ec = llvm::sys::fs::create_directories(subPath);
-  if (ec)
-    return llvm::errorCodeToError(ec);
-  return llvm::Error::success();
-}
-
-static void appendSymbolicInterfaceClangModuleFilename(
-    StringRef filePath, SmallVectorImpl<char> &resultingPath) {
-  llvm::sys::path::append(resultingPath, llvm::sys::path::filename(filePath));
-  StringRef extension = ".symbolicswiftinterface";
-  resultingPath.append(extension.begin(), extension.end());
-}
-
-// FIXME (Alex): Share code with IndexUnitWriter in LLVM after refactoring it.
-static llvm::Expected<bool>
-isFileUpToDateForOutputFile(StringRef filePath, StringRef timeCompareFilePath) {
-  auto makeError = [](StringRef path, std::error_code ec) -> llvm::Error {
-    std::string error;
-    llvm::raw_string_ostream(error)
-        << "could not access path '" << path << "': " << ec.message();
-    return llvm::createStringError(ec, error.c_str());
-  };
-  llvm::sys::fs::file_status unitStat;
-  if (std::error_code ec = llvm::sys::fs::status(filePath, unitStat)) {
-    if (ec != std::errc::no_such_file_or_directory)
-      return makeError(filePath, ec);
-    return false;
-  }
-
-  if (timeCompareFilePath.empty())
-    return true;
-
-  llvm::sys::fs::file_status compareStat;
-  if (std::error_code ec =
-          llvm::sys::fs::status(timeCompareFilePath, compareStat)) {
-    if (ec != std::errc::no_such_file_or_directory)
-      return makeError(timeCompareFilePath, ec);
-    return true;
-  }
-
-  // Return true (unit is up-to-date) if the file to compare is older than the
-  // unit file.
-  return compareStat.getLastModificationTime() <=
-         unitStat.getLastModificationTime();
-}
-
-/// Emit the symbolic swift interface file for an imported Clang module into the
-/// index store directory.
-///
-/// The swift interface file is emitted only when it doesn't exist yet, or when
-/// the PCM for the Clang module has been updated.
-///
-/// System modules without the 'cplusplus' requirement are not emitted.
-static void emitSymbolicInterfaceForClangModule(
-    ClangModuleUnit *clangModUnit, ModuleDecl *M,
-    const clang::Module *clangModule, StringRef indexStorePath,
-    const clang::CompilerInstance &clangCI, DiagnosticEngine &diags) {
-  if (!M->getASTContext().LangOpts.EnableCXXInterop)
-    return;
-  // Skip system modules without an explicit 'cplusplus' requirement.
-  bool isSystem = clangModUnit->isSystemModule();
-  if (isSystem && !importer::requiresCPlusPlus(clangModule))
-    return;
-
-  // Make sure the `interfaces` directory is created.
-  if (auto err = initSymbolicInterfaceStorePath(indexStorePath)) {
-    llvm::handleAllErrors(std::move(err), [&](const llvm::ECError &ec) {
-      diags.diagnose(SourceLoc(), diag::error_create_symbolic_interfaces_dir,
-                     ec.convertToErrorCode().message());
-    });
-    return;
-  }
-
-  auto moduleRef = clangModule->getASTFile();
-  if (!moduleRef)
-    return;
-
-  // Determine the output name for the symbolic interface file.
-  clang::serialization::ModuleFile *ModFile =
-      clangCI.getASTReader()->getModuleManager().lookup(*moduleRef);
-  assert(ModFile && "no module file loaded for module ?");
-  SmallString<128> interfaceOutputPath = indexStorePath;
-  appendSymbolicInterfaceToIndexStorePath(interfaceOutputPath);
-  appendSymbolicInterfaceClangModuleFilename(ModFile->FileName,
-                                             interfaceOutputPath);
-
-  // Check if the symbolic interface file is already up to date.
-  std::string error;
-  auto upToDate =
-      isFileUpToDateForOutputFile(interfaceOutputPath, ModFile->FileName);
-  if (!upToDate) {
-    llvm::handleAllErrors(
-        upToDate.takeError(), [&](const llvm::StringError &ec) {
-          diags.diagnose(SourceLoc(),
-                         diag::error_symbolic_interfaces_failed_status_check,
-                         ec.getMessage());
-        });
-    return;
-  }
-  if (M->getASTContext().LangOpts.EnableIndexingSystemModuleRemarks) {
-    diags.diagnose(SourceLoc(), diag::remark_emitting_symbolic_interface_module,
-                   interfaceOutputPath, *upToDate);
-  }
-  if (*upToDate)
-    return;
-
-  // Output the interface to a temporary file first.
-  SmallString<128> tempOutputPath = interfaceOutputPath;
-  tempOutputPath += "-%%%%%%%%";
-  int tempFD;
-  if (llvm::sys::fs::createUniqueFile(tempOutputPath.str(), tempFD,
-                                      tempOutputPath)) {
-    llvm::raw_string_ostream errOS(error);
-    errOS << "failed to create temporary file: " << tempOutputPath;
-    diags.diagnose(SourceLoc(), diag::error_write_symbolic_interface,
-                   errOS.str());
-    return;
-  }
-
-  llvm::raw_fd_ostream os(tempFD, /*shouldClose=*/true);
-  StreamPrinter printer(os);
-  ide::printSymbolicSwiftClangModuleInterface(M, printer, clangModule);
-  os.close();
-
-  if (os.has_error()) {
-    llvm::raw_string_ostream errOS(error);
-    errOS << "failed to write '" << tempOutputPath
-          << "': " << os.error().message();
-    diags.diagnose(SourceLoc(), diag::error_write_symbolic_interface,
-                   errOS.str());
-    os.clear_error();
-    llvm::sys::fs::remove(tempOutputPath);
-    return;
-  }
-
-  // Move the resulting output to the destination symbolic interface file.
-  std::error_code ec = llvm::sys::fs::rename(
-      /*from=*/tempOutputPath, /*to=*/interfaceOutputPath);
-  if (ec) {
-    llvm::raw_string_ostream errOS(error);
-    errOS << "failed to rename '" << tempOutputPath << "' to '"
-          << interfaceOutputPath << "': " << ec.message();
-    diags.diagnose(SourceLoc(), diag::error_write_symbolic_interface,
-                   errOS.str());
-    llvm::sys::fs::remove(tempOutputPath);
-    return;
-  }
-}
-
-static void emitTransitiveClangSymbolicInterfacesForSwiftModuleImports(
-    ArrayRef<ImportedModule> imports, StringRef indexStorePath,
-    const clang::CompilerInstance &clangCI, DiagnosticEngine &diags) {
-  auto &fileMgr = clangCI.getFileManager();
-  for (auto &import : imports) {
-    ModuleDecl *mod = import.importedModule;
-    if (mod->isOnoneSupportModule())
-      continue; // ignore the Onone support library.
-    if (mod->isSwiftShimsModule())
-      continue;
-
-    for (auto *FU : mod->getFiles()) {
-      switch (FU->getKind()) {
-      default:
-        break;
-      case FileUnitKind::SerializedAST:
-      case FileUnitKind::DWARFModule:
-      case FileUnitKind::ClangModule: {
-        auto *LFU = cast<LoadedFile>(FU);
-        if (auto F = fileMgr.getFile(LFU->getFilename())) {
-          if (FU->getKind() == FileUnitKind::ClangModule) {
-            auto clangModUnit = cast<ClangModuleUnit>(LFU);
-            if (auto clangMod = clangModUnit->getUnderlyingClangModule()) {
-              // Emit the symbolic interface file in addition to index data.
-              emitSymbolicInterfaceForClangModule(
-                  clangModUnit, mod, clangMod, indexStorePath, clangCI, diags);
-            }
-          }
-          // FIXME: We should keep recursing here into other Swift modules.
-        }
-      }
-      }
-    }
-  }
-}
-
 static void addModuleDependencies(ArrayRef<ImportedModule> imports,
                                   StringRef indexStorePath,
                                   bool indexClangModules,
                                   bool indexSystemModules,
                                   bool skipStdlib,
                                   bool includeLocals,
+                                  bool compress,
                                   bool explicitModuleBuild,
                                   StringRef targetTriple,
                                   const clang::CompilerInstance &clangCI,
@@ -688,11 +497,6 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
             if (shouldIndexModule)
               clang::index::emitIndexDataForModuleFile(clangMod,
                                                        clangCI, unitWriter);
-            // Emit the symbolic interface file in addition to index data.
-            if (indexClangModules)
-              emitSymbolicInterfaceForClangModule(clangModUnit, mod, clangMod,
-                                                  indexStorePath, clangCI,
-                                                  diags);
           }
         } else {
           // Serialized AST file.
@@ -706,6 +510,7 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
                                              indexClangModules,
                                              indexSystemModules, skipStdlib,
                                              includeLocals,
+                                             compress,
                                              explicitModuleBuild,
                                              targetTriple,
                                              clangCI, diags,
@@ -727,9 +532,6 @@ static void addModuleDependencies(ArrayRef<ImportedModule> imports,
             SmallVector<ImportedModule, 4> imports;
             mod->getImportedModules(imports,
                                     ModuleDecl::ImportFilterKind::Exported);
-            if (indexClangModules)
-              emitTransitiveClangSymbolicInterfacesForSwiftModuleImports(
-                  imports, indexStorePath, clangCI, diags);
           }
         }
         clang::index::writer::OpaqueModule opaqMod =
@@ -752,6 +554,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                  bool indexSystemModules,
                                  bool skipStdlib,
                                  bool includeLocals,
+                                 bool compress,
                                  bool explicitModuleBuild,
                                  StringRef targetTriple,
                                  const clang::CompilerInstance &clangCI,
@@ -833,7 +636,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
     std::string recordFile;
     bool failed = false;
     auto consumer = makeRecordingConsumer(filename.str(), indexStorePath.str(),
-                                          includeLocals, &diags, &recordFile, &failed);
+                                          includeLocals, compress, &diags, &recordFile, &failed);
     indexModule(module, *consumer);
 
     if (failed)
@@ -877,7 +680,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
       std::string outRecordFile;
       failed =
           failed || writeRecord(tracker, std::string(fileNameWithGroup.str()),
-                                indexStorePath.str(), &diags, outRecordFile);
+                                indexStorePath.str(), compress, &diags, outRecordFile);
       if (failed)
         return false;
       records.emplace_back(outRecordFile, moduleName.str().str());
@@ -899,7 +702,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
   auto clangRemapper = pathRemapper.asClangPathRemapper();
 
   IndexUnitWriter unitWriter(
-      fileMgr, indexStorePath, "swift", swiftVersion, filename, moduleName,
+      fileMgr, indexStorePath, "swift", swiftVersion, compress, filename, moduleName,
       /*MainFile=*/{}, isSystem, /*IsModuleUnit=*/true, isDebugCompilation,
       targetTriple, sysrootPath, clangRemapper, getModuleInfoFromOpaqueModule);
 
@@ -919,7 +722,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
                                        ModuleDecl::ImportFilterKind::Default});
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexClangModules,
-                        indexSystemModules, skipStdlib, includeLocals,
+                        indexSystemModules, skipStdlib, includeLocals, compress,
                         explicitModuleBuild,
                         targetTriple, clangCI, diags, unitWriter,
                         moduleNameScratch, pathRemapper, initialFile);
@@ -936,7 +739,7 @@ static bool
 recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                      StringRef indexStorePath, bool indexClangModules,
                      bool indexSystemModules, bool skipStdlib,
-                     bool includeLocals, bool isDebugCompilation,
+                     bool includeLocals, bool compress, bool isDebugCompilation,
                      bool isExplicitModuleBuild, StringRef targetTriple,
                      ArrayRef<clang::FileEntryRef> fileDependencies,
                      const clang::CompilerInstance &clangCI,
@@ -955,7 +758,7 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
   StringRef swiftVersion;
   StringRef sysrootPath = clangCI.getHeaderSearchOpts().Sysroot;
   IndexUnitWriter unitWriter(
-      fileMgr, indexStorePath, "swift", swiftVersion, indexUnitToken,
+      fileMgr, indexStorePath, "swift", swiftVersion, compress, indexUnitToken,
       module->getNameStr(), *mainFile, isSystem,
       /*isModuleUnit=*/false, isDebugCompilation, targetTriple, sysrootPath,
       clangRemapper, getModuleInfoFromOpaqueModule);
@@ -966,7 +769,7 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
                                         ModuleDecl::getImportFilterLocal());
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexClangModules,
-                        indexSystemModules, skipStdlib, includeLocals,
+                        indexSystemModules, skipStdlib, includeLocals, compress,
                         isExplicitModuleBuild, targetTriple, clangCI, diags,
                         unitWriter, moduleNameScratch, pathRemapper,
                         primarySourceFile);
@@ -975,7 +778,7 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
   for (auto F : fileDependencies)
     unitWriter.addFileDependency(F, /*FIXME:isSystem=*/false, /*Module=*/nullptr);
 
-  recordSourceFile(primarySourceFile, indexStorePath, includeLocals, diags,
+  recordSourceFile(primarySourceFile, indexStorePath, includeLocals, compress, diags,
                    [&](StringRef recordFile, StringRef filename) {
                      if (auto file = fileMgr.getFileRef(filename)) {
                        unitWriter.addRecordFile(
@@ -1024,6 +827,7 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
                            bool indexSystemModules,
                            bool skipStdlib,
                            bool includeLocals,
+                           bool compress,
                            bool isDebugCompilation,
                            bool isExplicitModuleBuild,
                            StringRef targetTriple,
@@ -1041,7 +845,7 @@ bool index::indexAndRecord(SourceFile *primarySourceFile,
 
   return recordSourceFileUnit(primarySourceFile, indexUnitToken,
                               indexStorePath, indexClangModules,
-                              indexSystemModules, skipStdlib, includeLocals,
+                              indexSystemModules, skipStdlib, includeLocals, compress,
                               isDebugCompilation, isExplicitModuleBuild,
                               targetTriple, {},
                               clangCI, pathRemapper, diags);
@@ -1055,6 +859,7 @@ bool index::indexAndRecord(ModuleDecl *module,
                            bool indexSystemModules,
                            bool skipStdlib,
                            bool includeLocals,
+                           bool compress,
                            bool isDebugCompilation,
                            bool isExplicitModuleBuild,
                            StringRef targetTriple,
@@ -1080,7 +885,7 @@ bool index::indexAndRecord(ModuleDecl *module,
       }
       if (recordSourceFileUnit(SF, indexUnitTokens[unitIndex],
                                indexStorePath, indexClangModules,
-                               indexSystemModules, skipStdlib, includeLocals,
+                               indexSystemModules, skipStdlib, includeLocals, compress,
                                isDebugCompilation, isExplicitModuleBuild,
                                targetTriple, {},
                                clangCI, pathRemapper, diags))

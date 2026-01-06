@@ -95,14 +95,14 @@ bb0:
 
 // IRGEN: [[PTR1:%.*]] = load ptr, ptr @fooWJrSUUpSr, align [[PTR_ALIGNMENT]]
 
-// IRGEN: [[PTR2:%.*]] = load ptr, ptr getelementptr inbounds (%swift.differentiability_witness, ptr @fooWJrSSUpSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
+// IRGEN: [[PTR2:%.*]] = load ptr, ptr getelementptr inbounds{{.*}} (%swift.differentiability_witness, ptr @fooWJrSSUpSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
 
 // IRGEN: [[PTR3:%.*]] = load ptr, ptr @barWJrSUUpSUr, align [[PTR_ALIGNMENT]]
 
-// IRGEN: [[PTR4:%.*]] = load ptr, ptr getelementptr inbounds (%swift.differentiability_witness, ptr @barWJrSSUpSSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
+// IRGEN: [[PTR4:%.*]] = load ptr, ptr getelementptr inbounds{{.*}} (%swift.differentiability_witness, ptr @barWJrSSUpSSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
 
 // IRGEN: [[PTR5:%.*]] = load ptr, ptr @generic16_Differentiation14DifferentiableRzlWJrSUpSr, align [[PTR_ALIGNMENT]]
 
-// IRGEN: [[PTR6:%.*]] = load ptr, ptr getelementptr inbounds (%swift.differentiability_witness, ptr @generics18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlWJrSSpSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
+// IRGEN: [[PTR6:%.*]] = load ptr, ptr getelementptr inbounds{{.*}} (%swift.differentiability_witness, ptr @generics18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlWJrSSpSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
 
-// IRGEN: [[PTR7:%.*]] = load ptr, ptr getelementptr inbounds (%swift.differentiability_witness, ptr @generic16_Differentiation14DifferentiableRz13TangentVector{{.*}}WJrSSpSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]
+// IRGEN: [[PTR7:%.*]] = load ptr, ptr getelementptr inbounds{{.*}} (%swift.differentiability_witness, ptr @generic16_Differentiation14DifferentiableRz13TangentVector{{.*}}WJrSSpSr, i32 0, i32 1), align [[PTR_ALIGNMENT]]

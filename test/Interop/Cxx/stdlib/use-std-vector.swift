@@ -190,4 +190,45 @@ StdVectorTestSuite.test("VectorOfString subclass for loop") {
     expectEqual(count, 1)
 }
 
+StdVectorTestSuite.test("VectorOfInt to span").require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let v = Vector([1, 2, 3])
+  let s = v.span
+  expectEqual(s.count, 3)
+  expectFalse(s.isEmpty)
+  expectEqual(s[0], 1)
+  expectEqual(s[1], 2)
+  expectEqual(s[2], 3)
+}
+
+StdVectorTestSuite.test("VectorOfImmortalRefPtr").require(.stdlib_5_8).code {
+    guard #available(SwiftStdlib 5.8, *) else { return }
+
+    var v = VectorOfImmortalRefPtr()
+    let i = ImmortalRef.create(123)
+    v.push_back(i)
+    expectEqual(v[0]?.value, 123)
+}
+
+StdVectorTestSuite.test("Subscript of VectorOfNonCopyable") {
+    var v = makeVectorOfNonCopyable()
+    expectEqual(v.size(), 2)
+    expectFalse(v.empty())
+
+    func getNumber(_ x: borrowing NonCopyable) -> Int32 {
+        return x.number
+    }
+
+    expectEqual(getNumber(v[0]), 1)
+    expectEqual(getNumber(v[1]), 2)
+
+    v[0] = NonCopyable(3)
+    v[1] = NonCopyable(4)
+
+    expectEqual(getNumber(v[0]), 3)
+    expectEqual(getNumber(v[1]), 4)
+}
+
+
 runAllTests()

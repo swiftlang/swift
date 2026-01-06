@@ -1,5 +1,3 @@
-import SwiftOnoneSupport
-
 func %%% (lhs: Int, rhs: Int) -> Int
 postfix func =-> (lhs: Int) -> Int
 postfix func => (lhs: Int) -> Int

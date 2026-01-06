@@ -11,7 +11,7 @@
 import UserA
 @_implementationOnly import UserB
 
-@_inlineable
+@inlinable
 public func createAWrapper() {
   let _ = MagicWrapper()
 }

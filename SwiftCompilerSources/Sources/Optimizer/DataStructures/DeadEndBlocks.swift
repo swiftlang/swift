@@ -51,3 +51,19 @@ struct DeadEndBlocks : CustomStringConvertible, NoReflectionChildren {
     worklist.deinitialize()
   }
 }
+
+//===--------------------------------------------------------------------===//
+//                              Tests
+//===--------------------------------------------------------------------===//
+
+let deadEndBlockTest = FunctionTest("deadendblocks") {
+  function, arguments, context in
+
+  print("Function \(function.name)")
+  
+  var deadEndBlocks = DeadEndBlocks(function: function, context)
+  print(deadEndBlocks)
+  defer { deadEndBlocks.deinitialize() }
+
+  print("end function \(function.name)")
+}

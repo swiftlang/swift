@@ -16,7 +16,8 @@ import PointerAuth
 // CHECK: [[PTR1:%.*]] = apply [[F1]]<SecureStruct>([[BBARG1]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 // CHECK: [[RAW1:%.*]] = struct_extract [[PTR1]] : $UnsafePointer<SecureStruct>, #UnsafePointer._rawValue
 // CHECK: [[ADDR1:%.*]] = pointer_to_address [[RAW1]] : $Builtin.RawPointer to [strict] $*SecureStruct
-// CHECK: [[A2:%.*]] = begin_access [read] [unsafe] [[ADDR1]] : $*SecureStruct
+// CHECK: [[MD:%.*]] = mark_dependence [unresolved] [[ADDR1]] : $*SecureStruct on [[BBARG1]] : $UnsafeMutablePointer<SecureStruct>
+// CHECK: [[A2:%.*]] = begin_access [read] [unsafe] [[MD]] : $*SecureStruct
 // CHECK: [[ELEM1:%.*]] = struct_element_addr [[A2]] : $*SecureStruct, #SecureStruct.secure_func_ptr1
 // CHECK: [[ASIGNED:%.*]] = begin_access [read] [signed] [[ELEM1]] : $*Optional<@convention(c) () -> Int32>
 // CHECK: [[FPLOAD:%.*]] = load [trivial] [[ASIGNED]] : $*Optional<@convention(c) () -> Int32>
@@ -35,7 +36,8 @@ func test_field_fn_read() -> Int32 {
 // CHECK:  [[P:%.*]] = apply [[F1]]<SecureStruct>([[UMP]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK:  [[EX1:%.*]] = struct_extract [[P]] : $UnsafeMutablePointer<SecureStruct>, #UnsafeMutablePointer._rawValue
 // CHECK:  [[ADDR:%.*]] = pointer_to_address [[EX1]] : $Builtin.RawPointer to [strict] $*SecureStruct
-// CHECK:  [[A1:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*SecureStruct
+// CHECK:  [[MD:%.*]] = mark_dependence [unresolved] [[ADDR]] : $*SecureStruct on [[UMP]] : $UnsafeMutablePointer<SecureStruct>
+// CHECK:  [[A1:%.*]] = begin_access [modify] [unsafe] [[MD]] : $*SecureStruct
 // CHECK:  [[ELEM1:%.*]] = struct_element_addr [[A1]] : $*SecureStruct, #SecureStruct.secure_func_ptr2
 // CHECK:  [[A2:%.*]] = begin_access [modify] [signed] [[ELEM1]] : $*Optional<@convention(c) () -> Int32>
 // CHECK:  assign {{.*}} to [[A2]] : $*Optional<@convention(c) () -> Int32>
@@ -69,7 +71,8 @@ func test_field_fn_ptr_temp() -> Int32 {
 // CHECK: [[PTR1:%.*]] = apply [[F1]]<AddressDiscriminatedSecureStruct>([[BBARG1]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 // CHECK: [[RAW1:%.*]] = struct_extract [[PTR1]] : $UnsafePointer<AddressDiscriminatedSecureStruct>, #UnsafePointer._rawValue
 // CHECK: [[ADDR1:%.*]] = pointer_to_address [[RAW1]] : $Builtin.RawPointer to [strict] $*AddressDiscriminatedSecureStruct
-// CHECK: [[A2:%.*]] = begin_access [read] [unsafe] [[ADDR1]] : $*AddressDiscriminatedSecureStruct
+// CHECK: [[MD:%.*]] = mark_dependence [unresolved] [[ADDR1]] : $*AddressDiscriminatedSecureStruct on [[BBARG1]] : $UnsafeMutablePointer<AddressDiscriminatedSecureStruct> // user: %20
+// CHECK: [[A2:%.*]] = begin_access [read] [unsafe] [[MD]] : $*AddressDiscriminatedSecureStruct
 // CHECK: [[ELEM1:%.*]] = struct_element_addr [[A2]] : $*AddressDiscriminatedSecureStruct, #AddressDiscriminatedSecureStruct.secure_func_ptr1
 // CHECK: [[ASIGNED:%.*]] = begin_access [read] [signed] [[ELEM1]] : $*Optional<@convention(c) () -> Int32>
 // CHECK: [[FPLOAD:%.*]] = load [trivial] [[ASIGNED]] : $*Optional<@convention(c) () -> Int32>
@@ -88,7 +91,8 @@ func test_addr_discriminated_field_fn_read() -> Int32 {
 // CHECK:  [[P:%.*]] = apply [[F1]]<AddressDiscriminatedSecureStruct>([[UMP]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK:  [[EX1:%.*]] = struct_extract [[P]] : $UnsafeMutablePointer<AddressDiscriminatedSecureStruct>, #UnsafeMutablePointer._rawValue
 // CHECK:  [[ADDR:%.*]] = pointer_to_address [[EX1]] : $Builtin.RawPointer to [strict] $*AddressDiscriminatedSecureStruct
-// CHECK:  [[A1:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*AddressDiscriminatedSecureStruct
+// CHECK:  [[MD:%.*]] = mark_dependence [unresolved] [[ADDR]] : $*AddressDiscriminatedSecureStruct on [[UMP]] : $UnsafeMutablePointer<AddressDiscriminatedSecureStruct>
+// CHECK:  [[A1:%.*]] = begin_access [modify] [unsafe] [[MD]] : $*AddressDiscriminatedSecureStruct
 // CHECK:  [[ELEM1:%.*]] = struct_element_addr [[A1]] : $*AddressDiscriminatedSecureStruct, #AddressDiscriminatedSecureStruct.secure_func_ptr2
 // CHECK:  [[A2:%.*]] = begin_access [modify] [signed] [[ELEM1]] : $*Optional<@convention(c) () -> Int32>
 // CHECK:  assign {{.*}} to [[A2]] : $*Optional<@convention(c) () -> Int32>
@@ -113,7 +117,8 @@ func test_addr_discriminated_field_fn_ptr_swap() {
 // CHECK: [[PTR1:%.*]] = apply [[F1]]<AddressDiscriminatedSecureStruct>([[BBARG1]]) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 // CHECK: [[RAW1:%.*]] = struct_extract [[PTR1]] : $UnsafePointer<AddressDiscriminatedSecureStruct>, #UnsafePointer._rawValue
 // CHECK: [[ADDR1:%.*]] = pointer_to_address [[RAW1]] : $Builtin.RawPointer to [strict] $*AddressDiscriminatedSecureStruct
-// CHECK: [[A2:%.*]] = begin_access [read] [unsafe] [[ADDR1]] : $*AddressDiscriminatedSecureStruct
+// CHECK: [[MD:%.*]] = mark_dependence [unresolved] [[ADDR1]] : $*AddressDiscriminatedSecureStruct on [[BBARG1]] : $UnsafeMutablePointer<AddressDiscriminatedSecureStruct>
+// CHECK: [[A2:%.*]] = begin_access [read] [unsafe] [[MD]] : $*AddressDiscriminatedSecureStruct
 // CHECK: copy_addr [[A2]] to [init] [[STK]] : $*AddressDiscriminatedSecureStruct
 // CHECK: end_access [[A2]] : $*AddressDiscriminatedSecureStruct
 // CHECK: [[ELEM1:%.*]] = struct_element_addr [[STK]] : $*AddressDiscriminatedSecureStruct, #AddressDiscriminatedSecureStruct.secure_func_ptr1

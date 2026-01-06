@@ -18,13 +18,13 @@ protocol Greeter: DistributedActor where ActorSystem: DistributedActorSystem<any
 
 // @Resolvable ->
 
-// CHECK: distributed actor $Greeter<ActorSystem>: Greeter,
-// CHECK-NEXT: Distributed._DistributedActorStub
-// CHECK-NEXT: where ActorSystem: DistributedActorSystem<any Codable>
+// CHECK:      distributed actor $Greeter<ActorSystem>: Greeter,
+// CHECK-NEXT:   Distributed._DistributedActorStub
+// CHECK-NEXT:   where ActorSystem: DistributedActorSystem<any Codable>
 // CHECK-NEXT: {
-// CHECK: }
+// CHECK:      }
 
-// CHECK: extension Greeter where Self: Distributed._DistributedActorStub {
+// CHECK:      extension Greeter where Self: Distributed._DistributedActorStub {
 // CHECK-NEXT:   distributed func greet(name: String) -> String {
 // CHECK-NEXT:     if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
 // CHECK-NEXT:       Distributed._distributedStubFatalError()

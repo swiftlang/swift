@@ -131,6 +131,9 @@ class alignas(1 << DeclAlignInBits) ProtocolConformance
   /// conformance definition.
   Type ConformingType;
 
+  friend class ConformanceIsolationRequest;
+  friend class RawConformanceIsolationRequest;
+
 protected:
   // clang-format off
   //
@@ -139,15 +142,22 @@ protected:
   union { uint64_t OpaqueBits;
 
     SWIFT_INLINE_BITFIELD_BASE(ProtocolConformance,
+                               1+1+
                                bitmax(NumProtocolConformanceKindBits, 8),
       /// The kind of protocol conformance.
-      Kind : bitmax(NumProtocolConformanceKindBits, 8)
+      Kind : bitmax(NumProtocolConformanceKindBits, 8),
+
+      /// Whether the "raw" conformance isolation is "inferred", which applies to most conformances.
+      IsRawIsolationInferred : 1,
+
+      /// Whether the computed actor isolation is nonisolated.
+      IsComputedNonisolated : 1
     );
 
     SWIFT_INLINE_BITFIELD_EMPTY(RootProtocolConformance, ProtocolConformance);
 
     SWIFT_INLINE_BITFIELD_FULL(NormalProtocolConformance, RootProtocolConformance,
-                               1+1+
+                               1+1+1+1+1+
                                bitmax(NumProtocolConformanceOptions,8)+
                                bitmax(NumProtocolConformanceStateBits,8)+
                                bitmax(NumConformanceEntryKindBits,8),
@@ -157,6 +167,13 @@ protected:
       /// populated any of its elements).
       HasComputedAssociatedConformances : 1,
 
+      /// Whether the preconcurrency attribute is effectful (not redundant) for
+      /// this conformance.
+      IsPreconcurrencyEffectful : 1,
+
+      /// Whether there is an explicit global actor specified for this
+      /// conformance.
+      HasExplicitGlobalActor : 1,
       : NumPadBits,
 
       /// Options.
@@ -188,6 +205,24 @@ protected:
   ProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
     : ConformingType(conformingType) {
     Bits.ProtocolConformance.Kind = unsigned(kind);
+    Bits.ProtocolConformance.IsRawIsolationInferred = false;
+    Bits.ProtocolConformance.IsComputedNonisolated = false;
+  }
+
+  bool isRawIsolationInferred() const {
+    return Bits.ProtocolConformance.IsRawIsolationInferred;
+  }
+
+  void setRawConformanceInferred(bool value = true) {
+    Bits.ProtocolConformance.IsRawIsolationInferred = value;
+  }
+
+  bool isComputedNonisolated() const {
+    return Bits.ProtocolConformance.IsComputedNonisolated;
+  }
+
+  void setComputedNonnisolated(bool value = true) {
+    Bits.ProtocolConformance.IsComputedNonisolated = value;
   }
 
 public:
@@ -235,6 +270,22 @@ public:
   /// If the current conformance is canonical already, it will be returned.
   /// Otherwise a new conformance will be created.
   ProtocolConformance *getCanonicalConformance();
+
+  /// Determine the "raw" actor isolation of this conformance, before applying any inference rules.
+  ///
+  /// Most clients should use `getIsolation()`, unless they are part of isolation inference
+  /// themselves (e.g., conformance checking).
+  ///
+  /// - Returns std::nullopt if the isolation will be inferred.
+  std::optional<ActorIsolation> getRawIsolation() const;
+
+  /// Determine the actor isolation of this conformance.
+  ActorIsolation getIsolation() const;
+
+  /// Determine whether this conformance is isolated to an actor.
+  bool isIsolated() const {
+    return getIsolation().isActorIsolated();
+  }
 
   /// Return true if the conformance has a witness for the given associated
   /// type.
@@ -344,10 +395,6 @@ public:
 
   /// Retrieve the protocol conformance for the inherited protocol.
   ProtocolConformance *getInheritedConformance(ProtocolDecl *protocol) const;
-
-  /// Given a dependent type expressed in terms of the self parameter,
-  /// map it into the context of this conformance.
-  Type getAssociatedType(Type assocType) const;
 
   /// Given that the requirement signature of the protocol directly states
   /// that the given dependent type must conform to the given protocol,
@@ -525,6 +572,8 @@ class NormalProtocolConformance : public RootProtocolConformance,
 {
   friend class ValueWitnessRequest;
   friend class TypeWitnessRequest;
+  friend class ConformanceIsolationRequest;
+  friend class RawConformanceIsolationRequest;
 
   /// The protocol being conformed to.
   ProtocolDecl *Protocol;
@@ -533,10 +582,17 @@ class NormalProtocolConformance : public RootProtocolConformance,
   SourceLoc Loc;
 
   /// The location of the protocol name within the conformance.
+  ///
+  /// - Important: This is not a valid insertion location for an attribute.
+  /// Use `applyConformanceAttribute` instead.
   SourceLoc ProtocolNameLoc;
 
-  /// The location of the `@preconcurrency` attribute, if any.
-  SourceLoc PreconcurrencyLoc;
+  /// The `TypeRepr` of the inheritance clause entry that declares this
+  /// conformance, if any. For example, if this is a conformance to `Y`
+  /// declared as `struct S: X, Y & Z {}`, this is the `TypeRepr` for `Y & Z`.
+  ///
+  /// - Important: The value can be valid only for an explicit conformance.
+  TypeRepr *inheritedTypeRepr;
 
   /// The declaration context containing the ExtensionDecl or
   /// NominalTypeDecl that declared the conformance.
@@ -566,28 +622,44 @@ class NormalProtocolConformance : public RootProtocolConformance,
 
   void resolveLazyInfo() const;
 
+  /// Retrieve the explicitly-specified global actor isolation.
+  TypeExpr *getExplicitGlobalActorIsolation() const;
+
+  // Record the explicitly-specified global actor isolation.
+  void setExplicitGlobalActorIsolation(TypeExpr *typeExpr);
+
+  /// Return the `TypeRepr` of the inheritance clause entry that declares this
+  /// conformance, if any. For example, if this is a conformance to `Y`
+  /// declared as `struct S: X, Y & Z {}`, this is the `TypeRepr` for `Y & Z`.
+  ///
+  /// - Important: The value can be valid only for an explicit conformance.
+  TypeRepr *getInheritedTypeRepr() const { return inheritedTypeRepr; }
+
 public:
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
-                            SourceLoc loc, DeclContext *dc,
-                            ProtocolConformanceState state,
-                            ProtocolConformanceOptions options,
-                            SourceLoc preconcurrencyLoc)
+                            SourceLoc loc, TypeRepr *inheritedTypeRepr,
+                            DeclContext *dc, ProtocolConformanceState state,
+                            ProtocolConformanceOptions options)
       : RootProtocolConformance(ProtocolConformanceKind::Normal,
                                 conformingType),
         Protocol(protocol), Loc(extractNearestSourceLoc(dc)),
-        ProtocolNameLoc(loc), PreconcurrencyLoc(preconcurrencyLoc),
+        ProtocolNameLoc(loc), inheritedTypeRepr(inheritedTypeRepr),
         Context(dc) {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
-    assert((preconcurrencyLoc.isInvalid() ||
-            options.contains(ProtocolConformanceFlags::Preconcurrency)) &&
-           "Cannot have a @preconcurrency location without isPreconcurrency");
+
     setState(state);
     Bits.NormalProtocolConformance.IsInvalid = false;
+    Bits.NormalProtocolConformance.IsPreconcurrencyEffectful = false;
     Bits.NormalProtocolConformance.Options = options.toRaw();
     Bits.NormalProtocolConformance.HasComputedAssociatedConformances = false;
     Bits.NormalProtocolConformance.SourceKind =
         unsigned(ConformanceEntryKind::Explicit);
+    Bits.NormalProtocolConformance.HasExplicitGlobalActor = false;
+    setExplicitGlobalActorIsolation(options.getGlobalActorIsolationType());
+
+    assert((!getPreconcurrencyLoc() || isPreconcurrency()) &&
+           "Cannot have a @preconcurrency location without isPreconcurrency");
   }
 
   /// Get the protocol being conformed to.
@@ -597,6 +669,9 @@ public:
   SourceLoc getLoc() const { return Loc; }
 
   /// Retrieve the name of the protocol location.
+  ///
+  /// - Important: This is not a valid insertion location for an attribute.
+  ///   Use `applyConformanceAttribute` instead.
   SourceLoc getProtocolNameLoc() const { return ProtocolNameLoc; }
 
   /// Get the declaration context that contains the conforming extension or
@@ -629,7 +704,8 @@ public:
   void setInvalid() { Bits.NormalProtocolConformance.IsInvalid = true; }
 
   ProtocolConformanceOptions getOptions() const {
-    return ProtocolConformanceOptions(Bits.NormalProtocolConformance.Options);
+    return ProtocolConformanceOptions(Bits.NormalProtocolConformance.Options,
+                                      getExplicitGlobalActorIsolation());
   }
 
   /// Whether this is an "unchecked" conformance.
@@ -645,6 +721,20 @@ public:
         (getOptions() | ProtocolConformanceFlags::Unchecked).toRaw();
   }
 
+  /// Whether the preconcurrency attribute is effectful (not redundant) for
+  /// this conformance.
+  bool isPreconcurrencyEffectful() const {
+    ASSERT(isPreconcurrency() && isComplete());
+    return Bits.NormalProtocolConformance.IsPreconcurrencyEffectful;
+  }
+
+  /// Record that the preconcurrency attribute is effectful (not redundant)
+  /// for this conformance.
+  void setPreconcurrencyEffectful() {
+    ASSERT(isPreconcurrency());
+    Bits.NormalProtocolConformance.IsPreconcurrencyEffectful = true;
+  }
+
   /// Whether this is an preconcurrency conformance.
   bool isPreconcurrency() const {
     return getOptions().contains(ProtocolConformanceFlags::Preconcurrency);
@@ -652,17 +742,20 @@ public:
 
   /// Retrieve the location of `@preconcurrency`, if there is one and it is
   /// known.
-  SourceLoc getPreconcurrencyLoc() const { return PreconcurrencyLoc; }
+  ///
+  /// - Important: The value can be valid only for an explicit conformance.
+  SourceLoc getPreconcurrencyLoc() const;
 
-  /// Whether this is an "unsafe" conformance.
-  bool isUnsafe() const {
-    return getOptions().contains(ProtocolConformanceFlags::Unsafe);
+  /// Query whether this conformance was explicitly declared to be safe or
+  /// unsafe.
+  ExplicitSafety getExplicitSafety() const {
+    if (getOptions().contains(ProtocolConformanceFlags::Unsafe))
+      return ExplicitSafety::Unsafe;
+    return ExplicitSafety::Unspecified;
   }
 
-  /// Whether this is an "safe(unchecked)" conformance.
-  bool isSafe() const {
-    return getOptions().contains(ProtocolConformanceFlags::Safe);
-  }
+  /// Whether this conformance has explicitly-specified global actor isolation.
+  bool hasExplicitGlobalActorIsolation() const;
 
   /// Determine whether we've lazily computed the associated conformance array
   /// already.
@@ -689,22 +782,7 @@ public:
 
   void setSourceKindAndImplyingConformance(
       ConformanceEntryKind sourceKind,
-      NormalProtocolConformance *implyingConformance) {
-    assert(sourceKind != ConformanceEntryKind::Inherited &&
-           "a normal conformance cannot be inherited");
-    assert((sourceKind == ConformanceEntryKind::Implied) ==
-               (bool)implyingConformance &&
-           "an implied conformance needs something that implies it");
-    assert(sourceKind != ConformanceEntryKind::PreMacroExpansion &&
-           "cannot create conformance pre-macro-expansion");
-    Bits.NormalProtocolConformance.SourceKind = unsigned(sourceKind);
-    if (auto implying = implyingConformance) {
-      ImplyingConformance = implying;
-      PreconcurrencyLoc = implying->getPreconcurrencyLoc();
-      Bits.NormalProtocolConformance.Options =
-          implyingConformance->getOptions().toRaw();
-    }
-  }
+      NormalProtocolConformance *implyingConformance);
 
   /// Determine whether this conformance is lazily loaded.
   ///
@@ -789,6 +867,15 @@ public:
 
   /// Triggers a request that resolves all of the conformance's value witnesses.
   void resolveValueWitnesses() const;
+
+  /// If the necessary source location information is found, attaches a fix-it
+  /// to the given diagnostic for applying the given attribute to the
+  /// conformance.
+  ///
+  /// \param attrStr A conformance attribute as a string, e.g. "@unsafe" or
+  /// "nonisolated".
+  void applyConformanceAttribute(InFlightDiagnostic &diag,
+                                 std::string attrStr) const;
 
   /// Determine whether the witness for the given type requirement
   /// is the default definition.
@@ -881,9 +968,7 @@ public:
   }
 
   ProtocolConformanceRef getAssociatedConformance(Type assocType,
-                                                  ProtocolDecl *protocol) const{
-    llvm_unreachable("self-conformances never have associated types");
-  }
+                                                  ProtocolDecl *protocol) const;
 
   bool hasWitness(ValueDecl *requirement) const {
     return true;

@@ -315,11 +315,11 @@ public struct TestGenericSubscripts {
   @usableFromInline package subscript<T>(where _: T) -> Int where T: PackageProtocol { return 0 } // expected-warning {{type referenced from a generic requirement of a '@usableFromInline' subscript should be '@usableFromInline' or public}}
 }
 
-@usableFromInline typealias TestGenericAlias<T: InternalProtocol> = T // expected-warning {{type referenced from a generic parameter of a '@usableFromInline' type alias should be '@usableFromInline' or public}}
-@usableFromInline typealias TestGenericAliasWhereClause<T> = T where T: InternalProtocol // expected-warning {{type referenced from a generic requirement of a '@usableFromInline' type alias should be '@usableFromInline' or public}}
+@usableFromInline typealias TestGenericAlias<T: InternalProtocol> = T // expected-warning {{type referenced from a generic parameter of a '@usableFromInline' generic type alias should be '@usableFromInline' or public}}
+@usableFromInline typealias TestGenericAliasWhereClause<T> = T where T: InternalProtocol // expected-warning {{type referenced from a generic requirement of a '@usableFromInline' generic type alias should be '@usableFromInline' or public}}
 
-@usableFromInline typealias PkgTestGenericAlias<T: PackageProtocol> = T // expected-warning {{type referenced from a generic parameter of a '@usableFromInline' type alias should be '@usableFromInline' or public}}
-@usableFromInline typealias PkgTestGenericAliasWhereClause<T> = T where T: PackageProtocol // expected-warning {{type referenced from a generic requirement of a '@usableFromInline' type alias should be '@usableFromInline' or public}}
+@usableFromInline typealias PkgTestGenericAlias<T: PackageProtocol> = T // expected-warning {{type referenced from a generic parameter of a '@usableFromInline' generic type alias should be '@usableFromInline' or public}}
+@usableFromInline typealias PkgTestGenericAliasWhereClause<T> = T where T: PackageProtocol // expected-warning {{type referenced from a generic requirement of a '@usableFromInline' generic type alias should be '@usableFromInline' or public}}
 
 @usableFromInline struct GenericStruct<T> {
   @usableFromInline struct Nested where T : InternalProtocol {}

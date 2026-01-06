@@ -26,7 +26,7 @@ import SIL
 //
 // Other case blocks of the switch_enum become dead.
 //
-extension SwitchEnumInst : OnoneSimplifyable {
+extension SwitchEnumInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     guard let enumInst = enumOp as? EnumInst,
           let caseBlock = getUniqueSuccessor(forCaseIndex: enumInst.caseIndex) else

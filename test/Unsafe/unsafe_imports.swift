@@ -1,28 +1,35 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/unsafe_swift_decls.swiftmodule %S/Inputs/unsafe_swift_decls.swift -enable-experimental-feature AllowUnsafeAttribute
+// RUN: %target-swift-frontend -emit-module-path %t/unsafe_swift_decls.swiftmodule %S/Inputs/unsafe_swift_decls.swift
 
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -I %S/Inputs -I %t
-
-// REQUIRES: swift_feature_AllowUnsafeAttribute
-// REQUIRES: swift_feature_WarnUnsafe
+// RUN: %target-typecheck-verify-swift -strict-memory-safety -I %S/Inputs -I %t
 
 import unsafe_decls
 import unsafe_swift_decls
 
-// expected-warning@+1{{global function 'testUnsafe' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
-func testUnsafe(_ ut: UnsafeType) { // expected-note{{reference to unsafe struct 'UnsafeType'}}
-  unsafe_c_function() // expected-note{{call to unsafe global function 'unsafe_c_function()'}}
+func testUnsafe(_ ut: UnsafeType) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{3-3=unsafe }}
+  unsafe_c_function() // expected-note{{reference to unsafe global function 'unsafe_c_function()'}}
 
   var array: [CInt] = [1, 2, 3, 4, 5]
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{3-3=unsafe }}
   print_ints(&array, CInt(array.count))
-  // expected-note@-1{{call to global function 'print_ints' involves unsafe type 'UnsafeMutablePointer<Int32>'}}
+  // expected-note@-1{{argument #0 in call to global function 'print_ints' has unsafe type 'UnsafeMutablePointer<Int32>?'}}
+
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
+  _ = print_ints // expected-note{{reference to global function 'print_ints' involves unsafe type 'UnsafeMutablePointer<Int32>'}}
 }
 
 // Reference a typealias that isn't itself @unsafe, but refers to an unsafe
 // type.
 
-// expected-warning@+1{{global function 'testUnsafeThroughAlias' involves unsafe code; use '@unsafe' to indicate that its use is not memory-safe}}
-func testUnsafeThroughAlias(_ ut: UnsafeTypeAlias) { // expected-note{{reference to type alias 'UnsafeTypeAlias' whose underlying type involves unsafe type 'PointerType'}}
+func testUnsafeThroughAlias(_ ut: UnsafeTypeAlias) {
+
+}
+
+func callThroughAlias(ut: UnsafeTypeAlias) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  testUnsafeThroughAlias(ut) // expected-note{{argument #0 in call to global function 'testUnsafeThroughAlias' has unsafe type 'UnsafeTypeAlias' (aka 'PointerType')}}
+  // expected-note@-1{{reference to parameter 'ut' involves unsafe type 'UnsafeTypeAlias' (aka 'PointerType')}}
 }
 
 

@@ -158,8 +158,8 @@ struct TestGeneral {
 
   // CHECK-LABEL: sil hidden [ossa] @$s37sendable_to_any_for_generic_arguments11TestGeneralV023test_function_types_as_E5_argsyyF
   // CHECK: [[FUNCV_REF:%.*]] = struct_extract %0, #TestGeneral.funcV
-  // CHECK-NEXT: %3 = unchecked_trivial_bit_cast [[FUNCV_REF]] to $S<(Array<Any>) -> Optional<Any>>
-  // CHECK: [[DATA_REF:%.*]] = struct_extract %20, #<abstract function>Test.data
+  // CHECK-NEXT: {{%.*}} = unchecked_trivial_bit_cast [[FUNCV_REF]] to $S<(Array<Any>) -> Optional<Any>>
+  // CHECK: [[DATA_REF:%.*]] = struct_extract %{{.*}}, #<abstract function>Test.data
   // CHECK-NEXT: [[DATA_COPY:%.*]] = copy_value [[DATA_REF]]
   // CHECK-NEXT: [[DATA_ANY:%.*]] = unchecked_value_cast [[DATA_COPY]] to $V<(Array<Any>) -> Any>
   // CHECK: [[ACCEPTS_ANY:%.*]] = function_ref @$s37sendable_to_any_for_generic_arguments11TestGeneralV023test_function_types_as_E5_argsyyF08accepts_C0L_yyAcDyyF1VL_VyypSayypGcGF : $@convention(thin) (@guaranteed V<(Array<Any>) -> Any>) -> ()
@@ -181,4 +181,104 @@ struct TestGeneral {
     let test = Test(data: V(v: { $0.first! }))
     accepts_any(test.data)
   }
+}
+
+extension Dictionary where Key == String, Value == Any {
+  subscript<T>(entry object: T) -> T? {
+    get { nil }
+    set { }
+  }
+
+  var test: Int? {
+    get { nil }
+    set { }
+  }
+
+  mutating func testMutating() {}
+}
+
+func test_subscript_computed_property_and_mutating_access(u: User) {
+  // CHECK:  [[DICT_GETTER:%.*]] = class_method %0, #User.dict!getter : (User) -> () -> [String : any Sendable], $@convention(method) (@guaranteed User) -> @owned Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[DICT:%.*]] = apply [[DICT_GETTER]]({{.*}}) : $@convention(method) (@guaranteed User) -> @owned Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[ANY_DICT:%.*]] = unchecked_bitwise_cast [[DICT]] to $Dictionary<String, Any>
+  // CHECK-NEXT: [[ANY_DICT_COPY:%.*]] = copy_value [[ANY_DICT]]
+  // CHECK-NEXT: [[BORROWED_COPY:%.*]] = begin_borrow [[ANY_DICT_COPY]]
+  // CHECK: [[SUBSCRIPT_GETTER:%.*]] = function_ref @$sSD37sendable_to_any_for_generic_argumentsSSRszypRs_rlE5entryqd__Sgqd___tcluig
+  // CHECK-NEXT: {{.*}} = apply [[SUBSCRIPT_GETTER]]<String, Any, String>({{.*}}, [[BORROWED_COPY]])
+  _ = u.dict[entry: ""]
+
+  // CHECK: [[DICT_GETTER:%.*]] = class_method %0, #User.dict!modify : (User) -> () -> (), $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK-NEXT: ([[DICT_ADDR:%.*]], {{.*}}) = begin_apply [[DICT_GETTER]]({{.*}}) : $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[ANY_DICT:%.*]] = alloc_stack $Dictionary<String, Any>
+  // CHECK-NEXT: [[LOADED_DICT:%.*]] = load [copy] [[DICT_ADDR]]
+  // CHECK-NEXT: [[ANY_LOADED_DICT:%.*]] = unchecked_bitwise_cast [[LOADED_DICT]] to $Dictionary<String, Any>
+  // CHECK-NEXT: [[COPIED_ANY_DICT:%.*]] = copy_value [[ANY_LOADED_DICT]]
+  // CHECK-NEXT: store [[COPIED_ANY_DICT]] to [init] [[ANY_DICT]]
+  // CHECK: [[SUBSCRIPT_SETTER:%.*]] = function_ref @$sSD37sendable_to_any_for_generic_argumentsSSRszypRs_rlE5entryqd__Sgqd___tcluis
+  // CHECK-NEXT: %{{.*}} = apply [[SUBSCRIPT_SETTER]]<String, Any, Int>({{.*}}, [[ANY_DICT]])
+  // CHECK-NEXT: [[LOADED_ANY_DICT:%.*]] = load [take] [[ANY_DICT]]
+  // CHECK-NEXT: [[SENDABLE_DICT:%.*]] = unchecked_bitwise_cast [[LOADED_ANY_DICT]] to $Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[COPIED_SENDABLE_DICT:%.*]] = copy_value [[SENDABLE_DICT]]
+  // CHECK-NEXT: assign [[COPIED_SENDABLE_DICT]] to [[DICT_ADDR]]
+  u.dict[entry: 42] = 42
+
+  // CHECK: [[DICT_GETTER:%.*]] = class_method %0, #User.dict!getter : (User) -> () -> [String : any Sendable], $@convention(method) (@guaranteed User) -> @owned Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[SENDABLE_DICT:%.*]] = apply [[DICT_GETTER]]({{.*}}) : $@convention(method) (@guaranteed User) -> @owned Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[DICT_CAST_TO_ANY:%.*]] = unchecked_bitwise_cast [[SENDABLE_DICT]] to $Dictionary<String, Any>
+  // CHECK-NEXT: [[ANY_DICT_COPY:%.*]] = copy_value [[DICT_CAST_TO_ANY]]
+  // CHECK-NEXT: [[ANY_DICT:%.*]] = begin_borrow [[ANY_DICT_COPY]]
+  // CHECK: [[GETTER:%.*]] = function_ref @$sSD37sendable_to_any_for_generic_argumentsSSRszypRs_rlE4testSiSgvg
+  // CHECK-NEXT: {{.*}} = apply [[GETTER]]([[ANY_DICT]]) : $@convention(method) (@guaranteed Dictionary<String, Any>) -> Optional<Int>
+  _ = u.dict.test
+
+  // CHECK: [[DICT_GETTER:%.*]] = class_method %0, #User.dict!modify : (User) -> () -> (), $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK-NEXT: ([[DICT:%.*]], {{.*}}) = begin_apply [[DICT_GETTER]]({{.*}}) : $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[ANY_DICT:%.*]] = alloc_stack $Dictionary<String, Any>
+  // CHECK-NEXT: [[LOADED_DICT:%.*]] = load [copy] [[DICT]]
+  // CHECK-NEXT: [[CASTED_DICT:%.*]] = unchecked_bitwise_cast [[LOADED_DICT]] to $Dictionary<String, Any>
+  // CHECK-NEXT: [[COPIED_CASTED_DICT:%.*]] = copy_value [[CASTED_DICT]]
+  // CHECK-NEXT: store [[COPIED_CASTED_DICT]] to [init] [[ANY_DICT]]
+  // CHECK: [[SETTER:%.*]] = function_ref @$sSD37sendable_to_any_for_generic_argumentsSSRszypRs_rlE4testSiSgvs
+  // CHECK-NEXT: {{.*}} = apply [[SETTER]]({{.*}}, [[ANY_DICT]]) : $@convention(method) (Optional<Int>, @inout Dictionary<String, Any>) -> ()
+  // CHECK-NEXT: [[LOADED_ANY_DICT:%.*]] = load [take] [[ANY_DICT]]
+  // CHECK-NEXT: [[SENDABLE_DICT:%.*]] = unchecked_bitwise_cast [[LOADED_ANY_DICT]] to $Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[COPIED_SENDABLE_DICT:%.*]] = copy_value [[SENDABLE_DICT]]
+  // CHECK-NEXT: assign [[COPIED_SENDABLE_DICT]] to [[DICT]]
+  u.dict.test = 42
+
+  // CHECK: [[DICT_GETTER:%.*]] = class_method %0, #User.dict!modify : (User) -> () -> (), $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK-NEXT: ([[DICT:%.*]], {{.*}}) = begin_apply [[DICT_GETTER:%.*]](%0) : $@yield_once @convention(method) (@guaranteed User) -> @yields @inout Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[ANY_DICT:%.*]] = alloc_stack $Dictionary<String, Any>
+  // CHECK-NEXT: [[LOADED_DICT:%.*]] = load [copy] [[DICT]]
+  // CHECK-NEXT: [[CASTED_DICT:%.*]] = unchecked_bitwise_cast [[LOADED_DICT]] to $Dictionary<String, Any>
+  // CHECK-NEXT: [[COPIED_DICT:%.*]] = copy_value [[CASTED_DICT]]
+  // CHECK-NEXT: store [[COPIED_DICT]] to [init] [[ANY_DICT]]
+  // CHECK: [[MUTATING_METHOD:%.*]] = function_ref @$sSD37sendable_to_any_for_generic_argumentsSSRszypRs_rlE12testMutatingyyF : $@convention(method) (@inout Dictionary<String, Any>) -> ()
+  // CHECK-NEXT: {{%.*}} = apply [[MUTATING_METHOD]]([[ANY_DICT]]) : $@convention(method) (@inout Dictionary<String, Any>) -> ()
+  // CHECK-NEXT: [[LOADED_ANY_DICT:%.*]] = load [take] [[ANY_DICT]]
+  // CHECK-NEXT: [[SENDABLE_DICT:%.*]] = unchecked_bitwise_cast [[LOADED_ANY_DICT]] to $Dictionary<String, any Sendable>
+  // CHECK-NEXT: [[COPIED_SENDABLE_DICT:%.*]] = copy_value [[SENDABLE_DICT]]
+  // CHECK-NEXT: assign [[COPIED_SENDABLE_DICT]] to [[DICT]]
+  u.dict.testMutating()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s37sendable_to_any_for_generic_arguments15test_inout_usesyyF
+// CHECK: [[SENDABLE_ARR_REF:%.*]] = begin_access [modify] [unknown] %2
+// CHECK-NEXT:  [[ANY_ARR:%.*]] = alloc_stack $Array<Any>
+// CHECK-NEXT:  [[SENDABLE_ARR:%.*]] = load [copy] [[SENDABLE_ARR_REF]]
+// CHECK-NEXT:  [[ANY_ARR_CAST:%.*]] = unchecked_bitwise_cast [[SENDABLE_ARR]] to $Array<Any>
+// CHECK-NEXT:  [[ANY_ARR_COPY:%.*]] = copy_value [[ANY_ARR_CAST]]
+// CHECK-NEXT:  store [[ANY_ARR_COPY]] to [init] [[ANY_ARR]]
+// CHECK: [[INOUT_FUNC:%.*]] = function_ref @$s37sendable_to_any_for_generic_arguments15test_inout_usesyyF0G0L_yySayypGzF : $@convention(thin) (@inout Array<Any>) -> ()
+// CHECK-NEXT:  {{.*}} = apply [[INOUT_FUNC]]([[ANY_ARR]]) : $@convention(thin) (@inout Array<Any>) -> ()
+// CHECK-NEXT: [[ANY_ARR_VALUE:%.*]] = load [take] [[ANY_ARR]]
+// CHECK-NEXT: [[SENDABLE_ARR_VALUE:%.*]] = unchecked_bitwise_cast [[ANY_ARR_VALUE]] to $Array<any Sendable>
+// CHECK-NEXT: [[SENDABLE_ARR_VALUE_COPY:%.*]] = copy_value [[SENDABLE_ARR_VALUE]]
+// CHECK-NEXT: assign [[SENDABLE_ARR_VALUE_COPY]] to [[SENDABLE_ARR_REF]]
+func test_inout_uses() {
+  func test(_ arr: inout [Any]) {
+  }
+
+  @preconcurrency var arr: [any Sendable] = []
+  test(&arr)
 }

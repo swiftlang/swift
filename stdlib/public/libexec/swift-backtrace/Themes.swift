@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_spi(Formatting) import _Backtracing
+@_spi(Formatting) import Runtime
 
 protocol ErrorAndWarningTheme {
   func crashReason(_ s: String) -> String
@@ -36,6 +36,16 @@ protocol PromptTheme {
 
 extension PromptTheme {
   public func prompt(_ s: String) -> String { return s }
+}
+
+protocol PlatformArchTheme {
+  func platform(_ s: String) -> String
+  func architecture(_ s: String) -> String
+}
+
+extension PlatformArchTheme {
+  public func platform(_ s: String) -> String { return s }
+  public func architecture(_ s: String) -> String { return s }
 }
 
 protocol MemoryDumpTheme {
@@ -67,7 +77,7 @@ extension RegisterDumpTheme {
 }
 
 typealias Theme = BacktraceFormattingTheme & ErrorAndWarningTheme &
-  PromptTheme & MemoryDumpTheme & RegisterDumpTheme
+  PromptTheme & MemoryDumpTheme & RegisterDumpTheme & PlatformArchTheme
 
 enum Themes {
 
@@ -163,6 +173,13 @@ enum Themes {
     }
     public func info(_ s: String) -> String {
       return "ℹ️ \(s)"
+    }
+
+    public func platform(_ s: String) -> String {
+      return "\(fg: .white)\(s)\(fg: .normal)"
+    }
+    public func architecture(_ s: String) -> String {
+      return "\(fg: .white)\(s)\(fg: .normal)"
     }
   }
 

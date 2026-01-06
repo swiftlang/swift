@@ -17,11 +17,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckInvertible.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/Assertions.h"
-#include "TypeChecker.h"
+#include "swift/ClangImporter/ClangImporter.h"
 
 using namespace swift;
 
@@ -38,6 +39,7 @@ static void addConformanceFixIt(const NominalTypeDecl *nominal,
     text.append(": ");
     if (inverse) text.append("~");
     text.append(getProtocolName(proto));
+    text.append(" ");
     diag.fixItInsert(fixItLoc, text);
   } else {
     auto fixItLoc = nominal->getInherited().getEndLoc();
@@ -115,7 +117,7 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
   assert(!conformance.isInvalid());
 
   const auto kp = getKnownProtocolKind(ip);
-  assert(conformance.getRequirement()->isSpecificProtocol(kp));
+  assert(conformance.getProtocol()->isSpecificProtocol(kp));
 
   auto *nominalDecl = dc->getSelfNominalTypeDecl();
   assert(isa<StructDecl>(nominalDecl) ||
@@ -152,6 +154,10 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
           ctx.Diags.diagnose(conformanceLoc,
                              diag::invertible_conformance_other_source_file,
                              getInvertibleProtocolKindName(ip), nominalDecl);
+
+          // Skip further work to avoid asking for stored properties of
+          // resilient types.
+          return;
         }
       }
 
@@ -251,7 +257,7 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
       // For a type conforming to IP, ensure that the storage conforms to IP.
       switch (IP) {
       case InvertibleProtocolKind::Copyable:
-        if (!type->isNoncopyable())
+        if (type->isCopyable())
           return false;
         break;
       case InvertibleProtocolKind::Escapable:
@@ -304,7 +310,7 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
   // Walk the stored properties of classes and structs.
   if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
     for (auto property : nominal->getStoredProperties()) {
-      auto propertyType = dc->mapTypeIntoContext(
+      auto propertyType = dc->mapTypeIntoEnvironment(
           property->getValueInterfaceType());
       if ((*this)(property, propertyType))
         return true;
@@ -315,6 +321,9 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
             dyn_cast_or_null<clang::CXXRecordDecl>(nominal->getClangDecl())) {
       for (auto cxxBase : cxxRecordDecl->bases()) {
         if (auto cxxBaseDecl = cxxBase.getType()->getAsCXXRecordDecl()) {
+          if (importer::isSymbolicCircularBase(cxxRecordDecl, cxxBaseDecl))
+            // Skip circular bases to avoid unbounded recursion
+            continue;
           auto clangModuleLoader = dc->getASTContext().getClangModuleLoader();
           auto importedDecl =
               clangModuleLoader->importDeclDirectly(cxxBaseDecl);
@@ -338,7 +347,7 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
           continue;
 
         // Check that the associated value type is Sendable.
-        auto elementType = dc->mapTypeIntoContext(
+        auto elementType = dc->mapTypeIntoEnvironment(
             element->getPayloadInterfaceType());
         if ((*this)(element, elementType))
           return true;

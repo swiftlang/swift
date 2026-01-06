@@ -106,3 +106,16 @@ func useUsableFromInlineTestKlass() {
     let k = UsableFromInlineTestKlass()
     k.e = E()
 }
+
+// rdar://142690658 (In ~Copyable public struct, an init with COW type param causes compiler error)
+//
+// CHECK-LABEL: sil hidden [ossa] @$s26moveonly_library_evolution19NonCopyableWithInitV1sACSS_tcfC :
+// CHECK-SAME: $@convention(method) (@owned String, @thin NonCopyableWithInit.Type) -> @out NonCopyableWithInit {
+// CHECK: bb0(%0 : $*NonCopyableWithInit, %1 : @owned $String, %2 : $@thin NonCopyableWithInit.Type):
+// CHECK:   [[BOX:%.*]] = project_box %{{.*}}, 0
+// CHECK:   store %{{.*}} to [init] [[BOX]]
+// CHECK:   [[MD:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[BOX]]
+// CHECK:   copy_addr [[MD]] to [init] %0
+public struct NonCopyableWithInit: ~Copyable {
+  init(s: String) {}
+}

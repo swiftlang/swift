@@ -80,7 +80,7 @@ internal func getAllProcesses(options: UniversalOptions) -> [ProcessIdentifier]?
   }
   let newCount = bufferSize / kinfo_stride
   if count > newCount {
-    buffer.dropLast(count - newCount)
+    buffer.removeLast(count - newCount)
   }
   let sorted = buffer.sorted { first, second in
     first.kp_proc.p_pid > second.kp_proc.p_pid
@@ -166,6 +166,31 @@ internal func process(matching: String) -> ProcessIdentifier? {
 internal func getRemoteProcess(processId: ProcessIdentifier,
                                options: UniversalOptions) -> (any RemoteProcess)? {
   return LinuxRemoteProcess(processId: processId)
+}
+
+#elseif os(Android)
+import Foundation
+
+internal typealias ProcessIdentifier = AndroidRemoteProcess.ProcessIdentifier
+
+internal func process(matching: String) -> ProcessIdentifier? {
+  guard let processId = AndroidRemoteProcess.ProcessIdentifier(matching) else {
+    return nil
+  }
+
+  let procfsPath = "/proc/\(processId)"
+  var isDirectory: Bool = false
+  guard FileManager.default.fileExists(atPath: procfsPath, isDirectory: &isDirectory)
+        && isDirectory else {
+    return nil
+  }
+
+  return processId
+}
+
+internal func getRemoteProcess(processId: ProcessIdentifier,
+                               options: UniversalOptions) -> (any RemoteProcess)? {
+  return AndroidRemoteProcess(processId: processId)
 }
 
 #else

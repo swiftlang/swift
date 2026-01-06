@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck %s -typecheck -module-name UseSynchronization -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -emit-clang-header-path %t/UseSynchronization.h
+// RUN: %target-swift-frontend %s -module-name UseSynchronization -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/UseSynchronization.h
 // RUN: %FileCheck %s < %t/UseSynchronization.h
 
 // REQUIRES: synchronization

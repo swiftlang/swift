@@ -721,3 +721,15 @@ bb0:
   %1 = tuple ()
   return %1 : $()
 }
+
+// CHECK-LABEL: @dead_prepare_init
+// CHECK-NOT: alloc_stack
+// // CHECK: } // end sil function 'dead_prepare_init'
+sil @dead_prepare_init : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Kl
+  %empty = builtin "prepareInitialization"(%0 : $*Kl) : $()
+  dealloc_stack %0 : $*Kl
+  %1 = tuple ()
+  return %1 : $()
+}

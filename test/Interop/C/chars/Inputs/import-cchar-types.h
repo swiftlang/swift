@@ -6,6 +6,10 @@
 extern char a_char;
 extern wchar_t a_wchar;
 
+// This case is a regression test for a crash when importing constant initializers for wchar_t,
+// since Unicode.Scalar cannot be initialized with integer literals.
+const wchar_t an_initialized_wchar = 2;
+
 #if __cplusplus
 extern char8_t small_char;
 #endif

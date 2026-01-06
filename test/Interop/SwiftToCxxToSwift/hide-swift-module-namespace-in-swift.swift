@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -typecheck -module-name SwiftMod -emit-clang-header-path %t/swiftMod.h -I %t -enable-experimental-cxx-interop -Xcc -DFIRSTPASS
+// RUN: %target-swift-frontend %t/swiftMod.swift -module-name SwiftMod -typecheck -verify -emit-clang-header-path %t/swiftMod.h -I %t -enable-experimental-cxx-interop -Xcc -DFIRSTPASS
 
 // RUN: %FileCheck %s < %t/swiftMod.h
 
-// RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -typecheck -module-name SwiftMod -emit-clang-header-path %t/swiftMod2.h -I %t -enable-experimental-cxx-interop -Xcc -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR
+// RUN: %target-swift-frontend %t/swiftMod.swift -module-name SwiftMod -typecheck -verify -emit-clang-header-path %t/swiftMod2.h -I %t -enable-experimental-cxx-interop -Xcc -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR
 
 // RUN: %check-interop-cxx-header-in-clang(%t/swiftMod2.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY  -Wno-error)
 
@@ -27,8 +27,8 @@ import SwiftToCxxTest
 
 @_expose(Cxx)
 public func testFunction() -> String {
-    let arr = Swift.Array<Int>()
-    let rng = Swift.SystemRandomNumberGenerator()
+    let arr = Swift.Array<Int>() // expected-warning {{initialization of immutable value 'arr' was never used}}
+    let rng = Swift.SystemRandomNumberGenerator() // expected-warning {{initialization of immutable value 'rng' was never used}}
     return ""
 }
 

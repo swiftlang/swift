@@ -13,3 +13,9 @@ target_link_libraries(swiftThreading PRIVATE swiftShims)
 #        to avoid pulling in headers from the compiler.
 target_include_directories(swiftThreading PRIVATE
   "${SwiftCore_SWIFTC_SOURCE_DIR}/include")
+
+if(NOT BUILD_SHARED_LIBS)
+  install(TARGETS swiftThreading
+    EXPORT SwiftCoreTargets
+    COMPONENT SwiftCore_runtime)
+endif()

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Methods -clang-header-expose-decls=all-public -emit-clang-header-path %t/methods.h
+// RUN: %target-swift-frontend %s -module-name Methods -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/methods.h
 // RUN: %FileCheck %s < %t/methods.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/methods.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
@@ -105,7 +105,7 @@ public final class PassStructInClassMethod {
 // CHECK-NEXT:   static SWIFT_INLINE_THUNK LargeStruct staticFinalClassMethod(swift::Int x) SWIFT_SYMBOL("s:7Methods09ClassWithA0C011staticFinalB6Method1xAA11LargeStructVSi_tFZ");
 
 // CHECK: class SWIFT_SYMBOL("s:7Methods11LargeStructV") LargeStruct final {
-// CHECK: SWIFT_INLINE_PRIVATE_HELPER LargeStruct(LargeStruct &&)
+// CHECK: SWIFT_INLINE_THUNK LargeStruct &operator =(const LargeStruct &other) noexcept {
 // CHECK: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct doubled() const SWIFT_SYMBOL("s:7Methods11LargeStructV7doubledACyF");
 // CHECK-NEXT: SWIFT_INLINE_THUNK void dump() const SWIFT_SYMBOL("s:7Methods11LargeStructV4dumpyyF");

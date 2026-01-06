@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt -sil-move-only-object-checker -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-move-only-object-checker -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature Lifetimes -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
 
 // REQUIRES: swift_feature_MoveOnlyClasses
+// REQUIRES: swift_feature_Lifetimes
 
 sil_stage raw
 
@@ -8,14 +9,26 @@ import Swift
 
 class Klass: ~Copyable {}
 
+struct NCNE : ~Copyable, ~Escapable {}
+
+struct NCNEHolder : ~Copyable, ~Escapable {
+  var ncne: NCNE {
+    @_lifetime(borrow self)
+    get
+  }
+}
+
 sil @classUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed Klass) -> ()
+
+sil @read_ncne : $@yield_once @convention(method) (@guaranteed NCNEHolder) -> @lifetime(borrow 0) @yields @guaranteed NCNE
+sil @use_ncne : $@convention(thin) (@guaranteed NCNE) -> ()
 
 // CHECK-LABEL: sil [ossa] @chainErrorTest : $@convention(thin) (@guaranteed Klass) -> () {
 // CHECK-NOT: copy_value
 // CHECK: explicit_copy_value
 // CHECK-NOT: copy_value
 // CHECK: explicit_copy_value
-// CHECK-NOT: copy_value
+// CHECK-NOT: copy_valuea
 // CHECK: } // end sil function 'chainErrorTest'
 sil [ossa] @chainErrorTest : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -50,4 +63,28 @@ bb0(%0 : @guaranteed $Klass):
   destroy_value %2 : $Klass
   %30 = tuple ()
   return %30 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testCopyOfMarkDep : $@convention(thin) (@guaranteed NCNEHolder) -> () {
+// CHECK-NOT: explicit_copy_value
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'testCopyOfMarkDep'
+sil [ossa] @testCopyOfMarkDep : $@convention(thin) (@guaranteed NCNEHolder) -> () {
+bb0(%0 : @guaranteed $NCNEHolder):
+  %1 = copy_value %0
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1
+  debug_value %2, let, name "h", argno 1
+  %4 = function_ref @read_ncne : $@yield_once @convention(method) (@guaranteed NCNEHolder) -> @lifetime(borrow 0) @yields @guaranteed NCNE
+  (%5, %6) = begin_apply %4(%2) : $@yield_once @convention(method) (@guaranteed NCNEHolder) -> @lifetime(borrow 0) @yields @guaranteed NCNE
+  %7 = mark_dependence [unresolved] %5 on %6
+  %8 = mark_dependence [unresolved] %7 on %2
+  %9 = copy_value %8
+  %10 = mark_unresolved_non_copyable_value [no_consume_or_assign] %9
+  %11 = function_ref @use_ncne : $@convention(thin) (@guaranteed NCNE) -> ()
+  %12 = apply %11(%10) : $@convention(thin) (@guaranteed NCNE) -> ()
+  destroy_value %10
+  %14 = end_apply %6 as $()
+  destroy_value %2
+  %16 = tuple ()
+  return %16
 }

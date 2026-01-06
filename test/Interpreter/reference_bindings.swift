@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_ReferenceBindings
+// UNSUPPORTED: back_deployment_runtime
 
 import StdlibUnittest
 

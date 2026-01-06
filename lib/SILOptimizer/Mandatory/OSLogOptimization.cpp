@@ -163,9 +163,9 @@ public:
 
     this->stringInitIntrinsic = callee;
 
-    MetatypeInst *stringMetatypeInst =
-        dyn_cast<MetatypeInst>(inst->getOperand(4)->getDefiningInstruction());
-    this->stringMetatype = stringMetatypeInst->getType();
+    auto stringMetatype = inst->getOperand(4)->getType();
+    assert(stringMetatype.isMetatype());
+    this->stringMetatype = stringMetatype;
   }
 
   bool isInitialized() { return stringInitIntrinsic != nullptr; }
@@ -938,6 +938,16 @@ static void substituteConstants(FoldState &foldState) {
   for (SILValue constantSILValue : foldState.getConstantSILValues()) {
     SymbolicValue constantSymbolicVal =
         evaluator.lookupConstValue(constantSILValue).value();
+    CanType instType = constantSILValue->getType().getASTType();
+
+    // If the SymbolicValue is a string but the instruction that is folded is
+    // not String typed, we are tracking a StaticString which is represented as
+    // a raw pointer. Skip folding StaticString as they are already efficiently
+    // represented.
+    if (constantSymbolicVal.getKind() == SymbolicValue::String &&
+        !instType->isString())
+      continue;
+
     // Make sure that the symbolic value tracked in the foldState is a constant.
     // In the case of ArraySymbolicValue, the array storage could be a non-constant
     // if some instruction in the array initialization sequence was not evaluated
@@ -976,7 +986,6 @@ static void substituteConstants(FoldState &foldState) {
 
     SILBuilderWithScope builder(insertionPoint);
     SILLocation loc = insertionPoint->getLoc();
-    CanType instType = constantSILValue->getType().getASTType();
     SILValue foldedSILVal = emitCodeForSymbolicValue(
         constantSymbolicVal, instType, builder, loc, foldState.stringInfo);
 
@@ -1197,7 +1206,7 @@ static bool tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
         }
         (void)deletedInstructions.insert(deadInst);
       });
-  InstructionDeleter deleter(std::move(callbacks));
+  InstructionDeleter deleter(std::move(callbacks), /*assumeFixedLifetimes=*/ false);
 
   unsigned startIndex = 0;
   while (startIndex < worklist.size()) {
@@ -1424,7 +1433,7 @@ suppressGlobalStringTablePointerError(SingleValueInstruction *oslogMessage) {
 
   // Replace the globalStringTablePointer builtins by a string_literal
   // instruction for an empty string and clean up dead code.
-  InstructionDeleter deleter;
+  InstructionDeleter deleter(/*assumeFixedLifetimes=*/ false);
   for (BuiltinInst *bi : globalStringTablePointerInsts) {
     SILBuilderWithScope builder(bi);
     StringLiteralInst *stringLiteral = builder.createStringLiteral(

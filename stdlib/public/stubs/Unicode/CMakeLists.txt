@@ -21,13 +21,16 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     if (SWIFT_HOST_VARIANT STREQUAL "linux")
       set(extra_c_compile_flags -ffreestanding)
     elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
-      set(extra_c_compile_flags -D__MACH__ -D__APPLE__ -ffreestanding)
+      set(extra_c_compile_flags -ffreestanding)
     endif()
     list(APPEND extra_c_compile_flags -nostdinc++)
 
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
+    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
+      set(SWIFT_SDK_embedded_ARCH_${mod}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
+    endif()
 
     add_swift_target_library_single(
       embedded-unicode-${mod}
@@ -36,6 +39,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       IS_FRAGILE
 
       UnicodeData.cpp
+      UnicodeEmoji.cpp
       UnicodeGrapheme.cpp
       UnicodeNormalization.cpp
       UnicodeScalarProps.cpp

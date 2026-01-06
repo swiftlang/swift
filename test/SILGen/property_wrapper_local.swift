@@ -21,13 +21,13 @@ func testLocalWrapper() {
   // CHECK: [[P:%.*]] = project_box [[WLIFETIME]] : ${ var Wrapper<Int> }
 
   value = 10
-  // CHECK: [[I:%.*]] = function_ref @$s22property_wrapper_local16testLocalWrapperyyF5valueL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
-  // CHECK: [[IPA:%.*]] = partial_apply [callee_guaranteed] [[I]]() : $@convention(thin) (Int) -> Wrapper<Int>
+  // CHECK: [[I:%.*]] = function_ref  @$s22property_wrapper_local16testLocalWrapperyyF5valueL_SivpfF : $@convention(thin) (Int) -> @out Wrapper<Int>
+  // CHECK: [[IPA:%.*]] = partial_apply [callee_guaranteed] [[I]]() : $@convention(thin) (Int) -> @out Wrapper<Int>
   // CHECK: [[S:%.*]] = function_ref @$s22property_wrapper_local16testLocalWrapperyyF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
   // CHECK-NEXT: [[C:%.*]] = copy_value [[WLIFETIME]] : ${ var Wrapper<Int> }
   // CHECK-NOT: mark_function_escape
   // CHECK-NEXT: [[SPA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[S]]([[C]]) : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
-  // CHECK-NEXT: assign_by_wrapper {{%.*}} : $Int to [[P]] : $*Wrapper<Int>, init [[IPA]] : $@callee_guaranteed (Int) -> Wrapper<Int>, set [[SPA]] : $@noescape @callee_guaranteed (Int) -> ()
+  // CHECK-NEXT: assign_or_init #value, local [[P]] : $*Wrapper<Int>, value {{%.*}} : $Int, init [[IPA]] : $@callee_guaranteed (Int) -> @out Wrapper<Int>, set [[SPA]] : $@noescape @callee_guaranteed (Int) -> ()
 
   _ = value
   // CHECK: mark_function_escape [[P]] : $*Wrapper<Int>
@@ -46,12 +46,12 @@ func testLocalWrapper() {
   // CHECK: [[OP:%.*]] = function_ref @$sSi2peoiyySiz_SitFZ : $@convention(method) (@inout Int, Int, @thin Int.Type) -> ()
   // CHECK: apply [[OP]]({{%.*}}) : $@convention(method) (@inout Int, Int, @thin Int.Type) -> ()
   // CHECK: [[RESULT:%.*]] = load [trivial] [[TMP]] : $*Int
-  // CHECK: assign_by_wrapper [[RESULT]] : $Int to [[P]]
+  // CHECK: assign_or_init #value, local [[P]] : $*Wrapper<Int>, value [[RESULT]]
 
   // Check local property wrapper backing initializer and accessors
 
-  // property wrapper backing initializer of value #1 in testLocalWrapper()
-  // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local16testLocalWrapperyyF5valueL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int> {
+  // property wrapped field init accessor of value #1 in testLocalWrapper()
+  // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local16testLocalWrapperyyF5valueL_SivpfF : $@convention(thin) (Int) -> @out Wrapper<Int> {
 
   // getter of $value #1 in testLocalWrapper()
   // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local16testLocalWrapperyyF6$valueL_AA0F0VySiGvg : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> Wrapper<Int> {
@@ -71,12 +71,12 @@ func testInitialValue() {
 
   value = 15
   // CHECK: function_ref @$s22property_wrapper_local16testInitialValueyyF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
-  // CHECK-NOT: assign_by_wrapper
+  // CHECK-NOT: assign_or_init
 
   value += 5
   // CHECK: function_ref @$sSi2peoiyySiz_SitFZ : $@convention(method) (@inout Int, Int, @thin Int.Type) -> ()
   // CHECK: function_ref @$s22property_wrapper_local16testInitialValueyyF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
-  // CHECK-NOT: assign_by_wrapper
+  // CHECK-NOT: assign_or_init
 
   // CHECK: return
 }

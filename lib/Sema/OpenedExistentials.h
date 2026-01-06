@@ -150,6 +150,13 @@ std::optional<std::pair<TypeVariableType *, Type>>
 canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                Type paramTy, Type argTy);
 
+/// A limited form of the check performed by \c canOpenExistentialCallArgument
+/// that assumes that a declaration where parameter came from, the parameter
+/// itself, and the types involved have been validated already.
+bool canOpenExistentialAt(ValueDecl *callee, unsigned paramIdx,
+                          GenericTypeParamType *genericParam,
+                          Type existentialTy);
+
 /// Given a type that includes an existential type that has been opened to
 /// the given type variable, replace the opened type variable and its member
 /// types with their upper bounds.

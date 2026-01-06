@@ -247,7 +247,7 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
     return true;
   }
 
-  if (dc->mapTypeIntoContext(nominal->getDeclaredInterfaceType())
+  if (dc->mapTypeIntoEnvironment(nominal->getDeclaredInterfaceType())
           ->isNoncopyable()) {
     // Already separately diagnosed when explicit.
     return true;
@@ -377,8 +377,8 @@ NormalProtocolConformance *
 DeriveImplicitBitwiseCopyableConformance::synthesizeConformance(
     DeclContext *dc) {
   auto conformance = context.getNormalConformance(
-      nominal->getDeclaredInterfaceType(), protocol, nominal->getLoc(), dc,
-      ProtocolConformanceState::Complete,
+      nominal->getDeclaredInterfaceType(), protocol, nominal->getLoc(),
+      /*inheritedTypeRepr=*/nullptr, dc, ProtocolConformanceState::Complete,
       ProtocolConformanceOptions());
   conformance->setSourceKindAndImplyingConformance(
       ConformanceEntryKind::Synthesized, nullptr);

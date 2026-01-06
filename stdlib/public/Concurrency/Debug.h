@@ -17,6 +17,8 @@
 #ifndef SWIFT_CONCURRENCY_DEBUG_H
 #define SWIFT_CONCURRENCY_DEBUG_H
 
+#include <cstdint>
+
 #include "swift/Runtime/Config.h"
 
 namespace swift {
@@ -31,6 +33,10 @@ const void *const _swift_concurrency_debug_jobMetadata;
 /// The metadata pointer used for async task objects.
 SWIFT_EXPORT_FROM(swift_Concurrency)
 const void *const _swift_concurrency_debug_asyncTaskMetadata;
+
+/// The size of an AsyncTask, in bytes.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+const size_t _swift_concurrency_debug_asyncTaskSize;
 
 /// A fake metadata pointer placed at the start of async task slab allocations.
 SWIFT_EXPORT_FROM(swift_Concurrency)

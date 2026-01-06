@@ -1,12 +1,18 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only > %t/cpp-parser.ast.raw
 
-// Filter out any addresses in the dump, since they can differ.
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/astgen.ast.raw > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen \
+// RUN:    | %sanitize-address > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only \
+// RUN:    | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
+
+// RUN: not %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -parse-as-library -enable-experimental-feature ParserASTGen \
+// RUN:    | %sanitize-address > %t/astgen.library.ast
+// RUN: not %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -parse-as-library \
+// RUN:    | %sanitize-address > %t/cpp-parser.library.ast
+
+// RUN: %diff -u %t/astgen.library.ast %t/cpp-parser.library.ast
 
 // REQUIRES: swift_feature_ParserASTGen
 
@@ -22,5 +28,10 @@ if let first = [1,2,3].first {
 
 func foo(x: Int) {}
 
-// FIXME: Top-level pattern binding decl must be enclosed with TopLevelCodeDecl
-// let a = 42
+let a = 42
+
+var b = {
+  12 + a
+}() {
+  didSet { print("didSet") }
+}

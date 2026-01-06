@@ -14,6 +14,7 @@ func test_ternary_literal(v: Test) -> Int? {
 }
 
 func test_ternary(v: Test) -> Int? {
+  // Because calls had favored types set if they were resolved during constraint generation.
   true ? v.test(entity(0)) : nil // Ok
 }
 
@@ -160,11 +161,13 @@ do {
 
     func f(_ p: UnsafeMutableRawPointer) {
       guard let x = UnsafeMutablePointer<Double>(OpaquePointer(self.p)) else {
+        // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'UnsafeMutablePointer<Double>'}}
         return
       }
       _ = x
 
       guard let x = UnsafeMutablePointer<Double>(OpaquePointer(p)) else {
+        // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'UnsafeMutablePointer<Double>'}}
         return
       }
       _ = x
@@ -256,4 +259,216 @@ extension Double {
 func test_non_default_literal_use(arg: Float) {
     let v = arg * 2.0 // shouldn't use `(Float, Double) -> Double` overload
     let _: Float = v // Ok
+}
+
+// This should be ambiguous without contextual type but was accepted before during to
+// unlabeled unary argument favoring.
+func test_variadic_static_member_is_preferred_over_partially_applied_instance_overload() {
+  struct Test {
+    func fn() {}
+    static func fn(_: Test...) {}
+  }
+
+  let t: Test
+  Test.fn(t) // Ok
+}
+
+// Unary unlabeled argument favoring hacks never applied to subscripts
+
+protocol Subscriptable {
+}
+
+extension Subscriptable {
+  subscript(key: String) -> Any? { nil }
+}
+
+struct MyValue {}
+
+extension Dictionary<String, MyValue> : Subscriptable {}
+
+func test_that_unary_argument_hacks_do_not_apply_to_subscripts(dict: [String: MyValue]) {
+  let value = dict["hello"]
+  let _: MyValue? = value // Ok
+}
+
+// Unlabeled unary argument hack was disabled if there were any protocol requirements
+// or variadic generic overloads present in the result set (regadless of their viability).
+//
+// Remove the requirement and variadic overloads and this code would start failing even
+// though it shouldn't!
+
+struct Future<T> {
+}
+
+protocol DB {
+  func get(_: Int, _: Int) -> Future<Int?>
+}
+
+extension DB {
+  func get(_: Int, _: Int = 42) async throws -> Int? { nil }
+  func get(_: Int) -> Future<Int?> { .init() }
+
+  func fetch(_: Int, _: Int = 42) async throws -> Int? { nil }
+  func fetch(_: Int) -> Future<Int?> { .init() }
+  func fetch<each T>(values: repeat each T) -> Int { 42 }
+}
+
+struct TestUnary {
+  var db: any DB
+
+  func get(v: Int) async throws {
+    guard let _ = try await self.db.get(v) else { // Ok
+      return
+    }
+
+    guard let _ = try await self.db.fetch(v) else { // Ok
+      return
+    }
+  }
+}
+
+// Prevent non-optional overload of `??` to be favored when all initializers are failable.
+
+class A {}
+class B {}
+
+protocol P {
+  init()
+}
+
+extension P {
+  init?(v: A) { self.init() }
+}
+
+struct V : P {
+  init() {}
+
+  @_disfavoredOverload
+  init?(v: B?) {}
+
+  // Important to keep this to make sure that disabled constraints
+  // are handled properly.
+  init<T: Collection>(other: T) where T.Element == Character {}
+}
+
+class TestFailableOnly {
+  var v: V?
+
+  func test(defaultB: B) {
+    guard let _ = self.v ?? V(v: defaultB) else { // OK (no warnings)
+      return
+    }
+  }
+}
+
+do {
+  @_disfavoredOverload
+  func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) async throws {}
+  func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) throws {} // expected-note {{found this candidate}}
+  func test(over: Int, other: String = "", block: @escaping (Int) throws -> Void) throws {} // expected-note {{found this candidate}}
+
+  func performLocal(v: Int, block: @escaping (Int) throws -> Void) async throws {
+    try await test(over: v, block: block) // expected-error {{ambiguous use of 'test'}}
+  }
+
+  // The hack applied only to `OverloadedDeclRefExpr`s.
+  struct MemberTest {
+    @_disfavoredOverload
+    func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) async throws {}
+    func test(over: Int, that: String = "", block: @escaping (Int) throws -> Void) throws {}
+    func test(over: Int, other: String = "", block: @escaping (Int) throws -> Void) throws {}
+
+    func performMember(v: Int, block: @escaping (Int) throws -> Void) async throws {
+      try await test(over: v, block: block) // Ok
+    }
+  }
+}
+
+// Calls with single unlabeled arguments shouldn't favor overloads that don't match on async.
+do {
+  struct V {
+    var data: Int = 0
+  }
+
+  func test(_: Int) -> Int { 42 }
+  func test(_: Int, v: Int = 42) async -> V? { nil }
+
+  func doAsync<T>(_ fn: () async -> T) async -> T { await fn() }
+
+  func computeAsync(v: Int) async {
+    let v1 = await test(v)
+    if let v1 {
+      _ = v1.data // Ok
+    }
+
+    let v2 = await doAsync { await test(v) }
+    if let v2 {
+      _ = v2.data // Ok
+    }
+
+    _ = await doAsync {
+      let v = await test(v)
+      if let v {
+        _ = v.data // Ok
+      }
+    }
+  }
+}
+
+do {
+  struct S {
+    func test() -> Int { 42 }
+    static func test(_: S...) {}
+
+    func doubleApply() {}
+    static func doubleApply(_: S) -> () -> Int { { 42 } }
+  }
+
+  func test(s: S) {
+    let res1 = S.test(s)
+    // expected-warning@-1 {{constant 'res1' inferred to have type '()', which may be unexpected}}
+    // expected-note@-2 {{add an explicit type annotation to silence this warning}}
+    _ = res1
+
+    let useInstance = S.test(s)()
+    let _: Int = useInstance
+
+    let res2 = {
+      S.test(s)
+    }
+    let _: () -> Void = res2
+
+    let _ = { () async -> Void in
+      _ = 42
+      return S.test(s)
+    }
+
+    let res3 = S.doubleApply(s)
+    let _: () -> Int = res3
+
+    let res4 = S.doubleApply(s)()
+    let _: Int = res4
+
+    let res5 = { S.doubleApply(s)() }
+    let _: () -> Int = res5
+
+    let res6 = {
+      _ = 42
+      return S.doubleApply(s)
+    }
+    let _: () -> Int = res6()
+  }
+
+  func testAsyncContext(s: S) async {
+    let res1 = S.test(s)
+    // expected-warning@-1 {{constant 'res1' inferred to have type '()', which may be unexpected}}
+    // expected-note@-2 {{add an explicit type annotation to silence this warning}}
+    _ = res1
+
+    let res2 = S.doubleApply(s)
+    let _: () -> Int = res2
+
+    let res3 = S.doubleApply(s)()
+    let _: Int = res3
+  }
 }

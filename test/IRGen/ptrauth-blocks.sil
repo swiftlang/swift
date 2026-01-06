@@ -20,13 +20,13 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
   return %b : $@convention(block) () -> ()
 }
 // CHECK-LABEL: define swiftcc ptr @init_header_trivial(ptr
-// CHECK:         [[HEADER:%.*]] = getelementptr inbounds { %objc_block, ptr }, ptr %0, i32 0, i32 0
-// CHECK:         [[SLOT:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 3
+// CHECK:         [[HEADER:%.*]] = getelementptr inbounds{{.*}} { %objc_block, ptr }, ptr %0, i32 0, i32 0
+// CHECK:         [[SLOT:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 3
 // CHECK:         [[T0:%.*]] = ptrtoint ptr [[SLOT]] to i64
 // CHECK:         [[SIGNED:%.*]] = call i64 @llvm.ptrauth.sign(i64 ptrtoint (ptr @invoke_trivial to i64), i32 0, i64 [[T0]])
 // CHECK:         [[T0:%.*]] = inttoptr i64 [[SIGNED]] to ptr
 // CHECK:         store ptr [[T0]], ptr [[SLOT]],
-// CHECK:         [[SLOT:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 4
+// CHECK:         [[SLOT:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 4
 // CHECK:         store ptr [[TRIVIAL_BLOCK_DESCRIPTOR]], ptr [[SLOT]]
 
 sil @invoke_trivial : $@convention(c) (@inout_aliasable @block_storage Builtin.RawPointer) -> () {
@@ -42,13 +42,13 @@ entry(%0 : $*@block_storage Builtin.NativeObject):
   return %b : $@convention(block) () -> ()
 }
 // CHECK-LABEL: define swiftcc ptr @init_header_nontrivial(ptr
-// CHECK:         [[HEADER:%.*]] = getelementptr inbounds { %objc_block, ptr }, ptr %0, i32 0, i32 0
-// CHECK:         [[SLOT:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 3
+// CHECK:         [[HEADER:%.*]] = getelementptr inbounds{{.*}} { %objc_block, ptr }, ptr %0, i32 0, i32 0
+// CHECK:         [[SLOT:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 3
 // CHECK:         [[T0:%.*]] = ptrtoint ptr [[SLOT]] to i64
 // CHECK:         [[SIGNED:%.*]] = call i64 @llvm.ptrauth.sign(i64 ptrtoint (ptr @invoke_nontrivial to i64), i32 0, i64 [[T0]])
 // CHECK:         [[T0:%.*]] = inttoptr i64 [[SIGNED]] to ptr
 // CHECK:         store ptr [[T0]], ptr [[SLOT]],
-// CHECK:         [[SLOT:%.*]] = getelementptr inbounds %objc_block, ptr [[HEADER]], i32 0, i32 4
+// CHECK:         [[SLOT:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 4
 // CHECK:         store ptr [[NONTRIVIAL_BLOCK_DESCRIPTOR]], ptr [[SLOT]]
 
 sil @invoke_nontrivial : $@convention(c) (@inout_aliasable @block_storage Builtin.NativeObject) -> () {
@@ -63,7 +63,7 @@ entry(%0 : $@convention(block) () -> ()):
   return undef : $()
 }
 // CHECK-LABEL: define swiftcc void @invoke_block(ptr %0)
-// CHECK:      [[SLOT:%.*]] = getelementptr inbounds %objc_block, ptr %0, i32 0, i32 3
+// CHECK:      [[SLOT:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr %0, i32 0, i32 3
 // CHECK-NEXT: [[T0:%.*]] = load ptr, ptr [[SLOT]], align
 // CHECK-NEXT: [[DISC:%.*]] = ptrtoint ptr [[SLOT]] to i64
 // CHECK-NEXT: call void [[T0]](ptr %0) [ "ptrauth"(i32 0, i64 [[DISC]]) ]

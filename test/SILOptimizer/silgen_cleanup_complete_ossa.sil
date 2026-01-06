@@ -6,6 +6,8 @@ sil_stage raw
 
 typealias AnyObject = Builtin.AnyObject
 
+protocol Error {}
+
 class Klass {
   var property: Builtin.Int64
 }
@@ -27,6 +29,12 @@ struct UInt8 {
 }
 
 protocol P : AnyObject {}
+
+struct Err: Error {
+  var i: Int
+}
+
+sil @throwing : $@convention(thin) (UInt8) -> @error_indirect Err
 
 // =============================================================================
 // Test complete OSSA lifetimes
@@ -365,5 +373,35 @@ left:
   unreachable
 
 right:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @testExtendTrivialToDeadEnd : $@convention(thin) (UInt8) -> () {
+// CHECK: bb0(%0 : $UInt8):
+// CHECK:   [[MV:%.*]] = move_value [var_decl] %0 : $UInt8
+// CHECK:   try_apply %{{.*}}(%{{.*}}, [[MV]]) : $@convention(thin) (UInt8) -> @error_indirect Err, normal bb1, error bb2
+// CHECK: bb1(
+// CHECK:   extend_lifetime [[MV]] : $UInt8
+// CHECK:   return
+// CHECK: bb2:
+// CHECK:   dealloc_stack
+// CHECK:   extend_lifetime [[MV]] : $UInt8
+// CHECK:   unreachable
+// CHECK-LABEL: } // end sil function 'testExtendTrivialToDeadEnd'
+sil [ossa] @testExtendTrivialToDeadEnd : $@convention(thin) (UInt8) -> () {
+bb0(%0 : $UInt8):
+  %mv = move_value [var_decl] %0
+  %e = alloc_stack $Err
+  %f = function_ref @throwing : $@convention(thin) (UInt8) -> @error_indirect Err
+  try_apply %f(%e, %mv) : $@convention(thin) (UInt8) -> @error_indirect Err, normal bb1, error bb2
+
+bb1(%ret : $()):
+  extend_lifetime %mv
+  dealloc_stack %e : $*Err
+  %99 = tuple ()
+  return %99
+
+bb2:
+  dealloc_stack %e : $*Err
   unreachable
 }

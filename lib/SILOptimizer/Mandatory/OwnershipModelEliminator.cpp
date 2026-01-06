@@ -22,6 +22,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Types.h"
+#include "swift/SIL/SILValue.h"
 #define DEBUG_TYPE "sil-ownership-model-eliminator"
 
 #include "swift/Basic/Assertions.h"
@@ -139,6 +141,11 @@ struct OwnershipModelEliminatorVisitor
   bool visitExplicitCopyAddrInst(ExplicitCopyAddrInst *cai);
   bool visitApplyInst(ApplyInst *ai);
 
+  bool visitIgnoredUseInst(IgnoredUseInst *iui) {
+    eraseInstruction(iui);
+    return true;
+  }
+
   void splitDestroy(DestroyValueInst *destroy);
   bool peepholeTupleConstructorUser(DestructureTupleInst *dti);
   bool visitDestroyValueInst(DestroyValueInst *dvi);
@@ -185,6 +192,15 @@ struct OwnershipModelEliminatorVisitor
     eraseInstruction(eli);
     return true;
   }
+
+  bool visitReturnBorrowInst(ReturnBorrowInst *rbi) {
+    return withBuilder<bool>(rbi, [&](SILBuilder &b, SILLocation loc) {
+      b.createReturn(loc, rbi->getReturnValue());
+      eraseInstruction(rbi);
+      return true;
+    });
+  }
+
   bool visitUncheckedOwnershipConversionInst(
       UncheckedOwnershipConversionInst *uoci) {
     eraseInstructionAndRAUW(uoci, uoci->getOperand());
@@ -245,6 +261,7 @@ struct OwnershipModelEliminatorVisitor
   HANDLE_FORWARDING_INST(DifferentiableFunctionExtract)
   HANDLE_FORWARDING_INST(MarkUninitialized)
   HANDLE_FORWARDING_INST(FunctionExtractIsolation)
+  HANDLE_FORWARDING_INST(ImplicitActorToOpaqueIsolationCast)
 #undef HANDLE_FORWARDING_INST
 };
 
@@ -399,6 +416,20 @@ bool OwnershipModelEliminatorVisitor::visitApplyInst(ApplyInst *ai) {
     changed = true;
   }
 
+  // Insert a retain for unowned results.
+  SILBuilderWithScope builder(ai->getNextInstruction(), builderCtx);
+  auto resultIt = fnConv.getDirectSILResults().begin();
+  auto copyValue = [&](unsigned idx, SILValue v) {
+    auto result = *resultIt;
+    if (result.getConvention() == ResultConvention::Unowned)
+      builder.emitCopyValueOperation(ai->getLoc(), v);
+    ++resultIt;
+  };
+  if (fnConv.getNumDirectSILResults() == 1)
+    copyValue(0, ai);
+  else
+    builder.emitDestructureValueOperation(ai->getLoc(), ai, copyValue);
+
   return changed;
 }
 
@@ -545,7 +576,7 @@ void OwnershipModelEliminatorVisitor::splitDestroy(DestroyValueInst *destroy) {
   auto operandTy = operand->getType();
   NominalTypeDecl *nominalDecl = operandTy.getNominalOrBoundGenericNominal();
 
-  if (auto *sd = dyn_cast<StructDecl>(nominalDecl)) {
+  if (isa<StructDecl>(nominalDecl)) {
     withBuilder<void>(destroy, [&](SILBuilder &builder, SILLocation loc) {
       llvm::SmallVector<Projection, 8> projections;
       Projection::getFirstLevelProjections(
@@ -866,17 +897,6 @@ static bool stripOwnership(SILFunction &func) {
   return madeChange;
 }
 
-static void prepareNonTransparentSILFunctionForOptimization(ModuleDecl *,
-                                                            SILFunction *f) {
-  if (!f->hasOwnership() || f->isTransparent())
-    return;
-
-  LLVM_DEBUG(llvm::dbgs() << "After deserialization, stripping ownership in:"
-                          << f->getName() << "\n");
-
-  stripOwnership(*f);
-}
-
 static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *f) {
   if (!f->hasOwnership())
     return;
@@ -890,11 +910,7 @@ static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *f) {
 namespace {
 
 struct OwnershipModelEliminator : SILFunctionTransform {
-  bool skipTransparent;
-  bool skipStdlibModule;
-
-  OwnershipModelEliminator(bool skipTransparent, bool skipStdlibModule)
-      : skipTransparent(skipTransparent), skipStdlibModule(skipStdlibModule) {}
+  OwnershipModelEliminator() {}
 
   void run() override {
     if (DumpBefore.size()) {
@@ -904,18 +920,7 @@ struct OwnershipModelEliminator : SILFunctionTransform {
     auto *f = getFunction();
     auto &mod = getFunction()->getModule();
 
-    // If we are supposed to skip the stdlib module and we are in the stdlib
-    // module bail.
-    if (skipStdlibModule && mod.isStdlibModule()) {
-      return;
-    }
-
     if (!f->hasOwnership())
-      return;
-
-    // If we were asked to not strip ownership from transparent functions in
-    // /our/ module, return.
-    if (skipTransparent && f->isTransparent())
       return;
 
     // Verify here to make sure ownership is correct before we strip.
@@ -945,25 +950,14 @@ struct OwnershipModelEliminator : SILFunctionTransform {
       invalidateAnalysis(InvalidKind);
     }
 
-    // If we were asked to strip transparent, we are at the beginning of the
-    // performance pipeline. In such a case, we register a handler so that all
-    // future things we deserialize have ownership stripped.
+    // Register a handler so that all future things we deserialize have ownership stripped.
     using NotificationHandlerTy =
         FunctionBodyDeserializationNotificationHandler;
     std::unique_ptr<DeserializationNotificationHandler> ptr;
-    if (skipTransparent) {
-      if (!mod.hasRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME()) {
-        ptr.reset(new NotificationHandlerTy(
-            prepareNonTransparentSILFunctionForOptimization));
-        mod.registerDeserializationNotificationHandler(std::move(ptr));
-        mod.setRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME();
-      }
-    } else {
-      if (!mod.hasRegisteredDeserializationNotificationHandlerForAllFuncOME()) {
-        ptr.reset(new NotificationHandlerTy(prepareSILFunctionForOptimization));
-        mod.registerDeserializationNotificationHandler(std::move(ptr));
-        mod.setRegisteredDeserializationNotificationHandlerForAllFuncOME();
-      }
+    if (!mod.hasRegisteredDeserializationNotificationHandlerForAllFuncOME()) {
+      ptr.reset(new NotificationHandlerTy(prepareSILFunctionForOptimization));
+      mod.registerDeserializationNotificationHandler(std::move(ptr));
+      mod.setRegisteredDeserializationNotificationHandlerForAllFuncOME();
     }
   }
 };
@@ -971,11 +965,5 @@ struct OwnershipModelEliminator : SILFunctionTransform {
 } // end anonymous namespace
 
 SILTransform *swift::createOwnershipModelEliminator() {
-  return new OwnershipModelEliminator(false /*skip transparent*/,
-                                      false /*ignore stdlib*/);
-}
-
-SILTransform *swift::createNonTransparentFunctionOwnershipModelEliminator() {
-  return new OwnershipModelEliminator(true /*skip transparent*/,
-                                      false /*ignore stdlib*/);
+  return new OwnershipModelEliminator();
 }

@@ -52,6 +52,9 @@ PARTITION_OP_ERROR(InOutSendingNotInitializedAtExit)
 /// at end of function without being reinitialized with something disconnected.
 PARTITION_OP_ERROR(InOutSendingNotDisconnectedAtExit)
 
+/// This is emitted when a concrete inout sending parameter is returned.
+PARTITION_OP_ERROR(InOutSendingReturned)
+
 /// Used to signify an "unknown code pattern" has occured while performing
 /// dataflow.
 ///
@@ -62,5 +65,8 @@ PARTITION_OP_ERROR(UnknownCodePattern)
 /// Used to signify that an isolation crossing function is returning a
 /// non-Sendable value.
 PARTITION_OP_ERROR(NonSendableIsolationCrossingResult)
+
+/// Used to signify that two 'inout sending' values are in the same region.
+PARTITION_OP_ERROR(InOutSendingParametersInSameRegion)
 
 #undef PARTITION_OP_ERROR

@@ -181,11 +181,9 @@ public:
   /// subsystem.
   SubstitutionMap subst(InFlightSubstitution &subs) const;
 
-  /// Apply type expansion lowering to all types in the substitution map. Opaque
-  /// archetypes will be lowered to their underlying types if the type expansion
-  /// context allows.
-  SubstitutionMap mapIntoTypeExpansionContext(
-      TypeExpansionContext context) const;
+  /// Create a substitution map for a protocol conformance.
+  static SubstitutionMap
+  getProtocolSubstitutions(ProtocolConformanceRef conformance);
 
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap
@@ -211,7 +209,7 @@ public:
 
   /// Swap archetypes in the substitution map's replacement types with their
   /// interface types.
-  SubstitutionMap mapReplacementTypesOutOfContext() const;
+  SubstitutionMap mapReplacementTypesOutOfEnvironment() const;
 
   /// Verify that the conformances stored in this substitution map match the
   /// replacement types provided.
@@ -219,7 +217,7 @@ public:
 
   /// Whether to dump the full substitution map, or just a minimal useful subset
   /// (on a single line).
-  enum class DumpStyle { Minimal, Full };
+  enum class DumpStyle { Minimal, NoConformances, Full };
   /// Dump the contents of this substitution map for debugging purposes.
   void dump(llvm::raw_ostream &out, DumpStyle style = DumpStyle::Full,
             unsigned indent = 0) const;
@@ -296,13 +294,12 @@ public:
   explicit LookUpConformanceInSubstitutionMap(SubstitutionMap Subs)
     : Subs(Subs) {}
 
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type dependentType,
+                                    ProtocolDecl *proto) const;
 };
 
 struct OverrideSubsInfo {
-  ASTContext &Ctx;
   unsigned BaseDepth;
   unsigned OrigDepth;
   SubstitutionMap BaseSubMap;
@@ -329,8 +326,8 @@ struct LookUpConformanceInOverrideSubs {
   explicit LookUpConformanceInOverrideSubs(const OverrideSubsInfo &info)
     : info(info) {}
 
-  ProtocolConformanceRef operator()(CanType type,
-                                    Type substType,
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type dependentType,
                                     ProtocolDecl *proto) const;
 };
 
@@ -340,11 +337,10 @@ struct OuterSubstitutions {
   SubstitutionMap subs;
   unsigned depth;
 
-  bool isUnsubstitutedTypeParameter(Type type) const;
   Type operator()(SubstitutableType *type) const;
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type dependentType,
+                                    ProtocolDecl *proto) const;
 };
 
 } // end namespace swift

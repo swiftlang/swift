@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 func test(_ v: [Int]) {
   let result = v.filter { }.flatMap(\.wrong) {

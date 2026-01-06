@@ -78,12 +78,15 @@ FEATURE(LayoutStringValueWitnesses,                     (6, 1))
 FEATURE(CreateTaskWithConsumedFunction,                 (6, 1))
 FEATURE(IsolatedDeinit,                                 (6, 1))
 
-FEATURE(TaskExecutor,                                   FUTURE)
+FEATURE(ValueGenericType,                               (6, 2))
+FEATURE(InitRawStructMetadata2,                         (6, 2))
+FEATURE(CustomGlobalExecutors,                          (6, 2))
+FEATURE(TaskExecutor,                                   (6, 2))
+FEATURE(TypedCoroAlloc,                                 (6, 2))
+
 FEATURE(Differentiation,                                FUTURE)
 FEATURE(ClearSensitive,                                 FUTURE)
 FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
-FEATURE(ValueGenericType,                               FUTURE)
-FEATURE(InitRawStructMetadata2,                         FUTURE)
 // TODO: CoroutineAccessors: Change to correct version number.
 FEATURE(CoroutineAccessors,                             FUTURE)
 

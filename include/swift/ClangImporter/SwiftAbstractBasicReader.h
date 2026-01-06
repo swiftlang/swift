@@ -64,6 +64,11 @@ public:
     return uint32_t(asImpl().readUInt64());
   }
 
+  clang::UnsignedOrNone readUnsignedOrNone() {
+    return clang::UnsignedOrNone::fromInternalRepresentation(
+        unsigned(asImpl().readUInt64()));
+  }
+
   clang::Selector readSelector() {
     uint64_t numArgsPlusOne = asImpl().readUInt64();
 

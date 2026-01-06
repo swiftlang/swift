@@ -321,7 +321,6 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kGetElement:
   case ArrayCallKind::kGetElementAddress:
   case ArrayCallKind::kEndMutation:
-  case ArrayCallKind::kCopyIntoVector:
     return true;
   case ArrayCallKind::kMakeMutable:
   case ArrayCallKind::kMutateUnknown:
@@ -472,7 +471,7 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
       continue;
     }
 
-    if (isa<MarkDependenceInst>(UseInst)) {
+    if (MarkDependenceInstruction(UseInst)) {
       continue;
     }
 
@@ -570,8 +569,9 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
       continue;
     }
 
-    if (isa<MarkDependenceInst>(UseInst))
+    if (MarkDependenceInstruction(UseInst)) {
       continue;
+    }
 
     if (isa<EndBorrowInst>(UseInst))
       continue;
@@ -639,8 +639,9 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
   //
   // The struct_extract, unchecked_ref_cast is handled below in the
   // "Transitive SafeArrayElementUse" code.
-  if (isa<MarkDependenceInst>(UseInst))
+  if (MarkDependenceInstruction(UseInst)) {
     return true;
+  }
 
   if (isa<EndBorrowInst>(UseInst))
     return true;

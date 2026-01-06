@@ -28,6 +28,7 @@ namespace swift {
   class SILType;
   class ProtocolDecl;
   enum class CastConsumptionKind : unsigned char;
+  class CheckedCastInstOptions;
 
 namespace irgen {
   class Address;
@@ -46,7 +47,8 @@ namespace irgen {
                                Address dest,
                                CanType toType,
                                CastConsumptionKind consumptionKind,
-                               CheckedCastMode mode);
+                               CheckedCastMode mode,
+                               CheckedCastInstOptions options);
 
   void emitScalarCheckedCast(IRGenFunction &IGF, Explosion &value,
                              SILType sourceLoweredType,
@@ -54,11 +56,12 @@ namespace irgen {
                              SILType targetLoweredType,
                              CanType targetFormalType,
                              CheckedCastMode mode,
+                             CheckedCastInstOptions options,
                              Explosion &out);
 
   llvm::Value *emitFastClassCastIfPossible(
       IRGenFunction &IGF, llvm::Value *instance, CanType sourceFormalType,
-      CanType targetFormalType, bool sourceWrappedInOptional,
+      CanType targetFormalType, CheckedCastMode mode, bool sourceWrappedInOptional,
       llvm::BasicBlock *&nilCheckBB, llvm::BasicBlock *&nilMergeBB);
 
   /// Convert a class object to the given destination type,
@@ -96,8 +99,8 @@ namespace irgen {
   /// not, the cast is done as a class instance cast.
   void emitScalarExistentialDowncast(
       IRGenFunction &IGF, llvm::Value *orig, SILType srcType, SILType destType,
-      CheckedCastMode mode, std::optional<MetatypeRepresentation> metatypeKind,
-      Explosion &ex);
+      CheckedCastMode mode, bool sourceWrappedInOptional,
+      std::optional<MetatypeRepresentation> metatypeKind, Explosion &ex);
 
   /// Emit a checked cast from a metatype to AnyObject.
   llvm::Value *emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,

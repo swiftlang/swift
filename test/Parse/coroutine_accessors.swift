@@ -1,8 +1,8 @@
-// RUN: %target-typecheck-verify-swift \
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated \
 // RUN:     -verify-additional-prefix enabled- \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN:     -debug-diagnostic-names
-// RUN: %target-typecheck-verify-swift \
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated \
 // RUN:     -verify-additional-prefix disabled- \
 // RUN:     -debug-diagnostic-names
 

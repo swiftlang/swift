@@ -52,7 +52,6 @@ namespace {
     SILValue
     visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI);
     SILValue visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI);
-    SILValue visitUncheckedAddrCastInst(UncheckedAddrCastInst *UACI);
     SILValue visitStructInst(StructInst *SI);
     SILValue visitTupleInst(TupleInst *SI);
     SILValue visitBuiltinInst(BuiltinInst *AI);
@@ -65,7 +64,6 @@ namespace {
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
     SILValue visitEndCOWMutationInst(EndCOWMutationInst *ECM);
-    SILValue visitBeginAccessInst(BeginAccessInst *BAI);
     SILValue visitMetatypeInst(MetatypeInst *MTI);
     SILValue visitConvertFunctionInst(ConvertFunctionInst *cfi);
 
@@ -357,21 +355,6 @@ visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI) {
   return simplifyDeadCast(OPRI);
 }
 
-SILValue
-InstSimplifier::
-visitUncheckedAddrCastInst(UncheckedAddrCastInst *UACI) {
-  // (unchecked-addr-cast Y->X (unchecked-addr-cast x X->Y)) -> x
-  if (auto *OtherUACI = dyn_cast<UncheckedAddrCastInst>(&*UACI->getOperand()))
-    if (OtherUACI->getOperand()->getType() == UACI->getType())
-      return OtherUACI->getOperand();
-
-  // (unchecked-addr-cast X->X x) -> x
-  if (UACI->getOperand()->getType() == UACI->getType())
-    return UACI->getOperand();
-
-  return SILValue();
-}
-
 SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
   // (upcast Y->X (unchecked-ref-cast x X->Y)) -> x
   if (auto *URCI = dyn_cast<UncheckedRefCastInst>(UI->getOperand()))
@@ -432,16 +415,6 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
     if (Op->getOperand()->getType() == UBCI->getType())
       return Op->getOperand();
 
-  return SILValue();
-}
-
-SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
-  // Remove "dead" begin_access.
-  if (llvm::all_of(BAI->getUses(), [](Operand *operand) -> bool {
-        return isIncidentalUse(operand->getUser());
-      })) {
-    return BAI->getOperand();
-  }
   return SILValue();
 }
 

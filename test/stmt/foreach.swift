@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // Bad containers and ranges
 struct BadContainer1 {
@@ -349,5 +349,18 @@ do {
       _ = i
       _ = leaves
     }
+  }
+}
+
+// Make sure the bodies still type-check okay if the preamble is invalid.
+func testInvalidPreamble() {
+  func takesAutoclosure(_ x: @autoclosure () -> Int) -> Int { 0 }
+
+  for _ in undefined { // expected-error {{cannot find 'undefined' in scope}}
+    let a = takesAutoclosure(0) // Fine
+  }
+  for x in undefined { // expected-error {{cannot find 'undefined' in scope}}
+    let b: Int = x  // No type error, `x` is invalid.
+    _ = "" as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
   }
 }

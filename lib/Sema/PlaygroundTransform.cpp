@@ -312,6 +312,11 @@ public:
       if (BraceStmt *B = FD->getTypecheckedBody()) {
         const ParameterList *PL = FD->getParameters();
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Return);
+
+        // Use FD's DeclContext as TypeCheckDC for transforms in func body
+        // then swap back TypeCheckDC at end of scope.
+        llvm::SaveAndRestore<DeclContext *> localDC(TypeCheckDC, FD);
+
         BraceStmt *NB = transformBraceStmt(B, PL);
         if (NB != B) {
           FD->setBody(NB, AbstractFunctionDecl::BodyKind::TypeChecked);
@@ -801,7 +806,7 @@ public:
         new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                               SourceLoc(), Context.getIdentifier(NameBuf),
                               TypeCheckDC);
-    VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
+    VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfEnvironment());
     VD->setImplicit();
 
     NamedPattern *NP = NamedPattern::createImplicit(Context, VD, VD->getTypeInContext());
@@ -815,10 +820,10 @@ public:
     // Don't try to log ~Copyable types, as we can't pass them to the generic logging functions yet.
     if (auto *VD = dyn_cast_or_null<ValueDecl>(node.dyn_cast<Decl *>())) {
       auto interfaceTy = VD->getInterfaceType();
-      auto contextualTy = VD->getInnermostDeclContext()->mapTypeIntoContext(interfaceTy);
-      return !contextualTy->isNoncopyable();
+      auto contextualTy = VD->getInnermostDeclContext()->mapTypeIntoEnvironment(interfaceTy);
+      return contextualTy->isCopyable();
     } else if (auto *E = node.dyn_cast<Expr *>()) {
-      return !E->getType()->isNoncopyable();
+      return E->getType()->isCopyable();
     } else {
       return true;
     }

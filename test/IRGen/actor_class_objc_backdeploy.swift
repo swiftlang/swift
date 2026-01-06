@@ -40,8 +40,8 @@ import Foundation
 
 
 // CHECK-LABEL: define {{.*}} @"$s16actor_class_objc7MyClassC1xSivg"
-// CHECK: [[T0:%.*]] = getelementptr inbounds %T16actor_class_objc7MyClassC, ptr %0, i32 0, i32 2
-// CHECK: [[T1:%.*]] = getelementptr inbounds %TSi, ptr [[T0]], i32 0, i32 0
+// CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} %T16actor_class_objc7MyClassC, ptr %0, i32 0, i32 2
+// CHECK: [[T1:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[T0]], i32 0, i32 0
 // CHECK: load [[INT]], ptr [[T1]], align
 
 // CHECK-LABEL: define {{.*}}swiftcc ptr @"$s16actor_class_objc7MyClassCACycfc"

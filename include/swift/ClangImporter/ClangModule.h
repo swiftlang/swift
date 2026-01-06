@@ -90,7 +90,9 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
-  virtual bool shouldCollectDisplayDecls() const override;
+  void lookupAvailabilityDomains(
+      Identifier identifier,
+      SmallVectorImpl<AvailabilityDomain> &results) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
@@ -108,7 +110,7 @@ public:
 
   Identifier
   getDiscriminatorForPrivateDecl(const Decl *D) const override {
-    llvm_unreachable("no private decls in Clang modules");
+    llvm_unreachable("Clang modules do not need discriminators");
   }
 
   virtual version::Version getLanguageVersionBuiltWith() const override {
@@ -139,6 +141,10 @@ public:
   }
 };
 
+// Strips the inline namespaces from inner until we reach outer or a
+// non-inline namespace. Returns the stripped nominal type or null when
+// something unexpected happened during stripping.
+NominalType *stripInlineNamespaces(NominalType *outer, NominalType *inner);
 }
 
 #endif

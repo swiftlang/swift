@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 //===--- Helper types used in this file.
 
@@ -210,8 +210,10 @@ func missingControllingExprInForEach() {
 // The #if block is used to provide a scope for the for stmt to force it to end
 // where necessary to provoke the crash.
 #if true  // <rdar://problem/21679557> compiler crashes on "for{{"
-  // expected-error @+2 {{expected pattern}}
-  // expected-error @+1 {{expected Sequence expression for for-each loop}}
+  // expected-error @+4 {{expected pattern}}
+  // expected-error @+3 {{expected Sequence expression for for-each loop}}
+  // expected-error @+2 {{closure expression is unused}}
+  // expected-note @+1 {{did you mean to use a 'do' statement?}}
   for{{ // expected-note 2 {{to match this opening '{'}}
 #endif  // expected-error {{expected '}' at end of closure}} expected-error {{expected '}' at end of brace statement}}
 
@@ -548,7 +550,8 @@ func exprPostfix2() {
 
 class ExprSuper {
   init() {
-    super. // expected-error {{expected member name following '.'}} 
+    super. // expected-error {{expected member name following '.'}}
+    // expected-error@-1 {{'super' cannot be used in class 'ExprSuper' because it has no superclass}}
   }
 }
 

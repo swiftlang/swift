@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_SOURCEFILE_H
 #define SWIFT_AST_SOURCEFILE_H
 
+#include "swift/AST/ASTDumper.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/IfConfigClauseRangeInfo.h"
@@ -20,14 +21,18 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/STLExtras.h"
 
 namespace swift {
-
+class ASTScope;
+class AvailabilityScope;
+class GeneratedSourceInfo;
 class PersistentParserState;
 struct SourceFileExtras;
+class Token;
+enum class DefaultIsolation : uint8_t;
 
 /// Kind of import affecting how a decl can be reexported.
 ///
@@ -98,6 +103,9 @@ public:
 
     /// Validate the new SwiftSyntax parser diagnostics.
     ValidateNewParserDiagnostics = 1 << 6,
+
+    /// Consider every #if ... #endif region active.
+    PoundIfAllActive = 1 << 7,
   };
   using ParsingOptions = OptionSet<ParsingFlags>;
 
@@ -129,8 +137,8 @@ private:
 
   /// Associates a list of source locations to the member declarations that must
   /// be diagnosed as being out of scope due to a missing import.
-  using DelayedMissingImportForMemberDiags =
-      llvm::SmallDenseMap<const ValueDecl *, std::vector<SourceLoc>>;
+  using DelayedMissingImportForMemberDiags = llvm::SmallDenseMap<
+      const ValueDecl *, std::vector<std::pair<SourceLoc, DiagnosticBehavior>>>;
   DelayedMissingImportForMemberDiags MissingImportForMemberDiagnostics;
 
   /// A unique identifier representing this file; used to mark private decls
@@ -463,6 +471,11 @@ public:
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
 
+  /// Returns true if any import of \p importedModule has the `@preconcurrency`
+  /// attribute.
+  virtual bool isModuleImportedPreconcurrency(
+      const ModuleDecl *importedModule) const override;
+
   // Is \p targetDecl accessible as an explicitly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;
 
@@ -510,8 +523,9 @@ public:
   /// Add a source location for which a delayed missing import for member
   /// diagnostic should be emited.
   void addDelayedMissingImportForMemberDiagnostic(const ValueDecl *decl,
-                                                  SourceLoc loc) {
-    MissingImportForMemberDiagnostics[decl].push_back(loc);
+                                                  SourceLoc loc,
+                                                  DiagnosticBehavior limit) {
+    MissingImportForMemberDiagnostics[decl].push_back({loc, limit});
   }
 
   DelayedMissingImportForMemberDiags
@@ -683,8 +697,18 @@ public:
     DelayedParserState = std::move(state);
   }
 
+  /// Retrieve default action isolation to be used for this source file.
+  /// It's determine based on on top-level `using <<isolation>>` declaration
+  /// found in the file.
+  std::optional<DefaultIsolation> getDefaultIsolation() const;
+
   SWIFT_DEBUG_DUMP;
-  void dump(raw_ostream &os, bool parseIfNeeded = false) const;
+  void
+  dump(raw_ostream &os,
+       ASTDumpMemberLoading memberLoading = ASTDumpMemberLoading::None) const;
+
+  /// Dumps this source file's AST in JSON format to the given output stream.
+  void dumpJSON(raw_ostream &os, ASTDumpMemberLoading memberLoading) const;
 
   /// Pretty-print the contents of this source file.
   ///
@@ -753,7 +777,7 @@ public:
 
   /// Get the root availability scope for the file. The root scope may be
   /// null if the scope tree has not been built yet. Use
-  /// TypeChecker::getOrBuildAvailabilityScope() to get a built
+  /// `AvailabilityScope::getOrBuildForSourceFile()` to get a built
   /// root of the tree.
   AvailabilityScope *getAvailabilityScope() const;
 
@@ -813,6 +837,22 @@ public:
   bool isAsyncTopLevelSourceFile() const;
 
   ArrayRef<TypeDecl *> getLocalTypeDecls() const;
+
+  /// Uniquely identifies a source file without exposing its full file path.
+  ///
+  /// A valid file ID should always be of the format "modulename/filename.swift"
+  struct FileIDStr {
+    StringRef moduleName;
+    StringRef fileName;
+
+    /// Parse a string as a SourceFile::FileIDStr.
+    ///
+    /// Returns \c nullopt if \param fileID could not be parsed.
+    static std::optional<FileIDStr> parse(StringRef fileID);
+
+    /// Whether this SourceFile::FileID matches that of the given \param file.
+    bool matches(const SourceFile *file) const;
+  };
 
 private:
 

@@ -17,6 +17,13 @@ import Swift
 /// Execute an operation with a cancellation handler that's immediately
 /// invoked if the current task is canceled.
 ///
+/// - Parameters:
+///   - operation: The operation to perform.
+///   - handler: A closure to execute on cancellation.
+///     If the task is canceled, this closure is called at most once;
+///     otherwise, it isn't called.
+///   - isolation: The actor that the operation and cancellation handler are isolated to.
+///
 /// This differs from the operation cooperatively checking for cancellation
 /// and reacting to it in that the cancellation handler is _always_ and
 /// _immediately_ invoked when the task is canceled. For example, even if the
@@ -39,13 +46,13 @@ import Swift
 /// ### Execution order and semantics
 /// The `operation` closure is always invoked, even when the
 /// `withTaskCancellationHandler(operation:onCancel:)` method is called from a task
-/// that was already cancelled.
+/// that was already canceled.
 ///
 /// When `withTaskCancellationHandler(operation:onCancel:)` is used in a task that has already been
-/// cancelled, the cancellation handler will be executed
+/// canceled, the cancellation handler will be executed
 /// immediately before the `operation` closure gets to execute.
 ///
-/// This allows the cancellation handler to set some external "cancelled" flag
+/// This allows the cancellation handler to set some external "canceled" flag
 /// that the operation may be *atomically* checking for in order to avoid
 /// performing any actual work once the operation gets to run.
 ///
@@ -77,9 +84,13 @@ public func withTaskCancellationHandler<T>(
 ) async rethrows -> T {
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
-  let record = _taskAddCancellationHandler(handler: handler)
-  defer { _taskRemoveCancellationHandler(record: record) }
-
+#if $BuiltinConcurrencyStackNesting
+  let record = unsafe Builtin.taskAddCancellationHandler(handler: handler)
+  defer { unsafe Builtin.taskRemoveCancellationHandler(record: record) }
+#else
+  let record = unsafe _taskAddCancellationHandler(handler: handler)
+  defer { unsafe _taskRemoveCancellationHandler(record: record) }
+#endif
   return try await operation()
 }
 
@@ -98,9 +109,13 @@ public func _unsafeInheritExecutor_withTaskCancellationHandler<T>(
 ) async rethrows -> T {
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
-  let record = _taskAddCancellationHandler(handler: handler)
-  defer { _taskRemoveCancellationHandler(record: record) }
-
+#if $BuiltinConcurrencyStackNesting
+  let record = unsafe Builtin.taskAddCancellationHandler(handler: handler)
+  defer { unsafe Builtin.taskRemoveCancellationHandler(record: record) }
+#else
+  let record = unsafe _taskAddCancellationHandler(handler: handler)
+  defer { unsafe _taskRemoveCancellationHandler(record: record) }
+#endif
   return try await operation()
 }
 
@@ -126,8 +141,8 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// - SeeAlso: `checkCancellation()`
   public static var isCancelled: Bool {
-     withUnsafeCurrentTask { task in
-       task?.isCancelled ?? false
+     unsafe withUnsafeCurrentTask { task in
+       unsafe task?.isCancelled ?? false
      }
   }
 }
@@ -168,3 +183,4 @@ func _taskAddCancellationHandler(handler: () -> Void) -> UnsafeRawPointer /*Canc
 func _taskRemoveCancellationHandler(
   record: UnsafeRawPointer /*CancellationNotificationStatusRecord*/
 )
+

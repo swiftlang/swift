@@ -209,6 +209,7 @@ public struct UnsafePointer<Pointee: ~Copyable>: Copyable {
 
   /// The underlying raw (untyped) pointer.
   @_preInverseGenerics
+  @safe
   public let _rawValue: Builtin.RawPointer
 
   /// Creates an `UnsafePointer` from a builtin raw pointer.
@@ -236,8 +237,9 @@ extension UnsafePointer: Hashable where Pointee: ~Copyable {
   // Note: This explicit `hashValue` applies @_preInverseGenerics to emulate the
   // original (pre-6.0) compiler-synthesized version.
   @_preInverseGenerics
+  @safe
   public var hashValue: Int {
-    _hashValue(for: self)
+    unsafe _hashValue(for: self)
   }
 }
 @_preInverseGenerics
@@ -282,7 +284,7 @@ extension UnsafePointer where Pointee: ~Copyable {
   @_alwaysEmitIntoClient
   public var pointee: Pointee {
     @_transparent unsafeAddress {
-      return self
+      return unsafe self
     }
   }
 }
@@ -295,7 +297,7 @@ extension UnsafePointer {
   @usableFromInline
   internal var pointee: Pointee {
     @_transparent unsafeAddress {
-      return self
+      return unsafe self
     }
   }
 }
@@ -311,7 +313,7 @@ extension UnsafePointer where Pointee: ~Copyable {
   public subscript(i: Int) -> Pointee {
     @_transparent
     unsafeAddress {
-      return self + i
+      return unsafe self + i
     }
   }
 }
@@ -325,7 +327,7 @@ extension UnsafePointer {
   internal subscript(i: Int) -> Pointee {
     @_transparent
     unsafeAddress {
-      return self + i
+      return unsafe self + i
     }
   }
 }
@@ -398,7 +400,7 @@ extension UnsafePointer where Pointee: ~Copyable {
     capacity count: Int,
     _ body: (_ pointer: UnsafePointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
-    _debugPrecondition(
+    unsafe _debugPrecondition(
       Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
       ( count == 1 ||
         ( MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
@@ -410,7 +412,7 @@ extension UnsafePointer where Pointee: ~Copyable {
     )
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
-    return try body(.init(_rawValue))
+    return try unsafe body(.init(_rawValue))
   }
 }
 
@@ -429,7 +431,7 @@ extension UnsafePointer {
   ) rethrows -> Result {
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
-    return try body(.init(_rawValue))
+    return try unsafe body(.init(_rawValue))
   }
 }
 
@@ -453,7 +455,7 @@ extension UnsafePointer {
       !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )
-    return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
+    return unsafe .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
   }
 }
 
@@ -461,12 +463,19 @@ extension UnsafePointer where Pointee: ~Copyable {
   @inlinable // unsafe-performance
   @_preInverseGenerics
   internal static var _max: UnsafePointer {
-    return UnsafePointer(
+    return unsafe UnsafePointer(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
     )._unsafelyUnwrappedUnchecked
   }
 }
 
+extension UnsafePointer where Pointee: ~Copyable {
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
+  }
+}
 
 /// A pointer for accessing and manipulating data of a
 /// specific type.
@@ -658,6 +667,7 @@ extension UnsafePointer where Pointee: ~Copyable {
 public struct UnsafeMutablePointer<Pointee: ~Copyable>: Copyable {
   /// The underlying raw (untyped) pointer.
   @_preInverseGenerics
+  @safe
   public let _rawValue: Builtin.RawPointer
 
   /// Creates an `UnsafeMutablePointer` from a builtin raw pointer.
@@ -685,8 +695,9 @@ extension UnsafeMutablePointer: Hashable where Pointee: ~Copyable {
   // Note: This explicit `hashValue` applies @_preInverseGenerics to emulate the
   // original (pre-6.0) compiler-synthesized version.
   @_preInverseGenerics
+  @safe
   public var hashValue: Int {
-    _hashValue(for: self)
+    unsafe _hashValue(for: self)
   }
 }
 
@@ -726,8 +737,8 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   @_transparent
   @_preInverseGenerics
   public init?(@_nonEphemeral mutating other: UnsafePointer<Pointee>?) {
-    guard let unwrapped = other else { return nil }
-    self.init(mutating: unwrapped)
+    guard let unwrapped = unsafe other else { return nil }
+    unsafe self.init(mutating: unwrapped)
   }
 
   /// Creates a mutable typed pointer referencing the same memory as the
@@ -736,6 +747,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// - Parameter other: The pointer to convert.
   @_transparent
   @_preInverseGenerics
+  @safe
   public init(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>) {
    self._rawValue = other._rawValue
   }
@@ -747,8 +759,9 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///   result is `nil`.
   @_transparent
   @_preInverseGenerics
+  @safe
   public init?(@_nonEphemeral _ other: UnsafeMutablePointer<Pointee>?) {
-   guard let unwrapped = other else { return nil }
+   guard let unwrapped = unsafe other else { return nil }
    self.init(unwrapped)
   }
 }
@@ -775,10 +788,15 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///
   ///     intPointer.deallocate()
   ///
+  /// You must only use `deallocate()` to end the lifetime of memory
+  /// created with `allocate()`; it is a programming error to use `free` or
+  /// another deallocation API, and may result in undefined behavior.
+  ///
   /// - Parameter count: The amount of memory to allocate, counted in instances
   ///   of `Pointee`.
   @inlinable
   @_preInverseGenerics
+  @safe
   public static func allocate(
     capacity count: Int
   ) -> UnsafeMutablePointer<Pointee> {
@@ -800,7 +818,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     }
     let rawPtr = Builtin.allocRaw(size._builtinWordValue, align)
     Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
-    return UnsafeMutablePointer(rawPtr)
+    return unsafe UnsafeMutablePointer(rawPtr)
   }
 }
 
@@ -835,10 +853,10 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   @_alwaysEmitIntoClient
   public var pointee: Pointee {
     @_transparent unsafeAddress {
-      return UnsafePointer(self)
+      return unsafe UnsafePointer(self)
     }
     @_transparent nonmutating unsafeMutableAddress {
-      return self
+      return unsafe self
     }
   }
 }
@@ -851,10 +869,10 @@ extension UnsafeMutablePointer {
   @usableFromInline
   internal var pointee: Pointee {
     @_transparent unsafeAddress {
-      return UnsafePointer(self)
+      return unsafe UnsafePointer(self)
     }
     @_transparent nonmutating unsafeMutableAddress {
-      return self
+      return unsafe self
     }
   }
 }
@@ -880,7 +898,7 @@ extension UnsafeMutablePointer {
     // Must not use `initializeFrom` with a `Collection` as that will introduce
     // a cycle.
     for offset in 0..<count {
-      Builtin.initialize(repeatedValue, (self + offset)._rawValue)
+      unsafe Builtin.initialize(repeatedValue, (self + offset)._rawValue)
     }
   }
 }
@@ -952,7 +970,7 @@ extension UnsafeMutablePointer {
   public func update(repeating repeatedValue: Pointee, count: Int) {
     _debugPrecondition(count >= 0, "UnsafeMutablePointer.update(repeating:count:) with negative count")
     for i in 0..<count {
-      self[i] = repeatedValue
+      unsafe self[i] = repeatedValue
     }
   }
 
@@ -960,7 +978,7 @@ extension UnsafeMutablePointer {
   @available(*, deprecated, renamed: "update(repeating:count:)")
   @_silgen_name("_swift_se0370_UnsafeMutablePointer_assign_repeating_count")
   public func assign(repeating repeatedValue: Pointee, count: Int) {
-    update(repeating: repeatedValue, count: count)
+    unsafe update(repeating: repeatedValue, count: count)
   }
 }
 
@@ -986,7 +1004,7 @@ extension UnsafeMutablePointer {
   public func update(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.update with negative count")
-    if UnsafePointer(self) < source || UnsafePointer(self) >= source + count {
+    if unsafe UnsafePointer(self) < source || UnsafePointer(self) >= source + count {
       // assign forward from a disjoint or following overlapping range.
       Builtin.assignCopyArrayFrontToBack(
         Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
@@ -995,7 +1013,7 @@ extension UnsafeMutablePointer {
       //   self[i] = source[i]
       // }
     }
-    else if UnsafePointer(self) != source {
+    else if unsafe UnsafePointer(self) != source {
       // assign backward from a non-following overlapping range.
       Builtin.assignCopyArrayBackToFront(
         Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
@@ -1011,8 +1029,9 @@ extension UnsafeMutablePointer {
   @_alwaysEmitIntoClient
   @available(*, deprecated, renamed: "update(from:count:)")
   @_silgen_name("_swift_se0370_UnsafeMutablePointer_assign_from_count")
+  @unsafe
   public func assign(from source: UnsafePointer<Pointee>, count: Int) {
-    update(from: source, count: count)
+    unsafe update(from: source, count: count)
   }
 }
 
@@ -1042,7 +1061,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.moveInitialize with negative count")
-    if self < source || self >= source + count {
+    if unsafe self < source || self >= source + count {
       // initialize forward from a disjoint or following overlapping range.
       Builtin.takeArrayFrontToBack(
         Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
@@ -1051,7 +1070,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
       //   (self + i).initialize(to: (source + i).move())
       // }
     }
-    else if self != source {
+    else if unsafe self != source {
       // initialize backward from a non-following overlapping range.
       Builtin.takeArrayBackToFront(
         Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
@@ -1086,7 +1105,7 @@ extension UnsafeMutablePointer {
   public func initialize(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.initialize with negative count")
-    _debugPrecondition(
+    unsafe _debugPrecondition(
       UnsafePointer(self) + count <= source ||
       source + count <= UnsafePointer(self),
       "UnsafeMutablePointer.initialize overlapping range")
@@ -1126,7 +1145,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ) {
     _debugPrecondition(
       count >= 0, "UnsafeMutablePointer.moveUpdate(from:) with negative count")
-    _debugPrecondition(
+    unsafe _debugPrecondition(
       self + count <= source || source + count <= self,
       "moveUpdate overlapping range")
     Builtin.assignTakeArray(
@@ -1145,7 +1164,7 @@ extension UnsafeMutablePointer {
   public func moveAssign(
     @_nonEphemeral from source: UnsafeMutablePointer, count: Int
   ) {
-    moveUpdate(from: source, count: count)
+    unsafe moveUpdate(from: source, count: count)
   }
 }
 
@@ -1234,12 +1253,13 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
+  @unsafe
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
     _ body: (_ pointer: UnsafeMutablePointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
-    _debugPrecondition(
+    unsafe _debugPrecondition(
       Int(bitPattern: .init(_rawValue)) & (MemoryLayout<T>.alignment-1) == 0 &&
       ( count == 1 ||
         ( MemoryLayout<Pointee>.stride > MemoryLayout<T>.stride
@@ -1251,7 +1271,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     )
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
-    return try body(.init(_rawValue))
+    return try unsafe body(.init(_rawValue))
   }
 }
 
@@ -1269,7 +1289,7 @@ extension UnsafeMutablePointer {
   ) rethrows -> Result {
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer { Builtin.rebindMemory(_rawValue, binding) }
-    return try body(.init(_rawValue))
+    return try unsafe body(.init(_rawValue))
   }
 }
 
@@ -1291,11 +1311,11 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   public subscript(i: Int) -> Pointee {
     @_transparent
     unsafeAddress {
-      return UnsafePointer(self + i)
+      return unsafe UnsafePointer(self + i)
     }
     @_transparent
     nonmutating unsafeMutableAddress {
-      return self + i
+      return unsafe self + i
     }
   }
 }
@@ -1309,11 +1329,11 @@ extension UnsafeMutablePointer {
   internal subscript(i: Int) -> Pointee {
     @_transparent
     unsafeAddress {
-      return UnsafePointer(self + i)
+      return unsafe UnsafePointer(self + i)
     }
     @_transparent
     nonmutating unsafeMutableAddress {
-      return self + i
+      return unsafe self + i
     }
   }
 }
@@ -1338,7 +1358,7 @@ extension UnsafeMutablePointer {
       !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )
-    return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
+    return unsafe .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
   }
 
   /// Obtain a mutable pointer to the stored property referred to by a key path.
@@ -1360,7 +1380,7 @@ extension UnsafeMutablePointer {
       !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )
-    return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
+    return unsafe .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
   }
 }
 
@@ -1368,8 +1388,16 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   @inlinable // unsafe-performance
   @_preInverseGenerics
   internal static var _max: UnsafeMutablePointer {
-    return UnsafeMutablePointer(
+    return unsafe UnsafeMutablePointer(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
     )._unsafelyUnwrappedUnchecked
+  }
+}
+
+extension UnsafeMutablePointer where Pointee: ~Copyable {
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
   }
 }

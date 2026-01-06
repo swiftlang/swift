@@ -101,6 +101,10 @@ public enum Ownership {
     }
   }
 
+  public init(in function: Function, of type: Type, with convention: ArgumentConvention) {
+    self = Ownership(bridged: BridgedValueOwnership_init(function.bridged, type.bridged, convention.bridged))
+  }
+
   public var _bridged: BridgedValue.Ownership {
     switch self {
       case .unowned:    return BridgedValue.Ownership.Unowned
@@ -138,6 +142,31 @@ extension Value {
     default:
       fatalError("unsupported ownership")
     }
+  }
+
+  /// Return true if the object type conforms to Escapable.
+  ///
+  /// Note: noescape function types conform to Escapable, use mayEscape instead to exclude them.
+  public var isEscapable: Bool {
+    type.objectType.isEscapable(in: parentFunction)
+  }
+
+  /// Return true only if this value's lifetime is unconstrained by an outer lifetime. Requires all of the following:
+  /// - the object type conforms to Escapable
+  /// - the type is not a noescape function
+  /// - the value is not the direct result of a partial_apply with a noescape (inout_aliasable) capture.
+  public var mayEscape: Bool {
+    if !type.objectType.mayEscape(in: parentFunction) {
+      return false
+    }
+    // A noescape partial_apply has an escaping function type if it has not been promoted to on_stack, but it's value
+    // still cannot "escape" its captures.
+    //
+    // TODO: This would be much more robust if pai.hasNoescapeCapture simply implied !pai.type.isEscapable
+    if let pai = self as? PartialApplyInst {
+      return pai.mayEscape
+    }
+    return true
   }
 
   public var definingInstructionOrTerminator: Instruction? {
@@ -218,9 +247,9 @@ extension Value {
   /// struct S { var c1: C; var c2: C }
   /// let s: S
   ///
-  /// `s.allContainedAddresss` refers to `s.c1.x`, `s.c1.y`, `s.c2.x` and `s.c2.y`
+  /// `s.allContainedAddresses` refers to `s.c1.x`, `s.c1.y`, `s.c2.x` and `s.c2.y`
   ///
-  public var allContainedAddresss: ProjectedValue {
+  public var allContainedAddresses: ProjectedValue {
     if type.isAddress {
       // This is the regular case: the path selects any sub-fields of an address.
       return at(SmallProjectionPath(.anyValueFields))
@@ -273,6 +302,10 @@ public final class Undef : Value {
   public var hasTrivialNonPointerType: Bool { false }
 
   public var isLexical: Bool { false }
+
+  public static func get(type: Type, _ context: some MutatingContext) -> Undef {
+    context._bridged.getSILUndef(type.bridged).value as! Undef
+  }
 }
 
 final class PlaceholderValue : Value {

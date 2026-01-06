@@ -96,7 +96,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     ReabstractionInfo ReInfo(M.getSwiftModule(), M.isWholeModule(), AI,
                              ReferencedF, Subs, IsNotSerialized,
                              /*ConvertIndirectToDirect=*/ true,
-                             /*dropMetatypeArgs=*/ false);
+                             /*dropUnusedArguments=*/ false);
 
     if (!ReInfo.canBeSpecialized())
       continue;

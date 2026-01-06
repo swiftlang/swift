@@ -118,13 +118,6 @@ struct SILFuncExtractorOptions {
                  llvm::cl::init(false),
                  llvm::cl::desc("Do not dump AST."));
 
-  llvm::cl::opt<bool>
-    EnableOSSAModules = llvm::cl::opt<bool>(
-      "enable-ossa-modules",
-      llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
-                     "this is disabled we do not serialize in OSSA "
-                     "form when optimizing."));
-
   llvm::cl::opt<llvm::cl::boolOrDefault>
     EnableObjCInterop = llvm::cl::opt<llvm::cl::boolOrDefault>(
       "enable-objc-interop",
@@ -242,7 +235,11 @@ int sil_func_extractor_main(ArrayRef<const char *> argv, void *MainAddr) {
   Invocation.setMainExecutablePath(llvm::sys::fs::getMainExecutable(argv[0], MainAddr));
 
   // Give the context the list of search paths to use for modules.
-  Invocation.setImportSearchPaths(options.ImportPaths);
+  std::vector<SearchPathOptions::SearchPath> ImportPaths;
+  for (const auto &path : options.ImportPaths) {
+    ImportPaths.push_back({path, /*isSystem=*/false});
+  }
+  Invocation.setImportSearchPaths(ImportPaths);
   // Set the SDK path and target if given.
   if (options.SDKPath.getNumOccurrences() == 0) {
     const char *SDKROOT = getenv("SDKROOT");
@@ -272,7 +269,7 @@ int sil_func_extractor_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOptions &Opts = Invocation.getSILOptions();
   Opts.EmitVerboseSIL = options.EmitVerboseSIL;
   Opts.EmitSortedSIL = options.EmitSortedSIL;
-  Opts.EnableOSSAModules = options.EnableOSSAModules;
+  Opts.StopOptimizationAfterSerialization |= options.EmitSIB;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =

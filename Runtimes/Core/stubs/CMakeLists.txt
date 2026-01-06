@@ -7,6 +7,7 @@ add_library(swiftStdlibStubs OBJECT
   ThreadLocalStorage.cpp
   MathStubs.cpp
   Unicode/UnicodeData.cpp
+  Unicode/UnicodeEmoji.cpp
   Unicode/UnicodeGrapheme.cpp
   Unicode/UnicodeNormalization.cpp
   Unicode/UnicodeScalarProps.cpp
@@ -28,7 +29,8 @@ endif()
 
 target_compile_definitions(swiftStdlibStubs PRIVATE
   $<$<BOOL:${BUILD_SHARED_LIBS}>:-DswiftCore_EXPORTS>
-  $<$<BOOL:${SwiftCore_ENABLE_UNICODE_DATA}>:-DSWIFT_STDLIB_ENABLE_UNICODE_DATA>)
+  $<$<BOOL:${SwiftCore_ENABLE_UNICODE_DATA}>:-DSWIFT_STDLIB_ENABLE_UNICODE_DATA>
+  $<$<BOOL:${SwiftCore_HAS_LOCALE}>:-DSWIFT_STDLIB_HAS_LOCALE>)
 
 target_link_libraries(swiftStdlibStubs PRIVATE
   swiftShims)
@@ -56,4 +58,10 @@ if(APPLE)
   set_property(SOURCE SwiftNativeNSXXXBaseARC.m
                APPEND_STRING
                PROPERTY COMPILE_FLAGS "-fobjc-arc")
+endif()
+
+if(NOT BUILD_SHARED_LIBS)
+  install(TARGETS swiftStdlibStubs
+    EXPORT SwiftCoreTargets
+    COMPONENT SwiftCore_runtime)
 endif()

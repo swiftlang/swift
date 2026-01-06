@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.7-abi-triple -I %t
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -target %target-swift-5.7-abi-triple -I %t
 // REQUIRES: concurrency
 // REQUIRES: distributed
 

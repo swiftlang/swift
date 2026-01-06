@@ -39,7 +39,7 @@ import SIL
 /// ```
 
 /// The optimization can be done if:
-/// * In caseof a `load`: during the (forward-extended) lifetime of the loaded value the
+/// * In case of a `load`: during the (forward-extended) lifetime of the loaded value the
 ///                       memory location is not changed.
 /// * In case of a `copy_value`: the (guaranteed) lifetime of the source operand extends
 ///                       the lifetime of the copied value.
@@ -53,27 +53,37 @@ let copyToBorrowOptimization = FunctionPass(name: "copy-to-borrow-optimization")
     return
   }
 
+  var changed = false
+
   for inst in function.instructions {
     switch inst {
     case let load as LoadInst:
-      optimize(load: load, context)
+      if optimize(load: load, context) {
+        changed = true
+      }
     case let copy as CopyValueInst:
-      optimize(copy: copy, context)
+      if optimize(copy: copy, context) {
+        changed = true
+      }
     default:
       break
     }
   }
+
+  if changed {
+    updateBorrowedFrom(in: function, context)
+  }
 }
 
-private func optimize(load: LoadInst, _ context: FunctionPassContext) {
+private func optimize(load: LoadInst, _ context: FunctionPassContext) -> Bool {
   if load.loadOwnership != .copy {
-    return
+    return false
   }
 
   var collectedUses = Uses(context)
   defer { collectedUses.deinitialize() }
   if !collectedUses.collectUses(of: load) {
-    return
+    return false
   }
 
   if mayWrite(toAddressOf: load,
@@ -81,21 +91,22 @@ private func optimize(load: LoadInst, _ context: FunctionPassContext) {
               usersInDeadEndBlocks: collectedUses.usersInDeadEndBlocks,
               context)
   {
-    return
+    return false
   }
 
   load.replaceWithLoadBorrow(collectedUses: collectedUses)
+  return true
 }
 
-private func optimize(copy: CopyValueInst, _ context: FunctionPassContext) {
+private func optimize(copy: CopyValueInst, _ context: FunctionPassContext) -> Bool {
   if copy.fromValue.ownership != .guaranteed {
-    return
+    return false
   }
 
   var collectedUses = Uses(context)
   defer { collectedUses.deinitialize() }
   if !collectedUses.collectUses(of: copy) {
-    return
+    return false
   }
 
   var liverange = InstructionRange(begin: copy, context)
@@ -104,10 +115,11 @@ private func optimize(copy: CopyValueInst, _ context: FunctionPassContext) {
   liverange.insert(contentsOf: collectedUses.usersInDeadEndBlocks)
 
   if !liverange.isFullyContainedIn(borrowScopeOf: copy.fromValue.lookThroughForwardingInstructions) {
-    return
+    return false
   }
 
   remove(copy: copy, collectedUses: collectedUses, liverange: liverange)
+  return true
 }
 
 private struct Uses {
@@ -122,7 +134,7 @@ private struct Uses {
   // Exit blocks of the load/copy_value's liverange which don't have a destroy.
   // Those are successor blocks of terminators, like `switch_enum`, which do _not_ forward the value.
   // E.g. the none-case of a switch_enum of an Optional.
-  private(set) var nonDestroyingLiverangeExits: Stack<BasicBlock>
+  private(set) var nonDestroyingLiverangeExits: Stack<Instruction>
 
   private(set) var usersInDeadEndBlocks: Stack<Instruction>
 
@@ -179,8 +191,13 @@ private struct Uses {
       // A terminator instruction can implicitly end the lifetime of its operand in a success block,
       // e.g. a `switch_enum` with a non-payload case block. Such success blocks need an `end_borrow`, though.
       for succ in termInst.successors where !succ.arguments.contains(where: {$0.ownership == .owned}) {
-        nonDestroyingLiverangeExits.append(succ)
+        nonDestroyingLiverangeExits.append(succ.instructions.first!)
       }
+    } else if !forwardingInst.forwardedResults.contains(where: { $0.ownership == .owned }) {
+      // The forwarding instruction has no owned result, which means it ends the lifetime of its owned operand.
+      // This can happen with an `unchecked_enum_data` which extracts a trivial payload out of a
+      // non-trivial enum.
+      nonDestroyingLiverangeExits.append(forwardingInst.next!)
     }
   }
 
@@ -268,7 +285,7 @@ private func remove(copy: CopyValueInst, collectedUses: Uses, liverange: Instruc
   context.erase(instructions: collectedUses.destroys)
 }
 
-// Handle the special case if the `load` or `copy_valuw` is immediately followed by a single `move_value`.
+// Handle the special case if the `load` or `copy_value` is immediately followed by a single `move_value`.
 // In this case we have to preserve the move's flags by inserting a `begin_borrow` with the same flags.
 // For example:
 //
@@ -314,15 +331,20 @@ private func createEndBorrows(for beginBorrow: Value, atEndOf liverange: Instruc
   //   destroy_value %2
   //   destroy_value %3  // The final destroy. Here we need to create the `end_borrow`(s)
   //
-  for destroy in collectedUses.destroys where !liverange.contains(destroy) {
-    let builder = Builder(before: destroy, context)
-    builder.createEndBorrow(of: beginBorrow)
+
+  var allLifetimeEndingInstructions = InstructionWorklist(context)
+  allLifetimeEndingInstructions.pushIfNotVisited(contentsOf: collectedUses.destroys.lazy.map { $0 })
+  allLifetimeEndingInstructions.pushIfNotVisited(contentsOf: collectedUses.nonDestroyingLiverangeExits)
+
+  defer {
+    allLifetimeEndingInstructions.deinitialize()
   }
-  for liverangeExitBlock in collectedUses.nonDestroyingLiverangeExits where
-      !liverange.blockRange.contains(liverangeExitBlock)
-  {
-    let builder = Builder(atBeginOf: liverangeExitBlock, context)
-    builder.createEndBorrow(of: beginBorrow)
+
+  while let endInst = allLifetimeEndingInstructions.pop() {
+    if !liverange.contains(endInst) {
+      let builder = Builder(before: endInst, context)
+      builder.createEndBorrow(of: beginBorrow)
+    }
   }
 }
 
@@ -350,6 +372,13 @@ private extension Value {
   }
 
   var lookThroughForwardingInstructions: Value {
+    if let bfi = definingInstruction as? BorrowedFromInst,
+       !bfi.borrowedPhi.isReborrow,
+       bfi.enclosingValues.count == 1
+    {
+      // Return the single forwarded enclosingValue
+      return bfi.enclosingValues[0]
+    }
     if let fi = definingInstruction as? ForwardingInstruction,
        let forwardedOp = fi.singleForwardedOperand
     {

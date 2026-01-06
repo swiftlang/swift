@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,6 +13,7 @@
 import ASTBridging
 import SwiftDiagnostics
 import SwiftIfConfig
+@_spi(ExperimentalLanguageFeatures) import SwiftWarningControl
 @_spi(ExperimentalLanguageFeatures) import SwiftParser
 import SwiftParserDiagnostics
 @_spi(Compiler) import SwiftSyntax
@@ -43,18 +44,31 @@ public struct ExportedSourceFile {
   /// This is a cached value; access via configuredRegions(astContext:).
   var _configuredRegions: ConfiguredRegions? = nil
 
-  public func position(of location: BridgedSourceLoc) -> AbsolutePosition? {
+  /// Warning group control regions for this source file
+  ///
+  /// This is a cached value; access via warningGroupControlRegionTree(astContext:)
+  var _warningControlRegionTree: WarningControlRegionTree? = nil
+
+  /// Configured regions for this source file assuming if it were being treated
+  /// as Embedded Swift. This is used only when we are compiling non-Embedded
+  /// Swift but diagnosing uses of constructs that aren't allowed in Embedded
+  /// Swift.
+  ///
+  /// This is a cached value; access via configuredRegionsAsEmbedded(astContext:).
+  var _configuredRegionsIfEmbedded: ConfiguredRegions? = nil
+
+  public func position(of location: SourceLoc) -> AbsolutePosition? {
     let sourceFileBaseAddress = UnsafeRawPointer(buffer.baseAddress!)
-    guard let opaqueValue = location.getOpaquePointerValue() else {
+    guard let rawAddress = location.raw else {
       return nil
     }
-    return AbsolutePosition(utf8Offset: opaqueValue - sourceFileBaseAddress)
+    return AbsolutePosition(utf8Offset: rawAddress - sourceFileBaseAddress)
   }
 
-  /// Retrieve a bridged source location for the given absolute position in
+  /// Retrieve a C++ source location for the given absolute position in
   /// this source file.
-  public func sourceLoc(at position: AbsolutePosition) -> BridgedSourceLoc {
-    BridgedSourceLoc(at: position, in: buffer)
+  public func sourceLoc(at position: AbsolutePosition) -> SourceLoc {
+    SourceLoc(at: position, in: buffer)
   }
 }
 
@@ -64,7 +78,7 @@ extension Parser.ExperimentalFeatures {
     guard let context = context else { return }
 
     func mapFeature(_ bridged: BridgedFeature, to feature: Self) {
-      if context.langOptsHasFeature(bridged) {
+      if context.langOpts.hasFeature(bridged) {
         insert(feature)
       }
     }
@@ -75,8 +89,10 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.NonescapableTypes, to: .nonescapableTypes)
     mapFeature(.TrailingComma, to: .trailingComma)
     mapFeature(.CoroutineAccessors, to: .coroutineAccessors)
-    mapFeature(.ValueGenerics, to: .valueGenerics)
-    mapFeature(.ABIAttribute, to: .abiAttribute)
+    mapFeature(.OldOwnershipOperatorSpellings, to: .oldOwnershipOperatorSpellings)
+    mapFeature(.KeyPathWithMethodMembers, to: .keypathWithMethodMembers)
+    mapFeature(.DefaultIsolationPerFile, to: .defaultIsolationPerFile)
+    mapFeature(.BorrowAndMutateAccessors, to: .borrowAndMutateAccessors)
   }
 }
 
@@ -130,24 +146,31 @@ public func parseSourceFile(
       .codeItemMacroExpansion,
       .peerMacroExpansion:
     if let dc, dc.isTypeContext {
-      parsed = Syntax(MemberBlockItemListSyntax.parse(from: &parser))
+      parsed = Syntax(MemberBlockItemListFileSyntax.parse(from: &parser))
     } else {
       parsed = Syntax(SourceFileSyntax.parse(from: &parser))
     }
 
   case .memberMacroExpansion:
-    parsed = Syntax(MemberBlockItemListSyntax.parse(from: &parser))
+    parsed = Syntax(MemberBlockItemListFileSyntax.parse(from: &parser))
 
   case .accessorMacroExpansion:
-    // FIXME: Implement specialized parsing.
-    parsed = Syntax(SourceFileSyntax.parse(from: &parser))
-  case .memberAttributeMacroExpansion,
-      .attribute:
-    // FIXME: Implement specialized parsing.
-    parsed = Syntax(SourceFileSyntax.parse(from: &parser))
+    parsed = Syntax(AccessorBlockFileSyntax.parse(from: &parser))
+
+  case .memberAttributeMacroExpansion:
+    var attrs = AttributeClauseFileSyntax.parse(from: &parser)
+    if !attrs.modifiers.isEmpty {
+      // 'memberAttribute' macro doesn't allow modifiers. Move to "unexpected" if any.
+      attrs.unexpectedBetweenAttributesAndModifiers = [Syntax(attrs.modifiers)]
+      attrs.modifiers = []
+    }
+    parsed = Syntax(attrs)
+
+  case .attributeFromClang:
+    parsed = Syntax(AttributeClauseFileSyntax.parse(from: &parser))
+
   case .bodyMacroExpansion:
-    // FIXME: Implement specialized parsing.
-    parsed = Syntax(SourceFileSyntax.parse(from: &parser))
+    parsed = Syntax(CodeBlockFileSyntax.parse(from: &parser))
   }
 
   let exportedPtr = UnsafeMutablePointer<ExportedSourceFile>.allocate(capacity: 1)
@@ -240,13 +263,11 @@ public func emitParserDiagnostics(
   }
 }
 
-/// Retrieve a syntax node in the given source file, with the given type.
-public func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
-  sourceFilePtr: UnsafeRawPointer,
-  sourceLocationPtr: UnsafePointer<UInt8>?,
-  type: Node.Type,
-  wantOutermost: Bool = false
-) -> Node? {
+/// Find a token in the given source file at the given location.
+func findToken(
+  in sourceFilePtr: UnsafeRawPointer,
+  at sourceLocationPtr: UnsafePointer<UInt8>?
+) -> TokenSyntax? {
   guard let sourceLocationPtr = sourceLocationPtr else {
     return nil
   }
@@ -268,6 +289,20 @@ public func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
     return nil
   }
 
+  return token
+}
+
+/// Retrieve a syntax node in the given source file, with the given type.
+public func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLocationPtr: UnsafePointer<UInt8>?,
+  type: Node.Type,
+  wantOutermost: Bool = false
+) -> Node? {
+  guard let token = findToken(in: sourceFilePtr, at: sourceLocationPtr) else {
+    return nil
+  }
+
   var currentSyntax = Syntax(token)
   var resultSyntax: Node? = nil
   while let parentSyntax = currentSyntax.parent {
@@ -278,9 +313,8 @@ public func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
     }
   }
 
-  // If we didn't find anything, complain and fail.
+  // If we didn't find anything, return nil.
   guard var resultSyntax else {
-    print("unable to find node: \(token.debugDescription)")
     return nil
   }
 
@@ -299,6 +333,28 @@ public func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
   }
 
   return resultSyntax
+}
+
+/// Retrieve a syntax node in the given source file that satisfies the
+/// given predicate.
+public func findSyntaxNodeInSourceFile(
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLocationPtr: UnsafePointer<UInt8>?,
+  where predicate: (Syntax) -> Bool
+) -> Syntax? {
+  guard let token = findToken(in: sourceFilePtr, at: sourceLocationPtr) else {
+    return nil
+  }
+
+  var currentSyntax = Syntax(token)
+  while let parentSyntax = currentSyntax.parent {
+    currentSyntax = parentSyntax
+    if predicate(currentSyntax) {
+      return currentSyntax
+    }
+  }
+
+  return nil
 }
 
 @_cdecl("swift_ASTGen_virtualFiles")

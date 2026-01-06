@@ -7,6 +7,9 @@
 // RUN: %sourcekitd-test -req=structure %S/../Inputs/placeholders.swift | %sed_clean > %t.placeholders.response
 // RUN: %diff -u %s.placeholders.response %t.placeholders.response
 
+// RUN: %sourcekitd-test -req=structure %S/Inputs/raw-identifiers.swift | %sed_clean > %t.raw-identifiers.swift.response
+// RUN: %diff -u %s.raw-identifiers.swift.response %t.raw-identifiers.swift.response
+
 // RUN: %sourcekitd-test -req=structure %S/Inputs/main.swift -name -foobar | %sed_clean > %t.foobar.response
 // RUN: %diff -u %s.foobar.response %t.foobar.response
 

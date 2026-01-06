@@ -47,6 +47,10 @@
 namespace swift {
 
 class AliasAnalysis;
+class SILCombineCanonicalize;
+namespace test {
+struct SILCombinerProcessInstruction;
+}
 
 /// This is a class which maintains the state of the combiner and simplifies
 /// many operations such as removing/adding instructions and syncing them with
@@ -132,6 +136,8 @@ public:
 
   bool runOnFunction(SILFunction &F);
 
+  bool shouldRemoveCondFail(CondFailInst &);
+
   void clear() {
     Iteration = 0;
     Worklist.resetChecked();
@@ -214,8 +220,10 @@ public:
   // by this method.
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
                                         SILBasicBlock::iterator &InstIter,
-                                        bool AddOperandsToWorklist = true) {
-    Worklist.eraseInstFromFunction(I, InstIter, AddOperandsToWorklist);
+                                        bool AddOperandsToWorklist = true,
+                                        bool salvageDebugInfo = true) {
+    Worklist.eraseInstFromFunction(I, InstIter, AddOperandsToWorklist,
+                                   salvageDebugInfo);
     MadeChange = true;
     // Dummy return, so the caller doesn't need to explicitly return nullptr.
     return nullptr;
@@ -226,9 +234,10 @@ public:
   void eraseInstIncludingUsers(SILInstruction *inst);
 
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
-                                        bool AddOperandsToWorklist = true) {
+                                        bool AddOperandsToWorklist = true,
+                                        bool salvageDebugInfo = true) {
     SILBasicBlock::iterator nullIter;
-    return eraseInstFromFunction(I, nullIter, AddOperandsToWorklist);
+    return eraseInstFromFunction(I, nullIter, AddOperandsToWorklist, salvageDebugInfo);
   }
 
   void addInitialGroup(ArrayRef<SILInstruction *> List) {
@@ -240,11 +249,8 @@ public:
 
   /// Instruction visitors.
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
-  SILInstruction *visitApplyInst(ApplyInst *AI);
   SILInstruction *visitBeginApplyInst(BeginApplyInst *BAI);
-  SILInstruction *visitTryApplyInst(TryApplyInst *AI);
   SILInstruction *optimizeStringObject(BuiltinInst *BI);
-  SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
@@ -254,16 +260,12 @@ public:
 
   SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
-  SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
-  SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
   SILInstruction *visitEndCOWMutationInst(EndCOWMutationInst *URCI);
   SILInstruction *visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI);
   SILInstruction *visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI);
-  SILInstruction *visitUnconditionalCheckedCastInst(
-                    UnconditionalCheckedCastInst *UCCI);
   SILInstruction *
   visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI);
   SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
@@ -288,7 +290,6 @@ public:
   SILInstruction *visitUnreachableInst(UnreachableInst *UI);
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
       
-  SILInstruction *visitMarkDependenceInst(MarkDependenceInst *MDI);
   SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *CFI);
   SILInstruction *
   visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *Cvt);
@@ -302,11 +303,12 @@ public:
 
   SILInstruction *legacyVisitGlobalValueInst(GlobalValueInst *globalValue);
 
-#define PASS(ID, TAG, DESCRIPTION)
-#define SWIFT_FUNCTION_PASS(ID, TAG, DESCRIPTION)
-#define SWIFT_SILCOMBINE_PASS(INST) \
+#define INSTRUCTION_SIMPLIFICATION(INST) \
   SILInstruction *visit##INST(INST *);
-#include "swift/SILOptimizer/PassManager/Passes.def"
+#define INSTRUCTION_SIMPLIFICATION_WITH_LEGACY(INST) \
+  SILInstruction *visit##INST(INST *);          \
+  SILInstruction *legacyVisit##INST(INST *);
+#include "Simplifications.def"
 
   /// Instruction visitor helpers.
 
@@ -339,7 +341,7 @@ public:
   /// try to visit it.
   bool trySinkOwnedForwardingInst(SingleValueInstruction *svi);
 
-  /// Apply CanonicalizeOSSALifetime to the extended lifetime of any copy
+  /// Apply OSSACanonicalizeOwned to the extended lifetime of any copy
   /// introduced during SILCombine for an owned value.
   void canonicalizeOSSALifetimes(SILInstruction *currentInst);
 
@@ -411,6 +413,11 @@ private:
 
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);
+
+  void processInstruction(SILInstruction *instruction,
+                          SILCombineCanonicalize &scCanonicalize,
+                          bool &MadeChange);
+  friend test::SILCombinerProcessInstruction;
 
   /// Add reachable code to the worklist. Meant to be used when starting to
   /// process a new function.

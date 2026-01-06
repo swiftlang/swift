@@ -350,7 +350,7 @@ extension DiscontiguousSlice where Base: MutableCollection {
   /// past the last element of a collection, so it doesn't correspond with an
   /// element.
   ///
-  /// - Parameter position: The position of the element to access. `position`
+  /// - Parameter i: The position of the element to access. `i`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
   ///
@@ -393,7 +393,7 @@ extension Collection {
   ///
   ///     let str = "The rain in Spain stays mainly in the plain."
   ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
-  ///     let vowelIndices = str.subranges(where: { vowels.contains($0) })
+  ///     let vowelIndices = str.indices(where: { vowels.contains($0) })
   ///
   ///     let disemvoweled = str.removingSubranges(vowelIndices)
   ///     print(String(disemvoweled))

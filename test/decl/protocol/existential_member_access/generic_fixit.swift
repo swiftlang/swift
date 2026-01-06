@@ -12,12 +12,12 @@ protocol P {
 protocol Q {}
 
 do {
-  func test(p: P) { // expected-error {{use of protocol 'P' as a type must be written 'any P'}}
+  func test(p: P) { // expected-warning {{use of protocol 'P' as a type must be written 'any P'}}
     p.method(false) // expected-error {{member 'method' cannot be used on value of type 'any P'; consider using a generic constraint instead}} {{-1:16--1:17=some P}} {{none}}
   }
 }
 do {
-  func test(p: ((P))) { // expected-error {{use of protocol 'P' as a type must be written 'any P'}}
+  func test(p: ((P))) { // expected-warning {{use of protocol 'P' as a type must be written 'any P'}}
     p.method(false) // expected-error {{member 'method' cannot be used on value of type 'any P'; consider using a generic constraint instead}} {{-1:18--1:19=some P}} {{none}}
   }
 }
@@ -57,12 +57,12 @@ do {
   }
 }
 do {
-  func test(p: P.Type) { // expected-error {{use of protocol 'P' as a type must be written 'any P'}}
+  func test(p: P.Type) { // expected-warning {{use of protocol 'P' as a type must be written 'any P'}}
     p.staticMethod(false) // expected-error {{member 'staticMethod' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}} {{-1:16--1:17=(some P)}} {{none}}
   }
 }
 do {
-  func test(p: (P).Type) { // expected-error {{use of protocol 'P' as a type must be written 'any P'}}
+  func test(p: (P).Type) { // expected-warning {{use of protocol 'P' as a type must be written 'any P'}}
     p.staticMethod(false) // expected-error {{member 'staticMethod' cannot be used on value of type 'any P.Type'; consider using a generic constraint instead}} {{-1:17--1:18=some P}} {{none}}
   }
 }
@@ -78,12 +78,12 @@ do {
 }
 
 do {
-  func test(p: P & Q) { // expected-error {{use of protocol 'P' as a type must be written 'any P'}}
+  func test(p: P & Q) { // expected-warning {{use of protocol 'P' as a type must be written 'any P'}}
     p.method(false) // expected-error {{member 'method' cannot be used on value of type 'any P & Q'; consider using a generic constraint instead}} {{-1:16--1:21=some P & Q}} {{none}}
   }
 }
 do {
-  func test(p: ((P & Q))) { // expected-error {{use of protocol 'P' as a type must be written 'any P'}}
+  func test(p: ((P & Q))) { // expected-warning {{use of protocol 'P' as a type must be written 'any P'}}
     p.method(false) // expected-error {{member 'method' cannot be used on value of type 'any P & Q'; consider using a generic constraint instead}} {{-1:18--1:23=some P & Q}} {{none}}
   }
 }
@@ -123,12 +123,12 @@ do {
   }
 }
 do {
-  func test(p: (P & Q).Type) { // expected-error {{use of protocol 'P' as a type must be written 'any P'}}
+  func test(p: (P & Q).Type) { // expected-warning {{use of protocol 'P' as a type must be written 'any P'}}
     p.staticMethod(false) // expected-error {{member 'staticMethod' cannot be used on value of type 'any (P & Q).Type'; consider using a generic constraint instead}} {{-1:17--1:22=some P & Q}} {{none}}
   }
 }
 do {
-  func test(p: ((P & Q)).Type) { // expected-error {{use of protocol 'P' as a type must be written 'any P'}}
+  func test(p: ((P & Q)).Type) { // expected-warning {{use of protocol 'P' as a type must be written 'any P'}}
     p.staticMethod(false) // expected-error {{member 'staticMethod' cannot be used on value of type 'any (P & Q).Type'; consider using a generic constraint instead}} {{-1:18--1:23=some P & Q}} {{none}}
   }
 }

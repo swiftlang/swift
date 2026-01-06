@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -D RESILIENT_MODULE -module-name Class -emit-module -emit-module-path %t/Class.swiftmodule -enable-library-evolution -clang-header-expose-decls=all-public -emit-clang-header-path %t/class.h
 
-// RUN: %target-swift-frontend %s -I %t -typecheck -module-name UseClass -clang-header-expose-decls=all-public -emit-clang-header-path %t/useclass.h
+// RUN: %target-swift-frontend %s -I %t -module-name UseClass -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/useclass.h
 
 // RUN: %FileCheck %s < %t/useclass.h
 
@@ -94,7 +94,7 @@ public func createCrossModuleDerivedDerivedClass() -> CrossModuleDerivedDerivedC
 // CHECK-NEXT: void **vtable_ = *selfPtr_;
 // CHECK-NEXT: #endif
 // CHECK-NEXT: struct FTypeAddress {
-// CHECK-NEXT: decltype(_impl::$s8UseClass018CrossModuleDerivedB0C015virtualMethodInE0yyF) * func;
+// CHECK-NEXT: decltype(UseClass::_impl::$s8UseClass018CrossModuleDerivedB0C015virtualMethodInE0yyF) * func;
 // CHECK-NEXT: };
 // CHECK-NEXT: FTypeAddress *fptrptr_ = reinterpret_cast<FTypeAddress *>(vtable_ + (_impl::$s8UseClass018CrossModuleDerivedB0CMo + 0) / sizeof(void *));
 // CHECK-NEXT: (* fptrptr_->func)(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));

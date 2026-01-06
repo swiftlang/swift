@@ -313,8 +313,6 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   ABSTRACT_SINGLE_VALUE_INST(AllocationInst, SingleValueInstruction)
     SINGLE_VALUE_INST(AllocStackInst, alloc_stack,
                               AllocationInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(AllocVectorInst, alloc_vector,
-                              AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocPackInst, alloc_pack,
                               AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocPackMetadataInst, alloc_pack_metadata,
@@ -425,6 +423,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(ObjCExistentialMetatypeToObjectInst, objc_existential_metatype_to_object,
                       SingleValueInstruction, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ImplicitActorToOpaqueIsolationCastInst, implicitactor_to_opaqueisolation_cast,
+                      SingleValueInstruction, None, DoesNotRelease)
     // unconditional_checked_cast_inst is only MayRead to prevent a subsequent
     // release of the cast's source from being hoisted above the cast:
     // retain X
@@ -443,6 +443,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(ValueToBridgeObjectInst, value_to_bridge_object,
                     SingleValueInstruction, None, DoesNotRelease)
+  // MarkDependenceAddrInst has read effects for the base operand. See
+  // getMemoryBehavior()
   SINGLE_VALUE_INST(MarkDependenceInst, mark_dependence,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(CopyBlockInst, copy_block,
@@ -467,7 +469,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 #include "swift/AST/ReferenceStorage.def"
   SINGLE_VALUE_INST(UncheckedOwnershipConversionInst, unchecked_ownership_conversion,
-                    SingleValueInstruction, None, MayRelease)
+                    SingleValueInstruction, None, DoesNotRelease)
+
   // A move_value is an OSSA only instruction. Its result does not have any side
   // effects relative to other OSSA values like copy_value.
   SINGLE_VALUE_INST(MoveValueInst, move_value, SingleValueInstruction, None,
@@ -518,6 +521,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(CopyableToMoveOnlyWrapperAddrInst,
                     copyable_to_moveonlywrapper_addr, SingleValueInstruction,
                     None, DoesNotRelease)
+  SINGLE_VALUE_INST(UncheckedOwnershipInst, unchecked_ownership,
+                    SingleValueInstruction, None, DoesNotRelease)
 
   // IsUnique does not actually write to memory but should be modeled
   // as such. Its operand is a pointer to an object reference. The
@@ -528,9 +533,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 
   SINGLE_VALUE_INST(EndCOWMutationInst, end_cow_mutation,
                             SingleValueInstruction, None, DoesNotRelease)
-
-  SINGLE_VALUE_INST(IsEscapingClosureInst, is_escaping_closure,
-                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(DestroyNotEscapedClosureInst, destroy_not_escaped_closure,
+                    SingleValueInstruction, MayHaveSideEffects, MayRelease)
 
   // Accessing memory
   SINGLE_VALUE_INST(LoadInst, load,
@@ -587,6 +591,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(ObjectInst, object,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(VectorInst, vector,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(VectorBaseAddrInst, vector_base_addr,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(TupleInst, tuple,
                     SingleValueInstruction, None, DoesNotRelease)
@@ -728,6 +734,8 @@ ABSTRACT_INST(TermInst, SILInstruction)
              TermInst, None, DoesNotRelease)
   TERMINATOR(ReturnInst, return,
              TermInst, None, DoesNotRelease)
+  TERMINATOR(ReturnBorrowInst, return_borrow,
+             TermInst, None, DoesNotRelease)
   TERMINATOR(ThrowInst, throw,
              TermInst, None, DoesNotRelease)
   TERMINATOR(ThrowAddrInst, throw_addr,
@@ -836,8 +844,6 @@ NON_VALUE_INST(StoreInst, store,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(AssignInst, assign,
                SILInstruction, MayWrite, DoesNotRelease)
-NON_VALUE_INST(AssignByWrapperInst, assign_by_wrapper,
-               SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(AssignOrInitInst, assign_or_init,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(MarkFunctionEscapeInst, mark_function_escape,
@@ -897,10 +903,20 @@ NON_VALUE_INST(MarkUnresolvedMoveAddrInst, mark_unresolved_move_addr,
 NON_VALUE_INST(MergeIsolationRegionInst, merge_isolation_region,
                SILInstruction, None, DoesNotRelease)
 
+NON_VALUE_INST(IgnoredUseInst, ignored_use,
+               SILInstruction, None, DoesNotRelease)
+
 NON_VALUE_INST(IncrementProfilerCounterInst, increment_profiler_counter,
                SILInstruction, MayReadWrite, DoesNotRelease)
 
-NODE_RANGE(NonValueInstruction, UnreachableInst, IncrementProfilerCounterInst)
+// MarkDependenceAddrInst has read effects for the base operand. See
+// getMemoryBehavior().
+NON_VALUE_INST(MarkDependenceAddrInst, mark_dependence_addr,
+               SILInstruction, MayReadWrite, DoesNotRelease)
+
+NON_VALUE_INST(EndCOWMutationAddrInst, end_cow_mutation_addr,
+               SILInstruction, MayHaveSideEffects, DoesNotRelease)
+NODE_RANGE(NonValueInstruction, UnreachableInst, EndCOWMutationAddrInst)
 
 ABSTRACT_INST(MultipleValueInstruction, SILInstruction)
 MULTIPLE_VALUE_INST(BeginApplyInst, begin_apply,

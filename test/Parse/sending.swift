@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature SendingArgsAndResults -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature SendingArgsAndResults -strict-concurrency=complete
 
-// REQUIRES: swift_feature_RegionBasedIsolation
 // REQUIRES: swift_feature_SendingArgsAndResults
 
 func testArg(_ x: sending String) {

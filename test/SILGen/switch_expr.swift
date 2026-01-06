@@ -302,6 +302,12 @@ struct TestPropertyInit {
   }
 }
 
+// https://github.com/swiftlang/swift/issues/75294
+func testAsyncLet(_ x: Int?) async {
+  async let _ = switch x { case let i?: i default: 0 }
+  // CHECK-LABEL: sil private [ossa] @$s11switch_expr12testAsyncLetyySiSgYaFSiyYaYbcfu_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (Optional<Int>) -> (@out τ_0_0, @error any Error) for <Int>
+}
+
 func testNested(_ e: E) throws -> Int {
   switch e {
   case .a:

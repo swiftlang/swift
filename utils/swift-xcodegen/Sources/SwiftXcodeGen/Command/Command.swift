@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,7 +21,7 @@ struct Command: Hashable {
 }
 
 extension Command: Decodable {
-  init(from decoder: Decoder) throws {
+  init(from decoder: any Decoder) throws {
     let command = try decoder.singleValueContainer().decode(String.self)
     self = try CommandParser.parseCommand(command)
   }
@@ -239,48 +239,4 @@ extension Command.Flag: CustomStringConvertible {
 
 extension Command.Option: CustomStringConvertible {
   var description: String { printed }
-}
-
-// MARK: Comparable
-// We sort the resulting command-line arguments to ensure deterministic
-// ordering.
-
-extension Command.Flag: Comparable {
-  static func < (lhs: Self, rhs: Self) -> Bool {
-    guard lhs.dash == rhs.dash else {
-      return lhs.dash < rhs.dash
-    }
-    return lhs.name.rawValue < rhs.name.rawValue
-  }
-}
-
-extension Command.Option: Comparable {
-  static func < (lhs: Self, rhs: Self) -> Bool {
-    guard lhs.flag == rhs.flag else {
-      return lhs.flag < rhs.flag
-    }
-    guard lhs.spacing == rhs.spacing else {
-      return lhs.spacing < rhs.spacing
-    }
-    return lhs.value < rhs.value
-  }
-}
-
-extension Command.Argument: Comparable {
-  static func < (lhs: Self, rhs: Self) -> Bool {
-    switch (lhs, rhs) {
-    // Sort flags < options < values
-    case (.flag, .option):  true
-    case (.flag, .value):   true
-    case (.option, .value): true
-
-    case (.option, .flag):  false
-    case (.value, .flag):   false
-    case (.value, .option): false
-
-    case (.flag(let lhs), .flag(let rhs)):     lhs < rhs
-    case (.option(let lhs), .option(let rhs)): lhs < rhs
-    case (.value(let lhs), .value(let rhs)):   lhs < rhs
-    }
-  }
 }

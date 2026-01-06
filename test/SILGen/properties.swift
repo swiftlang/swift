@@ -831,6 +831,7 @@ protocol NonmutatingProtocol {
 // CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
 // CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened("{{.*}}", any NonmutatingProtocol) Self, #NonmutatingProtocol.x!getter : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, [[C_FIELD_PAYLOAD]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}", any NonmutatingProtocol) Self>([[C_FIELD_COPY]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK-NEXT:   ignored_use
 // CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_COPY]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self
 // CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*any NonmutatingProtocol

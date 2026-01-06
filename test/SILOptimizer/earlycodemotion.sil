@@ -552,6 +552,28 @@ bb3(%12 : $Bool):
   return %12 : $Bool
 }
 
+// CHECK-LABEL: sil [ossa] @dont_sink_owned_trivial_enum :
+// CHECK:       bb1:
+// CHECK-NEXT:    enum
+// CHECK:       bb2:
+// CHECK-NEXT:    enum
+// CHECK:       bb3([[A:%.*]] : @owned $Optional<C>):
+// CHECK-NEXT:    return [[A]]
+// CHECK:       } // end sil function 'dont_sink_owned_trivial_enum'
+sil [ossa] @dont_sink_owned_trivial_enum : $@convention(thin) () -> @owned Optional<C> {
+bb0:
+  cond_br undef, bb1, bb2
+bb1:
+  %2 = enum $Optional<C>, #Optional.none!enumelt
+  br bb3(%2)
+bb2:
+  %4 = enum $Optional<C>, #Optional.none!enumelt
+  br bb3(%4)
+bb3(%6 : @owned $Optional<C>):
+  return %6
+}
+
+
 // Sink retain down the successors so we can pair up retain with release on the
 // fast path.
 class Test {

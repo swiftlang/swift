@@ -20,7 +20,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AnyFunctionRef.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericParamList.h"
@@ -94,9 +95,14 @@ class LookupTypeResult {
   SmallVector<LookupTypeResultEntry, 4> Results;
 
 public:
+  using const_iterator = SmallVectorImpl<LookupTypeResultEntry>::const_iterator;
+  const_iterator begin() const { return Results.begin(); }
+  const_iterator end() const { return Results.end(); }
+
   using iterator = SmallVectorImpl<LookupTypeResultEntry>::iterator;
   iterator begin() { return Results.begin(); }
   iterator end() { return Results.end(); }
+
   unsigned size() const { return Results.size(); }
 
   LookupTypeResultEntry operator[](unsigned index) const {
@@ -134,8 +140,8 @@ enum class TypeCheckExprFlags {
   /// Don't expand macros.
   DisableMacroExpansions = 0x04,
 
-  /// If set, typeCheckExpression will avoid invalidating the AST if
-  /// type-checking fails. Do not add new uses of this.
+  /// If set, typeCheckExpression will avoid pre-checking and invalidating
+  /// the AST if type-checking fails. Do not add new uses of this.
   AvoidInvalidatingAST = 0x08,
 };
 
@@ -241,6 +247,14 @@ public:
     /// requirement \c Req. Accordingly, \c Req is a conditional requirement of
     /// the last conformance in the chain (if any).
     SmallVector<ParentConditionalConformance, 2> ReqPath;
+
+    /// The isolated conformances that caused the requirement failure.
+    llvm::TinyPtrVector<ProtocolConformanceRef> IsolatedConformances = {};
+
+    /// The protocol (Sendable or SendableMetatype) to which the type
+    /// parameter conforms, causing a conflict with the isolated conformances
+    /// described above.
+    ProtocolDecl *IsolatedConformanceProto = nullptr;
   };
 
 private:
@@ -271,6 +285,16 @@ public:
         RequirementFailureInfo{Req, SubstReq, ReqPath});
   }
 
+  static CheckGenericArgumentsResult createIsolatedConformanceFailure(
+      Requirement Req, Requirement SubstReq,
+      llvm::TinyPtrVector<ProtocolConformanceRef> IsolatedConformances,
+      ProtocolDecl *IsolatedConformanceProto) {
+    return CheckGenericArgumentsResult(
+        CheckRequirementsResult::RequirementFailure,
+        RequirementFailureInfo{Req, SubstReq, { }, IsolatedConformances,
+                               IsolatedConformanceProto});
+  }
+  
   const RequirementFailureInfo &getRequirementFailureInfo() const {
     assert(Kind == CheckRequirementsResult::RequirementFailure);
 
@@ -278,6 +302,44 @@ public:
   }
 
   CheckRequirementsResult getKind() const { return Kind; }
+};
+
+/// Helper type for diagnosing a lookup that failed merely because it was
+/// restricted by a module selector.
+///
+/// To use this, perform the lookup again without its module selector and
+/// construct a \c ModuleSelectorCorrection from the lookup result. If
+/// there are any results, the \c diagnose() method will emit an error and a
+/// set of fix-it notes.
+class ModuleSelectorCorrection {
+  enum class CandidateKind {
+    /// A declaration that is found without depending on context.
+    /// Usually either a top-level type or a member with an explicit base type.
+    ContextFree,
+    /// A member declaration accessed via implicit \c self .
+    MemberViaSelf,
+    /// A member declaration not accessed via implicit \c self (usually a static
+    /// member of an enclosing type).
+    MemberViaContext,
+    /// A local declaration.
+    Local
+  };
+
+  using CandidateModule = std::pair<Identifier, CandidateKind>;
+  SmallSetVector<CandidateModule, 4> candidateModules;
+
+public:
+  ModuleSelectorCorrection(const LookupResult &candidates);
+  ModuleSelectorCorrection(const LookupTypeResult &candidates);
+  ModuleSelectorCorrection(const SmallVectorImpl<ValueDecl *> &candidates);
+  ModuleSelectorCorrection(const SmallVectorImpl<constraints::OverloadChoice> &candidates);
+
+  /// Emit an error and warnings if there were any candidates.
+  ///
+  /// \returns \c true if an error was diagnosed.
+  bool diagnose(ASTContext &ctx,
+                DeclNameLoc nameLoc,
+                DeclNameRef originalName) const;
 };
 
 /// Describes the kind of checked cast operation being performed.
@@ -298,6 +360,18 @@ enum class CheckedCastContextKind {
   /// Coerce to checked cast. Used when we verify if it is possible to
   /// suggest to convert a coercion to a checked cast.
   Coercion,
+};
+
+/// Determines which BraceStmts should be type-checked.
+enum class BraceStmtChecking {
+  /// Type-check all BraceStmts. This should always be the case for regular
+  /// type-checking.
+  All,
+
+  /// Only type-check the body of a do-catch statement, not including catch
+  /// clauses. This is necessary for completion where we still need the caught
+  /// error type to be computed.
+  OnlyDoCatchBody,
 };
 
 namespace TypeChecker {
@@ -463,7 +537,7 @@ bool typeCheckStmtConditionElement(StmtConditionElement &elt, bool &isFalsable,
 ConcreteDeclRef getReferencedDeclForHasSymbolCondition(Expr *E);
 
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
-                      bool LeaveBodyUnchecked = false);
+                      BraceStmtChecking braceChecking = BraceStmtChecking::All);
 
 /// Try to apply the result builder transform of the given builder type
 /// to the body of the function.
@@ -477,6 +551,8 @@ std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
 
 bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
+void collectReferencedGenericParams(Type ty, SmallPtrSet<CanType, 4> &referenced);
+
 Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
                                Type paramType, bool isAutoClosure,
                                bool atCallerSide);
@@ -485,8 +561,11 @@ void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
 void typeCheckDecl(Decl *D);
 
+void checkCircularOpaqueReturnTypeDecl(OpaqueTypeDecl *opaqueDecl);
+
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
+void checkDeclABIAttribute(Decl *apiDecl, ABIAttr *abiAttr);
 void checkClosureAttributes(ClosureExpr *closure);
 void checkParameterList(ParameterList *params, DeclContext *owner);
 
@@ -537,8 +616,17 @@ void diagnoseRequirementFailure(
 /// requirements and report on any requirement failures in detail for
 /// diagnostic needs.
 CheckGenericArgumentsResult
-checkGenericArgumentsForDiagnostics(ArrayRef<Requirement> requirements,
+checkGenericArgumentsForDiagnostics(GenericSignature signature,
+                                    ArrayRef<Requirement> requirements,
                                     TypeSubstitutionFn substitutions);
+
+/// Check the given generic parameter substitutions against the given
+/// generic signature and report on any requirement failures in detail for
+/// diagnostic needs.
+CheckGenericArgumentsResult
+checkGenericArgumentsForDiagnostics(GenericSignature signature,
+                                    TypeSubstitutionFn substitutions);
+
 
 /// Checks whether the generic requirements imposed on the nested type
 /// declaration \p decl (if present) are in agreement with the substitutions
@@ -637,7 +725,7 @@ void filterSolutionsForCodeCompletion(
 /// \returns `true` if target was applicable and it was possible to infer
 /// types for code completion, `false` otherwise.
 bool typeCheckForCodeCompletion(
-    constraints::SyntacticElementTarget &target, bool needsPrecheck,
+    constraints::SyntacticElementTarget &target,
     llvm::function_ref<void(const constraints::Solution &)> callback);
 
 /// Check the key-path expression.
@@ -720,8 +808,10 @@ Pattern *resolvePattern(Pattern *P, DeclContext *dc, bool isStmtCondition);
 ///
 /// \returns the type of the pattern, which may be an error type if an
 /// unrecoverable error occurred. If the options permit it, the type may
-/// involve \c UnresolvedType (for patterns with no type information) and
+/// involve \c PlaceholderType (for patterns with no type information) and
 /// unbound generic types.
+/// TODO: We ought to expose hooks that let callers open the
+/// PlaceholderTypes directly, similar to type resolution.
 Type typeCheckPattern(ContextualPattern pattern);
 
 /// Attempt to simplify an ExprPattern into a BoolPattern or
@@ -765,18 +855,14 @@ bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber,
 ///
 /// \returns true if a failure occurred.
 bool typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
-                              GenericEnvironment *packElementEnv);
+                              bool skipWhereClause);
 
 /// Compute the set of captures for the given closure.
 void computeCaptures(AbstractClosureExpr *ACE);
 
-/// Check for invalid captures from stored property initializers.
-void checkPatternBindingCaptures(IterableDeclContext *DC);
-
-/// Change the context of closures in the given initializer
-/// expression to the given context.
-void contextualizeInitializer(Initializer *DC, Expr *init);
-void contextualizeCallSideDefaultArgument(DeclContext *DC, Expr *init);
+/// Update the DeclContexts for AST nodes in a given DeclContext. This is
+/// necessary after type-checking since autoclosures may have been introduced.
+void contextualizeExpr(Expr *E, DeclContext *DC);
 void contextualizeTopLevelCode(TopLevelCodeDecl *TLCD);
 
 /// Retrieve the default type for the given protocol.
@@ -808,12 +894,21 @@ Expr *addImplicitLoadExpr(
     std::function<void(Expr *, Type)> setType =
         [](Expr *E, Type type) { E->setType(type); });
 
-/// Determine whether the given type contains the given protocol.
+Expr *addImplicitBorrowExpr(
+    ASTContext &Context, Expr *expr,
+    std::function<Type(Expr *)> getType = [](Expr *E) { return E->getType(); },
+    std::function<void(Expr *, Type)> setType =
+        [](Expr *E, Type type) { E->setType(type); });
+
+/// Determine whether the given type either conforms to, or itself an
+/// existential subtype of, the given protocol.
 ///
-/// \returns the conformance, if \c T conforms to the protocol \c Proto, or
-/// an empty optional.
-ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
-                                        bool allowMissing=false);
+/// \returns if the first element of the pair is true, T is an existential
+/// subtype of Proto, and the second element is ignored; if the first element
+/// is false, the second element is the result of the conformance lookup.
+std::pair<bool, ProtocolConformanceRef>
+containsProtocol(Type T, ProtocolDecl *Proto,
+                 bool allowMissing=false);
 
 /// Check whether the type conforms to a given known protocol.
 bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol,
@@ -996,38 +1091,6 @@ bool diagnoseConformanceExportability(SourceLoc loc,
 /// potentially unavailable API elements
 /// @{
 
-/// Returns true if the availability of the witness
-/// is sufficient to safely conform to the requirement in the context
-/// the provided conformance. On return, requiredAvailability holds th
-/// availability levels required for conformance.
-bool isAvailabilitySafeForConformance(
-    const ProtocolDecl *proto, const ValueDecl *requirement,
-    const ValueDecl *witness, const DeclContext *dc,
-    AvailabilityRange &requiredAvailability);
-
-/// Returns the most refined `AvailabilityContext` for the given location.
-/// If `MostRefined` is not `nullptr`, it will be set to the most refined scope
-/// that contains the given location.
-AvailabilityContext
-availabilityAtLocation(SourceLoc loc, const DeclContext *DC,
-                       const AvailabilityScope **MostRefined = nullptr);
-
-/// Returns an over-approximation of the range of operating system versions
-/// that could the passed-in location could be executing upon for
-/// the target platform. If MostRefined != nullptr, set to the most-refined
-/// scope found while approximating.
-AvailabilityRange overApproximateAvailabilityAtLocation(
-    SourceLoc loc, const DeclContext *DC,
-    const AvailabilityScope **MostRefined = nullptr);
-
-/// Walk the AST to build the tree of AvailabilityScopes.
-void buildAvailabilityScopes(SourceFile &SF);
-
-/// Build the hierarchy of AvailabilityScopes for the entire
-/// source file, if it has not already been built. Returns the root
-/// AvailabilityScope for the source file.
-AvailabilityScope *getOrBuildAvailabilityScope(SourceFile *SF);
-
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is potentially unavailable
 /// or None if this is allowed.
@@ -1037,17 +1100,30 @@ diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is unavailable or None if this
 /// is allowed.
-std::optional<Diagnostic> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
+std::optional<Diagnostic>
+diagnosticIfDeclCannotBeUnavailable(const Decl *D, SemanticAvailableAttr attr);
 
-bool checkAvailability(
-    SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
-    const DeclContext *ReferenceDC,
-    llvm::function_ref<InFlightDiagnostic(StringRef, llvm::VersionTuple)>
-        Diagnose);
+/// Emit a warning on the first use of a compatibility memberwise initializer
+/// overload in a SourceFile.
+void diagnoseCompatMemberwiseInitIfNeeded(const ConstructorDecl *init,
+                                          SourceLoc loc);
 
+/// Checks whether the required range of versions of the compilation's target
+/// platform are available at the given `SourceRange`. If not, `Diagnose` is
+/// invoked.
 bool checkAvailability(SourceRange ReferenceRange,
-                       AvailabilityRange RequiredAvailability,
-                       Diag<StringRef, llvm::VersionTuple> Diag,
+                       AvailabilityRange PlatformRange,
+                       const DeclContext *ReferenceDC,
+                       llvm::function_ref<InFlightDiagnostic(AvailabilityDomain,
+                                                             AvailabilityRange)>
+                           Diagnose);
+
+/// Checks whether the required range of versions of the compilation's target
+/// platform are available at the given `SourceRange`. If not, `Diag` is
+/// emitted.
+bool checkAvailability(SourceRange ReferenceRange,
+                       AvailabilityRange PlatformRange,
+                       Diag<AvailabilityDomain, AvailabilityRange> Diag,
                        const DeclContext *ReferenceDC);
 
 void checkConcurrencyAvailability(SourceRange ReferenceRange,
@@ -1231,24 +1307,6 @@ bool diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
                                  std::optional<FunctionTypeRepr *> repr,
                                  DeclContext *dc,
                                  std::optional<TypeResolutionStage> stage);
-
-/// Walk the parallel structure of a type with user-provided placeholders and
-/// an inferred type produced by the type checker. Where placeholders can be
-/// found, suggest the corresponding inferred type.
-///
-/// For example,
-///
-/// \code
-///  func foo(_ x: [_] = [0])
-/// \endcode
-///
-/// Has a written type of `(ArraySlice (Placeholder))` and an inferred type of
-/// `(ArraySlice Int)`, so we walk to `Placeholder` and `Int` in each type and
-/// suggest replacing `_` with `Int`.
-///
-/// \param writtenType The interface type usually derived from a user-written
-/// type repr. \param inferredType The type inferred by the type checker.
-void notePlaceholderReplacementTypes(Type writtenType, Type inferredType);
 } // namespace TypeChecker
 
 /// Returns the protocol requirement kind of the given declaration.
@@ -1409,26 +1467,9 @@ bool checkFallthroughStmt(FallthroughStmt *stmt);
 void checkUnknownAttrRestrictions(
     ASTContext &ctx, CaseStmt *caseBlock, bool &limitExhaustivityChecks);
 
-/// Bind all of the pattern variables that occur within a case statement and
-/// all of its case items to their "parent" pattern variables, forming chains
-/// of variables with the same name.
-///
-/// Given a case such as:
-/// \code
-/// case .a(let x), .b(let x), .c(let x):
-/// \endcode
-///
-/// Each case item contains a (different) pattern variable named.
-/// "x". This function will set the "parent" variable of the
-/// second and third "x" variables to the "x" variable immediately
-/// to its left. A fourth "x" will be the body case variable,
-/// whose parent will be set to the "x" within the final case
-/// item.
-///
-/// Each of the "x" variables must eventually have the same type, and agree on
-/// let vs. var. This function does not perform any of that validation, leaving
-/// it to later stages.
-void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
+/// Diagnoses any mutability mismatches for any same-named variables bound by
+/// given CaseStmt.
+void diagnoseCaseVarMutabilityMismatch(DeclContext *dc, CaseStmt *stmt);
 
 /// If \p attr was added by an access note, wraps the error in
 /// \c diag::wrap_invalid_attr_added_by_access_note and limits it as an access
@@ -1502,11 +1543,19 @@ using RequiredImportAccessLevelCallback =
     std::function<void(AttributedImport<ImportedModule>)>;
 
 /// Make a note that uses of \p decl in \p dc require that the decl's defining
-/// module be imported with an access level that is at least as permissive as \p
-/// accessLevel.
+/// module be imported with an access level that is at least as permissive as
+/// \p accessLevel.
 void recordRequiredImportAccessLevelForDecl(
     const Decl *decl, const DeclContext *dc, AccessLevel accessLevel,
     RequiredImportAccessLevelCallback remark);
+
+/// Make a note that uses of \p decl in \p dc require that the decl's defining
+/// module be imported with an access level that is at least as permissive as
+/// \p accessLevel. If `-Rmodule-api-import` is specified, a remark is emitted.
+void recordRequiredImportAccessLevelForDecl(const ValueDecl *decl,
+                                            const DeclContext *dc,
+                                            AccessLevel accessLevel,
+                                            SourceLoc loc);
 
 /// Report imports that are marked public but are not used in API.
 void diagnoseUnnecessaryPublicImports(SourceFile &SF);
@@ -1516,12 +1565,14 @@ void diagnoseUnnecessaryPublicImports(SourceFile &SF);
 /// delayed, the diagnostic will instead be emitted after type checking the
 /// entire file and will include an appropriate fix-it. Returns true if a
 /// diagnostic was emitted (and not delayed).
-bool maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
-                                         const DeclContext *dc, SourceLoc loc);
+bool maybeDiagnoseMissingImportForMember(
+    const ValueDecl *decl, const DeclContext *dc, SourceLoc loc,
+    DiagnosticBehavior limit = DiagnosticBehavior::Unspecified);
 
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
+
 } // end namespace swift
 
 #endif

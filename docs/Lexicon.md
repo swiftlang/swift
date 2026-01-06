@@ -106,10 +106,14 @@ This can be used as input to IRGen to generate LLVM IR or object files.
 
 ## canonical type
 
-A unique representation of a type, with any [sugar](#sugared-type) removed.
-These can usually be directly compared to test whether two types are the
-same; the exception is when generics get involved. In this case you'll need
-a [generic environment](#generic-environment). Contrast with [sugared type](#sugared-type).
+A type with [sugar](#sugared-type) removed. These can be compared for
+pointer equality to test whether two types are equivalent in the language
+semantics.
+
+Note that canonical types are independent of the generic signature, so
+two [type parameters](#type-parameter) that are spelled differently but
+related by a same-type requirement are not canonically equal. However,
+they will have the same [reduced type](#reduced-type).
 
 ## Clang importer
 
@@ -120,17 +124,19 @@ running inside the Swift compiler, which is also used during IRGen.
 ## conformance
 
 A construct detailing how a particular type conforms to a particular
-protocol. Represented in the compiler by the ProtocolConformance type at
-the AST level. See also [witness table](#witness-table).
+protocol. Represented in the compiler by the `ProtocolConformanceRef` type`.
+See also [witness table](#witness-table).
 
 ## contextual type
+
+This has two unrelated meanings:
 
 1. The expected type for a Swift sub-expression based on the rest of the
    statement. For example, in the statement `print(6 * 9)`, the contextual
    type of the expression `6 * 9` is `Any`.
-2. The type of a value or declaration from inside a potentially generic
-   context. This type may contain [archetypes](#archetype) and cannot be
-   used directly from outside the context. Compare with [interface type](#interface-type).
+2. A type that does not contain [type parameters](#type-parameters), but may
+   contain [archetypes](#archetype). Compare with
+   [interface type](#interface-type).
 
 ## critical edge
 
@@ -176,7 +182,14 @@ one half of the necessary information to complete a full dependency edge.
 The other half is provided by corresponding
 [dependency sink](#dependency-sink) requests.
 
-## DI (definite initialization / definitive initialization)
+## dependent member type
+
+One of the two kinds of [type parameters](#type-parameters). Consists of a
+base type, together with the name of an associated type. The base type is
+some other type parameter, and the associated type must be declared in some
+protocol that the base type conforms to.
+
+## DI (definite initialization)
 
 The feature that no uninitialized variables, constants, or properties will
 be read by a program, or the analysis pass that operates on [SIL](#sil) to
@@ -202,6 +215,30 @@ the same bug ("I have a dup of this"); as a verb, the act of marking a bug
 written "dupe". Pronounced the same way as the first syllable of
 "duplicate", which for most American English speakers is "doop".
 
+## equivalence class
+
+Given an [equivalence relation](#equivalence-relation) over some set, together
+with an element of that set, the equivalence class of that element is the subset
+of all elements equivalent to this element.
+
+A fact of mathematics is that every element of the set belongs to exactly one
+equivalence class, so the equivalence classes form a disjoint partition of the set.
+
+## equivalence relation
+
+A relation `R` over some set `S` is an _equivalence relation_ if:
+
+1. It is _reflexive_, which means that for all `x` in `S`, we have `x R x`.
+2. It is _symmetric_, which means that any `x` and `y` in `S` that satisfy `x R y`
+   also satisfy `y R x`.
+3. It is _transitive_, which means that for any `x`, `y`, and `z` in `S` that
+   satisfy `x R y` and `y R z`, we have `x R z`.
+
+Most of the time, the notion of value equality in programming defines an
+equivalence relation over the values of some type. A notable exception is
+floating point equality, which fails to be reflexive, because under the
+rules of IEEE floating point arithmetic, a NaN value is not equal to itself.
+
 ## existential type
 
 A type that is a protocol composition (including a single protocol and *zero* protocols; the latter is the `Any` type).
@@ -216,6 +253,13 @@ A module build where all dependency modules (including Clang modules) are
 passed to the compiler explicitly by an external build system, including
 any modules in caches. See also: [implicit module build](#implicit-module-build)
 and [fast dependency scanner](#fast-dependency-scanner).
+
+## generic parameter type
+
+One of the two kinds of [type parameters](#type-parameters). Declared within a
+generic parameter list, like `<T, U>`, attached to a generic declaration like
+`struct Pair<T, U> {...}`. Uniquely identified within its lexical scope by two
+integers, called the _depth_ and the _index_ of the generic parameter type.
 
 ## fast dependency scanner
 
@@ -242,19 +286,16 @@ Describes contributions which fix code that is not executed
 
 ## generic environment
 
-Provides context for interpreting a type that may have generic parameters
-in it. Generic parameter types are normally just represented as "first
-generic parameter in the outermost context" (or similar), so it's up to the
-generic environment to note that type must be a Collection. (Another
-way of looking at it is that the generic environment connects
-[interface types](#interface-type) with
-[contextual types](#contextual-type)).
+A mapping from [type parameters](#type-parameter) to [archetypes](#archetypes).
+Every generic signature has a _primary_ generic environment associated with it.
+
+Other kinds of generic environments exist for instantiating archetypes that
+represent opaque return types, and opened existentials.
 
 ## generic signature
 
-A representation of all generic parameters and their requirements. Like
-types, generic signatures can be [canonicalized](#canonical-type) to be
-compared directly.
+A representation of all generic parameters and the requirements imposed upon
+them within the lexical scope of a declaration.
 
 ## GOT
 
@@ -270,7 +311,8 @@ to describe the way it forms references to global objects that may or may not be
 
 ## iff
 
-["if and only if"](https://en.wikipedia.org/wiki/If_and_only_if). This term comes from mathematics.
+["if and only if"](https://en.wikipedia.org/wiki/If_and_only_if).
+This term comes from mathematics.
 
 ## implicit module build
 
@@ -558,6 +600,18 @@ See also: Mike Ash's blog post on
 [Objective-C Class Loading and Initialization](https://www.mikeash.com/pyblog/friday-qa-2009-05-22-objective-c-class-loading-and-initialization.html),
 which covers `+load` and `+initialize` in more detail.
 
+## reduced type
+
+A [canonical type](#canonical-type) which has been further simplified with
+respect to a [generic signature](#generic-signature), by performing two
+transformations until fixed point:
+1. Replacing type parameters fixed to concrete types with those concrete type.s
+2. Replacing all other type parameters with the smallest member of their
+   [equivalence class](#equivalence-class), chosen according to a well-founded
+   linear order.
+
+See also [sugared type](#sugared-type).
+
 ## refutable pattern
 
 A pattern that may not always match. These include patterns such as:
@@ -620,7 +674,9 @@ A type that may have been written in a more convenient way, using special
 language syntax or a typealias. (For example, `Int?` is the sugared form
 of `Optional<Int>`.) Sugared types preserve information about the form
 and use of the type even though the behavior usually does not change
-(except for things like access control). Contrast with [canonical type](#canonical-type).
+(except for things like access control).
+
+See also [canonical type](#canonical-type), [reduced type](#reduced-type).
 
 ## TBD
 
@@ -650,6 +706,16 @@ out-of-bounds index on an Array results in a trap") and a verb
 
 The runtime representation of a type, and everything you can do with it.
 Like a `Class` in Objective-C, but for any type.
+
+## type parameter
+
+A type that can be used within the body of a generic declaration, that
+abstracts over a concrete replacement type provided by the caller of a
+generic declaration.
+
+More specifically, a type parameter is either a
+[generic parameter type](#generic-parameter-type), or a
+[dependent member type](#dependent-member-type).
 
 ## USR
 

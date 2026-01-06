@@ -2,17 +2,17 @@
 // RUN:   -Xllvm -sil-print-types -Xllvm -sil-print-after=lifetime-dependence-insertion \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
-  @lifetime(borrow p)
+  @_lifetime(borrow p)
   init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
@@ -24,7 +24,7 @@ struct NC : ~Copyable {
   let i: Int
 
   // Requires a borrow.
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   borrowing func getBV() -> BV {
     BV(p, i)
   }
@@ -59,7 +59,7 @@ func bv_borrow_var(p: UnsafeRawPointer, i: Int) {
 // CHECK: [[MD:%.*]] = mark_dependence [unresolved] [[BV]] : $BV on %0 : $UnsafePointer<Int>
 // CHECK: return [[MD]] : $BV
 // CHECK-LABEL: } // end sil function '$s4test18bv_pointer_convert1pAA2BVVSPySiG_tF'
-@lifetime(borrow p)
+@_lifetime(borrow p)
 func bv_pointer_convert(p: UnsafePointer<Int>) -> BV {
   BV(p, 0)
 }

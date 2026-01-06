@@ -16,6 +16,9 @@ import ImportsMacroSpecificClangModule
 // CHECK-DAG:          "swift": "Swift"
 // CHECK-DAG:          "swift": "SwiftOnoneSupport"
 
+// Additional occurence in source-imported dependencies field
+//CHECK:      "swift": "ImportsMacroSpecificClangModule"
+
 //CHECK:      "swift": "ImportsMacroSpecificClangModule"
 //CHECK-NEXT:    },
 //CHECK-NEXT:    {
@@ -48,7 +51,7 @@ import ImportsMacroSpecificClangModule
 // CHECK-NEXT:      "sourceFiles": [
 // CHECK-DAG:        "{{.*}}OnlyWithMacro.h"
 // CHECK-DAG:        "{{.*}}module.modulemap"
-// CHECK-NEXT:      ],
+// CHECK:           ],
 // CHECK-NEXT:      "directDependencies": [
 // CHECK-NEXT:      ],
 // CHECK-NEXT:      "linkLibraries": [

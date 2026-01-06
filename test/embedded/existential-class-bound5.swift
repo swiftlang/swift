@@ -1,8 +1,7 @@
-// RUN: %target-swift-emit-ir -parse-as-library -module-name main -verify %s -enable-experimental-feature Embedded -wmo
+// RUN: %target-swift-emit-ir -parse-as-library -module-name main -verify %s -enable-experimental-feature Embedded -wmo -disable-experimental-feature EmbeddedExistentials
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_feature_Embedded
 
 protocol ClassBound: AnyObject {
@@ -23,8 +22,7 @@ func test(existential: any ClassBound) {
 }
 
 func test(existential: any NotClassBound) {
-    existential.foo() // expected-error {{cannot use a value of protocol type in embedded Swift}}
-                      // expected-note@+3 {{called from here}}
+    existential.foo() // expected-error {{cannot use a value of protocol type 'any NotClassBound' in embedded Swift}}
 }
 
 @main

@@ -183,8 +183,6 @@ entry(%b : $*MOStruct):
 
 // CHECK-LABEL: define{{.*}}@destroy_enum_value(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    trunc
-// CHECK-NEXT:    zext
 // CHECK-NEXT:    call{{.*}}@destroy_enum(
 // CHECK-NEXT:    ret void
 sil @destroy_enum_value : $@convention(thin) (@owned MOEnum) -> () {
@@ -198,7 +196,6 @@ entry(%b : $MOEnum):
 // CHECK-NEXT:    load
 // CHECK-NEXT:    getelementptr
 // CHECK-NEXT:    load
-// CHECK-NEXT:    zext
 // CHECK-NEXT:    call{{.*}}@destroy_enum(
 // CHECK-NEXT:    ret void
 sil @destroy_enum_value_indirect : $@convention(thin) (@in MOEnum) -> () {
@@ -209,7 +206,7 @@ entry(%b : $*MOEnum):
 
 // CHECK-LABEL: define{{.*}}@destroy_combo_struct_value(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:   call {{.*}} @[[COMBO_STRUCT_OUTLINED_DESTROY:"\$.*13MOComboStructVWOs"]](
+// CHECK-NEXT:   call {{.*}} @[[COMBO_STRUCT_OUTLINED_DESTROY:"\$.*13MOComboStructVWOh"]](
 // CHECK-NEXT:   ret void
 sil @destroy_combo_struct_value : $@convention(thin) (@owned MOComboStruct) -> () {
 entry(%b : $MOComboStruct):

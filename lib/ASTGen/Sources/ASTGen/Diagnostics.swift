@@ -1,4 +1,4 @@
-//===----------------------------------------------------------------------===//
+//===--- Diagnostics.swift ------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -131,6 +131,30 @@ extension ASTGenDiagnostic {
   }
 }
 
+/// Decl diagnostics
+extension ASTGenDiagnostic {
+  static func illegalTopLevelStmt(_ stmt: some SyntaxProtocol) -> Self {
+    Self(
+      node: stmt,
+      message: "statements are not allowed at the top level"
+    )
+  }
+
+  static func illegalTopLevelExpr(_ expr: some SyntaxProtocol) -> Self {
+    Self(
+      node: expr,
+      message: "expressions are not allowed at the top level"
+    )
+  }
+
+  static func invalidDefaultIsolationSpecifier(_ specifier: some SyntaxProtocol) -> Self {
+    Self(
+      node: specifier,
+      message: "default isolation can only be set to '@MainActor' or 'nonisolated'"
+    )
+  }
+}
+
 /// DeclAttributes diagnostics
 extension ASTGenDiagnostic {
   static func expectedArgumentsInAttribute(_ attribute: AttributeSyntax) -> Self {
@@ -145,6 +169,16 @@ extension ASTGenDiagnostic {
     Self(
       node: extra,
       message: "unexpected arguments in '\(attribute.attributeName.trimmedDescription)' attribute"
+    )
+  }
+}
+
+extension ASTGenDiagnostic {
+  static func poundDiagnostic(_ node: StringLiteralExprSyntax, message: String, isError: Bool) -> Self {
+    Self(
+      node: node,
+      message: node.representedLiteralValue!,
+      severity: isError ? .error : .warning
     )
   }
 }

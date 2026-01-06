@@ -43,12 +43,12 @@ __all__ = [
 
 # Options that can be "configured" by command line options
 
-BUILD_VARIANT = 'Debug'
+BUILD_VARIANT = 'RelWithDebInfo'
 CMAKE_GENERATOR = 'Ninja'
 
 COMPILER_VENDOR = 'none'
-SWIFT_USER_VISIBLE_VERSION = Version('6.2')
-CLANG_USER_VISIBLE_VERSION = Version('17.0.0')
+SWIFT_USER_VISIBLE_VERSION = Version('6.3')
+CLANG_USER_VISIBLE_VERSION = Version('21.0.0')
 SWIFT_ANALYZE_CODE_COVERAGE = 'false'
 
 DARWIN_XCRUN_TOOLCHAIN = 'default'
@@ -122,6 +122,8 @@ def llvm_install_components():
     """Convenience function for getting the default llvm install components for
     platforms.
     """
+    # llvm build product will take care of replacing compiler-rt with
+    # builtins,runtimes if need be
     components = ['llvm-ar', 'llvm-cov', 'llvm-profdata', 'IndexStore', 'clang',
                   'clang-resource-headers', 'compiler-rt', 'clangd', 'LTO',
                   'lld']

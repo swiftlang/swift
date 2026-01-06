@@ -21,6 +21,7 @@
 #include "TypoCorrection.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -59,6 +60,7 @@ namespace {
   class LookupResultBuilder {
     LookupResult &Result;
     DeclContext *DC;
+    Identifier ModuleSelector;
     NameLookupOptions Options;
 
     /// The vector of found declarations.
@@ -71,8 +73,9 @@ namespace {
 
   public:
     LookupResultBuilder(LookupResult &result, DeclContext *dc,
-                        NameLookupOptions options)
-      : Result(result), DC(dc), Options(options) {
+                        Identifier moduleSelector, NameLookupOptions options)
+      : Result(result), DC(dc), ModuleSelector(moduleSelector), Options(options)
+    {
       if (dc->getASTContext().isAccessControlDisabled())
         Options |= NameLookupFlags::IgnoreAccessControl;
     }
@@ -81,6 +84,11 @@ namespace {
       // Remove any overridden declarations from the found-declarations set.
       removeOverriddenDecls(FoundDecls);
       removeOverriddenDecls(FoundOuterDecls);
+
+      // Remove any declarations excluded by the module selector from the
+      // found-declarations set.
+      removeOutOfModuleDecls(FoundDecls, ModuleSelector, DC);
+      removeOutOfModuleDecls(FoundOuterDecls, ModuleSelector, DC);
 
       // Remove any shadowed declarations from the found-declarations set.
       removeShadowedDecls(FoundDecls, DC);
@@ -252,27 +260,36 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
   return newOptions;
 }
 
+/// HACK: Qualified lookup cannot be allowed to synthesize CodingKeys because
+/// it would lead to a number of egregious cycles through QualifiedLookupRequest
+/// when we resolve the protocol conformance. Codable's magic has pushed its way
+/// so deeply into the compiler, when doing unqualified lookup we have to
+/// pessimistically force every nominal context above this one to synthesize it
+/// in the event the user needs it from e.g. a non-primary input.
+///
+/// We can undo this if Codable's semantic content is divorced from its
+/// syntactic content - so we synthesize just enough to allow lookups to
+/// succeed, but don't force protocol conformances while we're doing it.
+static void synthesizeCodingKeysIfNeededForUnqualifiedLookup(ASTContext &ctx,
+                                                             DeclContext *dc,
+                                                             DeclNameRef name) {
+  if (!name.isSimpleName(ctx.Id_CodingKeys))
+    return;
+
+  for (auto typeCtx = dc->getInnermostTypeContext(); typeCtx != nullptr;
+       typeCtx = typeCtx->getParent()->getInnermostTypeContext()) {
+    if (auto *nominal = typeCtx->getSelfNominalTypeDecl())
+      nominal->synthesizeSemanticMembersIfNeeded(name.getFullName());
+  }
+}
+
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
   auto &ctx = dc->getASTContext();
-  // HACK: Qualified lookup cannot be allowed to synthesize CodingKeys because
-  // it would lead to a number of egregious cycles through
-  // QualifiedLookupRequest when we resolve the protocol conformance. Codable's
-  // magic has pushed its way so deeply into the compiler, we have to
-  // pessimistically force every nominal context above this one to synthesize
-  // it in the event the user needs it from e.g. a non-primary input.
-  // We can undo this if Codable's semantic content is divorced from its
-  // syntactic content - so we synthesize just enough to allow lookups to
-  // succeed, but don't force protocol conformances while we're doing it.
-  if (name.getBaseIdentifier() == ctx.Id_CodingKeys) {
-    for (auto typeCtx = dc->getInnermostTypeContext(); typeCtx != nullptr;
-         typeCtx = typeCtx->getParent()->getInnermostTypeContext()) {
-      if (auto *nominal = typeCtx->getSelfNominalTypeDecl()) {
-        nominal->synthesizeSemanticMembersIfNeeded(name.getFullName());
-      }
-    }
-  }
+
+  // HACK: Synthesize CodingKeys if needed.
+  synthesizeCodingKeysIfNeededForUnqualifiedLookup(ctx, dc, name);
 
   auto ulOptions = convertToUnqualifiedLookupOptions(options);
   auto descriptor = UnqualifiedLookupDescriptor(name, dc, loc, ulOptions);
@@ -280,7 +297,10 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
                                   UnqualifiedLookupRequest{descriptor}, {});
 
   LookupResult result;
-  LookupResultBuilder builder(result, dc, options);
+  // Disable module selector filtering--UnqualifiedLookupRequest should have
+  // done it.
+  LookupResultBuilder builder(result, dc, /*moduleSelector=*/Identifier(),
+                              options);
   for (auto idx : indices(lookup.allResults())) {
     const auto &found = lookup[idx];
     // Determine which type we looked through to find this result.
@@ -289,7 +309,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
     if (auto *typeDC = found.getDeclContext()) {
       if (!typeDC->isTypeContext()) {
         // If we don't have a type context this is an implicit 'self' reference.
-        if (auto *CE = dyn_cast<ClosureExpr>(typeDC)) {
+        if (isa<ClosureExpr>(typeDC)) {
           typeDC = typeDC->getInnermostTypeContext();
         } else {
           // Otherwise, we must have the method context.
@@ -297,7 +317,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
         }
         assert(typeDC->isTypeContext());
       }
-      foundInType = dc->mapTypeIntoContext(
+      foundInType = dc->mapTypeIntoEnvironment(
         typeDC->getDeclaredInterfaceType());
       assert(foundInType && "bogus base declaration?");
     }
@@ -314,6 +334,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclNameRef name,
                                    SourceLoc loc,
                                    NameLookupOptions options) {
   auto &ctx = dc->getASTContext();
+
   auto ulOptions = convertToUnqualifiedLookupOptions(options) |
                    UnqualifiedLookupFlags::TypeLookup;
   {
@@ -322,8 +343,15 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclNameRef name,
         name, dc, loc,
         ulOptions - UnqualifiedLookupFlags::AllowProtocolMembers);
 
-    auto lookup =
-        evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
+    UnqualifiedLookupRequest req(desc);
+    auto lookup = evaluateOrDefault(ctx.evaluator, req, {});
+
+    // HACK: Try synthesize CodingKeys if we got an empty result.
+    if (lookup.allResults().empty() && name.isSimpleName(ctx.Id_CodingKeys)) {
+      synthesizeCodingKeysIfNeededForUnqualifiedLookup(ctx, dc, name);
+      lookup = evaluateOrDefault(ctx.evaluator, req, {});
+    }
+
     if (!lookup.allResults().empty())
       return lookup;
   }
@@ -363,7 +391,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   // Make sure we've resolved implicit members, if we need them.
   namelookup::installSemanticMembersIfNeeded(type, name);
 
-  LookupResultBuilder builder(result, dc, options);
+  LookupResultBuilder builder(result, dc, name.getModuleSelector(), options);
   SmallVector<ValueDecl *, 4> lookupResults;
   dc->lookupQualified(type, name, loc, subOptions, lookupResults);
 
@@ -408,7 +436,7 @@ TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
     // Non-generic type aliases can only be accessed if the
     // underlying type is not dependent.
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      if (!aliasDecl->isGeneric() &&
+      if (!aliasDecl->hasGenericParamList() &&
           aliasDecl->getUnderlyingType()->hasTypeParameter() &&
           !doesTypeAliasFullyConstrainAllOuterGenericParams(aliasDecl)) {
         return UnsupportedMemberTypeAccessKind::TypeAliasOfUnboundGeneric;
@@ -785,7 +813,50 @@ TypoCorrectionResults::claimUniqueCorrection() {
   return SyntacticTypoCorrection(WrittenName, Loc, uniqueCorrectedName);
 }
 
+/// Returns a sorted vector of modules that are not imported in the given
+/// `SourceFile` and must be in order to make declarations from \p owningModule
+/// visible.
+static SmallVector<ModuleDecl *, 2>
+missingImportsForDefiningModule(ModuleDecl *owningModule, SourceFile &sf) {
+  SmallVector<ModuleDecl *, 2> result;
+  auto &ctx = sf.getASTContext();
+
+  if (auto *declaringModule =
+          owningModule->getDeclaringModuleIfCrossImportOverlay()) {
+    // If the module that owns the declaration is a cross import overlay the
+    // fix-its should suggest importing the declaring and bystanding modules,
+    // not the overlay module.
+    result.push_back(declaringModule);
+
+    SmallVector<Identifier, 2> bystanders;
+    if (owningModule->getRequiredBystandersIfCrossImportOverlay(declaringModule,
+                                                                bystanders)) {
+      for (auto bystander : bystanders) {
+        if (auto bystanderModule = ctx.getModuleByIdentifier(bystander))
+          result.push_back(bystanderModule);
+      }
+    }
+
+    // Remove the modules that are already imported by the source file.
+    auto &importCache = ctx.getImportCache();
+    const DeclContext *dc = &sf;
+    llvm::erase_if(result, [&](ModuleDecl *candidate) {
+      return importCache.isImportedBy(candidate, dc);
+    });
+  } else {
+    // Just the module that owns the declaration is required.
+    result.push_back(owningModule);
+  }
+
+  std::sort(result.begin(), result.end(), [](ModuleDecl *LHS, ModuleDecl *RHS) {
+    return LHS->getNameStr() < RHS->getNameStr();
+  });
+
+  return result;
+}
+
 struct MissingImportFixItInfo {
+  const ModuleDecl *moduleToImport = nullptr;
   OptionSet<ImportFlags> flags;
   std::optional<AccessLevel> accessLevel;
 };
@@ -793,16 +864,21 @@ struct MissingImportFixItInfo {
 class MissingImportFixItCache {
   SourceFile &sf;
   llvm::DenseMap<const ModuleDecl *, MissingImportFixItInfo> infos;
+  bool internalImportsByDefaultEnabled;
 
 public:
-  MissingImportFixItCache(SourceFile &sf) : sf(sf){};
+  MissingImportFixItCache(SourceFile &sf)
+      : sf(sf),
+        internalImportsByDefaultEnabled(sf.getASTContext().LangOpts.hasFeature(
+            Feature::InternalImportsByDefault)) {};
 
-  MissingImportFixItInfo getInfo(const ModuleDecl *mod) {
+  MissingImportFixItInfo getFixItInfo(ModuleDecl *mod) {
     auto existing = infos.find(mod);
     if (existing != infos.end())
       return existing->getSecond();
 
     MissingImportFixItInfo info;
+    info.moduleToImport = mod;
 
     // Find imports of the defining module in other source files and aggregate
     // the attributes and access level usage on those imports collectively. This
@@ -826,40 +902,62 @@ public:
 
     // Add an appropriate access level as long as it would not conflict with
     // existing imports that lack access levels.
-    if (!foundImport || anyImportHasAccessLevel)
-      info.accessLevel = sf.getMaxAccessLevelUsingImport(mod);
+    auto accessLevelForImport = [&]() -> std::optional<AccessLevel> {
+      auto maxAccessLevel = sf.getMaxAccessLevelUsingImport(mod);
+      if (internalImportsByDefaultEnabled) {
+        if (!foundImport && maxAccessLevel <= AccessLevel::Internal)
+          return std::nullopt;
+      }
 
+      if (foundImport && !anyImportHasAccessLevel)
+        return std::nullopt;
+
+      return maxAccessLevel;
+    };
+
+    info.accessLevel = accessLevelForImport();
     infos[mod] = info;
     return info;
   }
+
+  std::pair<SmallVector<ModuleDecl *, 2>,
+            SmallVector<MissingImportFixItInfo, 2>>
+  getModulesAndFixIts(ModuleDecl *mod) {
+    auto modulesToImport = missingImportsForDefiningModule(mod, sf);
+    SmallVector<MissingImportFixItInfo, 2> fixItInfos;
+
+    for (auto *mod : modulesToImport) {
+      fixItInfos.emplace_back(getFixItInfo(mod));
+    }
+
+    return {modulesToImport, fixItInfos};
+  }
 };
 
-static void diagnoseMissingImportForMember(const ValueDecl *decl,
-                                           SourceFile *sf, SourceLoc loc) {
+static void diagnoseMissingImportsForMember(
+    const ValueDecl *decl, SmallVectorImpl<ModuleDecl *> &modulesToImport,
+    SourceFile *sf, SourceLoc loc, DiagnosticBehavior limit) {
   auto &ctx = sf->getASTContext();
-  auto definingModule = decl->getModuleContextForNameLookup();
-  ctx.Diags.diagnose(loc, diag::candidate_from_missing_import,
-                     decl->getDescriptiveKind(), decl->getName(),
-                     definingModule);
+  auto count = modulesToImport.size();
+  ASSERT(count > 0);
+
+  if (count > 1) {
+    ctx.Diags
+        .diagnose(loc, diag::member_from_missing_imports_2_or_more, decl,
+                  bool(count > 2), modulesToImport[0], modulesToImport[1])
+        .limitBehavior(limit);
+  } else {
+    ctx.Diags
+        .diagnose(loc, diag::member_from_missing_import, decl,
+                  modulesToImport.front())
+        .limitBehavior(limit);
+  }
 }
 
-static void
-diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
-                                     SourceLoc loc,
-                                     MissingImportFixItCache &fixItCache) {
-
-  diagnoseMissingImportForMember(decl, sf, loc);
-
-  auto &ctx = sf->getASTContext();
-  auto definingModule = decl->getModuleContextForNameLookup();
-  SourceLoc bestLoc = ctx.Diags.getBestAddImportFixItLoc(decl, sf);
-  if (!bestLoc.isValid())
-    return;
-
-  llvm::SmallString<64> importText;
-
+static void appendMissingImportFixIt(llvm::SmallString<64> &importText,
+                                     const MissingImportFixItInfo &fixItInfo,
+                                     ASTContext &ctx) {
   // Add flags that must be used consistently on every import in every file.
-  auto fixItInfo = fixItCache.getInfo(definingModule);
   if (fixItInfo.flags.contains(ImportFlags::ImplementationOnly))
     importText += "@_implementationOnly ";
   if (fixItInfo.flags.contains(ImportFlags::WeakLinked))
@@ -877,68 +975,294 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
       importText += "@_spiOnly ";
   }
 
-  // Add @_spi groups if needed for the declaration.
-  if (decl->isSPI()) {
-    auto spiGroups = decl->getSPIGroups();
-    if (!spiGroups.empty()) {
-      importText += "@_spi(";
-      importText += spiGroups[0].str();
-      importText += ") ";
-    }
-  }
-
   if (explicitAccessLevel) {
     importText += getAccessLevelSpelling(*explicitAccessLevel);
     importText += " ";
   }
 
   importText += "import ";
-  importText += definingModule->getName().str();
+  importText += fixItInfo.moduleToImport->getName().str();
   importText += "\n";
-  ctx.Diags.diagnose(bestLoc, diag::candidate_add_import, definingModule)
-      .fixItInsert(bestLoc, importText);
+}
+
+static void emitMissingImportNoteAndFixIt(
+    SourceLoc loc, const MissingImportFixItInfo &fixItInfo, ASTContext &ctx) {
+  llvm::SmallString<64> importText;
+  appendMissingImportFixIt(importText, fixItInfo, ctx);
+  ctx.Diags
+      .diagnose(loc, diag::candidate_add_import, fixItInfo.moduleToImport)
+      .fixItInsert(loc, importText);
+}
+
+static void
+diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
+                                     SourceLoc loc, DiagnosticBehavior limit,
+                                     MissingImportFixItCache &fixItCache) {
+
+  auto modulesAndFixits =
+      fixItCache.getModulesAndFixIts(decl->getModuleContextForNameLookup());
+  auto modulesToImport = modulesAndFixits.first;
+  auto fixItInfos = modulesAndFixits.second;
+
+  if (modulesToImport.empty())
+    return;
+
+  diagnoseMissingImportsForMember(decl, modulesToImport, sf, loc, limit);
+
+  auto &ctx = sf->getASTContext();
+  SourceLoc bestLoc = ctx.Diags.getBestAddImportFixItLoc(sf);
+  if (!bestLoc.isValid())
+    return;
+
+  for (auto &fixItInfo : fixItInfos) {
+    emitMissingImportNoteAndFixIt(bestLoc, fixItInfo, ctx);
+  }
 }
 
 bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
                                                 const DeclContext *dc,
-                                                SourceLoc loc) {
-  if (dc->isDeclImported(decl))
-    return false;
-
-  if (dc->getASTContext().LangOpts.EnableCXXInterop) {
-    // With Cxx interop enabled, there are some declarations that always belong
-    // to the Clang header import module which should always be implicitly
-    // visible. However, that module is not implicitly imported in source files
-    // so we need to special case it here and avoid diagnosing.
-    if (decl->getModuleContextForNameLookup()->isClangHeaderImportModule())
-      return false;
-  }
-
+                                                SourceLoc loc,
+                                                DiagnosticBehavior limit) {
+  // Only diagnose references in source files.
   auto sf = dc->getParentSourceFile();
   if (!sf)
     return false;
 
   auto &ctx = dc->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                          /*allowMigration=*/true))
+    return false;
+
+  // Only diagnose members.
+  if (!decl->getDeclContext()->isTypeContext())
+    return false;
+
+  // Only diagnose declarations that haven't been imported.
+  if (dc->isDeclImported(decl))
+    return false;
+
+  auto definingModule = decl->getModuleContextForNameLookup();
+  if (ctx.LangOpts.EnableCXXInterop) {
+    // With Cxx interop enabled, there are some declarations that always belong
+    // to the Clang header import module which should always be implicitly
+    // visible. However, that module is not implicitly imported in source files
+    // so we need to special case it here and avoid diagnosing.
+    if (definingModule->isClangHeaderImportModule())
+      return false;
+  }
 
   // In lazy typechecking mode just emit the diagnostic immediately without a
   // fix-it since there won't be an opportunity to emit delayed diagnostics.
   if (ctx.TypeCheckerOpts.EnableLazyTypecheck) {
-    diagnoseMissingImportForMember(decl, sf, loc);
+    // Lazy type-checking and migration for MemberImportVisibility are
+    // completely incompatible, so just skip the diagnostic entirely.
+    if (ctx.LangOpts.isMigratingToFeature(Feature::MemberImportVisibility))
+      return false;
+
+    auto modulesToImport = missingImportsForDefiningModule(definingModule, *sf);
+    if (modulesToImport.empty())
+      return false;
+
+    diagnoseMissingImportsForMember(decl, modulesToImport, sf, loc, limit);
     return true;
   }
 
-  sf->addDelayedMissingImportForMemberDiagnostic(decl, loc);
+  sf->addDelayedMissingImportForMemberDiagnostic(decl, loc, limit);
   return false;
 }
 
+void migrateToMemberImportVisibility(SourceFile &sf) {
+  auto delayedDiags = sf.takeDelayedMissingImportForMemberDiagnostics();
+  if (delayedDiags.empty())
+    return;
+
+  auto &ctx = sf.getASTContext();
+  auto bestLoc = ctx.Diags.getBestAddImportFixItLoc(&sf);
+  if (bestLoc.isInvalid())
+    return;
+
+  // Collect the distinct modules that need to be imported and map them
+  // to the collection of declarations which are used in the file and belong
+  // to the module.
+  llvm::SmallVector<ModuleDecl *, 8> modulesToImport;
+  llvm::SmallDenseMap<ModuleDecl *, std::vector<const ValueDecl *>>
+      declsByModuleToImport;
+  for (auto declAndLocs : delayedDiags) {
+    auto decl = declAndLocs.first;
+    auto definingModules = missingImportsForDefiningModule(
+        decl->getModuleContextForNameLookup(), sf);
+
+    for (auto definingModule : definingModules) {
+      auto existing = declsByModuleToImport.find(definingModule);
+      if (existing != declsByModuleToImport.end()) {
+        existing->second.push_back(decl);
+      } else {
+        declsByModuleToImport[definingModule] = {decl};
+        modulesToImport.push_back(definingModule);
+      }
+    }
+  }
+
+  // Emit one warning for each module that needcs to be imported and emit notes
+  // for each reference to a declaration from that module in the file.
+  llvm::sort(modulesToImport, [](ModuleDecl *lhs, ModuleDecl *rhs) -> int {
+    return lhs->getName().compare(rhs->getName());
+  });
+
+  auto fixItCache = MissingImportFixItCache(sf);
+  for (auto mod : modulesToImport) {
+    auto fixItInfo = fixItCache.getFixItInfo(mod);
+    llvm::SmallString<64> importText;
+    appendMissingImportFixIt(importText, fixItInfo, ctx);
+    ctx.Diags.diagnose(bestLoc, diag::add_required_import_for_member, mod)
+        .fixItInsert(bestLoc, importText);
+
+    auto decls = declsByModuleToImport.find(mod);
+    if (decls == declsByModuleToImport.end())
+      continue;
+
+    for (auto decl : decls->second) {
+      auto locs = delayedDiags.find(decl);
+      if (locs == delayedDiags.end())
+        continue;
+
+      for (auto locAndLimit : locs->second) {
+        auto loc = locAndLimit.first;
+        ctx.Diags.diagnose(loc, diag::decl_from_module_used_here, decl, mod);
+      }
+    }
+  }
+}
+
 void swift::diagnoseMissingImports(SourceFile &sf) {
+  // Missing import diagnostics should be emitted differently in "migrate" mode.
+  if (sf.getASTContext().LangOpts.isMigratingToFeature(
+          Feature::MemberImportVisibility)) {
+    migrateToMemberImportVisibility(sf);
+    return;
+  }
+
   auto delayedDiags = sf.takeDelayedMissingImportForMemberDiagnostics();
   auto fixItCache = MissingImportFixItCache(sf);
 
   for (auto declAndLocs : delayedDiags) {
-    for (auto loc : declAndLocs.second) {
-      diagnoseAndFixMissingImportForMember(declAndLocs.first, &sf, loc,
+    for (auto locAndLimit : declAndLocs.second) {
+      auto [loc, limit] = locAndLimit;
+      diagnoseAndFixMissingImportForMember(declAndLocs.first, &sf, loc, limit,
                                            fixItCache);
     }
   }
+}
+
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const LookupResult &candidates) {
+  // Produce a list of *unique* module selector diagnostics so we don't
+  // emit a bunch of duplicates.
+  for (auto result : candidates) {
+    ValueDecl * decl = result.getValueDecl();
+
+    CandidateKind kind;
+    if (!result.getDeclContext()) {
+      if (decl->getDeclContext()->isLocalContext())
+        kind = CandidateKind::Local;
+      else
+        kind = CandidateKind::ContextFree;
+    } else {
+      if (result.getDeclContext()->isTypeContext())
+        kind = CandidateKind::MemberViaContext;
+      else // found through result.getDeclContext()'s implicit `self`
+        kind = CandidateKind::MemberViaSelf;
+    }
+
+    auto owningModule = decl->getModuleContext();
+    candidateModules.insert(
+      { owningModule->getNameForModuleSelector(), kind });
+  }
+}
+
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const LookupTypeResult &candidates) {
+  // Produce a list of *unique* module selector diagnostics so we don't
+  // emit a bunch of duplicates.
+  for (auto result : candidates) {
+    auto owningModule = result.Member->getModuleContext();
+    candidateModules.insert(
+      { owningModule->getNameForModuleSelector(), CandidateKind::ContextFree });
+  }
+}
+
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const SmallVectorImpl<ValueDecl *> &candidates) {
+  for (auto result : candidates) {
+    auto owningModule = result->getModuleContext();
+    candidateModules.insert(
+      { owningModule->getName(), CandidateKind::ContextFree });
+  }
+}
+
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const SmallVectorImpl<constraints::OverloadChoice> &candidates) {
+  for (auto result : candidates) {
+    auto owningModule = result.getDecl()->getModuleContext();
+    candidateModules.insert(
+      { owningModule->getNameForModuleSelector(), CandidateKind::ContextFree });
+  }
+}
+
+bool ModuleSelectorCorrection::diagnose(ASTContext &ctx,
+                                        DeclNameLoc nameLoc,
+                                        DeclNameRef originalName) const {
+  if (candidateModules.empty())
+    return false;
+
+  ctx.Diags.diagnose(nameLoc, diag::wrong_module_selector,
+                     originalName.getFullName(),
+                     originalName.getModuleSelector());
+
+  SourceLoc moduleSelectorLoc = nameLoc.getModuleSelectorLoc();
+
+  for (auto pair : candidateModules) {
+    Identifier moduleName = pair.first;
+    switch (pair.second) {
+    case CandidateKind::ContextFree:
+      ctx.Diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
+                         moduleName)
+          .fixItReplace(moduleSelectorLoc, moduleName.str());
+      break;
+
+    case CandidateKind::MemberViaSelf: {
+      SmallString<64> replacement("self.");
+      if (moduleName != originalName.getModuleSelector()) {
+        // The module selector specified the wrong module; replace it.
+        replacement += moduleName.str();
+
+        ctx.Diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
+                           moduleName)
+            .fixItReplace(moduleSelectorLoc, replacement);
+      } else {
+        // The module selector specified the right module, but we need to
+        // make the `self.` explicit.
+        ctx.Diags.diagnose(moduleSelectorLoc,
+                           diag::note_add_explicit_self_with_module_selector)
+            .fixItInsert(moduleSelectorLoc, replacement);
+      }
+      break;
+    }
+    case CandidateKind::MemberViaContext:
+      // FIXME: If we had more info here, we could construct a reference
+      //        to the outer type in question.
+      ctx.Diags.diagnose(moduleSelectorLoc,
+                         diag::note_remove_module_selector_outer_type)
+          .fixItRemoveChars(moduleSelectorLoc, nameLoc.getBaseNameLoc());
+      break;
+
+    case CandidateKind::Local:
+      ctx.Diags.diagnose(moduleSelectorLoc,
+                         diag::note_remove_module_selector_local_decl)
+          .fixItRemoveChars(moduleSelectorLoc, nameLoc.getBaseNameLoc());
+      break;
+    }
+  }
+
+  return true;
 }

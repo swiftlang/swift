@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -raw-sil-inst-lowering | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -definite-init -raw-sil-inst-lowering %s | %FileCheck %s
 
 sil_stage raw
 
@@ -79,139 +79,303 @@ bb0(%0 : $*SomeClass, %1 : @owned $SomeClass):
 }
 
 @propertyWrapper struct Wrapper<T> {
-  @_hasStorage var wrappedValue: T
+  @_hasStorage var wrappedValue: T { get set }
   init(wrappedValue initialValue: T)
 }
 
 struct RefStruct {
-  @_hasStorage var _wrapped: Wrapper<SomeClass>
+  @_hasStorage var _wrapped: Wrapper<SomeClass> { get set }
+  var wrapped: SomeClass {
+    @storageRestrictions(initializes: _wrapped) init
+    get
+    set
+  }
+  init(inputVal: SomeClass)
 }
 
-
-sil @init_closure : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
-sil @init_closure_indirect : $@convention(thin) (@owned SomeClass) -> @out Wrapper<SomeClass>
-sil @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-
-// CHECK-LABEL: sil [ossa] @assign_by_wrapper_initialization_direct
-// CHECK:   [[E:%[0-9]+]] = struct_element_addr
-// CHECK:   [[C:%[0-9]+]] = function_ref @init_closure
-// CHECK:   [[P:%[0-9]+]] = partial_apply [callee_guaranteed] [[C]]()
-// CHECK-NOT: partial_apply
-// CHECK:   [[R:%[0-9]+]] = apply [[P]](%0)
-// CHECK:   store [[R]] to [init] [[E]]
-// CHECK: } // end sil function 'assign_by_wrapper_initialization_direct'
-sil [ossa] @assign_by_wrapper_initialization_direct : $@convention(method) (@owned SomeClass) -> @owned RefStruct {
-bb0(%0 : @owned $SomeClass):
-  %1 = alloc_stack $RefStruct
-  %7 = struct_element_addr %1 : $*RefStruct, #RefStruct._wrapped
-  %8 = function_ref @init_closure : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
-  %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
-  %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  %11 = partial_apply [callee_guaranteed] %10(%1) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  assign_by_wrapper %0 : $SomeClass to [init] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
-  destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
-  destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>
-  %16 = load [take] %1 : $*RefStruct
-  dealloc_stack %1 : $*RefStruct
-  return %16 : $RefStruct
+// Wrapper.init(wrappedValue:)
+sil hidden [ossa] @$s4main7WrapperV12wrappedValueACyxGx_tcfC : $@convention(method) <T> (@in T, @thin Wrapper<T>.Type) -> @out Wrapper<T> {
+bb0(%0 : $*Wrapper<T>, %1 : $*T, %2 : $@thin Wrapper<T>.Type):
+  %3 = alloc_box $<τ_0_0> { var Wrapper<τ_0_0> } <T>, var, name "self" 
+  %4 = mark_uninitialized [rootself] %3 : $<τ_0_0> { var Wrapper<τ_0_0> } <T> 
+  %5 = begin_borrow [lexical] [var_decl] %4 : $<τ_0_0> { var Wrapper<τ_0_0> } <T> 
+  %6 = project_box %5 : $<τ_0_0> { var Wrapper<τ_0_0> } <T>, 0 
+  debug_value %1 : $*T, let, name "initialValue", argno 1, expr op_deref 
+  %8 = alloc_stack $T                             
+  copy_addr %1 to [init] %8 : $*T                 
+  %10 = begin_access [modify] [unknown] %6 : $*Wrapper<T> 
+  %11 = struct_element_addr %10 : $*Wrapper<T>, #Wrapper.wrappedValue 
+  copy_addr [take] %8 to %11 : $*T                
+  end_access %10 : $*Wrapper<T>                   
+  dealloc_stack %8 : $*T                          
+  copy_addr %6 to [init] %0 : $*Wrapper<T>        
+  destroy_addr %1 : $*T                           
+  end_borrow %5 : $<τ_0_0> { var Wrapper<τ_0_0> } <T> 
+  destroy_value %4 : $<τ_0_0> { var Wrapper<τ_0_0> } <T> 
+  %19 = tuple ()                                  
+  return %19 : $()                                
 }
 
-// CHECK-LABEL: sil [ossa] @assign_by_wrapper_initialization_indirect
-// CHECK:   [[E:%[0-9]+]] = struct_element_addr
-// CHECK:   [[C:%[0-9]+]] = function_ref @init_closure_indirect
-// CHECK:   [[P:%[0-9]+]] = partial_apply [callee_guaranteed] [[C]]()
-// CHECK-NOT: partial_apply
-// CHECK-NOT: destroy_addr
-// CHECK:   [[R:%[0-9]+]] = apply [[P]]([[E]], %0)
-// CHECK: } // end sil function 'assign_by_wrapper_initialization_indirect'
-sil [ossa] @assign_by_wrapper_initialization_indirect : $@convention(method) (@owned SomeClass) -> @owned RefStruct {
-bb0(%0 : @owned $SomeClass):
-  %1 = alloc_stack $RefStruct
-  %7 = struct_element_addr %1 : $*RefStruct, #RefStruct._wrapped
-  %8 = function_ref @init_closure_indirect : $@convention(thin) (@owned SomeClass) -> @out Wrapper<SomeClass>
-  %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @out Wrapper<SomeClass>
-  %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  %11 = partial_apply [callee_guaranteed] %10(%1) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  assign_by_wrapper %0 : $SomeClass to [init] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
-  destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
-  destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>
-  %16 = load [take] %1 : $*RefStruct
-  dealloc_stack %1 : $*RefStruct
-  return %16 : $RefStruct
+// property wrapped field init accessor of RefStruct.wrapped
+sil hidden [ossa] @$s4main9RefStructV7wrappedAA9SomeClassCvpfF : $@convention(thin) (@owned SomeClass, @thin RefStruct.Type) -> @out Wrapper<SomeClass> {
+bb0(%0 : $*Wrapper<SomeClass>, %1 : @owned $SomeClass, %2 : $@thin RefStruct.Type):
+  %3 = mark_uninitialized [out] %0 : $*Wrapper<SomeClass> 
+  debug_value %1 : $SomeClass, let, name "$input_value", argno 1 
+  %5 = metatype $@thin Wrapper<SomeClass>.Type    
+  %6 = copy_value %1 : $SomeClass                 
+  %7 = alloc_stack $SomeClass                     
+  store %6 to [init] %7 : $*SomeClass             
+  %9 = function_ref @$s4main7WrapperV12wrappedValueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0> // user: %10
+  %10 = apply %9<SomeClass>(%3, %7, %5) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
+  dealloc_stack %7 : $*SomeClass                  
+  destroy_value %1 : $SomeClass                   
+  %13 = tuple ()                                  
+  return %13 : $()                                
+} 
+
+// RefStruct.wrapped.setter
+sil hidden [ossa] @$s4main9RefStructV7wrappedAA9SomeClassCvs : $@convention(method) (@owned SomeClass, @inout RefStruct) -> () {
+bb0(%0 : @owned $SomeClass, %1 : $*RefStruct):
+  debug_value %0 : $SomeClass, let, name "value", argno 1 
+  debug_value %1 : $*RefStruct, var, name "self", argno 2, expr op_deref
+  %4 = begin_borrow %0 : $SomeClass               
+  %5 = copy_value %4 : $SomeClass                 
+  %6 = begin_access [modify] [unknown] %1 : $*RefStruct
+  %7 = struct_element_addr %6 : $*RefStruct, #RefStruct._wrapped
+  %8 = struct_element_addr %7 : $*Wrapper<SomeClass>, #Wrapper.wrappedValue
+  assign %5 to %8 : $*SomeClass                   
+  end_access %6 : $*RefStruct                     
+  end_borrow %4 : $SomeClass                      
+  destroy_value %0 : $SomeClass                   
+  %13 = tuple ()                                  
+  return %13 : $()                                
+} 
+
+// property wrapped field init accessor of GenericRefStruct.wrapped
+// Isolation: unspecified
+sil hidden [ossa] @$s4main16GenericRefStructV7wrappedxvpfF : $@convention(thin) <T> (@in T, @thin GenericRefStruct<T>.Type) -> @out Wrapper<T> {
+bb0(%0 : $*Wrapper<T>, %1 : $*T, %2 : $@thin GenericRefStruct<T>.Type):
+  %3 = mark_uninitialized [out] %0 : $*Wrapper<T> // user: %9
+  debug_value %1 : $*T, let, name "$input_value", argno 1, expr op_deref // id: %4
+  %5 = metatype $@thin Wrapper<T>.Type            // user: %9
+  %6 = alloc_stack $T                             // users: %10, %9, %7
+  copy_addr %1 to [init] %6 : $*T                 // id: %7
+  // function_ref Wrapper.init(wrappedValue:)
+  %8 = function_ref @$s4main7WrapperV12wrappedValueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0> // user: %9
+  %9 = apply %8<T>(%3, %6, %5) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
+  dealloc_stack %6 : $*T                          // id: %10
+  destroy_addr %1 : $*T                           // id: %11
+  %12 = tuple ()                                  // user: %13
+  return %12 : $()                                // id: %13
+} // end sil function '$s4main16GenericRefStructV7wrappedxvpfF'
+
+// GenericRefStruct.wrapped.setter
+// Isolation: unspecified
+sil hidden [ossa] @$s4main16GenericRefStructV7wrappedxvs : $@convention(method) <T> (@in T, @inout GenericRefStruct<T>) -> () {
+// %0 "value"                                     // users: %12, %5, %2
+// %1 "self"                                      // users: %6, %3
+bb0(%0 : $*T, %1 : $*GenericRefStruct<T>):
+  debug_value %0 : $*T, let, name "value", argno 1, expr op_deref // id: %2
+  debug_value %1 : $*GenericRefStruct<T>, var, name "self", argno 2, expr op_deref // id: %3
+  %4 = alloc_stack $T                             // users: %11, %9, %5
+  copy_addr %0 to [init] %4 : $*T                 // id: %5
+  %6 = begin_access [modify] [unknown] %1 : $*GenericRefStruct<T> // users: %10, %7
+  %7 = struct_element_addr %6 : $*GenericRefStruct<T>, #GenericRefStruct._wrapped // user: %8
+  %8 = struct_element_addr %7 : $*Wrapper<T>, #Wrapper.wrappedValue // user: %9
+  copy_addr [take] %4 to %8 : $*T                 // id: %9
+  end_access %6 : $*GenericRefStruct<T>           // id: %10
+  dealloc_stack %4 : $*T                          // id: %11
+  destroy_addr %0 : $*T                           // id: %12
+  %13 = tuple ()                                  // user: %14
+  return %13 : $()                                // id: %14
 }
 
-// CHECK-LABEL: sil [ossa] @assign_by_wrapper_assign_direct
-// CHECK:   [[E:%[0-9]+]] = struct_element_addr
-// CHECK:   [[C:%[0-9]+]] = function_ref @init_closure
-// CHECK:   [[P:%[0-9]+]] = partial_apply [callee_guaranteed] [[C]]()
-// CHECK-NOT: partial_apply
-// CHECK:   [[R:%[0-9]+]] = apply [[P]](%0)
-// CHECK:   store [[R]] to [assign] [[E]]
-// CHECK: } // end sil function 'assign_by_wrapper_assign_direct'
-sil [ossa] @assign_by_wrapper_assign_direct : $@convention(method) (@owned SomeClass, @owned Wrapper<SomeClass>) -> @owned RefStruct {
-bb0(%0 : @owned $SomeClass, %1 : @owned $Wrapper<SomeClass>):
-  %2 = alloc_stack $RefStruct
-  %7 = struct_element_addr %2 : $*RefStruct, #RefStruct._wrapped
-  store %1 to [init] %7 : $*Wrapper<SomeClass>
-  %8 = function_ref @init_closure : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
-  %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
-  %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  %11 = partial_apply [callee_guaranteed] %10(%2) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  assign_by_wrapper %0 : $SomeClass to [assign] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
-  destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
-  destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>
-  %16 = load [take] %2 : $*RefStruct
-  dealloc_stack %2 : $*RefStruct
-  return %16 : $RefStruct
+// ====== CASE 01 - Init Indirect =========
+// [Init] mode chosen because backing storage ._wrapped is uninitialized
+// The initializer closure (an init accessor thunk) has an indirect return type
+// Therefore, ._wrapped gets initialized indirectly
+
+// RefStruct.init(inputVal:)
+// CHECK-LABEL: sil hidden [ossa] @$assign_or_init_init_indirect
+// CHECK: [[INITIAL_VAL:%.*]] = copy_value {{%.*}} : $SomeClass 
+// CHECK: [[SELF_REF:%.*]] = begin_access [modify] [unknown] {{%.*}} : $*RefStruct
+// CHECK: [[INIT_REF:%.*]] = function_ref @$s4main9RefStructV7wrappedAA9SomeClassCvpfF : $@convention(thin) (@owned SomeClass, @thin RefStruct.Type) -> @out Wrapper<SomeClass>
+// CHECK: [[INIT_PAI:%.*]] = partial_apply [callee_guaranteed] [[INIT_REF]]({{%.*}})
+// CHECK: [[FIELD_REF:%.*]] = struct_element_addr [[SELF_REF]] : $*RefStruct, #RefStruct._wrapped
+// CHECK-NEXT: {{%.*}} = apply [[INIT_PAI]]([[FIELD_REF]], [[INITIAL_VAL]]) : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>
+sil hidden [ossa] @$assign_or_init_init_indirect : $@convention(method) (@owned SomeClass, @thin RefStruct.Type) -> @owned RefStruct {
+bb0(%0 : @owned $SomeClass, %1 : $@thin RefStruct.Type):
+  %2 = alloc_box ${ var RefStruct }, var, name "self" 
+  %3 = mark_uninitialized [rootself] %2 : ${ var RefStruct } 
+  %4 = begin_borrow [lexical] [var_decl] %3 : ${ var RefStruct } 
+  %5 = project_box %4 : ${ var RefStruct }, 0     
+  debug_value %0 : $SomeClass, let, name "inputVal", argno 1 
+  %7 = begin_borrow %0 : $SomeClass               
+  %8 = copy_value %7 : $SomeClass                 
+  %9 = begin_access [modify] [unknown] %5 : $*RefStruct 
+  %10 = function_ref @$s4main9RefStructV7wrappedAA9SomeClassCvpfF : $@convention(thin) (@owned SomeClass, @thin RefStruct.Type) -> @out Wrapper<SomeClass> // user: %12
+  %11 = metatype $@thin RefStruct.Type            
+  %12 = partial_apply [callee_guaranteed] %10(%11) : $@convention(thin) (@owned SomeClass, @thin RefStruct.Type) -> @out Wrapper<SomeClass> // users: %18, %15
+  %13 = function_ref @$s4main9RefStructV7wrappedAA9SomeClassCvs : $@convention(method) (@owned SomeClass, @inout RefStruct) -> () // user: %14
+  %14 = partial_apply [callee_guaranteed] [on_stack] %13(%9) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> () // users: %17, %15
+  assign_or_init #RefStruct.wrapped, 
+                 self %9 : $*RefStruct, 
+                 value %8 : $SomeClass, 
+                 init %12 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>, 
+                 set %14 : $@noescape @callee_guaranteed (@owned SomeClass) -> () // id: %15
+  end_access %9 : $*RefStruct                     
+  destroy_value %14 : $@noescape @callee_guaranteed (@owned SomeClass) -> () 
+  destroy_value %12 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>
+  end_borrow %7 : $SomeClass                      
+  %20 = load [copy] %5 : $*RefStruct              
+  destroy_value %0 : $SomeClass                   
+  end_borrow %4 : ${ var RefStruct }              
+  destroy_value %3 : ${ var RefStruct }           
+  return %20 : $RefStruct                         
 }
 
-// CHECK-LABEL: sil [ossa] @assign_by_wrapper_assign_indirect
-// CHECK:   [[E:%[0-9]+]] = struct_element_addr
-// CHECK:   [[C:%[0-9]+]] = function_ref @init_closure_indirect
-// CHECK:   [[P:%[0-9]+]] = partial_apply [callee_guaranteed] [[C]]()
-// CHECK-NOT: partial_apply
-// CHECK:   destroy_addr [[E]]
-// CHECK:   [[R:%[0-9]+]] = apply [[P]]([[E]], %0)
-// CHECK: } // end sil function 'assign_by_wrapper_assign_indirect'
-sil [ossa] @assign_by_wrapper_assign_indirect : $@convention(method) (@owned SomeClass, @owned Wrapper<SomeClass>) -> @owned RefStruct {
-bb0(%0 : @owned $SomeClass, %1 : @owned $Wrapper<SomeClass>):
-  %2 = alloc_stack $RefStruct
-  %7 = struct_element_addr %2 : $*RefStruct, #RefStruct._wrapped
-  store %1 to [init] %7 : $*Wrapper<SomeClass>
-  %8 = function_ref @init_closure_indirect : $@convention(thin) (@owned SomeClass) -> @out Wrapper<SomeClass>
-  %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @out Wrapper<SomeClass>
-  %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  %11 = partial_apply [callee_guaranteed] %10(%2) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  assign_by_wrapper %0 : $SomeClass to [assign] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
-  destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
-  destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>
-  %16 = load [take] %2 : $*RefStruct
-  dealloc_stack %2 : $*RefStruct
-  return %16 : $RefStruct
+// ====== CASE 02 - Assign Direct ============ 
+// RefStruct is already initialized, so DI selects [assign] mode
+// Because the property type (SomeClass) is loadable, the setter can consume the value directly
+// This test verifies that the setter path is taken
+
+// RefStruct.init(inputVal:)
+// CHECK-LABEL: sil hidden [ossa] @$assign_or_init_assign_direct
+// CHECK: [[FIELD_REF:%.*]] = struct_element_addr {{.*}} : $*RefStruct, #RefStruct._wrapped
+// CHECK-NEXT: {{.*}} = apply [[INIT_PAI]]([[FIELD_REF]], [[INITIAL_VAL]]) : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>
+// CHECK: [[INITIAL_VAL2:%.*]] = copy_value {{%.*}} : $SomeClass
+// CHECK: [[SELF_REF:%.*]] = begin_access [modify] [unknown] {{%.*}} : $*RefStruct
+// CHECK: [[SETTER_REF:%.*]] = function_ref @$s4main9RefStructV7wrappedAA9SomeClassCvs : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
+// CHECK-NEXT: [[SETTER_PAI:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER_REF]]([[SELF_REF]]) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
+// CHECK-NEXT: {{.*}} = apply [[SETTER_PAI]]([[INITIAL_VAL2]]) : $@noescape @callee_guaranteed (@owned SomeClass) -> () 
+sil hidden [ossa] @$assign_or_init_assign_direct : $@convention(method) (@owned SomeClass, @thin RefStruct.Type) -> @owned RefStruct {
+bb0(%0 : @owned $SomeClass, %1 : $@thin RefStruct.Type):
+  %2 = alloc_box ${ var RefStruct }, var, name "self" // user: %3
+  %3 = mark_uninitialized [rootself] %2 : ${ var RefStruct } // users: %36, %4
+  %4 = begin_borrow [lexical] [var_decl] %3 : ${ var RefStruct } // users: %35, %5
+  %5 = project_box %4 : ${ var RefStruct }, 0     // users: %33, %22, %9
+  debug_value %0 : $SomeClass, let, name "inputVal", argno 1 // id: %6
+  %7 = begin_borrow %0 : $SomeClass               // users: %19, %8
+  %8 = copy_value %7 : $SomeClass                 // user: %15
+  %9 = begin_access [modify] [unknown] %5 : $*RefStruct // users: %16, %15, %14
+  
+  // Initialization
+  %10 = function_ref @$s4main9RefStructV7wrappedAA9SomeClassCvpfF : $@convention(thin) (@owned SomeClass, @thin RefStruct.Type) -> @out Wrapper<SomeClass> // user: %12
+  %11 = metatype $@thin RefStruct.Type            // user: %12
+  %12 = partial_apply [callee_guaranteed] %10(%11) : $@convention(thin) (@owned SomeClass, @thin RefStruct.Type) -> @out Wrapper<SomeClass> // users: %18, %15
+  %13 = function_ref @$s4main9RefStructV7wrappedAA9SomeClassCvs : $@convention(method) (@owned SomeClass, @inout RefStruct) -> () // user: %14
+  %14 = partial_apply [callee_guaranteed] [on_stack] %13(%9) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> () // users: %17, %15
+  assign_or_init #RefStruct.wrapped, 
+                 self %9 : $*RefStruct, 
+                 value %8 : $SomeClass, 
+                 init %12 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>, 
+                 set %14 : $@noescape @callee_guaranteed (@owned SomeClass) -> () // id: %15
+  end_access %9 : $*RefStruct                     // id: %16
+  destroy_value %14 : $@noescape @callee_guaranteed (@owned SomeClass) -> () // id: %17
+  destroy_value %12 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass> // id: %18
+  end_borrow %7 : $SomeClass                      // id: %19
+  %20 = begin_borrow %0 : $SomeClass              // users: %32, %21
+  %21 = copy_value %20 : $SomeClass               // user: %28
+  %22 = begin_access [modify] [unknown] %5 : $*RefStruct // users: %29, %28, %27
+  
+  // Assignment
+  %23 = function_ref @$s4main9RefStructV7wrappedAA9SomeClassCvpfF : $@convention(thin) (@owned SomeClass, @thin RefStruct.Type) -> @out Wrapper<SomeClass> // user: %25
+  %24 = metatype $@thin RefStruct.Type            // user: %25
+  %25 = partial_apply [callee_guaranteed] %23(%24) : $@convention(thin) (@owned SomeClass, @thin RefStruct.Type) -> @out Wrapper<SomeClass> // users: %31, %28
+  %26 = function_ref @$s4main9RefStructV7wrappedAA9SomeClassCvs : $@convention(method) (@owned SomeClass, @inout RefStruct) -> () // user: %27
+  %27 = partial_apply [callee_guaranteed] [on_stack] %26(%22) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> () // users: %30, %28
+  assign_or_init #RefStruct.wrapped, 
+                 self %22 : $*RefStruct, 
+                 value %21 : $SomeClass, 
+                 init %25 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>, 
+                 set %27 : $@noescape @callee_guaranteed (@owned SomeClass) -> ()
+  end_access %22 : $*RefStruct                    // id: %29
+  destroy_value %27 : $@noescape @callee_guaranteed (@owned SomeClass) -> () 
+  destroy_value %25 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass> 
+  end_borrow %20 : $SomeClass                     
+  %33 = load [copy] %5 : $*RefStruct              
+  destroy_value %0 : $SomeClass                   
+  end_borrow %4 : ${ var RefStruct }              
+  destroy_value %3 : ${ var RefStruct }           
+  return %33 : $RefStruct                         
 }
 
-// CHECK-LABEL: sil [ossa] @assign_by_wrapper_assign_wrapped_value
-// CHECK:   [[A:%[0-9]+]] = alloc_stack $RefStruct
-// CHECK:   [[E:%[0-9]+]] = struct_element_addr
-// CHECK-NOT: partial_apply
-// CHECK:   [[C:%[0-9]+]] = function_ref @set_closure
-// CHECK:   [[P:%[0-9]+]] = partial_apply [callee_guaranteed] [[C]]([[A]])
-// CHECK:   apply [[P]](%0)
-// CHECK: } // end sil function 'assign_by_wrapper_assign_wrapped_value'
-sil [ossa] @assign_by_wrapper_assign_wrapped_value : $@convention(method) (@owned SomeClass, @owned RefStruct) -> @owned RefStruct {
-bb0(%0 : @owned $SomeClass, %1 : @owned $RefStruct):
-  %2 = alloc_stack $RefStruct
-  store %1 to [init] %2 : $*RefStruct
-  %7 = struct_element_addr %2 : $*RefStruct, #RefStruct._wrapped
-  %8 = function_ref @init_closure : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
-  %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
-  %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  %11 = partial_apply [callee_guaranteed] %10(%2) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  assign_by_wrapper %0 : $SomeClass to [assign_wrapped_value] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
-  destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
-  destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>
-  %16 = load [take] %2 : $*RefStruct
-  dealloc_stack %2 : $*RefStruct
-  return %16 : $RefStruct
+// ====== CASE 03 - Assign Indirect ==========
+// RefStruct is already initialized, so DI selects [assign] mode
+// The wrapped property type is address-only (e.g. a generic T), so values
+// are passed indirectly instead of by value
+// This test verifies that the setter uses the indirect assignment path
+
+struct GenericRefStruct<T> {
+  @_hasStorage var _wrapped: Wrapper<T> { get set }
+  var wrapped: T {
+    @storageRestrictions(initializes: _wrapped) init
+    get
+    set
+  }
+  init(inputVal: T)
 }
 
+// GenericRefStruct.init(inputVal:)
+// CHECK-LABEL: sil hidden [ossa] @$assign_or_init_assign_indirect
+// CHECK: [[TADDR1:%.*]] = alloc_stack $T
+// CHECK: copy_addr {{%.*}} to [init] [[TADDR1]] : $*T
+// CHECK: [[INIT_REF:%.*]] = function_ref @$s4main16GenericRefStructV7wrappedxvpfF : $@convention(thin) <{{.*}}> (@in {{.*}}, @thin GenericRefStruct<{{.*}}>.Type) -> @out Wrapper<{{.*}}>
+// CHECK: [[META1:%.*]] = metatype $@thin GenericRefStruct<{{.*}}>.Type
+// CHECK: [[INIT_PAI:%.*]] = partial_apply [callee_guaranteed] [[INIT_REF]]<{{.*}}>([[META1]])
+// CHECK: {{%.*}} = struct_element_addr %{{.*}} : $*GenericRefStruct<{{.*}}>, #GenericRefStruct._wrapped
+// CHECK-NEXT: {{%.*}} = apply [[INIT_PAI]](%{{.*}}, [[TADDR1]]) : $@callee_guaranteed (@in {{.*}}) -> @out Wrapper<{{.*}}>
+// CHECK: [[TADDR2:%.*]] = alloc_stack $T
+// CHECK: copy_addr {{%.*}} to [init] [[TADDR2]] : $*T
+// CHECK: [[SELF2:%.*]] = begin_access [modify] {{\[.*\]}} %{{.*}} : $*GenericRefStruct<{{.*}}>
+// CHECK: [[SET_REF:%.*]] = function_ref @$s4main16GenericRefStructV7wrappedxvs : $@convention(method) <{{.*}}> (@in {{.*}}, @inout GenericRefStruct<{{.*}}>) -> ()
+// CHECK: [[SET_PAI:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SET_REF]]<{{.*}}>([[SELF2]])
+// CHECK-NEXT: {{%.*}} = apply [[SET_PAI]]([[TADDR2]]) : $@noescape @callee_guaranteed (@in {{.*}}) -> ()
+sil hidden [ossa] @$assign_or_init_assign_indirect : $@convention(method) <T> (@in T, @thin GenericRefStruct<T>.Type) -> @out GenericRefStruct<T> {
+bb0(%0 : $*GenericRefStruct<T>, %1 : $*T, %2 : $@thin GenericRefStruct<T>.Type):
+  %3 = alloc_box $<τ_0_0> { var GenericRefStruct<τ_0_0> } <T>, var, name "self" // user: %4
+  %4 = mark_uninitialized [rootself] %3 : $<τ_0_0> { var GenericRefStruct<τ_0_0> } <T> // users: %37, %5
+  %5 = begin_borrow [lexical] [var_decl] %4 : $<τ_0_0> { var GenericRefStruct<τ_0_0> } <T> // users: %36, %6
+  %6 = project_box %5 : $<τ_0_0> { var GenericRefStruct<τ_0_0> } <T>, 0 // users: %34, %23, %10
+  debug_value %1 : $*T, let, name "inputVal", argno 1, expr op_deref // id: %7
+  %8 = alloc_stack $T                             // users: %20, %16, %9
+  copy_addr %1 to [init] %8 : $*T                 // id: %9
+  %10 = begin_access [modify] [unknown] %6 : $*GenericRefStruct<T> // users: %17, %16, %15
+  
+  // Initialization
+  %11 = function_ref @$s4main16GenericRefStructV7wrappedxvpfF : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin GenericRefStruct<τ_0_0>.Type) -> @out Wrapper<τ_0_0> // user: %13
+  %12 = metatype $@thin GenericRefStruct<T>.Type  // user: %13
+  %13 = partial_apply [callee_guaranteed] %11<T>(%12) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin GenericRefStruct<τ_0_0>.Type) -> @out Wrapper<τ_0_0> // users: %19, %16
+  %14 = function_ref @$s4main16GenericRefStructV7wrappedxvs : $@convention(method) <τ_0_0> (@in τ_0_0, @inout GenericRefStruct<τ_0_0>) -> () // user: %15
+  %15 = partial_apply [callee_guaranteed] [on_stack] %14<T>(%10) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout GenericRefStruct<τ_0_0>) -> () // users: %18, %16
+  assign_or_init #GenericRefStruct.wrapped, 
+                 self %10 : $*GenericRefStruct<T>, 
+                 value %8 : $*T, 
+                 init %13 : $@callee_guaranteed (@in T) -> @out Wrapper<T>, 
+                 set %15 : $@noescape @callee_guaranteed (@in T) -> ()
+  end_access %10 : $*GenericRefStruct<T>          // id: %17
+  destroy_value %15 : $@noescape @callee_guaranteed (@in T) -> () // id: %18
+  destroy_value %13 : $@callee_guaranteed (@in T) -> @out Wrapper<T> // id: %19
+  dealloc_stack %8 : $*T                          // id: %20
+  %21 = alloc_stack $T                            // users: %33, %29, %22
+  copy_addr %1 to [init] %21 : $*T                // id: %22
+  %23 = begin_access [modify] [unknown] %6 : $*GenericRefStruct<T> // users: %30, %29, %28
+  
+  // Assignment
+  %24 = function_ref @$s4main16GenericRefStructV7wrappedxvpfF : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin GenericRefStruct<τ_0_0>.Type) -> @out Wrapper<τ_0_0> // user: %26
+  %25 = metatype $@thin GenericRefStruct<T>.Type  // user: %26
+  %26 = partial_apply [callee_guaranteed] %24<T>(%25) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin GenericRefStruct<τ_0_0>.Type) -> @out Wrapper<τ_0_0> // users: %32, %29
+  %27 = function_ref @$s4main16GenericRefStructV7wrappedxvs : $@convention(method) <τ_0_0> (@in τ_0_0, @inout GenericRefStruct<τ_0_0>) -> () // user: %28
+  %28 = partial_apply [callee_guaranteed] [on_stack] %27<T>(%23) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout GenericRefStruct<τ_0_0>) -> () // users: %31, %29
+  assign_or_init #GenericRefStruct.wrapped, self %23 : $*GenericRefStruct<T>, value %21 : $*T, init %26 : $@callee_guaranteed (@in T) -> @out Wrapper<T>, set %28 : $@noescape @callee_guaranteed (@in T) -> () // id: %29
+  end_access %23 : $*GenericRefStruct<T>          // id: %30
+  destroy_value %28 : $@noescape @callee_guaranteed (@in T) -> () // id: %31
+  destroy_value %26 : $@callee_guaranteed (@in T) -> @out Wrapper<T> // id: %32
+  dealloc_stack %21 : $*T                         // id: %33
+  copy_addr %6 to [init] %0 : $*GenericRefStruct<T> // id: %34
+  destroy_addr %1 : $*T                           // id: %35
+  end_borrow %5 : $<τ_0_0> { var GenericRefStruct<τ_0_0> } <T> // id: %36
+  destroy_value %4 : $<τ_0_0> { var GenericRefStruct<τ_0_0> } <T> // id: %37
+  %38 = tuple ()                                  // user: %39
+  return %38 : $()                                // id: %39
+}

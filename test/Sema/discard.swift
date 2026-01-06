@@ -99,7 +99,7 @@ struct File: ~Copyable {
     discard (self) // expected-error {{cannot convert value of type 'File' to expected argument type 'Int'}}
 
     // FIXME: we should get an error about it being illegal to discard in a closure.
-    let _ = { // expected-error {{type of expression is ambiguous without a type annotation}}
+    let _ = { // expected-error {{failed to produce diagnostic for expression}}
       discard self
       return 0
     }()

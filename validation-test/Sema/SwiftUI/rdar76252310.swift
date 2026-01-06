@@ -41,13 +41,11 @@ func fromMainActor() async {
 func fromConcurrencyAware() async {
   let view = CoffeeTrackerView() // synthesized 'init' is 'nonisolated'
 
-  // expected-note@+3 {{property access is 'async'}}
-  // expected-warning@+2 {{non-sendable type 'some View' of property 'body' cannot exit main actor-isolated context}}
-  // expected-warning@+1 {{expression is 'async' but is not marked with 'await'}}
+  // expected-warning@+2 {{non-Sendable type 'some View' of property 'body' cannot exit main actor-isolated context}}
+  // expected-warning@+1 {{main actor-isolated property 'body' cannot be accessed from outside of the actor}} {{7-7=await }}
   _ = view.body
 
-  // expected-note@+2 {{property access is 'async'}}
-  // expected-warning@+1 {{expression is 'async' but is not marked with 'await'}}
+  // expected-warning@+1 {{main actor-isolated property 'showDrinkList' cannot be accessed from outside of the actor}} {{7-7=await }}
   _ = view.showDrinkList
 
   _ = view.storage

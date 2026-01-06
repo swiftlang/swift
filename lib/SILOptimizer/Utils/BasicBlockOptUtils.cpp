@@ -285,3 +285,16 @@ bool SinkAddressProjections::cloneProjections() {
   }
   return true;
 }
+
+void SinkAddressProjections::dump() const {
+  llvm::dbgs() << "Old projections: ";
+  for (auto *proj : oldProjections) {
+    proj->dump();
+  }
+  if (auto *np = newProjections) {
+    llvm::dbgs() << "New projections: ";
+    for (auto *proj : *np) {
+      proj->dump();
+    }
+  }
+}

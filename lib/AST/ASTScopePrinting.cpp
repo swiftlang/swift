@@ -29,6 +29,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 #include <algorithm>
@@ -52,8 +53,7 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
 
   llvm::errs() << "***Scope at " << lineColumn.first << ":" << lineColumn.second
                << "***\n";
-  auto *parentModule = getSourceFile()->getParentModule();
-  auto *locScope = findInnermostEnclosingScope(parentModule, loc, &llvm::errs());
+  auto *locScope = findInnermostEnclosingScope(loc, &llvm::errs());
   locScope->print(llvm::errs(), 0, false, false);
 
   namelookup::ASTScopeDeclGatherer gatherer;
@@ -69,9 +69,13 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
   }
 }
 
-llvm::raw_ostream &ASTScopeImpl::verificationError() const {
-  return llvm::errs() << "ASTScopeImpl verification error in source file '"
-                      << getSourceFile()->getFilename() << "': ";
+void ASTScopeImpl::abortWithVerificationError(
+    llvm::function_ref<void(llvm::raw_ostream &)> messageFn) const {
+  ABORT([&](auto &out) {
+    out << "ASTScopeImpl verification error in source file '"
+        << getSourceFile()->getFilename() << "':\n";
+    messageFn(out);
+  });
 }
 
 #pragma mark printing

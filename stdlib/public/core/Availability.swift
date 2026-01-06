@@ -52,7 +52,9 @@ public func _stdlib_isOSVersionAtLeast(
 @_semantics("availability.osversion")
 @_effects(readnone)
 @_unavailableInEmbedded
+#if hasFeature(Macros)
 @_noLocks
+#endif
 public func _stdlib_isOSVersionAtLeast(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
@@ -65,13 +67,15 @@ public func _stdlib_isOSVersionAtLeast(
 @_semantics("availability.osversion")
 @_effects(readnone)
 @_alwaysEmitIntoClient
+#if hasFeature(Macros)
 @_noLocks
+#endif
 public func _stdlib_isOSVersionAtLeast_AEIC(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
   _ patch: Builtin.Word
 ) -> Builtin.Int1 {
-#if (os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)) && SWIFT_RUNTIME_OS_VERSIONING
+#if (os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) || os(Android)) && SWIFT_RUNTIME_OS_VERSIONING
   if Int(major) == 9999 {
     return true._value
   }
@@ -110,7 +114,9 @@ public func _stdlib_isOSVersionAtLeast_AEIC(
 @_semantics("availability.osversion")
 @_effects(readnone)
 @available(macOS 10.15, iOS 13.0, *)
+#if hasFeature(Macros)
 @_noLocks
+#endif
 public func _stdlib_isVariantOSVersionAtLeast(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
@@ -153,7 +159,9 @@ public func _stdlib_isVariantOSVersionAtLeast(
 @_semantics("availability.osversion")
 @_effects(readnone)
 @_unavailableInEmbedded
+#if hasFeature(Macros)
 @_noLocks
+#endif
 public func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
@@ -188,6 +196,22 @@ public func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(
 #endif
 
 public typealias _SwiftStdlibVersion = SwiftShims._SwiftStdlibVersion
+
+/// This is a magic entry point known to the compiler. It is called in
+/// generated code for Swift runtime availability checking, e.g.
+///
+///     if #available(Swift 6.2, *) { }
+///
+@available(SwiftStdlib 5.7, *)
+@_alwaysEmitIntoClient
+internal func _isSwiftRuntimeVersionAtLeast(
+  _ major: Builtin.Word,
+  _ minor: Builtin.Word,
+  _ patch: Builtin.Word
+) -> Builtin.Int1 {
+  let version = _SwiftStdlibVersion(major, minor, patch)
+  return (_SwiftStdlibVersion.current._value <= version._value)._value
+}
 
 /// Return true if the main executable was linked with an SDK version
 /// corresponding to the given Swift Stdlib release, or later. Otherwise, return
@@ -230,9 +254,43 @@ extension _SwiftStdlibVersion {
   public static var v6_0_0: Self { Self(_value: 0x060000) }
   @_alwaysEmitIntoClient
   public static var v6_1_0: Self { Self(_value: 0x060100) }
+  @_alwaysEmitIntoClient
+  public static var v6_2_0: Self { Self(_value: 0x060200) }
+  @_alwaysEmitIntoClient
+  public static var v6_3_0: Self { Self(_value: 0x060300) }
+  @_alwaysEmitIntoClient
+  public static var v6_4_0: Self { Self(_value: 0x060400) }
 
+  private static var _current: Self { .v6_4_0 }
+
+#if hasFeature(Macros)
   @available(SwiftStdlib 5.7, *)
-  public static var current: Self { .v6_1_0 }
+  public static var current: Self {
+    @_noLocks
+    @_effects(readnone)
+    get { ._current }
+  }
+#else
+  @available(SwiftStdlib 5.7, *)
+  public static var current: Self {
+    @_effects(readnone)
+    get { ._current }
+  }
+#endif
+
+  @_alwaysEmitIntoClient
+  internal init(
+    _ major: Builtin.Word,
+    _ minor: Builtin.Word,
+    _ patch: Builtin.Word
+  ) {
+    let version = (Int(major), Int(minor), Int(patch))
+    var value: UInt32 = 0x0
+    value |= ((UInt32(truncatingIfNeeded: version.0) & 0xffff) << 16)
+    value |= ((UInt32(truncatingIfNeeded: version.1) & 0xff) << 8)
+    value |= ((UInt32(truncatingIfNeeded: version.2) & 0xff))
+    self = Self(_value: value)
+  }
 }
 
 @available(SwiftStdlib 5.7, *)

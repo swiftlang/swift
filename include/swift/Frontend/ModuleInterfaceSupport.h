@@ -40,6 +40,9 @@ struct ModuleInterfaceOptions {
   /// with types sharing a name with a module.
   bool AliasModuleNames = false;
 
+  /// Should we emit module selectors into the module interface?
+  bool UseModuleSelectors = false;
+
   /// See \ref FrontendOptions.PrintFullConvention.
   /// [TODO: Clang-type-plumbing] This check should go away.
   bool PrintFullConvention = false;
@@ -70,9 +73,6 @@ struct ModuleInterfaceOptions {
 
   /// Intentionally print invalid syntax into the file.
   bool DebugPrintInvalidSyntax = false;
-
-  /// A list of modules we shouldn't import in the public interfaces.
-  std::vector<std::string> ModulesToSkipInPublicInterface;
 
   /// A mode which decides whether the printed interface contains package, SPIs, or public/inlinable declarations.
   PrintOptions::InterfaceMode InterfaceContentMode = PrintOptions::InterfaceMode::Public;

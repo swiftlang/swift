@@ -41,10 +41,11 @@ struct TestInit {
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors8TestInitV1x1yACSi_SitcfC : $@convention(method) (Int, Int, @thin TestInit.Type) -> TestInit
+  // CHECK: end_access
+  // CHECK: [[SELF_VALUE:%.*]] = begin_access [modify] [static] {{.*}} : $*TestInit
   // CHECK: // function_ref TestInit.point.init
   // CHECK-NEXT: [[INIT_ACCESSOR_FN:%.*]] = function_ref @$s14init_accessors8TestInitV5pointSi_Sitvi : $@convention(thin) (Int, Int, @inout Int, @thin TestInit.Type) -> (@out Int, @out (Int, Int))
   // CHECK-NEXT: [[INIT_ACCESSOR:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[INIT_ACCESSOR_FN]](%2) : $@convention(thin) (Int, Int, @inout Int, @thin TestInit.Type) -> (@out Int, @out (Int, Int))
-  // CHECK: [[SELF_VALUE:%.*]] = begin_access [modify] [dynamic] {{.*}} : $*TestInit
   // CHECK: [[Y_REF:%.*]] = struct_element_addr [[SELF_VALUE]] : $*TestInit, #TestInit.y
   // CHECK-NEXT: [[FULL_REF:%.*]] = struct_element_addr [[SELF_VALUE]] : $*TestInit, #TestInit.full
   // CHECK-NEXT: ([[X_VAL:%.*]], [[Y_VAL:%.*]]) = destructure_tuple {{.*}} : $(Int, Int)
@@ -71,10 +72,13 @@ struct TestSetter {
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors10TestSetterV1x1yACSi_SitcfC : $@convention(method) (Int, Int, @thin TestSetter.Type) -> TestSetter
+  // CHECK: [[AS:%.*]] = alloc_stack
+  // CHECK: end_access
+  // CHECK: end_access
+  // CHECK: [[SELF:%.*]] = begin_access [modify] [static] [[AS]] : $*TestSetter
   // CHECK: [[INIT_ACCESSOR_FN:%.*]] = function_ref @$s14init_accessors10TestSetterV5pointSi_Sitvi : $@convention(thin) (Int, Int, @inout Int, @inout Int, @thin TestSetter.Type) -> ()
   // CHECK: [[INIT_ACCESSOR:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[INIT_ACCESSOR_FN]](%2) : $@convention(thin) (Int, Int, @inout Int, @inout Int, @thin TestSetter.Type) -> ()
-  // CHECK: [[SELF:%.*]] = begin_access [modify] [dynamic] %14 : $*TestSetter
-  // CHECK-NEXT: ([[X:%.*]], [[Y:%.*]]) = destructure_tuple {{.*}} : $(Int, Int)
+  // CHECK:      ([[X:%.*]], [[Y:%.*]]) = destructure_tuple {{.*}} : $(Int, Int)
   // CHECK-NEXT: [[X_REF:%.*]] = struct_element_addr [[SELF]] : $*TestSetter, #TestSetter.x
   // CHECK-NEXT: [[Y_REF:%.*]] = struct_element_addr [[SELF]] : $*TestSetter, #TestSetter.y
   // CHECK-NEXT: {{.*}} = apply [[INIT_ACCESSOR]]([[X]], [[Y]], [[X_REF]], [[Y_REF]]) : $@noescape @callee_guaranteed (Int, Int, @inout Int, @inout Int) -> ()
@@ -204,17 +208,18 @@ struct TestNoInitAndInit {
 
   // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors013TestNoInitAndE0V1x1yACSi_SitcfC : $@convention(method) (Int, Int, @thin TestNoInitAndInit.Type) -> TestNoInitAndInit
   //
+  // CHECK: end_access
+  // CHECK: [[SELF_REF:%.*]] = begin_access [modify] [static] {{.*}} : $*TestNoInitAndInit
   // CHECK: [[INIT_REF_FN:%.*]] = function_ref @$s14init_accessors013TestNoInitAndE0V6pointXSivi : $@convention(thin) (Int, @inout Int, @thin TestNoInitAndInit.Type) -> ()
   // CHECK: [[INIT_REF:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[INIT_REF_FN]](%2) : $@convention(thin) (Int, @inout Int, @thin TestNoInitAndInit.Type) -> ()
-  // CHECK: [[SELF_REF:%.*]] = begin_access [modify] [dynamic] {{.*}} : $*TestNoInitAndInit
-  // CHECK-NEXT: [[X_REF:%.*]] = struct_element_addr [[SELF_REF]] : $*TestNoInitAndInit, #TestNoInitAndInit.x
+  // CHECK:      [[X_REF:%.*]] = struct_element_addr [[SELF_REF]] : $*TestNoInitAndInit, #TestNoInitAndInit.x
   // CHECK-NEXT: {{.*}} = apply [[INIT_REF]](%0, [[X_REF]]) : $@noescape @callee_guaranteed (Int, @inout Int) -> ()
   // CHECK-NEXT: end_access [[SELF_REF]] : $*TestNoInitAndInit
   //
+  // CHECK: [[SELF_REF:%.*]] = begin_access [modify] [static] {{.*}} : $*TestNoInitAndInit
   // CHECK: [[INIT_REF_FN:%.*]] = function_ref @$s14init_accessors013TestNoInitAndE0V6pointYSivi : $@convention(thin) (Int, @thin TestNoInitAndInit.Type) -> @out Int
   // CHECK: [[INIT_REF:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[INIT_REF_FN]](%2) : $@convention(thin) (Int, @thin TestNoInitAndInit.Type) -> @out Int
-  // CHECK: [[SELF_REF:%.*]] = begin_access [modify] [dynamic] {{.*}} : $*TestNoInitAndInit
-  // CHECK-NEXT: [[Y_REF:%.*]] = struct_element_addr [[SELF_REF]] : $*TestNoInitAndInit, #TestNoInitAndInit.y
+  // CHECK:      [[Y_REF:%.*]] = struct_element_addr [[SELF_REF]] : $*TestNoInitAndInit, #TestNoInitAndInit.y
   // CHECK-NEXT: {{.*}} = apply [[INIT_REF]]([[Y_REF]], %1) : $@noescape @callee_guaranteed (Int) -> @out Int
   // CHECK-NEXT: end_access [[SELF_REF]] : $*TestNoInitAndInit
   init(x: Int, y: Int) {
@@ -330,17 +335,14 @@ struct TestGenericTuple<T, U> {
   //
   // CHECK: bb0([[A_REF:%.*]] : $*T, [[B_REF:%.*]] : $*(T, U), [[A_VALUE:%.*]] : $*T, [[B_VALUE:%.*]] : $*T, [[C_VALUE:%.*]] : $*U, [[METATYPE:%.*]] : $@thin TestGenericTuple<T, U>.Type):
   //
-  // CHECK: [[INIT_VALUE_1:%.*]] = alloc_stack $(T, U)
-  // CHECK-NEXT: [[INIT_VALUE_1_0:%.*]] = tuple_element_addr [[INIT_VALUE_1]] : $*(T, U), 0
-  // CHECK-NEXT: copy_addr [take] [[B_VALUE]] to [init] [[INIT_VALUE_1_0]]
-  // CHECK-NEXT: [[INIT_VALUE_1_1:%.*]] = tuple_element_addr [[INIT_VALUE_1]] : $*(T, U), 1
-  // CHECK-NEXT: copy_addr [take] [[C_VALUE]] to [init] [[INIT_VALUE_1_1]]
-
-  // CHECK-NEXT: [[INIT_VALUE_2:%.*]] = alloc_stack [lexical] [var_decl] $(T, (T, U))
-  // CHECK-NEXT: [[INIT_VALUE_2_0:%.*]] = tuple_element_addr [[INIT_VALUE_2]] : $*(T, (T, U)), 0
-  // CHECK-NEXT: copy_addr [take] [[A_VALUE]] to [init] [[INIT_VALUE_2_0]]
-  // CHECK-NEXT: [[INIT_VALUE_2_1:%.*]] = tuple_element_addr [[INIT_VALUE_2]] : $*(T, (T, U)), 1
-  // CHECK-NEXT: copy_addr [take] [[INIT_VALUE_1]] to [init] [[INIT_VALUE_2_1]]
+  // CHECK:      [[TUPLE:%.*]] = alloc_stack [lexical] [var_decl] $(T, (T, U))
+  // CHECK-NEXT: [[TUPLE_0:%.*]] = tuple_element_addr [[TUPLE]] : $*(T, (T, U)), 0
+  // CHECK-NEXT: [[TUPLE_1:%.*]] = tuple_element_addr [[TUPLE]] : $*(T, (T, U)), 1
+  // CHECK-NEXT: copy_addr [take] [[A_VALUE]] to [init] [[TUPLE_0]]
+  // CHECK-NEXT: [[TUPLE_1_0:%.*]] = tuple_element_addr [[TUPLE_1]] : $*(T, U), 0
+  // CHECK-NEXT: [[TUPLE_1_1:%.*]] = tuple_element_addr [[TUPLE_1]] : $*(T, U), 1
+  // CHECK-NEXT: copy_addr [take] [[B_VALUE]] to [init] [[TUPLE_1_0]]
+  // CHECK-NEXT: copy_addr [take] [[C_VALUE]] to [init] [[TUPLE_1_1]]
 
   var data: (T, (T, U)) {
     @storageRestrictions(initializes: a, b)

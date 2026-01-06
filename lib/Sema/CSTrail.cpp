@@ -90,6 +90,18 @@ SolverTrail::~SolverTrail() {
     result.TheConstraint.Constraint = constraint; \
     return result; \
   }
+#define BINDING_RELATION_CHANGE(Name) \
+  SolverTrail::Change \
+  SolverTrail::Change::Name(TypeVariableType *typeVar, \
+                            TypeVariableType *otherTypeVar, \
+                            Constraint *constraint) { \
+    Change result; \
+    result.Kind = ChangeKind::Name; \
+    result.BindingRelation.TypeVar = typeVar; \
+    result.BindingRelation.OtherTypeVar = otherTypeVar; \
+    result.BindingRelation.Constraint = constraint; \
+    return result; \
+  }
 #define SCORE_CHANGE(Name) \
   SolverTrail::Change \
   SolverTrail::Change::Name(ScoreKind kind, unsigned value) { \
@@ -179,11 +191,19 @@ SolverTrail::Change::RecordedOpenedPackExpansionType(PackExpansionType *expansio
   return result;
 }
 
-SolverTrail::Change
-SolverTrail::Change::RecordedPackEnvironment(PackElementExpr *packElement) {
+SolverTrail::Change SolverTrail::Change::RecordedPackElementExpansion(
+    PackElementExpr *packElement) {
   Change result;
-  result.Kind = ChangeKind::RecordedPackEnvironment;
+  result.Kind = ChangeKind::RecordedPackElementExpansion;
   result.TheElement = packElement;
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::RecordedPackExpansionEnvironment(PackExpansionExpr *expr) {
+  Change result;
+  result.Kind = ChangeKind::RecordedPackExpansionEnvironment;
+  result.TheExpansionExpr = expr;
   return result;
 }
 
@@ -306,6 +326,20 @@ SolverTrail::Change::RetiredConstraint(ConstraintList::iterator where,
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::RetractedBinding(TypeVariableType *typeVar,
+                                      inference::PotentialBinding binding) {
+  Change result;
+  result.Kind = ChangeKind::RetractedBinding;
+  result.Binding.TypeVar = typeVar;
+  result.Binding.BindingType = binding.BindingType;
+  result.Binding.BindingSource = binding.BindingSource;
+  result.Binding.Originator = binding.Originator;
+  result.Options = unsigned(binding.Kind);
+
+  return result;
+}
+
 SyntacticElementTargetKey
 SolverTrail::Change::getSyntacticElementTargetKey() const {
   ASSERT(Kind == ChangeKind::RecordedTarget);
@@ -359,11 +393,9 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cg.addConstraint(TheConstraint.TypeVar, TheConstraint.Constraint);
     break;
 
-  case ChangeKind::ExtendedEquivalenceClass: {
-    auto &node = cg[EquivClass.TypeVar];
-    node.truncateEquivalenceClass(EquivClass.PrevSize);
+  case ChangeKind::ExtendedEquivalenceClass:
+    cg[EquivClass.TypeVar].truncateEquivalenceClass(EquivClass.PrevSize);
     break;
-   }
 
   case ChangeKind::RelatedTypeVariables:
     cg.unrelateTypeVariables(Relation.TypeVar, Relation.OtherTypeVar);
@@ -373,9 +405,12 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cg.retractBindings(TheConstraint.TypeVar, TheConstraint.Constraint);
     break;
 
-  case ChangeKind::RetractedBindings:
-    cg.inferBindings(TheConstraint.TypeVar, TheConstraint.Constraint);
+  case ChangeKind::RetractedBindings: {
+    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
+    bool inserted = bindings.Constraints.insert(TheConstraint.Constraint);
+    ASSERT(inserted);
     break;
+  }
 
   case ChangeKind::UpdatedTypeVariable:
     Update.TypeVar->getImpl().setRawOptions(Options);
@@ -400,8 +435,12 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cs.removeOpenedPackExpansionType(TheExpansion);
     break;
 
-  case ChangeKind::RecordedPackEnvironment:
-    cs.removePackEnvironment(TheElement);
+  case ChangeKind::RecordedPackElementExpansion:
+    cs.removePackElementExpansion(TheElement);
+    break;
+
+  case ChangeKind::RecordedPackExpansionEnvironment:
+    cs.removePackExpansionEnvironment(TheExpansionExpr);
     break;
 
   case ChangeKind::RecordedNodeType:
@@ -494,17 +533,72 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cs.InactiveConstraints.insert(Retiree.Where,
                                   Retiree.Constraint);
     break;
+
+  case ChangeKind::RetractedDelayedBy:
+    cg[TheConstraint.TypeVar].getPotentialBindings()
+        .DelayedBy.push_back(TheConstraint.Constraint);
+    break;
+
+  case ChangeKind::RetractedProtocol:
+    cg[TheConstraint.TypeVar].getPotentialBindings()
+        .Protocols.push_back(TheConstraint.Constraint);
+    break;
+
+  case ChangeKind::RetractedDefault:
+    cg[TheConstraint.TypeVar].getPotentialBindings()
+        .Defaults.push_back(TheConstraint.Constraint);
+    break;
+
+  case ChangeKind::RetractedLiteral:
+    cg[TheConstraint.TypeVar].getPotentialBindings()
+        .inferFromLiteral(cs, TheConstraint.TypeVar,
+                          TheConstraint.Constraint);
+    break;
+
+  case ChangeKind::RetractedAdjacentVar:
+    cg[BindingRelation.TypeVar].getPotentialBindings()
+        .AdjacentVars.emplace_back(BindingRelation.OtherTypeVar,
+                                   BindingRelation.Constraint);
+    break;
+
+  case ChangeKind::RetractedSubtypeOf:
+    cg[BindingRelation.TypeVar].getPotentialBindings()
+        .SubtypeOf.emplace_back(BindingRelation.OtherTypeVar,
+                                BindingRelation.Constraint);
+    break;
+
+  case ChangeKind::RetractedSupertypeOf:
+    cg[BindingRelation.TypeVar].getPotentialBindings()
+        .SupertypeOf.emplace_back(BindingRelation.OtherTypeVar,
+                                  BindingRelation.Constraint);
+    break;
+
+  case ChangeKind::RetractedEquivalentTo:
+    cg[BindingRelation.TypeVar].getPotentialBindings()
+        .EquivalentTo.emplace_back(BindingRelation.OtherTypeVar,
+                                   BindingRelation.Constraint);
+    break;
+
+  case ChangeKind::RetractedBinding: {
+    PotentialBinding binding(Binding.BindingType, AllowedBindingKind(Options),
+                             Binding.BindingSource, Binding.Originator);
+
+    auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();
+    bindings.Bindings.push_back(binding);
+    break;
+  }
   }
 }
 
 void SolverTrail::Change::dump(llvm::raw_ostream &out,
                                ConstraintSystem &cs,
                                unsigned indent) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
 
   out.indent(indent);
 
+  auto &ctx = cs.getASTContext();
+  auto &SM = ctx.SourceMgr;
   switch (Kind) {
 
 #define LOCATOR_CHANGE(Name, _) \
@@ -539,6 +633,17 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
                                       indent + 2); \
       out << " on type variable "; \
       TheConstraint.TypeVar->print(out, PO); \
+      out << ")\n"; \
+      break;
+#define BINDING_RELATION_CHANGE(Name) \
+    case ChangeKind::Name: \
+      out << "(" << #Name << " "; \
+      BindingRelation.Constraint->print(out, &cs.getASTContext().SourceMgr, \
+                                        indent + 2); \
+      out << " on type variable "; \
+      BindingRelation.TypeVar->print(out, PO); \
+      out << " and "; \
+      BindingRelation.OtherTypeVar->print(out, PO); \
       out << ")\n"; \
       break;
 #define SCORE_CHANGE(Name) \
@@ -581,7 +686,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     }
     else {
       out << " to fixed type ";
-      parentOrFixed.get<TypeBase *>()->print(out, PO);
+      cast<TypeBase *>(parentOrFixed)->print(out, PO);
     }
     out << " with options 0x";
     out.write_hex(Options);
@@ -618,11 +723,16 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << ")\n";
     break;
 
-  case ChangeKind::RecordedPackEnvironment:
-    // FIXME: Print short form of PackExpansionExpr
-    out << "(RecordedPackEnvironment ";
-    simple_display(out, TheElement);
-    out << "\n";
+  case ChangeKind::RecordedPackElementExpansion:
+    out << "(RecordedPackElementExpansion ";
+    dumpAnchor(TheElement, &SM, out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedPackExpansionEnvironment:
+    out << "(RecordedPackExpansionEnvironment ";
+    dumpAnchor(TheExpansionExpr, &SM, out);
+    out << ")\n";
     break;
 
   case ChangeKind::RecordedNodeType:
@@ -654,8 +764,9 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
 
   case ChangeKind::RecordedContextualInfo:
-    // FIXME: Print short form of ASTNode
-    out << "(RecordedContextualInfo)\n";
+    out << "(RecordedContextualInfo ";
+    dumpAnchor(Node.Node, &SM, out);
+    out << ")\n";
     break;
 
   case ChangeKind::RecordedTarget:
@@ -665,8 +776,9 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
 
   case ChangeKind::RecordedCaseLabelItemInfo:
-    // FIXME: Print something here
-    out << "(RecordedCaseLabelItemInfo)\n";
+    out << "(RecordedCaseLabelItemInfo ";
+    dumpAnchor(TheItem, &SM, out);
+    out << ")\n";
     break;
 
   case ChangeKind::RecordedPotentialThrowSite:
@@ -691,6 +803,14 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     Retiree.Constraint->print(out, &cs.getASTContext().SourceMgr,
                               indent + 2);
     out << ")\n";
+    break;
+
+  case ChangeKind::RetractedBinding:
+    out << "(RetractedBinding ";
+    Binding.TypeVar->print(out, PO);
+    out << " with type ";
+    Binding.BindingType->print(out, PO);
+    out << " and kind " << Options << ")\n";
     break;
   }
 }
@@ -782,8 +902,7 @@ void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
   llvm::set_subtract(removedConstraints, intersects);
 
   // Print out Changes.
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
   out.indent(indent);
   out << "(Changes:\n";
   if (!addedTypeVars.empty()) {
@@ -812,7 +931,7 @@ void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
         }
       }
 
-      if (typeVar->getImpl().ParentOrFixed.is<TypeBase *>())
+      if (isa<TypeBase *>(typeVar->getImpl().ParentOrFixed))
         assignments.push_back(typeVar);
     }
 
@@ -825,7 +944,7 @@ void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
       for (auto *typeVar : assignments) {
         out.indent(indent + 4);
         out << "> $T" << typeVar->getImpl().getID() << " := ";
-        typeVar->getImpl().ParentOrFixed.get<TypeBase *>()->print(out, PO);
+        cast<TypeBase *>(typeVar->getImpl().ParentOrFixed)->print(out, PO);
         out << '\n';
       }
       out.indent(indent + 2);

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-inline-generics -emit-sorted-sil -Xllvm -sil-print-types -emit-sil -enable-spec-devirt -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-inline-generics -emit-sorted-sil -Xllvm -sil-print-types -emit-sil -O %s | %FileCheck %s
 
 // We used to crash on this when trying to devirtualize t.boo(a, 1),
 // because it is an "apply" with replacement types that contain
@@ -44,7 +44,7 @@ class Derived<T> : Base<T> {
 
 // Check that testDevirt is specialized and uses speculative devirtualization.
 // CHECK-LABEL: sil shared [noinline] @{{.*}}testDevirt
-// CHECK: checked_cast_br [exact] CC<Int32> in %{{.*}} : $CC<Int32> to CC<Int32>
+// This used to check speculative-devirtualization, which we don't have anymore.
 // CHECK: class_method
 // CHECK: }
 @inline(never)
@@ -193,9 +193,8 @@ public func doTest6() {
 }
 
 // CHECK-LABEL: sil private [noinline] @{{.*}}test7
-// CHECK-NOT: class_method
-// CHECK: checked_cast_br
-// CHECK-NOT: class_method
+// This used to check speculative-devirtualization, which we don't have anymore.
+// CHECK:     class_method
 // CHECK: }
 @inline(never)
 private func test7<T: ProtocolWithAssocType>(_ c: CP<T>) -> Int32 {

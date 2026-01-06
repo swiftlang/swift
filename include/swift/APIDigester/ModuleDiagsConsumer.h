@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,12 +18,10 @@
 #ifndef __SWIFT_MODULE_DIFFER_DIAGS_CONSUMER_H__
 #define __SWIFT_MODULE_DIFFER_DIAGS_CONSUMER_H__
 
-#include "llvm/ADT/MapVector.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/StringSet.h"
 #include <set>
 
 namespace swift {

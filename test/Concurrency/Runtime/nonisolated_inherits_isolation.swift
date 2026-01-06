@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift( -swift-version 6 -g %import-libdispatch -import-objc-header %S/Inputs/RunOnMainActor.h -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext )
+// RUN: %target-run-simple-swift( -swift-version 6 -g %import-libdispatch -import-objc-header %S/Inputs/RunOnMainActor.h -enable-upcoming-feature NonisolatedNonsendingByDefault )
+// RUN: %target-run-simple-swift( -swift-version 6 -g %import-libdispatch -import-objc-header %S/Inputs/RunOnMainActor.h -enable-upcoming-feature NonisolatedNonsendingByDefault  -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -6,7 +8,7 @@
 // REQUIRES: libdispatch
 // REQUIRES: asserts
 
-// REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // UNSUPPORTED: freestanding
 
@@ -31,6 +33,17 @@ struct CustomActor {
   static var shared: Custom {
     return Custom()
   }
+}
+
+nonisolated(nonsending)
+func executionCallerIsolation() async {
+  checkIfOnMainQueue()
+}
+
+// Expected to always crash
+@concurrent
+func executionConcurrentIsolation() async {
+  checkIfOnMainQueue()
 }
 
 let tests = TestSuite("NonIsolatedInheritsIsolation")
@@ -85,6 +98,25 @@ tests.test("Check if nonisolated inheriting nonisolated crashes") { () async -> 
     await nonisolatedCheckIfOnMainQueue()
   }
   sleep(5)
+}
+
+tests.test("Check if execution concurrent isolation crashes (main actor)") { @MainActor () async -> () in
+  expectCrashLater()
+  await executionConcurrentIsolation()
+}
+
+tests.test("Check if execution concurrent isolation crashes (custom actor)") { @CustomActor () async -> () in
+  expectCrashLater()
+  await executionConcurrentIsolation()
+}
+
+tests.test("Check if execution concurrent isolation does not crash (main actor)") { @MainActor () async -> () in
+  await executionCallerIsolation()
+}
+
+tests.test("Check if execution concurrent isolation does crash (custom actor)") { @CustomActor () async -> () in
+  expectCrashLater()
+  await executionCallerIsolation()
 }
 
 @MainActor func run() async {

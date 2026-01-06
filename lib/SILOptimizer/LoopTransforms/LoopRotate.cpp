@@ -18,6 +18,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -43,6 +44,9 @@ static llvm::cl::opt<int> LoopRotateSizeLimit("looprotate-size-limit",
                                               llvm::cl::init(20));
 static llvm::cl::opt<bool> RotateSingleBlockLoop("looprotate-single-block-loop",
                                                  llvm::cl::init(false));
+static llvm::cl::opt<bool>
+    LoopRotateInfiniteBudget("looprotate-infinite-budget",
+                             llvm::cl::init(false));
 
 static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
                        SILLoopInfo *loopInfo, bool rotateSingleBlockLoops,
@@ -117,9 +121,7 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
     if (!inst->mayHaveSideEffects() && !inst->mayReadFromMemory() &&
         !isa<TermInst>(inst) &&
         !isa<AllocationInst>(inst) && /* not marked mayhavesideeffects */
-        !isa<CopyValueInst>(inst) &&
-        !isa<MoveValueInst>(inst) &&
-        !isa<BeginBorrowInst>(inst) &&
+        !hasOwnershipOperandsOrResults(inst) &&
         hasLoopInvariantOperands(inst, loop, invariants)) {
       moves.push_back(inst);
       invariants.insert(inst);
@@ -132,7 +134,7 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
     cost += (int)instructionInlineCost(instRef);
   }
 
-  return cost < LoopRotateSizeLimit;
+  return cost < LoopRotateSizeLimit || LoopRotateInfiniteBudget;
 }
 
 static void mapOperands(SILInstruction *inst,
@@ -374,6 +376,15 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
     return false;
   }
 
+  // Incomplete liveranges in the dead-end exit block can cause a missing adjacent
+  // phi-argument for a re-borrow if there is a borrow-scope is in the loop.
+  // But even when we have complete lifetimes, it's probably not worth rotating
+  // a loop where the header block branches to a dead-end block.
+  auto *deBlocks = pm->getAnalysis<DeadEndBlocksAnalysis>()->get(exit->getParent());
+  if (deBlocks->isDeadEnd(exit)) {
+    return false;
+  }
+
   // We don't want to rotate such that we merge two headers of separate loops
   // into one. This can be turned into an assert again once we have guaranteed
   // preheader insertions.
@@ -417,7 +428,11 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   for (auto &inst : *header) {
     if (auto *bfi = dyn_cast<BorrowedFromInst>(&inst)) {
-      valueMap[bfi] = valueMap[bfi->getBorrowedValue()];
+      // Don't do valueMap[bfi] = valueMap[bfi->getBorrowedValue()]
+      // The subscript operator returns a reference into the map. Due to the
+      // assignment the map might get "reallocated" from under us.
+      auto mappedValue = valueMap[bfi->getBorrowedValue()];
+      valueMap[bfi] = mappedValue;
     } else if (SILInstruction *cloned = inst.clone(preheaderBranch)) {
       mapOperands(cloned, valueMap);
 
@@ -474,6 +489,12 @@ namespace {
 class LoopRotation : public SILFunctionTransform {
 
   void run() override {
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
+    // This pass results in verification failures when Swift sources are not
+    // enabled.
+    LLVM_DEBUG(llvm::dbgs() << "Loop Rotate disabled in C++-only Swift compiler\n");
+    return;
+#endif // !SWIFT_ENABLE_SWIFT_IN_SWIFT
     SILFunction *f = getFunction();
     SILLoopAnalysis *loopAnalysis = PM->getAnalysis<SILLoopAnalysis>();
     DominanceAnalysis *domAnalysis = PM->getAnalysis<DominanceAnalysis>();

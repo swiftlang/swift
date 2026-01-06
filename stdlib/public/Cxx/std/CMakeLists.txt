@@ -6,9 +6,13 @@ add_custom_command_target(unused_var
     CUSTOM_TARGET_NAME CxxStdlib-apinotes
     COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}"
     COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes" "${output_dir}"
+    COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std_span.apinotes" "${output_dir}"
+    COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std_string_view.apinotes" "${output_dir}"
     COMMENT "Copying CxxStdlib API Notes to ${output_dir}"
     OUTPUT "${output_dir}/std.apinotes"
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes")
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std_span.apinotes"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std_string_view.apinotes")
 
 swift_install_in_component(FILES std.apinotes
     DESTINATION "lib/swift/apinotes"
@@ -18,15 +22,6 @@ set_property(TARGET CxxStdlib-apinotes PROPERTY FOLDER "Miscellaneous")
 add_dependencies(sdk-overlay CxxStdlib-apinotes)
 add_dependencies(compiler CxxStdlib-apinotes)
 
-
-# Swift compiler currently assumes that the Darwin overlay is a dependency of
-# CxxStdlib, and fails to build CxxStdlib if Darwin.swiftmodule in build dir
-# is built with a different (older) version of the compiler. To workaround this,
-# declare the Darwin overlay as a dependency of CxxStdlib.
-set(swift_cxxstdlib_darwin_dependencies)
-if(SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
-  set(swift_cxxstdlib_darwin_dependencies Darwin)
-endif()
 
 set(swift_cxxstdlib_dependencies)
 if(NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT OR NOT SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT)
@@ -44,12 +39,6 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     String.swift
 
     SWIFT_MODULE_DEPENDS Cxx ${swift_cxxstdlib_dependencies}
-    SWIFT_MODULE_DEPENDS_IOS ${swift_cxxstdlib_darwin_dependencies}
-    SWIFT_MODULE_DEPENDS_OSX ${swift_cxxstdlib_darwin_dependencies}
-    SWIFT_MODULE_DEPENDS_TVOS ${swift_cxxstdlib_darwin_dependencies}
-    SWIFT_MODULE_DEPENDS_WATCHOS ${swift_cxxstdlib_darwin_dependencies}
-    SWIFT_MODULE_DEPENDS_XROS ${swift_cxxstdlib_darwin_dependencies}
-    SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_cxxstdlib_darwin_dependencies}
     SWIFT_MODULE_DEPENDS_ANDROID Android
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
@@ -59,6 +48,9 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     # This flag is unnecessary when building with newer compilers that allow
     # using C++ symbols in resilient overlays (see f4204568).
     -enable-experimental-feature AssumeResilientCxxTypes
+    -enable-experimental-feature Lifetimes
+    -enable-experimental-feature AllowUnsafeAttribute
+    -strict-memory-safety
 
     # The varying modularization of the C++ standard library on different
     # platforms makes it difficult to enable MemberImportVisibility for this
@@ -75,8 +67,9 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     DEPLOYMENT_VERSION_XROS ${COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_XROS}
 
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-    TARGET_SDKS ALL_APPLE_PLATFORMS LINUX WINDOWS ANDROID
+    TARGET_SDKS ALL_APPLE_PLATFORMS LINUX LINUX_STATIC WINDOWS ANDROID FREEBSD
     MACCATALYST_BUILD_FLAVOR zippered
     INSTALL_IN_COMPONENT compiler
+    INSTALL_BINARY_SWIFTMODULE NON_DARWIN_ONLY
     INSTALL_WITH_SHARED
     DEPENDS libstdcxx-modulemap libcxxshim_modulemap CxxStdlib-apinotes)

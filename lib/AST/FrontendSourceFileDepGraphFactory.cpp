@@ -217,11 +217,11 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
   case DeclKind::TopLevelCode:
-  case DeclKind::PoundDiagnostic:
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::Module:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     return "";
   }
 
@@ -242,7 +242,7 @@ bool fine_grained_dependencies::withReferenceDependencies(
         ModuleDepGraphFactory(backend, MD, alsoEmitDotFile).construct();
     return cont(std::move(g));
   } else {
-    auto *SF = MSF.get<const SourceFile *>();
+    auto *SF = cast<const SourceFile *>(MSF);
     SourceFileDepGraph g =
         FrontendSourceFileDepGraphFactory(SF, backend, outputPath, depTracker,
                                           alsoEmitDotFile)

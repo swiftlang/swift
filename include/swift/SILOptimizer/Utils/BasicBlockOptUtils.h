@@ -164,6 +164,8 @@ public:
   ///
   /// getInBlockProjectionOperandValues() can be called before or after cloning.
   bool cloneProjections();
+
+  SWIFT_DEBUG_DUMP;
 };
 
 /// Clone a single basic block and any required successor edges within the same

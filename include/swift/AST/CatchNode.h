@@ -22,12 +22,16 @@
 
 namespace swift {
 
+namespace detail {
+using CatchNodeBase = llvm::PointerUnion<AbstractFunctionDecl *, ClosureExpr *,
+                                         DoCatchStmt *, AnyTryExpr *>;
+} // end namespace detail
+
 /// An AST node that represents a point where a thrown error can be caught and
 /// or rethrown, which includes functions do...catch statements.
-class CatchNode: public llvm::PointerUnion<
-    AbstractFunctionDecl *, ClosureExpr *, DoCatchStmt *, AnyTryExpr *
-  > {
+class CatchNode : public detail::CatchNodeBase {
 public:
+  using Base = detail::CatchNodeBase;
   using PointerUnion::PointerUnion;
 
   /// Determine the thrown error type within the region of this catch node
@@ -45,6 +49,11 @@ public:
   /// needs to be inferred.
   Type getExplicitCaughtType(ASTContext &ctx) const;
 
+  /// Returns the explicitly-specified type error that will be caught by this
+  /// catch node, or `nullopt` if it has not yet been computed. This should only
+  /// be used for dumping.
+  std::optional<Type> getCachedExplicitCaughtType(ASTContext &ctx) const;
+
   friend llvm::hash_code hash_value(CatchNode catchNode) {
     using llvm::hash_value;
     return hash_value(catchNode.getOpaqueValue());
@@ -56,5 +65,18 @@ void simple_display(llvm::raw_ostream &out, CatchNode catchNode);
 SourceLoc extractNearestSourceLoc(CatchNode catchNode);
 
 } // end namespace swift
+
+namespace llvm {
+
+using swift::CatchNode;
+
+/// `isa`, `dyn_cast`, `cast` for `CatchNode`.
+template <typename To>
+struct CastInfo<To, CatchNode> : public CastInfo<To, CatchNode::Base> {};
+template <typename To>
+struct CastInfo<To, const CatchNode>
+    : public CastInfo<To, const CatchNode::Base> {};
+
+} // end namespace llvm
 
 #endif // SWIFT_AST_CATCHNODE_H

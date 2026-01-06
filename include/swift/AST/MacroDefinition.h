@@ -18,7 +18,10 @@
 #ifndef SWIFT_AST_MACRO_DEFINITION_H
 #define SWIFT_AST_MACRO_DEFINITION_H
 
+#include "swift/AST/Identifier.h"
 #include "swift/Basic/StringExtras.h"
+
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
@@ -69,7 +72,7 @@ struct ExternalMacroReference {
 };
 
 /// Describes the known kinds of builtin macros.
-enum class BuiltinMacroKind: uint8_t {
+enum class BuiltinMacroKind : uint8_t {
   /// #externalMacro, which references an external macro.
   ExternalMacro,
   /// #isolation, which produces the isolation of the current context

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,47 +14,9 @@ import ASTBridging
 import BasicBridging
 import SwiftIfConfig
 // Needed to use BumpPtrAllocator
-@_spi(BumpPtrAllocator) @_spi(RawSyntax) import SwiftSyntax
+@_spi(BumpPtrAllocator) @_spi(RawSyntax) @_spi(Compiler) import SwiftSyntax
 
 import struct SwiftDiagnostics.Diagnostic
-
-enum ASTNode {
-  case decl(BridgedDecl)
-  case stmt(BridgedStmt)
-  case expr(BridgedExpr)
-
-  var castToExpr: BridgedExpr {
-    guard case .expr(let bridged) = self else {
-      fatalError("Expected an expr")
-    }
-    return bridged
-  }
-
-  var castToStmt: BridgedStmt {
-    guard case .stmt(let bridged) = self else {
-      fatalError("Expected a stmt")
-    }
-    return bridged
-  }
-
-  var castToDecl: BridgedDecl {
-    guard case .decl(let bridged) = self else {
-      fatalError("Expected a decl")
-    }
-    return bridged
-  }
-
-  var bridged: BridgedASTNode {
-    switch self {
-    case .expr(let e):
-      return BridgedASTNode(raw: e.raw, kind: .expr)
-    case .stmt(let s):
-      return BridgedASTNode(raw: s.raw, kind: .stmt)
-    case .decl(let d):
-      return BridgedASTNode(raw: d.raw, kind: .decl)
-    }
-  }
-}
 
 /// Little utility wrapper that lets us have some mutable state within
 /// immutable structs, and is therefore pretty evil.
@@ -95,75 +57,132 @@ struct ASTGenVisitor {
     self.configuredRegions = configuredRegions
   }
 
-  func generate(sourceFile node: SourceFileSyntax) -> [ASTNode] {
-    var out = [ASTNode]()
-    let isTopLevel = self.declContext.isModuleScopeContext
+  func generate(sourceFile node: SourceFileSyntax) -> [BridgedASTNode] {
+    // If not top-level, no need for 'TopLevelCodeDecl' treatment.
+    if !self.declContext.isModuleScopeContext {
+      return self.generate(codeBlockItemList: node.statements)
+    } else {
+      return self.generateTopLevel(codeBlockItemList: node.statements)
+    }
+  }
 
-    visitIfConfigElements(
-      node.statements,
-      of: CodeBlockItemSyntax.self,
-      split: Self.splitCodeBlockItemIfConfig
-    ) { element in
-      guard let astNode = generate(codeBlockItem: element) else {
-        return
-      }
-      if !isTopLevel {
-        out.append(astNode)
-        return
+  func generateTopLevel(codeBlockItem node: CodeBlockItemSyntax) -> BridgedASTNode? {
+    let parentDC = self.declContext
+
+    func maybeTopLevelCodeDecl(body: () -> BridgedASTNode?) -> BridgedASTNode? {
+      let topLevelDecl: BridgedTopLevelCodeDecl = BridgedTopLevelCodeDecl.create(self.ctx, declContext: self.declContext)
+      guard let astNode = withDeclContext(topLevelDecl.asDeclContext, body) else {
+        return nil
       }
 
-      func getRange() -> (start: BridgedSourceLoc, end: BridgedSourceLoc) {
-        let loc = self.generateSourceLoc(element)
-        if let endTok = element.lastToken(viewMode: .sourceAccurate) {
-          switch endTok.parent?.kind {
-          case .stringLiteralExpr, .regexLiteralExpr:
-            // string/regex literal are single token in AST.
-            return (loc, self.generateSourceLoc(endTok.parent))
-          default:
-            return (loc, self.generateSourceLoc(endTok))
-          }
-        } else {
-          return (loc, loc)
+      if astNode.kind == .decl {
+        // If a decl is generated, discard the TopLevelCodeDecl.
+        return astNode
+      }
+
+      // Diagnose top-level code in non-script files.
+      if !declContext.parentSourceFile.isScriptMode {
+        switch astNode.kind {
+        case .stmt:
+          self.diagnose(.illegalTopLevelStmt(node))
+        case .expr:
+          self.diagnose(.illegalTopLevelExpr(node))
+        case .decl:
+          fatalError("unreachable")
         }
       }
 
-      switch astNode {
-      case .decl(let d):
-        out.append(.decl(d))
-      case .stmt(let s):
-        let range = getRange()
-        let topLevelDecl = BridgedTopLevelCodeDecl.createParsed(
-          self.ctx,
-          declContext: self.declContext,
-          startLoc: range.start,
-          stmt: s,
-          endLoc: range.end
-        )
-        out.append(.decl(topLevelDecl.asDecl))
-      case .expr(let e):
-        let range = getRange()
-        let topLevelDecl = BridgedTopLevelCodeDecl.createParsed(
-          self.ctx,
-          declContext: self.declContext,
-          startLoc: range.start,
-          expr: e,
-          endLoc: range.end
-        )
-        out.append(.decl(topLevelDecl.asDecl))
-      }
+      let bodyRange = self.generateImplicitBraceRange(node)
+      let body = BridgedBraceStmt.createImplicit(
+        self.ctx,
+        lBraceLoc: bodyRange.start,
+        element: astNode,
+        rBraceLoc: bodyRange.end
+      )
+      topLevelDecl.setBody(body: body)
+      return .decl(topLevelDecl.asDecl)
     }
 
+    switch node.item {
+    case .decl(let node):
+      if let node = node.as(MacroExpansionDeclSyntax.self) {
+        return maybeTopLevelCodeDecl {
+          switch self.maybeGenerateBuiltinPound(freestandingMacroExpansion: node) {
+          case .generated(let generated):
+            return generated
+          case .ignored:
+            /// If it is actually a macro expansion decl, it should use the parent DC.
+            return self.withDeclContext(parentDC) {
+              return .decl(self.generate(macroExpansionDecl: node).asDecl)
+            }
+          }
+        }
+      }
+      // Regular 'decl' nodes never be a stmt or expr. No top-level code treatment.
+      return self.generate(decl: node).map { .decl($0) }
+
+    case .expr(let node):
+      return maybeTopLevelCodeDecl {
+        if let node = node.as(MacroExpansionExprSyntax.self) {
+          switch self.maybeGenerateBuiltinPound(freestandingMacroExpansion: node) {
+          case .generated(let generated):
+            return generated
+          case .ignored:
+            break
+          }
+
+          // In non-script files, macro expansion at top-level must be a decl.
+          if !declContext.parentSourceFile.isScriptMode {
+            return withDeclContext(parentDC) {
+              return .decl(self.generateMacroExpansionDecl(macroExpansionExpr: node).asDecl)
+            }
+          }
+
+          // Otherwise, let regular 'self.generate(expr:)' generate the macro expansions.
+        }
+        return .expr(self.generate(expr: node))
+      }
+
+    case .stmt(let node):
+      return maybeTopLevelCodeDecl {
+        return .stmt(self.generate(stmt: node))
+      }
+    }
+  }
+
+  func generateTopLevel(codeBlockItemList node: CodeBlockItemListSyntax) -> [BridgedASTNode] {
+    var out = [BridgedASTNode]()
+    visitIfConfigElements(
+      node,
+      of: CodeBlockItemSyntax.self,
+      split: Self.splitCodeBlockItemIfConfig
+    ) { element in
+      guard let item = self.generateTopLevel(codeBlockItem: element) else {
+        return
+      }
+      out.append(item)
+
+      // Hoist 'VarDecl' to the block.
+      if item.kind == .decl {
+        withBridgedSwiftClosure { ptr in
+          let d = ptr!.load(as: BridgedDecl.self)
+          out.append(.decl(d))
+        } call: { handle in
+          item.castToDecl().forEachDeclToHoist(handle)
+        }
+      }
+    }
     return out
   }
 }
 
 extension ASTGenVisitor {
-  /// Obtains a bridged, `ASTContext`-owned "identifier".
+  /// Obtains a `ASTContext`-owned "identifier".
   ///
-  /// If the token text is `_`, return an empty identifier. If the token is an
+  /// If the token text is `_`, returns an empty identifier. If the token is an
   /// escaped identifier, backticks are stripped.
   @inline(__always)
-  func generateIdentifier(_ token: TokenSyntax) -> BridgedIdentifier {
+  func generateIdentifier(_ token: TokenSyntax) -> Identifier {
     if token.rawTokenKind == .wildcard {
       return nil
     }
@@ -174,32 +193,33 @@ extension ASTGenVisitor {
     return self.ctx.getIdentifier(text.bridged)
   }
 
-  /// Obtains a bridged, `ASTContext`-owned "identifier".
+  /// Obtains a `ASTContext`-owned "identifier".
   ///
-  /// If the `token` text is `nil`, return an empty identifier.
+  /// If the `token` text is `nil`, returns an empty identifier.
   @inline(__always)
-  func generateIdentifier(_ token: TokenSyntax?) -> BridgedIdentifier {
+  func generateIdentifier(_ token: TokenSyntax?) -> Identifier {
     token.map(generateIdentifier(_:)) ?? nil
   }
 
-  /// Obtains the start location of the node excluding leading trivia in the
+  /// Obtains the C++ start location of the node excluding leading trivia in the
   /// source buffer.
   @inline(__always)
-  func generateSourceLoc(_ node: some SyntaxProtocol) -> BridgedSourceLoc {
-    BridgedSourceLoc(at: node.positionAfterSkippingLeadingTrivia, in: self.base)
+  func generateSourceLoc(_ node: some SyntaxProtocol) -> SourceLoc {
+    SourceLoc(at: node.positionAfterSkippingLeadingTrivia, in: self.base)
   }
 
-  /// Obtains the start location of the node excluding leading trivia in the
+  /// Obtains the C++ start location of the node excluding leading trivia in the
   /// source buffer. If the `node` is nil returns an invalid source location.
   @inline(__always)
-  func generateSourceLoc(_ node: (some SyntaxProtocol)?) -> BridgedSourceLoc {
+  func generateSourceLoc(_ node: (some SyntaxProtocol)?) -> SourceLoc {
     node.map(generateSourceLoc(_:)) ?? nil
   }
 
-  /// Obtains a pair of bridged identifier and the bridged source location.
+  /// Obtains a pair of an `ASTContext`-owned identifier and a C++ source
+  /// location from `token`.
   @inline(__always)
   func generateIdentifierAndSourceLoc(_ token: TokenSyntax) -> (
-    identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc
+    identifier: Identifier, sourceLoc: SourceLoc
   ) {
     return (
       self.generateIdentifier(token),
@@ -207,12 +227,13 @@ extension ASTGenVisitor {
     )
   }
 
-  /// Obtains a pair of bridged identifier and the bridged source location.
+  /// Obtains a pair of an `ASTContext`-owned identifier and a C++ source
+  /// location from `token`.
   /// If `token` is `nil`, returns a pair of an empty identifier and an invalid
   /// source location.
   @inline(__always)
   func generateIdentifierAndSourceLoc(_ token: TokenSyntax?) -> (
-    identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc
+    identifier: Identifier, sourceLoc: SourceLoc
   ) {
     token.map(generateIdentifierAndSourceLoc(_:)) ?? (nil, nil)
   }
@@ -226,29 +247,136 @@ extension ASTGenVisitor {
     )
   }
 
-  /// Obtains bridged token source range from a pair of token nodes.
+  /// Obtains the bridged declaration based name and bridged source location from a token.
+  func generateDeclBaseName(_ token: TokenSyntax) -> (baseName: DeclBaseName, sourceLoc: SourceLoc) {
+    let baseName: DeclBaseName
+    switch token.keywordKind {
+    case .`init`:
+      baseName = .createConstructor()
+    case .deinit:
+      baseName = .createDestructor()
+    case .subscript:
+      baseName = .createSubscript()
+    default:
+      baseName = .init(self.generateIdentifier(token))
+    }
+    let baseNameLoc = self.generateSourceLoc(token)
+    return (baseName, baseNameLoc)
+  }
+
+  /// Obtains the bridged module name and bridged source location from a module selector.
+  func generateModuleSelector(_ node: ModuleSelectorSyntax?) -> (moduleName: Identifier, sourceLoc: SourceLoc) {
+    let moduleName = self.self.generateIdentifierAndSourceLoc(node?.moduleName)
+    return (moduleName: moduleName.identifier, sourceLoc: moduleName.sourceLoc)
+  }
+
+  func generateDeclNameRef(
+    moduleSelector: ModuleSelectorSyntax?,
+    baseName: TokenSyntax,
+    arguments: DeclNameArgumentsSyntax? = nil
+  ) -> (name: BridgedDeclNameRef, loc: BridgedDeclNameLoc) {
+    let moduleSelectorLoc = self.generateModuleSelector(moduleSelector)
+    let baseNameLoc = self.generateDeclBaseName(baseName)
+
+    // Create the name itself.
+    let nameRef: BridgedDeclNameRef
+    if let arguments {
+      let bridgedLabels: BridgedArrayRef
+      if arguments.arguments.isEmpty {
+        bridgedLabels = BridgedArrayRef()
+      } else {
+        let labels = arguments.arguments.lazy.map {
+          self.generateIdentifier($0.name)
+        }
+        bridgedLabels = labels.bridgedArray(in: self)
+      }
+      nameRef = .createParsed(
+        self.ctx,
+        moduleSelector: moduleSelectorLoc.moduleName,
+        baseName: baseNameLoc.baseName,
+        argumentLabels: bridgedLabels
+      )
+    } else {
+      nameRef = .createParsed(self.ctx, moduleSelector: moduleSelectorLoc.moduleName, baseName: baseNameLoc.baseName)
+    }
+
+    // Create the location. Complication: if the argument list has no labels, the paren locs aren't provided either.
+    // FIXME: This is silly but I'm pretty sure it's load-bearing.
+    let nameLoc: BridgedDeclNameLoc
+    if let arguments, !arguments.arguments.isEmpty {
+      let labelLocs = arguments.arguments.lazy.map {
+        self.generateSourceLoc($0.name)
+      }
+      let bridgedLabelLocs = labelLocs.bridgedArray(in: self)
+
+      nameLoc = .createParsed(
+        self.ctx,
+        moduleSelectorLoc: moduleSelectorLoc.sourceLoc,
+        baseNameLoc: baseNameLoc.sourceLoc,
+        lParenLoc: self.generateSourceLoc(arguments.leftParen),
+        argumentLabelLocs: bridgedLabelLocs,
+        rParenLoc: self.generateSourceLoc(arguments.rightParen)
+      )
+    } else {
+      nameLoc = .createParsed(
+        self.ctx,
+        moduleSelectorLoc: moduleSelectorLoc.sourceLoc,
+        baseNameLoc: baseNameLoc.sourceLoc
+      )
+    }
+
+    return (name: nameRef, loc: nameLoc)
+  }
+
+  /// Obtains a C++ source range from a pair of token nodes.
   @inline(__always)
-  func generateSourceRange(start: TokenSyntax, end: TokenSyntax) -> BridgedSourceRange {
-    BridgedSourceRange(
+  func generateSourceRange(start: TokenSyntax, end: TokenSyntax) -> SourceRange {
+    .init(
       start: self.generateSourceLoc(start),
       end: self.generateSourceLoc(end)
     )
   }
 
-  /// Obtains bridged token source range of a syntax node.
+  /// Obtains the C++ source range of a syntax node.
   @inline(__always)
-  func generateSourceRange(_ node: some SyntaxProtocol) -> BridgedSourceRange {
+  func generateSourceRange(_ node: some SyntaxProtocol) -> SourceRange {
     guard let start = node.firstToken(viewMode: .sourceAccurate) else {
-      return BridgedSourceRange(start: nil, end: nil)
+      return .init()
     }
     return generateSourceRange(start: start, end: node.lastToken(viewMode: .sourceAccurate)!)
   }
 
-  /// Obtains bridged character source range.
+  /// Obtains the C++ source range of a syntax node.
   @inline(__always)
-  func generateCharSourceRange(start: AbsolutePosition, length: SourceLength) -> BridgedCharSourceRange {
-    BridgedCharSourceRange(
-      start: BridgedSourceLoc(at: start, in: self.base),
+  func generateSourceRange(_ node: (some SyntaxProtocol)?) -> SourceRange {
+    guard let node = node else {
+      return .init()
+    }
+    return generateSourceRange(node)
+  }
+
+  /// Obtains the C++ source range of a syntax node.
+  /// Unlike `generateSourceRange(_:)`, this correctly emulates the string/regex literal token `SourceLoc` in AST.
+  func generateImplicitBraceRange(_ node: some SyntaxProtocol) -> SourceRange {
+    let loc = self.generateSourceLoc(node)
+    if let endTok = node.lastToken(viewMode: .sourceAccurate) {
+      switch endTok.parent?.kind {
+      case .stringLiteralExpr, .regexLiteralExpr:
+        // string/regex literal are single token in AST.
+        return .init(start: loc, end: self.generateSourceLoc(endTok.parent))
+      default:
+        return .init(start: loc, end: self.generateSourceLoc(endTok))
+      }
+    } else {
+      return .init(start:loc, end: loc)
+    }
+  }
+
+  /// Obtains a C++ character source range.
+  @inline(__always)
+  func generateCharSourceRange(start: AbsolutePosition, length: SourceLength) -> CharSourceRange {
+    .init(
+      start: SourceLoc(at: start, in: self.base),
       byteLength: UInt32(length.utf8Length)
     )
   }
@@ -424,6 +552,7 @@ public func buildTopLevelASTNodes(
   diagEngine: BridgedDiagnosticEngine,
   sourceFilePtr: UnsafeMutableRawPointer,
   dc: BridgedDeclContext,
+  attachedDecl: BridgedNullableDecl,
   ctx: BridgedASTContext,
   outputContext: UnsafeMutableRawPointer,
   callback: @convention(c) (BridgedASTNode, UnsafeMutableRawPointer) -> Void
@@ -440,12 +569,30 @@ public func buildTopLevelASTNodes(
   switch sourceFile.pointee.syntax.as(SyntaxEnum.self) {
   case .sourceFile(let node):
     for elem in visitor.generate(sourceFile: node) {
-      callback(elem.bridged, outputContext)
+      callback(elem, outputContext)
     }
-  case .memberBlockItemList(let node):
-    for elem in visitor.generate(memberBlockItemList: node) {
-      callback(ASTNode.decl(elem).bridged, outputContext)
+
+  case .memberBlockItemListFile(let node):
+    for elem in visitor.generate(memberBlockItemList: node.members) {
+      callback(.decl(elem), outputContext)
     }
+
+  case .codeBlockFile(let node):
+    let block = visitor.generate(codeBlock: node.body)
+    callback(.stmt(block.asStmt), outputContext)
+
+  case .attributeClauseFile(let node):
+    let decl = visitor.generate(generatedAttributeClauseFile: node)
+    callback(.decl(decl), outputContext)
+
+  case .accessorBlockFile(let node):
+    // For 'accessor' macro, 'attachedDecl' must be a 'AbstractStorageDecl'.
+    let storage = BridgedAbstractStorageDecl(raw: attachedDecl.raw!)
+
+    for elem in visitor.generate(accessorBlockFile: node, for: storage) {
+      callback(.decl(elem.asDecl), outputContext)
+    }
+
   default:
     fatalError("invalid syntax for a source file")
   }

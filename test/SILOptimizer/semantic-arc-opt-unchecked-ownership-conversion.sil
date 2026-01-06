@@ -1,7 +1,5 @@
 // RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts -sil-semantic-arc-peepholes-ownership-conversion-elim -sil-semantic-arc-peepholes-lifetime-joining %s | %FileCheck %s
 
-// REQUIRES: asserts
-
 sil_stage canonical
 
 import Builtin

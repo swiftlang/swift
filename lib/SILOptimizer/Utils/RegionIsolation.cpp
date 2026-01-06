@@ -26,7 +26,7 @@ LoggingFlag swift::regionisolation::ENABLE_LOGGING;
 static llvm::cl::opt<LoggingFlag, true> // The parser
     RegionBasedIsolationLog(
         "sil-regionbasedisolation-log",
-        llvm::cl::desc("Enable logging for SIL region based isolation "
+        llvm::cl::desc("Enable logging for SIL region-based isolation "
                        "diagnostics"),
         llvm::cl::Hidden,
         llvm::cl::values(

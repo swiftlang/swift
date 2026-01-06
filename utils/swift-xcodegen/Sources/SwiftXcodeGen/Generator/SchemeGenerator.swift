@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Xcodeproj
-
 struct Scheme {
   var name: String
   var buildAction: BuildAction

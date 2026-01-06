@@ -19,7 +19,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LifetimeDependence.h"
@@ -42,6 +41,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class AvailabilitySpec;
   class CodeCompletionCallbacks;
   class DoneParsingCallback;
   class DefaultArgumentInitializer;
@@ -53,7 +53,7 @@ namespace swift {
   class SILParserStateBase;
   class SourceManager;
   class UUID;
-  
+
   struct EnumElementInfo;
 
   /// Different contexts in which BraceItemList are parsed.
@@ -487,9 +487,8 @@ public:
   /// \returns the value returned by \c f
   /// \note When calling, you may need to specify the \c Val type
   ///       explicitly as a type parameter.
-  template <typename Val>
-  Val lookahead(unsigned char K,
-                llvm::function_ref<Val(CancellableBacktrackingScope &)> f) {
+  template <typename Fn>
+  decltype(auto) lookahead(unsigned char K, Fn f) {
     CancellableBacktrackingScope backtrackScope(*this);
 
     for (unsigned char i = 0; i < K; ++i)
@@ -542,29 +541,7 @@ public:
   /// diagnose it if not permitted in this mode.
   /// \param diagnoseDollarPrefix Whether to diagnose dollar-prefixed
   /// identifiers in addition to a standalone '$'.
-  void diagnoseDollarIdentifier(const Token &tok,
-                                bool diagnoseDollarPrefix) {
-    assert(tok.getText()[0] == '$');
-
-    // If '$' is not guarded by backticks, offer
-    // to replace it with '`$`'.
-    if (Tok.getRawText() == "$") {
-      diagnose(Tok.getLoc(), diag::standalone_dollar_identifier)
-          .fixItReplace(Tok.getLoc(), "`$`");
-      return;
-    }
-
-    if (!diagnoseDollarPrefix)
-      return;
-
-    if (tok.getText().size() == 1 || Context.LangOpts.EnableDollarIdentifiers ||
-        isInSILMode() || L->isSwiftInterface() ||
-        isInMacroExpansion(tok.getLoc()))
-      return;
-
-    diagnose(tok.getLoc(), diag::dollar_identifier_decl,
-             Context.getIdentifier(tok.getText()));
-  }
+  void diagnoseDollarIdentifier(const Token &tok, bool diagnoseDollarPrefix);
 
   /// Retrieve the location just past the end of the previous
   /// source location.
@@ -596,7 +573,11 @@ public:
   /// the '(' by a space.
   ///
   /// If the next token is not '(' or it's on a new line, return false.
-  bool consumeIfAttributeLParen();
+  bool consumeIfAttributeLParen(bool isCustomAttr = false);
+
+  /// Check if the current token is '(' and it looks like a start of an
+  /// attribute argument list.
+  bool isAtAttributeLParen(bool isCustomAttr = false);
 
   bool consumeIfNotAtStartOfLine(tok K) {
     if (Tok.isAtStartOfLine()) return false;
@@ -712,6 +693,18 @@ public:
     return Context.LangOpts.EnableExperimentalConcurrency;
   }
 
+  bool shouldAttachCommentToDecl() {
+    return Context.LangOpts.AttachCommentsToDecls;
+  }
+
+  /// Returns true if a Swift declaration starts after the current token,
+  /// otherwise returns false.
+  bool isNextStartOfSwiftDecl() {
+    BacktrackingScope backtrack(*this);
+    consumeToken();
+    return isStartOfSwiftDecl();
+  }
+
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, DiagRef Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
@@ -785,6 +778,17 @@ public:
   SourceLoc
   consumeStartingCharacterOfCurrentToken(tok Kind = tok::oper_binary_unspaced,
                                          size_t Len = 1);
+
+  /// If the next token is \c tok::colon, consume it; if the next token is
+  /// \c tok::colon_colon, split it into two \c tok::colons and consume the
+  /// first; otherwise, do nothing and return false.
+  bool consumeIfColonSplittingDoubles() {
+    if (!Tok.isAny(tok::colon, tok::colon_colon))
+      return false;
+
+    consumeStartingCharacterOfCurrentToken(tok::colon);
+    return true;
+  }
 
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
@@ -1006,7 +1010,7 @@ public:
     DeclAttributes &attributes, bool ifConfigsAreDeclAttrs);
 
   /// Parse a #error or #warning diagnostic.
-  ParserResult<PoundDiagnosticDecl> parseDeclPoundDiagnostic();
+  ParserStatus parseDeclPoundDiagnostic();
 
   /// Parse a #line/#sourceLocation directive.
   /// 'isLine = true' indicates parsing #line instead of #sourcelocation
@@ -1060,24 +1064,24 @@ public:
                           bool isAttrModifier, SourceRange &parensRange,
                           llvm::function_ref<ParserStatus()> parseAttr);
 
-  /// Parse the @_specialize attribute.
+  /// Parse the @_specialize/@specialized attribute.
   /// \p closingBrace is the expected closing brace, which can be either ) or ]
   /// \p Attr is where to store the parsed attribute
   bool parseSpecializeAttribute(
-      swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc,
-      SpecializeAttr *&Attr, AvailabilityRange *SILAvailability,
+      swift::tok ClosingBrace, SourceLoc AtLoc, SourceLoc Loc, bool isPublic,
+      AbstractSpecializeAttr *&Attr, AvailabilityRange *SILAvailability,
       llvm::function_ref<bool(Parser &)> parseSILTargetName =
           [](Parser &) { return false; },
       llvm::function_ref<bool(Parser &)> parseSILSIPModule =
           [](Parser &) { return false; });
 
-  /// Parse the arguments inside the @_specialize attribute
+  /// Parse the arguments inside the @_specialize/@specialized attribute
   bool parseSpecializeAttributeArguments(
-      swift::tok ClosingBrace, bool &DiscardAttribute,
+      swift::tok ClosingBrace, bool isPublic, bool &DiscardAttribute,
       std::optional<bool> &Exported,
       std::optional<SpecializeAttr::SpecializationKind> &Kind,
       TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
-      AvailabilityRange *SILAvailability,
+      DeclNameLoc &targetFunctionLoc, AvailabilityRange *SILAvailability,
       SmallVectorImpl<Identifier> &spiGroups,
       SmallVectorImpl<AvailableAttr *> &availableAttrs,
       llvm::function_ref<bool(Parser &)> parseSILTargetName,
@@ -1149,8 +1153,8 @@ public:
   );
 
   /// Parse the @lifetime attribute.
-  ParserResult<LifetimeAttr> parseLifetimeAttribute(SourceLoc AtLoc,
-                                                    SourceLoc Loc);
+  ParserResult<LifetimeAttr>
+  parseLifetimeAttribute(StringRef attrName, SourceLoc atLoc, SourceLoc loc);
 
   /// Common utility to parse swift @lifetime decl attribute and SIL @lifetime
   /// type modifier.
@@ -1161,7 +1165,6 @@ public:
                                   SourceLoc AtEndLoc,
                                   bool isFromClangAttribute = false);
 
-  bool isCustomAttributeArgument();
   bool canParseCustomAttribute();
 
   /// Parse a custom attribute after the initial '@'.
@@ -1180,7 +1183,8 @@ public:
 
   bool isParameterSpecifier() {
     if (Tok.is(tok::kw_inout)) return true;
-    if (Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
+    if ((Context.LangOpts.hasFeature(Feature::LifetimeDependence) ||
+         Context.LangOpts.hasFeature(Feature::Lifetimes)) &&
         isSILLifetimeDependenceToken())
       return true;
     if (!canHaveParameterSpecifierContextualKeyword()) return false;
@@ -1191,8 +1195,9 @@ public:
         Tok.isContextualKeyword("isolated") ||
         Tok.isContextualKeyword("_const"))
       return true;
-    if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
-        Tok.isContextualKeyword("sending"))
+    if (isCallerIsolatedSpecifier())
+      return true;
+    if (Tok.isContextualKeyword("sending"))
       return true;
     return false;
   }
@@ -1207,6 +1212,12 @@ public:
   bool isSILLifetimeDependenceToken() {
     return isInSILMode() && Tok.is(tok::at_sign) &&
            (peekToken().isContextualKeyword("lifetime"));
+  }
+
+  bool isCallerIsolatedSpecifier() {
+    if (!Tok.isContextualKeyword("nonisolated"))
+      return false;
+    return peekToken().isFollowingLParen();
   }
 
   bool canHaveParameterSpecifierContextualKeyword() {
@@ -1236,6 +1247,9 @@ public:
 
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
+
+  ParserResult<UsingDecl> parseDeclUsing(ParseDeclOptions Flags,
+                                         DeclAttributes &Attributes);
 
   /// Parse an inheritance clause into a vector of InheritedEntry's.
   ///
@@ -1443,6 +1457,7 @@ public:
     SourceLoc IsolatedLoc;
     SourceLoc ConstLoc;
     SourceLoc SendingLoc;
+    SourceLoc CallerIsolatedLoc;
     SmallVector<TypeOrCustomAttr> Attributes;
     LifetimeEntry *lifetimeEntry = nullptr;
 
@@ -1480,6 +1495,14 @@ public:
   ParserResult<TypeRepr> parseTypeTupleBody();
   ParserResult<TypeRepr> parseTypeArray(ParserResult<TypeRepr> Base);
 
+  /// Whether the parser is at the start of an InlineArray type body.
+  bool isStartOfInlineArrayTypeBody();
+
+  /// Parse an InlineArray type '[' integer 'x' type ']'.
+  ///
+  /// NOTE: 'isStartOfInlineArrayTypeBody' must be true.
+  ParserResult<TypeRepr> parseTypeInlineArray(SourceLoc lSquare);
+
   /// Parse a collection type.
   ///   type-simple:
   ///     '[' type ']'
@@ -1503,7 +1526,6 @@ public:
   /// A structure for collecting information about the default
   /// arguments of a context.
   struct DefaultArgumentInfo {
-    llvm::SmallVector<DefaultArgumentInitializer *, 4> ParsedContexts;
     unsigned NextIndex : 31;
     
     /// Track whether or not one of the parameters in a signature's argument
@@ -1514,10 +1536,6 @@ public:
     /// all the arguments, not just those that have default arguments.
     unsigned claimNextIndex() { return NextIndex++; }
 
-    /// Set the parsed context of all default argument initializers to
-    /// the given function, enum case or subscript.
-    void setFunctionContext(DeclContext *DC, ParameterList *paramList);
-    
     DefaultArgumentInfo() {
       NextIndex = 0;
       HasDefaultArgument = false;
@@ -1565,6 +1583,9 @@ public:
 
     /// The default argument for this parameter.
     Expr *DefaultArg = nullptr;
+
+    /// The default argument for this parameter.
+    DefaultArgumentInitializer *DefaultArgInitContext = nullptr;
 
     /// True if we emitted a parse error about this parameter.
     bool isInvalid = false;
@@ -1715,7 +1736,13 @@ public:
   /// and the expression will parse with the '<' as an operator.
   bool canParseAsGenericArgumentList();
 
+  bool canParseTypeSimple();
+  bool canParseTypeSimpleOrComposition();
+  bool canParseTypeScalar();
   bool canParseType();
+
+  bool canParseStartOfInlineArrayType();
+  bool canParseCollectionType();
 
   /// Returns true if a simple type identifier can be parsed.
   ///
@@ -1732,6 +1759,10 @@ public:
 
   /// Returns true if a qualified declaration name base type can be parsed.
   bool canParseBaseTypeForQualifiedDeclName();
+
+  /// Returns true if `nonisolated` contextual keyword could be parsed
+  /// as part of the type a the current location.
+  bool canParseNonisolatedAsTypeModifier();
 
   /// Returns true if the current token is '->' or effects specifiers followed
   /// by '->'.
@@ -1788,7 +1819,30 @@ public:
   /// \param name The parsed name of the label (empty if it doesn't exist, or is
   /// _)
   /// \param loc The location of the label (empty if it doesn't exist)
-  void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
+  /// \param isAttr True if this is an argument label for an attribute (allows, but deprecates, use of
+  ///               \c '=' instead of \c ':').
+  /// \param splittingColonColon True if \c :: tokens should be treated as two
+  ///                           adjacent colons.
+  void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
+                                  bool isAttr = false,
+                                  bool splittingColonColon = false);
+
+  /// If a \c module-selector is present, returns a true value (specifically,
+  /// 1 or 2 depending on how many tokens should be consumed to skip it).
+  unsigned isAtModuleSelector();
+
+  /// Attempts to parse a \c module-selector if one is present.
+  ///
+  /// \verbatim
+  ///   module-selector: identifier '::'
+  /// \endverbatim
+  ///
+  /// \return \c None if no selector is present or a selector is present but
+  ///         is not allowed; an instance with an empty \c Identifier if a
+  ///         selector is present but has no valid identifier; an instance with
+  ///         a valid \c Identifier if a selector is present and includes a
+  ///         module name.
+  std::optional<Located<Identifier>> parseModuleSelector();
 
   enum class DeclNameFlag : uint8_t {
     /// If passed, operator basenames are allowed.
@@ -1801,6 +1855,9 @@ public:
     /// If passed, 'deinit' and 'subscript' should be parsed as special names,
     /// not ordinary identifiers.
     AllowKeywordsUsingSpecialNames = AllowKeywords | 1 << 2,
+
+    /// If passed, module selectors are not permitted on this declaration name.
+    ModuleSelectorUnsupported = 1 << 3,
 
     /// If passed, compound names with argument lists are allowed, unless they
     /// have empty argument lists.
@@ -1820,6 +1877,9 @@ public:
     return DeclNameOptions(flag1) | flag2;
   }
 
+  /// Parse a declaration name that results in a `DeclNameRef` in the syntax
+  /// tree.
+  /// 
   /// Without \c DeclNameFlag::AllowCompoundNames, parse an
   /// unqualified-decl-base-name.
   ///
@@ -1843,7 +1903,8 @@ public:
       SourceLoc &rightAngleLoc, ArgumentList *&argList, bool isExprBasic,
       DiagRef diag);
 
-  ParserResult<Expr> parseExprIdentifier(bool allowKeyword);
+  ParserResult<Expr> parseExprIdentifier(bool allowKeyword,
+                                         bool allowModuleSelector = true);
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);
 
@@ -1990,7 +2051,8 @@ public:
   ParserResult<CaseStmt> parseStmtCatch();
   ParserResult<Stmt> parseStmtForEach(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
-  ParserStatus parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive);
+  ParserStatus parseStmtCases(SmallVectorImpl<CaseStmt *> &cases,
+                              bool IsActive);
   ParserResult<CaseStmt> parseStmtCase(bool IsActive);
   ParserResult<Stmt> parseStmtPoundAssert();
 
@@ -2047,27 +2109,15 @@ public:
   ParserStatus
   parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs);
 
-  /// Parse the availability macros definitions passed as arguments.
-  AvailabilityMacroMap &parseAllAvailabilityMacroArguments();
-
-  /// Result of parsing an availability macro definition.
-  struct AvailabilityMacroDefinition {
-    StringRef Name;
-    llvm::VersionTuple Version;
-    SmallVector<AvailabilitySpec *, 4> Specs;
-  };
-
   /// Parse an availability macro definition from a command line argument.
-  /// This function should be called on a Parser set up on the command line
+  /// This function should only be called on a Parser set up on the command line
   /// argument code.
   ParserStatus
-  parseAvailabilityMacroDefinition(AvailabilityMacroDefinition &Result);
+  parseAvailabilityMacroDefinition(std::string &Name,
+                                   llvm::VersionTuple &Version,
+                                   SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
-  ParserResult<PlatformVersionConstraintAvailabilitySpec>
-  parsePlatformVersionConstraintSpec();
-  ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
-  parsePlatformAgnosticVersionConstraintSpec();
   bool
   parseAvailability(bool parseAsPartOfSpecializeAttr, StringRef AttrName,
                     bool &DiscardAttribute, SourceRange &attrRange,

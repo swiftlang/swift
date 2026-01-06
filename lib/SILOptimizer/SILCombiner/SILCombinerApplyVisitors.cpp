@@ -149,6 +149,13 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   if (SubstCalleeTy->hasArchetype() || ConvertCalleeTy->hasArchetype())
     return nullptr;
 
+  // If we converted from a non-throwing to a throwing function which is
+  // try_apply'd, rewriting would require changing the CFG.  Bail for now.
+  if (!ConvertCalleeTy->hasErrorResult() && isa<TryApplyInst>(AI)) {
+    assert(SubstCalleeTy->hasErrorResult());
+    return nullptr;
+  }
+
   // Ok, we can now perform our transformation. Grab AI's operands and the
   // relevant types from the ConvertFunction function type and AI.
   Builder.setCurrentDebugScope(AI.getDebugScope());
@@ -165,8 +172,22 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   auto oldOpParamTypes = substConventions.getParameterSILTypes(context);
   auto newOpParamTypes = convertConventions.getParameterSILTypes(context);
 
+  // Currently we cannot deal with generic arguments/returns. Bail in this case.
+  for (auto newRetTy : newOpRetTypes) {
+    if (newRetTy.hasTypeParameter())
+      return nullptr;
+  }
+  for (auto newParamTy : newOpParamTypes) {
+    if (newParamTy.hasTypeParameter())
+      return nullptr;
+  }
+  if (newIndirectErrorResultType && newIndirectErrorResultType.hasTypeParameter())
+    return nullptr;
+
   llvm::SmallVector<SILValue, 8> Args;
-  auto convertOp = [&](SILValue Op, SILType OldOpType, SILType NewOpType) {
+  llvm::SmallVector<BeginBorrowInst *, 8> Borrows;
+  auto convertOp = [&](SILValue Op, SILType OldOpType, SILType NewOpType,
+                       OperandOwnership ownership) {
     // Convert function takes refs to refs, address to addresses, and leaves
     // other types alone.
     if (OldOpType.isAddress()) {
@@ -174,6 +195,12 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       auto UAC = Builder.createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(UAC);
     } else if (OldOpType.getASTType() != NewOpType.getASTType()) {
+      if (Op->getOwnershipKind() == OwnershipKind::Owned &&
+          !ownership.getOwnershipConstraint().isConsuming()) {
+        auto borrow = Builder.createBeginBorrow(AI.getLoc(), Op);
+        Op = borrow;
+        Borrows.push_back(borrow);
+      }
       auto URC =
           Builder.createUncheckedForwardingCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(URC);
@@ -187,14 +214,21 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   auto newRetI = newOpRetTypes.begin();
   auto oldRetI = oldOpRetTypes.begin();
   
+  auto getCurrentOperand = [&OpI, &AI]() -> Operand & {
+    return AI.getInstruction()
+        ->getAllOperands()[OpI + ApplyInst::getArgumentOperandNumber()];
+  };
+
   for (auto e = newOpRetTypes.end(); newRetI != e;
        ++OpI, ++newRetI, ++oldRetI) {
-    convertOp(Ops[OpI], *oldRetI, *newRetI);
+    convertOp(Ops[OpI], *oldRetI, *newRetI,
+              getCurrentOperand().getOperandOwnership());
   }
 
   if (oldIndirectErrorResultType) {
     assert(newIndirectErrorResultType);
-    convertOp(Ops[OpI], oldIndirectErrorResultType, newIndirectErrorResultType);
+    convertOp(Ops[OpI], oldIndirectErrorResultType, newIndirectErrorResultType,
+              getCurrentOperand().getOperandOwnership());
     ++OpI;
   }
 
@@ -202,7 +236,8 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   auto oldParamI = oldOpParamTypes.begin();
   for (auto e = newOpParamTypes.end(); newParamI != e;
        ++OpI, ++newParamI, ++oldParamI) {
-    convertOp(Ops[OpI], *oldParamI, *newParamI);
+    convertOp(Ops[OpI], *oldParamI, *newParamI,
+              getCurrentOperand().getOperandOwnership());
   }
 
   // Convert the direct results if they changed.
@@ -240,10 +275,22 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       
       Builder.createBranch(AI.getLoc(), TAI->getNormalBB(), branchArgs);
     }
-    
-    return Builder.createTryApply(AI.getLoc(), funcOper, SubstitutionMap(), Args,
-                                  normalBB, TAI->getErrorBB(),
-                                  TAI->getApplyOptions());
+
+    Builder.setInsertionPoint(AI.getInstruction());
+    auto *result = Builder.createTryApply(
+        AI.getLoc(), funcOper, SubstitutionMap(), Args, normalBB,
+        TAI->getErrorBB(), TAI->getApplyOptions());
+    if (!Borrows.empty()) {
+      Builder.setInsertionPoint(&TAI->getErrorBB()->front());
+      for (auto *borrow : Borrows) {
+        Builder.createEndBorrow(AI.getLoc(), borrow);
+      }
+      Builder.setInsertionPoint(&TAI->getNormalBB()->front());
+      for (auto *borrow : Borrows) {
+        Builder.createEndBorrow(AI.getLoc(), borrow);
+      }
+    }
+    return result;
   }
 
   // Match the throwing bit of the underlying function_ref. We assume that if
@@ -262,6 +309,11 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       Builder.createUncheckedForwardingCast(AI.getLoc(), NAI, oldResultTy);
   }
   
+  Builder.setInsertionPoint(AI->getNextInstruction());
+  for (auto *borrow : Borrows) {
+    Builder.createEndBorrow(AI.getLoc(), borrow);
+  }
+
   return result;
 }
 
@@ -383,6 +435,7 @@ bool swift::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
       break;
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
+    case KeyPathPatternComponent::Kind::Method:
       // We cannot predict the offset of fields in resilient types, because it's
       // unknown if a resilient field is a computed or stored property.
       if (component.getExternalDecl())
@@ -724,6 +777,14 @@ void SILCombiner::replaceWitnessMethodInst(
     eraseInstFromFunction(*WMI);
 }
 
+static bool hasUse(SILValue v, Operand *op) {
+  for (Operand *use : v->getUses()) {
+    if (use == op)
+      return true;
+  }
+  return false;
+}
+
 // This function determines concrete type of an opened existential argument
 // using ProtocolConformanceAnalysis. The concrete type of the argument can be a
 // class, struct, or an enum.
@@ -762,7 +823,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     /// and that the protocol type has a sole conformance, then we can propagate
     /// concrete type for it as well.
     ArchetypeType *archetypeTy;
-    if (SwiftArgType->isOpenedExistential() &&
+    if (isa<ExistentialArchetypeType>(SwiftArgType) &&
         (archetypeTy = dyn_cast<ArchetypeType>(SwiftArgType)) &&
         (archetypeTy->getConformsTo().size() == 1)) {
       PD = archetypeTy->getConformsTo()[0];
@@ -798,30 +859,20 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
   // Prepare the code by adding UncheckedCast instructions that cast opened
   // existentials to concrete types. Set the ConcreteValue of CEI.
   if (auto *OER = dyn_cast<OpenExistentialRefInst>(OAI.OpenedArchetypeValue)) {
-    // If we have an owned open_existential_ref, we only optimize for now if our
-    // open_existential_ref has a single non-debug consuming use that is a
-    // destroy_value.
-    if (OER->getForwardingOwnershipKind() != OwnershipKind::Owned) {
-      // We use OER as the insertion point so that
-      SILBuilderWithScope b(std::next(OER->getIterator()), Builder);
-      auto loc = RegularLocation::getAutoGeneratedLocation();
-      SoleCEI.ConcreteValue =
-          b.createUncheckedRefCast(loc, OER, concreteSILType);
-      return COAI;
-    }
-
-    auto *consumingUse = OER->getSingleConsumingUse();
-    if (!consumingUse || !isa<DestroyValueInst>(consumingUse->getUser())) {
+    // Make sure that the existential value outlives the apply. This is the case
+    // if the apply uses it as argument operand.
+    if (OER->getOwnershipKind() == OwnershipKind::Owned &&
+        !hasUse(OER, &ArgOperand)) {
       return std::nullopt;
     }
 
-    // We use std::next(OER) as the insertion point so that we can reuse the
-    // destroy_value of consumingUse.
     SILBuilderWithScope b(std::next(OER->getIterator()), Builder);
     auto loc = RegularLocation::getAutoGeneratedLocation();
-    auto *uri = b.createUncheckedRefCast(loc, OER, concreteSILType);
-    SoleCEI.ConcreteValue = uri;
-    replaceInstUsesWith(*OER, uri);
+    SoleCEI.ConcreteValue = b.createUncheckedRefCast(loc, OER, concreteSILType);
+    if (F->hasOwnership() &&
+        SoleCEI.ConcreteValue->getOwnershipKind() == OwnershipKind::Owned) {
+      SoleCEI.ConcreteValueNeedsFixup = true;
+    }
     return COAI;
   }
 
@@ -852,8 +903,24 @@ SILCombiner::buildConcreteOpenedExistentialInfo(Operand &ArgOperand) {
   // Build a ConcreteOpenedExistentialInfo following the data flow chain of the
   // ArgOperand through the open_existential backward to an init_existential.
   ConcreteOpenedExistentialInfo COEI(ArgOperand);
-  if (COEI.CEI)
+  if (COEI.CEI) {
+    auto ConcreteValue = COEI.CEI->ConcreteValue;
+    if (ConcreteValue->getFunction()->hasOwnership() &&
+        ConcreteValue->getOwnershipKind() == OwnershipKind::Owned) {
+      // Make sure that the existential value outlives the apply. This is the case
+      // if the apply uses it as argument operand.
+      if (!hasUse(COEI.OAI.OpenedArchetypeValue, &ArgOperand))
+        return std::nullopt;
+
+      SILBuilderWithScope b(COEI.OAI.OpenedArchetypeValue->getNextInstruction(),
+                            Builder);
+      auto loc = RegularLocation::getAutoGeneratedLocation();
+      COEI.CEI->ConcreteValue = b.createUncheckedRefCast(
+          loc, COEI.OAI.OpenedArchetypeValue, ConcreteValue->getType());
+      COEI.CEI->ConcreteValueNeedsFixup = true;
+    }
     return COEI;
+  }
 
   // Use SoleConformingType information.
   return buildConcreteOpenedExistentialInfoFromSoleConformingType(ArgOperand);
@@ -945,7 +1012,7 @@ static bool canReplaceCopiedArg(FullApplySite Apply, SILValue Arg,
 /// for the argument at \p SkipArgIdx, contain an opened archetype rooted
 /// on \p RootOA.
 static bool applyInvolvesOpenedArchetypeWithRoot(FullApplySite Apply,
-                                                 OpenedArchetypeType *RootOA,
+                                                 ExistentialArchetypeType *RootOA,
                                                  unsigned SkipArgIdx) {
   auto *env = RootOA->getGenericEnvironment();
 
@@ -1082,7 +1149,7 @@ SILValue SILCombiner::canCastArg(FullApplySite Apply,
                                  const OpenedArchetypeInfo &OAI,
                                  const ConcreteExistentialInfo &CEI,
                                  unsigned ArgIdx) {
-  if (!CEI.ConcreteValue || CEI.ConcreteType->isOpenedExistential() ||
+  if (!CEI.ConcreteValue || isa<ExistentialArchetypeType>(CEI.ConcreteType) ||
       !CEI.ConcreteValue->getType().isAddress())
     return SILValue();
 
@@ -1147,6 +1214,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
 
   // Transform the parameter arguments.
   SmallVector<ConcreteArgumentCopy, 4> concreteArgCopies;
+  llvm::SmallMapVector<SILValue, SILValue, 4> valuesToReplace;
   for (unsigned EndIdx = Apply.getNumArguments(); ArgIdx < EndIdx; ++ArgIdx) {
     auto ArgIt = COAIs.find(ArgIdx);
     if (ArgIt == COAIs.end()) {
@@ -1166,23 +1234,11 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
         NewArgs.push_back(cast);
         // Form a new set of substitutions where the argument is
         // replaced with a concrete type.
-        NewCallSubs = NewCallSubs.subst(
-            [&](SubstitutableType *type) -> Type {
-              if (type == OAI.OpenedArchetype)
-                return CEI.ConcreteType;
-              return type;
-            },
-            [&](CanType origTy, Type substTy,
-                ProtocolDecl *proto) -> ProtocolConformanceRef {
-              if (origTy->isEqual(OAI.OpenedArchetype)) {
-                assert(substTy->isEqual(CEI.ConcreteType));
-                // Do a conformance lookup on this witness requirement using the
-                // existential's conformances. The witness requirement may be a
-                // base type of the existential's requirements.
-                return CEI.lookupExistentialConformance(proto);
-              }
-              return ProtocolConformanceRef::forAbstract(substTy, proto);
-            }, SubstFlags::SubstituteLocalArchetypes);
+        ReplaceExistentialArchetypesWithConcreteTypes replacer(
+            OAI.OpenedArchetype->getGenericEnvironment(),
+            CEI.ExistentialSubs);
+        NewCallSubs = NewCallSubs.subst(replacer, replacer,
+                                        SubstFlags::SubstituteLocalArchetypes);
         continue;
       }
       // Otherwise, use the original argument.
@@ -1199,28 +1255,19 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
       concreteArgCopies.push_back(*argSub);
       NewArgs.push_back(argSub->tempArg);
     } else {
+      if (CEI.ConcreteValueNeedsFixup) {
+        valuesToReplace[OAI.OpenedArchetypeValue] = CEI.ConcreteValue;
+      }
       NewArgs.push_back(CEI.ConcreteValue);
     }
 
     // Form a new set of substitutions where the argument is
     // replaced with a concrete type.
-    NewCallSubs = NewCallSubs.subst(
-        [&](SubstitutableType *type) -> Type {
-          if (type == OAI.OpenedArchetype)
-            return CEI.ConcreteType;
-          return type;
-        },
-        [&](CanType origTy, Type substTy,
-            ProtocolDecl *proto) -> ProtocolConformanceRef {
-          if (origTy->isEqual(OAI.OpenedArchetype)) {
-            assert(substTy->isEqual(CEI.ConcreteType));
-            // Do a conformance lookup on this witness requirement using the
-            // existential's conformances. The witness requirement may be a
-            // base type of the existential's requirements.
-            return CEI.lookupExistentialConformance(proto);
-          }
-          return ProtocolConformanceRef::forAbstract(substTy, proto);
-        }, SubstFlags::SubstituteLocalArchetypes);
+    ReplaceExistentialArchetypesWithConcreteTypes replacer(
+        OAI.OpenedArchetype->getGenericEnvironment(),
+        CEI.ExistentialSubs);
+    NewCallSubs = NewCallSubs.subst(replacer, replacer,
+                                    SubstFlags::SubstituteLocalArchetypes);
   }
 
   // We need to make sure that we can a) update Apply to use the new args and b)
@@ -1260,9 +1307,8 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     // SILCombine Worklist.
     InstructionDeleter deleter;
     for (SILInstruction *inst : *Builder.getTrackingList()) {
-      deleter.trackIfDead(inst);
+      deleter.deleteIfDead(inst, false);
     }
-    deleter.cleanupDeadInstructions();
     Builder.getTrackingList()->clear();
     return nullptr;
   }
@@ -1304,6 +1350,20 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
       cleanupBuilder.createDeallocStack(cleanupLoc, argCopy.tempArg);
     }
   }
+  // Replace all uses of the opened existential with the unconditional cast to
+  // concrete type.
+  for (auto &valuePair : valuesToReplace) {
+    auto openedExistential = valuePair.first;
+    auto uncheckedCast = valuePair.second;
+    SmallVector<Operand *> uses(openedExistential->getNonTypeDependentUses());
+    for (auto use : uses) {
+      auto *user = use->getUser();
+      if (user == cast<SingleValueInstruction>(uncheckedCast)) {
+        continue;
+      }
+      use->set(uncheckedCast);
+    }
+  }
   return NewApply.getInstruction();
 }
 
@@ -1327,7 +1387,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
 
   // If the lookup type is not an opened existential type,
   // it cannot be made more concrete.
-  if (!WMI->getLookupType()->isOpenedExistential())
+  if (!isa<ExistentialArchetypeType>(WMI->getLookupType()))
     return nullptr;
 
   // Try to derive the concrete type and the related conformance of self and
@@ -1464,7 +1524,7 @@ static bool canBeRemovedIfResultIsNotUsed(SILFunction *f) {
   return false;
 }
 
-SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
+SILInstruction *SILCombiner::legacyVisitApplyInst(ApplyInst *AI) {
   Builder.setCurrentDebugScope(AI->getDebugScope());
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
@@ -1472,8 +1532,14 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     return nullptr;
 
   SILValue callee = AI->getCallee();
-  if (auto *cee = dyn_cast<ConvertEscapeToNoEscapeInst>(callee)) {
-    callee = cee->getOperand();
+  for (;;) {
+    if (auto *cee = dyn_cast<ConvertEscapeToNoEscapeInst>(callee)) {
+      callee = cee->getOperand();
+    } else if (auto *mdi = dyn_cast<MarkDependenceInst>(callee)) {
+      callee = mdi->getValue();
+    } else {
+      break;
+    }
   }
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(callee))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);
@@ -1495,14 +1561,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   }
 
   if (SF) {
-    if (SF->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED)) {
-      UserListTy Users;
-      // If the uninitialized array is only written into then it can be removed.
-      if (recursivelyCollectARCUsers(Users, AI)) {
-        if (eraseApply(AI, Users))
-          return nullptr;
-      }
-    }
     if (SF->hasSemanticsAttr(semantics::ARRAY_GET_CONTIGUOUSARRAYSTORAGETYPE)) {
       auto silTy = AI->getType();
       auto storageTy = AI->getType().getASTType();
@@ -1610,11 +1668,15 @@ isTryApplyResultNotUsed(UserListTy &AcceptedUses, TryApplyInst *TAI) {
   return true;
 }
 
-SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
+SILInstruction *SILCombiner::legacyVisitTryApplyInst(TryApplyInst *AI) {
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
   if (isa<PartialApplyInst>(AI->getCallee()))
     return nullptr;
+
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee())) {
+    return optimizeApplyOfConvertFunctionInst(AI, CFI);
+  }
 
   // Optimize readonly functions with no meaningful users.
   SILFunction *Fn = AI->getReferencedFunctionOrNull();

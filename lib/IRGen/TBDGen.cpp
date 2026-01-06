@@ -18,7 +18,6 @@
 
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -89,15 +88,18 @@ void TBDGenVisitor::addSymbolInternal(StringRef name, EncodeKind kind,
 
 static std::vector<OriginallyDefinedInAttr::ActiveVersion>
 getAllMovedPlatformVersions(Decl *D) {
+  StringRef Name = D->getDeclContext()->getParentModule()->getName().str();
+
   std::vector<OriginallyDefinedInAttr::ActiveVersion> Results;
   for (auto *attr: D->getAttrs()) {
     if (auto *ODA = dyn_cast<OriginallyDefinedInAttr>(attr)) {
       auto Active = ODA->isActivePlatform(D->getASTContext());
-      if (Active.has_value()) {
+      if (Active.has_value() && Active->LinkerModuleName != Name) {
         Results.push_back(*Active);
       }
     }
   }
+
   return Results;
 }
 
@@ -243,10 +245,21 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver,
   switch(Ver.Platform) {
   case swift::PlatformKind::none:
     llvm_unreachable("cannot find platform kind");
+  case swift::PlatformKind::DriverKit:
+    llvm_unreachable("not used for this platform");
+  case swift::PlatformKind::Swift:
+    llvm_unreachable("not used for this platform");
+  case PlatformKind::anyAppleOS:
+    llvm_unreachable("not used for this platform");
+  case swift::PlatformKind::FreeBSD:
+    llvm_unreachable("not used for this platform");
   case swift::PlatformKind::OpenBSD:
     llvm_unreachable("not used for this platform");
   case swift::PlatformKind::Windows:
     llvm_unreachable("not used for this platform");
+  case swift::PlatformKind::Android:
+    llvm_unreachable("not used for this platform");
+
   case swift::PlatformKind::iOS:
   case swift::PlatformKind::iOSApplicationExtension:
     if (target && target->isMacCatalystEnvironment())
@@ -292,14 +305,11 @@ getInnermostIntroVersion(ArrayRef<Decl *> DeclStack, PlatformKind Platform) {
 
 /// Using the introducing version of a symbol as the start version to redirect
 /// linkage path isn't sufficient. This is because the executable can be deployed
-/// to OS versions that were before the symbol was introduced. When that happens,
-/// strictly using the introductory version can lead to NOT redirecting.
+/// to OS versions that were before the symbol was introduced.
 static llvm::VersionTuple calculateLdPreviousVersionStart(ASTContext &ctx,
                                                 llvm::VersionTuple introVer) {
-  auto minDep = ctx.LangOpts.getMinPlatformVersion();
-  if (minDep < introVer)
-    return llvm::VersionTuple(1, 0);
-  return introVer;
+  // We can do this because currently because we don't support multiple moves.
+  return llvm::VersionTuple(1, 0);
 }
 
 void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
@@ -325,16 +335,16 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdPrevious(
     if (*IntroVer >= Ver.Version)
       continue;
     auto PlatformNumber = getLinkerPlatformId(Ver, Ctx);
-    auto It = previousInstallNameMap->find(Ver.ModuleName.str());
+    auto It = previousInstallNameMap->find(Ver.LinkerModuleName.str());
     if (It == previousInstallNameMap->end()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
+                         Ver.LinkerModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     auto InstallName = It->second.getInstallName(PlatformNumber);
     if (InstallName.empty()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::cannot_find_install_name,
-                         Ver.ModuleName, getLinkerPlatformName(Ver, Ctx));
+                         Ver.LinkerModuleName, getLinkerPlatformName(Ver, Ctx));
       continue;
     }
     llvm::SmallString<64> Buffer;
@@ -446,6 +456,15 @@ void TBDGenVisitor::didVisitDecl(Decl *D) {
 }
 
 void TBDGenVisitor::addFunction(SILDeclRef declRef) {
+  // If there is a specific symbol name this should have at the IR level,
+  // use it instead.
+  if (auto asmName = declRef.getAsmName()) {
+    addSymbol(*asmName, SymbolSource::forSILDeclRef(declRef),
+              SymbolFlags::Text);
+    return;
+  }
+
+
   addSymbol(declRef.mangle(), SymbolSource::forSILDeclRef(declRef),
             SymbolFlags::Text);
 }
@@ -497,6 +516,11 @@ void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
       if (AFD->hasAsync())
         addSymbol(decorated + "Tu", SymbolSource::forUnknown(),
                   SymbolFlags::Text);
+    auto *accessor = dyn_cast<AccessorDecl>(PWT);
+    if (accessor &&
+        requiresFeatureCoroutineAccessors(accessor->getAccessorKind()))
+      addSymbol(decorated + "Twc", SymbolSource::forUnknown(),
+                SymbolFlags::Text);
   }
 }
 
@@ -675,9 +699,26 @@ void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
 }
 
 class APIGenRecorder final : public APIRecorder {
-  static bool isSPI(const Decl *decl) {
+  bool isSPI(const Decl *decl) {
     assert(decl);
-    return decl->isSPI() || decl->isAvailableAsSPI();
+
+    // If the module's library level is more restricted than API, all symbols
+    // should be SPIs.
+    if (module->getLibraryLevel() < swift::LibraryLevel::API)
+      return true;
+
+    if (auto value = dyn_cast<ValueDecl>(decl)) {
+      auto accessScope =
+          value->getFormalAccessScope(/*useDC=*/nullptr,
+                                      /*treatUsableFromInlineAsPublic=*/true);
+      // Only declarations with a public access scope (`public` or `open`)
+      // can be APIs. Exported declarations with other access scopes (`package`)
+      // should be SPI.
+      if (!accessScope.isPublic())
+        return true;
+    }
+
+    return decl->isSPI() || getAvailability(decl).spiAvailable;
   }
 
 public:
@@ -701,6 +742,9 @@ public:
     apigen::APIAvailability availability;
     auto access = apigen::APIAccess::Public;
     if (decl) {
+      if (!shouldRecordDecl(decl))
+        return;
+
       availability = getAvailability(decl);
       if (isSPI(decl))
         access = apigen::APIAccess::Private;
@@ -726,6 +770,9 @@ public:
     auto access = apigen::APIAccess::Public;
     auto decl = method.hasDecl() ? method.getDecl() : nullptr;
     if (decl) {
+      if (!shouldRecordDecl(decl))
+        return;
+
       availability = getAvailability(decl);
       if (decl->getDescriptiveKind() == DescriptiveDeclKind::ClassMethod)
         isInstanceMethod = false;
@@ -745,7 +792,7 @@ public:
   }
 
 private:
-  apigen::APILoc getAPILocForDecl(const Decl *decl) {
+  apigen::APILoc getAPILocForDecl(const Decl *decl) const {
     if (!decl)
       return defaultLoc;
 
@@ -761,33 +808,46 @@ private:
     return apigen::APILoc(std::string(displayName), line, col);
   }
 
+  bool shouldRecordDecl(const Decl *decl) const {
+    // We cannot reason about API access for Clang declarations from header
+    // files as we don't know the header group. API records for header
+    // declarations should be deferred to Clang tools.
+    if (getAPILocForDecl(decl).getFilename().ends_with_insensitive(".h"))
+      return false;
+    return true;
+  }
+
   /// Follow the naming schema that IRGen uses for Categories (see
   /// ClassDataBuilder).
   using CategoryNameKey = std::pair<const ClassDecl *, const ModuleDecl *>;
   llvm::DenseMap<CategoryNameKey, unsigned> CategoryCounts;
 
   apigen::APIAvailability getAvailability(const Decl *decl) {
-    std::optional<bool> unavailable;
+    std::optional<bool> unavailable, spiAvailable;
     std::string introduced, obsoleted;
-    bool hasFallbackUnavailability = false;
+    bool hasFallbackUnavailability = false, hasFallbackSPIAvailability = false;
     auto platform = targetPlatform(module->getASTContext().LangOpts);
-    for (auto *attr : decl->getAttrs()) {
-      if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
-        if (ava->getPlatform() == PlatformKind::none) {
-          hasFallbackUnavailability = ava->isUnconditionallyUnavailable();
-          continue;
-        }
-        if (ava->getPlatform() != platform)
-          continue;
-        unavailable = ava->isUnconditionallyUnavailable();
-        if (ava->Introduced)
-          introduced = ava->Introduced->getAsString();
-        if (ava->Obsoleted)
-          obsoleted = ava->Obsoleted->getAsString();
+    const Decl *declForAvailability = decl->getInnermostDeclWithAvailability();
+    if (!declForAvailability)
+      return {};
+    for (auto attr : declForAvailability->getSemanticAvailableAttrs()) {
+      if (!attr.isPlatformSpecific()) {
+        hasFallbackUnavailability = attr.isUnconditionallyUnavailable();
+        hasFallbackSPIAvailability = attr.isSPI();
+        continue;
       }
+      if (attr.getPlatform() != platform)
+        continue;
+      unavailable = attr.isUnconditionallyUnavailable();
+      spiAvailable = attr.isSPI();
+      if (attr.getIntroduced())
+        introduced = attr.getIntroduced()->getAsString();
+      if (attr.getObsoleted())
+        obsoleted = attr.getObsoleted()->getAsString();
     }
     return {introduced, obsoleted,
-            unavailable.value_or(hasFallbackUnavailability)};
+            unavailable.value_or(hasFallbackUnavailability),
+            spiAvailable.value_or(hasFallbackSPIAvailability)};
   }
 
   StringRef getSelectorName(SILDeclRef method, SmallString<128> &buffer) {
@@ -804,6 +864,9 @@ private:
   }
 
   apigen::ObjCInterfaceRecord *addOrGetObjCInterface(const ClassDecl *decl) {
+    if (!shouldRecordDecl(decl))
+      return nullptr;
+
     auto entry = classMap.find(decl);
     if (entry != classMap.end())
       return entry->second;
@@ -842,6 +905,9 @@ private:
   }
 
   apigen::ObjCCategoryRecord *addOrGetObjCCategory(const ExtensionDecl *decl) {
+    if (!shouldRecordDecl(decl))
+      return nullptr;
+
     auto entry = categoryMap.find(decl);
     if (entry != categoryMap.end())
       return entry->second;

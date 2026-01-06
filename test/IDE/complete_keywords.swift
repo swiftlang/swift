@@ -343,13 +343,13 @@ enum InEnumFunc {
   }
 }
 
-class InClassFunc {
+class InClassFunc1 {
   func testInFuncBody4() {
     #^IN_FUNC_BODY_4?check=KW_DECL_STMT;check=KW_RETURN;check=KW_NO_IN^#
   }
 }
 
-class InClassFunc {
+class InClassFunc2 {
   class Nested {
     func testInFuncBody5() {
       #^IN_FUNC_BODY_5?check=KW_DECL_STMT;check=KW_RETURN;check=KW_NO_IN^#
@@ -375,6 +375,11 @@ struct InSubscript {
 
 struct InInit {
   init?() { #^IN_INIT_1?check=KW_DECL_STMT;check=KW_RETURN;check=KW_NO_IN^# }
+}
+
+struct InGenericTypeInit<T> {
+  init?() { return #^IN_INIT_2?check=KW_FAILABLE_INIT_NIL^# }
+  // KW_FAILABLE_INIT_NIL: Literal[Nil]/None: nil[#InGenericTypeInit<T>?#]; name=nil
 }
 
 struct InStruct {

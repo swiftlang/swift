@@ -12,20 +12,90 @@
 //
 //  This file defines diagnostic groups and links between them.
 //
+//  The GROUP(Name, Filename) macro is used to define each diagnostic group.
+//  These groups are used to associate documentation with particular set of
+//  diagnostics and also to provide more control over whether the warnings
+//  in the group are escalated to errors (via the -Wwarning and -Werror flags.)
+//  A given warning or error can be associated with a diagnostic group by using
+//  GROUPED_WARNING or GROUPED_ERROR, respectively. New warnings and errors
+//  should be introduced along with groups to improve documentation.
+//
+//    - Name: the name of the group that will be shown in diagnostic messages
+//      (e.g., StrictMemorySafety) and used in command-line options like
+//      -Wwarning and -Werror. Once assigned, the group name for a particular
+//      diagnostic should not be changed, because it will affect existing users
+//      of the command-line flags.
+//    - Filename: the name of the file that provides documentation for this
+//      diagnostic group. There should be a corresponding Markdown file in
+//      userdocs/diagnostics providing short-form documentation that helps
+//      explain the diagnostic and how to resolve the problem.
+//
 //===----------------------------------------------------------------------===//
 
 #define DEFINE_DIAGNOSTIC_GROUPS_MACROS
 #include "swift/AST/DefineDiagnosticGroupsMacros.h"
 
-// GROUP(Name, DocsFile)
-// GROUP_LINK(Parent, Child)
+// GROUP(Name,Option,DocsFile)
+// GROUP_LINK(Parent,Child)
 
-GROUP(no_group, "")
+GROUP(no_group,none,"")
 
-GROUP(DeprecatedDeclaration, "DeprecatedDeclaration.md")
-GROUP(Unsafe, "Unsafe.md")
-GROUP(UnknownWarningGroup, "UnknownWarningGroup.md")
-GROUP(DeclarationUnavailableFromAsynchronousContext, "DeclarationUnavailableFromAsynchronousContext.md")
+GROUP(ActorIsolatedCall,none,"actor-isolated-call")
+GROUP(AlwaysAvailableDomain,none,"always-available-domain")
+GROUP(AvailabilityUnrecognizedName,none,"availability-unrecognized-name")
+GROUP(ClangDeclarationImport,none,"clang-declaration-import")
+GROUP(CompilationCaching,none,"compilation-caching")
+GROUP(ConformanceIsolation,none,"conformance-isolation")
+GROUP(ForeignReferenceType,none,"foreign-reference-type")
+GROUP(DeprecatedDeclaration,none,"deprecated-declaration")
+GROUP(DynamicExclusivity,DefaultIgnoreWarnings,"dynamic-exclusivity")
+GROUP(DynamicCallable,none,"dynamic-callable-requirements")
+GROUP(EmbeddedRestrictions,DefaultIgnoreWarnings,"embedded-restrictions")
+GROUP(ErrorInFutureSwiftVersion,none,"error-in-future-swift-version")
+GROUP(ExclusivityViolation,none,"exclusivity-violation")
+GROUP(ExistentialAny,none,"existential-any")
+GROUP(ExistentialMemberAccess,none,"existential-member-access-limitations")
+GROUP(ExistentialType,none,"existential-type")
+GROUP(ExplicitSendable,DefaultIgnoreWarnings,"explicit-sendable-annotations")
+GROUP(ImplementationOnlyDeprecated,none,"implementation-only-deprecated")
+GROUP(IsolatedConformances,none,"isolated-conformances")
+GROUP(MemberImportVisibility,none,"member-import-visibility")
+GROUP(MissingModuleOnKnownPaths,none,"missing-module-on-known-paths")
+GROUP(ModuleNotTestable,none,"module-not-testable")
+GROUP(ModuleVersionMissing,none,"module-version-missing")
+GROUP(MultipleInheritance,none,"multiple-inheritance")
+GROUP(MutableGlobalVariable,none,"mutable-global-variable")
+GROUP(NominalTypes,none,"nominal-types")
+GROUP(NonisolatedNonsendingByDefault,none,"nonisolated-nonsending-by-default")
+GROUP(OpaqueTypeInference,none,"opaque-type-inference")
+GROUP(PerformanceHints,DefaultIgnoreWarnings,"performance-hints")
+GROUP(PreconcurrencyImport,DefaultIgnoreWarnings,"preconcurrency-import")
+GROUP(PropertyWrappers,none,"property-wrapper-requirements")
+GROUP(ProtocolTypeNonConformance,none,"protocol-type-non-conformance")
+GROUP(RegionIsolation,none,"region-isolation")
+GROUP(ResultBuilderMethods,none,"result-builder-methods")
+GROUP(ReturnTypeImplicitCopy,none,"return-type-implicit-copy")
+GROUP(SendableClosureCaptures,none,"sendable-closure-captures")
+GROUP(SendableMetatypes,none,"sendable-metatypes")
+GROUP(SemanticCopies,DefaultIgnoreWarnings,"semantic-copies")
+GROUP(SendingClosureRisksDataRace,none,"sending-closure-risks-data-race")
+GROUP(SendingRisksDataRace,none,"sending-risks-data-race")
+GROUP(StrictLanguageFeatures,none,"strict-language-features")
+GROUP(UnrecognizedStrictLanguageFeatures,DefaultIgnoreWarnings,"strict-language-features")
+GROUP(StrictMemorySafety,none,"strict-memory-safety")
+GROUP(StringInterpolationConformance,none,"string-interpolation-conformance")
+GROUP(TemporaryPointers,none,"temporary-pointers")
+GROUP(TrailingClosureMatching,none,"trailing-closure-matching")
+GROUP(UnknownWarningGroup,none,"unknown-warning-group")
+GROUP(WeakMutability,none,"weak-mutability")
+
+GROUP_LINK(PerformanceHints,ExistentialType)
+GROUP_LINK(PerformanceHints,ReturnTypeImplicitCopy)
+
+GROUP_LINK(RegionIsolation,SendingClosureRisksDataRace)
+GROUP_LINK(RegionIsolation,SendingRisksDataRace)
+
+GROUP_LINK(StrictLanguageFeatures, UnrecognizedStrictLanguageFeatures)
 
 #define UNDEFINE_DIAGNOSTIC_GROUPS_MACROS
 #include "swift/AST/DefineDiagnosticGroupsMacros.h"

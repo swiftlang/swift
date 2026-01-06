@@ -41,7 +41,7 @@ namespace swift {
 
   /// Emit diagnostics for syntactic restrictions on a given expression.
   void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
-                                       bool isExprStmt);
+                                       bool isExprStmt, bool isConstInitExpr);
 
   /// Emit diagnostics for a given statement.
   void performStmtDiagnostics(const Stmt *S, DeclContext *DC);
@@ -53,10 +53,10 @@ namespace swift {
 
   /// Emit a fix-it to set the access of \p VD to \p desiredAccess.
   ///
-  /// This actually updates \p VD as well.
+  /// This actually updates \p VD as well if \p updateAttr is true.
   void fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
                    AccessLevel desiredAccess, bool isForSetter = false,
-                   bool shouldUseDefaultAccess = false);
+                   bool shouldUseDefaultAccess = false, bool updateAttr = true);
 
   /// Compute the location of the 'var' keyword for a 'var'-to-'let' Fix-It.
   SourceLoc getFixItLocForVarToLet(VarDecl *var);
@@ -101,6 +101,13 @@ namespace swift {
   void diagnoseConstantArgumentRequirement(const Expr *expr,
                                            const DeclContext *declContext);
 
+  /// If \p expr is a `@const` expression which contains values and
+  /// operations that are not legal in a `@const` expression,
+  /// emit an error diagnostic.
+  void diagnoseInvalidConstExpressions(const Expr *expr,
+                                       const DeclContext *declContext,
+                                       bool isConstInitExpr);
+
   /// Attempt to fix the type of \p decl so that it's a valid override for
   /// \p base...but only if we're highly confident that we know what the user
   /// should have written.
@@ -133,13 +140,17 @@ namespace swift {
   bool diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
                                              ForEachStmt *forEach);
 
+  /// Determine if any of the performance hint diagnostics are enabled.
+  bool performanceHintDiagnosticsEnabled(ASTContext &ctx, SourceFile *sf);
+
   class BaseDiagnosticWalker : public ASTWalker {
+  protected:
     PreWalkAction walkToDeclPre(Decl *D) override {
       // We don't walk into any nested local decls, except PatternBindingDecls,
       // which are type-checked along with the parent, and MacroExpansionDecl,
       // which needs to be visited to visit the macro arguments.
-      return Action::VisitNodeIf(isa<PatternBindingDecl>(D) ||
-                                 isa<MacroExpansionDecl>(D));
+      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D) ||
+                                     isa<MacroExpansionDecl>(D));
     }
 
     MacroWalking getMacroWalkingBehavior() const override {

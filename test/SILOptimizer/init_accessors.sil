@@ -39,9 +39,9 @@ bb0(%0 : $Int, %1 : $*Test):
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s14init_accessors4TestV1vACSi_tcfC : $@convention(method) (Int, @thin Test.Type) -> Test
+// CHECK: [[SELF_REF:%.*]] = begin_access [modify] [unknown] [[SELF:%.*]] : $*Test
 // CHECK: [[INIT_REF:%.*]] = function_ref @$s14init_accessors4TestV1xSivi : $@convention(thin) (Int) -> @out Int
-// CHECK: [[SELF_REF:%.*]] = begin_access [modify] [dynamic] [[SELF:%.*]] : $*Test
-// CHECK-NEXT: [[FIELD_REF:%.*]] = struct_element_addr [[SELF_REF]] : $*Test, #Test._x
+// CHECK: [[FIELD_REF:%.*]] = struct_element_addr [[SELF_REF]] : $*Test, #Test._x
 // CHECK-NEXT: {{.*}} = apply [[INIT_REF]]([[FIELD_REF]], %0) : $@convention(thin) (Int) -> @out Int
 sil hidden [ossa] @$s14init_accessors4TestV1vACSi_tcfC : $@convention(method) (Int, @thin Test.Type) -> Test {
 bb0(%0 : $Int, %1 : $@thin Test.Type):

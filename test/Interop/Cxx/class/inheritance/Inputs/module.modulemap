@@ -16,8 +16,8 @@ module ReferenceToDerived {
   requires cplusplus
 }
 
-module SubTypes {
-  header "sub-types.h"
+module NestedTypes {
+  header "nested-types.h"
 }
 
 module Subscripts {
@@ -46,5 +46,10 @@ module FunctionsObjC {
 
 module InheritedLookup {
   header "inherited-lookup.h"
+  requires cplusplus
+}
+
+module CircularInheritance {
+  header "circular-inheritance.h"
   requires cplusplus
 }

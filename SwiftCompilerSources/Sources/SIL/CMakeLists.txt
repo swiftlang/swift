@@ -16,6 +16,8 @@ add_swift_compiler_module(SIL
     ASTExtensions.swift
     BasicBlock.swift
     Builder.swift
+    ConstExpressionEvaluator.swift
+    Context.swift
     DeclRef.swift
     Effects.swift
     ForwardingInstruction.swift
@@ -33,5 +35,6 @@ add_swift_compiler_module(SIL
     VTable.swift
     WitnessTable.swift)
 
+add_subdirectory(DataStructures)
 add_subdirectory(Utilities)
 

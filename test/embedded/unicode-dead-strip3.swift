@@ -21,7 +21,6 @@ struct Main {
 // The code uses String splitting, should need the normalization, NFC, NFD, grapheme breaking, linking tables, and not the others.
 // EXCLUDES-NOT: swift_stdlib_case
 // INCLUDES:     swift_stdlib_graphemeBreakProperties
-// INCLUDES:     swift_stdlib_linkingConsonant
 // EXCLUDES-NOT: swift_stdlib_mappings
 // EXCLUDES-NOT: swift_stdlib_names
 // INCLUDES:     swift_stdlib_nfc

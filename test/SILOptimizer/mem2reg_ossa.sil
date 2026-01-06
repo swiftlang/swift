@@ -46,6 +46,22 @@ struct S {
   var field: C
 }
 
+struct J {
+  var c: C
+}
+
+struct I {
+  var j: J
+}
+
+struct S1 {
+  var i: I
+}
+
+struct S2 {
+  var t: (J, J)
+}
+
 ///////////
 // Tests //
 ///////////
@@ -760,4 +776,58 @@ entry(%instance : @owned $C):
   dealloc_stack %stack : $*C
   %retval = tuple ()
   return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @no_promo_proj_uac_1 : {{.*}} {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'no_promo_proj_uac_1'
+sil [ossa] @no_promo_proj_uac_1 : $@convention(thin) () -> () {
+bb0:
+  %s = apply undef() : $@convention(thin) () -> (@owned S1)
+  %addr = alloc_stack $S1
+  store %s to [init] %addr
+  %i_addr = unchecked_addr_cast %addr to $*I
+  %j_addr = struct_element_addr %i_addr, #I.j
+  %j = load [copy] %j_addr
+  destroy_addr %addr
+  dealloc_stack %addr
+  apply undef(%j) : $@convention(thin) (@owned J) -> ()
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @no_promo_proj_uac_2 : {{.*}} {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'no_promo_proj_uac_2'
+sil [ossa] @no_promo_proj_uac_2 : $@convention(thin) () -> () {
+bb0:
+  %s = apply undef() : $@convention(thin) () -> (@owned S2)
+  %addr = alloc_stack $S2
+  store %s to [init] %addr
+  %t_addr = unchecked_addr_cast %addr to $*(J, J)
+  %j_addr = tuple_element_addr %t_addr, 0
+  %j = load [copy] %j_addr
+  destroy_addr %addr
+  dealloc_stack %addr
+  apply undef(%j) : $@convention(thin) (@owned J) -> ()
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @promo_uac_uac : {{.*}} {
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function 'promo_uac_uac'
+sil [ossa] @promo_uac_uac : $@convention(thin) () -> () {
+bb0:
+  %s = apply undef() : $@convention(thin) () -> (@owned S1)
+  %addr = alloc_stack $S1
+  store %s to [init] %addr
+  %i_addr = unchecked_addr_cast %addr to $*I
+  %j_addr = unchecked_addr_cast %i_addr to $*J
+  %j = load [copy] %j_addr
+  destroy_addr %addr
+  dealloc_stack %addr
+  apply undef(%j) : $@convention(thin) (@owned J) -> ()
+  %retval = tuple ()
+  return %retval
 }

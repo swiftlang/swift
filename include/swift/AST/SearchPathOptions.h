@@ -35,7 +35,7 @@ namespace swift {
 enum class ModuleSearchPathKind {
   Import,
   Framework,
-  DarwinImplicitFramework,
+  ImplicitFramework,
   RuntimeLibrary,
 };
 
@@ -45,7 +45,7 @@ enum class ModuleLoadingMode {
   PreferInterface,
   PreferSerialized,
   OnlyInterface,
-  OnlySerialized
+  OnlySerialized,
 };
 
 /// A single module search path that can come from different sources, e.g.
@@ -311,19 +311,21 @@ class SearchPathOptions {
   friend class ASTContext;
 
 public:
-  struct FrameworkSearchPath {
+  struct SearchPath {
     std::string Path;
     bool IsSystem = false;
-    FrameworkSearchPath(StringRef path, bool isSystem)
-    : Path(path), IsSystem(isSystem) {}
+    SearchPath(StringRef path, bool isSystem)
+        : Path(path), IsSystem(isSystem) {}
 
-    friend bool operator ==(const FrameworkSearchPath &LHS,
-                            const FrameworkSearchPath &RHS) {
+    friend bool operator==(const SearchPath &LHS, const SearchPath &RHS) {
       return LHS.Path == RHS.Path && LHS.IsSystem == RHS.IsSystem;
     }
-    friend bool operator !=(const FrameworkSearchPath &LHS,
-                            const FrameworkSearchPath &RHS) {
+    friend bool operator!=(const SearchPath &LHS, const SearchPath &RHS) {
       return !(LHS == RHS);
+    }
+    friend llvm::hash_code
+    hash_value(const SearchPath &searchPath) {
+      return llvm::hash_combine(searchPath.Path, searchPath.IsSystem);
     }
   };
 
@@ -332,34 +334,30 @@ private:
 
   /// Path to the SDK which is being built against.
   ///
-  /// Must me modified through setter to keep \c SearchPathLookup in sync.
+  /// Must be modified through setter to keep \c Lookup in sync.
   std::string SDKPath;
 
   /// Path(s) which should be searched for modules.
   ///
-  /// Must me modified through setter to keep \c SearchPathLookup in sync.
-  std::vector<std::string> ImportSearchPaths;
+  /// Must be modified through setter to keep \c Lookup in sync.
+  std::vector<SearchPath> ImportSearchPaths;
 
   /// Path(s) which should be searched for frameworks.
   ///
-  /// Must me modified through setter to keep \c SearchPathLookup in sync.
-  std::vector<FrameworkSearchPath> FrameworkSearchPaths;
+  /// Must be modified through setter to keep \c Lookup in sync.
+  std::vector<SearchPath> FrameworkSearchPaths;
 
   /// Paths to search for stdlib modules. One of these will be
   /// compiler-relative.
   ///
-  /// Must me modified through setter to keep \c SearchPathLookup in sync.
+  /// Must be modified through setter to keep \c Lookup in sync.
   std::vector<std::string> RuntimeLibraryImportPaths;
 
   /// When on Darwin the framework paths that are implicitly imported.
   /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
   ///
-  /// On non-Darwin platforms these are populated, but ignored.
-  ///
-  /// Computed when the SDK path is set and cached so we can reference the
-  /// Darwin implicit framework search paths as \c StringRef from
-  /// \c ModuleSearchPath.
-  std::vector<std::string> DarwinImplicitFrameworkSearchPaths;
+  /// Must be modified through setter to keep \c Lookup in sync.
+  std::vector<std::string> ImplicitFrameworkSearchPaths;
 
   /// Compiler plugin library search paths.
   std::vector<std::string> CompilerPluginLibraryPaths;
@@ -369,17 +367,16 @@ private:
 
   /// Add a single import search path. Must only be called from
   /// \c ASTContext::addSearchPath.
-  void addImportSearchPath(StringRef Path, llvm::vfs::FileSystem *FS) {
-    ImportSearchPaths.push_back(Path.str());
-    Lookup.searchPathAdded(FS, ImportSearchPaths.back(),
-                           ModuleSearchPathKind::Import, /*isSystem=*/false,
+  void addImportSearchPath(SearchPath Path, llvm::vfs::FileSystem *FS) {
+    ImportSearchPaths.push_back(Path);
+    Lookup.searchPathAdded(FS, ImportSearchPaths.back().Path,
+                           ModuleSearchPathKind::Import, Path.IsSystem,
                            ImportSearchPaths.size() - 1);
   }
 
   /// Add a single framework search path. Must only be called from
   /// \c ASTContext::addSearchPath.
-  void addFrameworkSearchPath(FrameworkSearchPath NewPath,
-                              llvm::vfs::FileSystem *FS) {
+  void addFrameworkSearchPath(SearchPath NewPath, llvm::vfs::FileSystem *FS) {
     FrameworkSearchPaths.push_back(NewPath);
     Lookup.searchPathAdded(FS, FrameworkSearchPaths.back().Path,
                            ModuleSearchPathKind::Framework, NewPath.IsSystem,
@@ -400,21 +397,6 @@ public:
 
   void setSDKPath(std::string NewSDKPath) {
     SDKPath = NewSDKPath;
-
-    // Compute Darwin implicit framework search paths.
-    SmallString<128> systemFrameworksScratch(NewSDKPath);
-    llvm::sys::path::append(systemFrameworksScratch, "System", "Library",
-                            "Frameworks");
-    SmallString<128> systemSubFrameworksScratch(NewSDKPath);
-    llvm::sys::path::append(systemSubFrameworksScratch, "System", "Library",
-                            "SubFrameworks");
-    SmallString<128> frameworksScratch(NewSDKPath);
-    llvm::sys::path::append(frameworksScratch, "Library", "Frameworks");
-    DarwinImplicitFrameworkSearchPaths = {systemFrameworksScratch.str().str(),
-                                          systemSubFrameworksScratch.str().str(),
-                                          frameworksScratch.str().str()};
-
-    Lookup.searchPathsDidChange();
   }
 
   /// Retrieves the corresponding parent platform path for the SDK, or
@@ -448,29 +430,35 @@ public:
     SysRoot = sysroot;
   }
 
-  ArrayRef<std::string> getImportSearchPaths() const {
+  ArrayRef<SearchPath> getImportSearchPaths() const {
     return ImportSearchPaths;
   }
 
-  void setImportSearchPaths(std::vector<std::string> NewImportSearchPaths) {
+  void setImportSearchPaths(std::vector<SearchPath> NewImportSearchPaths) {
     ImportSearchPaths = NewImportSearchPaths;
     Lookup.searchPathsDidChange();
   }
 
-  ArrayRef<FrameworkSearchPath> getFrameworkSearchPaths() const {
+  ArrayRef<SearchPath> getFrameworkSearchPaths() const {
     return FrameworkSearchPaths;
   }
 
-  void setFrameworkSearchPaths(
-      std::vector<FrameworkSearchPath> NewFrameworkSearchPaths) {
+  void
+  setFrameworkSearchPaths(std::vector<SearchPath> NewFrameworkSearchPaths) {
     FrameworkSearchPaths = NewFrameworkSearchPaths;
     Lookup.searchPathsDidChange();
   }
 
   /// The extra implicit framework search paths on Apple platforms:
   /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
-  ArrayRef<std::string> getDarwinImplicitFrameworkSearchPaths() const {
-    return DarwinImplicitFrameworkSearchPaths;
+  ArrayRef<std::string> getImplicitFrameworkSearchPaths() const {
+    return ImplicitFrameworkSearchPaths;
+  }
+
+  void setImplicitFrameworkSearchPaths(
+      std::vector<std::string> NewImplicitFrameworkSearchPaths) {
+    ImplicitFrameworkSearchPaths = NewImplicitFrameworkSearchPaths;
+    Lookup.searchPathsDidChange();
   }
 
   ArrayRef<std::string> getRuntimeLibraryImportPaths() const {
@@ -504,11 +492,17 @@ public:
   /// Path to in-process plugin server shared library.
   std::string InProcessPluginServerPath;
 
-  /// Don't look in for compiler-provided modules.
-  bool SkipRuntimeLibraryImportPaths = false;
+  /// Don't automatically add any import paths.
+  bool SkipAllImplicitImportPaths = false;
+
+  /// Don't automatically add any import paths from the SDK.
+  bool SkipSDKImportPaths = false;
 
   /// Scanner Prefix Mapper.
-  std::vector<std::string> ScannerPrefixMapper;
+  std::vector<std::pair<std::string, std::string>> ScannerPrefixMapper;
+
+  /// Verify resolved plugin is not changed.
+  bool ResolvedPluginVerification = false;
 
   /// When set, don't validate module system dependencies.
   ///
@@ -524,14 +518,8 @@ public:
   std::string ExplicitSwiftModuleMapPath;
 
   /// Module inputs specified with -swift-module-input,
-  /// <ModuleName, Path to .swiftmodule file>
-  std::vector<std::pair<std::string, std::string>> ExplicitSwiftModuleInputs;
-
-  /// A map of placeholder Swift module dependency information.
-  std::string PlaceholderDependencyModuleMap;
-
-  /// A file containing modules we should perform batch scanning.
-  std::string BatchScanInputFilePath;
+  /// ModuleName: Path to .swiftmodule file
+  llvm::StringMap<std::string> ExplicitSwiftModuleInputs;
 
   /// A file containing a list of protocols whose conformances require const value extraction.
   std::string ConstGatherProtocolListFilePath;
@@ -580,6 +568,9 @@ public:
   /// "in-package", must not require package-only module dependencies.
   bool ResolveInPackageModuleDependencies = false;
 
+  /// Enable auto bridging header chaining.
+  bool BridgingHeaderChaining = false;
+
   /// Return all module search paths that (non-recursively) contain a file whose
   /// name is in \p Filenames.
   SmallVector<const ModuleSearchPath *, 4>
@@ -596,37 +587,24 @@ public:
   makeOverlayFileSystem(
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS) const;
 
-private:
-  static StringRef
-  pathStringFromFrameworkSearchPath(const FrameworkSearchPath &next) {
-    return next.Path;
-  };
-
 public:
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
     using llvm::hash_combine;
     using llvm::hash_combine_range;
-
-    using FrameworkPathView = ArrayRefView<FrameworkSearchPath, StringRef,
-                                           pathStringFromFrameworkSearchPath>;
-    FrameworkPathView frameworkPathsOnly{FrameworkSearchPaths};
-
     return hash_combine(SDKPath,
-                        hash_combine_range(ImportSearchPaths.begin(),
-                                           ImportSearchPaths.end()),
-                        hash_combine_range(VFSOverlayFiles.begin(),
-                                           VFSOverlayFiles.end()),
-                        // FIXME: Should we include the system-ness of framework
-                        // search paths too?
-                        hash_combine_range(frameworkPathsOnly.begin(),
-                                           frameworkPathsOnly.end()),
+                        hash_combine_range(ImportSearchPaths.begin(), ImportSearchPaths.end()),
+                        hash_combine_range(VFSOverlayFiles.begin(), VFSOverlayFiles.end()),
+                        hash_combine_range(FrameworkSearchPaths.begin(),
+                                           FrameworkSearchPaths.end()),
                         hash_combine_range(LibrarySearchPaths.begin(),
                                            LibrarySearchPaths.end()),
                         RuntimeResourcePath,
                         hash_combine_range(RuntimeLibraryImportPaths.begin(),
                                            RuntimeLibraryImportPaths.end()),
+                        hash_combine_range(ImplicitFrameworkSearchPaths.begin(),
+                                           ImplicitFrameworkSearchPaths.end()),
                         DisableModulesValidateSystemDependencies,
                         ScannerModuleValidation,
                         ModuleLoadMode);

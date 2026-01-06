@@ -1,4 +1,4 @@
-// REQUIRES: swift_swift_parser, executable_test, concurrency
+// REQUIRES: swift_swift_parser, concurrency, string_processing
 // REQUIRES: swift_feature_MacrosOnImports
 
 // RUN: %empty-directory(%t)

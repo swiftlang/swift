@@ -14,7 +14,7 @@ func letEscape(f: () -> ()) -> () -> () {
   // CHECK: [[BORROW_MD_ESCAPABLE_COPY:%.*]] = begin_borrow [[MD_ESCAPABLE_COPY]]
   // CHECK: [[SUB_CLOSURE:%.*]] = function_ref @
   // CHECK: [[RESULT:%.*]] = apply [[SUB_CLOSURE]]([[BORROW_MD_ESCAPABLE_COPY]])
-  // CHECK: destroy_value [[MD_ESCAPABLE_COPY]]
+  // CHECK: destroy_not_escaped_closure [[MD_ESCAPABLE_COPY]]
   // CHECK: return [[RESULT]]
   return withoutActuallyEscaping(f) { return $0 }
 }
@@ -35,15 +35,15 @@ func letEscape(f: () -> ()) -> () -> () {
 // CHECK:  try_apply [[USER]]([[BORROW]]) : {{.*}}, normal bb1, error bb2
 //
 // CHECK: bb1([[RES:%.*]] : @owned $@callee_guaranteed () -> ()):
-// CHECK:   [[ESCAPED:%.*]] = is_escaping_closure [[BORROW]]
-// CHECK:   cond_fail [[ESCAPED]] : $Builtin.Int1
 // CHECK:   end_borrow [[BORROW]]
-// CHECK:   destroy_value [[MD]]
+// CHECK:   [[ESCAPED:%.*]] = destroy_not_escaped_closure [[MD]]
+// CHECK:   cond_fail [[ESCAPED]] : $Builtin.Int1
 // CHECK:   return [[RES]]
 //
 // CHECK: bb2([[ERR:%.*]] : @owned $any Error):
 // CHECK:   end_borrow [[BORROW]]
-// CHECK:   destroy_value [[MD]]
+// CHECK:   [[ESCAPED:%.*]] = destroy_not_escaped_closure [[MD]]
+// CHECK:   cond_fail [[ESCAPED]] : $Builtin.Int1
 // CHECK:   throw [[ERR]] : $any Error
 // CHECK: }
 
@@ -61,7 +61,7 @@ case dogAteIt
 // CHECK: function_ref @$sIeg_25without_actually_escaping13HomeworkErrorOIgozo_Ieg_ACIegozo_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (@owned @callee_guaranteed () -> (), @error HomeworkError)) -> (@owned @callee_guaranteed () -> (), @error HomeworkError)
 // CHECK: bb2([[ERR:%.*]] : @owned $any Error):
 // CHECK:   end_borrow [[BORROW]]
-// CHECK:   destroy_value [[MD]]
+// CHECK:   destroy_not_escaped_closure [[MD]]
 // CHECK:   throw [[ERR]] : $any Error
 // CHECK: }
 
@@ -117,7 +117,7 @@ func modifyAndPerform<T>(_ _: UnsafeMutablePointer<T>, closure: () ->()) {
 // CHECK: [[THUNK_FUNC:%.*]] = function_ref @$sIeg_Ieg_TR :
 // CHECK: [[THUNK_PA:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FUNC]]([[COPY_2_BORROWED_CLOSURE_1]])
 // CHECK: [[THUNK_PA_MDI:%.*]] = mark_dependence [[THUNK_PA]] : $@callee_guaranteed () -> () on [[COPY_BORROWED_CLOSURE_1]] : $@callee_guaranteed () -> ()
-// CHECK: destroy_value [[THUNK_PA_MDI]]
+// CHECK: destroy_not_escaped_closure [[THUNK_PA_MDI]]
 // CHECK: destroy_value [[COPY_BORROWED_CLOSURE_1]]
 // CHECK: } // end sil function '$s25without_actually_escaping0A24ActuallyEscapingConflictyyF'
 func withoutActuallyEscapingConflict() {

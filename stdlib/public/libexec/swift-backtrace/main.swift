@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2023-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -22,10 +22,11 @@ import Musl
 import CRT
 #endif
 
-@_spi(Formatting) import _Backtracing
-@_spi(Contexts) import _Backtracing
-@_spi(Registers) import _Backtracing
-@_spi(MemoryReaders) import _Backtracing
+@_spi(Formatting) import Runtime
+@_spi(Contexts) import Runtime
+@_spi(Registers) import Runtime
+@_spi(MemoryReaders) import Runtime
+@_spi(CrashLog) import Runtime
 
 @main
 internal struct SwiftBacktrace {
@@ -56,12 +57,18 @@ internal struct SwiftBacktrace {
   enum OutputTo {
     case stdout
     case stderr
+    case file
   }
 
   enum Symbolication {
     case off
     case fast
     case full
+  }
+
+  enum OutputFormat {
+    case text
+    case json
   }
 
   struct Arguments {
@@ -81,6 +88,8 @@ internal struct SwiftBacktrace {
     var cache = true
     var outputTo: OutputTo = .stdout
     var symbolicate: Symbolication = .full
+    var format: OutputFormat = .text
+    var outputPath: String = "/tmp"
   }
 
   static var args = Arguments()
@@ -88,6 +97,9 @@ internal struct SwiftBacktrace {
 
   static var target: Target? = nil
   static var currentThread: Int = 0
+
+  static var now = timespec(tv_sec: 0, tv_nsec: 0)
+  static var backtraceDuration = timespec(tv_sec: 0, tv_nsec: 0)
 
   static var theme: any Theme {
     if args.color {
@@ -97,15 +109,10 @@ internal struct SwiftBacktrace {
     }
   }
 
-  static var outputStream: CFileStream {
-    switch args.outputTo {
-      case .stdout: return standardOutput
-      case .stderr: return standardError
-    }
-  }
+  static var outputStream: CFileStream? = nil
 
   static func write(_ string: String, flush: Bool = false) {
-    var stream = outputStream
+    var stream = outputStream!
 
     print(string, terminator: "", to: &stream)
     if flush {
@@ -114,7 +121,7 @@ internal struct SwiftBacktrace {
   }
 
   static func writeln(_ string: String, flush: Bool = false) {
-    var stream = outputStream
+    var stream = outputStream!
 
     print(string, to: &stream)
     if flush {
@@ -144,8 +151,8 @@ internal struct SwiftBacktrace {
   }
 
   static func measureDuration(_ body: () -> ()) -> timespec {
-    var startTime = timespec()
-    var endTime = timespec()
+    var startTime = timespec(tv_sec: 0, tv_nsec: 0)
+    var endTime = timespec(tv_sec: 0, tv_nsec: 0)
 
     clock_gettime(CLOCK_MONOTONIC, &startTime)
     body()
@@ -207,6 +214,13 @@ Generate a backtrace for the parent process.
 
 --output-to <stream>    Set which output stream to use.  Options are "stdout"
 -o <stream>             and "stderr".  The default is "stdout".
+
+                        Alternatively, you may specify a file path here.  If
+                        the path points to a directory, a unique filename will
+                        be generated automatically.
+
+--format <format>       Set the output format.  Options are "text" and "json";
+                        the default is "text".
 
 --crashinfo <addr>
 -a <addr>               Provide a pointer to a platform specific CrashInfo
@@ -405,10 +419,8 @@ Generate a backtrace for the parent process.
             case "stderr":
               args.outputTo = .stderr
             default:
-              print("swift-backtrace: unknown output-to setting '\(v)'",
-                    to: &standardError)
-              usage()
-              exit(1)
+              args.outputTo = .file
+              args.outputPath = v
           }
         } else {
           print("swift-backtrace: missing output-to value",
@@ -448,6 +460,23 @@ Generate a backtrace for the parent process.
         } else {
           args.symbolicate = .full
         }
+      case "--format":
+        if let v = value {
+          switch v.lowercased() {
+            case "text":
+              args.format = .text
+            case "json":
+              args.format = .json
+            default:
+              print("swift-backtrace: unknown output format '\(v)'",
+                    to: &standardError)
+          }
+        } else {
+          print("swift-backtrace: missing format value",
+                to: &standardError)
+          usage()
+          exit(1)
+        }
       default:
         print("swift-backtrace: unknown argument '\(arg)'",
               to: &standardError)
@@ -461,6 +490,17 @@ Generate a backtrace for the parent process.
 
     sigfillset(&mask)
     sigprocmask(SIG_UNBLOCK, &mask, nil)
+  }
+
+  static func getJsonBacktraceFormatterOptions() -> BacktraceJSONFormatterOptions {
+    var options = BacktraceJSONFormatterOptions(rawValue: 0)
+    if (args.registers == .all) { options.formUnion(.allRegisters) }
+    if (args.demangle) { options.formUnion(.demangle) }
+    if (args.sanitize == true) { options.formUnion(.sanitize) }
+    if (args.showImages == .mentioned) { options.formUnion(.mentionedImages) }
+    if (args.showImages != ImagesToShow.none) { options.formUnion(.images) }
+    if (args.threads == true) { options.formUnion(.allThreads) }
+    return options
   }
 
   static func main() {
@@ -531,7 +571,7 @@ Generate a backtrace for the parent process.
 
     // Target's initializer fetches and symbolicates backtraces, so
     // we want to time that part here.
-    let duration = measureDuration {
+    backtraceDuration = measureDuration {
       target = Target(crashInfoAddr: crashInfoAddr,
                       limit: args.limit, top: args.top,
                       cache: args.cache,
@@ -540,14 +580,133 @@ Generate a backtrace for the parent process.
       currentThread = target!.crashingThreadNdx
     }
 
-    printCrashLog()
+    // Grab the current wall clock time; if clock_gettime() fails, get a
+    // lower resolution version instead.
+    if clock_gettime(CLOCK_REALTIME, &now) != 0 {
+      now.tv_sec = time(nil)
+      now.tv_nsec = 0
+    }
 
-    writeln("")
+    // Set up the output stream
+    var didOpenOutput = false
+    switch args.outputTo {
+      case .stdout:
+        outputStream = standardOutput
+      case .stderr:
+        outputStream = standardError
+      case .file:
+        if isDir(args.outputPath) {
+          // If the output path is a directory, generate a filename
+          let name = target!.name
+          let pid = target!.pid
+          let now = timespec(tv_sec: 0, tv_nsec: 0)
 
-    let formattedDuration = format(duration: duration)
+          let ext: String
+          switch args.format {
+            case .text:
+              ext = "log"
+            case .json:
+              ext = "json"
+          }
 
-    writeln("Backtrace took \(formattedDuration)s")
-    writeln("")
+          var filename =
+            "\(args.outputPath)/\(name)-\(pid)-\(now.tv_sec).\(now.tv_nsec).\(ext)"
+
+          var fd = open(filename, O_RDWR|O_CREAT|O_EXCL, 0o644)
+          var ndx = 1
+
+          while fd < 0 && (errno == EEXIST || errno == EINTR) {
+            if errno != EINTR {
+              ndx += 1
+              filename = "\(args.outputPath)/\(name)-\(pid)-\(now.tv_sec).\(now.tv_nsec)-\(ndx).\(ext)"
+            }
+            fd = open(filename, O_RDWR|O_CREAT|O_EXCL, 0o644)
+          }
+
+          if fd < 0 {
+            print("swift-backtrace: unable to create \(filename) for writing",
+                  to: &standardError)
+            outputStream = standardError
+          }
+
+          if let cFile = fdopen(fd, "wt") {
+            didOpenOutput = true
+            outputStream = CFileStream(fp: cFile)
+          } else {
+            close(fd)
+            unlink(filename)
+
+            print("swift-backtrace: unable to fdopen \(filename) for writing",
+                  to: &standardError)
+            outputStream = standardError
+          }
+        } else if let cFile = fopen(args.outputPath, "wt") {
+          didOpenOutput = true
+          outputStream = CFileStream(fp: cFile)
+        } else {
+          print("swift-backtrace: unable to open \(args.outputPath) for writing",
+                to: &standardError)
+
+          outputStream = standardError
+        }
+    }
+    defer {
+      if didOpenOutput {
+        outputStream!.close()
+      }
+    }
+
+    // Clear (or complete) the message written by the crash handler; this
+    // is always on stdout or stderr, even if you specify a file for output.
+    var handlerOut: CFileStream
+    if args.outputTo == .stdout {
+      handlerOut = standardOutput
+    } else {
+      handlerOut = standardError
+    }
+    if args.color {
+      print("\r\u{1b}[0K", terminator: "", to: &handlerOut)
+    } else {
+      print(" done ***\n\n", terminator: "", to: &handlerOut)
+    }
+
+    switch args.format {
+      case .text:
+        printCrashLog()
+
+        writeln("")
+
+        let formattedDuration = format(duration: backtraceDuration)
+
+        writeln("Backtrace took \(formattedDuration)s")
+        writeln("")
+      case .json:
+        guard let target = target else {
+          print("swift-backtrace: unable to get target",
+                to: &standardError)
+          return
+        }
+
+        let crashLog = captureCrashLog(
+          imageMap: target.images,
+          backtraceDuration: backtraceDuration)
+
+        guard let crashLog else {
+          print("swift-backtrace: unable to build crash log",
+                to: &standardError)
+          return
+        }
+
+        let writer = SwiftBacktraceWriter()
+        let options = getJsonBacktraceFormatterOptions()
+
+        var backtraceFormatter = BacktraceJSONFormatter(
+          crashLog: crashLog,
+          writer: writer,
+          options: options)
+
+        backtraceFormatter.writeCrashLog(now: formatISO8601(now))
+    }
 
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
     // On Darwin, if Developer Mode is turned off, or we can't tell if it's
@@ -707,17 +866,20 @@ Generate a backtrace for the parent process.
       description = "Program crashed: \(target.signalDescription) at \(hex(target.faultAddress))"
     }
 
-    // Clear (or complete) the message written by the crash handler
-    if args.color {
-      write("\r\u{1b}[0K")
-    } else {
-      write(" done ***\n\n")
-    }
-
     writeln(theme.crashReason(description))
 
     var mentionedImages = Set<Int>()
     let formatter = backtraceFormatter()
+
+    let architecture: String
+    switch crashingThread.backtrace {
+      case let .raw(backtrace):
+        architecture = backtrace.architecture
+      case let .symbolicated(backtrace):
+        architecture = backtrace.architecture
+    }
+
+    writeln("\nPlatform: \(theme.architecture(architecture)) \(theme.platform(target.images.platform))")
 
     func dump(ndx: Int, thread: TargetThread) {
       let crashed = thread.id == target.crashingThread ? " crashed" : ""
@@ -768,12 +930,11 @@ Generate a backtrace for the parent process.
       }
     }
 
+    dump(ndx: target.crashingThreadNdx, thread: crashingThread)
     if args.threads! {
-      for (ndx, thread) in target.threads.enumerated() {
+      for (ndx, thread) in target.threads.enumerated() where ndx != target.crashingThreadNdx {
         dump(ndx: ndx, thread: thread)
       }
-    } else {
-      dump(ndx: target.crashingThreadNdx, thread: crashingThread)
     }
 
     if args.registers! == .crashedOnly {
@@ -786,13 +947,6 @@ Generate a backtrace for the parent process.
       }
     }
 
-    let addressWidthInChars: Int
-    switch crashingThread.backtrace {
-      case let .raw(backtrace):
-        addressWidthInChars = (backtrace.addressWidth + 3) / 4
-      case let .symbolicated(backtrace):
-        addressWidthInChars = (backtrace.addressWidth + 3) / 4
-    }
     switch args.showImages! {
       case .none:
         break
@@ -804,12 +958,10 @@ Generate a backtrace for the parent process.
         } else {
           writeln("\n\nImages:\n")
         }
-        writeln(formatter.format(images: images,
-                                 addressWidth: addressWidthInChars))
+        writeln(formatter.format(images: images))
       case .all:
         writeln("\n\nImages:\n")
-        writeln(formatter.format(images: target.images,
-                                 addressWidth: addressWidthInChars))
+        writeln(formatter.format(images: target.images))
     }
   }
 
@@ -837,7 +989,7 @@ Generate a backtrace for the parent process.
     }
 
     while true {
-      outputStream.flush()
+      outputStream!.flush()
       write(theme.prompt(">>> "), flush: true)
       guard let input = readLine() else {
         print("")
@@ -891,20 +1043,15 @@ Generate a backtrace for the parent process.
           let formatter = backtraceFormatter()
           switch thread.backtrace {
             case let .raw(backtrace):
-              let addressWidthInChars = (backtrace.addressWidth + 3) / 4
-              if let frame = backtrace.frames.first {
-                let formatted = formatter.format(frame: frame,
-                                                 addressWidth: addressWidthInChars)
+              if let frame = backtrace.frames.consumingFirst {
+                let formatted = formatter.format(frame: frame)
                 writeln("\(formatted)")
               }
             case let .symbolicated(backtrace):
-              let addressWidthInChars = (backtrace.addressWidth + 3) / 4
-
               if let frame = backtrace.frames.drop(while: {
                 $0.isSwiftRuntimeFailure
-              }).first {
-                let formatted = formatter.format(frame: frame,
-                                                 addressWidth: addressWidthInChars)
+              }).consumingFirst {
+                let formatted = formatter.format(frame: frame)
                 writeln("\(formatted)")
               }
           }
@@ -975,12 +1122,10 @@ Generate a backtrace for the parent process.
 
             switch thread.backtrace {
               case let .raw(backtrace):
-                let addressWidthInChars = (backtrace.addressWidth + 3) / 4
-
-                if let frame = backtrace.frames.first {
+                if let frame = backtrace.frames.consumingFirst {
                   rows += formatter.formatRows(
-                    frame: frame,
-                    addressWidth: addressWidthInChars).map{ row in
+                    frame: frame
+                  ).map{ row in
 
                     switch row {
                       case let .columns(columns):
@@ -991,14 +1136,12 @@ Generate a backtrace for the parent process.
                   }
                 }
               case let .symbolicated(backtrace):
-                let addressWidthInChars = (backtrace.addressWidth + 3) / 4
-
                 if let frame = backtrace.frames.drop(while: {
                   $0.isSwiftRuntimeFailure
-                }).first {
+                }).consumingFirst {
                   rows += formatter.formatRows(
-                    frame: frame,
-                    addressWidth: addressWidthInChars).map{ row in
+                    frame: frame
+                  ).map{ row in
 
                     switch row {
                       case let .columns(columns):
@@ -1020,15 +1163,7 @@ Generate a backtrace for the parent process.
         case "images":
           let formatter = backtraceFormatter()
           let images = target.images
-          let addressWidthInChars: Int
-          switch target.threads[currentThread].backtrace {
-            case let .raw(backtrace):
-              addressWidthInChars = (backtrace.addressWidth + 3) / 4
-            case let .symbolicated(backtrace):
-              addressWidthInChars = (backtrace.addressWidth + 3) / 4
-          }
-          let output = formatter.format(images: images,
-                                        addressWidth: addressWidthInChars)
+          let output = formatter.format(images: images)
 
           writeln(output)
         case "set":
@@ -1274,11 +1409,15 @@ Generate a backtrace for the parent process.
          from: RemoteMemoryReader.Address(value),
          count: 16,
          as: UInt8.self) {
-      let formattedBytes = theme.data(bytes.map{
-        hex($0, withPrefix: false)
-      }.joined(separator: " "))
-      let printedBytes = printableBytes(from: bytes)
-      writeln("\(reg) \(hexValue)  \(formattedBytes)  \(printedBytes)")
+      if args.sanitize ?? false {
+        writeln("\(reg) \(hexValue)  <memory>")
+      } else {
+        let formattedBytes = theme.data(bytes.map{
+                                          hex($0, withPrefix: false)
+                                        }.joined(separator: " "))
+        let printedBytes = printableBytes(from: bytes)
+        writeln("\(reg) \(hexValue)  \(formattedBytes)  \(printedBytes)")
+      }
     } else {
       let decValue = theme.decimalValue("\(value)")
       writeln("\(reg) \(hexValue)  \(decValue)")

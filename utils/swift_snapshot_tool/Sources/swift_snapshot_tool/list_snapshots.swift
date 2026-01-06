@@ -14,7 +14,12 @@ import ArgumentParser
 
 struct ListSnapshots: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
-    commandName: "list")
+    commandName: "list",
+    discussion: """
+      Downloads the current list of available snapshots from swift.org and
+      outputs the snapshots to stdout. Useful to see what snapshots are
+      available.
+      """)
 
   @Flag var platform: Platform = .osx
 

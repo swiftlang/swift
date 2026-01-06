@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-additional-prefix swift5-
 // RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift6-
 
-struct A<B> { // expected-note{{generic type 'A' declared here}}
+struct A<B> { // expected-note{{generic struct 'A' declared here}}
   init(x:Int) {}
   static func c() {}
 

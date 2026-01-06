@@ -250,15 +250,14 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
       unsigned index = GenericParamKey(genericParam).findIndexIn(genericParams);
 
       if (index == genericParams.size()) {
-        llvm::errs() << "Cannot build interface type for term "
-                     << MutableTerm(begin, end) << "\n";
-        llvm::errs() << "Invalid generic parameter: "
-                     << Type(genericParam) << "\n";
-        llvm::errs() << "Valid generic parameters: ";
-        for (auto *otherParam : genericParams)
-          llvm::errs() << " " << otherParam->getCanonicalType();
-        llvm::errs() << "\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Cannot build interface type for term "
+              << MutableTerm(begin, end) << "\n";
+          out << "Invalid generic parameter: " << Type(genericParam) << "\n";
+          out << "Valid generic parameters: ";
+          for (auto *otherParam : genericParams)
+            out << " " << otherParam->getCanonicalType();
+        });
       }
 
       result = genericParams[index];
@@ -281,11 +280,11 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
         continue;
 
       case Symbol::Kind::Protocol:
-        handleRoot(GenericTypeParamType::getType(0, 0, ctx.getASTContext()));
+        handleRoot(ctx.getASTContext().TheSelfType);
         continue;
 
       case Symbol::Kind::AssociatedType:
-        handleRoot(GenericTypeParamType::getType(0, 0, ctx.getASTContext()));
+        handleRoot(ctx.getASTContext().TheSelfType);
 
         // An associated type symbol at the root means we have a dependent
         // member type rooted at Self; handle the associated type below.
@@ -300,8 +299,9 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
       case Symbol::Kind::ConcreteType:
       case Symbol::Kind::ConcreteConformance:
       case Symbol::Kind::Shape:
-        llvm::errs() << "Invalid root symbol: " << MutableTerm(begin, end) << "\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Invalid root symbol: " << MutableTerm(begin, end);
+        });
       }
     }
 
@@ -348,12 +348,12 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
 
     auto *props = map.lookUpProperties(prefix.rbegin(), prefix.rend());
     if (props == nullptr) {
-      llvm::errs() << "Cannot build interface type for term "
-                   << MutableTerm(begin, end) << "\n";
-      llvm::errs() << "Prefix does not conform to any protocols: "
-                   << prefix << "\n\n";
-      map.dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Cannot build interface type for term "
+            << MutableTerm(begin, end) << "\n";
+        out << "Prefix does not conform to any protocols: " << prefix << "\n\n";
+        map.dump(out);
+      });
     }
 
     // Assert that the associated type's protocol appears among the set
@@ -367,16 +367,16 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
 
     auto *assocType = props->getAssociatedType(symbol.getName());
     if (assocType == nullptr) {
-      llvm::errs() << "Cannot build interface type for term "
-                   << MutableTerm(begin, end) << "\n";
-      llvm::errs() << "Prefix term does not have a nested type named "
-                   << symbol.getName() << ": "
-                   << prefix << "\n";
-      llvm::errs() << "Property map entry: ";
-      props->dump(llvm::errs());
-      llvm::errs() << "\n\n";
-      map.dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Cannot build interface type for term "
+            << MutableTerm(begin, end) << "\n";
+        out << "Prefix term does not have a nested type named "
+            << symbol.getName() << ": " << prefix << "\n";
+        out << "Property map entry: ";
+        props->dump(out);
+        out << "\n\n";
+        map.dump(out);
+      });
     }
 
     result = DependentMemberType::get(result, assocType);
@@ -424,7 +424,12 @@ RewriteContext::getRelativeTermForType(CanType typeWitness,
   // Get the substitution S corresponding to τ_0_n.
   unsigned index = getGenericParamIndex(typeWitness->getRootGenericParam());
   result = MutableTerm(substitutions[index]);
-  ASSERT(result.back().getKind() != Symbol::Kind::Shape);
+  bool hasShape = false;
+
+  if (result.hasShape()) {
+    hasShape = true;
+    result.removeShape();
+  }
 
   // If the substitution is a term consisting of a single protocol symbol
   // [P], save P for later.
@@ -463,6 +468,9 @@ RewriteContext::getRelativeTermForType(CanType typeWitness,
   for (auto iter = symbols.rbegin(), end = symbols.rend(); iter != end; ++iter)
     result.add(*iter);
 
+  if (hasShape)
+    result.add(Symbol::forShape(*this));
+
   return result;
 }
 
@@ -485,27 +493,27 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
           auto substitution = substitutions[index];
 
           bool isShapePosition = (pos == TypePosition::Shape);
-          bool isShapeTerm = (substitution.back() == Symbol::forShape(Context));
+          bool isShapeTerm = substitution.hasShape();
           if (isShapePosition != isShapeTerm) {
-            llvm::errs() << "Shape vs. type mixup\n\n";
-            schema.dump(llvm::errs());
-            llvm::errs() << "Substitutions:\n";
-            for (auto otherSubst : substitutions) {
-              llvm::errs() << "- ";
-              otherSubst.dump(llvm::errs());
-              llvm::errs() << "\n";
-            }
-            llvm::errs() << "\n";
-            dump(llvm::errs());
-
-            abort();
+            ABORT([&](auto &out) {
+              out << "Shape vs. type mixup\n\n";
+              schema.dump(out);
+              out << "Substitutions:\n";
+              for (auto otherSubst : substitutions) {
+                out << "- ";
+                otherSubst.dump(out);
+                out << "\n";
+              }
+              out << "\n";
+              dump(out);
+            });
           }
 
           // Undo the thing where the count type of a PackExpansionType
           // becomes a shape term.
           if (isShapeTerm) {
-            MutableTerm mutTerm(substitution.begin(), substitution.end() - 1);
-            substitution = Term::get(mutTerm, Context);
+            MutableTerm noShape = substitution.termWithoutShape();
+            substitution = Term::get(noShape, Context);
           }
 
           // Prepend the prefix of the lookup key to the substitution.
@@ -571,8 +579,6 @@ RewriteContext::getRelativeSubstitutionSchemaFromType(
         //
         // τ_0_0 := T
         // τ_0_1 := U.[shape]
-        ASSERT(pos != TypePosition::Shape && "Not implemented");
-
         unsigned index = result.size();
 
         result.push_back(Term::get(term, *this));

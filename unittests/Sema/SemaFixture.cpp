@@ -124,26 +124,39 @@ ProtocolType *SemaTest::createProtocol(llvm::StringRef protocolName,
   return ProtocolType::get(PD, parent, Context);
 }
 
-BindingSet SemaTest::inferBindings(ConstraintSystem &cs,
-                                   TypeVariableType *typeVar) {
-  llvm::SmallDenseMap<TypeVariableType *, BindingSet> cache;
-
+const BindingSet &SemaTest::inferBindings(ConstraintSystem &cs,
+                                          TypeVariableType *typeVar) {
   for (auto *typeVar : cs.getTypeVariables()) {
+    auto &node = cs.getConstraintGraph()[typeVar];
+    node.resetBindingSet();
+
     if (!typeVar->getImpl().hasRepresentativeOrFixed())
-      cache.insert({typeVar, cs.getBindingsFor(typeVar, /*finalize=*/false)});
+      node.initBindingSet();
   }
 
   for (auto *typeVar : cs.getTypeVariables()) {
-    auto cachedBindings = cache.find(typeVar);
-    if (cachedBindings == cache.end())
+    auto &node = cs.getConstraintGraph()[typeVar];
+    if (!node.hasBindingSet())
       continue;
 
-    auto &bindings = cachedBindings->getSecond();
-    bindings.inferTransitiveProtocolRequirements(cache);
-    bindings.finalize(cache);
+    auto &bindings = node.getBindingSet();
+
+    // FIXME: This is also called in inferTransitiveUnresolvedMemberRefBindings(),
+    // why do we need to call it here too?
+    bindings.inferTransitiveProtocolRequirements();
+
+    bindings.inferTransitiveKeyPathBindings();
+    (void) bindings.finalizeKeyPathBindings();
+
+    bindings.inferTransitiveUnresolvedMemberRefBindings();
+    bindings.finalizeUnresolvedMemberChainResult();
+
+    bindings.inferTransitiveSupertypeBindings();
+
+    bindings.determineLiteralCoverage();
   }
 
-  auto result = cache.find(typeVar);
-  assert(result != cache.end());
-  return result->second;
+  auto &node = cs.getConstraintGraph()[typeVar];
+  ASSERT(node.hasBindingSet());
+  return node.getBindingSet();
 }

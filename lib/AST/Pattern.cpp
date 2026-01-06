@@ -153,7 +153,7 @@ Type Pattern::getType() const {
 
     if (auto genericEnv = dc->getGenericEnvironmentOfContext()) {
       ctx.DelayedPatternContexts.erase(this);
-      Ty = genericEnv->mapTypeIntoContext(Ty);
+      Ty = genericEnv->mapTypeIntoEnvironment(Ty);
       const_cast<Pattern*>(this)->Bits.Pattern.hasInterfaceType = false;
     }
   }
@@ -192,8 +192,7 @@ namespace {
     const std::function<void(VarDecl*)> &fn;
   public:
     
-    WalkToVarDecls(const std::function<void(VarDecl*)> &fn)
-    : fn(fn) {}
+    WalkToVarDecls(const std::function<void(VarDecl*)> &fn) : fn(fn) {}
 
     /// Walk everything that's available; there shouldn't be macro expansions
     /// that matter anyway.
@@ -208,21 +207,27 @@ namespace {
       return Action::Continue(P);
     }
 
-    // Only walk into an expression insofar as it doesn't open a new scope -
-    // that is, don't walk into a closure body.
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (isa<ClosureExpr>(E)) {
+      // Only walk into an expression insofar as it doesn't open a new scope -
+      // that is, don't walk into a closure body, TapExpr, or
+      // SingleValueStmtExpr. Also don't walk into key paths since any nested
+      // VarDecls are invalid there, and after being diagnosed by key path
+      // resolution the ASTWalker won't visit them.
+      if (isa<ClosureExpr>(E) || isa<TapExpr>(E) ||
+          isa<SingleValueStmtExpr>(E) || isa<KeyPathExpr>(E)) {
         return Action::SkipNode(E);
       }
       return Action::Continue(E);
     }
 
+    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+      // ErrorTypeReprs can contain invalid expressions.
+      return Action::Continue();
+    }
+
     // Don't walk into anything else.
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       return Action::SkipNode(S);
-    }
-    PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipNode();
     }
     PreWalkAction walkToParameterListPre(ParameterList *PL) override {
       return Action::SkipNode();
@@ -233,6 +238,9 @@ namespace {
   };
 } // end anonymous namespace
 
+void Expr::forEachUnresolvedVariable(llvm::function_ref<void(VarDecl *)> f) const {
+  const_cast<Expr *>(this)->walk(WalkToVarDecls(f));
+}
 
 /// apply the specified function to all variables referenced in this
 /// pattern.
@@ -367,10 +375,10 @@ OptionalSomePattern *OptionalSomePattern::create(ASTContext &ctx,
   return new (ctx) OptionalSomePattern(ctx, subPattern, questionLoc);
 }
 
-OptionalSomePattern *
-OptionalSomePattern::createImplicit(ASTContext &ctx, Pattern *subPattern,
-                                    SourceLoc questionLoc) {
-  auto *P = OptionalSomePattern::create(ctx, subPattern, questionLoc);
+OptionalSomePattern *OptionalSomePattern::createImplicit(ASTContext &ctx,
+                                                         Pattern *subPattern) {
+  auto *P = OptionalSomePattern::create(ctx, subPattern,
+                                        /*questionLoc*/ SourceLoc());
   P->setImplicit();
   return P;
 }
@@ -460,7 +468,7 @@ TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
                             alignof(TuplePattern));
   TuplePattern *pattern = ::new (buffer) TuplePattern(lp, n, rp);
   std::uninitialized_copy(elts.begin(), elts.end(),
-                          pattern->getTrailingObjects<TuplePatternElt>());
+                          pattern->getTrailingObjects());
   return pattern;
 }
 
@@ -717,7 +725,7 @@ DeclContext *ContextualPattern::getDeclContext() const {
   if (auto pbd = getPatternBindingDecl())
     return pbd->getDeclContext();
 
-  return declOrContext.get<DeclContext *>();
+  return cast<DeclContext *>(declOrContext);
 }
 
 PatternBindingDecl *ContextualPattern::getPatternBindingDecl() const {
@@ -797,7 +805,7 @@ Pattern::getOwnership(
       case VarDecl::Introducer::Var:
         // If the subpattern type is copyable, then we can bind the variable
         // by copying without requiring more than a borrow of the original.
-        if (!p->hasType() || !p->getType()->isNoncopyable()) {
+        if (!p->hasType() || p->getType()->isCopyable()) {
           break;
         }
         // TODO: An explicit `consuming` binding kind consumes regardless of

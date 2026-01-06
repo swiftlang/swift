@@ -6,7 +6,7 @@
 
 // RUN: cp %S/Inputs/custom-modules/module.modulemap %t/module.modulemap
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target %target-pre-stable-abi-triple -typecheck %s -module-name resilient -emit-objc-header-path %t/resilient.h -I %t -enable-library-evolution
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target %target-pre-stable-abi-triple %s -module-name resilient -typecheck -verify -emit-objc-header-path %t/resilient.h -I %t -enable-library-evolution
 // RUN: %FileCheck %s --check-prefix=NO-STUBS < %t/resilient.h
 // RUN: %check-in-clang %t/resilient.h -I %t
 

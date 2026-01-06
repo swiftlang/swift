@@ -2,6 +2,8 @@
 
 // REQUIRES: executable_test
 
+// UNSUPPORTED: back_deployment_runtime
+
 protocol P {}
 extension P {
   func foo() -> some Sequence<Int> {

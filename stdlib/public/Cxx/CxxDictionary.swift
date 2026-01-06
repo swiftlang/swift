@@ -144,6 +144,60 @@ extension CxxDictionary {
     }
   }
 
+  @inlinable
+  public func mapValues<R, E>(
+    _ transform: (Value) throws(E) -> R.Value
+  ) throws(E) -> R where R: CxxDictionary, R.Key == Key {
+    var result = R.init()
+
+    var iterator = __beginUnsafe()
+    let endIterator = __endUnsafe()
+
+    while iterator != endIterator {
+      let pair = iterator.pointee
+      try result.__insertUnsafe(R.Element(first: pair.first, second: transform(pair.second)))
+      iterator = iterator.successor()
+    }
+
+    return result
+  }
+
+  @inlinable
+  @_disfavoredOverload
+  public func mapValues<E>(
+    _ transform: (Value) throws(E) -> Value
+  ) throws(E) -> Self {
+    return try mapValues(transform) as Self
+  }
+
+  @inlinable
+  public func compactMapValues<R, E>(
+    _ transform: (Value) throws(E) -> R.Value?
+  ) throws(E) -> R where R: CxxDictionary, R.Key == Key {
+    var result = R.init()
+
+    var iterator = __beginUnsafe()
+    let endIterator = __endUnsafe()
+
+    while iterator != endIterator {
+      let pair = iterator.pointee
+      if let value = try transform(pair.second) {
+          result.__insertUnsafe(R.Element(first: pair.first, second: value))
+      }
+      iterator = iterator.successor()
+    }
+
+    return result
+  }
+
+  @inlinable
+  @_disfavoredOverload
+  public func compactMapValues<E>(
+    _ transform: (Value) throws(E) -> Value?
+  ) throws(E) -> Self {
+    return try compactMapValues(transform) as Self
+  }
+
   public func filter(_ isIncluded: (_ key: Key, _ value: Value) throws -> Bool) rethrows -> Self {
     var filteredDictionary = Self.init()
     var iterator = __beginUnsafe()
@@ -174,10 +228,10 @@ extension CxxDictionary {
   }
 
   @inlinable
-  public mutating func merge<S: Sequence>(
+  public mutating func merge<S: Sequence, E>(
     _ other: __owned S,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Element == (Key, Value) {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) where S.Element == (Key, Value) {
     for (key, value) in other {
       var iter = self.__findMutatingUnsafe(key)
       if iter != self.__endMutatingUnsafe() {
@@ -190,10 +244,10 @@ extension CxxDictionary {
   }
 
   @inlinable
-  public mutating func merge(
+  public mutating func merge<E>(
     _ other: __owned Dictionary<Key, Value>,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where Key: Hashable {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) where Key: Hashable {
     for (key, value) in other {
       var iter = self.__findMutatingUnsafe(key)
       if iter != self.__endMutatingUnsafe() {
@@ -206,10 +260,10 @@ extension CxxDictionary {
   }
 
   @inlinable
-  public mutating func merge(
-    _ other: __owned Self,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows {
+  public mutating func merge<T: CxxDictionary, E>(
+    _ other: __owned T,
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) where T.Key == Key, T.Value == Value {
     var iterator = other.__beginUnsafe()
     while iterator != other.__endUnsafe() {
       var iter = self.__findMutatingUnsafe(iterator.pointee.first)
@@ -224,32 +278,47 @@ extension CxxDictionary {
   }
 
   @inlinable
-  public __consuming func merging<S: Sequence>(
+  public __consuming func merging<S: Sequence, E>(
     _ other: __owned S,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows -> Self where S.Element == (Key, Value) {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) -> Self where S.Element == (Key, Value) {
     var result = self
     try result.merge(other, uniquingKeysWith: combine)
     return result
   }
 
   @inlinable
-  public __consuming func merging(
+  public __consuming func merging<E>(
       _ other: __owned Dictionary<Key, Value>,
-      uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows -> Self where Key: Hashable {
+      uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) -> Self where Key: Hashable {
     var result = self
     try result.merge(other, uniquingKeysWith: combine)
     return result
   }
 
   @inlinable
-  public __consuming func merging(
-    _ other: __owned Self,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows -> Self {
+  public __consuming func merging<T: CxxDictionary, E>(
+    _ other: __owned T,
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) -> Self where T.Key == Key, T.Value == Value {
     var result = self
     try result.merge(other, uniquingKeysWith: combine)
     return result
+  }
+}
+
+extension Dictionary {
+  @inlinable
+  public init(_ dictionary: some CxxDictionary<Key, Value>) {
+    self.init()
+
+    var it = dictionary.__beginUnsafe()
+    let endIterator = dictionary.__endUnsafe()
+    while it != endIterator {
+      self[it.pointee.first] = it.pointee.second
+      it = it.successor()
+    }
+    withExtendedLifetime(dictionary) {}
   }
 }

@@ -11,7 +11,11 @@
 
 // REQUIRES: executable_test
 //
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=freebsd
+
+// Undefined hidden symbol to C++ voidify in libcxx
+// rdar://121551667
+// XFAIL: OS=freebsd
 
 import StdlibUnittest
 #if !BRIDGING_HEADER
@@ -130,6 +134,39 @@ StdMapTestSuite.test("UnorderedMap.init(grouping:by:)") {
   expectEqual(m[1]?.size(), 2)
   expectEqual(m[2]?.size(), 4)
   expectEqual(m[3]?.size(), 6)
+}
+
+StdMapTestSuite.test("Dictionary<CInt, CInt>.init(_: Map)") {
+  let cxxMap0 = Map()
+  let swiftMap0 = Dictionary<CInt, CInt>(cxxMap0)
+  expectTrue(swiftMap0.isEmpty)
+
+  let cxxMap1 = initMap()
+  let swiftMap1 = Dictionary<CInt, CInt>(cxxMap1)
+  expectEqual(swiftMap1, [1 : 3, 2 : 2, 3 : 3])
+}
+
+StdMapTestSuite.test("Dictionary<CInt, CInt>.init(_: UnorderedMap)") {
+  let cxxMap0 = UnorderedMap()
+  let swiftMap0 = Dictionary<CInt, CInt>(cxxMap0)
+  expectTrue(swiftMap0.isEmpty)
+
+  let cxxMap1 = initUnorderedMap()
+  let swiftMap1 = Dictionary<CInt, CInt>(cxxMap1)
+  expectEqual(swiftMap1, [1 : 3, 2 : 2, 3 : 3])
+}
+
+StdMapTestSuite.test("Dictionary<std.string, std.string>.init(_: MapStrings)") {
+  let cxxMap0 = MapStrings()
+  let swiftMap0 = Dictionary<std.string, std.string>(cxxMap0)
+  expectTrue(swiftMap0.isEmpty)
+
+  var cxxMap1 = MapStrings()
+  cxxMap1[std.string("abc")] = std.string("def")
+  cxxMap1[std.string("890")] = std.string("3210")
+  let swiftMap1 = Dictionary<std.string, std.string>(cxxMap1)
+  expectEqual(swiftMap1, [std.string("abc") : std.string("def"),
+                          std.string("890") : std.string("3210")])
 }
 
 StdMapTestSuite.test("Map.subscript") {
@@ -265,6 +302,85 @@ StdMapTestSuite.test("UnorderedMap.subscript(:default:)") {
   expectEqual(m[-2, default: -2], 1)
 
   expectEqual(m[-5, default: 555], 555)
+}
+
+StdMapTestSuite.test("Map.mapValues") {
+  let m = initMap()
+  let n = m.mapValues { v in v * 2 }
+  expectEqual(n[1], 6)
+  expectEqual(n[2], 4)
+  expectEqual(n[3], 6)
+
+  let n2: MapIntString = m.mapValues { v in std.string("\(v * 3)") }
+  expectEqual(n2[1], std.string("9"))
+  expectEqual(n2[2], std.string("6"))
+  expectEqual(n2[3], std.string("9"))
+
+  let n3: UnorderedMap = m.mapValues { v in v * 4 }
+  expectEqual(n3[1], 12)
+  expectEqual(n3[2], 8)
+  expectEqual(n3[3], 12)
+}
+
+StdMapTestSuite.test("UnorderedMap.mapValues") {
+  let m = initUnorderedMap()
+  let n = m.mapValues { v in v * 2 }
+  expectEqual(n[1], 6)
+  expectEqual(n[2], 4)
+  expectEqual(n[3], 6)
+
+  let n2: UnorderedIntString = m.mapValues { v in std.string("\(v * 3)") }
+  expectEqual(n2[1], std.string("9"))
+  expectEqual(n2[2], std.string("6"))
+  expectEqual(n2[3], std.string("9"))
+
+  let n3: Map = m.mapValues { v in v * 4 }
+  expectEqual(n3[1], 12)
+  expectEqual(n3[2], 8)
+  expectEqual(n3[3], 12)
+}
+
+StdMapTestSuite.test("Map.compactMapValues") {
+  let m = Map([1: 1, 2: 2, 3: 3, 4: 4])
+  let n = m.compactMapValues { v in v % 2 == 0 ? nil : v * 2 }
+  expectEqual(n[1], 2)
+  expectNil(n[2])
+  expectEqual(n[3], 6)
+  expectNil(n[4])
+
+  let n2: MapIntString = m.compactMapValues { v in v % 2 == 0 ? nil : std.string("\(v * 3)") }
+  expectEqual(n2[1], std.string("3"))
+  expectNil(n2[2])
+  expectEqual(n2[3], std.string("9"))
+  expectNil(n2[4])
+
+  let n3: UnorderedMap = m.compactMapValues { v in v % 2 == 0 ? nil : v * 4 }
+  expectEqual(n3[1], 4)
+  expectNil(n3[2])
+  expectEqual(n3[3], 12)
+  expectNil(n3[4])
+}
+
+StdMapTestSuite.test("UnorderedMap.compactMapValues") {
+  let m = UnorderedMap([1: 1, 2: 2, 3: 3, 4: 4])
+
+  let n = m.compactMapValues { v in v % 2 == 0 ? nil : v * 2 }
+  expectEqual(n[1], 2)
+  expectNil(n[2])
+  expectEqual(n[3], 6)
+  expectNil(n[4])
+
+  let n2: UnorderedIntString = m.compactMapValues { v in v % 2 == 0 ? nil : std.string("\(v * 3)") }
+  expectEqual(n2[1], std.string("3"))
+  expectNil(n2[2])
+  expectEqual(n2[3], std.string("9"))
+  expectNil(n2[4])
+
+  let n3: Map = m.compactMapValues { v in v % 2 == 0 ? nil : v * 4 }
+  expectEqual(n3[1], 4)
+  expectNil(n3[2])
+  expectEqual(n3[3], 12)
+  expectNil(n3[4])
 }
 
 StdMapTestSuite.test("Map.filter") {
@@ -425,6 +541,103 @@ StdMapTestSuite.test("UnorderedMap.merge(map)") {
   expectEqual(m[1], 1)
   expectEqual(m[2], 2)
   expectEqual(m[3], 3)
+}
+
+StdMapTestSuite.test("Map.merge(CxxDictionary)") {
+  // Empty map merging with empty map.
+  var emptyMap = initEmptyMap()
+  emptyMap.merge(initEmptyUnorderedMap()) { v0, _ in v0 }
+  expectTrue(emptyMap.empty())
+
+  emptyMap.merge(initEmptyUnorderedMap()) { _, v1 in v1 }
+  expectTrue(emptyMap.empty())
+
+  // Empty map merging with non-empty map.
+  emptyMap.merge(initUnorderedMap()) { v0, _ in v0 }
+  expectEqual(emptyMap[1], 3)
+  expectEqual(emptyMap[2], 2)
+  expectEqual(emptyMap[3], 3)
+
+  emptyMap = initEmptyMap()
+  emptyMap.merge(initUnorderedMap()) { _, v1 in v1 }
+  expectEqual(emptyMap[1], 3)
+  expectEqual(emptyMap[2], 2)
+  expectEqual(emptyMap[3], 3)
+
+  // Non-empty map merging with empty map.
+  var map = initMap()
+  map.merge(initUnorderedMap()) { v0, _ in v0 }
+  expectEqual(emptyMap[1], 3)
+  expectEqual(emptyMap[2], 2)
+  expectEqual(emptyMap[3], 3)
+
+  map.merge(initEmptyUnorderedMap()) { _, v1 in v1 }
+  expectEqual(map[1], 3)
+  expectEqual(map[2], 2)
+  expectEqual(map[3], 3)
+
+  // Non-empty map merging with non-empty map.
+  let noneEmptydMap = UnorderedMap([1: 4, 2: 5, 3: 6, 4: 7])
+  map.merge(noneEmptydMap) { v0, _ in v0 }
+  expectEqual(map[1], 3)
+  expectEqual(map[2], 2)
+  expectEqual(map[3], 3)
+  expectEqual(map[4], 7)
+
+  map.merge(noneEmptydMap) { _, v1 in v1 }
+  expectEqual(map[1], 4)
+  expectEqual(map[2], 5)
+  expectEqual(map[3], 6)
+  expectEqual(map[4], 7)
+}
+
+StdMapTestSuite.test("UnorderedMap.merge(CxxDictionary)") {
+  // Empty map merging with empty map.
+  var emptyMap = initEmptyUnorderedMap()
+  emptyMap.merge(initEmptyMap()) { v0, _ in v0 }
+  expectTrue(emptyMap.empty())
+
+  emptyMap.merge(initEmptyMap()) { _, v1 in v1 }
+  expectTrue(emptyMap.empty())
+
+  // Empty map merging with non-empty map.
+  emptyMap.merge(initMap()) { v0, _ in v0 }
+  expectEqual(emptyMap[1], 3)
+  expectEqual(emptyMap[2], 2)
+  expectEqual(emptyMap[3], 3)
+
+  emptyMap = initEmptyUnorderedMap()
+  emptyMap.merge(initMap()) { _, v1 in v1 }
+  expectEqual(emptyMap[1], 3)
+  expectEqual(emptyMap[2], 2)
+  expectEqual(emptyMap[3], 3)
+
+  // Non-empty map merging with empty map.
+  var map = initUnorderedMap()
+  map.merge(initEmptyMap()) { _, v1 in v1 }
+  expectEqual(map[1], 3)
+  expectEqual(map[2], 2)
+  expectEqual(map[3], 3)
+
+  map.merge(initEmptyMap()) { v0, _ in v0 }
+  expectEqual(map[1], 3)
+  expectEqual(map[2], 2)
+  expectEqual(map[3], 3)
+
+  // Non-empty map merging with non-empty map.
+  let noneEmptyMap = Map([1: 4, 2: 5, 3: 6, 4: 7])
+
+  map.merge(noneEmptyMap) { v0, _ in v0 }
+  expectEqual(map[1], 3)
+  expectEqual(map[2], 2)
+  expectEqual(map[3], 3)
+  expectEqual(map[4], 7)
+
+  map.merge(noneEmptyMap) { _, v1 in v1 }
+  expectEqual(map[1], 4)
+  expectEqual(map[2], 5)
+  expectEqual(map[3], 6)
+  expectEqual(map[4], 7)
 }
 
 // `merging` is implemented by calling `merge`, so we can skip this test

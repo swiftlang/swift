@@ -242,13 +242,13 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::PatternBinding:
     case DeclKind::EnumCase:
     case DeclKind::TopLevelCode:
-    case DeclKind::PoundDiagnostic:
     case DeclKind::Missing:
     case DeclKind::MissingMember:
     case DeclKind::Module:
     case DeclKind::OpaqueType:
     case DeclKind::BuiltinTuple:
     case DeclKind::MacroExpansion:
+    case DeclKind::Using:
       break;
   }
 
@@ -279,6 +279,10 @@ SymbolSubKind index::getSubKindForAccessor(AccessorKind AK) {
   case AccessorKind::Modify:    return SymbolSubKind::SwiftAccessorModify;
   case AccessorKind::Modify2:   return SymbolSubKind::SwiftAccessorModify;
   case AccessorKind::Init:      return SymbolSubKind::SwiftAccessorInit;
+  case AccessorKind::Borrow:
+    return SymbolSubKind::SwiftAccessorBorrow;
+  case AccessorKind::Mutate:
+    return SymbolSubKind::SwiftAccessorMutate;
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");

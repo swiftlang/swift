@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -31,11 +31,6 @@ private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
 let lifetimeDependenceInsertionPass = FunctionPass(
   name: "lifetime-dependence-insertion")
 { (function: Function, context: FunctionPassContext) in
-#if os(Windows)
-  if !context.options.hasFeature(.NonescapableTypes) {
-    return
-  }
-#endif
   log(prefix: false, "\n--- Inserting lifetime dependence markers in \(function.name)")
 
   for instruction in function.instructions {
@@ -100,6 +95,7 @@ extension LifetimeDependentApply {
   struct LifetimeSource {
     let targetKind: TargetKind
     let convention: LifetimeDependenceConvention
+    let isInout: Bool
     let value: Value
   }
 
@@ -121,7 +117,8 @@ extension LifetimeDependentApply {
       guard let dep = applySite.resultDependence(on: operand) else {
         continue
       }
-      info.sources.push(LifetimeSource(targetKind: .result, convention: dep, value: operand.value))
+      let isInout = applySite.convention(of: operand)?.isInout ?? false
+      info.sources.push(LifetimeSource(targetKind: .result, convention: dep, isInout: isInout, value: operand.value))
     }
     return info
   }
@@ -130,15 +127,18 @@ extension LifetimeDependentApply {
     var info = LifetimeSourceInfo()
     let hasScopedYield = applySite.parameterOperands.contains {
       if let dep = applySite.resultDependence(on: $0) {
-        return dep == .scope
+        return dep.isScoped
       }
       return false
     }
     if hasScopedYield {
-      // for consistency, we you yieldAddress if any yielded value is an address.
+      // for consistency, we use yieldAddress if any yielded value is an address.
       let targetKind = beginApply.yieldedValues.contains(where: { $0.type.isAddress })
         ? TargetKind.yieldAddress : TargetKind.yield
-      info.sources.push(LifetimeSource(targetKind: targetKind, convention: .scope, value: beginApply.token))
+      info.sources.push(LifetimeSource(targetKind: targetKind,
+                                       convention: .scope(addressable: false, addressableForDeps: false),
+                                       isInout: false,
+                                       value: beginApply.token))
     }
     for operand in applySite.parameterOperands {
       guard let dep = applySite.resultDependence(on: operand) else {
@@ -148,9 +148,15 @@ extension LifetimeDependentApply {
       case .inherit:
         continue
       case .scope:
+        // FIXME: For yields with a scoped lifetime dependence, dependence on parameter operands is redundant,
+        // since we introduce dependence on the begin_apply's token as well.
+        // This can lead to duplicate lifetime dependence diagnostics in some cases.
+        // However this is neccessary for safety when begin_apply gets inlined which will delete the dependence on the token.
         for yieldedValue in beginApply.yieldedValues {
           let targetKind = yieldedValue.type.isAddress ? TargetKind.yieldAddress : TargetKind.yield
-          info.sources.push(LifetimeSource(targetKind: targetKind, convention: .inherit, value: operand.value))
+          let isInout = applySite.convention(of: operand)?.isInout ?? false
+          info.sources.push(LifetimeSource(targetKind: targetKind, convention: dep, isInout: isInout,
+                                           value: operand.value))
         }
       }
     }
@@ -179,7 +185,8 @@ extension LifetimeDependentApply {
       guard let dep = dep else {
         continue
       }
-      info.sources.push(LifetimeSource(targetKind: targetKind, convention: dep, value: operand.value))
+      let isInout = applySite.convention(of: operand)?.isInout ?? false
+      info.sources.push(LifetimeSource(targetKind: targetKind, convention: dep, isInout: isInout, value: operand.value))
     }
     return info
   }
@@ -194,8 +201,8 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
       // (a) the result or yield is never returned from this function
       //
       // (b) the inherited lifetime has a dependence root within this function (it comes from a dependent function
-      // argument or scoped dependence). In this case, when that depedence root is diagnosed, the analysis will find
-      // transtive uses of this apply's result.
+      // argument or scoped dependence). In this case, when that dependence root is diagnosed, the analysis will find
+      // transitive uses of this apply's result.
       //
       // (c) the dependent value is passed to another call with a dependent inout argument, or it is stored to a yielded
       // address of a coroutine that has a dependent inout argument. In this case, a mark_dependence will already be
@@ -216,9 +223,14 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
       // A coroutine creates its own borrow scope, nested within its borrowed operand.
       bases.append(source.value)
     case .result, .inParameter, .inoutParameter:
+      // addressable dependencies directly depend on the incoming address.
+      if context.options.enableAddressDependencies() && source.convention.isAddressable(for: source.value) {
+        bases.append(source.value)
+        return
+      }
       // Create a new dependence on the apply's access to the argument.
-      for varIntoducer in gatherVariableIntroducers(for: source.value, context) {
-        let scope = LifetimeDependence.Scope(base: varIntoducer, context)
+      for varIntroducer in gatherVariableIntroducers(for: source.value, ignoreTrivialCopies: !source.isInout, context) {
+        let scope = LifetimeDependence.Scope(base: varIntroducer, context)
         log("Scoped lifetime from \(source.value)")
         log("  scope: \(scope)")
         bases.append(scope.parentValue)
@@ -235,7 +247,7 @@ private func insertResultDependencies(for apply: LifetimeDependentApply, _ conte
   guard var sources = apply.getResultDependenceSources() else {
     return
   }
-  log("Creating dependencies for \(apply.applySite)")
+  log("Creating result dependencies for \(apply.applySite)")
 
   // Find the dependence base for each source.
   sources.initializeBases(context)
@@ -245,22 +257,19 @@ private func insertResultDependencies(for apply: LifetimeDependentApply, _ conte
     insertMarkDependencies(value: dependentValue, initializer: nil, bases: sources.bases, builder: builder, context)
   }
   for resultOper in apply.applySite.indirectResultOperands {
-    let accessBase = resultOper.value.accessBase
-    guard let (initialAddress, initializingStore) = accessBase.findSingleInitializer(context) else {
-      continue
+    guard let initialAddress = resultOper.value.accessBase.address else {
+      diagnoseUnknownDependenceSource(sourceLoc: apply.applySite.location.sourceLoc, context)
+      return
     }
-    // TODO: This might bail-out on SIL that should be diagnosed. We should handle/cleanup projections and casts that
-    // occur before the initializingStore. Or check in the SIL verifier that all stores without an access scope follow
-    // this form. Then convert this bail-out to an assert.
-    guard initialAddress.usesOccurOnOrAfter(instruction: initializingStore, context) else {
-      continue
-    }
-    assert(initializingStore == resultOper.instruction, "an indirect result is a store")
     Builder.insert(after: apply.applySite, context) { builder in
-      insertMarkDependencies(value: initialAddress, initializer: initializingStore, bases: sources.bases,
+      insertMarkDependencies(value: initialAddress, initializer: resultOper.instruction, bases: sources.bases,
                              builder: builder, context)
     }
   }
+}
+
+private func diagnoseUnknownDependenceSource(sourceLoc: SourceLoc?, _ context: FunctionPassContext) {
+  context.diagnosticEngine.diagnose(.lifetime_value_outside_scope, at: sourceLoc)
 }
 
 private func insertParameterDependencies(apply: LifetimeDependentApply, target: Operand,
@@ -268,9 +277,12 @@ private func insertParameterDependencies(apply: LifetimeDependentApply, target: 
   guard var sources = apply.getParameterDependenceSources(target: target) else {
     return
   }
-  log("Creating dependencies for \(apply.applySite)")
+  log("Creating parameter dependencies for \(apply.applySite)")
 
   sources.initializeBases(context)
+
+  assert(target.value.type.isAddress,
+         "lifetime-dependent parameter must be 'inout'")
 
   Builder.insert(after: apply.applySite, context) {
     insertMarkDependencies(value: target.value, initializer: nil, bases: sources.bases, builder: $0, context)
@@ -282,21 +294,194 @@ private func insertMarkDependencies(value: Value, initializer: Instruction?,
                                     _ context: FunctionPassContext) {
   var currentValue = value
   for base in bases {
-    let markDep = builder.createMarkDependence(
-      value: currentValue, base: base, kind: .Unresolved)
-
-    // Address dependencies cannot be represented as SSA values, so it doesn not make sense to replace any uses of the
-    // dependent address. TODO: consider a separate mark_dependence_addr instruction since the semantics are different.
-    if !value.type.isAddress {
-      let uses = currentValue.uses.lazy.filter {
-        if $0.isScopeEndingUse {
-          return false
-        }
-        let inst = $0.instruction
-        return inst != markDep && inst != initializer && !(inst is Deallocation)
-      }
-      uses.replaceAll(with: markDep, context)
+    if value.type.isAddress {
+      // Address dependencies cannot be represented as SSA values, so it does not make sense to replace any uses of the
+      // dependent address.
+      _ = builder.createMarkDependenceAddr(value: currentValue, base: base, kind: .Unresolved)
+      continue
     }
+    let markDep = builder.createMarkDependence(value: currentValue, base: base, kind: .Unresolved)
+    let uses = currentValue.uses.lazy.filter {
+      if $0.isScopeEndingUse {
+        return false
+      }
+      let inst = $0.instruction
+      return inst != markDep && inst != initializer && !(inst is Deallocation)
+    }
+    uses.replaceAll(with: markDep, context)
     currentValue = markDep
   }
+}
+
+/// Walk up the value dependence chain to find the best-effort variable declaration. Used to find the source of a borrow
+/// dependence or to print the source variable in a diagnostic message.
+///
+/// Returns an array with at least one introducer value.
+///
+/// The walk stops at:
+/// - a variable declaration (begin_borrow [var_decl], move_value [var_decl])
+/// - a begin_access for a mutable variable access
+/// - the value or address "root" of the dependence chain
+func gatherVariableIntroducers(for value: Value, ignoreTrivialCopies: Bool, _ context: Context)
+  -> SingleInlineArray<Value>
+{
+  var introducers = SingleInlineArray<Value>()
+  var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value,
+                                                     ignoreTrivialCopies: ignoreTrivialCopies) {
+    introducers.push($0)
+    return .continueWalk
+  }
+  defer { useDefVisitor.deinitialize() }
+  _ = useDefVisitor.walkUp(newLifetime: value)
+  assert(!introducers.isEmpty, "missing variable introducer")
+  return introducers
+}
+
+// =============================================================================
+// VariableIntroducerUseDefWalker - upward walk
+// =============================================================================
+
+/// Walk up lifetime dependencies to the first value associated with a variable declaration.
+///
+/// To start walking:
+///     walkUp(newLifetime: Value) -> WalkResult
+///
+/// This utility finds the value or address associated with the lvalue (variable declaration) that is passed as the
+/// source of a lifetime dependent argument. If no lvalue is found, then it finds the "root" of the chain of temporary
+/// rvalues.
+///
+/// This "looks through" projections: a property that is either visible as a stored property or access via
+/// unsafe[Mutable]Address.
+///
+///     dependsOn(lvalue.field) // finds 'lvalue' when 'field' is a stored property
+///
+///     dependsOn(lvalue.computed) // finds the temporary value directly returned by a getter.
+///
+/// SILGen emits temporary copies that violate lifetime dependence semantics. This utility looks through such temporary
+/// copies, stopping at a value that introduces an immutable variable: move_value [var_decl] or begin_borrow [var_decl],
+/// or at an access of a mutable variable: begin_access [read] or begin_access [modify].
+///
+/// In this example, the dependence "root" is copied, borrowed, and forwarded before being used as the base operand of
+/// `mark_dependence`. The dependence "root" is the parent of the outer-most dependence scope.
+///
+///     %root = apply                  // lifetime dependence root
+///     %copy = copy_value %root
+///     %parent = begin_borrow %copy   // lifetime dependence parent value
+///     %base = struct_extract %parent // lifetime dependence base value
+///     %dependent = mark_dependence [nonescaping] %value on %base
+///
+/// VariableIntroducerUseDefWalker extends the ForwardingUseDefWalker to follow copies, moves, and
+/// borrows. ForwardingUseDefWalker treats these as forward-extended lifetime introducers. But they inherit a lifetime
+/// dependency from their operand because non-escapable values can be copied, moved, and borrowed. Nonetheless, all of
+/// their uses must remain within original dependence scope.
+///
+///   # owned lifetime dependence
+///   %parent = apply               // begin dependence scope -+
+///   ...                                                      |
+///   %1 = mark_dependence [nonescaping] %value on %parent     |
+///   ...                                                      |
+///   %2 = copy_value %1        -+                             |
+///   # forwarding instruction   |                             |
+///   %3 = struct $S (%2)        | forward-extended lifetime   |
+///                              |                             | OSSA Lifetime
+///   %4 = move_value %3        -+                             |
+///   ...                        | forward-extended lifetime   |
+///   %5 = begin_borrow %4       | -+                          |
+///   # dependent use of %1      |  | forward-extended lifetime|
+///   end_borrow %5              | -+                          |
+///   destroy_value %4          -+                             |
+///   ...                                                      |
+///   destroy_value %parent        // end dependence scope    -+
+///
+/// All of the dependent uses including `end_borrow %5` and `destroy_value %4` must be before the end of the dependence
+/// scope: `destroy_value %parent`. In this case, the dependence parent is an owned value, so the scope is simply the
+/// value's OSSA lifetime.
+struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, LifetimeDependenceUseDefAddressWalker {
+  let context: Context
+
+  // If the scoped value is trivial, then only the variable's lexical scope is relevant, and access scopes can be
+  // ignored.
+  let isTrivialScope: Bool
+
+  // This visited set is only really needed for instructions with
+  // multiple results, including phis.
+  private var visitedValues: ValueSet
+
+  // Call \p visit rather than calling this directly.
+  private let visitorClosure: (Value) -> WalkResult
+
+  init(_ context: Context, scopedValue: Value, ignoreTrivialCopies: Bool, _ visitor: @escaping (Value) -> WalkResult) {
+    self.context = context
+    if ignoreTrivialCopies {
+      self.isTrivialScope = scopedValue.type.isAddress
+        ? scopedValue.type.objectType.isTrivial(in: scopedValue.parentFunction)
+        : scopedValue.isTrivial(context)
+    } else {
+      self.isTrivialScope = false
+    }
+    self.visitedValues = ValueSet(context)
+    self.visitorClosure = visitor
+  }
+
+  mutating func deinitialize() {
+    visitedValues.deinitialize()
+  }
+ 
+  mutating func introducer(_ value: Value, _ owner: Value?) -> WalkResult {
+    if let addrToPtr = value as? AddressToPointerInst {
+      // AddressToPointer introduces the value dependence. To handle Builtin.addressOfBorrow, follow the address that
+      // the pointer is derived from.
+      return walkUp(address: addrToPtr.address)
+    }
+    return visitorClosure(value)
+  }
+
+  mutating func addressIntroducer(_ address: Value, access: AccessBaseAndScopes) -> WalkResult {
+    return visitorClosure(address)
+  }
+
+  mutating func needWalk(for value: Value, _ owner: Value?) -> Bool {
+    visitedValues.insert(value)
+  }
+
+  mutating func needWalk(for address: Value) -> Bool {
+    visitedValues.insert(address)
+  }
+
+  mutating func walkUp(newLifetime: Value) -> WalkResult {
+    if newLifetime.type.isAddress {
+      return walkUp(address: newLifetime)
+    }
+    let newOwner = newLifetime.ownership == .owned ? newLifetime : nil
+    return walkUp(value: newLifetime, newOwner)
+  }
+
+  /// Override to check for variable introducers: move_value, begin_value, before following
+  /// OwnershipTransitionInstruction.
+  mutating func walkUp(value: Value, _ owner: Value?) -> WalkResult {
+    if let inst = value.definingInstruction, VariableScopeInstruction(inst) != nil {
+      return visitorClosure(value)
+    }
+    return walkUpDefault(value: value, owner)
+  }
+
+  /// Override to check for on-stack variables before following an initializer.
+  mutating func walkUp(address: Value, access: AccessBaseAndScopes) -> WalkResult {
+    // Check for stack locations that correspond to an lvalue if there isn't any nested access scope.
+    if access.innermostAccess == nil {
+      if case let .stack(allocStack) = access.base {
+        if allocStack.varDecl != nil {
+          return addressIntroducer(allocStack, access: access)
+        }
+      }
+    }
+    return walkUpDefault(address: address, access: access)
+  }
+}
+
+let variableIntroducerTest = FunctionTest("variable_introducer") {
+    function, arguments, context in
+  let value = arguments.takeValue()
+  print("Variable introducers of: \(value)")
+  print(gatherVariableIntroducers(for: value, ignoreTrivialCopies: false, context))
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,23 +17,25 @@
 //===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
-#include "DerivedConformances.h"
+#include "DerivedConformance/DerivedConformance.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
+#include "TypeCheckEmbedded.h"
 #include "TypeCheckMacros.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
-#include "TypeChecker.h"
 #include "TypeCheckUnsafe.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessNotes.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
@@ -76,21 +78,6 @@
 using namespace swift;
 
 #define DEBUG_TYPE "TypeCheckDeclPrimary"
-
-static Type containsParameterizedProtocolType(Type inheritedTy) {
-  if (inheritedTy->is<ParameterizedProtocolType>()) {
-    return inheritedTy;
-  }
-
-  if (auto *compositionTy = inheritedTy->getAs<ProtocolCompositionType>()) {
-    for (auto memberTy : compositionTy->getMembers()) {
-      if (auto paramTy = containsParameterizedProtocolType(memberTy))
-        return paramTy;
-    }
-  }
-
-  return Type();
-}
 
 class CheckRepressions {
   llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> declUnion;
@@ -136,6 +123,39 @@ public:
                       ctx.getProtocol(*kp));
       return Type();
     }
+
+    if (rpk == RepressibleProtocolKind::Sendable) {
+      if (!ctx.LangOpts.hasFeature(Feature::TildeSendable)) {
+        diagnoseInvalid(repr, repr.getLoc(),
+                        diag::tilde_sendable_requires_feature_flag);
+        return Type();
+      }
+    }
+
+    if (auto *TD = dyn_cast<const TypeDecl *>(decl)) {
+      if (rpk == RepressibleProtocolKind::Sendable) {
+        auto *C = dyn_cast<ClassDecl>(TD);
+        if (C && C->isActor()) {
+          diagnoseInvalid(
+              repr, repr.getLoc(),
+              diag::conformance_repression_only_on_struct_class_enum,
+              ctx.getProtocol(*kp));
+          return Type();
+        }
+      }
+
+      if (!(isa<StructDecl>(TD) || isa<ClassDecl>(TD) || isa<EnumDecl>(TD))) {
+        diagnoseInvalid(repr, repr.getLoc(),
+                        diag::conformance_repression_only_on_struct_class_enum,
+                        ctx.getProtocol(*kp))
+            // Downgrade to a warning for `~BitwiseCopyable` because it was
+            // accepted in some incorrect positions before.
+            .warnUntilFutureLanguageModeIf(kp ==
+                                           KnownProtocolKind::BitwiseCopyable);
+        return Type();
+      }
+    }
+
     if (auto *extension = dyn_cast<const ExtensionDecl *>(decl)) {
       diagnoseInvalid(repr, extension,
                       diag::suppress_inferrable_protocol_extension,
@@ -199,7 +219,7 @@ static void checkInheritanceClause(
       }
     }
   } else {
-    typeDecl = declUnion.get<const TypeDecl *>();
+    typeDecl = cast<const TypeDecl *>(declUnion);
     decl = typeDecl;
   }
 
@@ -268,7 +288,7 @@ static void checkInheritanceClause(
           isa<ProtocolDecl>(decl) &&
           Lexer::getTokenAtLocation(ctx.SourceMgr, sourceRange.Start)
               .is(tok::kw_class);
-      if (ctx.LangOpts.isSwiftVersionAtLeast(5) && isWrittenAsClass) {
+      if (ctx.isLanguageModeAtLeast(5) && isWrittenAsClass) {
         diags
             .diagnose(sourceRange.Start,
                       diag::anyobject_class_inheritance_deprecated)
@@ -282,7 +302,7 @@ static void checkInheritanceClause(
         auto knownIndex = inheritedAnyObject->first;
         auto knownRange = inheritedAnyObject->second;
         SourceRange removeRange = inheritedTypes.getRemovalRange(knownIndex);
-        if (!ctx.LangOpts.isSwiftVersionAtLeast(5) &&
+        if (!ctx.isLanguageModeAtLeast(5) &&
             isa<ProtocolDecl>(decl) &&
             Lexer::getTokenAtLocation(ctx.SourceMgr, knownRange.Start)
               .is(tok::kw_class)) {
@@ -300,14 +320,6 @@ static void checkInheritanceClause(
 
       // Note that we saw inheritance from 'AnyObject'.
       inheritedAnyObject = { i, inherited.getSourceRange() };
-    }
-
-    if (auto paramTy = containsParameterizedProtocolType(inheritedTy)) {
-      if (!isa<ProtocolDecl>(decl)) {
-        decl->diagnose(diag::inheritance_from_parameterized_protocol,
-                       paramTy);
-      }
-      continue;
     }
 
     if (inheritedTy->isConstraintType()) {
@@ -461,13 +473,6 @@ static void installCodingKeysIfNecessary(NominalTypeDecl *NTD) {
   (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
 }
 
-// TODO(distributed): same ugly hack as Codable does...
-static void installDistributedActorIfNecessary(NominalTypeDecl *NTD) {
-  auto req =
-    ResolveImplicitMemberRequest{NTD, ImplicitMemberAction::ResolveDistributedActor};
-  (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
-}
-
 // Check for static properties that produce empty option sets
 // using a rawValue initializer with a value of '0'
 static void checkForEmptyOptionSet(const VarDecl *VD) {
@@ -559,6 +564,7 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     return;
 
   auto *decl = ownerCtx->getAsDecl();
+  auto &ctx = ownerCtx->getASTContext();
   bool hasPack = false;
 
   for (auto gp : *genericParams) {
@@ -566,10 +572,13 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     // is not enabled.
     if (gp->isParameterPack()) {
       // Variadic nominal types require runtime support.
-      if (isa<NominalTypeDecl>(decl)) {
+      //
+      // Embedded doesn't require runtime support for this feature.
+      if (isa<NominalTypeDecl>(decl) &&
+          !ctx.LangOpts.hasFeature(Feature::Embedded)) {
         TypeChecker::checkAvailability(
             gp->getSourceRange(),
-            ownerCtx->getASTContext().getVariadicGenericTypeAvailability(),
+            ctx.getVariadicGenericTypeAvailability(),
             diag::availability_variadic_type_only_version_newer,
             ownerCtx);
       }
@@ -583,12 +592,19 @@ static void checkGenericParams(GenericContext *ownerCtx) {
       hasPack = true;
     }
 
-    if (gp->isValue()) {
-      // Value generic nominal types require runtime support.
-      if (isa<NominalTypeDecl>(decl)) {
+    // Value generic nominal types require runtime support.
+    if (gp->isValue() && isa<NominalTypeDecl>(decl)) {
+      auto nomTypeDecl = cast<NominalTypeDecl>(decl);
+      // But: Embedded doesn't require runtime support for this feature.
+      // But: Stdlib/libswiftCore carries its own support,
+      //      so non-public stdlib declarations are safe
+      if (!ctx.LangOpts.hasFeature(Feature::Embedded) &&
+          !(decl->getModuleContext()->isStdlibModule() &&
+            !nomTypeDecl->isAccessibleFrom(nullptr))) {
+        // Everything else gets diagnosed for availability
         TypeChecker::checkAvailability(
           gp->getSourceRange(),
-          ownerCtx->getASTContext().getValueGenericTypeAvailability(),
+          ctx.getValueGenericTypeAvailability(),
           diag::availability_value_generic_type_only_version_newer,
           ownerCtx);
       }
@@ -598,7 +614,8 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     checkInheritanceClause(gp);
   }
 
-  // Force resolution of interface types written in requirements here.
+  // Force resolution of interface types written in requirements here to check
+  // that generic types satisfy generic requirements, and so on.
   WhereClauseOwner(ownerCtx)
       .visitRequirements(TypeResolutionStage::Interface,
                          [](Requirement, RequirementRepr *) { return false; });
@@ -610,15 +627,15 @@ static void checkGenericParams(GenericContext *ownerCtx) {
 /// Returns \c true if \p current and \p other are in the same source file
 /// \em and \c current appears before \p other in that file.
 static bool isBeforeInSameFile(Decl *current, Decl *other) {
-  if (current->getDeclContext()->getParentSourceFile() !=
-                  other->getDeclContext()->getParentSourceFile())
+  if (current->getDeclContext()->getOutermostParentSourceFile() !=
+                  other->getDeclContext()->getOutermostParentSourceFile())
     return false;
 
-  if (!current->getLoc().isValid())
+  if (current->getLoc().isInvalid() || other->getLoc().isInvalid())
     return false;
 
   return current->getASTContext().SourceMgr
-                        .isBeforeInBuffer(current->getLoc(), other->getLoc());
+                        .isBefore(current->getLoc(), other->getLoc());
 }
 
 template <typename T>
@@ -720,6 +737,20 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       auto found = nominal->lookupDirect(current->getBaseName(), SourceLoc(),
                                          flags);
       otherDefinitions.append(found.begin(), found.end());
+
+      // Look into the generics of the type. Value generic parameters can appear
+      // as static members of the type.
+      if (auto genericDC = static_cast<Decl *>(nominal)->getAsGenericContext()) {
+        auto gpList = genericDC->getGenericParams();
+
+        if (gpList && !current->getBaseName().isSpecial()) {
+          auto gp = gpList->lookUpGenericParam(current->getBaseIdentifier());
+
+          if (gp && gp->isValue()) {
+            otherDefinitions.push_back(gp);
+          }
+        }
+      }
     }
   } else if (currentDC->isLocalContext()) {
     if (!current->isImplicit()) {
@@ -732,7 +763,8 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       else
         roleFilter = currentIsABIOnly ? ABIRole::ProvidesABI
                                       : ABIRole::ProvidesAPI;
-      ASTScope::lookupLocalDecls(currentFile, current->getBaseName(),
+      ASTScope::lookupLocalDecls(currentFile,
+                                 DeclNameRef(current->getBaseName()),
                                  current->getLoc(),
                                  /*stopAfterInnermostBraceStmt=*/true,
                                  roleFilter, otherDefinitions);
@@ -848,65 +880,37 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
           continue;
       }
 
-      // Signatures are the same, but interface types are not. We must
-      // have a type that we've massaged as part of signature
-      // interface type generation.
-      if (current->getInterfaceType()->isEqual(other->getInterfaceType())) {
-        if (currentDC->isTypeContext() == other->getDeclContext()->isTypeContext()) {
-          auto currFnTy = current->getInterfaceType()->getAs<AnyFunctionType>();
-          auto otherFnTy = other->getInterfaceType()->getAs<AnyFunctionType>();
-          if (currFnTy && otherFnTy && currentDC->isTypeContext()) {
-            currFnTy = currFnTy->getResult()->getAs<AnyFunctionType>();
-            otherFnTy = otherFnTy->getResult()->getAs<AnyFunctionType>();
-          }
-          
-          if (currFnTy && otherFnTy) {
-            ArrayRef<AnyFunctionType::Param> currParams = currFnTy->getParams();
-            ArrayRef<AnyFunctionType::Param> otherParams = otherFnTy->getParams();
-            
-            if (currParams.size() == otherParams.size()) {
-              auto diagnosed = false;
-              for (unsigned i : indices(currParams)) {
-                  
-                bool currIsIUO = false;
-                bool otherIsIUO = false;
-                bool optionalRedecl = false;
-                
-                if (currParams[i].getPlainType()->getOptionalObjectType()) {
-                  optionalRedecl = true;
-                  auto *param = swift::getParameterAt(current, i);
-                  assert(param);
-                  if (param->isImplicitlyUnwrappedOptional())
-                    currIsIUO = true;
-                }
-                
-                if (otherParams[i].getPlainType()->getOptionalObjectType()) {
-                  auto *param = swift::getParameterAt(other, i);
-                  assert(param);
-                  if (param->isImplicitlyUnwrappedOptional())
-                    otherIsIUO = true;
-                }
-                else {
-                  optionalRedecl = false;
-                }
-                
-                if (optionalRedecl && currIsIUO != otherIsIUO) {
-                  ctx.Diags.diagnoseWithNotes(
-                    current->diagnose(diag::invalid_redecl, current), [&]() {
-                    other->diagnose(diag::invalid_redecl_prev, other);
-                  });
-                  current->diagnose(diag::invalid_redecl_by_optionality_note,
-                                    otherIsIUO, currIsIUO);
-                  
-                  current->setInvalid();
-                  diagnosed = true;
-                  break;
-                }
-              }
+      // Emit a custom diagnostic if the interface types match but one of the
+      // parameters differ in IUO-ness.
+      if (current->getInterfaceType()->isEqual(other->getInterfaceType()) &&
+          currentDC->isTypeContext() == otherDC->isTypeContext()) {
+        auto currParams = current->getParameterList();
+        auto otherParams = other->getParameterList();
 
-              if (diagnosed)
-                break;
+        if (currParams && otherParams &&
+            currParams->size() == otherParams->size()) {
+          for (unsigned i : indices(*currParams)) {
+            auto *currParam = currParams->get(i);
+            auto *otherParam = otherParams->get(i);
+
+            if (!currParam->getInterfaceType()->isOptional() ||
+                !otherParam->getInterfaceType()->isOptional()) {
+              continue;
             }
+
+            auto currIsIUO = currParam->isImplicitlyUnwrappedOptional();
+            auto otherIsIUO = otherParam->isImplicitlyUnwrappedOptional();
+            if (currIsIUO == otherIsIUO)
+              continue;
+
+            ctx.Diags.diagnoseWithNotes(
+                current->diagnose(diag::invalid_redecl, current),
+                [&]() { other->diagnose(diag::invalid_redecl_prev, other); });
+            current->diagnose(diag::invalid_redecl_by_optionality_note,
+                              otherIsIUO, currIsIUO);
+
+            current->setInvalid();
+            return std::make_tuple();
           }
         }
       }
@@ -955,11 +959,11 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
         public:
           static AvailabilityRange from(const ValueDecl *VD) {
             AvailabilityRange result;
-            for (auto semanticAttr : VD->getSemanticAvailableAttrs()) {
-              if (semanticAttr.isSwiftLanguageModeSpecific()) {
-                if (auto introduced = semanticAttr.getParsedAttr()->Introduced)
+            for (auto attr : VD->getSemanticAvailableAttrs()) {
+              if (attr.isSwiftLanguageModeSpecific()) {
+                if (auto introduced = attr.getIntroduced())
                   result.introduced = introduced;
-                if (auto obsoleted = semanticAttr.getParsedAttr()->Obsoleted)
+                if (auto obsoleted = attr.getObsoleted())
                   result.obsoleted = obsoleted;
               }
             }
@@ -1021,7 +1025,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
           // productive diagnostic.
           if (!other->getOverriddenDecl())
             current->diagnose(diag::invalid_redecl_init, current,
-                              otherInit->isMemberwiseInitializer());
+                              otherInit->isMemberwiseInitializer().has_value());
         } else if (current->isImplicit() || other->isImplicit()) {
           // If both declarations are implicit, we do not diagnose anything
           // as it would lead to misleading diagnostics and it's likely that
@@ -1073,9 +1077,15 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
                     return req->getName() == VD->getName();
                   });
             }
-            declToDiagnose->diagnose(diag::invalid_redecl_implicit,
-                                     current->getDescriptiveKind(),
-                                     isProtocolRequirement, other);
+            auto *conflictDecl = current == declToDiagnose ? other : current;
+            if (conflictDecl->isSpecialDistributedActorProperty()) {
+              declToDiagnose->diagnose(
+                  diag::distributed_actor_user_defined_special_property,
+                  other->getName());
+            } else {
+              declToDiagnose->diagnose(diag::invalid_redecl_implicit, current,
+                                       isProtocolRequirement, other);
+            }
 
             // Emit a specialized note if the one of the declarations is
             // the backing storage property ('_foo') or projected value
@@ -1128,6 +1138,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       break;
     }
   }
+
   return std::make_tuple<>();
 }
 
@@ -1144,8 +1155,7 @@ static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
   assert(PD->getDefaultArgumentKind() == DefaultArgumentKind::Inherited);
 
   auto *DC = PD->getInnermostDeclContext();
-  const SourceFile *SF = DC->getParentSourceFile();
-  assert((SF && SF->Kind == SourceFileKind::Interface || PD->isImplicit()) &&
+  assert((DC->isInSwiftinterface() || PD->isImplicit()) &&
          "explicit inherited default argument outside of a module interface?");
 
   // The containing decl should be a designated initializer.
@@ -1194,73 +1204,18 @@ static bool checkExpressionMacroDefaultValueRestrictions(ParamDecl *param) {
 #endif
 }
 
-void TypeChecker::notePlaceholderReplacementTypes(Type writtenType,
-                                                  Type inferredType) {
-  assert(writtenType && inferredType &&
-         "Must provide both written and inferred types");
-  assert(writtenType->hasPlaceholder() && "Written type has no placeholder?");
-
-  class PlaceholderNotator
-      : public CanTypeDifferenceVisitor<PlaceholderNotator> {
-  public:
-    bool visitDifferentComponentTypes(CanType t1, CanType t2) {
-      // Never replace anything the user wrote with an error type.
-      if (t2->hasError() || t2->hasUnresolvedType()) {
-        return false;
-      }
-
-      auto *placeholder = t1->getAs<PlaceholderType>();
-      if (!placeholder) {
-        return false;
-      }
-
-      if (auto *origRepr =
-              placeholder->getOriginator().dyn_cast<TypeRepr *>()) {
-        assert(isa<PlaceholderTypeRepr>(origRepr));
-        t1->getASTContext()
-            .Diags
-            .diagnose(origRepr->getLoc(),
-                      diag::replace_placeholder_with_inferred_type, t2)
-            .fixItReplace(origRepr->getSourceRange(), t2.getString());
-      }
-      return false;
-    }
-
-    bool check(Type t1, Type t2) {
-      return !visit(t1->getCanonicalType(), t2->getCanonicalType());
-    };
-  };
-
-  PlaceholderNotator().check(writtenType, inferredType);
-}
-
 /// Check the default arguments that occur within this parameter list.
 static void checkDefaultArguments(ParameterList *params) {
   // Force the default values in case they produce diagnostics.
   for (auto *param : *params) {
-    auto ifacety = param->getInterfaceType();
-    auto *expr = param->getTypeCheckedDefaultExpr();
+    (void)param->getTypeCheckedDefaultExpr();
 
     // Force captures since this can emit diagnostics.
-    (void) param->getDefaultArgumentCaptureInfo();
+    (void)param->getDefaultArgumentCaptureInfo();
 
     // If the default argument has isolation, it must match the
     // isolation of the decl context.
     (void)param->getInitializerIsolation();
-
-    if (!ifacety->hasPlaceholder()) {
-      continue;
-    }
-
-    // Placeholder types are banned for all parameter decls. We try to use the
-    // freshly-checked default expression's contextual type to suggest a
-    // reasonable type to insert.
-    param->diagnose(diag::placeholder_type_not_allowed_in_parameter)
-        .highlight(param->getSourceRange());
-    if (expr && !expr->getType()->hasError()) {
-      TypeChecker::notePlaceholderReplacementTypes(
-          ifacety, expr->getType()->mapTypeOutOfContext());
-    }
   }
 }
 
@@ -1339,7 +1294,7 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
 
   // Walk the checked initializer and contextualize any closures
   // we saw there.
-  TypeChecker::contextualizeInitializer(dc, initExpr);
+  TypeChecker::contextualizeExpr(initExpr, dc);
   TypeChecker::checkInitializerEffects(dc, initExpr);
 
   return initExpr;
@@ -1354,17 +1309,16 @@ Type DefaultArgumentTypeRequest::evaluate(Evaluator &evaluator,
   return Type();
 }
 
-Initializer *
+DefaultArgumentInitializer *
 DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
                                             ParamDecl *param) const {
-  auto &ctx = param->getASTContext();
   auto *parentDC = param->getDeclContext();
-  auto *paramList = getParameterList(cast<ValueDecl>(parentDC->getAsDecl()));
+  auto *paramList = cast<ValueDecl>(parentDC->getAsDecl())->getParameterList();
 
   // In order to compute the initializer context for this parameter, we need to
   // know its index in the parameter list. Therefore iterate over the parameters
   // looking for it and fill in the other parameter's contexts while we're here.
-  Initializer *result = nullptr;
+  DefaultArgumentInitializer *result = nullptr;
   for (auto idx : indices(*paramList)) {
     auto *otherParam = paramList->get(idx);
 
@@ -1379,7 +1333,7 @@ DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
     // Create a new initializer context. If this is for the parameter that
     // kicked off the request, make a note of it for when we return. Otherwise
     // cache the result ourselves.
-    auto *initDC = new (ctx) DefaultArgumentInitializer(parentDC, idx);
+    auto *initDC = DefaultArgumentInitializer::create(parentDC, idx);
     if (param == otherParam) {
       result = initDC;
     } else {
@@ -1780,6 +1734,38 @@ static TypeRepr *unwrapAttributedRepr(TypeRepr *repr) {
   return repr;
 }
 
+struct ProtocolAndRetroactiveStatus {
+  ProtocolDecl *proto = nullptr;
+  bool isMarkedRetroactive = false;
+};
+
+static void collectProtocolsFromInheritedEntry(
+    const InheritedEntry &entry, Type inheritedTy,
+    SmallVectorImpl<ProtocolAndRetroactiveStatus> &protos) {
+
+  bool isMarkedRetroactive = entry.isRetroactive();
+
+  if (auto *protoTy = inheritedTy->getAs<ProtocolType>()) {
+    auto *proto = protoTy->getDecl();
+
+    // As a fallback, to support previous language versions, also allow
+    // this through if the protocol has been explicitly module-qualified.
+    TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
+    if (isModuleQualified(repr, proto->getParentModule()))
+      isMarkedRetroactive = true;
+
+    protos.push_back({proto, isMarkedRetroactive});
+  } else if (auto *pct = inheritedTy->getAs<ProtocolCompositionType>()) {
+    for (auto member : pct->getMembers()) {
+      // FIXME: Check for module qualification on each composed protocol.
+      collectProtocolsFromInheritedEntry(entry, member, protos);
+    }
+  } else if (auto *ppt = inheritedTy->getAs<ParameterizedProtocolType>()) {
+    // FIXME: Check for module qualification.
+    protos.push_back({ppt->getProtocol(), isMarkedRetroactive});
+  }
+}
+
 /// Determines if this extension declares a conformance of a type declared
 /// outside this module to a protocol declared outside this module (but only
 /// in library evolution mode)
@@ -1799,110 +1785,105 @@ static void diagnoseRetroactiveConformances(
   }
 
   // Don't warn for this if we see it in module interfaces.
-  if (ext->getParentSourceFile()->Kind == SourceFileKind::Interface) {
+  if (ext->getDeclContext()->isInSwiftinterface()) {
     return;
   }
 
-  Type extendedType = ext->getExtendedType();
   NominalTypeDecl *extendedNominalDecl = ext->getExtendedNominal();
-  if (!extendedNominalDecl) {
+  if (!extendedNominalDecl || isa<BuiltinTupleDecl>(extendedNominalDecl))
     return;
-  }
 
   ModuleDecl *extTypeModule = extendedNominalDecl->getParentModule();
 
   // If the type comes from the __ObjC clang header module, don't warn.
-  if (extTypeModule->getName().is(CLANG_HEADER_MODULE_NAME)) {
+  if (extTypeModule->getName().is(CLANG_HEADER_MODULE_NAME))
     return;
-  }
 
   // At this point, we know we're extending a type declared outside this module.
   // We better only be conforming it to protocols declared within this module.
-  llvm::SmallSetVector<ProtocolDecl *, 8> externalProtocols;
-  llvm::SmallSet<ProtocolDecl *, 8> protocolsWithRetroactiveAttr;
+  llvm::SmallMapVector<ProtocolDecl *, bool, 8> protocols;
+  llvm::SmallPtrSet<ProtocolDecl *, 2> protocolsWithRetroactiveAttr;
+
+  for (auto *conformance : ext->getLocalConformances()) {
+    auto *proto = conformance->getProtocol();
+    bool inserted = protocols.insert(std::make_pair(
+        proto, conformance->isRetroactive())).second;
+    ASSERT(inserted);
+
+    if (proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype)) {
+      protocolsWithRetroactiveAttr.insert(proto);
+    }
+
+    // Implied conformance to Sendable is a special case that should not be
+    // diagnosed. Pretend it's always @retroactive.
+    if (conformance->getSourceKind() == ConformanceEntryKind::Implied &&
+        proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+        extendedNominalDecl->hasClangNode()) {
+      protocolsWithRetroactiveAttr.insert(proto);
+    }
+  }
+
   for (const InheritedEntry &entry : ext->getInherited().getEntries()) {
-    if (entry.getType().isNull() || !entry.getTypeRepr()) {
+    auto inheritedTy = entry.getType();
+    if (inheritedTy.isNull() || !entry.getTypeRepr()) {
       continue;
     }
 
-    auto proto =
-        dyn_cast_or_null<ProtocolDecl>(entry.getType()->getAnyNominal());
-    if (!proto) {  
-      continue;
-    }
-    
-    // As a fallback, to support previous language versions, also allow
-    // this through if the protocol has been explicitly module-qualified.
-    TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
-    if (isModuleQualified(repr, proto->getParentModule())) {
-      continue;
-    }
+    SmallVector<ProtocolAndRetroactiveStatus, 2> protosAndStatuses;
+    collectProtocolsFromInheritedEntry(entry, inheritedTy, protosAndStatuses);
 
-    proto->walkInheritedProtocols([&](ProtocolDecl *decl) {
+    for (auto protoAndStatus : protosAndStatuses) {
+      auto proto = protoAndStatus.proto;
 
-      // Get the original conformance of the extended type to this protocol.
-      auto conformanceRef = lookupConformance(extendedType, decl);
-      if (!conformanceRef.isConcrete()) {
-        return TypeWalker::Action::Continue;
-      }
-      auto conformance = conformanceRef.getConcrete();
+      proto->walkInheritedProtocols([&](ProtocolDecl *decl) {
+        // If this isn't a retroactive conformance, skip it.
+        auto found = protocols.find(proto);
+        if (found != protocols.end() && !found->second) {
+          // However, if this is the protocol in the inherited type entry,
+          // check to make sure it's not erroneously marked @retroactive when it's
+          // not actually retroactive.
+          if (decl == proto && entry.isRetroactive()) {
+            auto loc =
+                entry.getTypeRepr()->findAttrLoc(TypeAttrKind::Retroactive);
 
-      // If that conformance came from this extension, then we warn. Otherwise
-      // we will have diagnosed it on the extension that actually declares this
-      // specific conformance.
-      if (conformance->getDeclContext() != ext) {
-        return TypeWalker::Action::Continue;
-      }
+            bool typeInSamePackage = extTypeModule->inSamePackage(module);
+            bool typeIsSameModule =
+                extTypeModule->isSameModuleLookingThroughOverlays(module);
 
-      // If this isn't a retroactive conformance, skip it.
-      if (!conformance->isRetroactive()) {
-        // However, if this is the protocol in the inherited type entry,
-        // check to make sure it's not erroneously marked @retroactive when it's
-        // not actually retroactive.
-        if (decl == proto && entry.isRetroactive()) {
-          auto loc =
-              entry.getTypeRepr()->findAttrLoc(TypeAttrKind::Retroactive);
+            auto declForDiag = (typeIsSameModule || typeInSamePackage)
+                                   ? extendedNominalDecl
+                                   : proto;
+            bool isSameModule = declForDiag->getParentModule()
+                                    ->isSameModuleLookingThroughOverlays(module);
 
-          bool typeInSamePackage = extTypeModule->inSamePackage(module);
-          bool typeIsSameModule =
-              extTypeModule->isSameModuleLookingThroughOverlays(module);
-
-          auto declForDiag = (typeIsSameModule || typeInSamePackage)
-                                 ? extendedNominalDecl
-                                 : proto;
-          bool isSameModule = declForDiag->getParentModule()
-                                  ->isSameModuleLookingThroughOverlays(module);
-
-          diags
-              .diagnose(loc, diag::retroactive_attr_does_not_apply, declForDiag,
-                        isSameModule)
-              .warnUntilSwiftVersion(6)
-              .fixItRemove(SourceRange(loc, loc.getAdvancedLoc(1)));
-          return TypeWalker::Action::Stop;
+            diags
+                .diagnose(loc, diag::retroactive_attr_does_not_apply, declForDiag,
+                          isSameModule)
+                .warnUntilLanguageMode(6)
+                .fixItRemove(SourceRange(loc, loc.getAdvancedLoc(1)));
+            return TypeWalker::Action::Stop;
+          }
+          return TypeWalker::Action::Continue;
         }
+
+        if (protoAndStatus.isMarkedRetroactive) {
+          // Note that we encountered this protocol through a conformance marked
+          // @retroactive in case multiple clauses cause the protocol to be
+          // inherited.
+          protocolsWithRetroactiveAttr.insert(decl);
+          return TypeWalker::Action::Continue;
+        }
+
         return TypeWalker::Action::Continue;
-      }
-
-      // If it's marked @retroactive, no need to warn.
-      if (entry.isRetroactive()) {
-        // Note that we encountered this protocol through a conformance marked
-        // @retroactive in case multiple clauses cause the protocol to be
-        // inherited.
-        protocolsWithRetroactiveAttr.insert(decl);
-        return TypeWalker::Action::Continue;
-      }
-
-      // If we've come this far, we know this extension is the first declaration
-      // of the conformance of the extended type to this protocol.
-      externalProtocols.insert(decl);
-
-      return TypeWalker::Action::Continue;
-    });
+      });
+    }
   }
 
   // Remove protocols that are reachable through a @retroactive conformance.
-  for (auto *proto : protocolsWithRetroactiveAttr) {
-    externalProtocols.remove(proto);
+  SmallSetVector<ProtocolDecl *, 4> externalProtocols;
+  for (auto pair : protocols) {
+    if (pair.second && !protocolsWithRetroactiveAttr.count(pair.first))
+      externalProtocols.insert(pair.first);
   }
 
   // If we didn't find any violations, we're done.
@@ -1984,195 +1965,6 @@ void TypeChecker::diagnoseDuplicateCaptureVars(CaptureListExpr *expr) {
   diagnoseDuplicateDecls(captureListVars);
 }
 
-static StringRef prettyPrintAttrs(const ValueDecl *VD,
-                                  ArrayRef<const DeclAttribute *> attrs,
-                                  SmallVectorImpl<char> &out) {
-  llvm::raw_svector_ostream os(out);
-  StreamPrinter printer(os);
-
-  PrintOptions opts = PrintOptions::printDeclarations();
-  VD->getAttrs().print(printer, opts, attrs, VD);
-  return StringRef(out.begin(), out.size()).drop_back();
-}
-
-static void diagnoseChangesByAccessNote(
-    ValueDecl *VD,
-    ArrayRef<const DeclAttribute *> attrs,
-    Diag<StringRef, StringRef, DescriptiveDeclKind> diagID,
-    Diag<StringRef> fixItID,
-    llvm::function_ref<void(InFlightDiagnostic, StringRef)> addFixIts) {
-  if (!VD->getASTContext().LangOpts.shouldRemarkOnAccessNoteSuccess() ||
-      attrs.empty())
-    return;
-
-  // Generate string containing all attributes.
-  SmallString<64> attrString;
-  auto attrText = prettyPrintAttrs(VD, attrs, attrString);
-
-  SourceLoc fixItLoc;
-
-  auto reason = VD->getModuleContext()->getAccessNotes().Reason;
-  auto diag = VD->diagnose(diagID, reason, attrText, VD->getDescriptiveKind());
-  for (auto attr : attrs) {
-    diag.highlight(attr->getRangeWithAt());
-    if (fixItLoc.isInvalid())
-      fixItLoc = attr->getRangeWithAt().Start;
-  }
-  diag.flush();
-
-  if (!fixItLoc)
-    fixItLoc = VD->getAttributeInsertionLoc(true);
-
-  addFixIts(VD->getASTContext().Diags.diagnose(fixItLoc, fixItID, attrText),
-            attrString);
-}
-
-template <typename Attr>
-static void addOrRemoveAttr(ValueDecl *VD, const AccessNotesFile &notes,
-                            std::optional<bool> expected,
-                            SmallVectorImpl<DeclAttribute *> &removedAttrs,
-                            llvm::function_ref<Attr *()> willCreate) {
-  if (!expected) return;
-
-  auto attr = VD->getAttrs().getAttribute<Attr>();
-  if (*expected == (attr != nullptr)) return;
-
-  if (*expected) {
-    attr = willCreate();
-    attr->setAddedByAccessNote();
-    VD->getAttrs().add(attr);
-
-    // Arrange for us to emit a remark about this attribute after type checking
-    // has ensured it's valid.
-    if (auto SF = VD->getDeclContext()->getParentSourceFile())
-      SF->AttrsAddedByAccessNotes[VD].push_back(attr);
-  } else {
-    removedAttrs.push_back(attr);
-    VD->getAttrs().removeAttribute(attr);
-  }
-}
-
-InFlightDiagnostic
-swift::softenIfAccessNote(const Decl *D, const DeclAttribute *attr,
-                          InFlightDiagnostic &diag) {
-  const ValueDecl *VD = dyn_cast<ValueDecl>(D);
-  if (!VD || !attr || !attr->getAddedByAccessNote())
-    return std::move(diag);
-
-  SmallString<32> attrString;
-  auto attrText = prettyPrintAttrs(VD, llvm::ArrayRef(attr), attrString);
-
-  ASTContext &ctx = D->getASTContext();
-  auto behavior = ctx.LangOpts.getAccessNoteFailureLimit();
-  return std::move(diag.wrapIn(diag::wrap_invalid_attr_added_by_access_note,
-                               D->getModuleContext()->getAccessNotes().Reason,
-                               ctx.AllocateCopy(attrText), D->getDescriptiveKind())
-                        .limitBehavior(behavior));
-}
-
-static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
-                            const AccessNotesFile &notes) {
-  ASTContext &ctx = VD->getASTContext();
-  SmallVector<DeclAttribute *, 2> removedAttrs;
-
-  addOrRemoveAttr<ObjCAttr>(VD, notes, note.ObjC, removedAttrs, [&]{
-    return ObjCAttr::create(ctx, note.ObjCName, false);
-  });
-
-  addOrRemoveAttr<DynamicAttr>(VD, notes, note.Dynamic, removedAttrs, [&]{
-    return new (ctx) DynamicAttr(true);
-  });
-
-  // FIXME: If we ever have more attributes, we'll need to sort removedAttrs by
-  // SourceLoc. As it is, attrs are always before modifiers, so we're okay now.
-
-  diagnoseChangesByAccessNote(VD, removedAttrs,
-                              diag::attr_removed_by_access_note,
-                              diag::fixit_attr_removed_by_access_note,
-                              [&](InFlightDiagnostic diag, StringRef code) {
-    for (auto attr : llvm::reverse(removedAttrs))
-      diag.fixItRemove(attr->getRangeWithAt());
-  });
-
-  if (note.ObjCName) {
-    auto newName = note.ObjCName.value();
-
-    // addOrRemoveAttr above guarantees there's an ObjCAttr on this decl.
-    auto attr = VD->getAttrs().getAttribute<ObjCAttr>();
-    assert(attr && "ObjCName set, but ObjCAttr not true or did not apply???");
-
-    if (!attr->hasName()) {
-      // There was already an @objc attribute with no selector. Set it.
-      attr->setName(newName, true);
-
-      if (!ctx.LangOpts.shouldRemarkOnAccessNoteSuccess())
-        return;
-
-      VD->diagnose(diag::attr_objc_name_changed_by_access_note,
-                   notes.Reason, VD->getDescriptiveKind(), newName);
-
-      auto fixIt =
-          VD->diagnose(diag::fixit_attr_objc_name_changed_by_access_note);
-      fixDeclarationObjCName(fixIt, VD, ObjCSelector(), newName);
-    }
-    else if (attr->getName() != newName) {
-      // There was already an @objc
-      auto behavior = ctx.LangOpts.getAccessNoteFailureLimit();
-
-      VD->diagnose(diag::attr_objc_name_conflicts_with_access_note,
-                   notes.Reason, VD->getDescriptiveKind(),
-                   attr->getName().value(), newName)
-          .highlight(attr->getRangeWithAt())
-          .limitBehavior(behavior);
-    }
-  }
-}
-
-void TypeChecker::applyAccessNote(ValueDecl *VD) {
-  (void)evaluateOrDefault(VD->getASTContext().evaluator,
-                          ApplyAccessNoteRequest{VD}, {});
-}
-
-void swift::diagnoseAttrsAddedByAccessNote(SourceFile &SF) {
-  if (!SF.getASTContext().LangOpts.shouldRemarkOnAccessNoteSuccess())
-    return;
-
-  for (auto declAndAttrs : SF.AttrsAddedByAccessNotes) {
-    auto D = declAndAttrs.getFirst();
-    SmallVector<DeclAttribute *, 4> sortedAttrs;
-    llvm::append_range(sortedAttrs, declAndAttrs.getSecond());
-
-    // Filter out invalid attributes.
-    sortedAttrs.erase(
-      llvm::remove_if(sortedAttrs, [](DeclAttribute *attr) {
-        assert(attr->getAddedByAccessNote());
-        return attr->isInvalid();
-      }), sortedAttrs.end());
-    if (sortedAttrs.empty()) continue;
-
-    // Sort attributes by name.
-    llvm::sort(sortedAttrs, [](DeclAttribute * first, DeclAttribute * second) {
-      return first->getAttrName() < second->getAttrName();
-    });
-    sortedAttrs.erase(std::unique(sortedAttrs.begin(), sortedAttrs.end()),
-                      sortedAttrs.end());
-
-    diagnoseChangesByAccessNote(D, sortedAttrs, diag::attr_added_by_access_note,
-                                diag::fixit_attr_added_by_access_note,
-                                [=](InFlightDiagnostic diag, StringRef code) {
-      diag.fixItInsert(D->getAttributeInsertionLoc(/*isModifier=*/true), code);
-    });
-  }
-}
-
-evaluator::SideEffect
-ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
-  AccessNotesFile &notes = VD->getModuleContext()->getAccessNotes();
-  if (auto note = notes.lookup(VD))
-    applyAccessNote(VD, *note.get(), notes);
-  return {};
-}
-
 static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
                                             const Pattern *P,
                                             Expr *init) {
@@ -2188,7 +1980,7 @@ static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
                        diag::placeholder_type_not_allowed_in_pattern)
         .highlight(P->getSourceRange());
     if (init && !init->getType()->hasError()) {
-      auto initTy = init->getType()->mapTypeOutOfContext();
+      auto initTy = init->getType()->mapTypeOutOfEnvironment();
       Ctx.Diags
           .diagnose(PTR->getLoc(),
                     diag::replace_placeholder_with_inferred_type, initTy)
@@ -2223,23 +2015,26 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
     return;
 
   // If we make a ~P marking but our protocol Self type still conforms to P,
-  // diagnose an error.
+  // diagnose an error. Same goes for associated types like Self.A.
   //
-  // FIXME: This duplicates logic from computeRequirementDiagnostics().
-  // Get the list of written inverses.
-  InvertibleProtocolSet inverses;
-  bool anyObject = false;
-  (void) getDirectlyInheritedNominalTypeDecls(proto, inverses, anyObject);
-
-  for (auto ip : inverses) {
-    auto kp = getKnownProtocolKind(ip);
-    auto *otherProto = ctx.getProtocol(kp);
-    if (!genericSig->requiresProtocol(selfTy, otherProto))
+  // NOTE: This duplicates logic from computeRequirementDiagnostics().
+  for (auto ir : proto->getInverseRequirements()) {
+    if (!genericSig->requiresProtocol(ir.subject, ir.protocol))
       continue;
 
-    ctx.Diags.diagnose(proto,
-                       diag::inverse_generic_but_also_conforms,
-                       selfTy, getProtocolName(kp));
+    // We didn't diagnose this as an error for associated types prior to
+    // SuppressedAssociatedTypesWithDefaults.
+    //
+    // FIXME: Once feature is enabled always, this exception should be lifted!
+    if (ir.subject->getAs<DependentMemberType>() &&
+        !ctx.LangOpts.hasFeature(
+            Feature::SuppressedAssociatedTypesWithDefaults)) {
+      continue;
+    }
+
+    auto name = getProtocolName(ir.protocol->getKnownProtocolKind().value());
+    ctx.Diags.diagnose(ir.loc, diag::inverse_generic_but_also_conforms,
+                       ir.subject, name);
   }
 
   auto requiredProtos = genericSig->getRequiredProtocols(selfTy);
@@ -2279,7 +2074,7 @@ static void dumpGenericSignature(ASTContext &ctx, GenericContext *GC) {
         GC->printContext(llvm::errs());
       }
       llvm::errs() << "Generic signature: ";
-      PrintOptions Opts;
+      PrintOptions Opts = PrintOptions::forDebugging();
       Opts.ProtocolQualifiedDependentMemberTypes = true;
       Opts.PrintInverseRequirements =
           !ctx.TypeCheckerOpts.DebugInverseRequirements;
@@ -2357,10 +2152,12 @@ public:
       (void) VD->isObjC();
       (void) VD->isDynamic();
 
-      // Check for actor isolation of top-level and local declarations.
+      // Check for actor isolation of top-level and local declarations, and
+      // protocol requirements.g
       // Declarations inside types are handled in checkConformancesInContext()
       // to avoid cycles involving associated type inference.
-      if (!VD->getDeclContext()->isTypeContext())
+      if (!VD->getDeclContext()->isTypeContext() ||
+          isa<ProtocolDecl>(VD->getDeclContext()))
         (void) getActorIsolation(VD);
 
       // If this is a member of a nominal type, don't allow it to have a name of
@@ -2380,28 +2177,22 @@ public:
                           "`" + VD->getBaseName().userFacingName().str() + "`");
       }
 
-      // Expand extension macros.
       if (auto *nominal = dyn_cast<NominalTypeDecl>(VD)) {
+        // Expand extension macros.
         (void)evaluateOrDefault(
             Ctx.evaluator,
             ExpandExtensionMacros{nominal},
             { });
+
+        // If strict memory safety checking is enabled, check the storage
+        // of the nominal type.
+        if (Ctx.LangOpts.hasFeature(
+                Feature::StrictMemorySafety, /*allowMigration=*/true) &&
+            !isa<ProtocolDecl>(nominal)) {
+          checkUnsafeStorage(nominal);
+        }
       }
     }
-
-    // Diagnose any uses of unsafe constructs within this declaration.
-    if (!hasUnsafeCheckingOutsideOfPrimary(decl))
-      diagnoseUnsafeUsesIn(decl);
-  }
-
-  /// Determine whether @unsafe checking for this declaration occurs outside
-  /// of "primary" declaration checking, e.g., with the request that
-  /// type-checks a function body.
-  static bool hasUnsafeCheckingOutsideOfPrimary(const Decl *decl) {
-    if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-      return func->hasBody();
-
-    return false;
   }
 
   //===--------------------------------------------------------------------===//
@@ -2469,10 +2260,14 @@ public:
     // concurrency checking enabled.
     if (ID->preconcurrency() &&
         Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
-        Ctx.LangOpts.hasFeature(Feature::WarnUnsafe) && !
-        ID->getAttrs().hasAttribute<SafeAttr>()) {
+        Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety) &&
+        ID->getExplicitSafety() != ExplicitSafety::Unsafe) {
       diagnoseUnsafeUse(UnsafeUse::forPreconcurrencyImport(ID));
     }
+  }
+
+  void visitUsingDecl(UsingDecl *UD) {
+    // Nothing to validate yet.
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
@@ -2564,9 +2359,8 @@ public:
           // This allows the compiler to process existing .swiftinterface
           // files that contain this issue.
           if (resultType->isVoid()) {
-            if (auto sourceFile = MD->getParentSourceFile())
-              if (sourceFile->Kind == SourceFileKind::Interface)
-                diag.limitBehavior(DiagnosticBehavior::Warning);
+            if (MD->getDeclContext()->isInSwiftinterface())
+              diag.limitBehavior(DiagnosticBehavior::Warning);
           }
         }
 
@@ -2610,7 +2404,7 @@ public:
     checkGlobalIsolation(VD);
 
     // Visit auxiliary decls first
-    VD->visitAuxiliaryDecls([&](VarDecl *var) {
+    VD->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *var) {
       this->visitBoundVariable(var);
     });
 
@@ -2788,8 +2582,8 @@ public:
           // across module generation, as required for TBDGen.
           if (var->supportsInitialization() &&
               !var->getAttrs().hasAttribute<HasInitialValueAttr>()) {
-            var->getAttrs().add(new (Ctx)
-                                    HasInitialValueAttr(/*IsImplicit=*/true));
+            var->addAttribute(new (Ctx)
+                                  HasInitialValueAttr(/*IsImplicit=*/true));
           }
 
           // If we fail to check the bound inout introducer, mark the variable
@@ -2809,6 +2603,10 @@ public:
 
         // If the variable has no storage, it never needs an initializer.
         if (!var->hasStorage())
+          return;
+
+        // If the variable is @_extern, it never needs an initializer.
+        if (var->getAttrs().hasAttribute<ExternAttr>())
           return;
 
         if (var->getAttrs().hasAttribute<SILGenNameAttr>()
@@ -2907,6 +2705,15 @@ public:
     for (auto i : range(PBD->getNumPatternEntries())) {
       if (!PBD->isInitialized(i))
         continue;
+
+      if (PBD->isInitializerSubsumed(i)) {
+        auto *var = PBD->getSingleVar();
+        // The initializer of a property wrapped variable gets transferred
+        // the synthesized backing storage property, let have it contextualized
+        // there.
+        if (var && var->hasAttachedPropertyWrapper())
+          continue;
+      }
 
       if (!PBD->isInitializerChecked(i)) {
         TypeCheckExprOptions options;
@@ -3048,7 +2855,7 @@ public:
 
     // Reject noncopyable typed subscripts with read/set accessors since we
     // cannot define modify operations upon them without copying the read.
-    if (SD->mapTypeIntoContext(SD->getElementInterfaceType())->isNoncopyable()) {
+    if (SD->mapTypeIntoEnvironment(SD->getElementInterfaceType())->isNoncopyable()) {
       if (auto *read = SD->getAccessor(AccessorKind::Read)) {
         if (!read->isImplicit()) {
           if (auto *set = SD->getAccessor(AccessorKind::Set)) {
@@ -3131,6 +2938,7 @@ public:
 
     // An associated type that was introduced after the protocol
     auto module = AT->getDeclContext()->getParentModule();
+    // FIXME: [availability] Query AvailabilityContext, not platform range.
     if (!defaultType &&
         module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
         AvailabilityInference::availableRange(proto).isSupersetOf(
@@ -3145,7 +2953,8 @@ public:
 
     // We don't allow nested types inside inlinable contexts.
     auto kind = DC->getFragileFunctionKind();
-    if (kind.kind != FragileFunctionKind::None) {
+    if (kind.kind != FragileFunctionKind::None &&
+        kind.kind != FragileFunctionKind::EmbeddedAlwaysEmitIntoClient) {
       NTD->diagnose(diag::local_type_in_inlinable_function, NTD->getName(),
                     kind.getSelector());
     }
@@ -3206,11 +3015,13 @@ public:
 
     // Temporary restriction until we figure out pattern matching and
     // enum case construction with packs.
-    if (auto genericSig = ED->getGenericSignature()) {
-      for (auto paramTy : genericSig.getGenericParams()) {
-        if (paramTy->isParameterPack()) {
-          ED->diagnose(diag::enum_with_pack);
-          break;
+    if (!ED->isSynthesized()) {
+      if (auto genericSig = ED->getGenericSignature()) {
+        for (auto paramTy : genericSig.getGenericParams()) {
+          if (paramTy->isParameterPack()) {
+            ED->diagnose(diag::enum_with_pack);
+            break;
+          }
         }
       }
     }
@@ -3232,8 +3043,6 @@ public:
     diagnoseMissingExplicitSendable(ED);
     checkAccessControl(ED);
 
-    TypeChecker::checkPatternBindingCaptures(ED);
-
     auto &DE = Ctx.Diags;
     if (auto rawTy = ED->getRawType()) {
       // The raw type must be one of the blessed literal convertible types.
@@ -3249,6 +3058,13 @@ public:
         DE.diagnose(ED->getInherited().getStartLoc(),
                     diag::empty_enum_raw_type);
       }
+    }
+
+    // If the enum is exported to C, it must be representable in C.
+    if (auto CDeclAttr = ED->getAttrs().getAttribute<swift::CDeclAttr>()) {
+      evaluateOrDefault(Ctx.evaluator,
+                        TypeCheckCDeclEnumRequest{ED, CDeclAttr},
+                        {});
     }
 
     // -----
@@ -3295,15 +3111,12 @@ public:
     TypeChecker::addImplicitConstructors(SD);
 
     installCodingKeysIfNecessary(SD);
-    installDistributedActorIfNecessary(SD);
 
     TypeChecker::checkDeclAttributes(SD);
 
     for (Decl *Member : SD->getMembers()) {
       visit(Member);
     }
-
-    TypeChecker::checkPatternBindingCaptures(SD);
 
     checkInheritanceClause(SD);
     diagnoseMissingExplicitSendable(SD);
@@ -3339,8 +3152,7 @@ public:
   void checkRequiredInClassInits(ClassDecl *cd) {
     // Initializers may be omitted from property declarations in module
     // interface files so don't diagnose in them.
-    SourceFile *sourceFile = cd->getDeclContext()->getParentSourceFile();
-    if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
+    if (cd->getDeclContext()->isInSwiftinterface())
       return;
 
     ClassDecl *source = nullptr;
@@ -3486,8 +3298,6 @@ public:
 
     for (Decl *Member : CD->getABIMembers())
       visit(Member);
-
-    TypeChecker::checkPatternBindingCaptures(CD);
 
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
@@ -3649,7 +3459,7 @@ public:
       PD->dumpRef(llvm::errs());
       llvm::errs() << "\n";
       llvm::errs() << "Requirement signature: ";
-      PrintOptions Opts;
+      PrintOptions Opts = PrintOptions::forDebugging();
       Opts.ProtocolQualifiedDependentMemberTypes = true;
       Opts.PrintInverseRequirements =
           !Ctx.TypeCheckerOpts.DebugInverseRequirements;
@@ -3696,13 +3506,14 @@ public:
         TypeChecker::checkProtocolSelfRequirements(FD);
       }
 
-      checkAccessControl(FD);
-
       TypeChecker::checkParameterList(FD->getParameters(), FD);
     }
 
+    checkAccessControl(FD);
+
     TypeChecker::checkDeclAttributes(FD);
     TypeChecker::checkDistributedFunc(FD);
+    checkEmbeddedRestrictionsInSignature(FD);
 
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
@@ -3787,25 +3598,10 @@ public:
     }
 
     // If the function is exported to C, it must be representable in (Obj-)C.
-    // FIXME: This needs to be moved to its own request if we want to
-    // productize @_cdecl.
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
-      std::optional<ForeignAsyncConvention> asyncConvention;
-      std::optional<ForeignErrorConvention> errorConvention;
-      ObjCReason reason(ObjCReason::ExplicitlyCDecl, CDeclAttr);
-      if (isRepresentableInObjC(FD, reason, asyncConvention, errorConvention)) {
-        if (FD->hasAsync()) {
-          FD->setForeignAsyncConvention(*asyncConvention);
-          Ctx.Diags.diagnose(
-              CDeclAttr->getLocation(), diag::attr_decl_async,
-              CDeclAttr->getAttrName(), FD->getDescriptiveKind());
-        } else if (FD->hasThrows()) {
-          FD->setForeignErrorConvention(*errorConvention);
-          Ctx.Diags.diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);
-        }
-      } else {
-        reason.setAttrInvalid();
-      }
+      evaluateOrDefault(Ctx.evaluator,
+                        TypeCheckCDeclFunctionRequest{FD, CDeclAttr},
+                        {});
     }
 
     TypeChecker::checkObjCImplementation(FD);
@@ -3888,10 +3684,8 @@ public:
       return;
 
     auto &ctx = ED->getASTContext();
-
-    if (!ctx.LangOpts.hasFeature(Feature::TupleConformances)) {
-      ED->diagnose(diag::experimental_tuple_extension);
-    }
+    ASSERT(ctx.LangOpts.hasFeature(Feature::TupleConformances) &&
+           "Extension binding should not have permitted this");
 
     if (!isValidExtendedTypeForTupleExtension(ED)) {
       ED->diagnose(diag::tuple_extension_wrong_type,
@@ -3995,11 +3789,6 @@ public:
       return;
     }
 
-    // Record a dependency from TypeCheckSourceFileRequest to
-    // ExtendedNominalRequest, since the call to getExtendedNominal()
-    // above doesn't record a dependency when reading a cached value.
-    ED->computeExtendedNominal();
-
     if (!extType->hasError()) {
       // The first condition catches syntactic forms like
       //     protocol A & B { ... } // may be protocols or typealiases
@@ -4020,7 +3809,6 @@ public:
                                  nominal->getDeclaredType());
         diag.highlight(extTypeRepr->getSourceRange());
         if (firstNominalIsNotMostSpecific) {
-          diag.flush();
           Type mostSpecificProtocol = extTypeNominal->getDeclaredType();
           ED->diagnose(diag::composition_in_extended_type_alternative,
                        mostSpecificProtocol)
@@ -4072,8 +3860,6 @@ public:
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
-    TypeChecker::checkPatternBindingCaptures(ED);
-
     TypeChecker::checkConformancesInContext(ED);
 
     checkAccessControl(ED);
@@ -4094,16 +3880,6 @@ public:
     llvm_unreachable("TopLevelCodeDecls are handled elsewhere");
   }
   
-  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
-    if (PDD->hasBeenEmitted()) { return; }
-    PDD->markEmitted();
-    Ctx.Diags
-        .diagnose(PDD->getMessage()->getStartLoc(),
-                  PDD->isError() ? diag::pound_error : diag::pound_warning,
-                  PDD->getMessage()->getValue())
-        .highlight(PDD->getMessage()->getSourceRange());
-  }
-
   void visitConstructorDecl(ConstructorDecl *CD) {
     // Force creation of the generic signature.
     (void) CD->getGenericSignature();
@@ -4121,6 +3897,7 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
     TypeChecker::checkParameterList(CD->getParameters(), CD);
+    checkEmbeddedRestrictionsInSignature(CD);
 
     if (CD->getAsyncLoc().isValid())
       TypeChecker::checkConcurrencyAvailability(CD->getAsyncLoc(), CD);
@@ -4160,7 +3937,7 @@ public:
             } else {
               CD->diagnose(diag::required_initializer_override_wrong_keyword)
                   .fixItReplace(attr->getLocation(), "required");
-              CD->getAttrs().add(new (Ctx) RequiredAttr(/*IsImplicit=*/true));
+              CD->addAttribute(new (Ctx) RequiredAttr(/*IsImplicit=*/true));
             }
 
             auto *reqInit =
@@ -4202,7 +3979,7 @@ public:
         auto *reqInit = findNonImplicitRequiredInit(CD->getOverriddenDecl());
         reqInit->diagnose(diag::overridden_required_initializer_here);
 
-        CD->getAttrs().add(new (Ctx) RequiredAttr(/*IsImplicit=*/true));
+        CD->addAttribute(new (Ctx) RequiredAttr(/*IsImplicit=*/true));
       }
     }
 
@@ -4315,7 +4092,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
           // cannot have more than one isolated parameter (SE-0313)
           param->diagnose(diag::isolated_parameter_duplicate)
               .highlight(param->getSourceRange())
-              .warnUntilSwiftVersion(6);
+              .warnUntilLanguageMode(6);
           // I'd love to describe the context in which there is an isolated parameter,
           // we had a DescriptiveDeclContextKind, but that only
           // exists for Decls.
@@ -4376,9 +4153,10 @@ void TypeChecker::checkParameterList(ParameterList *params,
 
     if (!param->isInvalid()) {
       auto *SF = owner->getParentSourceFile();
-      param->visitAuxiliaryDecls([&](VarDecl *auxiliaryDecl) {
-        if (!isa<ParamDecl>(auxiliaryDecl))
-          DeclChecker(SF->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
+      auto &ctx = SF->getASTContext();
+      param->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *auxVar) {
+        if (!isa<ParamDecl>(auxVar))
+          DeclChecker(ctx, SF).visitBoundVariable(auxVar);
       });
     }
 
@@ -4423,12 +4201,9 @@ void TypeChecker::checkParameterList(ParameterList *params,
 std::optional<unsigned>
 ExpandMacroExpansionDeclRequest::evaluate(Evaluator &evaluator,
                                           MacroExpansionDecl *MED) const {
-  auto &ctx = MED->getASTContext();
-  auto *dc = MED->getDeclContext();
-
   // Resolve macro candidates.
-  auto macro = evaluateOrDefault(ctx.evaluator, ResolveMacroRequest{MED, dc},
-                                 ConcreteDeclRef());
+  auto macro =
+      evaluateOrDefault(evaluator, ResolveMacroRequest{MED}, ConcreteDeclRef());
   if (!macro)
     return std::nullopt;
   MED->setMacroRef(macro);

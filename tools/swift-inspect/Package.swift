@@ -19,7 +19,8 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .target(name: "SwiftInspectClient", condition: .when(platforms: [.windows])),
                 .target(name: "SwiftInspectClientInterface", condition: .when(platforms: [.windows])),
-                .target(name: "SwiftInspectLinux", condition: .when(platforms: [.linux])),
+                .target(name: "SwiftInspectLinux", condition: .when(platforms: [.linux, .android])),
+                .target(name: "AndroidCLib", condition: .when(platforms: [.android])),
             ],
             swiftSettings: [.unsafeFlags(["-parse-as-library"])]),
         .target(name: "SwiftInspectClient"),
@@ -32,6 +33,11 @@ let package = Package(
         .systemLibrary(
             name: "LinuxSystemHeaders",
             path: "Sources/SwiftInspectLinux/SystemHeaders"),
+        .target(
+            name: "AndroidCLib",
+            path: "Sources/AndroidCLib",
+            publicHeadersPath: "include",
+            cSettings: [.unsafeFlags(["-fPIC"])]),
         .systemLibrary(
             name: "SwiftInspectClientInterface"),
         .testTarget(
@@ -44,7 +50,7 @@ let package = Package(
 
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     package.dependencies += [
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.2"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
     ]
 } else {
     package.dependencies += [.package(path: "../../../swift-argument-parser")]

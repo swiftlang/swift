@@ -2,3 +2,28 @@ module Namespaces {
   header "namespace.h"
   requires cplusplus
 }
+
+module TopLevelModule {
+  module SubModule {
+    module DeepSubModule {
+      header "deep-submodule.h"
+      export *
+    }
+    module AnotherDeepSubModule {
+      header "another-deep-submodule.h"
+      export *
+    }
+    export *
+  }
+  export *
+}
+
+module AmbiguousA {
+  header "ambiguous_a.h"
+  requires cplusplus
+}
+
+module AmbiguousB {
+  header "ambiguous_a.h"
+  requires cplusplus
+}

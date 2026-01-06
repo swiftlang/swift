@@ -258,11 +258,9 @@ bool CompileInstance::setupCI(
   auto &Diags = CI->getDiags();
 
   SmallVector<const char *, 16> args;
-  // Put '-resource-dir' and '-diagnostic-documentation-path' at the top to
-  // allow overriding them with the passed in arguments.
+  // Put '-resource-dir' at the top to allow overriding them with the passed in
+  // arguments.
   args.append({"-resource-dir", RuntimeResourcePath.c_str()});
-  args.append({"-Xfrontend", "-diagnostic-documentation-path", "-Xfrontend",
-               DiagnosticDocumentationPath.c_str()});
   args.append(origArgs.begin(), origArgs.end());
 
   SmallString<256> driverPath(SwiftExecutablePath);
@@ -379,7 +377,8 @@ bool CompileInstance::performCompile(
   CI->addDiagnosticConsumer(DiagC);
   SWIFT_DEFER { CI->removeDiagnosticConsumer(DiagC); };
   int ReturnValue = 0;
-  return performCompileStepsPostSema(*CI, ReturnValue, /*observer=*/nullptr);
+  return performCompileStepsPostSema(*CI, ReturnValue, /*observer=*/nullptr,
+                                     Args);
 }
 
 bool CompileInstance::shouldCheckDependencies() const {

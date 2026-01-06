@@ -1,8 +1,4 @@
-// With RTTI some of the objects with virtual bases / destructors in this test
-// will cause linker errors because of undefined vtables.
-// FIXME: Once we can link with libc++ we can start using RTTI.
-//
-// RUN: %target-swift-frontend -enable-experimental-cxx-interop -I %S/Inputs %s -emit-ir -Xcc -fno-rtti | %FileCheck %s
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -I %S/Inputs %s -emit-ir | %FileCheck %s
 
 import CustomDestructor
 

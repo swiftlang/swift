@@ -1086,6 +1086,7 @@ class ThrowDerivedClass : ThrowBaseClass {
   // CHECK-NEXT:   try_apply {{.*}}({{.*}}) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[SUCC_BB2:bb[0-9]+]], error [[ERROR_BB2:bb[0-9]+]]
   //
   // CHECK: [[SUCC_BB2]](
+  // CHECK-NEXT: ignored_use
   // CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[PB_BOX]]
   // CHECK-NEXT: end_borrow [[SELF_LIFETIME]]
   // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]

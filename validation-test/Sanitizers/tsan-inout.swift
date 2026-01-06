@@ -8,6 +8,12 @@
 // REQUIRES: stress_test
 // REQUIRES: tsan_runtime
 
+// Bug in TSan on FreeBSD
+// Thread destruction interceptor marks the thread ignored and then checks that
+// the thread isn't being ignored.
+// rdar://158450231
+// XFAIL: OS=freebsd
+
 // Test ThreadSanitizer execution end-to-end when calling
 // an uninstrumented module with inout parameters
 
@@ -27,7 +33,7 @@ var gInThread2: () -> () = { }
 // Spawn two threads, run the two passed in closures simultaneously, and
 // join them.
 func testRace(name: String, thread inThread1: @escaping () -> (), thread inThread2: @escaping () -> ()) {
-#if canImport(Darwin)
+#if canImport(Darwin) || os(FreeBSD)
   var thread1: pthread_t?
   var thread2: pthread_t?
 #else

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -102,71 +102,230 @@ private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
 let lifetimeDependenceScopeFixupPass = FunctionPass(
   name: "lifetime-dependence-scope-fixup")
 { (function: Function, context: FunctionPassContext) in
-#if os(Windows)
-  if !context.options.hasFeature(.NonescapableTypes) {
-    return
-  }
-#endif
   log(prefix: false, "\n--- Scope fixup for lifetime dependence in \(function.name)")
 
   let localReachabilityCache = LocalVariableReachabilityCache()
 
+  var mustFixStackNesting = false
   for instruction in function.instructions {
-    guard let markDep = instruction as? MarkDependenceInst else {
+    guard let markDep = instruction as? MarkDependenceInstruction else {
       continue
     }
     guard let innerLifetimeDep = LifetimeDependence(markDep, context) else {
       continue
     }
     // Redirect the dependence base to ignore irrelevant borrow scopes.
-    guard let newLifetimeDep = markDep.rewriteSkippingBorrow(scope: innerLifetimeDep.scope, context) else {
+    let newLifetimeDep = markDep.rewriteSkippingBorrow(scope: innerLifetimeDep.scope, context)
+
+    // Recursively sink enclosing end_access, end_borrow, end_apply, and destroy_value. If the scope can be extended
+    // into the caller, return the function arguments that are the dependency sources.
+    var scopeExtension = ScopeExtension(localReachabilityCache, context)
+    guard scopeExtension.extendScopes(dependence: newLifetimeDep) else {
       continue
     }
-    // Recursively sink enclosing end_access, end_borrow, or end_apply.
-    let args = extendScopes(dependence: newLifetimeDep, localReachabilityCache, context)
+    mustFixStackNesting = mustFixStackNesting || scopeExtension.mustFixStackNesting
+    let args = scopeExtension.findArgumentDependencies()
+
+    // If the scope cannot be extended to the caller, this must be the outermost dependency level.
+    // Insert end_cow_mutation_addr if needed.
+    if args.isEmpty {
+      createEndCOWMutationIfNeeded(lifetimeDep: newLifetimeDep, context)
+    }
 
     // Redirect the dependence base to the function arguments. This may create additional mark_dependence instructions.
     markDep.redirectFunctionReturn(to: args, context)
   }
+  if mustFixStackNesting {
+    context.fixStackNesting(in: function)
+  }
 }
 
-private extension MarkDependenceInst {
+private extension Type {
+  func mayHaveMutableSpan(in function: Function, _ context: FunctionPassContext) -> Bool {
+    // Escapable and Copyable types cannot have MutableSpan
+    if isEscapable || !isMoveOnly {
+      return false
+    }
+    if hasArchetype {
+      return true
+    }
+    if isBuiltinType {
+      return false
+    }
+    // Only result types that are nominal can have a MutableSpan derived from an inout array access.
+    if nominal == nil {
+      return false
+    }
+    if nominal == context.swiftMutableSpan {
+      return true
+    }
+    if isStruct {
+      guard let fields = getNominalFields(in: function) else {
+        return false
+      }
+      return fields.contains { $0.mayHaveMutableSpan(in: function, context) }
+    }
+    if isTuple {
+      return tupleElements.contains { $0.mayHaveMutableSpan(in: function, context) }
+    }
+    if isEnum {
+      guard let cases = getEnumCases(in: function) else {
+        return true
+      }
+      return cases.contains { $0.payload?.mayHaveMutableSpan(in: function, context) ?? false }
+    }
+    // Classes cannot be ~Escapable, therefore cannot hold a MutableSpan.
+    if isClass {
+      return false
+    }
+    return false
+  }
+
+  // Returns true if a type maybe Array/ArraySlice/ContiguousArray which are optimized COW types.
+  // The standard library introduces builtins begin_cow_mutation/end_cow_mutation for such types which are then used to optimize uniqueness checks.
+  func mayHaveOptimizedCOWType(in function: Function) -> Bool {
+    // Trivial types cannot be Array/ArraySlice/ContiguousArray.
+    if isTrivial(in: function) {
+      return false
+    }
+    // Builtin types do not contain Array/ArraySlice/ContiguousArray.
+    if isBuiltinType {
+      return false
+    }
+    // ~Copyable types cannot contain Array/ArraySlice/ContiguousArray.
+    if isMoveOnly {
+      return false
+    }
+    return true
+  }
+}
+
+/// Insert end_cow_mutation_addr for lifetime dependent values that maybe of type MutableSpan and depend on a mutable address.
+private func createEndCOWMutationIfNeeded(lifetimeDep: LifetimeDependence, _ context: FunctionPassContext) {
+  var scoped : ScopedInstruction
+
+  // Handle cases which generate mutable addresses: begin_access [modify] and yield &
+  switch lifetimeDep.scope {
+    case let .access(beginAccess):
+      if beginAccess.accessKind != .modify {
+        return
+      }
+      scoped = beginAccess
+    case let .yield(value):
+      let beginApply = value.definingInstruction as! BeginApplyInst
+      if value == beginApply.token {
+        return
+      }
+      if beginApply.convention(of: value as! MultipleValueInstructionResult) != .indirectInout {
+        return
+      }
+      scoped = beginApply
+    // None of the below cases can generate a mutable address.
+    case .owned, .borrowed, .local, .initialized, .caller, .global, .unknown:
+      return
+  }
+
+  guard lifetimeDep.dependentValue.type.mayHaveMutableSpan(in: lifetimeDep.dependentValue.parentFunction, context) &&
+    lifetimeDep.parentValue.type.mayHaveOptimizedCOWType(in: lifetimeDep.dependentValue.parentFunction) else {
+    return
+  }
+
+  for endInstruction in scoped.endInstructions {
+    let builder = Builder(before: endInstruction, context)
+    builder.createEndCOWMutationAddr(address: lifetimeDep.parentValue)
+  }
+}
+
+private extension MarkDependenceInstruction {
   /// Rewrite the mark_dependence base operand to ignore inner borrow scopes (begin_borrow, load_borrow).
   ///
   /// Note: this could be done as a general simplification, e.g. after inlining. But currently this is only relevant for
   /// diagnostics.
-  func rewriteSkippingBorrow(scope: LifetimeDependence.Scope, _ context: FunctionPassContext) -> LifetimeDependence? {
+  func rewriteSkippingBorrow(scope: LifetimeDependence.Scope, _ context: FunctionPassContext) -> LifetimeDependence {
     guard let newScope = scope.ignoreBorrowScope(context) else {
-      return nil
+      return LifetimeDependence(scope: scope, markDep: self)!
     }
     let newBase = newScope.parentValue
     if newBase != self.baseOperand.value {
       self.baseOperand.set(to: newBase, context)
     }
-    return LifetimeDependence(scope: newScope, dependentValue: self)
+    return LifetimeDependence(scope: newScope, markDep: self)!
   }
 
-  /// Rewrite the mark_dependence base operand, setting it to a function argument.
-  ///
-  /// To handle more than one function argument, new mark_dependence instructions will be chained.
-  /// This is called when the dependent value is returned by the function and the dependence base is in the caller.
   func redirectFunctionReturn(to args: SingleInlineArray<FunctionArgument>, _ context: FunctionPassContext) {
-    var updatedMarkDep: MarkDependenceInst?
+    var updatedMarkDep: MarkDependenceInstruction?
     for arg in args {
       guard let currentMarkDep = updatedMarkDep else {
         self.baseOperand.set(to: arg, context)
         updatedMarkDep = self
         continue
       }
-      let newMarkDep = Builder(after: currentMarkDep, location: currentMarkDep.location, context)
-        .createMarkDependence(value: currentMarkDep, base: arg, kind: .Unresolved)
-      let uses = currentMarkDep.uses.lazy.filter {
-        let inst = $0.instruction
-        return inst != newMarkDep
+      switch currentMarkDep {
+      case let mdi as MarkDependenceInst:
+        updatedMarkDep = mdi.redirectFunctionReturnForward(to: arg, input: mdi, context)
+      case let mdi as MarkDependenceAddrInst:
+        updatedMarkDep = mdi.redirectFunctionReturnAddress(to: arg, context)
+      default:
+        fatalError("unexpected MarkDependenceInstruction")
       }
-      uses.replaceAll(with: newMarkDep, context)
-      updatedMarkDep = newMarkDep
     }
+  }
+}
+
+private extension MarkDependenceInst {
+  /// Rewrite the mark_dependence base operand, setting it to a function argument.
+  ///
+  /// This is called when the dependent value is returned by the function and the dependence base is in the caller.
+  func redirectFunctionReturnForward(to arg: FunctionArgument, input: MarkDependenceInst,
+    _ context: FunctionPassContext) -> MarkDependenceInst {
+    // To handle more than one function argument, new mark_dependence instructions will be chained.
+    let newMarkDep = Builder(after: input, location: input.location, context)
+      .createMarkDependence(value: input, base: arg, kind: .Unresolved)
+    let uses = input.uses.lazy.filter {
+      let inst = $0.instruction
+      return inst != newMarkDep
+    }
+    uses.replaceAll(with: newMarkDep, context)
+    return newMarkDep
+  }
+}
+
+private extension MarkDependenceAddrInst {
+  /// Rewrite the mark_dependence_addr base operand, setting it to a function argument.
+  ///
+  /// This is called when the dependent value is returned by the function and the dependence base is in the caller.
+  func redirectFunctionReturnAddress(to arg: FunctionArgument, _ context: FunctionPassContext)
+    -> MarkDependenceAddrInst {
+    return Builder(after: self, location: self.location, context)
+        .createMarkDependenceAddr(value: self.address, base: arg, kind: .Unresolved)
+  }
+}
+
+/// A scope extension is a set of nested scopes and their owners. The owner is a value that represents ownership of
+/// the outermost scopes, which cannot be extended; it limits how far the nested scopes can be extended.
+private struct ScopeExtension {
+  let context: FunctionPassContext
+  let localReachabilityCache: LocalVariableReachabilityCache
+
+  /// The ownership lifetime of the dependence base, which cannot be extended.
+  var owners = SingleInlineArray<Value>()
+
+  // Initialized after walking dependent uses. True if the scope can be extended into the caller.
+  var dependsOnCaller: Bool?
+
+  // Does scope extension potentially invalidate stack nesting?
+  var mustFixStackNesting = false
+
+  // Scopes listed in RPO over an upward walk. The outermost scope is first.
+  var scopes = SingleInlineArray<ExtendableScope>()
+
+  var innermostScope: ExtendableScope { get { scopes.last! } }
+
+  var visitedValues: ValueSet?
+
+  init(_ localReachabilityCache: LocalVariableReachabilityCache, _ context: FunctionPassContext) {
+    self.localReachabilityCache = localReachabilityCache
+    self.context = context
   }
 }
 
@@ -199,145 +358,270 @@ private extension MarkDependenceInst {
 // access. This scope fixup pass must extend '%a1' to cover the `@useDependent` but must not extend the base of the
 // `mark_dependence` to the outer access `%0`. This ensures that exclusivity diagnostics correctly reports the
 // violation, and that subsequent optimizations do not shrink the inner access `%a1`.
-private func extendScopes(dependence: LifetimeDependence,
-                          _ localReachabilityCache: LocalVariableReachabilityCache,
-                          _ context: FunctionPassContext) -> SingleInlineArray<FunctionArgument> {
-  log("Scope fixup for lifetime dependent instructions: \(dependence)")
+extension ScopeExtension {
+  mutating func extendScopes(dependence: LifetimeDependence) -> Bool {
+    log("Scope fixup for lifetime dependent instructions:\n\(dependence)")
 
-  // Each scope extension is a set of nested scopes and an owner. The owner is a value that represents ownerhip of the
-  // outermost scope, which cannot be extended; it limits how far the nested scopes can be extended.
-  guard let scopeExtensions = dependence.scope.gatherExtensions(context) else {
-    return SingleInlineArray()
-  }
-  var dependsOnArgs = SingleInlineArray<FunctionArgument>()
-  for scopeExtension in scopeExtensions {
-    var scopeExtension = scopeExtension
-    guard var useRange = computeDependentUseRange(of: dependence.dependentValue, within: &scopeExtension,
-                                                  localReachabilityCache, context) else {
-      continue
+    gatherExtensions(dependence: dependence)
+
+    // computeDependentUseRange initializes scopeExtension.dependsOnCaller.
+    guard var useRange = computeDependentUseRange(of: dependence) else {
+      return false
     }
-    defer { useRange.deinitialize() }
-
-    scopeExtension.extend(over: &useRange, context)
-
-    if scopeExtension.dependsOnCaller, let arg = scopeExtension.dependsOnArg {
-      dependsOnArgs.push(arg)
+    // tryExtendScopes deinitializes 'useRange'
+    var scopesToExtend = SingleInlineArray<ExtendableScope>()
+    guard canExtendScopes(over: &useRange, scopesToExtend: &scopesToExtend) else {
+      useRange.deinitialize()
+      return false
     }
+    // extend(over:) must receive the original unmodified `useRange`, without intermediate scope ending instructions.
+    // This deinitializes `useRange` before erasing instructions.
+    extend(scopesToExtend: scopesToExtend, over: &useRange, context)
+    return true
   }
-  return dependsOnArgs
 }
 
-/// All scopes nested within a single dependence base that require extension.
-private struct ScopeExtension {
-  /// The ownership lifetime of the dependence base, which cannot be extended.
-  let owner: Value
+// TODO: add parent and child indices to model a DAG of scopes. This will allow sibling scopes that do not follow a
+// stack discipline among them but still share the same parent and child scopes. This can occur with dependencies on
+// multiple call operands. Until then, scope extension may bail out unnecessarily while trying to extend over a sibling
+// scope.
+private struct ExtendableScope {
+  enum Introducer {
+    case scoped(ScopedInstruction)
+    case stack(Instruction)
+    case owned(Value)
+  }
 
-  /// The scopes nested under 'value' that may be extended, in inside-out order. There is always at
-  /// least one element, otherwise there is nothing to consider extending.
-  let nestedScopes: SingleInlineArray<LifetimeDependence.Scope>
+  // scope.allocStackInstruction is always valid for Introducer.allocStack and is valid for Introducer.scoped when
+  // ScopedInstruction is a store_borrow.
+  let scope: LifetimeDependence.Scope
+  let introducer: Introducer
 
-  var innerScope: LifetimeDependence.Scope { get { nestedScopes.first! } }
-
-  /// `dependsOnArg` is set to the function argument that represents the caller's dependency source.
-  var dependsOnArg: FunctionArgument?
-
-  /// `dependsOnCaller` is true if the dependent value is returned by the function.
-  /// Initialized during computeDependentUseRange().
-  var dependsOnCaller = false
-}
-
-private extension LifetimeDependence.Scope {
-  /// The instruction that introduces an extendable scope. This returns a non-nil scope introducer for
-  /// Extendable.nestedScopes.
-  var extendableBegin: Instruction? {
-    switch self {
-    case let .access(beginAccess):
-      return beginAccess
-    case let .borrowed(beginBorrow):
-      return beginBorrow.value.definingInstruction!
-    case let .yield(yieldedValue):
-      return yieldedValue.definingInstruction!
-    default:
-      return nil
+  var firstInstruction: Instruction {
+    switch introducer {
+    case let .scoped(scopedInst):
+      return scopedInst
+    case let .stack(initializingStore):
+      return initializingStore
+    case let .owned(value):
+      if let definingInst = value.definingInstructionOrTerminator {
+        return definingInst
+      }
+      return value.parentBlock.instructions.first!
     }
   }
 
-  /// Find any nested scopes that may be extended.
-  ///
-  /// Return 'nil' if 'self' is not extendable.
-  ///
-  /// TODO: handle trivial variable scopes
-  func gatherExtensions(innerScopes: SingleInlineArray<LifetimeDependence.Scope>? = nil, _ context: FunctionPassContext)
-    -> SingleInlineArray<ScopeExtension>? {
-
-    var innerScopes = innerScopes ?? SingleInlineArray()
-    switch self {
-    case let .access(beginAccess):
-      // Finding the access base also finds all intermediate nested scopes; there is no need to recursively call
-      // gatherExtensions().
-      let (accessBase, nestedAccesses) = beginAccess.accessBaseWithScopes
-      let ownerAddress: Value
-      var dependsOnArg: FunctionArgument? = nil
-      switch accessBase {
-      case .global, .unidentified:
-        ownerAddress = beginAccess.address
-      case let .argument(arg):
-        ownerAddress = beginAccess.address
-        dependsOnArg = arg
-      case .box, .stack, .class, .tail, .yield, .storeBorrow,
-           .pointer, .index:
-        ownerAddress = accessBase.address!
-      }
-      assert(!nestedAccesses.isEmpty)
-      for nestedAccess in nestedAccesses {
-        innerScopes.push(.access(nestedAccess))
-      }
-      // This is the outermost scope. We only see nested access scopes after inlining.
+  var endInstructions: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
+    switch introducer {
+    case let .scoped(scopedInst):
+      return scopedInst.scopeEndingOperands.users
+    case .stack:
+      // For alloc_stack without a store-borrow scope, include the deallocs in its scope to ensure that we never shorten
+      // the original allocation. It's possible that some other use depends on the address.
       //
-      // TODO: could we have a nested access within an yielded inout address?
-      return SingleInlineArray(element: ScopeExtension(owner: ownerAddress, nestedScopes: innerScopes,
-                                                       dependsOnArg: dependsOnArg))
-    case let .borrowed(beginBorrow):
-      let borrowedValue = beginBorrow.baseOperand!.value
-      let enclosingScope = LifetimeDependence.Scope(base: borrowedValue, context)
-      innerScopes.push(self)
-      var innerBorrowScopes = innerScopes
-      innerBorrowScopes.push(enclosingScope)
-      if let extensions = enclosingScope.gatherExtensions(innerScopes: innerBorrowScopes, context) {
-        return extensions
-      }
-      // This is the outermost scope that can be extended because gatherExtensions did not find an enclosing scope.
-      var dependsOnArg: FunctionArgument? = nil
-      if case let .caller(arg) = enclosingScope {
-        dependsOnArg = arg
-      }
-      return SingleInlineArray(element: ScopeExtension(owner: enclosingScope.parentValue, nestedScopes: innerScopes,
-                                                       dependsOnArg: dependsOnArg))
-    case let .yield(yieldedValue):
-      innerScopes.push(self)
-      var extensions = SingleInlineArray<ScopeExtension>()
-      let applySite = yieldedValue.definingInstruction as! BeginApplyInst
-      for operand in applySite.parameterOperands {
-        guard let dep = applySite.resultDependence(on: operand), dep == .scope else {
-          continue
-        }
-        let enclosingScope = LifetimeDependence.Scope(base: operand.value, context)
-        if let operandExtensions = enclosingScope.gatherExtensions(innerScopes: innerScopes, context) {
-          extensions.append(contentsOf: operandExtensions)
-        } else {
-          // This is the outermost scope that can be extended because gatherExtensions did not find an enclosing scope.
-          var dependsOnArg: FunctionArgument? = nil
-          if case let .caller(arg) = enclosingScope {
-            dependsOnArg = arg
-          }
-          extensions.push(ScopeExtension(owner: enclosingScope.parentValue, nestedScopes: innerScopes,
-                                         dependsOnArg: dependsOnArg))
-        }
-      }
-      return extensions
-    default:
+      // Same as 'AllocStackInst.deallocations' but as an Instruction list...
+      return scope.allocStackInstruction!.uses.lazy.filter
+      { $0.instruction is DeallocStackInst }.lazy.map { $0.instruction }
+
+    case let .owned(value):
+      return value.uses.endingLifetime.users
+    }
+  }
+
+  var deallocs: LazyMapSequence<LazyFilterSequence<UseList>, DeallocStackInst>? {
+    guard let allocStack = scope.allocStackInstruction else {
       return nil
     }
+    return allocStack.deallocations
+  }
+
+  // Allow scope extension as long as `beginInst` does not define a variable scope and is either a scoped instruction or
+  // a store to a singly-initialized temporary.
+  init?(_ scope: LifetimeDependence.Scope, beginInst: Instruction?) {
+    self.scope = scope
+    guard let beginInst = beginInst, VariableScopeInstruction(beginInst) == nil else {
+      return nil
+    }
+    // Check for "scoped" store_borrow extension before checking allocStackInstruction.
+    if let scopedInst = beginInst as? ScopedInstruction {
+      self.introducer = .scoped(scopedInst)
+      return
+    }
+    if scope.allocStackInstruction != nil {
+      self.introducer = .stack(beginInst)
+      return
+    }
+    return nil
+  }
+
+  // Allow extension of owned temporaries that
+  // (a) are Escapable
+  // (b) do not define a variable scope
+  // (c) are only consumed by destroy_value
+  init?(_ scope: LifetimeDependence.Scope, owner: Value) {
+    self.scope = scope
+    // TODO: allow extension of lifetime dependent values by implementing a ScopeExtensionWalker that extends
+    // LifetimeDependenceUseDefWalker.
+    guard owner.type.isEscapable(in: owner.parentFunction),
+          VariableScopeInstruction(owner.definingInstruction) == nil,
+          owner.uses.endingLifetime.allSatisfy({ $0.instruction is DestroyValueInst }) else {
+      return nil
+    }
+    self.introducer = .owned(owner)
+  }
+}
+
+// Gather extendable scopes.
+extension ScopeExtension {
+  mutating func gatherExtensions(dependence: LifetimeDependence) {
+    visitedValues = ValueSet(context)
+    defer {
+      visitedValues!.deinitialize()
+      visitedValues = nil
+    }
+    gatherExtensions(scope: dependence.scope)
+  }
+
+  mutating func gatherExtensions(valueOrAddress: Value) {
+    if visitedValues!.insert(valueOrAddress) {
+      gatherExtensions(scope: LifetimeDependence.Scope(base: valueOrAddress, context))
+    }
+  }
+
+  mutating func nonExtendable(_ scope: LifetimeDependence.Scope) {
+    owners.push(scope.parentValue)
+  }
+
+  // If `scope` is extendable, find its owner or outer scopes first, then push for extension.
+  mutating func gatherExtensions(scope: LifetimeDependence.Scope) {
+    switch scope {
+    case let .access(beginAccess):
+      gatherAccessExtensions(beginAccess: beginAccess)
+      return
+
+    case let .borrowed(beginBorrow):
+      if let beginInst = beginBorrow.value.definingInstruction {
+        if let extScope = ExtendableScope(scope, beginInst: beginInst) {
+          gatherExtensions(valueOrAddress: beginBorrow.baseOperand!.value)
+          scopes.push(extScope)
+          return
+        }
+      }
+
+    case let .yield(yieldedValue):
+      let beginApply = yieldedValue.definingInstruction as! BeginApplyInst
+      gatherYieldExtension(beginApply)
+      scopes.push(ExtendableScope(scope, beginInst: beginApply)!)
+      return
+
+    case let .initialized(initializer):
+      switch initializer {
+      case let .store(initializingStore: store, initialAddress: _):
+        if let sb = store as? StoreBorrowInst {
+          // Follow the stored value since the owner of the borrowed value needs to cover this allocation.
+          gatherExtensions(valueOrAddress: sb.source)
+        }
+        if scope.allocStackInstruction != nil {
+          scopes.push(ExtendableScope(scope, beginInst: store)!)
+          return
+        }
+        break
+      case .argument, .yield:
+        // TODO: extend indirectly yielded scopes.
+        break
+      }
+    case let .owned(value):
+      if let extScope = ExtendableScope(scope, owner: value) {
+        scopes.push(extScope)
+        return
+      }
+
+    case let .local(varInst):
+      switch varInst {
+      case let .beginBorrow(beginBorrow):
+        if let extScope = ExtendableScope(scope, beginInst: beginBorrow) {
+          gatherExtensions(valueOrAddress: beginBorrow.operand.value)
+          scopes.push(extScope)
+          return
+        }
+
+      case let .moveValue(moveValue):
+        if let extScope = ExtendableScope(scope, owner: moveValue) {
+          scopes.push(extScope)
+          return
+        }
+      }
+    default:
+      break
+    }
+    nonExtendable(scope)
+  }
+
+  /// Unlike LifetimeDependenceInsertion, this does not stop at an argument's "variable introducer" and does not stop at
+  /// an addressable parameter. The purpose here is to extend any enclosing OSSA scopes as far as possible to achieve
+  /// the longest possible owner lifetime, rather than to find the source-level lvalue for a call argument.
+  mutating func gatherYieldExtension(_ beginApply: BeginApplyInst) {
+    // Create a separate ScopeExtension for each operand that the yielded value depends on.
+    for operand in beginApply.parameterOperands {
+      gatherExtensions(valueOrAddress: operand.value)
+    }
+  }
+
+  mutating func gatherAccessExtensions(beginAccess: BeginAccessInst) {
+    let accessBaseAndScopes = beginAccess.accessBaseWithScopes
+    if let baseAddress = accessBaseAndScopes.base.address {
+      gatherExtensions(valueOrAddress: baseAddress)
+    }
+    for nestedScope in accessBaseAndScopes.scopes.reversed() {
+      switch nestedScope {
+      case let .access(nestedBeginAccess):
+        scopes.push(ExtendableScope(.access(nestedBeginAccess), beginInst: nestedBeginAccess)!)
+      case .dependence, .base:
+        // ignore recursive mark_dependence base for the purpose of extending scopes. This pass will extend the base
+        // of that mark_dependence (if it is unresolved) later as a separate LifetimeDependence.Scope.
+        break
+      }
+    }
+  }
+}
+
+extension ScopeExtension {
+  /// Check if the dependent value depends only on function arguments and can therefore be returned to caller. If so,
+  /// return the list of arguments that it depends on. If this returns an empty list, then the dependent value cannot be
+  /// returned.
+  ///
+  /// The conditions for returning a dependent value are:
+  /// - The dependent value is returned from this function.
+  /// - All nested scopes are access scopes that are redundant with the caller's exclusive access scope.
+  /// - All scope owners are function arguments.
+  func findArgumentDependencies() -> SingleInlineArray<FunctionArgument> {
+    let noCallerScope = SingleInlineArray<FunctionArgument>()
+    // Check that the dependent value is returned by this function.
+    if !dependsOnCaller! {
+      return noCallerScope
+    }
+    // Check that all nested scopes that it depends on can be covered by exclusive access in the caller.
+    for extScope in scopes {
+      switch extScope.scope {
+      case .access:
+        break
+      default:
+        return noCallerScope
+      }
+    }
+    // All owners must be arguments with exclusive access to depend on the caller's scope (inout_aliasable arguments do
+    // not have exclusivity).
+    var compatibleArgs = SingleInlineArray<FunctionArgument>()
+    for owner in owners {
+      guard let arg = owner as? FunctionArgument else {
+        return noCallerScope
+      }
+      guard arg.convention.isIndirectIn || arg.convention.isInout else {
+        return noCallerScope
+      }
+      compatibleArgs.push(arg)
+    }
+    return compatibleArgs
   }
 }
 
@@ -371,201 +655,338 @@ extension ScopeExtension {
         return range.deinitialize()
       }
     }
+
+    var description: String {
+      switch self {
+      case .fullRange:
+        return "full range"
+      case let .addressRange(range):
+        return range.description
+      case let .valueRange(range):
+        return range.description
+      }
+    }
   }
 
   /// Return nil if the scope's owner is valid across the function, such as a guaranteed function argument.
-  func computeRange(_ localReachabilityCache: LocalVariableReachabilityCache, _ context: FunctionPassContext) -> Range?
-  {
+  func computeSingleOwnerRange(owner: Value) -> Range? {
     if owner.type.isAddress {
       // Get the range of the accessBase lifetime at the point where the outermost extendable scope begins.
-      if let range = AddressOwnershipLiveRange.compute(for: owner, at: nestedScopes.last!.extendableBegin!,
+      if let range = AddressOwnershipLiveRange.compute(for: owner, at: scopes.first!.firstInstruction,
                                                        localReachabilityCache, context) {
         return .addressRange(range)
       }
       return nil
     }
-    if owner.ownership == .owned {
+    switch owner.ownership {
+    case .owned:
       return .valueRange(computeLinearLiveness(for: owner, context))
-    }
-    // Trivial or guaranted owner.
-    //
-    // TODO: limit extension to the begin_borrow [var_decl] scope
-    return .fullRange
-  }
-}
-
-/// Return an InstructionRange covering all the dependent uses of 'value'.
-private func computeDependentUseRange(of value: Value, within scopeExtension: inout ScopeExtension,
-                                      _ localReachabilityCache: LocalVariableReachabilityCache,
-                                      _ context: FunctionPassContext)
-  -> InstructionRange? {
-
-  guard var ownershipRange = scopeExtension.computeRange(localReachabilityCache, context) else {
-    return nil
-  }
-  defer {ownershipRange.deinitialize()}
-
-  // The innermost scope that must be extended must dominate all uses.
-  var useRange = InstructionRange(begin: scopeExtension.innerScope.extendableBegin!, context)
-  let function = value.parentFunction
-  var walker = LifetimeDependentUseWalker(function, localReachabilityCache, context) {
-    // Do not extend the useRange past the ownershipRange.
-    let dependentInst = $0.instruction
-    if ownershipRange.coversUse(dependentInst) {
-      useRange.insert(dependentInst)
-    }
-    return .continueWalk
-  }
-  defer {walker.deinitialize()}
-
-  _ = walker.walkDown(root: value)
-
-  log("Scope fixup for dependent uses:\n\(useRange)")
-
-  scopeExtension.dependsOnCaller = walker.dependsOnCaller
-
-  // Lifetime dependenent uses may not be dominated by the access. The dependent value may be used by a phi or stored
-  // into a memory location. The access may be conditional relative to such uses. If any use was not dominated, then
-  // `useRange` will include the function entry.
-  let firstInst = function.entryBlock.instructions.first!
-  if firstInst != useRange.begin, useRange.contains(firstInst) {
-    return nil
-  }
-  return useRange
-}
-
-// Extend nested scopes across a use-range within their owner's range.
-extension ScopeExtension {
-  func extend(over useRange: inout InstructionRange, _ context: some MutatingContext) {
-
-    // Prepare to extend each scope.
-    var scopesToExtend = SingleInlineArray<LifetimeDependence.Scope>()
-    for innerScope in nestedScopes {
-      guard let beginInst = innerScope.extendableBegin as? ScopedInstruction else {
-        fatalError("all nested scopes must have a scoped begin instruction")
+    case .guaranteed:
+      if let bbv = BeginBorrowValue(owner) {
+        if case .functionArgument = bbv {
+          return .fullRange
+        }
+        return .valueRange(computeLinearLiveness(for: bbv.value, context))
       }
-      // Extend 'useRange' to to cover this scope's end instructions. The extended scope must at least cover the
-      // original scope because the original scope may protect other operations.
-      var requiresExtension = false
-      for endInst in beginInst.endInstructions {
-        if useRange.contains(endInst) {
-          // If any end instruction is inside the new range, then all end instructions must be rewritten.
-          requiresExtension = true
-        } else {
-          // Update 'range' with the current scope-ending instructions.
-          useRange.insert(endInst)
+      return nil
+    case .none:
+      return .fullRange
+    case .unowned:
+      return nil
+    }
+  }
+
+  /// Return an InstructionRange covering all the dependent uses of 'dependence'.
+  ///
+  /// Initialize dependsOnCaller.
+  mutating func computeDependentUseRange(of dependence: LifetimeDependence) -> InstructionRange? {
+    if scopes.isEmpty {
+      return nil
+    }
+    let function = dependence.function
+    var inRangeUses = [Instruction]()
+    do {
+      // The innermost scope that must be extended must dominate all uses.
+      var walker = LifetimeDependentUseWalker(function, localReachabilityCache, context) {
+        inRangeUses.append($0)
+        return .continueWalk
+      }
+      defer {walker.deinitialize()}
+      // walkDown may abort if any utility used by address use walker, such asLocalVarUtils, has unhandled cases.
+      if walker.walkDown(dependence: dependence) == .abortWalk {
+        return nil
+      }
+      dependsOnCaller = walker.dependsOnCaller
+    }
+    for owner in owners {
+      guard var ownershipRange = computeSingleOwnerRange(owner: owner) else {
+        return nil
+      }
+      defer { ownershipRange.deinitialize() }
+
+      inRangeUses = inRangeUses.filter { ownershipRange.coversUse($0) }
+    }
+    var useRange = InstructionRange(begin: innermostScope.firstInstruction, context)
+    useRange.insert(contentsOf: inRangeUses)
+
+    log("Scope fixup for dependent uses:\n\(useRange)")
+
+    // Lifetime dependent uses may not be dominated by `innermostScope`. The dependent value may be used by a phi or
+    // stored into a memory location. The access may be conditional relative to such uses. If any use was not dominated,
+    // then `useRange` will include the function entry. There is no way to directly check if `useRange` is
+    // valid. `useRange.blockRange.isValid` is not a strong enough check because it will always succeed when
+    // `useRange.begin == entryBlock` even if a use is above `useRange.begin`. Instead check if `useRange` contains the
+    // first instruction, and the first instruction does not itself start `innermostScope`.
+    let firstInst = function.entryBlock.instructions.first!
+    if firstInst != useRange.begin, useRange.contains(firstInst) {
+      useRange.deinitialize()
+      return nil
+    }
+    return useRange
+  }
+}
+
+extension ScopeExtension {
+  /// Return true if all nested scopes were extended across `useRange`. `useRange` has already been pruned to be a
+  /// subset of the ranges of the owners.
+  ///
+  /// Note: the scopes may not be strictly nested. Two adjacent scopes in the nested scopes array may have begin at the
+  /// same nesting level. Their begin instructions may occur in any order relative to the nested scopes array, but we
+  /// order the end instructions according to the arbitrary order that the scopes were inserted in the array. This is
+  /// conservative and could extend some scopes longer than strictly necessary. To improve this, `scopes` must be
+  /// represnted as a DAG by recording parent and child indices.
+  func canExtendScopes(over useRange: inout InstructionRange,
+                       scopesToExtend: inout SingleInlineArray<ExtendableScope>) -> Bool {
+    var extendedUseRange = InstructionRange(begin: useRange.begin!, ends: useRange.ends, context)
+
+    // Insert the first instruction of the exit blocks to mimic `useRange`. There is no way to directly copy
+    // `useRange`. Inserting the exit block instructions is inaccurate, but for the purpose of canExtend() below, it has
+    // the same effect as a copy of `useRange`.
+    extendedUseRange.insert(contentsOf: useRange.exits)
+    defer { extendedUseRange.deinitialize() }
+
+    // Append each scope that needs extension to scopesToExtend from the inner to the outer scope.
+    for extScope in scopes.reversed() {
+      var mustExtend = false
+      // Iterating over scopeEndInst ignores unreachable paths which may not include the dealloc_stack. This is fine
+      // because the stack allocation effectively covers the entire unreachable path.
+      for scopeEndInst in extScope.endInstructions {
+        switch extendedUseRange.overlaps(pathBegin: extScope.firstInstruction, pathEnd: scopeEndInst, context) {
+        case .containsPath, .containsEnd, .disjoint:
+          // containsPath can occur when the extendable scope has the same begin as the use range.
+          // disjoint is unexpected, but if it occurs then `extScope` must be before the useRange.
+          mustExtend = true
+          break
+        case .containsBegin, .overlappedByPath:
+          // containsBegin can occur when the extendable scope has the same begin as the use range.
+          //
+          // An outer scope might not originally cover one of its inner scopes. Therefore, extend 'extendedUseRange' to
+          // to cover this scope's end instructions. The extended scope must at least cover the original scopes because
+          // the original scopes may protect other operations.
+          extendedUseRange.insert(scopeEndInst)
+          break
         }
       }
-      if !requiresExtension {
-        break
+      if !mustExtend {
+        continue
       }
-      if !innerScope.canExtend(over: &useRange, context) {
+      scopesToExtend.push(extScope)
+      if !extScope.canExtend(over: &extendedUseRange, context) {
         // Scope ending instructions cannot be inserted at the 'range' boundary. Ignore all nested scopes.
         //
-        // Note: We could still extend previously prepared inner scopes up to this 'innerScope'. To do that, we would
-        // need to repeat the steps above: treat 'innerScope' as the new owner, and recompute 'useRange'. But this
+        // Note: We could still extend previously prepared inner scopes up to this scope. To do that, we would
+        // need to repeat the steps above: treat 'extScope' as the new owner, and recompute `useRange`. But this
         // scenario could only happen with nested coroutine, where the range boundary is reachable from the outer
         // coroutine's EndApply and AbortApply--it is vanishingly unlikely if not impossible.
-        return
+        return false
       }
-      scopesToExtend.push(innerScope)
     }
+    return true
+  }
+  
+  // Extend the scopes that actually required extension.
+  //
+  // Consumes 'useRange'
+  private mutating func extend(scopesToExtend: SingleInlineArray<ExtendableScope>,
+                               over useRange: inout InstructionRange,
+                               _ context: some MutatingContext) {
+    var deadInsts = [Instruction]()
+    for extScope in scopesToExtend {
+      // Extend 'useRange' to to cover this scope's end instructions. 'useRange' cannot be extended until the
+      // inner scopes have been extended.
+      useRange.insert(contentsOf: extScope.endInstructions)
 
-    // Extend the scopes that actually required extension.
-    for innerScope in scopesToExtend {
-      innerScope.extend(over: &useRange, context)
+      // Note, we could Skip extension here if we have a fully overlapping scope. But that requires computing the scope
+      // of [beginInst : beginInst.endInstructions) because an outer scope may be disjoint from the inner scope but
+      // still requires extension:
+      //     %access = begin_access [read] %owner       // <=== outer scoope
+      //     %temp = load [copy] %access
+      //     end_access %access
+      //     (%dependent, %token) = begin_apply (%temp) // <=== inner scope
+      //     end_apply %token
+      //
+      deadInsts += extScope.extend(over: &useRange, context)
+
+      // Continue checking enclosing scopes for extension even if 'mustExtend' is false. Multiple ScopeExtensions may
+      // share the same inner scope, so this inner scope may already have been extended while handling a previous
+      // ScopeExtension. Nonetheless, some enclosing scopes may still require extension. This only happens when a
+      // yielded value depends on multiple begin_apply operands.
+    }
+    // 'useRange' is invalid as soon as instructions are deleted.
+    useRange.deinitialize()
+
+    // Delete original end instructions.
+    for deadInst in deadInsts {
+      if deadInst is DeallocStackInst {
+        mustFixStackNesting = true
+      }
+      context.erase(instruction: deadInst)
     }
   }
 }
 
 // Extend a dependence scope to cover the dependent uses.
-private extension LifetimeDependence.Scope {
+extension ExtendableScope {
   /// Return true if new scope-ending instruction can be inserted at the range boundary.
   func canExtend(over range: inout InstructionRange, _ context: some Context) -> Bool {
-    switch self {
+    switch self.scope {
     case let .yield(yieldedValue):
-      let beginApply = yieldedValue.definingInstruction as! BeginApplyInst
-      let canEndAtBoundary = { (boundaryInst: Instruction) in
-        switch beginApply.endReaches(block: boundaryInst.parentBlock, context) {
-        case .abortReaches, .endReaches:
-          return true
-        case .none:
-          return false
-        }
+      return canExtend(beginApply: yieldedValue.definingInstruction as! BeginApplyInst, over: &range, context)
+    case let .initialized(initializer):
+      switch initializer {
+      case .argument, .yield:
+        // A yield is already considered nested within the coroutine.
+        return true
+      case .store:
+        return self.scope.allocStackInstruction != nil
       }
-      for end in range.ends {
-        if (!canEndAtBoundary(end)) {
-          return false
-        }
-      }
-      for exit in range.exits {
-        if (!canEndAtBoundary(exit)) {
-          return false
-        }
-      }
-      return true
     default:
       // non-yield scopes can always be ended at any point.
       return true
     }
   }
 
-  /// Extend this scope over the 'range' boundary.
-  func extend(over range: inout InstructionRange, _ context: some MutatingContext) {
-    guard let beginInst = extendableBegin as? ScopedInstruction else {
-      fatalError("all nested scoped must have a scoped begin instruction")
+  func canExtend(beginApply: BeginApplyInst, over range: inout InstructionRange, _ context: some Context) -> Bool {
+    let canEndAtBoundary = { (boundaryInst: Instruction) in
+      switch beginApply.endReaches(block: boundaryInst.parentBlock, context) {
+      case .abortReaches, .endReaches, .deadEndReaches:
+        return true
+      case .none:
+        return false
+      }
     }
-    // Collect the original end instructions and extend the range to to cover them. The resulting access scope
-    // must cover the original scope because it may protect other memory operations.
-    var endInsts = [Instruction]()
-    for end in beginInst.endInstructions {
-      assert(range.inclusiveRangeContains(end))
-      endInsts.append(end)
+    for end in range.ends {
+      if (!canEndAtBoundary(end)) {
+        return false
+      }
     }
-    insertBoundaryEnds(range: &range, context)
-
-    // Delete original end instructions
-    for endInst in endInsts {
-      context.erase(instruction: endInst)
+    for exit in range.exits {
+      if (!canEndAtBoundary(exit)) {
+        return false
+      }
     }
+    return true
   }
 
-  /// Create new scope-ending instructions at the boundary of 'range'.
-  func insertBoundaryEnds(range: inout InstructionRange, _ context: some MutatingContext) {
+  /// Extend this scope over the 'range' boundary. Return the old scope ending instructions to be deleted.
+  func extend(over range: inout InstructionRange, _ context: some MutatingContext) -> [Instruction] {
+    // Collect the original end instructions and extend the range to to cover them. The resulting access scope
+    // must cover the original scope because it may protect other memory operations.
+    let originalScopeEnds = [Instruction](self.endInstructions)
+    // Track scope-ending instructions that have not yet been reused as range-ending instructions.
+    var unreusedEnds = InstructionSet(context)
+    for end in originalScopeEnds {
+      assert(range.inclusiveRangeContains(end))
+      unreusedEnds.insert(end)
+    }
+    defer { unreusedEnds.deinitialize() }
+
+    // Never reuse dealloc_stack to avoid running data flow.
+    var endsToErase = [Instruction]()
+    if let deallocs = self.deallocs {
+      endsToErase.append(contentsOf: deallocs.map { $0 })
+      for dealloc in deallocs {
+        unreusedEnds.erase(dealloc)
+      }
+    }
+
     for end in range.ends {
-      let location = end.location.autoGenerated
-      if end is ReturnInst {
+      let location = end.location.asAutoGenerated
+      switch end {
+      case is BranchInst:
+        assert(end.parentBlock.singleSuccessor!.terminator is ReturnInst,
+               "a phi only ends a use range if it is a returned value")
+        fallthrough
+      case is ReturnInstruction:
         // End this inner scope just before the return. The mark_dependence base operand will be redirected to a
         // function argument.
         let builder = Builder(before: end, location: location, context)
         // Insert newEnd so that this scope will be nested in any outer scopes.
-        range.insert(createEndInstruction(builder, context)!)
+        range.insert(contentsOf: createEndInstructions(builder, context))
+        continue
+      default:
+        break
+      }
+      // If this range ending instruction was also scope-ending, then mark it as reused by removing it from the set.
+      if unreusedEnds.contains(end) {
+        unreusedEnds.erase(end)
+        assert(!unreusedEnds.contains(end))
         continue
       }
       Builder.insert(after: end, location: location, context) {
-        range.insert(createEndInstruction($0, context)!)
+        range.insert(contentsOf: createEndInstructions($0, context))
       }
     }
     for exitInst in range.exits {
-      let location = exitInst.location.autoGenerated
+      let location = exitInst.location.asAutoGenerated
       let builder = Builder(before: exitInst, location: location, context)
-      range.insert(createEndInstruction(builder, context)!)
+      range.insert(contentsOf: createEndInstructions(builder, context))
     }
+    endsToErase.append(contentsOf: originalScopeEnds.filter { unreusedEnds.contains($0) })
+    return endsToErase
   }
 
   /// Create a scope-ending instruction at 'builder's insertion point.
-  func createEndInstruction(_ builder: Builder, _ context: some Context) -> Instruction? {
-    switch self {
+  func createEndInstructions(_ builder: Builder, _ context: some Context) -> SingleInlineArray<Instruction> {
+    switch self.scope {
     case let .access(beginAccess):
-      return builder.createEndAccess(beginAccess: beginAccess)
+      return SingleInlineArray(element: builder.createEndAccess(beginAccess: beginAccess))
     case let .borrowed(beginBorrow):
-      return builder.createEndBorrow(of: beginBorrow.value)
+      return SingleInlineArray(element: builder.createEndBorrow(of: beginBorrow.value))
     case let .yield(yieldedValue):
       let beginApply = yieldedValue.definingInstruction as! BeginApplyInst
-      return beginApply.createEnd(builder, context)
+      // createEnd() returns non-nil because beginApply.endReaches() was checked by canExtend()
+      return SingleInlineArray(element: beginApply.createEnd(builder, context)!)
+    case let .initialized(initializer):
+      switch initializer {
+      case let .store(initializingStore: store, initialAddress: _):
+        var endInsts = SingleInlineArray<Instruction>()
+        if let sb = store as? StoreBorrowInst {
+          endInsts.append(builder.createEndBorrow(of: sb))
+        }
+        if let allocStack = self.scope.allocStackInstruction {
+          endInsts.append(builder.createDeallocStack(allocStack))
+          return endInsts
+        }
+        break
+      case .argument, .yield:
+        // TODO: extend indirectly yielded scopes.
+        break
+      }
+    case let .owned(value):
+      return SingleInlineArray(element: builder.createDestroyValue(operand: value))
+    case let .local(varInst):
+      switch varInst {
+      case let .beginBorrow(beginBorrow):
+        // FIXME: we may need to rewrite the dealloc_stack.
+        return SingleInlineArray(element: builder.createEndBorrow(of: beginBorrow))
+      case let .moveValue(moveValue):
+        return SingleInlineArray(element: builder.createDestroyValue(operand: moveValue))
+      }
     default:
-      return nil
+      break
     }
+    fatalError("Unsupported scoped extension: \(self)")
   }
 }
 
@@ -583,64 +1004,62 @@ private extension BeginApplyInst {
       return builder.createEndApply(beginApply: self)
     case .abortReaches:
       return builder.createAbortApply(beginApply: self)
+    case .deadEndReaches:
+      return builder.createEndBorrow(of: self.token)
     }
   }
 
   enum EndReaches {
     case endReaches
     case abortReaches
+    case deadEndReaches
   }
 
   /// Return the single kind of coroutine termination that reaches 'reachableBlock' or nil.
   func endReaches(block reachableBlock: BasicBlock, _ context: some Context) -> EndReaches? {
-    var endBlocks = BasicBlockSet(context)
-    var abortBlocks = BasicBlockSet(context)
+    // TODO: use InlineArray<3> once bootstrapping is fixed.
+    var endingBlockMap: [(EndReaches, BasicBlockSet)] = [
+      (.endReaches, BasicBlockSet(context)),
+      (.abortReaches, BasicBlockSet(context)),
+      (.deadEndReaches, BasicBlockSet(context))
+    ]
     defer {
-      endBlocks.deinitialize()
-      abortBlocks.deinitialize()
+      for index in endingBlockMap.indices {
+        endingBlockMap[index].1.deinitialize()
+      }
     }
     for endInst in endInstructions {
+      let endKind: EndReaches
       switch endInst {
       case let endApply as EndApplyInst:
         // Cannot extend the scope of a coroutine when the resume produces a value.
         if !endApply.type.isEmpty(in: parentFunction) {
           return nil
         }
-        endBlocks.insert(endInst.parentBlock)
+        endKind = .endReaches
       case is AbortApplyInst:
-        abortBlocks.insert(endInst.parentBlock)
+        endKind = .abortReaches
+      case is EndBorrowInst:
+        endKind = .deadEndReaches
       default:
         fatalError("invalid begin_apply ending instruction")
       }
+      let endingBlocksIndex = endingBlockMap.firstIndex(where: { $0.0 == endKind })!
+      endingBlockMap[endingBlocksIndex].1.insert(endInst.parentBlock)
     }
     var endReaches: EndReaches?
     var backwardWalk = BasicBlockWorklist(context)
     defer { backwardWalk.deinitialize() }
 
     let backwardVisit = { (block: BasicBlock) -> WalkResult in
-      if endBlocks.contains(block) {
-        switch endReaches {
-        case .none:
-          endReaches = .endReaches
-          break
-        case .endReaches:
-          break
-        case .abortReaches:
-          return .abortWalk
+      for (endKind, endingBlocks) in endingBlockMap {
+        if endingBlocks.contains(block) {
+          if let endReaches = endReaches, endReaches != endKind {
+            return .abortWalk
+          }
+          endReaches = endKind
+          return .continueWalk
         }
-        return .continueWalk
-      }
-      if abortBlocks.contains(block) {
-        switch endReaches {
-        case .none:
-          endReaches = .abortReaches
-          break
-        case .abortReaches:
-          break
-        case .endReaches:
-          return .abortWalk
-        }
-        return .continueWalk
       }
       if block == self.parentBlock {
         // the insertion point is not dominated by the coroutine
@@ -668,7 +1087,7 @@ private extension BeginApplyInst {
 private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   let function: Function
   let context: Context
-  let visitor: (Operand) -> WalkResult
+  let visitor: (Instruction) -> WalkResult
   let localReachabilityCache: LocalVariableReachabilityCache
   var visitedValues: ValueSet
 
@@ -676,7 +1095,7 @@ private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   var dependsOnCaller = false
 
   init(_ function: Function, _ localReachabilityCache: LocalVariableReachabilityCache, _ context: Context,
-       visitor: @escaping (Operand) -> WalkResult) {
+       visitor: @escaping (Instruction) -> WalkResult) {
     self.function = function
     self.context = context
     self.visitor = visitor
@@ -695,42 +1114,42 @@ private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   mutating func deadValue(_ value: Value, using operand: Operand?)
   -> WalkResult {
     if let operand {
-      return visitor(operand)
+      return visitor(operand.instruction)
     }
     return .continueWalk
   }
 
   mutating func leafUse(of operand: Operand) -> WalkResult {
-    return visitor(operand)
+    return visitor(operand.instruction)
   }
 
   mutating func escapingDependence(on operand: Operand) -> WalkResult {
     log(">>> Escaping dependence: \(operand)")
-    _ = visitor(operand)
+    _ = visitor(operand.instruction)
     // Make a best-effort attempt to extend the access scope regardless of escapes. It is possible that some mandatory
     // pass between scope fixup and diagnostics will make it possible for the LifetimeDependenceDefUseWalker to analyze
     // this use.
     return .continueWalk
   }
 
-  mutating func inoutDependence(argument: FunctionArgument, on operand: Operand) -> WalkResult {
+  mutating func inoutDependence(argument: FunctionArgument, functionExit: Instruction) -> WalkResult {
     dependsOnCaller = true
-    return visitor(operand)
+    return visitor(functionExit)
   }
 
   mutating func returnedDependence(result operand: Operand) -> WalkResult {
     dependsOnCaller = true
-    return visitor(operand)
+    return visitor(operand.instruction)
   }
 
   mutating func returnedDependence(address: FunctionArgument,
                                    on operand: Operand) -> WalkResult {
     dependsOnCaller = true
-    return visitor(operand)
+    return visitor(operand.instruction)
   }
 
   mutating func yieldedDependence(result: Operand) -> WalkResult {
-    return .continueWalk
+    return visitor(result.instruction)
   }
 
   mutating func storeToYieldDependence(address: Value, of operand: Operand) -> WalkResult {

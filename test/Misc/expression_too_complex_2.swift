@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-memory-threshold 32000
+// RUN: %target-typecheck-verify-swift -solver-memory-threshold=32000
 // REQUIRES: OS=ios
 import UIKit
 class MyViewCell: UITableViewCell {

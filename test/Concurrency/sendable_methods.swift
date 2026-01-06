@@ -10,7 +10,7 @@ func outer() {
     func nonSendable() {}
 
     let _ : @Sendable () -> Void = sendable
-    let _ : @Sendable () -> Void = nonSendable // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+    let _ : @Sendable () -> Void = nonSendable // expected-warning{{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
 }
 
 
@@ -118,7 +118,7 @@ h(GenericQ<NonSendable>().f) // ok
 h(GenericS(NonSendable()).f) // ok
 h(GenericS<Int>().f)
 h(GenericS(1).f)
-h(NonSendable().f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+h(NonSendable().f) // expected-warning{{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
 
 func executeAsTask (_ f: @escaping  @Sendable () -> Void) {
   Task {
@@ -128,7 +128,7 @@ func executeAsTask (_ f: @escaping  @Sendable () -> Void) {
 executeAsTask(S().f)
 executeAsTask(C().f)
 executeAsTask(E().f)
-executeAsTask(NonSendable().f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+executeAsTask(NonSendable().f) // expected-warning{{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
 
 do {
   let f = S.f
@@ -148,9 +148,9 @@ var partialClass : @Sendable () -> Void = C().f
 var partialEnum : @Sendable () -> Void = E().f
 
 // Reassign
-partialClass = NonSendable().f // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
-partialStruct = NonSendable().f // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
-partialEnum = NonSendable().f // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+partialClass = NonSendable().f // expected-warning{{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
+partialStruct = NonSendable().f // expected-warning{{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
+partialEnum = NonSendable().f // expected-warning{{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
 
 // Static Functions 
 struct World {
@@ -309,7 +309,7 @@ do {
   let _: @Sendable (S) -> @Sendable () -> Void = S.foo // Ok
 
   let classFn = NonSendable.f(NonSendable())
-  bar(classFn) // expected-warning {{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+  bar(classFn) // expected-warning {{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
 
   let _: @Sendable (NonSendable) -> () -> Void = NonSendable.f // Ok
 

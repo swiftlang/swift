@@ -17,6 +17,7 @@
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
@@ -38,6 +39,7 @@ namespace swift {
   class TypeRepr;
   class UnsafeUse;
   class ValueDecl;
+  enum class DisallowedOriginKind : uint8_t;
 
 enum class DeclAvailabilityFlag : uint8_t {
   /// Do not diagnose uses of protocols in versions before they were introduced.
@@ -62,19 +64,30 @@ enum class DeclAvailabilityFlag : uint8_t {
   /// Do not diagnose potential decl unavailability if that unavailability
   /// would only occur at or below the deployment target.
   AllowPotentiallyUnavailableAtOrBelowDeploymentTarget = 1 << 4,
+
+  /// Don't perform "unsafe" checking.
+  DisableUnsafeChecking = 1 << 5,
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 
-// This enum must be kept in sync with
-// diag::decl_from_hidden_module and
-// diag::conformance_from_implementation_only_module.
+// Classification of the kind of declaration visible to clients that is
+// restricting references to some decls.
+//
+// This enum must be kept in sync with diag's `EXPORTABILITY_REASON_SELECT`,
+// and fit in the size of `ExportContext.Reason`.
 enum class ExportabilityReason : unsigned {
   General,
   PropertyWrapper,
   ResultBuilder,
   ExtensionWithPublicMembers,
   ExtensionWithConditionalConformances,
-  Inheritance
+  Inheritance,
+  ImplicitlyPublicInheritance,
+  AvailableAttribute,
+  PublicVarDecl,
+  ImplicitlyPublicVarDecl,
+  AssociatedValue,
+  ImplicitlyPublicAssociatedValue,
 };
 
 /// A description of the restrictions on what declarations can be referenced
@@ -106,14 +119,16 @@ class ExportContext {
   DeclContext *DC;
   AvailabilityContext Availability;
   FragileFunctionKind FragileKind;
+  llvm::SmallVectorImpl<UnsafeUse> *UnsafeUses;
   unsigned SPI : 1;
-  unsigned Exported : 1;
+  unsigned Exported : 2;
   unsigned Implicit : 1;
-  unsigned Reason : 3;
+  unsigned Reason : 4;
 
   ExportContext(DeclContext *DC, AvailabilityContext availability,
-                FragileFunctionKind kind, bool spi, bool exported,
-                bool implicit);
+                FragileFunctionKind kind,
+                llvm::SmallVectorImpl<UnsafeUse> *unsafeUses,
+                bool spi, ExportedLevel exported, bool implicit);
 
 public:
 
@@ -159,12 +174,14 @@ public:
 
   AvailabilityContext getAvailability() const { return Availability; }
 
-  AvailabilityRange getAvailabilityRange() const {
-    return Availability.getPlatformRange();
-  }
-
   /// If not 'None', the context has the inlinable function body restriction.
   FragileFunctionKind getFragileFunctionKind() const { return FragileKind; }
+
+  /// Retrieve a pointer to the vector where any unsafe uses should be stored.
+  /// When NULL, we shouldn't be checking
+  llvm::SmallVectorImpl<UnsafeUse> *getUnsafeUses() const {
+    return UnsafeUses;
+  }
 
   /// If true, the context is part of a synthesized declaration, and
   /// availability checking should be disabled.
@@ -173,40 +190,26 @@ public:
   /// If true, the context is SPI and can reference SPI declarations.
   bool isSPI() const { return SPI; }
 
-  /// If true, the context is exported and cannot reference SPI declarations
-  /// or declarations from `@_implementationOnly` imports.
-  bool isExported() const { return Exported; }
+  /// If true, the context is exported explicitly and cannot reference
+  /// restricted decls.
+  bool isExported() const { return Exported != unsigned(ExportedLevel::None); }
 
-  /// If true, the context is part of a deprecated declaration and can
-  /// reference other deprecated declarations without warning.
-  bool isDeprecated() const { return Availability.isDeprecated(); }
-
-  std::optional<PlatformKind> getUnavailablePlatformKind() const {
-    return Availability.getUnavailablePlatformKind();
-  }
+  /// Get the export level of the context.
+  ExportedLevel getExportedLevel() const { return ExportedLevel(Exported); }
 
   /// If true, the context can only reference exported declarations, either
   /// because it is the signature context of an exported declaration, or
   /// because it is the function body context of an inlinable function.
   bool mustOnlyReferenceExportedDecls() const;
 
+  /// If true, the context reference a dependency of \p originKind  without
+  /// restriction.
+  bool canReferenceOrigin(DisallowedOriginKind originKind) const;
+
   /// Get the ExportabilityReason for diagnostics. If this is 'None', there
   /// are no restrictions on referencing unexported declarations.
   std::optional<ExportabilityReason> getExportabilityReason() const;
-
-  /// If \p decl is unconditionally unavailable in this context, and the context
-  /// is not also unavailable in the same way, then this returns the specific
-  /// `@available` attribute that makes the decl unavailable. Otherwise, returns
-  /// nullptr.
-  std::optional<SemanticAvailableAttr>
-  shouldDiagnoseDeclAsUnavailable(const Decl *decl) const;
 };
-
-/// Check if a declaration is exported as part of a module's external interface.
-/// This includes public and @usableFromInline decls.
-bool isExported(const ValueDecl *VD);
-bool isExported(const ExtensionDecl *ED);
-bool isExported(const Decl *D);
 
 /// Diagnose uses of unavailable declarations in expressions.
 void diagnoseExprAvailability(const Expr *E, DeclContext *DC);
@@ -240,15 +243,7 @@ bool diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 /// unavailable declaration.
 void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
                                        const ValueDecl *base,
-                                       const AvailableAttr *attr);
-
-/// Checks whether a declaration should be considered unavailable when referred
-/// to in the given declaration context and availability context and, if so,
-/// returns a result that describes the unsatisfied constraint.
-/// Returns `std::nullopt` if the declaration is available.
-std::optional<AvailabilityConstraint>
-getUnsatisfiedAvailabilityConstraint(const Decl *decl,
-                                     AvailabilityContext availabilityContext);
+                                       SemanticAvailableAttr attr);
 
 /// Checks whether a declaration should be considered unavailable when referred
 /// to at the given source location in the given decl context and, if so,
@@ -266,12 +261,6 @@ bool checkTypeMetadataAvailability(Type type, SourceRange loc,
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);
-
-/// Determine the enclosing context that allows for some use of an unsafe
-/// construct, and whether that reference is in the definition (true) vs.
-/// in the interface (false) of that context.
-std::pair<const Decl *, bool /*inDefinition*/>
-enclosingContextForUnsafe(SourceLoc referenceLoc, const DeclContext *referenceDC);
 
 } // namespace swift
 

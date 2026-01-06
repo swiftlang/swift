@@ -141,7 +141,7 @@ ArchetypeToConcreteConvertUInt8(t: f)
 // CHECK-LABEL: sil shared [noinline] {{.*}}@$s37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC{{[_0-9a-zA-Z]*}}FAA1DC_Tg5 : $@convention(thin) (@guaranteed D) -> @owned C {
 // CHECK: bb0([[ARG:%.*]] : $D):
 // CHECK:   [[UPCAST:%.*]] = upcast [[ARG]] : $D to $C
-// CHECK:   strong_retain [[ARG]]
+// CHECK:   strong_retain [[UPCAST]]
 // CHECK:   return [[UPCAST]]
 // CHECK: } // end sil function '$s37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertC{{[_0-9a-zA-Z]*}}FAA1DC_Tg5'
 

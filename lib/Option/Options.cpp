@@ -16,15 +16,16 @@
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/Option.h"
 
+#define OPTTABLE_STR_TABLE_CODE
+#include "swift/Option/Options.inc"
+#undef OPTTABLE_STR_TABLE_CODE
+
+#define OPTTABLE_PREFIXES_TABLE_CODE
+#include "swift/Option/Options.inc"
+#undef OPTTABLE_PREFIXES_TABLE_CODE
+
 using namespace swift::options;
 using namespace llvm::opt;
-
-#define PREFIX(NAME, VALUE)                                                    \
-  constexpr llvm::StringLiteral NAME##_init[] = VALUE;                         \
-  constexpr llvm::ArrayRef<llvm::StringLiteral> NAME(                          \
-      NAME##_init, std::size(NAME##_init) - 1);
-#include "swift/Option/Options.inc"
-#undef PREFIX
 
 static const llvm::opt::GenericOptTable::Info InfoTable[] = {
 #define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
@@ -36,7 +37,8 @@ namespace {
 
 class SwiftOptTable : public llvm::opt::GenericOptTable {
 public:
-  SwiftOptTable() : GenericOptTable(InfoTable) {}
+  SwiftOptTable()
+      : GenericOptTable(OptionStrTable, OptionPrefixesTable, InfoTable) {}
 };
 
 } // end anonymous namespace

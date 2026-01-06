@@ -21,36 +21,77 @@ public struct BufferView : ~Escapable {
   @inlinable
   @lifetime(borrow a)
   internal init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) {
-    self.init(ptr, a.count)
+    let bv = BufferView(ptr, a.count)
+    self = _overrideLifetime(bv, borrowing: a)
   }
   @inlinable
-  @lifetime(a)
+  @lifetime(copy a)
   internal init(_ ptr: UnsafeRawBufferPointer, _ a: consuming AnotherView) {
-    self.init(ptr, a._count)
+    let bv = BufferView(ptr, a._count)
+    self = _overrideLifetime(bv, copying: a)
   }
 }
 
 @inlinable
-@lifetime(x)
+@lifetime(copy x)
 public func derive(_ x: consuming BufferView) -> BufferView {
-  return BufferView(x._ptr, x._count)
+  let pointer = x._ptr
+  let bv = BufferView(pointer, x._count)
+  return _overrideLifetime(bv, copying: x)
 }
 
 @inlinable
 public func use(_ x: consuming BufferView) {}
 
 @inlinable
-@lifetime(view)
+@lifetime(copy view)
 public func consumeAndCreate(_ view: consuming BufferView) -> BufferView {
-  return BufferView(view._ptr, view._count)
+  let pointer = view._ptr
+  let bv = BufferView(pointer, view._count)
+  return _overrideLifetime(bv, copying: view)
 }
 
+// FIXME: Filed rdar://150398673 ([nonescapable] allocbox-to-stack fails causing lifetime diagnostics to fail)
+// Remove _overrideLifetime when this is fixed.
 @inlinable
-@lifetime(this, that)
+@lifetime(copy this, copy that)
 public func deriveThisOrThat(_ this: consuming BufferView, _ that: consuming BufferView) -> BufferView {
   if (Int.random(in: 1..<100) == 0) {
-    return BufferView(this._ptr, this._count)
+    let thisView = BufferView(this._ptr, this._count)
+    return _overrideLifetime(thisView, copying: this)
   }
-  return BufferView(that._ptr, that._count)
+  let thatView = BufferView(that._ptr, that._count)
+  return _overrideLifetime(thatView, copying: that)
 }
 
+public struct Container {
+  var buffer: UnsafeRawBufferPointer
+  var object: AnyObject
+}
+
+extension Container {
+  public var storage: BufferView {
+    get {
+      let view = BufferView(buffer, 1)
+      return _overrideLifetime(view, borrowing: self)
+    }
+  }
+}
+
+// Test feature guard: NonescapableAccessorOnTrivial
+extension UnsafeMutableBufferPointer where Element: ~Copyable {
+  public var span: Span<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    get {
+      unsafe Span(_unsafeElements: self)
+    }
+  }
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    get {
+      unsafe MutableSpan(_unsafeElements: self)
+    }
+  }
+}

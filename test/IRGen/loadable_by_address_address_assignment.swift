@@ -3,8 +3,6 @@
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 // wasm currently disables aggressive reg2mem
-// UNSUPPORTED: wasm
-// UNSUPPORTED: OS=wasi
 // UNSUPPORTED: CPU=wasm32
 
 public struct LargeThing {

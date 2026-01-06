@@ -42,11 +42,18 @@ struct MyStruct {
   static func cfoo()
 }
 
+enum MyError: Error {
+  case x
+}
+
 // CHECK: <protocol>protocol <name>MyProt</name> {
 // CHECK:   <ifunc>func <name>foo()</name></ifunc>
 // CHECK:   <ifunc>func <name>foo2()</name> throws</ifunc>
 // CHECK:   <ifunc>func <name>foo3()</name> throws -> <type>Int</type></ifunc>
-// CHECK:   <ifunc>func <name>foo4<<generic-param><name>T</name></generic-param>>()</name> where T: MyProt</ifunc>
+
+// FIXME: The end of the source range needs to be advanced past the ')' here!
+// CHECK:   <ifunc>func <name>foo4()</name> throws(MyError</ifunc>)
+// CHECK:   <ifunc>func <name>foo5<<generic-param><name>T</name></generic-param>>()</name> where T: MyProt</ifunc>
 // CHECK:   <ifunc><name>init()</name></ifunc>
 // CHECK:   <ifunc><name>init(<param><name>a</name>: <type>Int</type></param>)</name> throws</ifunc>
 // CHECK:   <ifunc><name>init<<generic-param><name>T</name></generic-param>>(<param><name>a</name>: <type>T</type></param>)</name> where T: MyProt</ifunc>
@@ -55,7 +62,8 @@ protocol MyProt {
   func foo()
   func foo2() throws
   func foo3() throws -> Int
-  func foo4<T>() where T: MyProt
+  func foo4() throws(MyError)
+  func foo5<T>() where T: MyProt
   init()
   init(a: Int) throws
   init<T>(a: T) where T: MyProt

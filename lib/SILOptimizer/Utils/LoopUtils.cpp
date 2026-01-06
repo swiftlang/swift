@@ -218,9 +218,21 @@ bool swift::canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI) {
   return MadeChange;
 }
 
-bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
+bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBlocks *deb) {
   SinkAddressProjections sinkProj;
   for (auto res : I->getResults()) {
+    // If a guaranteed value is used in a dead-end exit block and the enclosing value
+    // is _not_ destroyed in this block, we end up missing the enclosing value as
+    // phi-argument after duplicating the loop.
+    // TODO: once we have complete lifetimes we can remove this check
+    if (res->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      for (Operand *use : res->getUses()) {
+        SILBasicBlock *useBlock = use->getUser()->getParent();
+        if (!L->contains(useBlock) && deb->isDeadEnd(useBlock))
+          return false;
+      }
+    }
+
     if (!res->getType().isAddress()) {
       continue;
     }
@@ -264,11 +276,11 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
       return false;
     }
   }
-  // Like partial_apply [onstack], mark_dependence [nonescaping] creates a
-  // borrow scope. We currently assume that a set of dominated scope-ending uses
-  // can be found.
+  // Like partial_apply [onstack], mark_dependence [nonescaping] on values
+  // creates a borrow scope. We currently assume that a set of dominated
+  // scope-ending uses can be found.
   if (auto *MD = dyn_cast<MarkDependenceInst>(I)) {
-    return !MD->isNonEscaping();
+    return !MD->isNonEscaping() || MD->getType().isAddress();
   }
   // CodeGen can't build ssa for objc methods.
   if (auto *Method = dyn_cast<MethodInst>(I)) {

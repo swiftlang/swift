@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-import System
+public import System
+import Foundation
 
 public protocol PathProtocol: Hashable, CustomStringConvertible {
   var storage: FilePath { get }
@@ -68,14 +69,11 @@ public extension PathProtocol {
     return RelativePath(result)
   }
 
-  func hasExtension(_ ext: FileExtension) -> Bool {
-    storage.extension == ext.rawValue
-  }
   func hasExtension(_ exts: FileExtension...) -> Bool {
     // Note that querying `.extension` involves re-parsing, so only do it
     // once here.
-    let ext = storage.extension
-    return exts.contains(where: { ext == $0.rawValue })
+    guard let pathExt = storage.extension else { return false }
+    return exts.contains(where: { $0.matches(pathExt) })
   }
 
   func starts(with other: Self) -> Bool {
@@ -127,12 +125,19 @@ extension PathProtocol {
     return false
   }
 
-  var isCSourceLike: Bool {
+  var isClangSource: Bool {
     hasExtension(.c, .cpp, .m, .mm)
   }
 
   var isSourceLike: Bool {
-    isCSourceLike || hasExtension(.swift)
+    isClangSource || hasExtension(.swift)
+  }
+
+  /// Checks whether this file a source file that should be excluded from
+  /// any generated targets.
+  var isExcludedSource: Bool {
+    // We don't get useful build arguments for these.
+    hasExtension(.asm, .s, .cc, .cl, .inc, .proto)
   }
 
   var isDocLike: Bool {
@@ -147,5 +152,18 @@ extension Collection where Element: PathProtocol {
     guard let first = self.first else { return nil }
     let result = dropFirst().reduce(first, { $0.commonAncestor(with: $1) })
     return result == first ? result.parentDir : result
+  }
+}
+
+extension StringProtocol {
+  func hasExtension(_ exts: FileExtension...) -> Bool {
+    guard let pathExt = FilePath(String(self)).extension else { return false }
+    return exts.contains(where: { $0.matches(pathExt) })
+  }
+}
+
+extension FileExtension {
+  func matches(_ extStr: String) -> Bool {
+    rawValue.compare(extStr, options: .caseInsensitive) == .orderedSame
   }
 }

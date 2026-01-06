@@ -9,8 +9,8 @@
 // rdar://100558042
 // UNSUPPORTED: CPU=arm64e
 
-// RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
-// RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift %S/Inputs/main.swift -emit-module -emit-executable -module-name TypeLowering -o %t/TypesToReflect
+// RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library %no-fixup-chains -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
+// RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift %S/Inputs/main.swift -emit-module -emit-executable %no-fixup-chains -module-name TypeLowering -o %t/TypesToReflect
 
 // RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // RUN: %target-swift-reflection-dump %t/TypesToReflect %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
@@ -1269,3 +1269,14 @@ BD
 
 // CHECK-32:      (builtin Builtin.DefaultActorStorage)
 // CHECK-32-NEXT:    (builtin size=48 alignment=8 stride=48 num_extra_inhabitants=0 bitwise_takable=1)
+
+$1_SiBV
+// CHECK-64:      (builtin_fixed_array
+// CHECK-64-NEXT:   (integer value=2)
+// CHECK-64-NEXT:   (struct Swift.Int))
+// CHECK-64-NEXT: (array size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1)
+
+// CHECK-32:      (builtin_fixed_array
+// CHECK-32-NEXT:   (integer value=2)
+// CHECK-32-NEXT:   (struct Swift.Int))
+// CHECK-32-NEXT: (array size=8 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1)

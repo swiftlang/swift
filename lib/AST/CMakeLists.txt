@@ -27,9 +27,12 @@ add_swift_host_library(swiftAST STATIC
   Attr.cpp
   AutoDiff.cpp
   Availability.cpp
+  AvailabilityConstraint.cpp
   AvailabilityContext.cpp
   AvailabilityDomain.cpp
+  AvailabilityQuery.cpp
   AvailabilityScope.cpp
+  AvailabilityScopeBuilder.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
   CaptureInfo.cpp
@@ -41,7 +44,10 @@ add_swift_host_library(swiftAST STATIC
   ConformanceLookupTable.cpp
   Decl.cpp
   DeclContext.cpp
+  DeclContextDumper.cpp
+  DeclNameExtractor.cpp
   DeclNameLoc.cpp
+  DiagnosticArgument.cpp
   DiagnosticBridge.cpp
   DiagnosticConsumer.cpp
   DiagnosticEngine.cpp
@@ -82,7 +88,7 @@ add_swift_host_library(swiftAST STATIC
   ParameterPack.cpp
   Parameter.cpp
   Pattern.cpp
-  PlatformKind.cpp
+  PlatformKindUtils.cpp
   PluginLoader.cpp
   PluginRegistry.cpp
   PrettyStackTrace.cpp
@@ -91,6 +97,7 @@ add_swift_host_library(swiftAST STATIC
   RawComment.cpp
   Requirement.cpp
   RequirementEnvironment.cpp
+  RequirementMachine/ApplyInverses.cpp
   RequirementMachine/ConcreteContraction.cpp
   RequirementMachine/ConcreteTypeWitness.cpp
   RequirementMachine/Diagnostics.cpp
@@ -170,5 +177,10 @@ target_link_libraries(swiftAST INTERFACE
 target_link_libraries(swiftAST
   PUBLIC swiftBasic
   PRIVATE swiftMarkup)
+
+if (SWIFT_BUILD_SWIFT_SYNTAX)
+  target_link_libraries(swiftAST
+    PRIVATE swiftASTGen swiftBasicSwift)
+endif()
 
 set_swift_llvm_is_available(swiftAST)

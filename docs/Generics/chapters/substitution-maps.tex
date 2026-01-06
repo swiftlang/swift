@@ -2,498 +2,402 @@
 
 \begin{document}
 
-\chapter{Substitution Maps}\label{substmaps}
+\chapter{Substitution Maps}\label{chap:substitution maps}
 
-\lettrine{S}{ubstitution maps arise} when the type checker needs to reason about a reference to a generic declaration, specialized with list of generic arguments. Abstractly, a \IndexDefinition{substitution map}substitution map defines a \IndexDefinition{replacement type}replacement type corresponding to each type parameter of a generic signature; applying a substitution map to the interface type of a generic declaration recursively replaces the type parameters therein, producing the type of the specialized reference.
+\lettrine{S}{ubstitution maps} are the semantic objects that describe \emph{references} to generic declarations. If we think of a generic signature as a \emph{contract} between a declaration and its client, then the previous chapter's derived requirements formalism gave us one side of this contract: within the \emph{body} of a generic declaration, we start from the assumption that the concrete replacement types, whatever they might be, must satisfy the generic signature's explicit requirements, and from this, we derive various consequences which then hold. In this chapter, we turn our attention to the client's side of this contract, which leads to the study of \emph{type substitution}.
 
-The \index{generic signature!type substitution}generic signature of a substitution map is called the \IndexDefinition{input generic signature}\emph{input generic signature}. A substitution map stores its input generic signature, and the generic signature's list of generic parameters and \index{conformance}conformance requirements determine the substitution map's shape:
-\begin{quote}
-\texttt{<\ttbox{A}, \ttbox{B} where \ttbox{B:\ Sequence}, B.[Sequence]Element == Int>}
-\end{quote}
-Formally, a substitution map consists of a replacement type for each generic parameter, and a conformance for each conformance requirement:
-\begin{quote}
+\paragraph{Input generic signature.}
+The ``shape'' of a substitution map is determined by its \IndexDefinition{input generic signature}\emph{input generic signature}. In this chapter, we will primarily focus on the simplest case, where this generic signature has no requirements, but we will summarize the general case shortly. Subsequent chapters will explain how requirements interact with substitution.
+
+\begin{example}
+Let's look at this generic function, and think about its callers:
+\begin{Verbatim}
+func combine<T, U>(_ t: T, _ u: U) -> (T, Array<U>) {
+  return (t, [u])
+}
+\end{Verbatim}
+Our generic signature has two generic parameters and no requirements. Let's call it $G$:
+\[G := \texttt{<T, U>}, \qquad \text{or} \qquad \texttt{<\rT, \rU>}.\]
+Suppose we call our function with these two values; what is the type of the result?
+\begin{Verbatim}
+let t: Optional<Int> = 3
+let u: String = "Hello world"
+
+let result = combine(t, u)  // what is the return type of this call?
+\end{Verbatim}
+By matching the function's declared parameter types against the types of the argument expressions, the \index{expression type checker}expression type checker can deduce that \tT~must be \texttt{Optional<Int>}, and also that \tU~must be \texttt{String}. This gives us our substitution map; let's call it $\Sigma$:
+\begin{align*}
+\Sigma := \{&\SubstType{\rT}{Optional<Int>},\\
+&\SubstType{\rU}{String}\}
+\end{align*}
+Our notation for specifying a substitution map lists the \IndexDefinition{replacement type}replacement type for each generic parameter of its input generic signature, in order. Type substitution disregards \index{sugared type}type sugar, and to remind ourselves of this fact, we write the canonical generic parameter type on the left-hand side of the ``$\mapsto$'' symbol. We often name our substitution maps $\Sigma$ or some variation, like $\Sigma_1$, $\Sigma_2$, $\Sigma^\prime$, and so on.
+
+Recall from \ChapRef{chap:types} that types have a tree structure, so the two replacement types in our substitution map~$\Sigma$ have an in-memory form that looks something like this:
+\begin{center}
+\begin{tikzpicture}[node distance=0.5cm, baseline={([yshift=-2pt]OptionalInt)}]
+\node (OptionalInt) [type] {\texttt{Optional<Int>}};
+
+\node (Int) [type, below=of OptionalInt] {\texttt{\vphantom{y}Int}};
+
+\draw [arrow] (OptionalInt) -- (Int);
+\end{tikzpicture}\;,
+\quad and \quad
+\begin{tikzpicture}[node distance=0.5cm, baseline={([yshift=-2pt]String)}]
+\node (String) [type] {\texttt{String}};
+\end{tikzpicture}\;.
+\end{center}
+Now, to figure out the inferred type of ``\texttt{result},'' we note that our function's declared return type is the \index{tuple type}tuple type \texttt{(\rT, Array<\rU>)}. Let's call this the \emph{original type}. This type contains the generic parameters of~$G$. To get the \emph{substituted type}, we replace each occurrence of \rT\ and \rU\ in the original type with its replacement type. We conclude that the substituted type is \texttt{(Optional<Int>, Array<String>)}. \FigRef{subst fig} illustrates the transformation.
+\end{example}
+
+\begin{figure}\captionabove{Type substitution}\label{subst fig}
+\begin{center}
 \begin{tabular}{ccc}
-\ttbox{A}&\ttbox{B}&\ttbox{B:\ Sequence}\\
-$\Downarrow$&$\Downarrow$&$\Downarrow$\\
-\ttbox{String}&\ttbox{Array<Int>}&\ttbox{Array<Int>:\ Sequence}
+\textbf{Original type:}&&\textbf{Substituted type:}\\[\medskipamount]
+\begin{tikzpicture}[baseline={([yshift=-3pt]Tuple)}]
+\node (Tuple) [type] {\texttt{(\rT, Array<\rU>)}};
+
+\node (T) [type, fill=light-gray, below=of Tuple, xshift=-38] {\texttt{\vphantom{y}}\rT};
+
+\node (ArrayU) [type, below=of Tuple, xshift=38] {\texttt{Array<\rU>}};
+
+\node (U) [type, fill=light-gray, below=of ArrayU] {\texttt{\vphantom{y}}\rU};
+
+\draw [arrow] (Tuple) -- (T);
+\draw [arrow] (Tuple) -- (ArrayU);
+\draw [arrow] (ArrayU) -- (U);
+\end{tikzpicture}&
+{\Large $\Rightarrow$}&
+\begin{tikzpicture}[baseline={([yshift=-3pt]TupleSubst)}]
+\node (TupleSubst) [type, xshift=30] {\texttt{(Optional<Int>, Array<String>)}};
+
+\node (OptionalInt) [type, below=of TupleSubst, xshift=-50] {\texttt{Optional<Int>}};
+
+\node (Int) [type, below=of OptionalInt] {\texttt{\vphantom{y}Int}};
+
+\node (ArrayString) [type, below=of TupleSubst, xshift=50] {\texttt{Array<String>}};
+
+\node (String) [type, below=of ArrayString] {\texttt{String}};
+
+\draw [arrow] (TupleSubst) -- (OptionalInt);
+\draw [arrow] (OptionalInt) -- (Int);
+\draw [arrow] (TupleSubst) -- (ArrayString);
+\draw [arrow] (ArrayString) -- (String);
+\end{tikzpicture}
 \end{tabular}
-\end{quote}
-We can collect all of the above information in a table:
-\begin{quote}
-\begin{tabular}{|lcl|}
-\hline
-\rule{0pt}{3ex}\textbf{Generic parameters}&&\textbf{Replacement types}\\
-\texttt{A}&$\mapsto$&\texttt{String}\\
-\texttt{B}&$\mapsto$&\texttt{Array<Int>}\\[\medskipamount]
-\textbf{Conformance requirements}&&\textbf{Conformances}\\
-$\ConfReq{B}{Sequence}$&$\mapsto$&$\ConfReq{Array<Int>}{Sequence}$\\[\medskipamount]
-\hline
-\end{tabular}
-\end{quote}
-Or more concisely,\index{$\mapsto$}\index{$\mapsto$!z@\igobble|seealso{substitution map}}
-\begin{align*}
-\SubstMapC{
-&\SubstType{A}{String},\\
-&\SubstType{B}{Array<Int>}
-}{\\
-&\SubstConf{B}{Array<Int>}{Sequence}
-}
-\end{align*}
+\end{center}
+\end{figure}
 
-\begin{listing}\captionabove{Substitution maps in type checking}\label{substmaptypecheck}
-\begin{Verbatim}
-func genericFunction<A, B: Sequence>(_: A, _: B)
-    where B.Element == Int {}
-
-struct GenericType<A, B: Sequence> where B.Element == Int {
-  func nonGenericMethod() {}
-}
-
-// substitution map for the call is {A := String, B := Array<Int>}.
-genericFunction("hello", [1, 2, 3])
-
-// the type of `value' is GenericType<String, Array<Int>>.
-let value = GenericType<String, Array<Int>>()
-
-// the context substitution map for the type of `value' is
-// {A := String, B := Array<Int>}.
-value.nonGenericMethod()
-\end{Verbatim}
-\end{listing}
-
-\begin{example}
-We often use the Greek letter $\Sigma$, in various forms, to denote substitution maps. For example, $\Sigma$, $\Sigma_1$, $\Sigma_2$, $\Sigma^\prime$, etc. For now we'll just work with the single substitution map defined above, so let's denote it by $\Sigma$:
-\begin{align*}
-\Sigma := \SubstMapC{
-&\SubstType{A}{String},\\
-&\SubstType{B}{Array<Int>}
-}{\\
-&\SubstConf{B}{Array<Int>}{Sequence}
-}
-\end{align*}
-Our substitution map appears while type checking the program shown in \ListingRef{substmaptypecheck}. Here, all three of \texttt{genericFunction()}, \texttt{GenericType} and \texttt{nonGenericMethod()} have the same generic signature, \texttt{<A, B where B:~Sequence, B.Element == Int>}. When type checking a generic function call, the expression type checker infers the generic arguments from the types of the argument expressions. When referencing a generic type, the generic arguments can be written explicitly. In fact, all three declarations are also referenced with the same substitution map. (In the case of a generic type, this substitution map is called the \emph{context substitution map}, as you will see in \SecRef{contextsubstmap}.)
-\end{example}
-
-\paragraph{Type substitution.} Substitution maps operate on interface types. Recall that an \index{interface type!type substitution}interface type is a type \emph{containing} valid type parameters for some generic signature, which may itself not be a type parameter; for example, one possible interface type is \texttt{Array<T>}, if \texttt{T} is a generic parameter type. Let's introduce the formal notation \IndexSetDefinition{type}{\TypeObj{G}}$\TypeObj{G}$ to mean the set of interface types for a generic signature $G$. Then, if $\texttt{T}\in\TypeObj{G}$ and $\Sigma$ is a substitution map with input generic signature $G$, we can \emph{apply} $\Sigma$ to \texttt{T} to get a new type. This operation is called \IndexDefinition{type substitution}\emph{type substitution}. The interface type here is called the \IndexDefinition{original type}\emph{original type}, and the result of the substitution is the \IndexDefinition{substituted type}\emph{substituted type}. We will think of applying a substitution map to an interface type as an binary operation: \[\texttt{T}\otimes\Sigma\]
-The \index{$\otimes$}\index{$\otimes$!z@\igobble|seealso{type substitution}}\index{binary operation}$\otimes$ binary operation is a \emph{right action} of substitution maps on types. (We could have instead defined a left action, but later we will see the right action formulation is more natural for expressing certain identities. Indeed, we'll develop this notation further throughout this book.)
-
-Type substitution recursively replaces any type parameters appearing in the original type with new types derived from the substitution map, while preserving the ``concrete structure'' of the original type. Thus the behavior of type substitution is ultimately defined by how substitution maps act the two kinds of type parameters: generic parameters and dependent member types:
-\begin{itemize}
-\item Applying a substitution map to a generic parameter type returns the corresponding replacement type from the substitution map.
-
-Type substitution does not care about generic parameter sugar in the original type; replacement types for generic parameters are always looked up by depth and index in the substitution map.
-
-\item Applying a substitution map to a dependent member type derives the replacement type from one of the substitution map's conformances.
-
-Now, we haven't talked about conformances yet. There is a circularity between substitution maps and conformances---substitution maps can store conformances, and conformances can store substitution maps. We will look at conformances in great detail in \ChapRef{conformances}. The derivation of replacement types for dependent member types is discussed in \SecRef{abstract conformances}.
-\end{itemize}
-
-\begin{example}
-Applying the substitution map from our running example to sugared and canonical generic parameter types produces the same results:
+This operation is called \emph{type substitution}. We will introduce some notation to talk about it first, before we look at the formal algorithm. With $\Sigma$ as above, we denote this type substitution operation as follows, with the original type on the left of the $\otimes$ operator, and the substitution map on the right:
 \[
-\left\{
-\begin{array}{l}
-\texttt{A}\\
-\ttgp{0}{0}\\
-\texttt{B}\\
-\ttgp{0}{1}
-\end{array}\right\}
-\otimes
-\Sigma
-=
-\left\{
-\begin{array}{l}
-\texttt{String}\\
-\texttt{String}\\
-\texttt{Array<Int>}\\
-\texttt{Array<Int>}
-\end{array}\right\}
+\texttt{(\rT, Array<\rU>)} \otimes \Sigma = \texttt{(Optional<Int>, Array<String>)}
 \]
-\end{example}
-\begin{listing}\captionabove{Applying a substitution map to four interface types}\label{typealiassubstlisting}
+The above example showed one way to ``observe'' type substitution: we write down a generic function declaration, call it with some list of generic argument types, and then look at the return type of the call. Here is another similar trick.
+
+\begin{example}
+Consider \index{type resolution}type resolution with a \index{generic type alias!type substitution}generic type alias:
 \begin{Verbatim}
-struct GenericType<A, B: Sequence> where B.Element == Int {
-  typealias T1 = A
-  typealias T2 = B
-  typealias T3 = (A.Type, Float)
-  typealias T4 = (Optional<A>) -> B
-}
+typealias Foo<T, U> = (T, Array<U>)
 
-let t1: GenericType<String, Array<Int>>.T1 = ...
-let t2: GenericType<String, Array<Int>>.T2 = ...
-let t3: GenericType<String, Array<Int>>.T3 = ...
-let t4: GenericType<String, Array<Int>>.T4 = ...
+let x: Foo<Optional<Int>, String> = ...
 \end{Verbatim}
-\end{listing}
-
-\begin{example}\label{type alias subst example} \ListingRef{typealiassubstlisting} shows a generic type with four member type alias declarations. There are four global variables, and the type of each global variable is written as a member type alias reference with the same type base type, \texttt{GenericType<String, Array<Int>>}. 
-
-\index{underlying type}
-\index{type alias declaration}
-\index{substitution map}
-Type resolution resolves a member type alias reference by applying a substitution map to the underlying type of the type alias declaration. Here, the underlying type of each type alias declaration is an interface type for the generic signature of \texttt{GenericType}, and the substitution map is the substitution map $\Sigma$ of \ExRef{substmaptypecheck}.
-
-The type of each global variable \texttt{t1}, \texttt{t2}, \texttt{t3} and \texttt{t4} is determined by applying $\Sigma$ to the underlying type of each type alias declaration:
-\begin{quote}
-\begin{tabular}{lll}
-\toprule
-&\textbf{Original type}&\textbf{Substituted type}\\
-\midrule
-\texttt{t1}&\texttt{A}&\texttt{String}\\
-\texttt{t2}&\texttt{B}&\texttt{Array<Int>}\\
-\texttt{t3}&\texttt{(A.Type, Float)}&\texttt{(String.Type, Float)}\\
-\texttt{t4}&\texttt{(Optional<A>) -> B}&\texttt{(Optional<String>) -> Array<Int>}\\
-\bottomrule
-\end{tabular}
-\end{quote}
-The first two original types are generic parameters, and substitution directly projects the corresponding replacement type from the substitution map; the second two original types are substituted by recursively replacing generic parameters they contain.
+Here, we're referencing \texttt{Foo} with the same generic arguments as before, so we get the same substitution map~$\Sigma$. To resolve the type annotation on ``\texttt{x}'', we apply $\Sigma$ to the \index{underlying type!type substitution}underlying type of \texttt{Foo}:
+\[
+\texttt{(\rT, Array<\rU>)} \otimes \Sigma = \texttt{(Optional<Int>, Array<String>)}
+\]
+Since the underlying type of the alias and the generic arguments of a reference are both arbitrary, we can use generic type aliases to encode any type substitution operation. We will discuss type resolution of generic type aliases in \SecRef{identtyperepr} and \SecRef{member type repr}.
 \end{example}
-
-References to generic type alias declarations are more complex because in addition to the generic parameters of the base type, the generic type alias will have generic parameters of its own. \SecRef{identtyperepr} describes how the substitution map is computed in this case.
-
-\paragraph{Substitution failure.}
-Substitution of an interface type containing dependent member types can \IndexDefinition{substitution failure}\emph{fail} if any of the conformances in the substitution map are invalid. In this case, an \index{error type}error type is returned instead of signaling an assertion. Invalid conformances can appear in substitution maps when the user's own code is invalid; it is not an invariant violation as long as other errors are diagnosed elsewhere and the compiler does not proceed to \index{SILGen}SILGen with error types in the \index{abstract syntax tree}abstract syntax tree.
 
 \paragraph{Output generic signature.}
-If the replacement types in the substitution map are \index{fully-concrete type}fully concrete---that is, they do not contain any type parameters---then all possible substituted types produced by this substitution map will also be fully concrete. If the replacement types are interface types for some \IndexDefinition{output generic signature}\emph{output} generic signature, the substitution map will produce interface types for this generic signature. The output generic signature might be a different from the \emph{input} generic signature of the substitution map. 
+In our examples so far, the replacement types in the substitution map were \index{fully-concrete type}fully concrete. To observe a substitution map whose replacement types contain type parameters, we can reference a generic declaration from the body of some other generic declaration. We say that a generic signature $H$ is the \IndexDefinition{output generic signature}\emph{output generic signature} of a substitution map $\Sigma$ if all type parameters that appear in the replacement types of $\Sigma$ are valid type parameters of~$H$.
 
-The output generic signature is not stored in the substitution map; it is implicit from context. Also, fully-concrete types can be seen as valid interface types for \emph{any} generic signature, because they do not contain type parameters at all. Keeping these caveats in mind, we have this essential principle:
-\begin{quote}
-\textbf{A substitution map defines a transformation from the interface types of its input generic signature to the interface types of its output generic signature.}
-\end{quote}
-Recall our notation $\TypeObj{G}$ for the set of interface types of $G$. We also use the notation \IndexSetDefinition{sub}{\SubMapObj{G}{H}}$\SubMapObj{G}{H}$ for the set of substitution maps with input generic signature $G$ and output generic signature $H$. We make use of this notation to formalize our principle. If $\texttt{T}\in\TypeObj{G}$ and $\Sigma\in\SubMapObj{G}{H}$, then $\texttt{T}\otimes\Sigma\in\TypeObj{H}$, and thus the $\otimes$ binary operation is a function between the following sets:
-\[\TypeObj{G}\otimes\SubMapObj{G}{H}\longrightarrow\TypeObj{H}\]
-
-\begin{algorithm}[Substitute interface type]\label{type subst algo}
-Takes an interface type \tX\ and a substitution map $\Sigma$ as input. The type parameters contained in \tX\ must be valid for the input generic signature of $\Sigma$. Outputs $\tX\otimes\Sigma$.
-\begin{enumerate}
-\item If \tX\ is a generic parameter type \ttgp{d}{i}, find the replacement type for \ttgp{d}{i} in~$\Sigma$ and return it.
-\item If \tX\ is a dependent member type \texttt{T.[P]A}, apply \AlgRef{dependent member type substitution} to \texttt{T.[P]A}~and~$\Sigma$, and return the result.
-\item If \tX\ does not recursively contain any type parameters, return \tX.
-\item Otherwise, recursively apply this algorithm to each child of \tX, and return the new type formed from the substituted children.
-\end{enumerate}
-\end{algorithm}
-
-\section{Generic Arguments}\label{contextsubstmap}
-
-A nominal type is \IndexDefinition{specialized type}\emph{specialized} if the type itself or one of its \index{parent type!specialized type}parent types is a generic nominal type. That is, \texttt{Array<Int>} and \texttt{Array<Int>.Iterator} are both specialized types, but \texttt{Int} and \texttt{String.UTF8View} are not. Equivalently, a nominal type is specialized if its nominal type declaration is a generic context---that is, if the type declaration itself has a generic parameter list, or an outer declaration context has one.
-
-Every specialized type determines a unique substitution map for the generic signature of its declaration, called the \IndexDefinition{context substitution map}\emph{context substitution map}. The context substitution map replaces the generic parameters of the type declaration with the corresponding generic arguments of the specialized type.
-
-Let's say that $d$ is a \index{nominal type declaration!generic arguments}nominal type declaration with generic signature $G$. The \index{declared interface type!nominal type declaration}declared interface type of $d$, which we will denote by $\tXd$, is an element of $\TypeObj{G}$. Suppose that \tX\ is some specialized type of $d$ whose generic arguments are interface types for a generic signature $H$, so that $\tX\in\TypeObj{H}$. The context substitution map of \tX\ is a substitution map $\Sigma\in\SubMapObj{G}{H}$, such that applying it to the declared interface type of $d$ gives us back \texttt{T}. That is,
-\[
-\tX = \tXd\otimes\Sigma
-\]
-To demonstrate the above identity, consider the generic signature of the \texttt{Dictionary} type declaration in the standard library:
-\begin{quote}
-\texttt{<Key, Value where Key:\ Hashable>}
-\end{quote}
-One possible specialized type for \texttt{Dictionary} is the type \texttt{Dictionary<Int, String>}; this type is related to the declared interface type of \texttt{Dictionary} by this substitution map:
-\begin{align*}
-\texttt{Dictionary<\ttgp{0}{0}, \ttgp{0}{1}>}\otimes
-\SubstMapC{
-&\SubstType{\ttgp{0}{0}}{Int},\\
-&\SubstType{\ttgp{0}{1}}{String}
-}{\\
-&\SubstConf{\ttgp{0}{0}}{Int}{Hashable}
-}\\
-{} = \texttt{Dictionary<Int, String>}
-\end{align*}
-\paragraph{The identity substitution map.}
-What is the context substitution map of a type declaration's declared interface type? By definition, if $\Sigma$ is the context substitution map of $\tXd$, then $\tXd\otimes\Sigma=\tXd$; it leaves the declared interface type unchanged. That is, this substitution map maps every generic parameter of the type declaration's generic signature to itself. If we look at the \texttt{Dictionary} type again, we can write down this substitution map:
-\begin{align*}
-\texttt{Dictionary<\ttgp{0}{0}, \ttgp{0}{1}>}\otimes
-\SubstMapC{
-&\SubstType{\ttgp{0}{0}}{\ttgp{0}{0}},\\
-&\SubstType{\ttgp{0}{1}}{\ttgp{0}{1}}
-}{\\
-&\SubstConf{\ttgp{0}{0}}{\ttgp{0}{0}}{Hashable}
-}\\
-{} = \texttt{Dictionary<\ttgp{0}{0}, \ttgp{0}{1}>}
-\end{align*}
-This is called the \IndexDefinition{identity substitution map}\emph{identity substitution map} for this generic signature; every generic signature has one. We denote the identity substitution map of a generic signature $G$ by \index{$1_G$}\index{$1_G$!z@\igobble|seealso{identity substitution map}}$1_G$. Then, $1_G\in\SubMapObj{G}{G}$, and if $\texttt{T}\in\TypeObj{G}$, we have
-\[\tX \otimes 1_G = \tX\]
-Applying the identity substitution map to any interface type leaves it unchanged, with three caveats:
-\begin{enumerate}
-\item The interface type must only contain type parameters which are valid in the input generic signature $G$ of this identity substitution map $1_G$.
-\item Substitution might change type sugar, because generic parameters appearing in the original interface type might be sugared differently than the input generic signature of this identity substitution map. Therefore, canonical equality of types is preserved, not necessarily pointer equality.
-\item We won't talk about archetypes until \ChapRef{genericenv}, but you may have met them already. Applying the identity substitution map to a contextual type containing archetypes replaces the archetypes with equivalent type parameters. There is a corresponding \emph{forwarding substitution map} which maps all generic parameters to archetypes; the forwarding substitution map acts as the identity in the world of contextual types.
-\end{enumerate}
-
-\paragraph{The empty substitution map.}
-The \index{empty generic signature}empty generic signature only has a single unique substitution map, the \IndexDefinition{empty substitution map}\emph{empty substitution map}, so the context substitution map of a non-specialized nominal type is the empty substitution map. In our notation, the empty substitution map is denoted $\SubstMap{}$. The only valid interface types of the empty generic signature are the \index{fully-concrete type}fully-concrete types. The action of the empty substitution map leaves fully-concrete types unchanged, so for example, $\texttt{Int}\otimes\SubstMap{} = \texttt{Int}$.
-
-The empty substitution map $\SubstMap{}$ is almost never the same as the identity substitution map $1_G$. In fact, they only coincide if $G$ is the empty generic signature. Applying the empty substitution map to an interface type containing type parameters is a substitution failure and returns an error type.
-\[\texttt{\ttgp{0}{0}.[Sequence]Element} \otimes \SubstMap{} = \texttt{<<error type>>}\]
-
-\section{Composing Substitution Maps}\label{submapcomposition}\label{classinheritance}
-
-\iffalse
-
-\SecRef{abstract conformances} talks about composition with root conformances
-
-\fi
-
-Suppose that we have three generic signatures, $G$, $H$ and $I$, and a pair of substitution maps: $\Sigma_1\in\SubMapObj{G}{H}$, and $\Sigma_2\in\SubMapObj{H}{I}$. If we start with an interface type $\tX\in\TypeObj{G}$, then $\tX\otimes\Sigma_1\in\TypeObj{H}$. If we then apply $\Sigma_2$ to $\tX\otimes\Sigma_1$, we get an interface type in $\TypeObj{I}$:
-\[(\tX\otimes\Sigma_1)\otimes\Sigma_2\]
-The \IndexDefinition{substitution map composition}\emph{composition} of the substitution maps $\Sigma_1$ and $\Sigma_2$, denoted by \index{$\otimes$}$\Sigma_1\otimes\Sigma_2$, is the unique substitution map which satisfies the following equation for all $\tX\in\TypeObj{F}$:
-\[\tX\otimes(\Sigma_1\otimes\Sigma_2):=(\tX\otimes\Sigma_1)\otimes\Sigma_2\]
-That is, applying the composition of two substitution maps is the same as applying the first substitution map followed by the second. Since $(\tX\otimes\Sigma_1)\otimes\Sigma_2\in\TypeObj{I}$, we see that $\Sigma_1\otimes\Sigma_2\in\SubMapObj{G}{I}$; the \index{input generic signature}input generic signature of the composition is the input generic signature of the first substitution map, and the output generic signature of the composition is the \index{output generic signature}output generic signature of the second. Substitution map composition can thus be understood as a function between sets:
-\[\SubMapObj{G}{H}\otimes\SubMapObj{H}{I}\longrightarrow\SubMapObj{G}{I}\]
-
-To understand how the composition $\Sigma_1\otimes\Sigma_2$ is actually constructed from $\Sigma_1$ and $\Sigma_2$ in the implementation, we decompose $\Sigma_1$ by applying it to each \index{generic parameter type!type substitution}generic parameter of generic signature $F$:
-\[\Sigma_1 := \SubstMap{\SubstType{\ttgp{0}{0}}{$\ttgp{0}{0}\otimes\Sigma_1$},\,\ldots}\]
-This looks like a circular definition, but what it really says is that the behavior of $\Sigma_1$ is completely determined by these primitive elements of its input generic signature. Now, we define $\Sigma_1\otimes\Sigma_2$ by applying $\Sigma_2$ to each element of $\Sigma_1$:
-\[
-\Sigma_1\otimes\Sigma_2 := \SubstMap{
-\SubstType{\ttgp{0}{0}}{$\bigl((\ttgp{0}{0}\otimes\Sigma_1)\otimes\Sigma_2\bigr)$},\,
-\ldots
-}
-\]
-Under this definition, if we take a generic parameter \ttgp{d}{i} of $G$, we see that $\Sigma_1\otimes\Sigma_2$ satisfies the necessary identity:
-\[
-\ttgp{d}{i}\otimes(\Sigma_1\otimes\Sigma_2)=(\ttgp{d}{i}\otimes\Sigma_1)\otimes\Sigma_2
-\]
-Since the behavior of $\Sigma_1\otimes\Sigma_2$ is completely determined by its replacement types, this is actually true for any interface type $\tX\in\TypeObj{G}$:
-\[\tX\otimes(\Sigma_1\otimes\Sigma_2)=(\tX\otimes\Sigma_1)\otimes\Sigma_2\]
-
-\newcommand{\FirstMapInExample}{\SubstMap{
-\SubstType{T}{Array<A>},\,\SubstType{U}{A}
-}}
-\newcommand{\SecondMapInExample}{\SubstMap{
-\SubstType{A}{Int}
-}}
-\newcommand{\ThirdMapInExample}{\SubstMap{
-\SubstType{T}{Array<Int>},\,\SubstType{U}{Int}
-}}
-
-\begin{listing}\captionabove{Motivating substitution map composition}\label{composesubstmaplisting}
-\begin{Verbatim}
-struct Outer<A> {
-  var inner: Inner<Array<A>, A>
-}
-
-struct Inner<T, U> {
-  var value: (T) -> U
-}
-
-let outer: Outer<Int> = ...
-let x = outer.inner.value
-\end{Verbatim}
-\end{listing}
-\begin{example}\label{composesubstmapexample}
-\index{expression}
-\ListingRef{composesubstmaplisting} shows an example where substitution map composition can help reason about the types of chained \index{member reference expression}member reference expressions. The \texttt{inner} stored property of \texttt{Outer} has type \texttt{Inner<Array<A>, A>}. Here is the context substitution map of this type, which we will refer to as $\Sigma_1$:
-\[
-\Sigma_1 := \FirstMapInExample
-\]
-The interface type of the \texttt{inner} stored property is a specialization of the nominal type \texttt{Inner} with generic signature \texttt{<T, U>}, so the input generic signature of $\Sigma_1$ is \texttt{<T, U>}. The interface type of \texttt{inner} is declared inside the nominal type \texttt{Outer} with generic signature \texttt{<A>}, so the output generic signature of $\Sigma_1$ is \texttt{<A>}.
-
-Now, let's look at the \texttt{outer} global variable. It has the type \texttt{Outer<Int>}, with the following context substitution map, which we denote as $\Sigma_2$:
-\[
-\Sigma_2 := \SecondMapInExample
-\]
-The input generic signature of $\Sigma_2$ is \texttt{<A>}, the generic signature of \texttt{Outer}. The output generic signature of $\Sigma_2$ is the empty generic signature, because its replacement types are fully concrete. We can compose $\Sigma_1$ and $\Sigma_2$, because the output generic signature of $\Sigma_1$ is the same as the input generic signature of $\Sigma_2$:
-\[\Sigma_1\otimes\Sigma_2 = \FirstMapInExample\otimes\SecondMapInExample = \ThirdMapInExample\]
-
-Now, the substituted type of \texttt{outer.inner.value} can be derived from the interface type of \texttt{value} in two equivalent ways:
-\begin{enumerate}
-\item By applying $\Sigma_1$ to \verb|(T) -> U| and then applying $\Sigma_2$ to the result:
-\begin{gather*}
-(\texttt{(T) -> U}\otimes\Sigma_1)\otimes \Sigma_2\\
-\qquad {} = \texttt{(Array<A>) -> A}\otimes \Sigma_2\\
-\qquad {} = \texttt{(Array<Int>) -> Int}
-\end{gather*}
-\item By applying the composition $\Sigma_1\otimes\Sigma_2$ to \texttt{(T) -> U}:
-\begin{gather*}
-\texttt{(T) -> U}\otimes(\Sigma_1\otimes \Sigma_2)\\
-\qquad {} = \texttt{(T) -> U}\otimes \ThirdMapInExample\\
-\qquad {} = \texttt{(Array<Int>) -> Int}
-\end{gather*}
-\end{enumerate}
-The final substituted type, \texttt{(Array<Int>) -> Int}, is the same in both cases.
-\end{example}
-If $\Sigma\in\SubMapObj{G}{H}$, then the identity substitution maps $1_G$ and $1_H$ have a natural behavior under substitution map composition:
-\[1_G\otimes\Sigma = \Sigma\otimes 1_H = \Sigma\]
-The second identity carries the same caveat as the identity $\tX\otimes 1_G=\tX$ does for types; it is only true if the replacement types of $\Sigma$ are interface types. If the replacement types are contextual types, they will map to interface types, as we will explain in \SecRef{archetypesubst}.
 \begin{example}
-Recall the generic signatures $G$ and $H$, and the substitution map $\Sigma_1 := \FirstMapInExample\in\SubMapObj{G}{H}$ from \ExRef{composesubstmapexample}. We can write down the identity substitution maps $1_G$ and $1_H$:
-\begin{gather*}
-1_G := \SubstMap{\SubstType{T}{T},\,\SubstType{U}{U}}\\
-1_H := \SubstMap{\SubstType{A}{A}}
-\end{gather*}
-Now, one can verify that both of these hold:
-\begin{gather*}
-\SubstMap{\SubstType{T}{T},\,\SubstType{U}{U}}\otimes\FirstMapInExample=\FirstMapInExample\\
-\FirstMapInExample\otimes\SubstMap{\SubstType{A}{A}}=\FirstMapInExample
-\end{gather*}
-Thus $1_G\otimes\Sigma_1 = \Sigma_1\otimes 1_H=\Sigma_1$. Note that the left and right identity substitution maps are different in this case, because the input and output generic signatures of $\Sigma_1$ are different.
+In the following, the generic \texttt{callee()} function is referenced from the body of \texttt{caller()}:
+\begin{Verbatim}
+func callee<T>(_ value: T) -> Array<T> {
+  return [value]
+}
+
+func caller<X, Y>(_ x: X, y: Y) -> Array<(X, Y)> {
+  return callee((x, y))  // call here
+}
+\end{Verbatim}
+The call expression passes in a tuple value as the argument, so the replacement type for \rT\ is the tuple type \texttt{(\rT, \rU)}:
+\begin{center}
+\begin{tikzpicture}[node distance=0.5cm, baseline={([yshift=-2pt]OptionalInt)}]
+\node (Tuple) [type] {\texttt{(\rT, \rU)}};
+
+\node (T) [type, fill=light-gray, below=of Tuple, xshift=-40] {\texttt{\vphantom{y}}\rT};
+\node (U) [type, fill=light-gray, below=of Tuple, xshift=40] {\texttt{\vphantom{y}}\rU};
+
+\draw [arrow] (Tuple) -- (T);
+\draw [arrow] (Tuple) -- (U);
+\end{tikzpicture}
+\end{center}
+Our input generic signature is the generic signature of \texttt{callee()}:
+\[ G := \texttt{<\rT>} \]
+Our output generic signature is the generic signature of \texttt{caller()}:
+\[ H := \texttt{<\rT, \rU>} \]
+Here is the substitution map:
+\[ \Sigma := \{ \SubstType{\rT}{(\rT, \rU)} \} \]
+Now, we apply $\Sigma$ to the return type of \texttt{callee()} to get the substituted type:
+\[ \texttt{Array<\rT>} \otimes \Sigma = \texttt{Array<(\rT, \rU)>} \]
+\FigRef{subst fig output sig} illustrates the transformation.
 \end{example}
-\index{associative operation}
-One final rule here is that substitution map composition is \emph{associative}. This means that both possible ways of composing three substitution maps will output the same result:
-\[
-(\Sigma_1\otimes\Sigma_2)\otimes\Sigma_3=\Sigma_1\otimes(\Sigma_2\otimes\Sigma_3)
-\]
-Putting everything together, if \tX is some type, all of the following are equivalent when defined (and by our compatibility conditions, if one is defined, all are):
-\begin{gather*}
-((\tX\otimes\Sigma_1)\otimes\Sigma_2)\otimes\Sigma_3\\
-(\tX\otimes\Sigma_1)\otimes(\Sigma_2\otimes\Sigma_3)\\
-(\tX\otimes(\Sigma_1\otimes\Sigma_2))\otimes\Sigma_3\\
-\tX\otimes((\Sigma_1\otimes\Sigma_2)\otimes\Sigma_3)\\
-\tX\otimes(\Sigma_1\otimes(\Sigma_2\otimes\Sigma_3))
-\end{gather*}
-Thus, our type substitution algebra allows us to omit grouping parentheses without introducing ambiguity:
-\[\tX\otimes\Sigma_1\otimes\Sigma_2\otimes\Sigma_3\]
 
-A \IndexDefinition{commutative diagram}\emph{commutative diagram} is one where following the chain of operations along two paths with the same start and end always produces the same result.
+\begin{figure}\captionabove{Type substitution with output generic signature}\label{subst fig output sig}
+\begin{center}
+\begin{tabular}{ccc}
+\textbf{Original type:}&&\textbf{Substituted type:}\\[\medskipamount]
+\begin{tikzpicture}[baseline={([yshift=-3pt]ArrayT)}]
+\node (ArrayT) [type] {\texttt{Array<\rT>}};
 
-\paragraph{Categorically speaking.}
-A \IndexDefinition{category}\emph{category} is a collection of \IndexDefinition{object}\emph{objects} and \IndexDefinition{morphism}\emph{morphisms}. (Very often the morphisms are \index{function}functions of some sort, but they might also be completely abstract.) Each morphism is associated with a pair of objects, the \emph{source} and \emph{destination}. The collection of morphisms with source $A$ and destination $B$ is denoted $\mathrm{Hom}(A,B)$. The morphisms of a category must obey certain properties:
-\begin{enumerate}
-\item For every object $A$, there is an \IndexDefinition{identity morphism}\emph{identity morphism} $1_A\in\mathrm{Hom}(A, A)$.
-\item If $f\in\mathrm{Hom}(A, B)$ and $g\in\mathrm{Hom}(B, C)$ are a pair of morphisms, there is a third morphism $g\circ f\in\mathrm{Hom}(A,C)$, called the \emph{composition} of $g$ with $f$.
-\item Composition respects the identity: if $f\in\mathrm{Hom}(A, B)$, then $f\circ 1_A=1_B\circ f=f$.
-\item Composition is associative: if $f\in\mathrm{Hom}(A, B)$, $g\in\mathrm{Hom}(B, C)$ and $h\in\mathrm{Hom}(C, D)$, then $h\circ(g\circ f)=(h\circ g)\circ f$.
-\end{enumerate}
-We define \emph{the category of generic signatures} as follows:
+\node (T) [type, fill=light-gray, below=of ArrayT] {\texttt{\vphantom{y}}\rT};
+
+\draw [arrow] (ArrayT) -- (T);
+\end{tikzpicture}&
+{\Large $\Rightarrow$}&
+\begin{tikzpicture}[baseline={([yshift=-3pt]ArrayTuple)}]
+\node (ArrayTuple) [type] {\texttt{Array<(\rT, \rU)>}};
+
+\node (Tuple) [type, below=of ArrayTuple] {\texttt{(\rT, \rU)}};
+
+\node (T) [type, fill=light-gray, below=of Tuple, xshift=-40] {\texttt{\vphantom{y}}\rT};
+
+\node (U) [type, fill=light-gray, below=of Tuple, xshift=40] {\texttt{\vphantom{y}}\rU};
+
+\draw [arrow] (ArrayTuple) -- (Tuple);
+\draw [arrow] (Tuple) -- (T);
+\draw [arrow] (Tuple) -- (U);
+\end{tikzpicture}
+\end{tabular}
+\end{center}
+\end{figure}
+
+Next, we introduce a bit of notation to formalize a concept we've already seen:
+\begin{definition}\label{interface type def}
+Let $G$ be a generic signature. We write \IndexSetDefinition{type}{\TypeObj{G}}$\TypeObj{G}$ to denote the \index{set!types}set of \IndexDefinition{interface type}interface types of $G$. In particular, this set contains the following:
 \begin{itemize}
-\item The objects are generic signatures.
-\item The morphisms are substitution maps (a technicality here is that their replacement types must not contain archetypes).
-\item The source of a morphism (substitution map) is the input generic signature of the substitution map.
-\item The destination of a morphism (substitution map) is the output generic signature of the substitution map.
-\item The identity morphism is the identity substitution map (you will see later it does not act as the identity on archetypes, which is why we rule them out above).
-\item The composition of morphisms $g\circ f$ is the composition of substitution maps $f\otimes g$ (note that we must reverse the order here for the definition to work).
+\item All \index{valid type parameter!interface type}valid type parameters of $G$.
+\item All \index{nominal type}nominal types, formed from the non-generic nominal type declarations.
+\item All \index{generic nominal type}generic nominal types, formed from the generic nominal type declarations and all combinations of generic arguments from $\TypeObj{G}$.
+\item All \index{structural type}structural types---such as \index{function type}function types, \index{tuple type}tuple types, and \index{metatype type}metatypes---formed from the elements of $\TypeObj{G}$.
 \end{itemize}
-Category theory often comes up in programming when working with data structures and higher-order functions; an excellent introduction to the topic is \cite{catprogrammer}. While we don't need to deal with categories in the abstract here, but we will encounter another idea from category theory, the commutative diagram, in \SecRef{type witnesses}.
+\end{definition}
 
-\section{Building Substitution Maps}\label{buildingsubmaps}
+We can also talk about the set of all substitution maps that map the interface types of one fixed generic signature into another:
+\begin{definition}
+Let $G$ and $H$ be generic signatures. We write \IndexSetDefinition{sub}{\SubMapObj{G}{H}}$\SubMapObj{G}{H}$ to denote the set of all substitution maps that have input generic signature~$G$ and output generic signature~$H$.
+\end{definition}
 
-Now that we've seen how to get substitution maps from types, and how to compose existing substitution maps, it's time to talk about building substitution maps from scratch using the two variants of the \textbf{get substitution map} operation.
+These are \index{infinite set}infinite sets, so we do not realize them in the implementation. Instead, we use them as a notational aid to understand type substitution. An important and subtle point is that the output generic signature is not stored in the substitution map itself; it is implicit from usage. Thus, we must take care not to get our output generic signatures ``mixed up'' by keeping the relationships between these sets in mind.
 
-\IndexDefinition{get substitution map}
-\index{serialized module}
-\index{conforming type}
-The first variant constructs a substitution map directly from its three constituent parts: a generic signature, an array of replacement types, and an array of conformances. The arrays must have the correct length---equal to the number of generic parameters and \index{conformance requirement!type substitution}conformance requirements, respectively.
-This variant of \textbf{get substitution map} is used when constructing a substitution map from a deserialized representation, because a serialized substitution map is guaranteed to satisfy the above invariants.
+Suppose we are given a $\Sigma\in\SubMapObj{G}{H}$. Note that the replacement types of $\Sigma$ are elements of $\TypeObj{H}$, and furthermore, if we take some $\tX\in\TypeObj{G}$ and replace each type parameter that occurs in \tX\ with an element of $\TypeObj{H}$, the transformed type will then also be an element of $\TypeObj{H}$. In particular, $\tX\otimes\Sigma\in\TypeObj{H}$, and we can think of type substitution as the following mapping between sets:
+\[\TypeObj{G}\otimes\SubMapObj{G}{H}\longrightarrow\TypeObj{H}\]
+We model type substitution a binary operation on types and substitution maps, instead of using an ``applicative'' notation like ``$\Sigma(\tT)$'' where the substitution map is represented as a unary function. The reason for this will soon become clear, when we encounter additional forms of the \index{$\otimes$}\index{$\otimes$!z@\igobble|seealso{type substitution}}\index{binary operation}$\otimes$ operator that allow us to write down more complex expressions. The different forms of $\otimes$ will be related by various identities, which will define the \emph{type substitution algebra}.
 
-\IndexDefinition{replacement type callback}
-\index{type variable type}
-\index{type parameter}
-\index{archetype type}
-\IndexDefinition{query substitution map callback}
-\IndexDefinition{query type map callback}
-The second variant takes the input generic signature and a pair of callbacks:
+The below algorithm for \IndexDefinition{type substitution}type substitution formalizes the structural transformation we saw earlier. It also calls out to a handful of subroutines to handle the dependent member type and archetype cases, which we will fill out later.
+
+\begin{algorithm}[Substitute type]\label{type subst algo}
+Takes a type \tX, and a substitution map $\Sigma$ with input generic signature $G$. Outputs $\tX\otimes\Sigma$.
 \begin{enumerate}
-\item The \textbf{replacement type callback} maps a generic parameter type to a replacement type. It is invoked with each generic parameter type to populate the replacement types array.
-\item The \textbf{conformance lookup callback} maps a protocol conformance requirement to a conformance. It is invoked with each conformance requirement to populate the conformances array.
+\item (Type parameter) If \tX\ is a type parameter \tT:
+\begin{enumerate}
+\item If $\Query{isValidTypeParameter}{G,\,\tT}$ is false, return the \index{error type}error type.
+\item If \tT\ is a generic parameter type, return the replacement type for \tT\ in~$\Sigma$.
+\item If \tT\ is a dependent member type, apply \AlgRef{dependent member type substitution}, and return the result.
 \end{enumerate}
-The conformance lookup callback takes three parameters:
-\begin{enumerate}
-\item The \emph{original type}; this is the subject type of the conformance requirement.
-\item The \emph{substituted type}; this is the result of applying the substitution map to the original type, which should be canonically equal to the conforming type of the conformance that will be returned.
-\item The protocol declaration named by the conformance requirement.
-\end{enumerate}
-The callbacks can be arbitrarily defined by the caller. Several pre-existing callbacks also implement common behaviors. For the replacement type callback,
-\begin{enumerate}
-\item The \textbf{query substitution map} callback looks up a generic parameter in an existing substitution map.
-\item The \textbf{query type map} callback looks up a generic parameter in a hashtable.
-\end{enumerate}
-For the conformance lookup callback,
-\begin{enumerate}
-\item The \textbf{global conformance lookup} callback performs a global conformance lookup (\SecRef{conformance lookup}).
-\item The \textbf{local conformance lookup} callback performs a local conformance lookup into another substitution map (\SecRef{abstract conformances}).
-\item The \textbf{make abstract conformance} callback asserts that the substituted type is a type variable, type parameter or archetype, and returns an abstract conformance (also in \SecRef{abstract conformances}). It is used when it is known that the substitution map can be constructed without performing any conformance lookups, as is the case with the identity substitution map.
-\end{enumerate}
-\IndexDefinition{conformance lookup callback}
-\index{abstract conformance}
-\index{global conformance lookup!substitution map}
-\index{local conformance lookup}
-\IndexDefinition{global conformance lookup callback}
-\IndexDefinition{local conformance lookup callback}
-\IndexDefinition{make abstract conformance callback}
-
-Specialized types only store their generic arguments, not conformances, so the \index{context substitution map!construction}context substitution map of a specialized type is constructed by first populating a \texttt{DenseMap} with the generic arguments of the specialized type and all of its parent types, and then invoking the \textbf{get substitution map} operation with the \textbf{query type map} and \textbf{global conformance lookup} callbacks.
-
-\index{identity substitution map}
-The identity substitution map of a generic signature is constructed from a replacement type callback which just returns the input generic parameter together with the \textbf{make abstract conformance} callback.
-
-\iffalse
-
-When a subclass inherits from a superclass, there is a subtype relationship between the subclass and superclass. If neither class is generic, the relationship is straightforward. Here, we have a pair of classes \texttt{C} and \texttt{D}; \texttt{D} inherits from \texttt{C}, so instances of \texttt{D} are also instances of \texttt{C}:
-\begin{Verbatim}
-class C {}
-class D {}
-
-let instanceOfD: D = D()
-let instanceOfC: C = instanceOfD  // okay
-\end{Verbatim}
-With generic classes, the situation is more subtle. The subclass \emph{declaration} states a superclass \emph{type}. The superclass type appears in the inheritance clause of the subclass, and can reference the subclass's generic parameters:
-\begin{Verbatim}
-class Base<T, U> {}
-class Derived<A>: Base<String, A> {}
-\end{Verbatim}
-Now, the declaration \texttt{Derived} has the generic superclass type \texttt{Base<String, A>}. We expect that \texttt{Derived<A>} is a subtype of \texttt{Base<String, A>}, and \texttt{Derived<Int>} is a subtype of \texttt{Base<String, Int>}, but that \texttt{Derived<Int>} and \texttt{Base<String, String>} are unrelated types.
-
-To get a complete picture of the subtype relationship, we need to define the concept of the superclass type \emph{of a type}, and not just the superclass type of a declaration.
-
-First of all, what is the superclass type of the declared interface type of a class? The superclass type of the class declaration is an interface type for the class declaration's generic signature, so we say that the superclass type of the declared interface type is just the superclass type of the declaration. In our example, this tells us that \texttt{Derived<A>} is a subtype of \texttt{Base<String, A>} and an unrelated type to \texttt{Base<Int, A>}.
-
-What about the superclass type of an arbitrary specialization of the class? Here, we rely on the property that a specialized type is the result of applying its context substitution map to the declared interface type. If we instead apply the context substitution map to the superclass type of the class declaration, we get the superclass type of our specialized type. This can be shown with a commutative diagram:
-\begin{quote}
-\begin{tikzcd}[column sep=3cm,row sep=1cm]
-\mathboxed{declared interface type} \arrow[d, "\text{superclass type}"{left}] \arrow[r, "\text{substitution}"] &\mathboxed{specialized type} \arrow[d, "\text{superclass type}"] \\
-\mathboxed{superclass type of declaration} \arrow[r, "\text{substitution}"]&\mathboxed{superclass type of type}
-\end{tikzcd}
-\end{quote}
-
-Now that we can compute the superclass type of a type, we can walk up the inheritance hierarchy by iterating the process, to get the superclass type of a superclass type, and so on.
-
-\begin{algorithm}[Iterated superclass type]\label{superclassfordecl} As input, takes a class type \texttt{T} and a superclass declaration \texttt{D}. Returns the superclass type of \texttt{T} for \texttt{D}.
-\begin{enumerate}
-\item Let \texttt{C} be the class declaration referenced by \texttt{T}. If $\texttt{C}=\texttt{D}$, return \texttt{T}.
-\item If \texttt{C} does not have a superclass type, fail with an invariant violation; \texttt{D} is not actually a superclass of \texttt{T}.
-\item Otherwise, apply the context substitution map of \texttt{T} to the superclass type of \texttt{C}. Assign this new type to \texttt{T}, and go back to Step~1.
+\item (Archetype) If \tX\ is a \index{primary archetype!type substitution}primary archetype $\archetype{T}_G$, return $\tT \otimes \Sigma$ (\SecRef{archetypesubst}). If \tX\ is an opaque archetype, call \AlgRef{opaquearchetypesubst}. If \tX\ is existential, call \AlgRef{existential archetype subst}.
+\item (Base case) If \tX\ does not contain type parameters or archetypes: return \tX.
+\item (Recurse) Apply $\Sigma$ to each child of \tX\ recursively, and form a new type from these substituted child types, preserving any non-type structural components of \tX.
 \end{enumerate}
 \end{algorithm}
 
-\begin{example}\label{genericsuperclassexample}
-\ListingRef{generic superclass example listing} shows a class hierarchy demonstrating these behaviors:
-\begin{enumerate}
-\item The superclass type of \texttt{Derived} is \texttt{Middle<Int, String>}.
-\item The superclass type of \texttt{Middle} is \texttt{Base<(T, T)>}.
-\end{enumerate}
-The superclass type of the type \texttt{Middle<Int, String>} is the superclass type of \texttt{Middle} with the context substitution map of \texttt{Middle<Int, String>} applied:
-\[\texttt{Base<(T, T)>}\otimes
-\SubstMap{
-\SubstType{T}{Int}\\
-\SubstType{U}{String}
-} = \texttt{Base<(Int, Int)>}
-\]
-This means the superclass type of \texttt{Derived} with respect to \texttt{Base} is \texttt{Base<(Int, Int)>}.
+\begin{figure}\captionabove{Type substitution with dependent member type}\label{subst fig dmt}
+\begin{center}
+\begin{tabular}{ccc}
+\textbf{Original type:}&&\textbf{Substituted type:}\\[\medskipamount]
+\begin{tikzpicture}[baseline={([yshift=-3pt]ArrayTElement)}]
+\node (ArrayTElement) [type] {\texttt{Array<\rT.Element>}};
 
-What is the type \texttt{Derived.C}? The type alias \texttt{C} is declared in \texttt{Base}. The superclass type of \texttt{Derived} with respect to \texttt{Base} is \texttt{Base<(Int, Int)>}. We can apply the context substitution map of this superclass type to the declared interface type of \texttt{C}:
-\[\texttt{() -> T}\otimes
-\SubstMap{
-\SubstType{T}{(Int, Int)}
-} = \texttt{() -> (Int, Int)}
-\]
-\end{example}
+\node (TElement) [type, fill=light-gray, below=of ArrayTElement] {\texttt{\vphantom{y}\rT.Element}};
 
-\fi
+\node (T) [type, fill=light-gray, below=of TElement]  {\texttt{\vphantom{y}}\rT};
+
+\draw [arrow] (ArrayTElement) -- (TElement);
+\draw [arrow] (TElement) -- (T);
+
+\begin{scope}[on background layer]
+  \node (Foo)[fit=(TElement) (T), inner sep=5pt, rounded corners, draw=gray, dashed] {};
+\end{scope}
+
+\end{tikzpicture}&
+{\quad \Large $\Rightarrow$}&
+\begin{tikzpicture}[baseline={([yshift=-3pt]ArrayTuple)}]
+\node (ArrayInt) [type] {\texttt{Array<Int>}};
+
+\node (Int) [type, below=of ArrayInt] {\texttt{\vphantom{y}Int}};
+
+\draw [arrow] (ArrayInt) -- (Int);
+\end{tikzpicture}
+\end{tabular}
+\end{center}
+\end{figure}
+
+\paragraph{Dependent member types.}
+If a generic signature states \index{conformance requirement!type substitution}conformance requirements to protocols with associated types, the generic signature's \index{valid type parameter}valid type parameters also include all \index{dependent member type!type substitution}dependent member types \index{derived requirement}derived from these conformance requirements, in addition to the generic parameters stated in the generic signature.
+\begin{Verbatim}
+func extract<S: Sequence>(_ s: S) -> Array<S.Element> {...}
+let mySet: Set<Int> = [1, 2, 3]
+let x = extract(mySet)
+\end{Verbatim}
+A substitution map records a \index{root conformance}\emph{root conformance} for each conformance requirement of its \index{input generic signature!conformance requirement}input generic signature. In the call to \texttt{extract()}, the substitution map is:
+\begin{align*}
+\Sigma := \{&\SubstType{\rT}{Set<Int>},\\
+&\SubstConf{\rT}{Set<Int>}{Sequence}\}
+\end{align*}
+Type substitution treats a dependent member type as an indivisible atomic element, and replaces it in one shot with a substituted type. (We do not recurse into the base type.) In \SecRef{abstract conformances}, we will see that the substituted type is computed from one of the conformances stored in the substitution map. We leave this unexplained for now:
+\[ \texttt{Array<\rT.Element>} \otimes \Sigma = \texttt{Array<Int>} \]
+\FigRef{subst fig dmt} illustrates the transformation.
+
+\paragraph{Archetypes.} In \ChapRef{chap:archetypes}, we will meet \index{archetype type}\emph{archetypes}, an alternate representation which combines a type parameter with a generic signature. There are three kinds of archetype. A \emph{primary} archetype acts like the type parameter it represents, as far as type substitution is concerned. Substitution of \emph{opaque} and \emph{existential} archetypes is different, and will be described in \SecRef{opaquearchetype} and \SecRef{open existential archetypes}.
+
+\paragraph{Substitution failure.}
+Type substitution outputs an error type if the original type contains a type parameter that is not valid in the substitution map's input generic signature. Type substitution might also produce an error type if the substitution map's replacement types contain error types, or if one of the conformances stored in the substitution map is invalid. This is called \IndexDefinition{substitution failure}\emph{substitution failure}, and it indicates an error was diagnosed elsewhere in the user's program. The compiler does not proceed to \index{SILGen}SILGen if errors were diagnosed, and so error types should not appear after type checking.
+
+\paragraph{Other requirements.}
+Conformance requirements are special, because a substitution map directly records how it fulfills each conformance requirement. Other requirements are instead conditions to check. For example, if the input generic signature states a \index{same-type requirement!type substitution}same-type requirement, then a substitution map for this generic signature must \emph{satisfy} this requirement, in the sense that applying the substitution map to both sides should produce canonically equal substituted types. A substitution map is \emph{well-formed} if it satisfies all derived requirements of its input generic signature. We will discuss the algorithm for checking if requirements are satisfied in \SecRef{checking generic arguments}.
+
+\section{Nominal Types}\label{contextsubstmap}
+
+We're now going to look at the relationship between nominal type declarations, nominal types, and substitution maps. Consider these declarations:
+\begin{Verbatim}
+struct Bacon<T, U> {
+  struct Lettuce<V> {
+    struct Tomato {
+      var t: T
+      var u: U
+      var v: V
+    }
+  }
+}
+\end{Verbatim}
+(We will discuss the stored properties of \texttt{Tomato} shortly.) Given these declarations, we can then write down various nominal types, for example the type of ``\texttt{x}'' below:
+\begin{Verbatim}
+let x: Bacon<Int, Bool>.Lettuce<Float>.Tomato = ...
+\end{Verbatim}
+In the implementation, \texttt{Bacon<Int, Bool>} is classified as a \index{generic nominal type}generic nominal type, while both \texttt{Int} and \texttt{Bacon<Int, Bool>.Lettuce<Float>.Tomato} are ``just'' \index{nominal type}nominal types. However, the latter's \index{parent type}\emph{parent} is a generic nominal type. We say that a \IndexDefinition{specialized type}\emph{specialized type} is a nominal type that is either itself generic, or has a generic parent. Equivalently, a nominal type is specialized if its declaration has a non-empty generic signature.
+
+\begin{figure}[b!]\captionabove{Applying the context substitution map}\label{context sub map fig}
+\begin{center}
+\begin{tabular}{c}
+\textbf{Declared interface type:}\\[\medskipamount]
+\begin{tikzpicture}[node distance=0.4cm]
+\node (Tomato) [type] {\texttt{\vphantom{y}Bacon<\rT, \rU>.Lettuce<\ttgp{1}{0}>.Tomato}};
+
+\node (Lettuce) [type, below=of Tomato] {\texttt{\vphantom{y}Bacon<\rT, \rU>.Lettuce<\ttgp{1}{0}>}};
+
+\node (Bacon) [type, below=of Lettuce] {\texttt{\vphantom{y}Bacon<\rT, \rU>}};
+\node (V) [type, fill=light-gray, right=of Lettuce, xshift=20pt] {\texttt{\vphantom{y}\ttgp{1}{0}}};
+
+\node (Dummy) [left=of Lettuce, xshift=-20pt] {\texttt{\phantom{Float}}};
+
+\node (U) [type, fill=light-gray, below=of V] {\texttt{\vphantom{y}\rT}};
+\node (T) [type, fill=light-gray, below=of U] {\texttt{\vphantom{y}\rU}};
+
+\draw [arrow] (Tomato) -- (Lettuce);
+\draw [arrow] (Lettuce) -- (Bacon);
+\draw [arrow] (Lettuce) -- (V);
+
+\draw [arrow] (Bacon) -- (U);
+\draw [arrow] (Bacon.east) ++ (0, -0.1) -- ++ (0.5, 0) |- (T);
+\end{tikzpicture}\\
+\textbf{Specialized type:}\\[\medskipamount]
+\begin{tikzpicture}[node distance=0.4cm]
+\node (Tomato) [type] {\texttt{\vphantom{y}Bacon<Int, Bool>.Lettuce<Float>.Tomato}};
+
+\node (Lettuce) [type, below=of Tomato] {\texttt{\vphantom{y}Bacon<Int, Bool>.Lettuce<Float>}};
+
+\node (Bacon) [type, below=of Lettuce] {\texttt{\vphantom{y}Bacon<Int, Bool>}};
+\node (Float) [type, right=of Lettuce, xshift=28pt] {\texttt{\vphantom{y}Float}};
+
+\node (Dummy) [left=of Lettuce, xshift=-28pt] {\texttt{\phantom{Float}}};
+
+\node (Int) [type, below=of Float] {\texttt{\vphantom{y}Int}};
+\node (Bool) [type, below=of Int] {\texttt{\vphantom{y}Bool}};
+
+\draw [arrow] (Tomato) -- (Lettuce);
+\draw [arrow] (Lettuce) -- (Bacon);
+\draw [arrow] (Lettuce) -- (Float);
+
+\draw [arrow] (Bacon) -- (Int);
+\draw [arrow] (Bacon.east) ++ (0, -0.1) -- ++ (0.8, 0) |- (Bool);
+\end{tikzpicture}
+\end{tabular}
+\end{center}
+\end{figure}
+
+If we take the \index{generic argument}generic arguments from each level of nesting in the specialized type \texttt{Bacon<Int, Bool>.Lettuce<Float>.Tomato}, we can form a substitution map for the generic signature of the declaration of \texttt{Tomato}, which is \texttt{<\rT, \rU, \ttgp{1}{0}>}:
+\[
+\Sigma := \SubstMap{ \SubstType{\rT}{Int},\, \SubstType{\rU}{Bool},\, \SubstType{\ttgp{1}{0}}{Float} }
+\]
+Recall from \ChapRef{chap:decls} that every nominal type declaration has a \index{declared interface type!nominal type declaration}declared interface type. In the case of \texttt{Tomato}, this is \texttt{Bacon<\rT, \rU>.Lettuce<\ttgp{1}{0}>.Tomato}. Now, we see that when we apply our substitution map $\Sigma$ to the declared interface type of \texttt{Tomato}, we get back our specialized type:
+\begin{gather*}
+\texttt{Bacon<\rT, \rU>.Lettuce<\ttgp{1}{0}>.Tomato} \otimes \Sigma \\
+{} \qquad = \texttt{Bacon<Int, Bool>.Lettuce<Float>.Tomato}
+\end{gather*}
+We say that $\Sigma$ is the \IndexDefinition{context substitution map}\emph{context substitution map} of our specialized type. \FigRef{context sub map fig} illustrates the transformation.
+
+\paragraph{Context substitution map.}
+Suppose we have two generic signatures $G$ and $H$, and a \index{nominal type declaration!generic arguments}nominal type declaration $d$ with generic signature $G$. Let $\tXd$ denote the \index{declared interface type!nominal type declaration}declared interface type of $d$. If we are given some other specialized type formed from $d$, call it $\tX\in\TypeObj{H}$, then the context substitution map of \tX\ is the unique substitution map $\Sigma\in\SubMapObj{G}{H}$ that satisfies the identity:
+\[ \tXd \otimes \Sigma = \tX \]
+The context substitution map is more than just a mathematical trick, because it explains the type of a \index{member reference expression}member reference expression like ``\texttt{foo.bar}''. Recall that \texttt{Tomato} declared three stored properties named \texttt{t}, \texttt{u}, and \texttt{v}, with interface types \rT, \rU, and \ttgp{1}{0}, respectively. Consider this snippet:
+\begin{Verbatim}
+let x: Bacon<Int, Bool>.Lettuce<Float>.Tomato = ...
+let xt = x.t
+let xu = x.u
+let xv = x.v
+\end{Verbatim}
+To deduce the inferred types of \texttt{xt}, \texttt{xu}, and \texttt{xv}, we can apply our substitution map~$\Sigma$ to the interface type of each stored property:
+\begin{gather*}
+\rT \otimes \Sigma = \texttt{Int}\\
+\rU \otimes \Sigma = \texttt{Bool}\\
+\ttgp{1}{0} \otimes \Sigma = \texttt{Float}
+\end{gather*}
+
+\paragraph{Identity substitution map.}
+What is the context substitution map of $\tXd$, the declared interface type of $d$? If $\Sigma$ satisfies $\tXd = \tXd \otimes \Sigma$, then in particular, $\Sigma$ replaces every generic parameter of $G$ with itself. We call this the \IndexDefinition{identity substitution map}\emph{identity substitution map} for~$G$ and we denote it by~\index{$1_G$}\index{$1_G$!z@\igobble|seealso{identity substitution map}}$1_G$. Note that $1_G \in \SubMapObj{G}{G}$. For example, if $G$ is the generic signature of \texttt{Tomato} from the above, then:
+\[
+1_G := \SubstMap{\SubstType{\rT}{\rT},\,\SubstType{\rU}{\rU},\,\SubstType{\ttgp{1}{0}}{\ttgp{1}{0}}}
+\]
+If $G$ states one or more conformance requirements, the identity substitution map for~$G$ will also record a series of \index{abstract conformance!identity substitution map}\emph{abstract conformances} corresponding to each conformance requirement in $G$. This ensures that applying $1_G$ to a \index{dependent member type!identity substitution map}dependent member type leaves it unchanged. We will discuss abstract conformances in \SecRef{abstract conformances}.
+
+For example, if $G := \texttt{<\rT, \rU\ where \rT:~Sequence, \rU:~Sequence>}$:
+\begin{align*}
+1_G := \SubstMapC{&\SubstType{\rT}{\rT}}{\\
+&\SubstConf{\rT}{\rT}{Sequence},\\
+&\SubstConf{\rU}{\rU}{Sequence}}
+\end{align*}
+
+In general, if \tX\ is any \index{interface type!identity substitution map}interface type in $\TypeObj{G}$, then $\tX \otimes 1_G = \tX$. In other words, applying the identity substitution map to any interface type of $G$ leaves it unchanged. (This does not hold when the original type is a \index{contextual type}contextual type that contains archetypes; such a type is not an element of $\TypeObj{G}$. We will discuss archetype substitution in \SecRef{archetypesubst}, and encounter another substitution map, the \emph{forwarding substitution map}, which plays the role of the identity on contextual types.)
+
+\paragraph{Empty substitution map.}
+A nominal type declaration like \texttt{Int}, with an \index{empty generic signature}empty generic signature, only declares a single nominal type with no generic arguments. The \index{context substitution map!non-generic type}context substitution map of this type is called the \IndexDefinition{empty substitution map}\emph{empty substitution map}, because it does not store any replacement types or conformances. We denote it by $\SubstMap{}$.
+
+This is the \emph{only} possible substitution map for the empty generic signature. If $G$ is the empty generic signature, the set of \index{interface type!empty generic signature}interface types $\TypeObj{G}$ is the set of \index{fully-concrete type}fully-concrete types that do not contain any type parameters. The empty substitution map leaves such a type unchanged, so for example, $\texttt{Int}\otimes\SubstMap{} = \texttt{Int}$.
+
+The empty substitution map should not be confused with the identity substitution map of a non-empty generic signature. If the original type contains any type parameters whatsoever, applying the empty substitution map will replace them with \index{error type}error types:
+\[\texttt{\rT.Element} \otimes \SubstMap{} = \texttt{<<error type>>}\]
 
 \section{Nested Nominal Types}\label{nested nominal types}
 
-Nominal type declarations can appear \index{nested type declaration}inside other declaration contexts, subject to the following \index{limitation!nested type declarations}restrictions:
+We've seen that generic signatures and substitution maps use a flat representation that collects all outer generic parameters together, while \index{nominal type}nominal types have a recursive structure that reflects the lexical nesting of their nominal type declarations. When we build the \index{context substitution map}context substitution map for a nominal type, we must be able to translate between these two representations. In particular, we must be able to recover a generic argument for each generic parameter of the signature. This imposes some \index{limitation!nominal type nesting}restrictions on how \index{nested type declaration}nominal type declarations can nest:
 \begin{enumerate}
-\item Structs, enums and classes cannot be nested in generic \index{local declaration context}local contexts.
-\item Structs, enums and classes cannot be nested in protocols or \index{protocol extension}protocol extensions.
-\item Protocols cannot be nested in generic contexts.
+\item Structs, enums and classes cannot nest in generic \index{local declaration context}local contexts.
+\item Structs, enums and classes cannot nest in protocols or \index{protocol extension}protocol extensions.
+\item Protocols cannot nest in other generic contexts.
 \end{enumerate}
-We're going to explore the implementation limitations behind these restrictions, and possible future directions for lifting them. (The rest of the book talks about what the compiler does, but this section is about what the compiler \emph{doesn't} do.)
 
-\paragraph{Types in generic local contexts.} \index{local declaration context}\index{local type declaration}This restriction is a consequence of a shortcoming in the representation of a nominal type. Recall from \ChapRef{types} that nominal types and generic nominal types store a parent type, and generic nominal types additionally store a list of generic arguments, corresponding to the generic parameter list of the nominal type declaration. This essentially means there is no place to store the generic arguments from outer \index{generic context}local contexts, such as functions.
-
-\begin{listing}\captionabove{A nominal type declaration in a generic local context}\label{nominal type in generic local context}
+\paragraph{Types in generic local contexts.} This restriction stems from the fact that a nominal type declaration can only encode generic arguments for outer nominal type contexts. If the parent context of a nominal type declaration is a generic context that is not a type, the \index{local type declaration}nominal type declaration only declares a single nominal type without any generic arguments. This prevents us from being able to properly model the following code, which is rejected today:
 \begin{Verbatim}
 func f<T>(t: T) {
   struct Nested {  // error
@@ -506,255 +410,977 @@ func f<T>(t: T) {
   
   Nested(t: t).printT()
 }
-
+\end{Verbatim}
+The \texttt{Nested} local type declaration has a stored property of type \rT, the generic parameter of the outer declaration \texttt{f()}. However, \texttt{Nested} only declares a single nominal type, also written as \texttt{Nested}. This type does not have a parent type or any generic arguments, because it is not nested inside of another nominal type. This means we have to way to fill in the replacement type for \rT\ in the \index{context substitution map!of local type}context substitution map:
+\[
+\texttt{Nested} \otimes \SubstMap{\rT\mapsto\text{???}} = \texttt{Nested}
+\]
+If we call our function \texttt{f()} with two generic argument types, the \index{SIL optimizer}SIL optimizer may decide to specialize one or both calls to \texttt{f()}:
+\begin{Verbatim}
 func g() {
   f(t: 123)
   f(t: "hello")
 }
 \end{Verbatim}
-\end{listing}
+We will form a substitution map replacing \rT\ with \texttt{Int} or \texttt{String}, respectively, and apply this substitution map to every SIL instruction appearing in the body of \texttt{f()}. To ensure the stored property access has the correct substituted type, we must be able to represent the two distinct \index{specialized type}specializations of \texttt{Nested}. Thus, we actually want the declared interface type of \texttt{Nested} must to store a generic argument for the outer generic parameter, so notionally, we want to be able to write something like:
+\[
+\texttt{<\rT>.Nested} \otimes \SubstMap{\SubstType{\rT}{Int}} = \texttt{<Int>.Nested}
+\]
+The representation of \index{runtime type metadata}runtime type metadata is already designed to store a flat list of generic arguments, just like a generic signature or substitution map. So while lifting this restriction would require some engineering effort on the compiler side, it would be a backward-deployable and \index{ABI}ABI-compatible change.
 
-\ListingRef{nominal type in generic local context} shows a nominal type nested inside of a generic function. The generic signature of \texttt{Nested} contains the generic parameter \texttt{T} from the outer generic function \texttt{algorithm()}. However, under our rules, the declared interface type of \texttt{Nested} is a singleton nominal type, because \texttt{Nested} does not have its own generic parameter list, and its parent context is not a nominal type declaration. This means there is no way to recover a \index{context substitution map!of local type}context substitution map for this type because the generic argument for \texttt{T} is not actually stored anywhere.
-
-In the source language, there is no way to specialize \texttt{Nested}; the reference to \texttt{T} inside \texttt{f()} is always understood to be the generic parameter \texttt{T} of the outer function. However, inside the compiler, different generic specializations can still arise. If the two calls to \texttt{f()} from inside \texttt{g()} are specialized and inlined by the SIL optimizer for example, the two temporary instances of \texttt{Nested} must have different in-memory layouts, because in one call \texttt{T} is \texttt{Int}, and in the other \texttt{T} is \texttt{String}.
-
-A better representation for the specializations of nominal types would replace the parent type and list of generic arguments with a single ``flat'' list that includes all outer generic arguments as well. This approach could represent generic arguments coming from outer local contexts without loss of information.
-
-\index{runtime type metadata}
-Luckily, this ``flat'' representation is already implemented in the Swift runtime. The runtime type metadata for a nominal type includes all the generic parameters from the nominal type declaration's generic signature, not just the generic parameters of the nominal type declaration itself. So while lifting this restriction would require some engineering effort on the compiler side, it would be a backward-deployable and \index{ABI}ABI-compatible change.
-
-\paragraph{Types in protocol contexts.} Allowing struct, enum and class declarations to appear inside protocols and protocol extensions would come down to deciding if the \IndexSelf protocol \tSelf\ type should be ``captured'' by the nested type.
-
-\begin{listing}\captionabove{A nominal type declaration nested in a protocol context}\label{nominal type in protocol context}
+\paragraph{Types in protocol contexts.} We do not allow struct, enum, and class declarations to appear inside protocols and protocol extensions today. There are two ways to lift this restriction, and they differ in whether the nominal type declaration should capture the \IndexSelf protocol \tSelf\ type. Consider this protocol, and the protocol extension that follows. Note that \texttt{Box} has a stored property of type \texttt{\rT.Contents}, because the declaration of the \texttt{Contents} associated type is visible from \texttt{Holder}'s lexical scope:
 \begin{Verbatim}
-protocol P {}
-
-extension P {
-  typealias Me = Self
-
-  struct Nested {  // error
-    let value: Me  // because what would this mean?
-
-    func method() {
-      print(value)
-    }
-  }
-  
-  func f() {
-    Nested(value: self).method()
-  }
+protocol Holder {
+  associatedtype Contents
+  var contents: Contents { get }
 }
 
-struct S1: P {}
-struct S2: P {}  // are S1.Nested and S2.Nested distinct?
+extension Holder {
+  struct Box {  // error today
+    let contents: Contents  // depends on the outer Self
+  }
+  
+  var box: Box {
+    return Box(contents: contents)
+  }
+}
 \end{Verbatim}
-\end{listing}
-If the nested type captures \tSelf, the code shown in \ListingRef{nominal type in generic local context} would become valid. With this model, the \texttt{Nested} struct depends on \tSelf, so it would not make sense to reference it as a member of the protocol itself, like \texttt{P.Nested}. Instead, \texttt{Nested} would behave as if it was a member of every \index{conforming type}conforming type, like \texttt{S.Nested} above (or even \texttt{T.Nested}, if \texttt{T} is a generic parameter conforming to \texttt{P}). At the implementation level, the generic signature of a nominal type nested inside of a protocol context would include the protocol \tSelf\ type, and the \emph{entire} parent type, for example \texttt{S} in \texttt{S.Nested}, would become the replacement type for \tSelf\ in the context substitution map.
-
-The alternative is to prohibit the nested type from referencing the protocol \tSelf\ type. The nested type's generic signature would \emph{not} include the protocol \tSelf\ type, and \texttt{P.Nested} would be a valid member type reference. The protocol would effectively act as a namespace for the nominal types it contains, with the nested type not depending on the conformance to the protocol in any way.
-
-\begin{listing}\captionabove{Protocol declaration nested inside other declaration contexts}\label{protocol nested inside type}
+Today, we reject the nested struct \texttt{Box}, but one possible interpretation would allow this code. In this model, the declared interface type of \texttt{Box} is something like ``\texttt{\rT.Box},'' but that's not a dependent member type; it's a nominal type whose \index{parent type}parent type is a \emph{type parameter}. Every nominal type that conforms to \texttt{Holder} would gain a new member type declaration named \texttt{Box}, and the generic argument for \tSelf\ would be this parent type. That is, if we conform a type \texttt{Foo} to \texttt{Holder} and call \texttt{box()}, we would receive a value of type \texttt{Foo.Box}:
 \begin{Verbatim}
-struct Outer {
+struct Foo: Holder {
+  typealias Contents = Int
+}
+
+let x: Foo.Box = Foo.box(123)  // imaginary
+\end{Verbatim}
+The context substitution map of \texttt{Foo.Box} would then be the \index{protocol substitution map}protocol substitution map of the conformance:
+\[
+\texttt{\rT.Box} \otimes \SubstMapC{\SubstType{\rT}{Foo}}{\SubstConf{\rT}{Foo}{Holder}} = \texttt{Foo.Box}
+\]
+In this model, it would not make sense to reference \texttt{Box} as a member of the protocol itself; that is, \texttt{Holder.Box} would not be valid.
+
+The alternative would prohibit the nested type declaration from capturing the protocol \tSelf\ type. In this case, the nested type declaration's generic signature would \emph{not} include the protocol \tSelf\ type, so \texttt{Box} would be disallowed as written above, because of its stored property. In this model, the protocol would simply act as a namespace, and the nested type would not depend on the protocol in any other way. a nested type could then be referenced as a member of the protocol type itself, like \texttt{Holder.Box}.
+
+\paragraph{Protocols in generic contexts.} 
+Historically, protocols could only be declared at the top level of a source file. In \IndexSwift{5.a@5.10}Swift~5.10 \cite{se0404}, this was relaxed to allow protocols to nest inside other declarations arbitrarily, as long as those declarations are not generic:
+\begin{Verbatim}
+enum E {
   protocol P {}  // allowed as of SE-0404
 }
 
-struct S: Outer.P {}
-
-func generic<T>(_: T) {
+struct S: E.P {}
+\end{Verbatim}
+However, protocols are still prohibited from appearing within generic declarations:
+\begin{Verbatim}
+struct G<T>(_: T) {
   protocol P {  // error
-    func f(_: T)  // because what would this mean?
+    func f() -> T  // because what would this mean?
   }
 }
 \end{Verbatim}
-\end{listing}
+If a protocol could depend on outer generic parameters in this way, its \index{protocol generic signature!generic protocol}protocol generic signature would contain those other parameters and their requirements, in addition to \IndexSelf\tSelf. \index{Haskell}Haskell calls this a \index{multi-parameter type class}\emph{multi-parameter type class}.
 
-\paragraph{Protocols in other declaration contexts.} The final possibility is the nesting of protocols inside other declaration contexts, such as functions or nominal types. This breaks down into two cases, illustrated in \ListingRef{protocol nested inside type}:
-\begin{enumerate}
-\item Protocols inside non-generic declaration contexts.
-\item Protocols inside generic declaration contexts.
-\end{enumerate}
-The first case was originally prohibited, but is now permitted as of \IndexSwift{5.a@5.10}Swift~5.10 \cite{se0404}; the non-generic declaration context acts as a namespace to which the protocol declaration is scoped, but apart from the interaction with name lookup this has no other semantic consequences. The second case is more subtle. If we were to allow a ``generic protocol'' to be parameterized by its outer generic parameters in addition to just the protocol \IndexSelf\tSelf\ type, we would get what \index{Haskell}Haskell calls a \index{multi-parameter type class}``multi-parameter type class.'' Multi-parameter type classes introduce some complications, for example undecidable type inference~\cite{mptc}.
+Effectively, each specialization of a generic protocol would be a distinct type, and the same concrete conforming type could conform to multiple specializations of a generic protocol with different implementations of each conformance:
+\begin{Verbatim}
+struct S: G<Int>.P {...}
+struct S: G<String>.P {...}
+\end{Verbatim}
+This would be a major change. Today, a conformance requirement $\TP$ is effectively a unary predicate---a true or false statement---about this type parameter. A conformance to a generic protocol, on the other hand, is a more general kind of relation that relates \emph{multiple} type parameters which then all ``participate'' in the conformance. At the very least, this entails a complete rethink of the formal system from the previous chapter, as well as most of the material in \PartRef{part rqm}. To get another sense of the complexity this feature introduces, see~\cite{mptc}.
 
-\section{Reabstraction Thunks}
+\section{Composition}\label{sec:composition}
 
-\begin{example}
-Unbounded space usage example
-\index{limitation!reabstraction thunks}
+Suppose that we have three generic signatures $G$, $H$, $I$, and a pair of substitution maps $\Sigma_1\in\SubMapObj{G}{H}$, $\Sigma_2\in\SubMapObj{H}{I}$. If we take any interface type $\tX\in\TypeObj{G}$, we can apply $\Sigma_1$ to $\tX$, and we get $\tX\otimes\Sigma_1\in\TypeObj{H}$. If we then apply $\Sigma_2$ to $\tX\otimes\Sigma_1$, we get the following element of $\TypeObj{I}$:
+\[(\tX\otimes\Sigma_1)\otimes\Sigma_2\]
+Now, consider how we might get from \tX\ to $(\tX\otimes\Sigma_1)\otimes\Sigma_2$ in one step.
+\begin{definition}\label{subst map composition}
+The \index{composition!of substitution maps}\IndexDefinition{substitution map composition}\emph{composition} of the substitution maps $\Sigma_1$ and $\Sigma_2$, denoted by \index{$\otimes$}$\Sigma_1\otimes\Sigma_2$, is defined as the unique substitution map which satisfies the following identity for all $\tX\in\TypeObj{G}$:
+\[\tX\otimes(\Sigma_1\otimes\Sigma_2):=(\tX\otimes\Sigma_1)\otimes\Sigma_2\]
+
+Since $(\tX\otimes\Sigma_1)\otimes\Sigma_2\in\TypeObj{I}$, it follows that $\Sigma_1\otimes\Sigma_2\in\SubMapObj{G}{I}$; that is, the \index{input generic signature}input generic signature of $\Sigma_1 \otimes \Sigma_2$ is the input generic signature of $\Sigma_1$, and the output generic signature of $\Sigma_1 \otimes \Sigma_2$ is the \index{output generic signature}output generic signature of $\Sigma_2$. Substitution map composition gives us this mapping of sets:
+\[\SubMapObj{G}{H}\otimes\SubMapObj{H}{I}\longrightarrow\SubMapObj{G}{I}\]
+\end{definition}
+
+Simply stated, applying the composition of two substitution maps to an interface type produces the same result as first applying the first substitution map, followed by the second. Now we will see how to construct $\Sigma_1 \otimes \Sigma_2$. First, suppose that~$G$, the input generic signature of~$\Sigma_1$, does not state any conformance requirements, so the behavior of~$\Sigma_1$ is completely determined by its replacement types:
+\[\Sigma_1 := \SubstMap{\ldots,\,\SubstType{\ttgp{d}{i}}{$\ttgp{d}{i}\otimes\Sigma_1$},\,\ldots}\]
+To construct $\Sigma_1 \otimes \Sigma_2$, we apply $\Sigma_2$ to each replacement type of $\Sigma_1$:
+\[
+\Sigma_1\otimes\Sigma_2 := \SubstMap{
+\ldots,\,
+\SubstType{\ttgp{d}{i}}{$\bigl((\ttgp{d}{i}\otimes\Sigma_1)\otimes\Sigma_2\bigr)$},\,
+\ldots
+}
+\]
+It is immediate that the following identity now holds all generic parameters $\ttgp{d}{i}$ of $G$, which completely determines $\Sigma_1 \otimes \Sigma_2$:
+\[
+\ttgp{d}{i}\otimes(\Sigma_1\otimes\Sigma_2)=(\ttgp{d}{i}\otimes\Sigma_1)\otimes\Sigma_2
+\]
+
+In the general case where $G$ states one or more conformance requirements, $\Sigma_1$ also stores a list of \index{root conformance!substitution map composition}\emph{root conformances}. In this case, substitution map composition also needs to apply $\Sigma_2$ to each root conformance of $\Sigma_1$ to properly form the new substitution map. Conformance substitution will be explained in \SecRef{conformance subst}.
+
+\newcommand{\FirstMapInExample}{\SubstMap{
+\SubstType{\rT}{Optional<\rT>},\,\SubstType{\rU}{Bool}
+}}
+\newcommand{\SecondMapInExample}{\SubstMap{
+\SubstType{\rT}{Int}
+}}
+\newcommand{\ThirdMapInExample}{\SubstMap{
+\SubstType{\rT}{Optional<Int>},\,\SubstType{\rU}{Bool}
+}}
+
+\begin{example}\label{composesubstmapexample}
+Substitution map composition can help us reason about the types of chained \index{member reference expression}member reference expressions, like the type of ``\texttt{x}'' below:
+\begin{Verbatim}
+struct Outer<T> {
+  var inner: Inner<Optional<T>, Bool>
+}
+
+struct Inner<T, U> {
+  var value: (T, U)
+}
+
+let outer: Outer<Int> = ...
+let x = outer.inner.value  // What is the type of `x'?
+\end{Verbatim}
+First, consider the type of the ``\texttt{inner}'' stored property of \texttt{Outer}. Let's denote its context substitution map by $\Sigma_1$:
+\[
+\Sigma_1 := \FirstMapInExample
+\]
+Note that the input generic signature of $\Sigma_1$ is the generic signature of \texttt{Inner}, which is the declaration being referenced, and the output generic signature of $\Sigma_1$ is the generic signature of \texttt{Outer}, the declaration the reference appears in.
+
+Now, consider the type of the ``\texttt{outer}'' global variable. We will denote its context substitution map by $\Sigma_2$:
+\[
+\Sigma_2 := \SecondMapInExample
+\]
+The input generic signature of $\Sigma_2$ is the generic signature of \texttt{Outer}, which is the output generic signature of $\Sigma_1$, so we can compose the two substitution maps:
+\[\Sigma_1\otimes\Sigma_2 = \ThirdMapInExample\]
+Finally, consider the interface type of the ``\texttt{value}'' stored property of \texttt{Inner}. This is the tuple type \texttt{(\rT, \rU)}. The type of the expression ``\texttt{outer.inner.value}'' can be derived from this original type in two ways: we can apply each substitution map in turn, or we can apply their composition:
+\begin{gather*}
+(\texttt{(\rT, \rU)}\otimes\Sigma_1)\otimes \Sigma_2\\
+\qquad {} = \texttt{(Optional<\rT>, \rU)}\otimes \Sigma_2\\
+\qquad {} = \texttt{(Optional<Int>, Bool)}\\[\medskipamount]
+\texttt{(\rT, \rU)}\otimes(\Sigma_1\otimes \Sigma_2)\\
+\qquad {} = \texttt{(\rT, \rU)}\otimes \ThirdMapInExample\\
+\qquad {} = \texttt{(Optional<Int>, Bool)}
+\end{gather*}
 \end{example}
 
-This is not the whole story; the representation of SIL function type is more elaborate \cite{substfunctype}.
+\paragraph{Commutative diagrams.}
+A \IndexDefinition{commutative diagram}\emph{commutative diagram} exhibits a collection of objects and operations, where each operation is represented by a labeled arrow. When we say this diagram \emph{commutes}, we mean that whenever we have two paths with the same source and destination, we can follow the composition of operations given by either path and arrive at the same result. For example, we can illustrate \DefRef{subst map composition} with this diagram:
+\begin{center}
+\begin{tikzcd}[column sep=2cm, row sep=2cm]
+\tX \arrow[r, "\Sigma_1"] \arrow[rd, "\Sigma_1 \otimes \Sigma_2"'] &{\tX \otimes \Sigma_1}\arrow[d, "\Sigma_2"]\\
+&{(\tX \otimes \Sigma_1) \otimes \Sigma_2}
+\end{tikzcd}
+\end{center}
+We will see more interesting commutative diagrams later.
 
-\section{Source Code Reference}\label{substmapsourcecoderef}
+\paragraph{Identity substitution map.}
+We saw that every generic signature has an identity substitution map in \SecRef{contextsubstmap}. The identity substitution map comes up whenever we forward the generic parameters as arguments to another generic declaration.  Now, we consider how the identity behaves under composition. There are two possibilities.
+
+If $\Sigma\in\SubMapObj{G}{H}$, we can compose $\Sigma$ with the \index{identity substitution map}identity substitution map $1_G$ on the left. This applies $\Sigma$ to each replacement type of $1_G$, which projects each replacement type of $\Sigma$ in turn; we assemble a new substitution map identical to $\Sigma$:
+\[
+1_G \otimes \Sigma = \Sigma\tag{1}
+\]
+We can also compose $\Sigma$ with $1_H$ on the right. This applies $1_H$ to each replacement type of $\Sigma$. From our earlier discussion of the identity substitution map, we know this leaves the replacement types of $\Sigma$ unchanged, so again we get:
+\[
+\Sigma\otimes 1_H = \Sigma\tag{1}
+\]
+
+A remark about \index{primary archetype}primary archetypes, which we won't introduce until \ChapRef{chap:archetypes}. Our definition of $\SubMapObj{G}{H}$ was crafted to exclude substitution maps whose replacement types contain primary archetypes. If we also consider such substitution maps, then (1) still holds, but (2) does not. In \SecRef{archetypesubst}, we will see that a different substitution map, the \emph{forwarding substitution map}, acts as the identity element on such types, that we will refer to as \emph{contextual types}.
+
+\paragraph{Order of operations.}
+A fact we will state without proof is that substitution map composition is an \index{associative operation}\emph{associative} operation. That is, if $\Sigma_1$, $\Sigma_2$, and $\Sigma_3$ are any three substitution maps such that all below compositions are defined, then:
+\[
+(\Sigma_1 \otimes \Sigma_2) \otimes \Sigma_3 = \Sigma_1 \otimes (\Sigma_2 \otimes \Sigma_3)
+\]
+For example, this means that when \tX\ is any interface type, all of the following expressions must produce the same substituted type:
+\begin{gather*}
+((\tX\otimes\Sigma_1)\otimes\Sigma_2)\otimes\Sigma_3\\
+(\tX\otimes\Sigma_1)\otimes(\Sigma_2\otimes\Sigma_3)\\
+(\tX\otimes(\Sigma_1\otimes\Sigma_2))\otimes\Sigma_3\\
+\tX\otimes((\Sigma_1\otimes\Sigma_2)\otimes\Sigma_3)\\
+\tX\otimes(\Sigma_1\otimes(\Sigma_2\otimes\Sigma_3))
+\end{gather*}
+Thus, we can omit parentheses without ambiguity in our notation:
+\[\tX\otimes\Sigma_1\otimes\Sigma_2\otimes\Sigma_3\]
+
+\paragraph{Categorically speaking.}
+We won't need this elsewhere, but it's worth mentioning briefly that a certain mathematical abstraction captures the properties of substitution map composition. A \IndexDefinition{category}\emph{category} is a collection of \IndexDefinition{object in category}\emph{objects} and \IndexDefinition{morphism in category}\emph{morphisms}. A morphism has a \emph{source} and \emph{destination} object, and the collection of morphisms with source $A$ and destination $B$ is denoted $\mathrm{Hom}(A,B)$. The morphisms must satisfy some axioms:
+\begin{enumerate}
+\item For every object $A$, there is an \IndexDefinition{identity morphism}\emph{identity morphism} $1_A\in\mathrm{Hom}(A, A)$.
+\item If $f\in\mathrm{Hom}(A, B)$ and $g\in\mathrm{Hom}(B, C)$, there is a morphism $g\circ f\in\mathrm{Hom}(A,C)$, called the \index{composition!of morphisms}\emph{composition} of $g$ and $f$. (The conventional notation $g\circ f$ mirrors how we write $g(f(x))$ with function application on the left.)
+\item Composition respects the identity: if $f\in\mathrm{Hom}(A, B)$, then $f\circ 1_A=1_B\circ f=f$.
+\item Composition is associative: if $f\in\mathrm{Hom}(A, B)$, $g\in\mathrm{Hom}(B, C)$ and $h\in\mathrm{Hom}(C, D)$, then $h\circ(g\circ f)=(h\circ g)\circ f$.
+\end{enumerate}
+For example, we could define \emph{the category of interface types} as follows:
+\begin{itemize}
+\item The objects are the sets $\TypeObj{G}$, for each generic signature $G$.
+\item Substitution maps are morphisms, and $\mathrm{Hom}$ is $\textsc{Sub}$.
+\item The source of a morphism $\Sigma\in\SubMapObj{G}{H}$ is $\TypeObj{G}$.
+\item The destination of a morphism $\Sigma\in\SubMapObj{G}{H}$ is $\TypeObj{H}$.
+\item Identity substitution maps are identity morphisms.
+\item Morphism composition $g \circ f$ is substitution map composition $f\otimes g$.
+\end{itemize}
+This happens to be a \emph{concrete} category, where every object is a set and every morphism is a function between sets, but this need not be the case in general. In programming, we often encounter category theory when working with data structures and higher-order functions; an excellent introduction to the topic is \cite{catprogrammer}.
+
+\section{Subclassing}\label{classinheritance}
+
+The Swift language supports \IndexDefinition{subclassing}\emph{subclassing}, or \index{inheritance|see{subclassing}}\emph{inheritance}. After some preliminaries, we will use the type substitution algebra to describe the interaction between subclassing and generics. This will be useful when we discuss the semantics of \index{superclass requirements}superclass requirements in later chapters. Since superclass requirements are not an essential part of the core Swift generics model, the reader can safely skip this section on a first reading.
+
+An inheritance relationship is established when some \index{class declaration!superclass type}class declaration, known as the \emph{subclass}, states a \IndexDefinition{superclass type}\emph{superclass type} in its \index{inheritance clause!class declaration}inheritance clause. Unlike \index{C++}C++, Swift does not allow multiple inheritance, so a class declaration can have at most one superclass type. Unlike \index{Java}Java, there is no distinguished \texttt{Object} class at the root of the hierarchy, so it is common to have class declarations with no superclass type at all.
+\begin{example}
+First, consider the case where the superclass and the subclass are both non-generic. In the below, \texttt{Apple} and \texttt{Banana} state the superclass type \texttt{Fruit}:
+\begin{Verbatim}
+class Fruit {
+  func eat() {...}
+  func juice() {...}
+}
+
+class Apple: Fruit {
+  override func eat() {...}
+}
+
+class Banana: Fruit {}
+
+let f: Fruit = Apple()  // implicit conversion from Apple to Fruit
+f.eat()                 // vtable-dispatched call to Apple.eat()
+\end{Verbatim}
+In the \index{expression type checker}expression type checker, \texttt{Apple}~and~\texttt{Banana} are \index{subtype}\emph{subtypes} of~\texttt{Fruit}. This allows us to assign the result of the \texttt{Apple()}~constructor call to our variable~\texttt{f}, whose type is~\texttt{Fruit}. We can visualize this with a \index{class hierarchy diagram}class hierarchy diagram:
+\begin{center}
+\begin{tikzpicture}[node distance=0.75cm]
+\node (Fruit) [class] {\texttt{\vphantom{p}Fruit}};
+\node (Apple) [class, below left=of Fruit, xshift=2em] {\texttt{Apple}};
+\node (Banana) [class, below right=of Fruit, xshift=-2em] {\texttt{\vphantom{p}Banana}};
+\draw [arrow] (Apple) -- (Fruit);
+\draw [arrow] (Banana) -- (Fruit);
+\end{tikzpicture}
+\end{center}
+Qualified lookup walks up the class hierarchy, so a \index{qualified lookup!superclass}qualified lookup into \texttt{Apple} or \texttt{Banana} will also find members of \texttt{Fruit}. Furthermore, subclasses can~\IndexDefinition{override}\emph{override} \index{function declaration!override}methods, \index{variable declaration!override}properties, and \index{subscript declaration!override}subscripts declared in their superclass. In the above, \texttt{Apple} overrides \texttt{Fruit.eat()} with its own implementation.
+
+An instance of~\texttt{Fruit} might actually be an~\texttt{Apple} at run time, so a call to \texttt{eat()} on a value type of \texttt{Fruit} must be dispatched through a \IndexDefinition{vtable}\emph{vtable} stored in the object header. The vtable for~\texttt{Fruit} points at \texttt{Fruit}'s original implementation of \texttt{eat()} and \texttt{juice()}, while the vtable for \texttt{Apple} replaces \texttt{eat()} with a pointer to \texttt{Apple.eat()}.
+\end{example}
+
+\begin{example}
+Next, suppose we declare a generic subclass of \texttt{Fruit}. Notice how we override \texttt{Fruit.eat()} to print the concrete replacement type for~\rT:
+\begin{Verbatim}
+class Pear<T>: Fruit {
+  override func eat() {
+    print(T.self)
+  }
+}
+\end{Verbatim}
+With \texttt{Pear} as above, we can form various \index{generic class type}generic class types, such as \texttt{Pear<Int>}, \texttt{Pear<Bool>}, and so on; these are all obtained by applying a \index{substitution map}substitution map to the \index{declared interface type!class declaration}declared interface type \texttt{Pear<\rT>}. The key fact about this example is that every \index{specialized type}specialization of \texttt{Pear} has the same superclass type, \texttt{Fruit}, because \texttt{Pear}'s superclass type does not depend on its generic parameter \rT. Thus, as far as the expression type checker is concerned, all specializations of \texttt{Pear} are subtypes of~\texttt{Fruit}. Our complete class hierarchy diagram is now infinite, but here is one part of it:
+\begin{center}
+\begin{tikzpicture}
+\node (Fruit) [class] {\texttt{\vphantom{p}Fruit}};
+\node (PearInt) [class, below left=of Fruit] {\texttt{\vphantom{p}Pear<Int>}};
+\node (PearString) [class, below=of Fruit] {\texttt{\vphantom{p}Pear<Bool>}};
+\node (PearT) [class, below right=of Fruit] {\texttt{\vphantom{p}Pear<\rT>}};
+\draw [arrow] (PearInt) -- (Fruit);
+\draw [arrow] (PearString) -- (Fruit);
+\draw [arrow] (PearT) -- (Fruit);
+\end{tikzpicture}
+\end{center}
+This example implements a design pattern known as \index{type erasure}\emph{type erasure}. If we take a value of type~\texttt{Pear<X>} for some \tX, we can always convert it to a value of type~\texttt{Fruit}, effectively \emph{erasing} the generic argument \tX\ from the static type of the resulting value. This allows the type \tX\ to vary dynamically. In the below, the static type of~\texttt{f} is just~\texttt{Fruit}, but the dynamic type of the value stored within is either \texttt{Pear<Int>} or \texttt{Pear<String>}, depending on the outcome of an arbitrary check:
+\begin{Verbatim}
+let someCondition: Bool = ...
+let p1 = Pear<Int>()
+let p2 = Pear<String>()
+let f: Fruit = (someCondition ? p1 : p2)
+\end{Verbatim}
+In \ChapRef{chap:existential types}, we will learn about \emph{existential types}, another more general type erasure mechanism built into the language, based on protocols.
+\end{example}
+
+\paragraph{Generic superclasses.} The interesting case arises when both subclass and superclass are generic. The superclass type of a class declaration is an \index{interface type!superclass type}interface type, so it can contain type parameters from the \index{generic signature!superclass type}generic signature of the subclass. For example:
+\begin{Verbatim}
+class StoneFruit<T> {}
+class Mango<U>: StoneFruit<Array<U>> {}
+\end{Verbatim}
+In certain situations, we don't care about generic arguments at all, and we say that the \IndexDefinition{superclass declaration}\emph{superclass declaration} of \texttt{Mango} is \texttt{StoneFruit}. However, the full relationship is expressed by the fact that the superclass \emph{type} of \texttt{Mango} is \texttt{StoneFruit<Array<\rT>>}.  We can also obtain the superclass type of a \index{class type!superclass type}class \emph{type}, that is, a reference to a class declaration specialized with a list of generic arguments. This is defined in terms of applying a substitution map to the superclass type of a class declaration.
+
+\begin{algorithm}[Get superclass type]\label{superclass type of type} Takes a class type~\tC\ as input. Returns the superclass type of~\tC, or null if \tC\ does not have a superclass type.
+\begin{enumerate}
+\item Let $c$ be the class declaration of \tC. If $c$ doesn't have a superclass type, return null.
+\item Let \texttt{S} be the superclass type of $c$.
+\item Let $\Sigma$ be the \index{context substitution map!superclass type}context substitution map of \tC.
+\item Return $\texttt{S}\otimes\Sigma$.
+\end{enumerate}
+\end{algorithm}
+\begin{example}
+The class type \texttt{Mango<Int>} is formed by applying the substitution map $\{\SubstType{\rT}{Int}\}$ to the declared interface type \texttt{Mango<\rT>}. To compute the superclass type of \texttt{Mango<Int>}, we apply this substitution map to the superclass type of the declaration, which is  \texttt{StoneFruit<Array<\rT>>}:
+\[
+\texttt{StoneFruit<Array<\rT>>} \otimes \{\SubstType{\rT}{Int}\} = \texttt{StoneFruit<Array<Int>>}
+\]
+The below class hierarchy diagram shows the relationship (or lack hereof) between the two types \texttt{Mango<Int>} and \texttt{Mango<Bool>}:
+\begin{center}
+\begin{tikzpicture}
+\node (StoneFruitInt) [class] {\texttt{\vphantom{p}StoneFruit<Array<Int>>}};
+\node (MangoInt) [class, below=of StoneFruitInt] {\texttt{Mango<Int>}};
+
+\node (StoneFruitBool) [class, right=of StoneFruitInt] {\texttt{\vphantom{p}StoneFruit<Array<Bool>>}};
+\node (MangoBool) [class, below=of StoneFruitBool] {\texttt{Mango<Bool>}};
+
+\draw [arrow] (MangoInt) -- (StoneFruitInt);
+\draw [arrow] (MangoBool) -- (StoneFruitBool);
+\end{tikzpicture}
+\end{center}
+Now, consider the superclass type of \texttt{Mango<\rT>}. We saw at the beginning of this chapter that the context substitution map of the declared interface type is the \index{identity substitution map!superclass type}identity substitution map. Indeed, since $\texttt{Mango<\rT>} \otimes \SubstMap{\SubstType{\rT}{\rT}} = \texttt{Mango<\rT>}$, the superclass type of \texttt{Mango<\rT>} is \texttt{StoneFruit<Array<\rT>>}, which is the same as the superclass type of the declaration of \texttt{Mango}.
+\end{example}
+Suppose that the class type \tC\ given to \AlgRef{superclass type of type} is an \index{interface type!superclass type}interface type for some generic signature~$H$, so that $\tC\in\TypeObj{H}$. If $G$~is the generic signature of~$c$ in Step~2, then $\Sigma\in\SubMapObj{G}{H}$ in Step~1. We already said that \texttt{S}, the superclass type of $c$, is an element of $\TypeObj{G}$, so our result $\texttt{S}\otimes\Sigma\in\TypeObj{H}$. That is, the superclass type of \tC, if it exists, is again an interface type for~$H$.
+
+Not every interface type has a superclass type. Thus, for every generic signature $H$, we get the following \emph{partial} mapping of \index{set!types}sets, which we denote by ``\textsf{superclass}'':
+\[
+\textsf{superclass}\colon \TypeObj{G} \rightarrow \TypeObj{G}
+\]
+If \tC\ is a class type, $\tC^\prime$ is the superclass type of \tC, and $\Sigma$ is a substitution map, then the following diagram commutes:
+\begin{center}
+\begin{tikzcd}[column sep=3cm,row sep=1cm]
+\tC \arrow[d, "\textsf{superclass}"{left}] \arrow[r, "\Sigma"] &\tC \otimes \Sigma \arrow[d, "\textsf{superclass}"] \\
+\tC^\prime \arrow[r, "\Sigma"]&\tC^\prime \otimes \Sigma
+\end{tikzcd}
+\end{center}
+
+\begin{example}
+We can restate our previous example this way:
+\begin{center}
+\begin{tikzcd}[column sep=3cm,row sep=1cm]
+\texttt{Mango<\rT>} \arrow[d, "\textsf{superclass}"{left}] \arrow[r, "\{\SubstType{\rT}{Int}\}"] &\texttt{Mango<Int>} \arrow[d, "\textsf{superclass}"] \\
+\texttt{StoneFruit<Array<\rT>>} \arrow[r, "\{\SubstType{\rT}{Int}\}"]&\texttt{StoneFruit<Array<Int>>}
+\end{tikzcd}
+\end{center}
+\end{example}
+
+\paragraph{Superclass substitution map.} If qualified lookup into a class type finds a member one or more levels up the class hierarchy, we need to form the correct substitution map for the \index{member reference expression}member reference expression.
+\begin{example}
+When we invoke \texttt{method()} on a value of type \texttt{Top<Int>} below, the substitution map for the call is the \index{context substitution map!class member}context substitution map of \texttt{Top<Int>}, because \texttt{method()} is a direct member of \texttt{Top}:
+\begin{Verbatim}
+class Top<T> {
+  func method() {}
+}
+Top<Int>().method()
+\end{Verbatim}
+If we call \texttt{method()} on a subclass of \texttt{Top} though, this is no longer the case:
+\begin{Verbatim}
+class Mid<X, Y>: Top<(Y, X)> {}
+class Bot: Mid<Int, Bool> {}
+Bot().method()
+\end{Verbatim}
+The class type \texttt{Bot} is not generic, so it's context substitution map is \index{empty substitution map}empty. However, we need a substitution map for \texttt{<\rT>}, the generic signature of \texttt{method()}. Notice how starting from \texttt{Bot}, we reach the parent context of \texttt{method()} in two hops; we jump to \texttt{Mid}, and then to \texttt{Top}. The superclass types of \texttt{Mid} and \texttt{Bot} are as follows:
+\begin{gather*}
+\mathsf{superclass}(\texttt{Mid<\rT, \rU>}) = \texttt{Top<(\rU, \rT)>} = \texttt{Top<\rT>} \otimes \Sigma_1\\
+\mathsf{superclass}(\texttt{Bot}) = \texttt{Mid<Int, Bool>} = \texttt{Mid<\rT, \rU>} \otimes \Sigma_2
+\end{gather*}
+with the two substitution maps below:
+\begin{gather*}
+\Sigma_1 := \SubstMap{\SubstType{\rT}{(\rU, \rT)}}\\
+\Sigma_2 := \SubstMap{\SubstType{\rT}{Int},\,\SubstType{\rU}{Bool}}
+\end{gather*}
+The input generic signature of~$\Sigma_1$ is the generic signature of \texttt{Top}, and the output generic signature of~$\Sigma_1$ is the generic signature of \texttt{Mid}. Also, the input generic signature of~$\Sigma_2$ is the generic signature of \texttt{Mid}, and its output generic signature is the generic signature of \texttt{Bot}, which is the empty generic signature. If we \index{substitution map composition!superclass type}compose the two substitution maps, we get the following:
+\[
+\Sigma_1 \otimes \Sigma_2 = \SubstMap{\SubstType{\rT}{(Bool, Int)}}
+\]
+This is the substitution map for the call. In particular, when we call \texttt{method()} on a value of type \texttt{Bot}, the type of the \texttt{self} parameter inside the method is going to be:
+\[
+\texttt{Top<\rT>} \otimes \Sigma_1 \otimes \Sigma_2 = \texttt{Top<(Bool, Int)>}
+\]
+In fact, we can also get the same result if we apply ``\textsf{superclass}'' twice:
+\[
+\mathsf{superclass}(\mathsf{superclass}(\texttt{Bot})) = (\texttt{Top<\rT>} \otimes \Sigma_1) \otimes \Sigma_2
+\]
+\end{example}
+
+We can generalize this as follows. We are given a class type together with the parent \index{class declaration}class declaration of some referenced member, so we must walk up the class hierarchy and collect substitutions along the way, until we reach the parent class.
+
+\begin{algorithm}[Get superclass type for declaration]\label{superclassfordecl} As input, takes a class type \tC\ and a class declaration $d$. Returns the superclass type of \tC\ for $d$.
+\begin{enumerate}
+\item Let $c$ be the class declaration of \tC. If~$c=d$, return \tC.
+\item Let \texttt{S} be the superclass type of $c$, or signal an invariant violation if it doesn't have one. (That would indicate $d$~is not a superclass of the original class type~\tC, in which case members of $d$ should not be visible as members of \tC.)
+\item Let~$\Sigma$ be the context substitution map of~\tC. Set $\tC \leftarrow \texttt{S} \otimes \Sigma$. Go back to Step~1.
+\end{enumerate}
+\end{algorithm}
+
+Note that this algorithm returns the type of the \Index{self parameter@\texttt{self} parameter}\texttt{self} parameter as seen ``inside'' the referenced member. To get the substitution map for the reference, we ask this type for its context substitution map. This is known as the \IndexDefinition{superclass substitution map}\emph{superclass substitution map}.
+
+This wraps up our discussion of subclassing for now. In later sections, we will learn more about this topic, and in particular, we will see how this all intersects with superclass requirements in a generic signature:
+\begin{itemize}
+\item \ChapRef{chap:conformances} explains how a subclass inherits conformances from its superclass.
+\item \SecRef{local requirements} explains how archetypes behave when their type parameter is subject to a superclass requirement.
+\item \SecRef{identtyperepr} explains how type resolution resolves a reference to a member type declared in the superclass of a base type.
+\item \SecRef{checking generic arguments} explains how we can check if a substitution map satisfies a superclass requirement.
+\item \SecRef{requirement desugaring} and \SecRef{minimal requirements} explain what it means for the user's program to state a superclass requirement that is either redundant or in conflict with some other requirement.
+\end{itemize}
+
+\section{SIL Type Lowering}\label{sec:type lowering}
+
+We end this chapter by taking a brief look at the \index{SIL}SIL type system. Recall that SIL is an intermediate representation, constructed from the \index{abstract syntax tree}abstract syntax tree by the compiler's \index{SILGen}SILGen pass. In this section, the types appearing in the \index{abstract syntax tree}abstract syntax tree will be called \IndexDefinition{formal type}\emph{formal types}, to distinguish them from the \IndexDefinition{lowered type}\emph{lowered types} used by SIL. The translation of formal types into lowered types is the process of \IndexDefinition{SIL type lowering}\index{type lowering|see{SIL type lowering}}\emph{SIL type lowering}.
+
+Our primary focus in this section is the relationship between SIL type lowering and \index{type substitution!lowered type}type substitution. We cannot hope to gain a complete understanding of SIL type lowering here, so certain concepts will be omitted or left unexplained. For more details about SIL and SIL types, see \cite{sil,siltypes}. The reader may also choose to skip this section entirely, because this material is not needed in the rest of this book.
+
+\paragraph{Loadable or address-only.}
+Most formal types are also lowered types, and SIL type lowering simply returns the original formal type in this case. One major exception concerns the types of functions. Unlike the \index{function type!SIL type lowering}function types of \SecRef{sec:more types}, which we will refer to as \emph{formal} function types in this section, the type of a function in SIL is a different kind of type that does not appear in the abstract syntax tree: the \IndexDefinition{SIL function type}\emph{SIL function type}. Compared to formal function types, SIL function types encode more details about the \index{calling convention}calling convention. We begin by taking a look at one of these details.
+
+A SIL function type makes explicit whether each \IndexDefinition{lowered parameter}lowered parameter and \IndexDefinition{lowered result}result can be passed in registers, or if it must be passed indirectly, via a pointer to a value stored in memory. If the parameter's lowered type is \IndexDefinition{loadable type}\emph{loadable}, it is passed directly; otherwise, the lowered type is \IndexDefinition{address-only type}\emph{address-only}, and it must be passed indirectly. Almost all lowered types are loadable. The exceptions are the following:
+\begin{enumerate}
+\item \index{type parameter type!SIL type lowering}Type parameter types and \index{archetype type!SIL type lowering}archetype types are address-only when they are not subject to an \Index{AnyObject@\texttt{AnyObject}}\texttt{AnyObject} layout constraint (\SecRef{sec:requirements}).
+
+(Values of such type have an unknown size at compile time.)
+
+\item \index{weak reference type!SIL type lowering}Weak reference types  (\SecRef{sec:special types}) are address-only.
+
+(While a weak reference is just the address of a class instance, the location of each weak reference must be registered with the Swift runtime at all times, and so they can only ``exist'' in memory.)
+
+\item \index{struct type!SIL type lowering}Struct and \index{enum type}enum types with \index{resilience!SIL type lowering}\emph{resilient} declarations are address-only.
+
+(We briefly talked about the resilience model in \SecRef{module system}, but further discussion is beyond the scope of this book. See \cite{evolutionblog,libraryevolution} for details.)
+
+\item Aggregate types, such as \index{tuple type!SIL type lowering}tuples with address-only elements, structs with address-only \index{stored property}stored properties, and enums with address-only cases, are address-only.
+
+(The property of being address-only is \index{transitive relation}transitive with respect to containment.)
+
+\item \index{existential type!SIL type lowering}Existential types (\ChapRef{chap:existential types}) are address-only when not \texttt{AnyObject} constrained.
+
+(A value of such a type can \emph{contain} a value of address-only type, and so the existential container itself must be address-only.)
+\end{enumerate}
+We will look at some examples before we discuss the general case.
+
+\begin{example}\label{ex:loadable address only 1}
+The \texttt{Int} and \texttt{String} types in the standard library are loadable, and so is the below \texttt{Loadable} struct type, because its stored properties are loadable:
+\begin{Verbatim}
+struct Loadable {
+  var x: Int
+  var y: String
+}
+\end{Verbatim}
+On the other hand, the below \texttt{AddressOnly} struct is address-only, because it contains a weak reference:
+\begin{Verbatim}
+struct AddressOnly {
+  weak var x: AnyObject?
+}
+\end{Verbatim}
+\end{example}
+
+For \index{generic nominal type!SIL type lowering}generic nominal types, deciding if a type is address-only requires type substitution.
+
+\begin{example}\label{ex:lowering optional}
+First, consider the standard library \texttt{Optional} enum:
+\begin{Verbatim}
+public enum Optional<Wrapped> {
+  case none
+  case some(Wrapped)
+}
+\end{Verbatim}
+In this section, we will say that a \index{generic nominal type!SIL type lowering}generic nominal type formed from this declaration is an ``\index{optional type}optional type.'' (Not to be confused with the \index{optional sugared type}optional sugared type that is spelled as \texttt{Int?}, from \SecRef{sec:more types}---however, the latter desugars to the former.)
+
+The generic argument of an optional type is called the \index{payload type of optional}\emph{payload type} of the optional. In memory, a value of optional type must be large enough to store the payload, together with a tag value indicating if the selected case is \texttt{none} or \texttt{some}. (The tag is also sometimes encoded \emph{inside} the payload~\cite{typelayout}.)
+
+An optional type is loadable if and only if its payload type is loadable. Thus, \texttt{Optional<Int>} is loadable, while \texttt{Optional<AddressOnly>}, with \texttt{AddressOnly} as in the previous example, is address-only.
+\end{example}
+
+\begin{example}
+Next, consider this enum declaration, which is identical to \texttt{Optional} except that the ``\texttt{some}'' case is declared to be \index{indirect enum case}\texttt{indirect}:
+\begin{Verbatim}
+enum IndirectOptional<Wrapped> {
+  case none
+  indirect case some(Wrapped)
+}
+\end{Verbatim}
+Instead of storing the payload inline, an \texttt{indirect} enum case is represented by a single reference-counted pointer that refers to a heap-allocated box. For this reason, both \texttt{IndirectOptional<Int>} and \texttt{IndirectOptional<AddressOnly>} are loadable.
+\end{example}
+
+\begin{example}
+This generic struct declaration has no stored properties at all:
+\begin{Verbatim}
+struct Phantom<T> {}
+\end{Verbatim}
+Hence, both \texttt{Phantom<Int>} and \texttt{Phantom<AddressOnly>} are loadable.
+\end{example}
+
+\begin{example}
+When a type contains \index{type parameter type!SIL type lowering}type parameters, its category depends on the referencing generic context:
+\begin{Verbatim}
+func f<T, U: AnyObject>(_ t: T, _ u: U) {
+  let x: Optional<T> = ...  // address-only
+  let y: Optional<U> = ...  // loadable
+}
+\end{Verbatim}
+The type of \texttt{x} is address-only, because \texttt{T} is unconstrained, while the type of \texttt{y} is loadable, because \texttt{U} is subject to an \texttt{AnyObject} layout constraint.
+\end{example}
+
+Now, we're going to look at the algorithm. As described here, it accepts both formal and lowered types. In the actual implementation, it operates on lowered types only, and we compute a number of additional properties of the type's layout in the same way.
+
+\begin{algorithm}[Decide if type is address-only]\label{alg:lowered type category}
+Receives a type~\tX\ as input, together with an optional \index{generic signature!SIL type lowering}generic signature~$G$ in the case where \tX\ contains type parameters. Returns one of ``\index{loadable type}loadable'' or ``\index{address-only type}address-only'' as output.
+\begin{enumerate}
+\item If \tX\ is a \index{type parameter!SIL type lowering}\textbf{type parameter}, say $\tX = \tT$: evaluate the \IndexQuery{requiresClass}$\Query{requiresClass}{G,\,\tT}$ generic signature query. If the answer to the query is true, return ``loadable,'' otherwise return ``address-only.''
+\item If \tX\ is an \index{archetype type!SIL type lowering}\textbf{archetype type} (\ChapRef{chap:archetypes}): proceed as above, but in place of~$G$, use the generic signature stored within the archetype.
+\item If \tX\ is a \index{weak reference type!SIL type lowering}\textbf{weak reference type}, return ``address-only.''
+\item If \tX\ is a \index{struct type!SIL type lowering}\textbf{struct type}, say $\tX = \tXd \otimes \Sigma$ where~$\Sigma$ is the \index{context substitution map}context substitution map and~$\tXd$ is the \index{declared interface type!SIL type lowering}declared interface type of its struct declaration~$d$, then, for each \index{stored property!SIL type lowering}stored property of~$d$:
+\begin{enumerate}
+\item Let \tY\ be the \index{interface type!SIL type lowering}interface type of the stored property.
+\item Compute the substituted type $\tY \otimes \Sigma$.
+\item Recursively check if $\tY \otimes \Sigma$ is address-only.
+\item If it is address-only, immediately return ``address-only.''
+\end{enumerate}
+Otherwise, if all substituted stored property types are loadable, return ``loadable.''
+
+\item If \tX\ is an \index{enum type!SIL type lowering}\textbf{enum type}:
+\begin{enumerate}
+\item Check if the \index{enum declaration!SIL type lowering}enum declaration is \texttt{indirect}; if so, return ``loadable.''
+\item Otherwise, proceed as in the struct case, but only consider those enum cases \emph{not} declared as \index{indirect enum case}\texttt{indirect}.
+
+(The lowered type of an \index{indirect enum case}\texttt{indirect} case is always a reference-counted pointer to a \index{heap-allocated box}heap-allocated box, and such a pointer is loadable. If the enum itself is \texttt{indirect}, we proceed as if each case was \texttt{indirect}.)
+\end{enumerate}
+
+\item If \tX\ is a \index{tuple type!SIL type lowering}\textbf{tuple type}, recursively check if each element type of \tX\ is address-only. If any are address-only, return ``address-only.'' Otherwise, return ``loadable.''
+
+\item If \tX\ is an \index{existential type!SIL type lowering}\textbf{existential type}, check if the existential type satisfies the \texttt{AnyObject} layout constraint. If so, return ``loadable,'' otherwise ``address-only.''
+
+\item If \tX\ is a \index{class type!SIL type lowering}\textbf{class type}, \index{metatype type!SIL type lowering}\textbf{metatype type}, or \index{function type!SIL type lowering}\textbf{(SIL) function type}, return ``loadable.''
+\end{enumerate}
+\end{algorithm}
+
+\paragraph{Exploding tuples.}
+A formal function type has zero or more parameter types, and exactly one return type. This return type can be a \index{tuple type!SIL type lowering}tuple type, which is how we model the case of having no return value, or more than one return value. 
+
+Like a formal function type, a \index{SIL function type}SIL function type has zero or more \index{lowered parameter!tuple type}lowered parameter types, but unlike a formal function type, a SIL function type \emph{also} has zero or more lowered \index{lowered result!tuple type}result types. When a tuple type appears in the parameter list or return type of a formal function type, SIL type lowering will ``explode'' it into multiple lowered parameters or lowered results.
+
+Both lowered parameters and lowered results are annotated with a \index{convention!SIL type lowering}\emph{convention}, which encodes two things: whether the value is passed directly in registers or indirectly via memory, and also, how the \index{ownership}ownership of the value changes during the call:
+\begin{enumerate}
+\item The directness is determined by the lowered parameter or result type; if the type is loadable, we may pass it directly (but sometimes, we must pass it indirectly, as we will see below); when it is address-only, it must be passed indirectly.
+\item A discussion of ownership is beyond the scope of this book. See \cite{siltypes} for details.
+\end{enumerate}
+
+A SIL function type also has an overall \index{calling convention}convention specifier. The possible conventions are a superset of those for formal function types, which were listed in \SecRef{sec:more types}. For us, the two that we need are \index{thin function!SIL type lowering}\texttt{@convention(thin)}, for functions that don't capture values (such as global functions and methods), and \index{thick function!SIL type lowering}\texttt{@convention(thick)}, for functions that do (such as \index{closure expression!SIL type lowering}closure expressions). A thick function value consists of a function pointer together with a \index{closure context}context, which can be used to store \index{captured value}captured values---the caller passes the context as an additional parameter. Finally, a SIL function type has a \index{generic signature!SIL function type}generic signature.
+
+\begin{example}
+Here is a \index{function declaration}function declaration with two parameters, the second of which is a tuple. The second element of the tuple is our address-only type from \ExRef{ex:loadable address only 1}:
+\begin{Verbatim}
+func foo(x: Int, y: (String, AddressOnly)) {}
+\end{Verbatim}
+Here is the notation used by the compiler when printing this declaration's SIL function type (for example, put the above declaration together with the \texttt{AddressOnly} struct from earlier in a source file, and build it the \IndexFlag{emit-silgen}\verb|-emit-silgen| flag):
+\begin{quote}
+\begin{verbatim}
+@convention(thin)
+(Int, @guaranteed String, @in_guaranteed AddressOnly) -> ()
+\end{verbatim}
+\end{quote}
+The \texttt{Int} parameter does not have a convention annotation, so it is passed directly. The \texttt{Int} type is \index{trivial type}trivial, so its values can be moved and copied without ownership concerns. The \texttt{String} parameter is also passed directly, but this time, the \verb|@guaranteed| convention indicates that ownership of the string is retained by the caller. Finally, the \texttt{AddressOnly} parameter is address-only, so the \verb|@in_guaranteed| convention is used to pass the value indirectly, and once again, the caller retains ownership of the value. Since \texttt{foo()} does not state a return type, the SIL function type has zero results.
+\end{example}
+
+\begin{example}
+Here is a generic function that returns a tuple:
+\begin{Verbatim}
+func flip<T, U>(t: T, u: U) -> (U, T) {
+  return (u, t)
+}
+\end{Verbatim}
+Here is its SIL function type:
+\begin{quote}
+\begin{verbatim}
+@convention(thin)
+<T, U> (@in_guaranteed T, @in_guaranteed U) -> (@out U, @out T)
+\end{verbatim}
+\end{quote}
+Both parameters are passed indirectly, with the caller retaining ownership (so in fact the implementation of the function must copy these values). The SIL function type also returns two results indirectly (at the machine level, the caller provides a pair of return buffers, large enough to hold both results.)
+\end{example}
+
+\paragraph{Re-abstraction thunks.}
+So, to get a SIL function type of a \index{function declaration!SIL type lowering}function declaration or \index{closure expression!SIL type lowering}closure expression, we take its \index{interface type!SIL function type}interface type, which is a formal function type. We explode tuples in the parameter list and return type, compute the category of each parameter and result, and do a few other things. Of course, some of those parameter and result types may themselves be function types, and we recursively lower those function types, too. We then form our SIL function type. This is sufficient to explain SILGen's behavior with direct calls of functions and closures, but it is not the whole story.
+
+To understand what happens when a function value is passed between generic contexts, we need to talk about \IndexDefinition{abstraction pattern}\emph{abstraction patterns}. The operation of SIL type lowering in the compiler receives not just a \index{formal type}formal type, but also an abstraction pattern.
+
+This complication arises for the following reason. When a substitution map is applied to a SIL function type, the type parameters in the SIL function type are replaced with concrete types. However, substitution does not change the directness of the SIL function type's parameters and results. If an original type parameter is address-only but its replacement type is loadable, the resulting SIL function type will differ from what we would get if we just lower the substituted formal type instead. Typically, a closure expression is emitted with a ``natural'' abstraction pattern that is its own formal type. To change the abstraction pattern of a function value, SILGen wraps the function value in a \IndexDefinition{re-abstraction thunk}\emph{re-abstraction thunk}. There are two kinds of thunk:
+\begin{enumerate}
+\item A \IndexDefinition{substituted-to-original thunk}\textbf{substituted-to-original thunk} appears when a closure is passed in to a generic function. It wraps a function type lowered with itself as the abstraction pattern, with a function type lowered with a more general abstraction pattern.
+\item An \IndexDefinition{original-to-substituted thunk}\textbf{original-to-substituted thunk} appears when a closure is returned from a generic function. It wraps a function type lowered with a more general abstraction pattern, with one lowered with the fully substituted abstraction pattern.
+\end{enumerate}
+
+\begin{example}\label{ex:abstraction pattern 1}
+Consider this rather pointless generic function that applies a closure to a value and returns the result:
+\begin{Verbatim}
+func apply<T>(_ x: T, _ fn: (T) -> T) -> T {
+  return fn(x)
+}
+\end{Verbatim}
+Say we call our function like this, with the substitution map $\Sigma := \SubstMap{\SubstType{\rT}{String}}$:
+\begin{Verbatim}
+let fn: (String) -> String = { $0.uppercased() }
+let result = apply("hello world", fn)
+\end{Verbatim}
+If we apply $\Sigma$ to the formal type of the ``\texttt{fn}'' parameter to \texttt{apply()}, we get:
+\[
+\left[ \texttt{(\rT) -> \rT} \right] \otimes \Sigma = \texttt{(String) -> String}
+\]
+The above formal type is identical to the formal type of the \index{closure expression}closure expression passed in as an argument by the caller. Now, let's take a look at lowered types. Since \texttt{String} is loadable, lowering the above formal type gives:
+\begin{quote}
+\begin{verbatim}
+@convention(thick) (@guaranteed String) -> (@owned String)
+\end{verbatim}
+\end{quote}
+On the other hand, the lowered type of the ``\texttt{fn}'' parameter passes the parameter and returns the result indirectly:
+\begin{quote}
+\begin{verbatim}
+@convention(thick) <T> (@in_guaranteed T) -> (@out T)
+\end{verbatim}
+\end{quote}
+Finally, if we apply $\Sigma$ to this \index{SIL function type!type substitution}SIL function type, we obtain the following:
+\begin{quote}
+\begin{verbatim}
+@convention(thick) (@in_guaranteed String) -> (@out String)
+\end{verbatim}
+\end{quote}
+To reconcile the difference, SILGen wraps the closure with a substituted-to-original thunk before handing it off to \texttt{apply()}. This thunk receives a pointer to a \texttt{String}, loads it, and calls the wrapped closure with the loaded value. The closure returns a new \texttt{String} directly, which the thunk stores into the indirect result buffer before returning.
+\end{example}
+
+\paragraph{More about abstraction patterns.}
+For our purposes, an \index{abstraction pattern}abstraction pattern simply consists of the unsubstituted \index{formal type!abstraction pattern}formal type for computing the directness of each \index{lowered parameter!abstraction pattern}parameter and \index{lowered result!abstraction pattern}result in the \index{SIL function type!abstraction pattern}SIL function type. (In reality, abstraction patterns also carry a \emph{kind} and some additional information, but we won't need this level of detail here.) So, a \index{re-abstraction thunk}re-abstraction thunk is then basically a closure that wraps another closure. The body of the thunk takes each parameter and forwards it to the wrapped closure, then takes the the wrapped closure's result and returns it to the caller of the thunk. In doing so, a re-abstraction thunk can change the convention of the parameters and results.
+
+There is also a useful peephole optimization that we will mention now. Very often, the closure being re-abstracted is a literal \index{closure expression!re-abstraction thunk}closure expression, in which case SILGen is able to directly emit the closure with the expected abstraction pattern, instead of immediately wrapping it in a thunk. This avoids an unnecessary heap allocation.
+
+\paragraph{Opaque abstraction patterns.}
+Type lowering traverses a formal function type ``in parallel'' with the abstraction pattern in order to build the \index{SIL function type}SIL function type. The abstraction pattern must have the same shape as the formal type, in the sense that the formal type should be obtainable from the abstraction pattern by substitution. For example, the abstraction pattern \texttt{(Int, \rU) -> \rV} is compatible with the formal type \texttt{(Int, (Bool, String) -> Float) -> Bool}, but not with the formal type \texttt{(Bool, Int, String) -> (Float, Float)}---in the latter, the number of parameters doesn't match up, and neither does the return type.
+
+The implementation of this ``parallel decomposition'' is mostly obvious, except when the abstraction pattern consists of a single \index{type parameter}type parameter. This is referred to as an \index{opaque abstraction pattern}\emph{opaque} abstraction pattern in the implementation (not to be confused with opaque parameters or opaque result types). In this situation, we lower the formal function type in the ``most general'' way, as if each one of its parameters and results was passed indirectly, without exploding tuples. The next three examples will illustrate this.
+
+\begin{example}
+Let's modify the \texttt{apply()} function from \ExRef{ex:abstraction pattern 1} to receive an array of closures instead, while making the closure's parameter concrete:
+\begin{Verbatim}
+func apply1<T>(_ x: String, _ fns: [(String) -> T]) -> [T] {
+  return fns.map { fn in fn(x) }
+}
+\end{Verbatim}
+We can do the same but make the result concrete instead:
+\begin{Verbatim}
+func apply2<T>(_ x: T, _ fns: [(T) -> String]) -> [String] {
+  return fns.map { fn in fn(x) }
+}
+\end{Verbatim}
+Say we call both functions with an array containing some large number of closures:
+\begin{Verbatim}
+let fns: [(String) -> String] = [
+  { $0.uppercased() },
+  /* and more... */
+]
+apply1("hello ", "world", fns)
+apply2("hello ", "world", fns)
+\end{Verbatim}
+We don't want to re-abstract every closure in the array before we pass it to \texttt{apply1()} and \texttt{apply2()}. Instead, when storing a closure in a generic container,  we re-abstract it into its most general form, where both the parameter and result are passed indirectly. This is accomplished by wrapping each closure in a \index{substituted-to-original thunk}substituted-to-original thunk before storing it in the array, and wrapping it again in an \index{original-to-substituted thunk}original-to-substituted thunk when loading it from the array.
+\end{example}
+
+An interesting \index{limitation!re-abstraction thunk}limitation of this implementation model is that re-abstraction thunks can nest, resulting in potentially unbounded memory usage. This was reported by a Swift developer on the forums~\cite{abstractleak}.
+
+\begin{example}
+Suppose we take an array of closures, repeatedly load each element from the array, and store it back without modification:
+\begin{Verbatim}
+var fns: [(String) -> String] = []
+
+// Initialize the array
+for n in 0 ..< 100 {
+  array.append({ $0.lowercased() })
+}
+
+// Repeat this as many times as necessary
+for _ in 0 ..< 1000 {
+  for n in 0 ..< array.count {
+    let fn = array[n]
+    array[n] = fn
+  }
+}
+\end{Verbatim}
+Each loaded element will be wrapped with an \index{original-to-substituted thunk}original-to-substituted thunk, and this thunk will then be wrapped with a \index{substituted-to-original thunk}substituted-to-original thunk before being stored back to the same location in the array. Thus, each iteration will allocate a pair of closure contexts on the heap, and repeating will consume an arbitrary amount of memory.
+
+For a simple example like the above, we could detect this situation, and either avoid emitting redundant thunks in \index{SILGen}SILGen, or clean up redundant thunks with a \index{SIL optimizer}SIL optimizer pass. A compile-time fix would not completely solve the problem, though, because we can just change the second ``\texttt{for}'' loop into the following:
+\begin{Verbatim}
+for _ in 0 ..< 1000 {
+  for n in 0 ..< array.count {
+    let fn = array[n]
+    let fn2 = someFunction(fn)
+    array[n] = fn2
+  }
+}
+\end{Verbatim}
+Perhaps \texttt{someFunction()} just returns its argument unchanged, but if its defined in another module, the compiler has no way to know this, because it cannot analyze its body, so we would encounter the same problem again. To solve this problem completely would require some kind of run time check when forming a re-abstraction thunk, to ``collapse'' multiple levels of nested thunks into one.
+\end{example}
+
+Our final example shows that a re-abstraction thunk may also need to explode and implode \index{tuple type!SIL type lowering}tuple types appearing in the formal function type's parameters and result.
+\begin{example}
+Consider a closure with formal type \texttt{(String, (Int, Bool)) -> ()}. Using its own formal type as the abstraction pattern, we get a SIL function type with three parameters and no results:
+\begin{quote}
+\begin{verbatim}
+(@guaranteed String, Int, Bool) -> ()
+\end{verbatim}
+\end{quote}
+The most general lowered type for this function type, however, is the following:
+\begin{quote}
+\begin{verbatim}
+(@in_guaranteed String, @in (Int, Bool)) -> (@out ())
+\end{verbatim}
+\end{quote}
+The latter lowered type receives the two-element tuple as a single indirect parameter. It also returns an empty tuple indirectly (an empty tuple value does not take up any space in memory, so there is nothing to load or store; however, the \index{calling convention}calling convention still allots a parameter to serve as the indirect result buffer). Now, if we are asked to emit a \index{substituted-to-original thunk!tuple type}substituted-to-original thunk to convert from the first type to the second, the thunk must explode the tuple and load both elements from memory before passing them directly to the wrapped closure. Likewise, an \index{original-to-substituted thunk!tuple type}original-to-substituted thunk must implode the last two lowered parameters into a single tuple value to be passed indirectly.
+\end{example}
+
+\paragraph{Optional payloads.}
+Most \index{generic nominal type!SIL type lowering}generic nominal types use a uniform representation that does not depend on the abstraction pattern, and type lowering simply returns the original formal type unchanged when given such a formal type, ignoring the abstraction pattern. In particular, the generic arguments of generic nominal types are not themselves lowered.
+
+Optional types are the exception. (Recall the declaration of \texttt{Optional} from \ExRef{ex:lowering optional}.) Optional function types are particularly common, and we don't want to pay the cost of allocating a re-abstraction thunk every time we wrap a function type with an optional, or unwrap an optional function type.
+
+For this reason, SIL type lowering treats \index{optional type!re-abstraction}optional types as a special case. When lowering a formal optional type with an optional type as the abstraction pattern, we lower its payload type with the abstraction pattern's formal type, and form a \IndexDefinition{lowered optional type}lowered optional type from the result.
+
+For example, consider the formal type \texttt{Optional<(String) -> String>}. Lowering this type with itself as the abstraction pattern yields the following---notice how the generic argument becomes a \index{SIL function type!optional payload}SIL function type, and this SIL function type receives its parameter and returns its result directly:
+\begin{center}
+\texttt{Optional<@convention(thick) (@guaranteed String) -> (@owned String)>}
+\end{center}
+
+Since the same formal optional type can map to one of several lowered optional types depending on the abstraction pattern, values of optional types may need to be re-abstracted. We accomplish this  by generating a conditional branch. If the active case is ``\texttt{none}'' we simply return this empty value. If the active case is ``\texttt{some}'' we wrap the payload in a re-abstraction thunk, and then wrap this thunk in a new optional value.
+
+Finally, we are ready to look at the type lowering algorithm.
+
+\begin{algorithm}[Lower type with abstraction pattern]\label{alg:compute lowered type}
+Receives a \index{formal type}formal type~\tX\ and an \index{abstraction pattern}abstraction pattern \tY\ as input, together with an optional \index{generic signature!SIL type lowering}generic signature~$G$ in the case where \tY\ \index{type!containing type parameters}contains type parameters. Returns a lowered type. The structure of the abstraction pattern must match the formal type.
+\begin{enumerate}
+\item If \tX\ is a \index{function type!SIL type lowering}\textbf{function type}:
+\begin{enumerate}
+\item Walk the formal parameters of \tX\ and \tY\ in parallel:
+\begin{enumerate}
+\item Lower each formal parameter type using the corresponding formal parameter type of \tY\ as the abstraction pattern.
+\item For any formal parameter of \tY\ that is a tuple type, explode the lowered type into multiple lowered parameters.
+\item Compute a category for each lowered parameter type using \AlgRef{alg:lowered type category}.
+\end{enumerate}
+\item Consider the formal result types of \tX\ and \tY:
+\begin{enumerate}
+\item Lower the formal result type of \tX\ using the result type of \tY\ as the abstraction pattern.
+\item If the formal result type of \tY\ is a tuple type, explode the lowered result type into multiple lowered results.
+\item Compute a category for each lowered result type using \AlgRef{alg:lowered type category}.
+\end{enumerate}
+\item Collect the lowered parameter types, lowered result types, and their categories, to form a new \index{SIL function type}SIL function type.
+\end{enumerate}
+
+\item If \tX\ is a \index{tuple type!SIL type lowering}\textbf{tuple type}, walk the elements of \tX\ and \tY\ in parallel, and lower each element. Collect the lowered element types to form a lowered tuple type, and return the result.
+
+\item If \tX\ is an \index{optional type!SIL type lowering}\textbf{optional type}:
+\begin{enumerate}
+\item Lower the payload type of \tX\ using the payload type of \tY\ as the abstraction pattern.
+\item Form a new optional type from this lowered payload type.
+\end{enumerate}
+
+\item If \tX\ is a \index{struct type!SIL type lowering}\textbf{struct type}, \index{enum type!SIL type lowering}\textbf{enum type} (except for \texttt{Optional}, which was handled above), or \index{class type!SIL type lowering}\textbf{class type}, return \tX\ itself. (The formal type is already a lowered type in this case, and we ignore the abstraction pattern \tY.)
+\end{enumerate}
+\end{algorithm}
+
+\paragraph{Substitution with lowered types.}
+We're now going to investigate the meaning of applying a \index{substitution map!lowered type}substitution map to a \index{lowered type!type substitution}\index{type substitution!lowered type}lowered type. This is a common operation in the \index{SIL optimizer}SIL optimizer; for example, it is used to generate \index{specialization}specializations of generic functions. If the implementation of the function is visible from the call site, the optimizer can generate a specialization by cloning each SIL instruction in the function's body, and applying the substitution map from the call site.
+
+A substitution map's \index{replacement type!SIL type lowering}replacement types are always \index{formal type!type substitution}formal types. When we substitute a type parameter appearing in a lowered type, we must sometimes lower the replacement type if it appears in a certain position. We always lower the replacement type with an opaque abstraction pattern. We do this precisely in those positions where \AlgRef{alg:compute lowered type} would lower a formal type that appears there. Such a position within a type is referred to as \IndexDefinition{lowered position}\emph{lowered position}. Lowered positions are defined recursively. The entire original lowered type is itself in lowered position. Furthermore:
+\begin{enumerate}
+\item A \index{SIL function type!lowered position}SIL function type can only appear in lowered position, and all of its parameter and result types are also in lowered position.
+\item If a \index{tuple type!lowered position}tuple type appears in lowered position, its element types are also in lowered position.
+\item If an \index{optional type!lowered position}optional type appears in lowered position, its generic argument is also in lowered position.
+\end{enumerate}
+If a type parameter occurs in any other position, the replacement type is not lowered, and it is substituted as-is.
+
+Let's say that \tY~is an abstraction pattern, \tX~is a formal type, and $L(\tY, \tX)$ is the lowered type for~\tX\ with respect to~\tY. Finally, let ``$=$'' denote \index{canonical type equality}canonical type equality. In \ExRef{ex:abstraction pattern 1}, we saw that lowering a type with its own abstraction pattern is not, in general, compatible with type substitution---that is, $L(\tX, \tX) \otimes \Sigma \neq L(\tX \otimes \Sigma, \tX \otimes \Sigma)$. However, there is an identity relating type lowering with type substitution. When the abstraction pattern \tY\ remains unsubstituted and we apply a substitution map to both sides, it is always true that $L(\tY, \tX) \otimes \Sigma = L(\tY, \tX \otimes \Sigma)$.
+
+\begin{example}
+Let's apply $\SubstMap{\SubstType{\rT}{Int},\,\rU \mapsto \left[ \texttt{() -> String} \right] }$ to a pair of lowered types. First, consider the generic nominal type \texttt{Array<(\rT, \rU)>}. Neither of the two type parameters are in lowered position, so type substitution will replace them without lowering, and we just get \texttt{Array<(Int, () -> String)>}.
+
+Now, suppose we apply $\Sigma$ to \texttt{Optional<(\rT, \rU)>}. Both type parameters are in lowered position, so type substitution will lower the replacement types with an \index{opaque abstraction pattern}opaque abstraction pattern. We see that while \texttt{Int} remains unchanged, the formal function type \texttt{() -> String} becomes a SIL function type, and we get:
+\[
+\texttt{Optional<(Int, @convention(thick) () -> (@out String))>}
+\]
+\end{example}
+
+\paragraph{History.}
+\IndexSwift{3.1}Swift~3.1 introduced the special type lowering support and re-abstraction for \index{optional type!SIL type lowering}optional payloads; prior to this, optional types were lowered like every other generic nominal type~\cite{optionalpayload}. The \index{opaque abstraction pattern}most general form of a \index{function type!SIL type lowering}function type changed in \IndexSwift{5.0}Swift~5, when \IndexFlag{language-mode}\verb|-swift-version 3| mode was dropped (these days, the \texttt{-swift-version} flag is named \texttt{-language-mode}, and the minimum supported language mode at the time of writing is~\texttt{4}). As we saw in \SecRef{sec:more types}, \IndexSwift{3.0}Swift~3 did not distinguish between function types that receive multiple parameters and function types with a single parameter of \index{tuple type!SIL type lowering}tuple type. Thus, in Swift~3, the most general form of a function type had to implode all parameters into a single indirect parameter of tuple type, which was somewhat inefficient. Resolving this was a strong impetus for dropping Swift~3 source compatibility~\cite{mostopaque}. Finally, \IndexSwift{5.6}Swift~5.6 introduced the peephole optimization allowing \index{SILGen}SILGen to emit a closure expression with an arbitrary abstraction pattern, rather than immediately wrapping it with a substituted-to-original thunk~\cite{emitabstract}.
+
+\section{Source Code Reference}\label{src:substitution maps}
 
 Key source files:
 \begin{itemize}
 \item \SourceFile{include/swift/AST/SubstitutionMap.h}
+\item \SourceFile{include/swift/AST/Type.h}
+\item \SourceFile{include/swift/AST/Types.h}
 \item \SourceFile{lib/AST/SubstitutionMap.cpp}
 \item \SourceFile{lib/AST/TypeSubstitution.cpp}
 \end{itemize}
-Other source files:
-\begin{itemize}
-\item \SourceFile{include/swift/AST/GenericSignature.h}
-\item \SourceFile{include/swift/AST/Type.h}
-\item \SourceFile{include/swift/AST/Types.h}
-\end{itemize}
 
-\IndexSource{type substitution}
 \apiref{Type}{class}
-See also \SecRef{typesourceref}.
+See also \SecRef{src:types}.
 \begin{itemize}
-\item \texttt{subst()} applies a substitution map to this type and returns the substituted type.
+\item \texttt{subst()} applies a \IndexSource{substitution map}substitution map to this type and returns the \IndexSource{type substitution}\IndexSource{substituted type}substituted type.
 \end{itemize}
 
-\IndexSource{context substitution map}
 \apiref{TypeBase}{class}
-See also \SecRef{typesourceref} and \SecRef{genericsigsourceref}.
 \begin{itemize}
-\item \texttt{getContextSubstitutionMap()} returns this type's context substitution map.
+\item \texttt{getContextSubstitutionMap()} returns this type's \IndexSource{context substitution map}context substitution map.
 \end{itemize}
 
-\IndexSource{substitution map}
-\IndexSource{input generic signature}
-\IndexSource{empty substitution map}
-\IndexSource{substitution map composition}
+\apiref{GenericSignature}{class}
+See also \SecRef{src:generic signatures}.
+\begin{itemize}
+\item \texttt{getIdentitySubstitutionMap()} returns the \IndexSource{identity substitution map}identity substitution map for this generic signature, that replaces each \IndexSource{generic signature!type substitution}generic parameter with itself.
+\end{itemize}
+
 \apiref{SubstitutionMap}{class}
-Represents an immutable, uniqued substitution map. See also \SecRef{conformancesourceref}.
+A \IndexSource{substitution map}substitution map. Just like \texttt{Type} and \texttt{GenericSignature}, substitution maps are immutable and uniqued, and the representation of a \texttt{SubstitutionMap} fits in a single pointer, so they are cheap to pass by value.
 
-\paragraph{Canonical substitution maps.}
-\IndexDefinition{canonical substitution map}%
-\index{canonical type}%
-\index{canonical conformance}%
-\IndexDefinition{substitution map equality}%
-Substitution maps are immutable and uniqued, just like types and generic signatures. A substitution map is canonical if all replacement types are canonical types and all conformances are canonical conformances. A substitution map is canonicalized by constructing a new substitution map from the original substitution map's canonicalized replacement types and conformances.
+The default \texttt{SubstitutionMap()} constructor constructs an \IndexSource{empty substitution map}empty substitution map. The implicit \texttt{bool} conversion tests for a non-empty substitution map. We defer our discussion of the entry points that build non-empty substitution maps to \SecRef{src:conformances}, since this involves passing in an array of conformances as well, and we haven't introduced conformances yet.
 
-As with types, canonicalization gives substitution maps two levels of equality; two substitution maps are equal pointers if their replacement types and conformances are equal pointers. Two substitution maps are canonically equal if their canonical substitution maps are equal pointers; or equivalently, if their replacement types and conformances are canonically equal.
-
-Applying a canonical substitution map to a canonical original type is not guaranteed to produce a canonical substituted type. However, there are two important invariants that do hold:
-\begin{enumerate}
-\item Given two canonically equal original types, applying the same substitution map to both will produce two canonically equal substituted types.
-\item Given an original type and two canonically equal substitution maps, applying the two substitution maps to this type will also produce two canonically equal substituted types.
-\end{enumerate}
-
-As with \texttt{Type} and \texttt{GenericSignature}, this class stores a single pointer, so substitution maps are cheap to pass around as values. The default constructor \texttt{SubstitutionMap()} constructs an empty substitution map. The implicit \texttt{bool} conversion tests for a non-empty substitution map.
-
-\IndexSource{substitution map equality}
-The overload of \texttt{operator==} implements substitution map pointer equality. Canonical equality can be tested by first canonicalizing both sides:
-\begin{Verbatim}
-if (subMap1.getCanonical() == subMap2.getCanonical())
-  ...;
-\end{Verbatim}
-
-\index{primary archetype}
-\index{opened archetype}
-\Index{dynamic Self type@dynamic \tSelf\ type}
-\IndexSource{canonical substitution map}
 Accessor methods:
 \begin{itemize}
 \item \texttt{empty()} answers if this is the empty substitution map; this is the logical negation of the \texttt{bool} implicit conversion.
-\item \texttt{getGenericSignature()} returns the substitution map's input generic signature.
+\item \texttt{getGenericSignature()} returns the substitution map's \IndexSource{input generic signature}input generic signature.
 \item \texttt{getReplacementTypes()} returns an array of \texttt{Type}.
-\item \texttt{hasAnySubstitutableParams()} answers if the input generic signature contains at least one generic parameter not fixed to a concrete type; that is, it must be non-empty and not fully concrete (see the \texttt{areAllParamsConcrete()} method of \texttt{GenericSignatureImpl} from \SecRef{genericsigsourceref}).
+\item \texttt{hasAnySubstitutableParams()} answers if this substitution map's input generic signature contains at least one generic parameter that is not fixed to a concrete type (see the \texttt{GenericSignatureImpl::areAllParamsConcrete()} method from \SecRef{src:generic signatures}).
 \end{itemize}
-Recursive properties computed from replacement types:
+
+Recursive properties of replacement types:
 \begin{itemize}
-\item \texttt{hasArchetypes()} answers if any of the replacement types contain a primary archetype or opened existential archetype.
-\item \texttt{hasOpenedExistential()} answers if any of the replacement types contain an opened existential archetype.
-\item \texttt{hasDynamicSelf()} answers if any of the replacement types contain the dynamic Self type.
+\item \texttt{hasPrimaryArchetypes()} answers if any of the replacement types contain \IndexSource{primary archetype}primary archetypes.
+\item \texttt{hasOpenedExistential()} answers if any of the replacement types contain an \IndexSource{existential archetype}existential archetype.
+\item \texttt{hasDynamicSelf()} answers if any of the replacement types contain the \IndexSource{dynamic Self type@dynamic \tSelf\ type}dynamic Self type.
 \end{itemize}
-Canonical substitution maps:
+
+A substitution map is \IndexSource{canonical substitution map}\emph{canonical} if all replacement types are \IndexSource{canonical type}canonical types and all conformances are \IndexSource{canonical conformance}canonical conformances. A substitution map is canonicalized by constructing a new substitution map from the original substitution map's canonicalized replacement types and conformances.
 \begin{itemize}
 \item \texttt{isCanonical()} answers if the replacement types and conformances stored in this substitution map are canonical.
 \item \texttt{getCanonical()} constructs a new substitution map by canonicalizing the replacement types and conformances of this substitution map.
 \end{itemize}
-Composing substitution maps (\SecRef{submapcomposition}):
+
+Substitution map composition (\SecRef{sec:composition}):
 \begin{itemize}
-\item \texttt{subst()} applies another substitution map to this substitution map, producing a new substitution map.
+\item \texttt{subst()} returns the \IndexSource{substitution map composition}composition of this substitution map on the left with the given substitution map on the right.
 \end{itemize}
-Two overloads of the \texttt{get()} static method are defined for constructing substitution maps (\SecRef{buildingsubmaps}).
-\IndexSource{get substitution map}
 
-\medskip
-\noindent
-\texttt{get(GenericSignature, ArrayRef<Type>, ArrayRef<ProtocolConformanceRef>)}\newline builds a new substitution map from an input generic signature, an array of replacement types, and array of conformances.
-
-\medskip
-\noindent
-\texttt{get(GenericSignature, TypeSubstitutionFn, LookupConformanceFn)} builds a new substitution map by invoking a pair of callbacks to produce each replacement type and conformance.
-
-\IndexSource{replacement type callback}
-\apiref{TypeSubstitutionFn}{type alias}
-The type signature of a replacement type callback for \texttt{SubstitutionMap::get()}.
-\begin{verbatim}
-using TypeSubstitutionFn
-  = llvm::function_ref<Type(SubstitutableType *dependentType)>;
-\end{verbatim}
-The parameter type is always a \texttt{GenericTypeParamType *} when the callback is used with \texttt{SubstitutionMap::get()}.
-
-\IndexSource{query substitution map callback}
-\apiref{QuerySubstitutionMap}{struct}
-A callback intended to be used with \texttt{SubstitutionMap::get()} as a replacement type callback.
-Overloads \texttt{operator()} with the signature of \texttt{TypeSubstitutionFn}.
-
-Constructed from a \texttt{SubstitutionMap}:
+As with types, substitution maps have two levels of \IndexSource{substitution map equality}equality; two substitution maps are equal pointers if their replacement types and conformances are equal pointers. Two substitution maps are canonically equal if their canonical substitution maps are equal pointers; or equivalently, if their replacement types and conformances are canonically equal. The \texttt{operator==} overloads implements pointer equality. Canonical equality can be tested by first canonicalizing both sides:
 \begin{Verbatim}
-QuerySubstitutionMap{subMap}
+if (subMap1.getCanonical() == subMap2.getCanonical())
+  ...;
 \end{Verbatim}
+However, unlike types, checking two substitution maps for equality is rare. The fact that they are uniquely-allocated is more of a performance optimization than anything else.
 
-\IndexSource{query type map callback}
-\apiref{QueryTypeSubstitutionMap}{struct}
-A callback intended to be used with \texttt{SubstitutionMap::get()} as a replacement type callback.
-Overloads \texttt{operator()} with the signature of \texttt{TypeSubstitutionFn}.
+\subsection*{Subclassing}
 
-Constructed from an LLVM \texttt{DenseMap}:
-\begin{Verbatim}
-DenseMap<SubstitutableType *, Type> typeMap;
-
-QueryTypeSubstitutionMap{typeMap}
-\end{Verbatim}
-
-\IndexSource{conformance lookup callback}
-\apiref{LookupConformanceFn}{type alias}
-The type signature of a conformance lookup callback for \texttt{SubstitutionMap::get()}.
-\begin{verbatim}
-using LookupConformanceFn = llvm::function_ref<
-    ProtocolConformanceRef(CanType origType,
-                           Type substType,
-                           ProtocolDecl *conformedProtocol)>;
-\end{verbatim}
-
-\IndexSource{global conformance lookup callback}
-\apiref{LookUpConformanceInModule}{struct}
-A callback intended to be used with \texttt{SubstitutionMap::get()} as a conformance lookup callback. Overloads \texttt{operator()} with the signature of \texttt{LookupConformanceFn}.
-
-Performs a global conformance lookup. Constructed without arguments:
-\begin{Verbatim}
-LookUpConformanceInModule()
-\end{Verbatim}
-
-\IndexSource{local conformance lookup callback}
-\apiref{LookUpConformanceInSubstitutionMap}{struct}
-A callback intended to be used with \texttt{SubstitutionMap::get()} as a conformance lookup callback. Overloads \texttt{operator()} with the signature of \texttt{LookupConformanceFn}.
-
-Constructed with a \texttt{SubstitutionMap}:
-\begin{Verbatim}
-LookUpConformanceInSubstitutionMap{subMap}
-\end{Verbatim}
-
-\IndexSource{make abstract conformance callback}
-\apiref{MakeAbstractConformanceForGenericType}{struct}
-A callback intended to be used with \texttt{SubstitutionMap::get()} as a conformance lookup callback. Overloads \texttt{operator()} with the signature of \texttt{LookupConformanceFn}.
-
-Constructed without arguments:
-\begin{Verbatim}
-MakeAbstractConformanceForGenericType()
-\end{Verbatim}
-
-\apiref{GenericSignature}{class}
-See also \SecRef{genericsigsourceref}.
-
+\apiref{ClassDecl}{class}
+See also \SecRef{src:declarations}.
 \begin{itemize}
-\item \texttt{getIdentitySubstitutionMap()} returns the \IndexSource{identity substitution map}substitution map that replaces each \IndexSource{generic signature!type substitution}generic parameter with itself.
+\item \texttt{getSuperclass()} returns this \IndexSource{class declaration}class declaration's \IndexSource{superclass type}superclass type.
 \end{itemize}
+
+\apiref{Type}{class}
+\begin{itemize}
+\item \texttt{getSuperclass()} returns this \IndexSource{class type}class type's \IndexSource{superclass type}superclass type. This is \AlgRef{superclass type of type}.
+\item \texttt{getSuperclassDecl()} returns this \IndexSource{class type}class type's \IndexSource{superclass declaration}superclass declaration. This is \AlgRef{superclassfordecl}.
+\end{itemize}
+
+\subsection*{SIL Types}
+
+Key source files:
+\begin{itemize}
+\item \SourceFile{include/swift/AST/Types.h}
+\item \SourceFile{include/swift/SIL/SILType.h}
+\item \SourceFile{lib/SIL/IR/SILType.cpp}
+\item \SourceFile{lib/SIL/IR/SILFunctionType.cpp}
+\end{itemize}
+
+A \IndexSource{lowered type}lowered type is represented as a \texttt{CanType}, just like a \IndexSource{formal type}formal type. Be forewarned that the distinction between the two is not enforced statically, and care must be taken not to get them mixed up.
+
+\apiref{TypeBase}{class}
+See also \SecRef{src:types}. Two methods distinguish formal types from lowered types:
+\begin{itemize}
+\item \texttt{isLegalFormalType()} checks if this is a legal formal type.
+\item \texttt{isLegalSILType()} checks if this is a legal lowered type.
+\end{itemize}
+
+\apiref{SILValueCategory}{enum class}
+In the implementation, whether a type is loadable or address-only is referred to as the lowered type's ``category.''
+\begin{itemize}
+\item \texttt{SILValueCategory::Object} is the category of loadable types.
+\item \texttt{SILValueCategory::Address} is the category of address-only types.
+\end{itemize}
+
+\apiref{SILType}{class}
+Combines a lowered type together with its category. SIL types can be taken apart:
+\begin{itemize}
+\item \texttt{getASTType()} returns the SIL type's lowered type as a \texttt{CanType}.
+\item \texttt{getCategory()} returns the SIL type's category.
+\end{itemize}
+New SIL types can be constructed from a lowered type and a category as follows:
+\begin{itemize}
+\item \texttt{SILType::getPrimitiveObjectType()} is a static factory method that returns a new object SIL type for the given lowered type. The lowered type must be loadable.
+\item \texttt{SILType::getPrimitiveAddressType()} is a static factory method that returns a new address SIL type for the given lowered type.
+\end{itemize}
+One can also call the \texttt{SILType} constructor with a lowered type and a \texttt{SILValueCategory}.
+
+Note that all of the above requires already having a lowered type on hand; attempting to construct a SIL type from a formal type that is not a lowered type will result in a run time assertion. To construct a SIL type from a formal type, the formal type must be lowered first, as discussed below.
+
+SIL types support down-casting to the various \texttt{TypeBase} subclasses that represent different kinds of lowered types. The \texttt{SILType} class declares three template methods, \verb|is<>()|, \verb|getAs<>|, and \verb|castTo<>|. These are equivalent to calling \texttt{getASTType()} and then passing the result to the top-level \verb|isa<>|, \verb|dyn_cast<>|, and \verb|cast<>| template functions discussed in \SecRef{src:types}.
+
+The printed representation of a SIL type is \verb|$type| for a loadable type and \verb|$*type| for an address-only type, where \verb|type| is the printed representation of its lowered type. This printed representation shows up in \IndexFlag{emit-silgen}\verb|-emit-silgen| output, for example.
+
+\apiref{SILFunctionType}{class}
+A \texttt{TypeBase} subclass representing a \IndexSource{SIL function type}SIL function type.
+\begin{itemize}
+\item \texttt{getParameters()} returns an \texttt{ArrayRef<SILParameterInfo>} with the function's \IndexSource{lowered parameter}lowered parameters.
+\item \texttt{getResults()} returns an \texttt{ArrayRef<SILResultInfo>} with the function's \IndexSource{lowered result}lowered results.
+\item \texttt{getInvocationGenericSignature()} returns the function's \IndexSource{generic signature!SIL function type}generic signature.
+\end{itemize}
+
+In reality, generic SIL function types have a more complex representation than what we've described; see~\cite{substfunctype}.
+
+\subsection*{SIL Type Lowering}
+
+Key source files:
+\begin{itemize}
+\item \SourceFile{include/swift/SIL/AbstractionPattern.h}
+\item \SourceFile{include/swift/SIL/TypeLowering.h}
+\item \SourceFile{lib/SIL/IR/AbstractionPattern.cpp}
+\item \SourceFile{lib/SIL/IR/TypeLowering.cpp}
+\end{itemize}
+
+\apiref{AbstractionPattern}{class}
+An \IndexSource{abstraction pattern}abstraction pattern.
+\begin{itemize}
+\item \texttt{getKind()} returns the abstraction pattern's kind. See the source code for an explanation of the possible kinds.
+\item \texttt{isTypeParameterOrOpaqueArchetype()} returns if this is an \IndexSource{opaque abstraction pattern}opaque abstraction pattern.
+\item \texttt{getType()} returns the abstraction pattern's \IndexSource{formal type!abstraction pattern}formal type.
+\end{itemize}
+
+\apiref{TypeConverter}{class}
+A singleton object responsible for \IndexSource{SIL type lowering}SIL type lowering.
+\begin{itemize}
+\item \texttt{getLoweredType()} takes a \texttt{CanType} representing a formal type, and returns a \texttt{SILType} which encodes the lowered type together with its category.
+\item \texttt{getTypeLowering()} takes a \texttt{CanType} representing a formal type, and returns a \texttt{TypeLowering} object, which encodes the lowered type together with additional recursive properties computed by type lowering, such as whether the type is \IndexSource{trivial type}trivial.
+\end{itemize}
+
+\subsection*{Re-abstraction Thunks}
+
+Key source files:
+\begin{itemize}
+\item \SourceFile{lib/SILGen/SILGenPoly.cpp}
+\item \SourceFile{lib/SILGen/SILGenThunk.cpp}
+\end{itemize}
+
+\apiref{SILGenFunction}{class}
+A class containing various entry points used by \IndexSource{SILGen}SILGen to emit the SIL functions. The following two entry points emit \IndexSource{re-abstraction thunk}re-abstraction thunks:
+\begin{itemize}
+\item \texttt{emitOrigToSubstValue()} re-abstracts a value from a given abstraction pattern to the ``natural'' abstraction pattern for its formal type. If the value has function type, this emits an \IndexSource{original-to-substituted thunk}original-to-substituted thunk.
+\item \texttt{emitSubstToOrigValue()} re-abstracts a value from the ``natural'' abstraction pattern for its formal type to a given abstraction pattern. If the value has function type, this emits an  \IndexSource{substituted-to-original thunk}substituted-to-original thunk.
+\end{itemize}
+
+\subsection*{SIL Type Substitution}
+
+Key source files:
+\begin{itemize}
+\item \SourceFile{lib/SIL/IR/SILTypeSubstitution.cpp}
+\end{itemize}
+
+\apiref{SILType}{class}
+\IndexSource{type substitution!lowered type}SIL type substitution:
+\begin{itemize}
+\item \texttt{subst()} applies a \IndexSource{substitution map!lowered type}substitution map to a SIL type.
+\end{itemize}
+
+\apiref{SILTypeSubstituter}{class}
+A \texttt{CanTypeVisitor} implementation used to implement the above.
 
 \end{document}

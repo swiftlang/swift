@@ -44,9 +44,8 @@ public struct Concrete : Thrower {
 
 // CHECK-LABEL: sil @$s4test6calleryyAA8ConcreteVKF : $@convention(thin) (Concrete) -> @error any Error
 public func caller(_ c: Concrete) throws {
-  // CHECK: [[ARG:%.*]] = struct $Concrete ()
   // CHECK: [[FN:%.*]] = function_ref @$s4test8ConcreteV4failyyKF : $@convention(method) (Concrete) -> @error any Error
-  // CHECK: try_apply [[FN]]([[ARG]]) : $@convention(method) (Concrete) -> @error any Error
+  // CHECK: try_apply [[FN]](%0) : $@convention(method) (Concrete) -> @error any Error
   try callee(c)
 }
 

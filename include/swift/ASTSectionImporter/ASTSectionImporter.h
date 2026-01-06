@@ -64,11 +64,5 @@ namespace swift {
   parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
                   StringRef Data, const llvm::Triple &filter);
 
-  // An old version temporarily left for remaining call site.
-  // TODO: remove this once the other version is committed and used.
-  bool parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
-                       StringRef Data, const llvm::Triple &filter,
-                       SmallVectorImpl<std::string> &foundModules);
-
 }
 #endif

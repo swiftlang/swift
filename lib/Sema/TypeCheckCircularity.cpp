@@ -232,6 +232,14 @@ bool CircularityChecker::expandTuple(CanTupleType tupleType, unsigned depth) {
 /// Visit a nominal type and try to expand it one level.
 bool CircularityChecker::expandNominal(CanType type, NominalTypeDecl *D,
                                        unsigned depth) {
+  if (D->isResilient(OriginalDecl->getParentModule(),
+                     ResilienceExpansion::Maximal)) {
+    LLVM_DEBUG(llvm::dbgs() << std::string(depth, ' ')
+                            << "skipping resilient nominal "
+                            << type << "\n";);
+    return false;
+  }
+
   LLVM_DEBUG(llvm::dbgs() << std::string(depth, ' ') << "expanding nominal "
                           << type << "\n";);
   if (auto S = dyn_cast<StructDecl>(D)) {

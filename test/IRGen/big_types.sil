@@ -80,17 +80,14 @@ unwind:
 // CHECK-LABEL: sil @use_yield_big : $@convention(thin) () -> () {
 // CHECK:       bb0:
 // CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $BigStruct
-// CHECK-NEXT:    [[TEMP2:%.*]] = alloc_stack $BigStruct
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[CORO:%.*]] = function_ref @test_yield_big : $@yield_once @convention(thin) () -> @yields @in_guaranteed BigStruct
 // CHECK-NEXT:    ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[CORO]]()
 // CHECK-NEXT:   copy_addr [take] [[ADDR]] to [init] [[TEMP]] : $*BigStruct
-// CHECK-NEXT:   copy_addr [take] [[TEMP]] to [init] [[TEMP2]] : $*BigStruct
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[USE:%.*]] = function_ref @use_big_struct : $@convention(thin) (@in_guaranteed BigStruct) -> ()
-// CHECK-NEXT:    apply [[USE]]([[TEMP2]])
+// CHECK-NEXT:    apply [[USE]]([[TEMP]])
 // CHECK-NEXT:    [[RET:%.*]] = end_apply [[TOKEN]] as $()
-// CHECK-NEXT:    dealloc_stack [[TEMP2]] : $*BigStruct
 // CHECK-NEXT:    dealloc_stack [[TEMP]] : $*BigStruct
 // CHECK-NEXT:    return [[RET]] : $()
 sil @use_yield_big : $@convention(thin) () -> () {

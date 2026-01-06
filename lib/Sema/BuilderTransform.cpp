@@ -175,9 +175,6 @@ protected:
 
     if (auto *decl = element.dyn_cast<Decl *>()) {
       switch (decl->getKind()) {
-        // Skip #warning/#error; we'll handle them when applying
-        // the builder.
-      case DeclKind::PoundDiagnostic:
       case DeclKind::PatternBinding:
       case DeclKind::Var:
       case DeclKind::Param:
@@ -219,7 +216,7 @@ protected:
       return std::nullopt;
     }
 
-    auto *expr = element.get<Expr *>();
+    auto *expr = cast<Expr *>(element);
     if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
       // This should never be treated as an expression in a result builder, it
       // should have statement semantics.
@@ -261,7 +258,8 @@ protected:
   }
 
   std::pair<NullablePtr<Expr>, std::optional<UnsupportedElt>>
-  transform(BraceStmt *braceStmt, SmallVectorImpl<ASTNode> &newBody) {
+  transform(BraceStmt *braceStmt, SmallVectorImpl<ASTNode> &newBody,
+            bool isolateBuildBlock = false) {
     SmallVector<Expr *, 4> buildBlockArguments;
 
     auto failTransform = [&](UnsupportedElt unsupported) {
@@ -271,12 +269,7 @@ protected:
     for (auto element : braceStmt->getElements()) {
       if (auto unsupported =
               transformBraceElement(element, newBody, buildBlockArguments)) {
-        // When in code completion mode, simply ignore unsported constructs to
-        // get results for anything that's unrelated to the unsupported
-        // constructs.
-        if (!ctx.CompletionCallback) {
-          return failTransform(*unsupported);
-        }
+        return failTransform(*unsupported);
       }
     }
 
@@ -326,6 +319,14 @@ protected:
       auto *buildBlock = builder.buildCall(
           braceStmt->getStartLoc(), ctx.Id_buildBlock, buildBlockArguments,
           /*argLabels=*/{});
+
+      if (isolateBuildBlock) {
+        auto *buildBlockVar = captureExpr(buildBlock, newBody);
+        return std::make_pair(
+            builder.buildVarRef(buildBlockVar, braceStmt->getStartLoc()),
+            std::nullopt);
+      }
+
       return std::make_pair(buildBlock, std::nullopt);
     }
   }
@@ -362,7 +363,7 @@ protected:
     } else {
       Expr *buildBlockResult = buildBlockVarRef.get();
       // Otherwise, it's a top-level brace and we need to synthesize
-      // a call to `buildFialBlock` if supported.
+      // a call to `buildFinalBlock` if supported.
       if (builder.supports(ctx.Id_buildFinalResult, {Identifier()})) {
         buildBlockResult =
             builder.buildCall(resultLoc, ctx.Id_buildFinalResult,
@@ -502,7 +503,8 @@ protected:
 
       auto *ifBraceStmt = cast<BraceStmt>(ifStmt->getThenStmt());
 
-      std::tie(thenVarRef, unsupported) = transform(ifBraceStmt, thenBody);
+      std::tie(thenVarRef, unsupported) =
+          transform(ifBraceStmt, thenBody, /*isolateBuildBlock=*/true);
       if (unsupported) {
         recordUnsupported(*unsupported);
         return nullptr;
@@ -537,7 +539,8 @@ protected:
         auto *elseBraceStmt = cast<BraceStmt>(elseStmt);
         SmallVector<ASTNode> elseBody;
 
-        std::tie(elseVarRef, unsupported) = transform(elseBraceStmt, elseBody);
+        std::tie(elseVarRef, unsupported) = transform(
+            elseBraceStmt, elseBody, /*isolateBuildBlock=*/true);
         if (unsupported) {
           recordUnsupported(*unsupported);
           return nullptr;
@@ -577,7 +580,7 @@ protected:
     // type-checked first.
     SmallVector<ASTNode, 4> doBody;
 
-    SmallVector<ASTNode, 4> cases;
+    SmallVector<CaseStmt *, 4> cases;
     SmallVector<Expr *, 4> caseVarRefs;
 
     for (auto *caseStmt : switchStmt->getCases()) {
@@ -634,7 +637,8 @@ protected:
     std::optional<UnsupportedElt> unsupported;
     SmallVector<ASTNode, 4> newBody;
 
-    std::tie(caseVarRef, unsupported) = transform(body, newBody);
+    std::tie(caseVarRef, unsupported) =
+        transform(body, newBody, /*isolateBuildBlock=*/true);
 
     if (unsupported) {
       recordUnsupported(*unsupported);
@@ -646,7 +650,7 @@ protected:
         caseStmt->getCaseLabelItems(),
         caseStmt->hasUnknownAttr() ? caseStmt->getStartLoc() : SourceLoc(),
         caseStmt->getItemTerminatorLoc(), cloneBraceWith(body, newBody),
-        caseStmt->getCaseBodyVariablesOrEmptyArray(), caseStmt->isImplicit(),
+        caseStmt->getCaseBodyVariables(), caseStmt->isImplicit(),
         caseStmt->getFallthroughStmt());
 
     return std::make_pair(caseVarRef.get(), newCase);
@@ -726,6 +730,7 @@ protected:
     auto *newForEach = new (ctx)
         ForEachStmt(forEachStmt->getLabelInfo(), forEachStmt->getForLoc(),
                     forEachStmt->getTryLoc(), forEachStmt->getAwaitLoc(),
+                    forEachStmt->getUnsafeLoc(),
                     forEachStmt->getPattern(), forEachStmt->getInLoc(),
                     forEachStmt->getParsedSequence(),
                     forEachStmt->getWhereLoc(), forEachStmt->getWhere(),
@@ -770,8 +775,9 @@ protected:
 #undef UNSUPPORTED_STMT
 
 private:
-  static bool isBuildableIfChainRecursive(IfStmt *ifStmt, unsigned &numPayloads,
-                                          bool &isOptional) {
+  static void checkBuildableIfChainRecursive(IfStmt *ifStmt,
+                                             unsigned &numPayloads,
+                                             bool &isOptional) {
     // The 'then' clause contributes a payload.
     ++numPayloads;
 
@@ -779,7 +785,7 @@ private:
     if (auto elseStmt = ifStmt->getElseStmt()) {
       // If it's 'else if', it contributes payloads recursively.
       if (auto elseIfStmt = dyn_cast<IfStmt>(elseStmt)) {
-        return isBuildableIfChainRecursive(elseIfStmt, numPayloads, isOptional);
+        checkBuildableIfChainRecursive(elseIfStmt, numPayloads, isOptional);
         // Otherwise it's just the one.
       } else {
         ++numPayloads;
@@ -789,8 +795,6 @@ private:
     } else {
       isOptional = true;
     }
-
-    return true;
   }
 
   static bool hasUnconditionalElse(IfStmt *ifStmt) {
@@ -805,8 +809,7 @@ private:
 
   bool isBuildableIfChain(IfStmt *ifStmt, unsigned &numPayloads,
                           bool &isOptional) {
-    if (!isBuildableIfChainRecursive(ifStmt, numPayloads, isOptional))
-      return false;
+    checkBuildableIfChainRecursive(ifStmt, numPayloads, isOptional);
 
     // If there's a missing 'else', we need 'buildOptional' to exist.
     if (isOptional && !builder.supportsOptional())
@@ -949,8 +952,11 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
     return nullptr;
 
   ConstraintSystemOptions options = ConstraintSystemFlags::AllowFixes;
+  if (debugConstraintSolverForTarget(ctx, target))
+    options |= ConstraintSystemFlags::DebugConstraints;
+
   auto resultInterfaceTy = func->getResultInterfaceType();
-  auto resultContextType = func->mapTypeIntoContext(resultInterfaceTy);
+  auto resultContextType = func->mapTypeIntoEnvironment(resultInterfaceTy);
 
   // Determine whether we're inferring the underlying type for the opaque
   // result type of this function.
@@ -976,13 +982,13 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   // parameters to appear in the result builder type, because
   // the result builder type will only be used inside the body
   // of this decl; it's not part of the interface type.
-  builderType = func->mapTypeIntoContext(builderType);
+  builderType = func->mapTypeIntoEnvironment(builderType);
 
-  if (auto result = cs.matchResultBuilder(
-          func, builderType, resultContextType, resultConstraintKind,
-          /*contextualType=*/Type(),
-          cs.getConstraintLocator(func->getBody()))) {
-    if (result->isFailure())
+  {
+    auto result = cs.matchResultBuilder(
+        func, builderType, resultContextType, resultConstraintKind,
+        /*contextualType=*/Type(), cs.getConstraintLocator(func->getBody()));
+    if (!result || result->isFailure())
       return nullptr;
   }
 
@@ -994,7 +1000,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
     cs.Options |= ConstraintSystemFlags::ForCodeCompletion;
     cs.solveForCodeCompletion(solutions);
 
-    CompletionContextFinder analyzer(target, func->getDeclContext());
+    CompletionContextFinder analyzer(target);
     if (analyzer.hasCompletion()) {
       filterSolutionsForCodeCompletion(solutions, analyzer);
       for (const auto &solution : solutions) {
@@ -1047,9 +1053,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
 
     case SolutionResult::Kind::TooComplex:
       reportSolutionsToSolutionCallback(salvagedResult);
-      func->diagnose(diag::expression_too_complex)
-        .highlight(func->getBodySourceRange());
-      salvagedResult.markAsDiagnosed();
+      cs.diagnoseTooComplex(func->getLoc(), salvagedResult);
       return nullptr;
     }
 
@@ -1119,8 +1123,9 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
   if (fn.bodyHasExplicitReturnStmt()) {
     // Diagnostic mode means that solver couldn't reach any viable
     // solution, so let's diagnose presence of a `return` statement
-    // in the closure body.
-    if (shouldAttemptFixes()) {
+    // in the closure body. Avoid doing this for completion since we need to
+    // continue solving the body.
+    if (shouldAttemptFixes() && !isForCodeCompletion()) {
       if (recordFix(IgnoreResultBuilderWithReturnStmts::create(
               *this, builderType,
               getConstraintLocator(fn.getAbstractClosureExpr()))))
@@ -1144,18 +1149,10 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
     auto *body = transform.apply(fn.getBody());
 
     if (auto unsupported = transform.getUnsupportedElement()) {
-      assert(!body || getASTContext().CompletionCallback);
+      assert(!body);
 
       // If we aren't supposed to attempt fixes, fail.
       if (!shouldAttemptFixes()) {
-        return getTypeMatchFailure(locator);
-      }
-
-      // If we're solving for code completion and the body contains the code
-      // completion location, skipping it won't get us to a useful solution so
-      // just bail.
-      if (isForCodeCompletion() &&
-          containsIDEInspectionTarget(fn.getBody())) {
         return getTypeMatchFailure(locator);
       }
 
@@ -1165,6 +1162,13 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
                   *this, unsupported, builder, getConstraintLocator(locator)),
               /*impact=*/100)) {
         return getTypeMatchFailure(locator);
+      }
+
+      // If we're solving for code completion and the body contains the code
+      // completion location, fall back to solving as a regular function body.
+      if (isForCodeCompletion() &&
+          containsIDEInspectionTarget(fn.getBody())) {
+        return std::nullopt;
       }
 
       if (auto *closure =
@@ -1283,9 +1287,7 @@ bool AnyFunctionRef::bodyHasExplicitReturnStmt() const {
     return false;
   }
 
-  auto &ctx = getAsDeclContext()->getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-                           BraceHasExplicitReturnStmtRequest{body}, false);
+  return body->hasExplicitReturnStmt(getAsDeclContext()->getASTContext());
 }
 
 void AnyFunctionRef::getExplicitReturnStmts(
@@ -1316,7 +1318,8 @@ ResultBuilderOpSupport TypeChecker::checkBuilderOpSupport(
   dc->lookupQualified(
       builderType, DeclNameRef(fnName),
       builderType->getAnyNominal()->getLoc(),
-      NL_QualifiedDefault | NL_ProtocolMembers, foundDecls);
+      NL_QualifiedDefault | NL_ProtocolMembers | NL_IgnoreMissingImports,
+      foundDecls);
   for (auto decl : foundDecls) {
     if (auto func = dyn_cast<FuncDecl>(decl)) {
       // Function must be static.

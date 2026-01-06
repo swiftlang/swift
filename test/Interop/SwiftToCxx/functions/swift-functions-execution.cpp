@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/swift-functions.swift -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h  -cxx-interoperability-mode=upcoming-swift
+// RUN: %target-swift-frontend %S/swift-functions.swift -module-name Functions -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/functions.h  -cxx-interoperability-mode=upcoming-swift
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-functions-execution.o -g
 // RUN: %target-interop-build-swift %S/swift-functions.swift -o %t/swift-functions-execution -Xlinker %t/swift-functions-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain -g

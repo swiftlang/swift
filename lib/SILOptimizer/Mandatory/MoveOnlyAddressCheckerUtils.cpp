@@ -243,7 +243,7 @@
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
@@ -259,8 +259,8 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -472,13 +472,29 @@ static bool visitScopeEndsRequiringInit(
     return true;
   }
 
+  // Check for mutate accessor.
+  if (auto ai =
+          dyn_cast_or_null<ApplyInst>(operand->getDefiningInstruction())) {
+    if (ai->hasInoutResult()) {
+      auto *access =
+          dyn_cast<BeginAccessInst>(getAccessScope(ai->getSelfArgument()));
+      if (access) {
+        assert(access->getAccessKind() == SILAccessKind::Modify);
+        for (auto *inst : access->getEndAccesses()) {
+          visit(inst, ScopeRequiringFinalInit::ModifyMemoryAccess);
+        }
+        return true;
+      }
+      return false;
+    }
+  }
   return false;
 }
 
 static bool isCopyableValue(SILValue value) {
   if (value->getType().isMoveOnly())
     return false;
-  if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(value))
+  if (isa<MoveOnlyWrapperToCopyableAddrInst>(value))
     return false;
   return true;
 }
@@ -1070,7 +1086,7 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
                       "adding mark_unresolved_non_copyable_value as init!\n");
         return true;
       }
-    } else if (auto *box = dyn_cast<AllocBoxInst>(
+    } else if (isa<AllocBoxInst>(
                    lookThroughOwnershipInsts(projectBox->getOperand()))) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Found move only var allocbox use... "
@@ -1081,8 +1097,7 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
 
   // Check if our address is from a ref_element_addr. In such a case, we treat
   // the mark_unresolved_non_copyable_value as the initialization.
-  if (auto *refEltAddr =
-          dyn_cast<RefElementAddrInst>(stripAccessMarkers(operand))) {
+  if (isa<RefElementAddrInst>(stripAccessMarkers(operand))) {
     LLVM_DEBUG(llvm::dbgs()
                << "Found ref_element_addr use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
@@ -1091,8 +1106,7 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
 
   // Check if our address is from a global_addr. In such a case, we treat the
   // mark_unresolved_non_copyable_value as the initialization.
-  if (auto *globalAddr =
-          dyn_cast<GlobalAddrInst>(stripAccessMarkers(operand))) {
+  if (isa<GlobalAddrInst>(stripAccessMarkers(operand))) {
     LLVM_DEBUG(llvm::dbgs()
                << "Found global_addr use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
@@ -1108,15 +1122,22 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
     return true;
   }
 
-  if (auto *bai = dyn_cast_or_null<BeginApplyInst>(
+  if (isa_and_nonnull<BeginApplyInst>(
           stripAccessMarkers(operand)->getDefiningInstruction())) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding accessor coroutine begin_apply as init!\n");
     return true;
   }
 
-  if (auto *eai = dyn_cast<UncheckedTakeEnumDataAddrInst>(
-          stripAccessMarkers(operand))) {
+  if (auto *applyInst = dyn_cast_or_null<ApplyInst>(
+          stripAccessMarkers(operand)->getDefiningInstruction())) {
+    if (applyInst->hasAddressResult()) {
+      LLVM_DEBUG(llvm::dbgs() << "Adding apply as init!\n");
+      return true;
+    }
+  }
+
+  if (isa<UncheckedTakeEnumDataAddrInst>(stripAccessMarkers(operand))) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding enum projection as init!\n");
     return true;
@@ -1139,14 +1160,14 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
   }
 
   // Assume a value whose deinit has been dropped has been initialized.
-  if (auto *ddi = dyn_cast<DropDeinitInst>(operand)) {
+  if (isa<DropDeinitInst>(operand)) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding copyable_to_move_only_wrapper as init!\n");
     return true;
   }
 
   // Assume a value wrapped in a MoveOnlyWrapper is initialized.
-  if (auto *m2c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(operand)) {
+  if (isa<CopyableToMoveOnlyWrapperAddrInst>(operand)) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding copyable_to_move_only_wrapper as init!\n");
     return true;
@@ -1475,7 +1496,7 @@ struct MoveOnlyAddressCheckerPImpl {
   /// The instruction deleter used by \p canonicalizer.
   InstructionDeleter deleter;
 
-  /// State to run CanonicalizeOSSALifetime.
+  /// State to run OSSACanonicalizeOwned.
   OSSACanonicalizer canonicalizer;
 
   /// Per mark must check address use state.
@@ -1690,6 +1711,7 @@ struct CopiedLoadBorrowEliminationVisitor
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
       case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer:
       case OperandOwnership::BitwiseEscape: {
         // Look through copy_value of a move only value. We treat copy_value of
         // copyable values as normal uses.
@@ -1743,6 +1765,9 @@ struct CopiedLoadBorrowEliminationVisitor
         // Look through borrows.
         for (auto value : nextUse->getUser()->getResults()) {
           for (auto *use : value->getUses()) {
+            if (use->get()->getType().isTrivial(*use->getFunction())) {
+              continue;
+            }
             useWorklist.push_back(use);
           }
         }
@@ -1855,8 +1880,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
   if (feature &&
       !fn->getModule().getASTContext().LangOpts.hasFeature(*feature) &&
       !isa<DropDeinitInst>(user)) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "    " << getFeatureName(*feature) << " disabled!\n");
+    LLVM_DEBUG(llvm::dbgs() << "    " << feature->getName() << " disabled!\n");
     // If the types equal, just bail early.
     // Emit the error.
     return {PartialMutationError::featureDisabled(iterType, kind)};
@@ -1895,7 +1919,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
     // Otherwise, walk one level towards our child type. We unconditionally
     // unwrap since we should never fail here due to earlier checking.
     std::tie(iterPair, iterType) =
-        *pair.walkOneLevelTowardsChild(iterPair, iterType, fn);
+        *pair.walkOneLevelTowardsChild(iterPair, iterType, targetType, fn);
   }
 
   return {};
@@ -2183,7 +2207,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // Ignore end_access.
   if (isa<EndAccessInst>(user))
     return true;
-    
+  
+  // Ignore end_cow_mutation_addr.
+  if (isa<EndCOWMutationAddrInst>(user)) {
+    return true;
+  }
+
   // Ignore sanitizer markers.
   if (auto bu = dyn_cast<BuiltinInst>(user)) {
     if (bu->getBuiltinKind() == BuiltinValueKind::TSanInoutAccess) {
@@ -2403,6 +2432,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
             checkKind == MarkUnresolvedNonCopyableValueInst::CheckKind::
                              NoConsumeOrAssign &&
             !moveChecker.canonicalizer.hasPartialApplyConsumingUse()) {
+          moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
+              markedValue);
+          return true;
+        }
+
+        if (operand->isBorrowAccessorResult()) {
           moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
               markedValue);
           return true;
@@ -2698,7 +2733,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     return true;
   }
 
-  if (auto *fixLifetime = dyn_cast<FixLifetimeInst>(op->getUser())) {
+  if (isa<FixLifetimeInst>(op->getUser())) {
     LLVM_DEBUG(llvm::dbgs() << "fix_lifetime use\n");
     SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
     TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
@@ -2741,7 +2776,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     }
   }
 
-  if (auto *seai = dyn_cast<SwitchEnumAddrInst>(user)) {
+  if (isa<SwitchEnumAddrInst>(user)) {
     SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
     TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
     if (!leafRanges.size()) {
@@ -2981,7 +3016,7 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
             LLVM_DEBUG(llvm::dbgs() << "    Also a def block; skipping!\n");
             continue;
           }
-          [[clang::fallthrough]];
+          LLVM_FALLTHROUGH;
         }
         case IsLive::LiveWithin:
           if (isLive == IsLive::LiveWithin)
@@ -3427,6 +3462,10 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
       auto accessPath = AccessPathWithBase::computeInScope(copy->getSrc());
       if (auto *access = dyn_cast_or_null<BeginAccessInst>(accessPath.base))
         access->setAccessKind(SILAccessKind::Modify);
+      if (auto *oeai =
+              dyn_cast_or_null<OpenExistentialAddrInst>(copy->getSrc())) {
+        oeai->setAccessKind(OpenedExistentialAccess::Mutable);
+      }
       copy->setIsTakeOfSrc(IsTake);
       continue;
     }
@@ -3829,6 +3868,8 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
 
     CopiedLoadBorrowEliminationState state(markedAddress->getFunction());
     CopiedLoadBorrowEliminationVisitor copiedLoadBorrowEliminator(state);
+    // FIXME: should check AddressUseKind::NonEscaping != walk() to handle
+    // PointerEscape.
     if (AddressUseKind::Unknown ==
         std::move(copiedLoadBorrowEliminator).walk(markedAddress)) {
       LLVM_DEBUG(llvm::dbgs() << "Failed copied load borrow eliminator visit: "
@@ -3871,6 +3912,8 @@ bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
     RAIILLVMDebug l("main use gathering visitor");
 
     visitor.reset(markedAddress);
+    // FIXME: should check walkResult != AddressUseKind::NonEscaping to handle
+    // PointerEscape.
     if (AddressUseKind::Unknown == std::move(visitor).walk(markedAddress)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Failed access path visit: " << *markedAddress);
@@ -4058,13 +4101,12 @@ bool MoveOnlyAddressChecker::check(
   return pimpl.changed;
 }
 bool MoveOnlyAddressChecker::completeLifetimes() {
-  // TODO: Delete once OSSALifetimeCompletion is run as part of SILGenCleanup
+  // TODO: Delete once OSSACompleteLifetime is run as part of SILGenCleanup
   bool changed = false;
 
   // Lifetimes must be completed inside out (bottom-up in the CFG).
   PostOrderFunctionInfo *postOrder = poa->get(fn);
-  OSSALifetimeCompletion completion(fn, domTree,
-                                    *deadEndBlocksAnalysis->get(fn));
+  OSSACompleteLifetime completion(fn, *deadEndBlocksAnalysis->get(fn));
   for (auto *block : postOrder->getPostOrder()) {
     for (SILInstruction &inst : reverse(*block)) {
       for (auto result : inst.getResults()) {
@@ -4073,7 +4115,7 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
           continue;
         }
         if (completion.completeOSSALifetime(
-                result, OSSALifetimeCompletion::Boundary::Availability) ==
+                result, OSSACompleteLifetime::Boundary::Availability) ==
             LifetimeCompletion::WasCompleted) {
           changed = true;
         }
@@ -4084,7 +4126,7 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
         continue;
       }
       if (completion.completeOSSALifetime(
-              arg, OSSALifetimeCompletion::Boundary::Availability) ==
+              arg, OSSACompleteLifetime::Boundary::Availability) ==
           LifetimeCompletion::WasCompleted) {
         changed = true;
       }

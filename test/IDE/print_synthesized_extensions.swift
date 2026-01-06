@@ -241,9 +241,9 @@ extension S13 : P5 {
 }
 
 // CHECK1: <synthesized>extension <ref:Struct>S1</ref> where <ref:GenericTypeParam>T</ref> : <ref:module>print_synthesized_extensions</ref>.<ref:Protocol>P2</ref> {
-// CHECK1-NEXT:     <decl:Func>public func <loc>p2member()</loc></decl>
 // CHECK1-NEXT:     <decl:Func>public func <loc>ef1(<decl:Param>t: <ref:GenericTypeParam>T</ref></decl>)</loc></decl>
 // CHECK1-NEXT:     <decl:Func>public func <loc>ef2(<decl:Param>t: <ref:module>print_synthesized_extensions</ref>.<ref:Struct>S2</ref></decl>)</loc></decl>
+// CHECK1-NEXT:     <decl:Func>public func <loc>p2member()</loc></decl>
 // CHECK1-NEXT: }</synthesized>
 
 // CHECK2:  <synthesized>extension <ref:Struct>S1</ref> where <ref:GenericTypeParam>T</ref> : <ref:module>print_synthesized_extensions</ref>.<ref:Protocol>P3</ref>  {

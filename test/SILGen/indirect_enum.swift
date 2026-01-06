@@ -12,6 +12,7 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
 // CHECK: bb0([[ARG1:%.*]] : $*T, [[ARG2:%.*]] : @guaranteed $TreeA<T>, [[ARG3:%.*]] : @guaranteed $TreeA<T>):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<T>.Type
 // CHECK-NEXT:    [[NIL:%.*]] = enum $TreeA<T>, #TreeA.Nil!enumelt
+// CHECK-NEXT:  ignored_use
 // CHECK-NOT:     destroy_value [[NIL]]
   let _ = TreeA<T>.Nil
 
@@ -20,6 +21,7 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:    copy_addr [[ARG1]] to [init] [[PB]]
 // CHECK-NEXT:    [[LEAF:%.*]] = enum $TreeA<T>, #TreeA.Leaf!enumelt, [[BOX]]
+// CHECK-NEXT:    ignored_use
 // CHECK-NEXT:    destroy_value [[LEAF]]
   let _ = TreeA<T>.Leaf(t)
 
@@ -33,6 +35,7 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
 // CHECK-NEXT:    [[ARG3_COPY:%.*]] = copy_value [[ARG3]]
 // CHECK-NEXT:    store [[ARG3_COPY]] to [init] [[RIGHT]]
 // CHECK-NEXT:    [[BRANCH:%.*]] = enum $TreeA<T>, #TreeA.Branch!enumelt, [[BOX]]
+// CHECK-NEXT:    ignored_use
 // CHECK-NEXT:    destroy_value [[BRANCH]]
   let _ = TreeA<T>.Branch(left: l, right: r)
 
@@ -51,6 +54,7 @@ func TreeA_reabstract(_ f: @escaping (Int) -> Int) {
 // CHECK-NEXT:    [[FNC:%.*]] = convert_function [[FN]]
 // CHECK-NEXT:    store [[FNC]] to [init] [[PB]]
 // CHECK-NEXT:    [[LEAF:%.*]] = enum $TreeA<(Int) -> Int>, #TreeA.Leaf!enumelt, [[BOX]]
+// CHECK-NEXT:    ignored_use
 // CHECK-NEXT:    destroy_value [[LEAF]]
 // CHECK: return
   let _ = TreeA<(Int) -> Int>.Leaf(f)
@@ -69,6 +73,7 @@ func TreeB_cases<T>(_ t: T, l: TreeB<T>, r: TreeB<T>) {
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeB<T>.Type
 // CHECK:         [[NIL:%.*]] = alloc_stack $TreeB<T>
 // CHECK-NEXT:    inject_enum_addr [[NIL]] : $*TreeB<T>, #TreeB.Nil!enumelt
+// CHECK-NEXT:    ignored_use
 // CHECK-NEXT:    destroy_addr [[NIL]]
 // CHECK-NEXT:    dealloc_stack [[NIL]]
   let _ = TreeB<T>.Nil
@@ -78,6 +83,7 @@ func TreeB_cases<T>(_ t: T, l: TreeB<T>, r: TreeB<T>) {
 // CHECK-NEXT:    [[PAYLOAD:%.*]] = init_enum_data_addr [[LEAF]] : $*TreeB<T>, #TreeB.Leaf!enumelt
 // CHECK-NEXT:    copy_addr %0 to [init] [[PAYLOAD]]
 // CHECK-NEXT:    inject_enum_addr [[LEAF]] : $*TreeB<T>, #TreeB.Leaf!enumelt
+// CHECK-NEXT:    ignored_use
 // CHECK-NEXT:    destroy_addr [[LEAF]]
 // CHECK-NEXT:    dealloc_stack [[LEAF]]
   let _ = TreeB<T>.Leaf(t)
@@ -93,6 +99,7 @@ func TreeB_cases<T>(_ t: T, l: TreeB<T>, r: TreeB<T>) {
 // CHECK-NEXT:    [[PAYLOAD:%.*]] = init_enum_data_addr [[BRANCH]]
 // CHECK-NEXT:    store [[BOX]] to [init] [[PAYLOAD]]
 // CHECK-NEXT:    inject_enum_addr [[BRANCH]] : $*TreeB<T>, #TreeB.Branch!enumelt
+// CHECK-NEXT:    ignored_use
 // CHECK-NEXT:    destroy_addr [[BRANCH]]
 // CHECK-NEXT:    dealloc_stack [[BRANCH]]
   let _ = TreeB<T>.Branch(left: l, right: r)
@@ -105,11 +112,13 @@ func TreeInt_cases(_ t: Int, l: TreeInt, r: TreeInt) {
 // CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @guaranteed $TreeInt, [[ARG3:%.*]] : @guaranteed $TreeInt):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeInt.Type
 // CHECK-NEXT:    [[NIL:%.*]] = enum $TreeInt, #TreeInt.Nil!enumelt
+// CHECK-NEXT:    ignored_use
 // CHECK-NOT:     destroy_value [[NIL]]
   let _ = TreeInt.Nil
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin TreeInt.Type
 // CHECK-NEXT:    [[LEAF:%.*]] = enum $TreeInt, #TreeInt.Leaf!enumelt, [[ARG1]]
+// CHECK-NEXT:    ignored_use
 // CHECK-NOT:     destroy_value [[LEAF]]
   let _ = TreeInt.Leaf(t)
 
@@ -123,6 +132,7 @@ func TreeInt_cases(_ t: Int, l: TreeInt, r: TreeInt) {
 // CHECK-NEXT:    [[ARG3_COPY:%.*]] = copy_value [[ARG3]] : $TreeInt
 // CHECK-NEXT:    store [[ARG3_COPY]] to [init] [[RIGHT]]
 // CHECK-NEXT:    [[BRANCH:%.*]] = enum $TreeInt, #TreeInt.Branch!enumelt, [[BOX]]
+// CHECK-NEXT:    ignored_use
 // CHECK-NEXT:    destroy_value [[BRANCH]]
   let _ = TreeInt.Branch(left: l, right: r)
 }

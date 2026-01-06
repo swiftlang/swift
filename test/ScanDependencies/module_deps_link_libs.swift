@@ -13,13 +13,16 @@ import SubE
 // CHECK: "mainModuleName": "deps"
 
 // CHECK:           "linkName": "objc",
+// CHECK-NEXT:          "isStatic": false,
 // CHECK-NEXT:          "isFramework": false,
 // CHECK-NEXT:          "shouldForceLoad": false
 
 // CHECK:           "linkName": "nonSwiftyLibC",
+// CHECK-NEXT:          "isStatic": false,
 // CHECK-NEXT:          "isFramework": true,
 // CHECK-NEXT:          "shouldForceLoad": false
 
 // CHECK:           "linkName": "swiftyLibE",
+// CHECK-NEXT:          "isStatic": false,
 // CHECK-NEXT:          "isFramework": false,
 // CHECK-NEXT:          "shouldForceLoad": true

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import ArgumentParser
-import Darwin
+import Foundation
 import SwiftXcodeGen
 
 @main
@@ -84,7 +84,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
 
     // Check to see if we have a separate runnable build dir.
     let runnableBuildDirPath = 
-      self.runnableBuildDir?.absoluteInWorkingDir.resolvingSymlinks
+      self.runnableBuildDir?.absoluteInWorkingDir.realPath
     let runnableBuildDir = try runnableBuildDirPath.map {
       try NinjaBuildDir(at: $0, projectRootDir: ninja.projectRootDir)
         .buildDir(for: .swift)
@@ -204,7 +204,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
       if self.addClangToolsExtra {
         spec.addClangTargets(
           below: "../clang-tools-extra", addingPrefix: "extra-",
-          mayHaveUnbuildableFiles: true
+          mayHaveUnbuildableFiles: true, excluding: ["test"]
         )
         if self.addTestFolders {
           spec.addReference(to: "../clang-tools-extra/test")
@@ -295,7 +295,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
 
   func runTask<R>(
     _ body: @escaping @Sendable () throws -> R
-  ) async throws -> Task<R, Error> {
+  ) async throws -> Task<R, any Error> {
     let task = Task(operation: body)
     if !self.parallel {
       _ = try await task.value
@@ -307,13 +307,6 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
     guard log.logLevel <= .note else { return }
 
     var notes: [String] = []
-    if projectOpts.useBuildableFolders {
-      notes.append("""
-        - Buildable folders are enabled by default, which requires Xcode 16. You
-          can pass '--no-buildable-folders' to disable this. See the '--help'
-          entry for more info.
-        """)
-    }
 
     if !projectOpts.addStdlibSwift {
       notes.append("""
@@ -332,7 +325,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
   }
 
   func generate() async throws {
-    let buildDirPath = buildDir.absoluteInWorkingDir.resolvingSymlinks
+    let buildDirPath = buildDir.absoluteInWorkingDir.realPath
     log.info("Generating project for '\(buildDirPath)'...")
 
     let projectRootDir = self.projectRootDir?.absoluteInWorkingDir
@@ -399,14 +392,37 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
         try lldbLLVMWorkspace.write("LLDB+LLVM", into: outputDir)
       }
     }
-    showCaveatsIfNeeded()
+  }
+
+  func printingTimeTaken<T>(_ fn: () async throws -> T) async rethrows -> T {
+    let start = ContinuousClock.now
+    let result = try await fn()
+    let end = ContinuousClock.now
+
+    let duration = start.duration(to: end)
+
+    // Note we don't print the time taken when we fail.
+    var message = "Successfully generated in "
+    message += duration.formatted(
+      .units(
+        allowed: [.seconds],
+        width: .narrow,
+        fractionalPart: .init(lengthLimits: 0...3, roundingRule: .up)
+      )
+    )
+    log.info(message)
+
+    return result
   }
 
   func run() async {
     // Set the log level
     log.logLevel = .init(self.logLevel ?? (self.quiet ? .warning : .info))
     do {
-      try await generate()
+      try await printingTimeTaken {
+        try await generate()
+      }
+      showCaveatsIfNeeded()
     } catch {
       log.error("\(error)")
     }

@@ -1,6 +1,5 @@
-// RUN: not --crash %target-swift-frontend -c %s 2>&1 | %FileCheck %s
-// CHECK: *** DESERIALIZATION FAILURE ***
-// CHECK: SILFunction type mismatch for 'asinf': '$@convention(thin) (Float) -> Float' != '$@convention(c) (Float) -> Float'
+// RUN: %empty-directory(%t/cache)
+// RUN: %target-swift-frontend -c %s -module-cache-path %t/cache
 
 // REQUIRES: VENDOR=apple
 

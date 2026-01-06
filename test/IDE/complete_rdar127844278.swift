@@ -31,5 +31,5 @@ func foo<T>(@Builder _: () -> T) where T: Q {}
 foo {
   S(#^COMPLETE^#)
 }
-// COMPLETE-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#a: Void#}[')'][#S<()>#]; name=a:
-// COMPLETE-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#b: String#}[')'][#S<String>#]; name=b:
+// COMPLETE-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#a: Void#}[')'][#S<()>#]; name=a:
+// COMPLETE-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['(']{#b: String#}[')'][#S<String>#]; name=b:

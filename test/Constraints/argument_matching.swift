@@ -1461,7 +1461,7 @@ func testClosures() {
 
 func acceptAutoclosure(f: @autoclosure () -> Int) { }
 func produceInt() -> Int { }
-acceptAutoclosure(f: produceInt) // expected-error{{add () to forward @autoclosure parameter}} {{32-32=()}}
+acceptAutoclosure(f: produceInt) // expected-error{{add () to forward '@autoclosure' parameter}} {{32-32=()}}
 
 // -------------------------------------------
 // Trailing closures
@@ -1488,19 +1488,15 @@ func trailingclosure4(f: () -> Int) {}
 trailingclosure4 { 5 }
 
 func trailingClosure5<T>(_ file: String = #file, line: UInt = #line, expression: () -> T?) { }
-// expected-note@-1 {{in call to function 'trailingClosure5(_:line:expression:)'}}
 func trailingClosure6<T>(value: Int, expression: () -> T?) { }
-// expected-note@-1 {{in call to function 'trailingClosure6(value:expression:)'}}
 
 trailingClosure5(file: "hello", line: 17) { // expected-error{{extraneous argument label 'file:' in call}}{{18-24=}}
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
   return Optional.Some(5)
   // expected-error@-1 {{enum type 'Optional<Wrapped>' has no case 'Some'; did you mean 'some'?}} {{19-23=some}}
   // expected-error@-2 {{generic parameter 'Wrapped' could not be inferred}}
   // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}}
 }
 trailingClosure6(5) { // expected-error{{missing argument label 'value:' in call}}{{18-18=value: }}
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
   return Optional.Some(5)
   // expected-error@-1 {{enum type 'Optional<Wrapped>' has no case 'Some'; did you mean 'some'?}} {{19-23=some}}
   // expected-error@-2 {{generic parameter 'Wrapped' could not be inferred}}
@@ -1824,4 +1820,13 @@ struct Issue75527 {
     let fn = Issue75527.foo(self) as Magic
     fn(0) // Make sure the argument label does not escape here.
   }
+}
+
+do {
+  func f(p: Int, _: String) {}
+  // FIXME: Wrong expected argument type.
+  // expected-error@+2:5 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@+1:8 {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  f(0, "")
+  // expected-error@-1:4 {{missing argument label 'p:' in call}}{{5-5=p: }}
 }

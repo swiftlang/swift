@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,12 +12,14 @@
 
 #include "FeatureSet.h"
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "clang/AST/DeclObjC.h"
 #include "swift/Basic/Assertions.h"
 
@@ -25,7 +27,8 @@ using namespace swift;
 
 /// Does the interface of this declaration use a type for which the
 /// given predicate returns true?
-static bool usesTypeMatching(Decl *decl, llvm::function_ref<bool(Type)> fn) {
+static bool usesTypeMatching(const Decl *decl,
+                             llvm::function_ref<bool(Type)> fn) {
   if (auto value = dyn_cast<ValueDecl>(decl)) {
     if (Type type = value->getInterfaceType()) {
       return type.findIf(fn);
@@ -80,7 +83,7 @@ UNINTERESTING_FEATURE(FlowSensitiveConcurrencyCaptures)
 UNINTERESTING_FEATURE(CodeItemMacros)
 UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
-UNINTERESTING_FEATURE(SymbolLinkageMarkers)
+UNINTERESTING_FEATURE(DeferredCodeGen)
 UNINTERESTING_FEATURE(LazyImmediate)
 UNINTERESTING_FEATURE(MoveOnlyClasses)
 UNINTERESTING_FEATURE(NoImplicitCopy)
@@ -88,7 +91,6 @@ UNINTERESTING_FEATURE(OldOwnershipOperatorSpellings)
 UNINTERESTING_FEATURE(MoveOnlyEnumDeinits)
 UNINTERESTING_FEATURE(MoveOnlyTuples)
 UNINTERESTING_FEATURE(MoveOnlyPartialReinitialization)
-UNINTERESTING_FEATURE(LayoutPrespecialization)
 UNINTERESTING_FEATURE(AccessLevelOnImport)
 UNINTERESTING_FEATURE(AllowNonResilientAccessInPackage)
 UNINTERESTING_FEATURE(ClientBypassResilientAccessInPackage)
@@ -102,164 +104,179 @@ UNINTERESTING_FEATURE(OpaqueTypeErasure)
 UNINTERESTING_FEATURE(PackageCMO)
 UNINTERESTING_FEATURE(ParserRoundTrip)
 UNINTERESTING_FEATURE(ParserValidation)
+UNINTERESTING_FEATURE(UnqualifiedLookupValidation)
 UNINTERESTING_FEATURE(ImplicitSome)
 UNINTERESTING_FEATURE(ParserASTGen)
 UNINTERESTING_FEATURE(BuiltinMacros)
-UNINTERESTING_FEATURE(ImportSymbolicCXXDecls)
 UNINTERESTING_FEATURE(GenerateBindingsForThrowingFunctionsInCXX)
+UNINTERESTING_FEATURE(ExcludePrivateFromMemberwiseInit)
 UNINTERESTING_FEATURE(ReferenceBindings)
 UNINTERESTING_FEATURE(BuiltinModule)
 UNINTERESTING_FEATURE(RegionBasedIsolation)
 UNINTERESTING_FEATURE(PlaygroundExtendedCallbacks)
 UNINTERESTING_FEATURE(ThenStatements)
 UNINTERESTING_FEATURE(DoExpressions)
+UNINTERESTING_FEATURE(ForExpressions)
 UNINTERESTING_FEATURE(ImplicitLastExprResults)
 UNINTERESTING_FEATURE(RawLayout)
 UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
+UNINTERESTING_FEATURE(SuppressedAssociatedTypesWithDefaults)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
-UNINTERESTING_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext)
+UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
+UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
+UNINTERESTING_FEATURE(ImportMacroAliases)
+UNINTERESTING_FEATURE(NoExplicitNonIsolated)
+UNINTERESTING_FEATURE(EmbeddedExistentials)
 
-static bool usesFeatureNonescapableTypes(Decl *decl) {
-  auto containsNonEscapable =
-      [](SmallVectorImpl<InverseRequirement> &inverseReqs) {
-        auto foundIt =
-            llvm::find_if(inverseReqs, [](InverseRequirement inverseReq) {
-              if (inverseReq.getKind() == InvertibleProtocolKind::Escapable) {
-                return true;
-              }
-              return false;
-            });
-        return foundIt != inverseReqs.end();
-      };
+// TODO: Return true for inlinable function bodies with module selectors in them
+UNINTERESTING_FEATURE(ModuleSelector)
 
-  if (auto *valueDecl = dyn_cast<ValueDecl>(decl)) {
-    if (isa<StructDecl, EnumDecl, ClassDecl>(decl)) {
-      auto *nominalDecl = cast<NominalTypeDecl>(valueDecl);
-      InvertibleProtocolSet inverses;
-      bool anyObject = false;
-      getDirectlyInheritedNominalTypeDecls(nominalDecl, inverses, anyObject);
-      if (inverses.containsEscapable()) {
-        return true;
-      }
-    }
-
-    if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-      auto reqSig = proto->getRequirementSignature();
-
-      SmallVector<Requirement, 2> reqs;
-      SmallVector<InverseRequirement, 2> inverses;
-      reqSig.getRequirementsWithInverses(proto, reqs, inverses);
-      if (containsNonEscapable(inverses))
-        return true;
-    }
-
-    if (isa<AbstractFunctionDecl>(valueDecl) ||
-        isa<AbstractStorageDecl>(valueDecl)) {
-      if (valueDecl->getInterfaceType().findIf([&](Type type) -> bool {
-            if (auto *nominalDecl = type->getAnyNominal()) {
-              if (isa<StructDecl, EnumDecl, ClassDecl>(nominalDecl))
-                return usesFeatureNonescapableTypes(nominalDecl);
-            }
-            return false;
-          })) {
-        return true;
-      }
-    }
-  }
-
-  if (auto *ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto *nominal = ext->getExtendedNominal())
-      if (usesFeatureNonescapableTypes(nominal))
-        return true;
-  }
-
-  if (auto *genCtx = decl->getAsGenericContext()) {
-    if (auto genericSig = genCtx->getGenericSignature()) {
-      SmallVector<Requirement, 2> reqs;
-      SmallVector<InverseRequirement, 2> inverseReqs;
-      genericSig->getRequirementsWithInverses(reqs, inverseReqs);
-      if (containsNonEscapable(inverseReqs)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
+static bool usesFeatureInlineArrayTypeSugar(Decl *D) {
+  return usesTypeMatching(D, [&](Type ty) {
+    return isa<InlineArrayType>(ty.getPointer());
+  });
 }
 
 UNINTERESTING_FEATURE(StaticExclusiveOnly)
+UNINTERESTING_FEATURE(ManualOwnership)
 UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
-UNINTERESTING_FEATURE(FixedArrays)
-UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
-UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
-UNINTERESTING_FEATURE(GenerateForceToMainActorThunks)
-UNINTERESTING_FEATURE(Span)
+UNINTERESTING_FEATURE(SendingArgsAndResults)
+UNINTERESTING_FEATURE(CheckImplementationOnly)
+UNINTERESTING_FEATURE(CheckImplementationOnlyStrict)
+UNINTERESTING_FEATURE(EnforceSPIOperatorGroup)
 
-static bool usesFeatureSendingArgsAndResults(Decl *decl) {
-  auto isFunctionTypeWithSending = [](Type type) {
-      auto fnType = type->getAs<AnyFunctionType>();
-      if (!fnType)
-        return false;
-
-      if (fnType->hasExtInfo() && fnType->hasSendingResult())
+static bool usesFeatureCAttribute(Decl *decl) {
+  for (auto attr : decl->getAttrs()) {
+    if (auto cdeclAttr = dyn_cast<CDeclAttr>(attr))
+      if (!cdeclAttr->Underscored)
         return true;
-
-      return llvm::any_of(fnType->getParams(),
-                          [](AnyFunctionType::Param param) {
-                            return param.getParameterFlags().isSending();
-                          });
-  };
-  auto declUsesFunctionTypesThatUseSending = [&](Decl *decl) {
-    return usesTypeMatching(decl, isFunctionTypeWithSending);
-  };
-
-  if (auto *pd = dyn_cast<ParamDecl>(decl)) {
-    if (pd->isSending()) {
-      return true;
-    }
-
-    if (declUsesFunctionTypesThatUseSending(pd))
-      return true;
-  }
-
-  if (auto *fDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
-    // First check for param decl results.
-    if (llvm::any_of(fDecl->getParameters()->getArray(), [](ParamDecl *pd) {
-          return usesFeatureSendingArgsAndResults(pd);
-        }))
-      return true;
-    if (declUsesFunctionTypesThatUseSending(decl))
-      return true;
-  }
-
-  // Check if we have a pattern binding decl for a function that has sending
-  // parameters and results.
-  if (auto *pbd = dyn_cast<PatternBindingDecl>(decl)) {
-    for (auto index : range(pbd->getNumPatternEntries())) {
-      auto *pattern = pbd->getPattern(index);
-      if (pattern->hasType() && isFunctionTypeWithSending(pattern->getType()))
-        return true;
-    }
   }
 
   return false;
 }
 
+static bool findLifetimeAttr(Decl *decl, bool findUnderscored) {
+  auto hasLifetimeAttr = [&](Decl *decl) {
+    if (!decl->getAttrs().hasAttribute<LifetimeAttr>()) {
+      return false;
+    }
+    // Since we ban mixing @lifetime and @_lifetime on the same decl, checking
+    // any one LifetimeAttr on the decl is sufficient.
+    // FIXME: Implement the ban.
+    if (findUnderscored) {
+      return decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
+    }
+    return !decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
+  };
+
+  switch (decl->getKind()) {
+  case DeclKind::Var: {
+    auto *var = cast<VarDecl>(decl);
+    return llvm::any_of(var->getAllAccessors(), hasLifetimeAttr);
+  }
+  default:
+    return hasLifetimeAttr(decl);
+  }
+}
+
 static bool usesFeatureLifetimeDependence(Decl *decl) {
-  if (decl->getAttrs().hasAttribute<LifetimeAttr>()) {
+  if (findLifetimeAttr(decl, /*findUnderscored*/ false)) {
     return true;
   }
-  auto *afd = dyn_cast<AbstractFunctionDecl>(decl);
-  if (!afd) {
+
+  // Guard inferred lifetime dependencies with LifetimeDependence if it was
+  // enabled.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::LifetimeDependence)) {
     return false;
   }
-  return afd->getInterfaceType()
+
+  // Check for inferred lifetime dependencies
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+    return afd->getInterfaceType()
       ->getAs<AnyFunctionType>()
       ->hasLifetimeDependencies();
+  }
+  if (auto *varDecl = dyn_cast<VarDecl>(decl)) {
+    return !varDecl->getTypeInContext()->isEscapable();
+  }
+  return false;
+}
+
+static bool usesFeatureLifetimes(Decl *decl) {
+  if (findLifetimeAttr(decl, /*findUnderscored*/ true)) {
+    return true;
+  }
+
+  // Guard inferred lifetime dependencies with Lifetimes if it was enabled.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::Lifetimes)) {
+    return false;
+  }
+
+  // Check for inferred lifetime dependencies
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+    return afd->getInterfaceType()
+        ->getAs<AnyFunctionType>()
+        ->hasLifetimeDependencies();
+  }
+  if (auto *varDecl = dyn_cast<VarDecl>(decl)) {
+    return !varDecl->getTypeInContext()->isEscapable();
+  }
+  return false;
+}
+
+static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
+  auto hasInoutLifetimeDependence = [](Decl *decl) {
+    for (auto attr : decl->getAttrs().getAttributes<LifetimeAttr>()) {
+      for (auto source : attr->getLifetimeEntry()->getSources()) {
+        if (source.getParsedLifetimeDependenceKind() ==
+            ParsedLifetimeDependenceKind::Inout) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  switch (decl->getKind()) {
+  case DeclKind::Var: {
+    auto *var = cast<VarDecl>(decl);
+    return llvm::any_of(var->getAllAccessors(), hasInoutLifetimeDependence);
+  }
+  default:
+    return hasInoutLifetimeDependence(decl);
+  }
+}
+
+static bool usesFeatureLifetimeDependenceMutableAccessors(Decl *decl) {
+  if (!isa<VarDecl>(decl)) {
+    return false;
+  }
+  auto var = cast<VarDecl>(decl);
+  return var->isGetterMutating() && !var->getTypeInContext()->isEscapable();
+}
+
+static bool usesFeatureNonescapableAccessorOnTrivial(Decl *decl) {
+  if (!isa<VarDecl>(decl)) {
+    return false;
+  }
+  auto var = cast<VarDecl>(decl);
+  if (!var->hasParsedAccessors()) {
+    return false;
+  }
+  // Check for properties that are both non-Copyable and non-Escapable
+  // (MutableSpan).
+  if (var->getTypeInContext()->isNoncopyable()
+      && !var->getTypeInContext()->isEscapable()) {
+    auto selfTy = var->getDeclContext()->getSelfTypeInContext();
+    // Consider 'self' trivial if it is BitwiseCopyable and Escapable
+    // (UnsafeMutableBufferPointer).
+    return selfTy->isBitwiseCopyable() && selfTy->isEscapable();
+  }
+  return false;
 }
 
 UNINTERESTING_FEATURE(DynamicActorIsolation)
@@ -267,28 +284,6 @@ UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(ClosureIsolation)
 UNINTERESTING_FEATURE(Extern)
 UNINTERESTING_FEATURE(ConsumeSelfInDeinit)
-
-static bool usesFeatureBitwiseCopyable2(Decl *decl) {
-  if (!decl->getModuleContext()->isStdlibModule()) {
-    return false;
-  }
-  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-    return proto->getNameStr() == "BitwiseCopyable";
-  }
-  if (auto *typealias = dyn_cast<TypeAliasDecl>(decl)) {
-    return typealias->getNameStr() == "_BitwiseCopyable";
-  }
-  return false;
-}
-
-static bool usesFeatureIsolatedAny(Decl *decl) {
-  return usesTypeMatching(decl, [](Type type) {
-    if (auto fnType = type->getAs<AnyFunctionType>()) {
-      return fnType->getIsolation().isErased();
-    }
-    return false;
-  });
-}
 
 static bool usesFeatureAddressableParameters(Decl *d) {
   if (d->getAttrs().hasAttribute<AddressableSelfAttr>()) {
@@ -308,20 +303,25 @@ static bool usesFeatureAddressableParameters(Decl *d) {
   return false;
 }
 
+static bool usesFeatureAddressableTypes(Decl *d) {
+  if (d->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
+    return true;
+  }
+  
+  return false;
+}
+
 UNINTERESTING_FEATURE(IsolatedAny2)
 UNINTERESTING_FEATURE(GlobalActorIsolatedTypesUsability)
 UNINTERESTING_FEATURE(ObjCImplementation)
 UNINTERESTING_FEATURE(ObjCImplementationWithResilientStorage)
-UNINTERESTING_FEATURE(CImplementation)
 UNINTERESTING_FEATURE(Sensitive)
 UNINTERESTING_FEATURE(DebugDescriptionMacro)
 UNINTERESTING_FEATURE(ReinitializeConsumeInMultiBlockDefer)
 UNINTERESTING_FEATURE(SE427NoInferenceOnExtension)
 UNINTERESTING_FEATURE(TrailingComma)
-
-static bool usesFeatureAllowUnsafeAttribute(Decl *decl) {
-  return decl->getAttrs().hasAttribute<UnsafeAttr>();
-}
+UNINTERESTING_FEATURE(RawIdentifiers)
+UNINTERESTING_FEATURE(InferIsolatedConformances)
 
 static ABIAttr *getABIAttr(Decl *decl) {
   if (auto pbd = dyn_cast<PatternBindingDecl>(decl))
@@ -333,49 +333,47 @@ static ABIAttr *getABIAttr(Decl *decl) {
   return decl->getAttrs().getAttribute<ABIAttr>();
 }
 
-static bool usesFeatureABIAttribute(Decl *decl) {
+static bool usesFeatureABIAttributeSE0479(Decl *decl) {
   return getABIAttr(decl) != nullptr;
 }
 
-UNINTERESTING_FEATURE(WarnUnsafe)
-UNINTERESTING_FEATURE(SafeInterop)
-UNINTERESTING_FEATURE(SafeInteropWrappers)
-UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
-UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
-UNINTERESTING_FEATURE(CoroutineAccessorsAllocateInCallee)
-
-bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
-  if (auto cd = dyn_cast<ClassDecl>(decl)) {
-    return cd->getFormalAccess() == AccessLevel::Open &&
-           usesFeatureIsolatedDeinit(cd->getDestructor());
-  } else if (auto dd = dyn_cast<DestructorDecl>(decl)) {
-    if (dd->hasExplicitIsolationAttribute()) {
-      return true;
-    }
-    if (auto superDD = dd->getSuperDeinit()) {
-      return usesFeatureIsolatedDeinit(superDD);
-    }
-    return false;
-  } else {
-    return false;
-  }
-}
-
-static bool usesFeatureValueGenerics(Decl *decl) {
-  auto genericContext = decl->getAsGenericContext();
-
-  if (!genericContext || !genericContext->getGenericParams())
-    return false;
-
-  for (auto param : genericContext->getGenericParams()->getParams()) {
-    if (param->isValue())
-      return true;
-
-    continue;
-  }
-
+static bool usesFeatureIsolatedConformances(Decl *decl) { 
+  // FIXME: Check conformances associated with this decl?
   return false;
 }
+
+static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureSourceWarningControl(Decl *decl) {
+  return decl->getAttrs().hasAttribute<WarnAttr>();
+}
+
+static bool usesFeatureCompileTimeValues(Decl *decl) {
+  return decl->getAttrs().hasAttribute<ConstValAttr>() ||
+         decl->getAttrs().hasAttribute<ConstInitializedAttr>();
+}
+
+static bool usesFeatureCompileTimeValuesPreview(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureClosureBodyMacro(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBuiltinConcurrencyStackNesting(Decl *decl) {
+  return false;
+}
+
+UNINTERESTING_FEATURE(StrictMemorySafety)
+UNINTERESTING_FEATURE(LibraryEvolution)
+UNINTERESTING_FEATURE(SafeInteropWrappers)
+UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
+UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
+UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
+UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {
@@ -396,6 +394,123 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
   }
 }
 
+UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
+UNINTERESTING_FEATURE(CustomAvailability)
+
+static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
+  // Explicit `@concurrent` attribute on the declaration.
+  if (decl->getAttrs().hasAttribute<ConcurrentAttr>())
+    return true;
+
+  // Explicit `nonisolated(nonsending)` attribute on the declaration.
+  if (auto *nonisolated = decl->getAttrs().getAttribute<NonisolatedAttr>()) {
+    if (nonisolated->isNonSending())
+      return true;
+  }
+
+  auto hasCallerIsolatedAttr = [](TypeRepr *R) {
+    if (!R)
+      return false;
+
+    return R->findIf([](TypeRepr *repr) {
+      if (isa<CallerIsolatedTypeRepr>(repr))
+        return true;
+
+      // We don't check for @concurrent here because it's
+      // not printed in type positions since it indicates
+      // old "nonisolated" state.
+
+      return false;
+    });
+  };
+
+  auto *VD = dyn_cast<ValueDecl>(decl);
+  if (!VD)
+    return false;
+
+  // The declaration is going to be printed with `nonisolated(nonsending)`
+  // attribute.
+  if (getActorIsolation(VD).isCallerIsolationInheriting())
+    return true;
+
+  // Check if any parameters that have `nonisolated(nonsending)` attribute.
+  if (auto *PL = VD->getParameterList()) {
+    if (llvm::any_of(*PL, [&](const ParamDecl *P) {
+          return hasCallerIsolatedAttr(P->getTypeRepr());
+        }))
+      return true;
+  }
+
+  // Check if result type has explicit `nonisolated(nonsending)` attribute.
+  if (hasCallerIsolatedAttr(VD->getResultTypeRepr()))
+    return true;
+
+  return false;
+}
+
+static bool usesFeatureNonexhaustiveAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<NonexhaustiveAttr>();
+}
+
+static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
+  auto *VD = dyn_cast<ValueDecl>(decl);
+  if (!VD)
+    return false;
+
+  if (auto *PL = VD->getParameterList()) {
+    return llvm::any_of(*PL, [&](const ParamDecl *P) {
+      auto *attr = P->getAttrs().getAttribute<InheritActorContextAttr>();
+      return attr && attr->isAlways();
+    });
+  }
+
+  return false;
+}
+
+static bool usesFeatureDefaultIsolationPerFile(Decl *D) {
+  return isa<UsingDecl>(D);
+}
+
+UNINTERESTING_FEATURE(BuiltinSelect)
+UNINTERESTING_FEATURE(BuiltinInterleave)
+UNINTERESTING_FEATURE(BuiltinVectorsExternC)
+UNINTERESTING_FEATURE(AddressOfProperty2)
+UNINTERESTING_FEATURE(ImmutableWeakCaptures)
+// Ignore borrow and mutate accessors until it is used in the standard library.
+UNINTERESTING_FEATURE(BorrowAndMutateAccessors)
+
+static bool usesFeatureInlineAlways(Decl *decl) {
+  if (auto *inlineAttr = decl->getAttrs().getAttribute<InlineAttr>()) {
+    return inlineAttr->getKind() == InlineKind::Always;
+  }
+  return false;
+}
+
+UNINTERESTING_FEATURE(SwiftRuntimeAvailability)
+UNINTERESTING_FEATURE(StandaloneSwiftAvailability)
+
+static bool usesFeatureTildeSendable(Decl *decl) {
+  auto *TD = dyn_cast<TypeDecl>(decl);
+  if (!TD)
+    return false;
+
+  return llvm::any_of(
+      TD->getInherited().getEntries(), [&decl](const auto &entry) {
+        if (!entry.isSuppressed())
+          return false;
+
+        auto T = entry.getType();
+        if (!T)
+          return false;
+
+        auto &C = decl->getASTContext();
+        return C.getProtocol(KnownProtocolKind::Sendable) == T->getAnyNominal();
+      });
+}
+
+UNINTERESTING_FEATURE(AnyAppleOSAvailability)
+UNINTERESTING_FEATURE(StrictAccessControl)
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
@@ -407,7 +522,7 @@ void FeatureSet::collectRequiredFeature(Feature feature,
 
 void FeatureSet::collectSuppressibleFeature(Feature feature,
                                             InsertOrRemove operation) {
-  suppressible.insertOrRemove(numFeatures() - size_t(feature),
+  suppressible.insertOrRemove(Feature::getNumFeatures() - size_t(feature),
                               operation == Insert);
 }
 
@@ -428,6 +543,11 @@ static bool hasFeatureSuppressionAttribute(Decl *decl, StringRef featureName,
   return false;
 }
 
+// These functions are only used when there suppressible language features
+// defined, so suppress warnings about them being unused to avoid spam when
+// there are none.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused"
 static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
   return hasFeatureSuppressionAttribute(decl, featureName, true);
 }
@@ -435,6 +555,7 @@ static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
 static bool allowFeatureSuppression(StringRef featureName, Decl *decl) {
   return hasFeatureSuppressionAttribute(decl, featureName, false);
 }
+#pragma clang diagnostic pop
 
 /// Go through all the features used by the given declaration and
 /// either add or remove them to this set.
@@ -481,8 +602,12 @@ FeatureSet swift::getUniqueFeaturesUsed(Decl *decl) {
   // Remove all the features used by all enclosing declarations.
   Decl *enclosingDecl = decl;
   while (!features.empty()) {
+    // If we were in an @abi attribute, collect from the API counterpart.
+    auto abiRole = ABIRoleInfo(enclosingDecl);
+    if (!abiRole.providesAPI() && abiRole.getCounterpart())
+      enclosingDecl = abiRole.getCounterpart();
     // Find the next outermost enclosing declaration.
-    if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
+    else if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
       enclosingDecl = accessor->getStorage();
     else
       enclosingDecl = enclosingDecl->getDeclContext()->getAsDecl();

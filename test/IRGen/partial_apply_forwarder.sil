@@ -170,15 +170,15 @@ sil hidden_external @takingQAndS : $@convention(thin) <τ_0_0 where  τ_0_0 : Q>
 // CHECK:   [[WBREF:%.*]] = call noalias ptr @swift_allocObject(ptr [[WBTY]]
 // CHECK:   [[CONTEXT0:%.*]] = call noalias ptr @swift_allocObject
 
-// CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, ptr }>, ptr [[CONTEXT0]], i32 0, i32 {{(1|2)}}
+// CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, ptr }>, ptr [[CONTEXT0]], i32 0, i32 {{(1|2)}}
 // CHECK:   [[WITNESS:%.*]] = call ptr @swift_getWitnessTable(ptr @"$s23partial_apply_forwarder12BaseProducerVyxGAA1QAAMc", ptr [[BPTY]], ptr undef)
 // CHECK:   store ptr [[WITNESS]], ptr [[WITNESS_ADDR]]
 
-// CHECK:   [[SADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, ptr }>, ptr [[CONTEXT0]], i32 0, i32 {{(2|3)}}
-// CHECK:   [[XADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder1SV, ptr [[SADDR]], i32 0, i32 0
+// CHECK:   [[SADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, ptr }>, ptr [[CONTEXT0]], i32 0, i32 {{(2|3)}}
+// CHECK:   [[XADDR:%.*]] = getelementptr inbounds{{.*}} %T23partial_apply_forwarder1SV, ptr [[SADDR]], i32 0, i32 0
 // CHECK:   store i64 %1, ptr [[XADDR]]
 
-// CHECK:   [[WBADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, ptr }>, ptr [[CONTEXT0]], i32 0, i32 {{(3|4)}}
+// CHECK:   [[WBADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, ptr }>, ptr [[CONTEXT0]], i32 0, i32 {{(3|4)}}
 // CHECK:   store ptr [[WBREF]], ptr [[WBADDR]]
 // CHECK:   [[CLOSURE:%.*]] = insertvalue { ptr, ptr } { ptr @"$s11takingQAndSTA{{(\.ptrauth)?}}", ptr undef }, ptr [[CONTEXT0]], 1
 // CHECK:   ret { ptr, ptr } [[CLOSURE]]
@@ -186,14 +186,14 @@ sil hidden_external @takingQAndS : $@convention(thin) <τ_0_0 where  τ_0_0 : Q>
 // CHECK-LABEL: define internal swiftcc void @"$s11takingQAndSTA"(ptr swiftself %0)
 // CHECK: entry:
 
-// CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, ptr }>, ptr %0, i32 0, i32 {{(1|2)}}
+// CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, ptr }>, ptr %0, i32 0, i32 {{(1|2)}}
 // CHECK:   [[WITNESS:%.*]] = load ptr, ptr [[WITNESS_ADDR]]
 
-// CHECK:   [[SADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, ptr }>, ptr %0, i32 0, i32 {{(2|3)}}
-// CHECK:   [[XADDR:%.*]] = getelementptr inbounds %T23partial_apply_forwarder1SV, ptr [[SADDR]], i32 0, i32 0
+// CHECK:   [[SADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, ptr }>, ptr %0, i32 0, i32 {{(2|3)}}
+// CHECK:   [[XADDR:%.*]] = getelementptr inbounds{{.*}} %T23partial_apply_forwarder1SV, ptr [[SADDR]], i32 0, i32 0
 // CHECK:   [[X:%.*]] = load i64, ptr [[XADDR]]
 
-// CHECK:   [[WBADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, ptr }>, ptr %0, i32 0, i32 {{(3|4)}}
+// CHECK:   [[WBADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, ptr }>, ptr %0, i32 0, i32 {{(3|4)}}
 // CHECK:   [[WB:%.*]] = load ptr, ptr [[WBADDR]]
 // CHECK:   call ptr @swift_retain(ptr returned [[WB]])
 // CHECK:   [[TY:%.*]] = load ptr, ptr [[WB]]

@@ -12,10 +12,6 @@ public func getWrappedMagicInt() -> CInt {
 // CHECK: sil @$s4main18getWrappedMagicInts5Int32VyF : $@convention(thin) () -> Int32 {
 // CHECK: [[INT_WRAPPER:%.*]] = struct $IntWrapper ([[_:%.*]] : $Int32)
 // CHECK: [[_:%.*]] = struct $MagicWrapper<IntWrapper> ([[INT_WRAPPER]] : $IntWrapper)
-// CHECK: // function_ref {{_ZNK12MagicWrapperI10IntWrapperE15getValuePlusArgEi|\?getValuePlusArg@\?\$MagicWrapper@UIntWrapper@@@@QEBAHH@Z}}
-// CHECK: [[_:%.*]] = function_ref @{{_ZNK12MagicWrapperI10IntWrapperE15getValuePlusArgEi|\?getValuePlusArg@\?\$MagicWrapper@UIntWrapper@@@@QEBAHH@Z}} : $@convention(cxx_method) (Int32, @in_guaranteed MagicWrapper<IntWrapper>) -> Int32
+// CHECK: [[_:%.*]] = function_ref @$sSo0030MagicWrapperIntWrapper_bHAFhxbV15getValuePlusArgys5Int32VAEFTo : $@convention(cxx_method) (Int32, @in_guaranteed MagicWrapper<IntWrapper>) -> Int32
 
-// CHECK: // {{_ZNK12MagicWrapperI10IntWrapperE15getValuePlusArgEi|\?getValuePlusArg@\?\$MagicWrapper@UIntWrapper@@@@QEBAHH@Z}}
-// CHECK: MagicWrapper<IntWrapper>::getValuePlusArg
-
-// CHECK: sil [clang MagicWrapper<IntWrapper>.getValuePlusArg] @{{_ZNK12MagicWrapperI10IntWrapperE15getValuePlusArgEi|\?getValuePlusArg@\?\$MagicWrapper@UIntWrapper@@@@QEBAHH@Z}} : $@convention(cxx_method) (Int32, @in_guaranteed MagicWrapper<IntWrapper>) -> Int32
+// CHECK: sil {{.*}}[clang MagicWrapper<IntWrapper>.getValuePlusArg] @$sSo0030MagicWrapperIntWrapper_bHAFhxbV15getValuePlusArgys5Int32VAEFTo : $@convention(cxx_method) (Int32, @in_guaranteed MagicWrapper<IntWrapper>) -> Int32

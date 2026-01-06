@@ -21,11 +21,11 @@ bb0:
   return %0 : $()
 } // end sil function '$s26closure_specialize_fragile6actionyyF'
 
-// CHECK-LABEL: sil [serialized] [always_inline] @$s26closure_specialize_fragile0C6CalleryyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [serialized] [heuristic_always_inline] @$s26closure_specialize_fragile0C6CalleryyF : $@convention(thin) () -> ()
 // CHECK: function_ref @$s26closure_specialize_fragile15resilientCalleeyyyc2fn_tF : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
 // CHECK: return
 // fragileCaller()
-sil [serialized] [always_inline] @$s26closure_specialize_fragile0C6CalleryyF : $@convention(thin) () -> () {
+sil [serialized] [heuristic_always_inline] @$s26closure_specialize_fragile0C6CalleryyF : $@convention(thin) () -> () {
 bb0:
   // function_ref resilientCallee(fn:)
   %0 = function_ref @$s26closure_specialize_fragile15resilientCalleeyyyc2fn_tF : $@convention(thin) (@owned @callee_owned () -> ()) -> ()

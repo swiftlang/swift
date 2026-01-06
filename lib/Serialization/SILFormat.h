@@ -81,6 +81,13 @@ enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
   DeclRef,
 };
 
+enum class ExtraStringFlavor : uint8_t {
+  /// asmname attributes
+  AsmName,
+  /// section attribute
+  Section,
+};
+
 /// The record types within the "sil-index" block.
 ///
 /// \sa SIL_INDEX_BLOCK_ID
@@ -102,19 +109,22 @@ namespace sil_index_block {
     SIL_WITNESS_TABLE_OFFSETS,
     SIL_DEFAULT_WITNESS_TABLE_NAMES,
     SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
+    SIL_DEFAULT_OVERRIDE_TABLE_NAMES,
+    SIL_DEFAULT_OVERRIDE_TABLE_OFFSETS,
     SIL_PROPERTY_OFFSETS,
     SIL_DIFFERENTIABILITY_WITNESS_NAMES,
     SIL_DIFFERENTIABILITY_WITNESS_OFFSETS,
+    SIL_ASM_NAMES,
   };
 
   using ListLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    BCFixed<5>,  // record ID
     BCVBR<16>,  // table offset within the blob
     BCBlob      // map from identifier strings to IDs.
   >;
 
   using OffsetLayout = BCGenericRecordLayout<
-    BCFixed<4>,  // record ID
+    BCFixed<5>,  // record ID
     BCArray<BitOffsetField>
   >;
 
@@ -155,6 +165,8 @@ namespace sil_block {
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
     SIL_DEFAULT_WITNESS_TABLE,
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
+    SIL_DEFAULT_OVERRIDE_TABLE,
+    SIL_DEFAULT_OVERRIDE_TABLE_ENTRY,
     SIL_DIFFERENTIABILITY_WITNESS,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
@@ -179,7 +191,10 @@ namespace sil_block {
     SIL_DEBUG_SCOPE,
     SIL_DEBUG_SCOPE_REF,
     SIL_SOURCE_LOC,
-    SIL_SOURCE_LOC_REF
+    SIL_SOURCE_LOC_REF,
+    SIL_DEBUG_VALUE_DELIMITER,
+    SIL_DEBUG_VALUE,
+    SIL_EXTRA_STRING,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -223,6 +238,7 @@ namespace sil_block {
     BCFixed<1>,          // Is this a declaration. We represent this separately
                          // from whether or not we have entries since we can
                          // have empty witness tables.
+    BCFixed<1>,          // Is this a specialized witness table.
     BCFixed<2>,          // SerializedKind.
     ProtocolConformanceIDField   // conformance
     // Witness table entries will be serialized after.
@@ -242,8 +258,7 @@ namespace sil_block {
 
   using WitnessAssocProtocolLayout = BCRecordLayout<
     SIL_WITNESS_ASSOC_PROTOCOL,
-    TypeIDField, // ID of associated type
-    DeclIDField, // ID of ProtocolDecl
+    TypeIDField, // ID of requirement subject type
     ProtocolConformanceIDField
   >;
 
@@ -255,7 +270,6 @@ namespace sil_block {
 
   using WitnessConditionalConformanceLayout = BCRecordLayout<
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
-    TypeIDField, // ID of associated type
     ProtocolConformanceIDField // ID of conformance
   >;
 
@@ -270,14 +284,30 @@ namespace sil_block {
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY
   >;
 
+  using DefaultOverrideTableLayout = BCRecordLayout<
+    SIL_DEFAULT_OVERRIDE_TABLE,
+    DeclIDField,  // ID of ClassDecl
+    SILLinkageField  // Linkage
+    // Default override table entries will be serialized after.
+  >;
+
+  using DefaultOverrideTableEntryLayout = BCRecordLayout<
+    SIL_DEFAULT_OVERRIDE_TABLE_ENTRY,
+    DeclIDField,  // SILFunction name
+    BCArray<ValueIDField> // SILDeclRef(method) + SILDeclRef(original)
+  >;
+
   using SILGlobalVarLayout = BCRecordLayout<
     SIL_GLOBALVAR,
     SILLinkageField,
     BCFixed<2>,          // serialized
     BCFixed<1>,          // Is this a declaration.
     BCFixed<1>,          // Is this a let variable.
+    BCFixed<1>,          // Is this marked as "used".
+    BCVBR<8>,            // # of trailing records
     TypeIDField,
-    DeclIDField
+    DeclIDField,
+    ModuleIDField        // Parent ModuleDecl *
   >;
 
   using DifferentiabilityWitnessLayout = BCRecordLayout<
@@ -312,6 +342,22 @@ namespace sil_block {
     SILTypeCategoryField 
   >;
 
+  using SILDebugValueLayout = BCRecordLayout<
+    SIL_DEBUG_VALUE,
+
+    SILTypeCategoryField, /// operand type category
+    SILTypeCategoryField, /// debug var type category
+    BCFixed<11>,          /// poison, movableValueDebuginfo, trace,
+                          /// hasDebugVar, isLet, isDenseMapSingleton(two
+                          /// bits), hasSource, hasLoc, hasExpr
+    BCArray<ValueIDField> /// operand info: operand, type, debug var info:
+                          /// name, argno, optional stuff: typeid
+  >;
+
+  using DebugValueDelimiterLayout = BCRecordLayout<
+    SIL_DEBUG_VALUE_DELIMITER
+    >;
+
   using SourceLocLayout = BCRecordLayout<
     SIL_SOURCE_LOC,
     ValueIDField,
@@ -340,8 +386,9 @@ namespace sil_block {
                      BCFixed<3>,  // perfConstraints
                      BCFixed<2>,  // classSubclassScope
                      BCFixed<1>,  // hasCReferences
+                     BCFixed<1>,  // markedAsUsed
                      BCFixed<3>,  // side effect info.
-                     BCVBR<8>,    // number of specialize attributes
+                     BCVBR<8>,    // number of trailing records
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // force weak linking
                      BC_AVAIL_TUPLE, // availability for weak linking
@@ -380,6 +427,14 @@ namespace sil_block {
                      BCVBR<8>,          // argumentIndex
                      BCFixed<1>,        // argumentIndexValid
                      BCFixed<1>         // isDerived
+                     >;
+
+  /// Used for additional strings that can be associated with a record,
+  /// written out as records that trail
+  using SILExtraStringLayout =
+      BCRecordLayout<SIL_EXTRA_STRING,
+                     BCFixed<8>,    // string flavor
+                     BCBlob       // string data
                      >;
 
   // Has an optional argument list where each argument is a typed valueref.
@@ -487,7 +542,7 @@ namespace sil_block {
 
   // SIL instructions with one type. (alloc_stack)
   using SILOneTypeLayout = BCRecordLayout<SIL_ONE_TYPE, SILInstOpCodeField,
-                                          BCFixed<4>, // Optional attributes
+                                          BCFixed<5>, // Optional attributes
                                           TypeIDField, SILTypeCategoryField>;
 
   // SIL instructions with one typed valueref. (dealloc_stack, return)

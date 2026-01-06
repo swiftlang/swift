@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "RequirementMachine/RequirementLowering.h"
 
 using namespace swift;
 
@@ -82,7 +83,9 @@ ProtocolDecl *Requirement::getProtocolDecl() const {
 
 CheckRequirementResult Requirement::checkRequirement(
     SmallVectorImpl<Requirement> &subReqs,
-    bool allowMissing) const {
+    bool allowMissing,
+    SmallVectorImpl<ProtocolConformanceRef> *isolatedConformances
+) const {
   if (hasError())
     return CheckRequirementResult::SubstitutionFailure;
 
@@ -121,6 +124,15 @@ CheckRequirementResult Requirement::checkRequirement(
         firstType, proto, allowMissing);
     if (!conformance)
       return CheckRequirementResult::RequirementFailure;
+
+    // Collect isolated conformances.
+    if (isolatedConformances) {
+      conformance.forEachIsolatedConformance(
+          [&](ProtocolConformanceRef isolatedConformance) {
+            isolatedConformances->push_back(isolatedConformance);
+            return false;
+          });
+    }
 
     auto condReqs = conformance.getConditionalRequirements();
     if (condReqs.empty())
@@ -244,10 +256,11 @@ int Requirement::compare(const Requirement &other) const {
 
   // We should only have multiple conformance requirements.
   if (getKind() != RequirementKind::Conformance) {
-    llvm::errs() << "Unordered generic requirements\n";
-    llvm::errs() << "LHS: "; dump(llvm::errs()); llvm::errs() << "\n";
-    llvm::errs() << "RHS: "; other.dump(llvm::errs()); llvm::errs() << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "Unordered generic requirements\n";
+      out << "LHS: "; dump(out); out << "\n";
+      out << "RHS: "; other.dump(out);
+    });
   }
 
   int compareProtos =
@@ -267,28 +280,24 @@ checkRequirementsImpl(ArrayRef<Requirement> requirements,
   while (!worklist.empty()) {
     auto req = worklist.pop_back_val();
 
-  // Check preconditions.
-#ifndef NDEBUG
-  {
+    // Check preconditions.
     auto firstType = req.getFirstType();
-    assert((allowTypeParameters || !firstType->hasTypeParameter())
+    ASSERT((allowTypeParameters || !firstType->hasTypeParameter())
            && "must take a contextual type. if you really are ok with an "
             "indefinite answer (and usually YOU ARE NOT), then consider whether "
             "you really, definitely are ok with an indefinite answer, and "
             "use `checkRequirementsWithoutContext` instead");
-    assert(!firstType->hasTypeVariable());
+    ASSERT(!firstType->hasTypeVariable());
 
     if (req.getKind() != RequirementKind::Layout) {
       auto secondType = req.getSecondType();
-      assert((allowTypeParameters || !secondType->hasTypeParameter())
+      ASSERT((allowTypeParameters || !secondType->hasTypeParameter())
              && "must take a contextual type. if you really are ok with an "
               "indefinite answer (and usually YOU ARE NOT), then consider whether "
               "you really, definitely are ok with an indefinite answer, and "
               "use `checkRequirementsWithoutContext` instead");
-      assert(!secondType->hasTypeVariable());
+      ASSERT(!secondType->hasTypeVariable());
     }
-  }
-#endif
 
     switch (req.checkRequirement(worklist, /*allowMissing=*/true)) {
     case CheckRequirementResult::Success:
@@ -356,10 +365,51 @@ InvertibleProtocolKind InverseRequirement::getKind() const {
   return *getInvertibleProtocolKind(*(protocol->getKnownProtocolKind()));
 }
 
+/// Do these two ArrayRefs alias any of the same memory?
+template<typename T>
+bool arrayrefs_overlap(ArrayRef<T> A, ArrayRef<T> B) {
+  if (A.empty() || B.empty())
+    return false;
+
+  const T *ABegin = A.data();
+  const T *AEnd = ABegin + A.size();
+  const T *BBegin = B.data();
+  const T *BEnd = BBegin + B.size();
+
+  return ABegin < BEnd && BBegin < AEnd;
+}
+
 void InverseRequirement::expandDefaults(
     ASTContext &ctx,
     ArrayRef<Type> gps,
-    SmallVectorImpl<StructuralRequirement> &result) {
+    ArrayRef<StructuralRequirement> existingReqs,
+    SmallVectorImpl<StructuralRequirement> &result,
+    SmallVectorImpl<Type> &expandedGPs) {
+  // If there are no subjects, there's nothing to expand.
+  if (gps.empty())
+    return;
+
+  // Vectors can reallocate, so we mustn't be looking at an ArrayRef pointing
+  // into the same span of memory that we're also mutating!
+  ASSERT(!arrayrefs_overlap(existingReqs, {result.data(), result.size()}) &&
+         "requirements are aliasing!");
+  ASSERT(!arrayrefs_overlap(gps, {expandedGPs.data(), expandedGPs.size()}) &&
+         "types are aliasing!");
+
+  auto expandFor = [&](Type gp) {
+    expandedGPs.push_back(gp);
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
+      auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
+
+      result.push_back({{RequirementKind::Conformance, gp,
+                         proto->getDeclaredInterfaceType()},
+                         SourceLoc()});
+    }
+  };
+
+  // Used for further expansion of defaults for dependent type members of gps.
+  // Contains the root generic parameters of the ones we were asked to expand.
+  llvm::SmallSetVector<CanType, 8> seenRoots;
   for (auto gp : gps) {
     // Value generics never have inverses (or the positive thereof).
     if (auto gpTy = gp->getAs<GenericTypeParamType>()) {
@@ -368,11 +418,57 @@ void InverseRequirement::expandDefaults(
       }
     }
 
-    for (auto ip : InvertibleProtocolSet::allKnown()) {
-      auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
-      result.push_back({{RequirementKind::Conformance, gp,
-                         proto->getDeclaredInterfaceType()},
-                         SourceLoc()});
+    // Each generic parameter is inferred to have a conformance requirement
+    // to all invertible protocols, regardless of what other requirements exist.
+    // We later cancel them out in applyInverses.
+    expandFor(gp);
+    seenRoots.insert(gp->getDependentMemberRoot()->getCanonicalType());
+  }
+
+  // Look for structural requirements stating type parameter G conforms to P.
+  // If P has a primary associatedtype P.A, infer default requirements for G.A
+  // For example, given protocol,
+  //
+  //    protocol P<A>: ~Copyable { associatedtype A: ~Copyable }
+  //
+  // For an initial gp [T] and structural requirements [T: P, T.A: P],
+  // we proceed with one pass over the original structural requirements:
+  //
+  // 1. Expand new requirement 'T: Copyable' (already done earlier)
+  // 2. Because of requirement 'T: P', infer requirement [T.A: Copyable]
+  // 4. Because of requirement 'T.A: P', infer requirement [T.A.A: Copyable]
+  // 5. Expansion stops, as no other structural requirements are relevant.
+  //    Because Copyable & Escapable don't have associated types, we're done.
+  if (ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypesWithDefaults)) {
+    // Help avoid duplicate expansions of the same member type.
+    llvm::SmallSetVector<CanType, 8> dmtsExpanded;
+
+    for (auto const& sreq : existingReqs) {
+      auto &req = sreq.req;
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+
+      // Is this subject rooted in one we did expand defaults for?
+      auto subject = req.getFirstType();
+      auto subjectRoot = subject->getDependentMemberRoot()->getCanonicalType();
+      if (!seenRoots.contains(subjectRoot))
+        continue;
+
+      // Given a structural requirement `Subject: P`,
+      // for each primary associated type A of P, expand defaults for Subject.A
+      auto *proto = req.getProtocolDecl();
+      for (auto *ATD : proto->getPrimaryAssociatedTypes()) {
+        auto dmt = DependentMemberType::get(subject, ATD);
+        auto cleanDMT =
+            rewriting::stripBoundDependentMemberTypes(dmt)->getCanonicalType();
+
+        // Did we already expand for the same DMT?
+        if (dmtsExpanded.contains(cleanDMT))
+          continue;
+
+        expandFor(dmt);
+        dmtsExpanded.insert(cleanDMT);
+      }
     }
   }
 }

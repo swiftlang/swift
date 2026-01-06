@@ -1,23 +1,23 @@
 // RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let c: Int
-  @lifetime(borrow p)
+  @_lifetime(borrow p)
   init(_ p: UnsafeRawPointer, _ c: Int) {
     self.p = p
     self.c = c
   }
 }
 
-@lifetime(bv)
+@_lifetime(copy bv)
 func bv_copy(_ bv: borrowing BV) -> BV {
   copy bv
 }
@@ -30,20 +30,20 @@ public struct NEInt: ~Escapable {
   var i: Int
 
   // Test yielding an address.
-  // CHECK-LABEL: sil hidden @$s4test5NEIntV5ipropSivM : $@yield_once @convention(method) (@inout NEInt) -> @yields @inout Int {
+  // CHECK-LABEL: sil hidden @$s4test5NEIntV5iprop{{.*}}vM : $@yield_once @convention(method) (@lifetime(copy 0) @inout NEInt) -> @lifetime(borrow 0) @yields @inout NEInt
   // CHECK: bb0(%0 : $*NEInt):
   // CHECK: [[A:%.*]] = begin_access [modify] [static] %0 : $*NEInt
-  // CHECK: [[E:%.*]] = struct_element_addr [[A]] : $*NEInt, #NEInt.i
-  // CHECK: yield [[E]] : $*Int, resume bb1, unwind bb2
+  // CHECK: yield [[A]] : $*NEInt, resume bb1, unwind bb2
   // CHECK: end_access [[A]] : $*NEInt
   // CHECK: end_access [[A]] : $*NEInt
-  // CHECK-LABEL: } // end sil function '$s4test5NEIntV5ipropSivM'
-  var iprop: Int {
-    _read { yield i }
-    _modify { yield &i }
+  var iprop: NEInt {
+    @_lifetime(copy self)
+    _read { yield self }
+    @_lifetime(&self)
+    _modify { yield &self }
   }
 
-  @lifetime(borrow owner)
+  @_lifetime(borrow owner)
   init(owner: borrowing NCInt) {
     self.i = owner.i
   }
@@ -56,6 +56,7 @@ public enum NEOptional<Wrapped: ~Escapable>: ~Escapable {
 
 extension NEOptional where Wrapped: ~Escapable {
   // Test that enum initialization passes diagnostics.
+  @_lifetime(copy some)
   public init(_ some: consuming Wrapped) { self = .some(some) }
 }
 
@@ -68,7 +69,7 @@ func takeClosure(_: () -> ()) {}
 // CHECK:        apply %{{.*}}(%0) : $@convention(thin) (@guaranteed BV) -> @lifetime(copy 0) @owned BV
 // CHECK-NEXT:   return %3 : $BV
 // CHECK-LABEL: } // end sil function '$s4test14bv_borrow_copyyAA2BVVADF'
-@lifetime(borrow bv)
+@_lifetime(borrow bv)
 func bv_borrow_copy(_ bv: borrowing BV) -> BV {
   bv_copy(bv) 
 }
@@ -82,7 +83,7 @@ func bv_borrow_copy(_ bv: borrowing BV) -> BV {
 // CHECK:         %{{.*}} = mark_dependence [nonescaping] [[R]] : $BV on %0 : $BV
 // CHECK-NEXT:    return %{{.*}} : $BV
 // CHECK-LABEL: } // end sil function '$s4test010bv_borrow_C00B0AA2BVVAE_tF'
-@lifetime(borrow bv)
+@_lifetime(borrow bv)
 func bv_borrow_borrow(bv: borrowing BV) -> BV {
   bv_borrow_copy(bv)
 }

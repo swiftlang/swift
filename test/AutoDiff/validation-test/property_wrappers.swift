@@ -19,6 +19,7 @@ struct Wrapper<Value> {
   var wrappedValue: Value { // computed property
     get { value }
     set { value = newValue }
+    _modify { yield &value }
   }
 
   init(wrappedValue: Value) {
@@ -46,8 +47,6 @@ PropertyWrapperTests.test("SimpleStruct") {
   expectEqual((.init(x: 60, y: 0, z: 20), 300),
               gradient(at: Struct(), 2, of: setter))
 
-  // TODO: Support `modify` accessors (https://github.com/apple/swift/issues/55084).
-  /*
   func modify(_ s: Struct, _ x: Tracked<Float>) -> Tracked<Float> {
     var s = s
     s.x *= x * s.z
@@ -55,7 +54,6 @@ PropertyWrapperTests.test("SimpleStruct") {
   }
   expectEqual((.init(x: 60, y: 0, z: 20), 300),
               gradient(at: Struct(), 2, of: modify))
-  */
 }
 
 struct GenericStruct<T> {
@@ -86,8 +84,6 @@ PropertyWrapperTests.test("GenericStruct") {
   expectEqual((.init(x: 60, y: 0, z: 20), 300),
               gradient(at: GenericStruct<Tracked<Float>>(y: 20), 2, of: setter))
 
-  // TODO: Support `modify` accessors (https://github.com/apple/swift/issues/55084).
-  /*
   func modify<T>(_ s: GenericStruct<T>, _ x: Tracked<Float>) -> Tracked<Float> {
     var s = s
     s.x *= x * s.z
@@ -95,7 +91,6 @@ PropertyWrapperTests.test("GenericStruct") {
   }
   expectEqual((.init(x: 60, y: 0, z: 20), 300),
               gradient(at: GenericStruct<Tracked<Float>>(y: 1), 2, of: modify))
-  */
 }
 
 // TF-1149: Test class with loadable type but address-only `TangentVector` type.
@@ -131,16 +126,18 @@ PropertyWrapperTests.test("SimpleClass") {
               gradient(at: Class(), 2, of: setter))
   */
 
-  // TODO: Support `modify` accessors (https://github.com/apple/swift/issues/55084).
-  /*
+  // FIXME(TF-1175): Same issue as above
   func modify(_ c: Class, _ x: Tracked<Float>) -> Tracked<Float> {
     var c = c
     c.x *= x * c.z
     return c.x
   }
+  /*
   expectEqual((.init(x: 60, y: 0, z: 20), 300),
               gradient(at: Class(), 2, of: modify))
   */
+  expectEqual((.init(x: 1, y: 0, z: 0), 0),
+              gradient(at: Class(), 2, of: modify))
 }
 
 // From: https://github.com/apple/swift-evolution/blob/master/proposals/0258-property-wrappers.md#proposed-solution
@@ -157,12 +154,13 @@ enum Lazy<Value> {
 
   var wrappedValue: Value {
     // TODO(TF-1250): Replace with actual mutating getter implementation.
-    // Requires differentiation to support functions with multiple results.
-    get {
+    // Requires support for mutating semantic member accessor
+    /* mutating */ get {
       switch self {
       case .uninitialized(let initializer):
         let value = initializer()
         // NOTE: Actual implementation assigns to `self` here.
+        // self = .initialized(value)
         return value
       case .initialized(let value):
         return value

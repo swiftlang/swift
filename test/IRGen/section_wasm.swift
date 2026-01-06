@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %S/section.swift -S -parse-as-library | %FileCheck %s --check-prefix=ASM --check-prefix ASM-%target-os
+// RUN: %target-swift-frontend -enable-experimental-feature CompileTimeValuesPreview -primary-file %S/section.swift -S -parse-as-library | %FileCheck %s --check-prefix=ASM --check-prefix ASM-%target-os
 // REQUIRES: CPU=wasm32
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_SymbolLinkageMarkers
+// REQUIRES: swift_feature_CompileTimeValuesPreview
 
 // Wasm cannot have user defined section name for code sections
 //

@@ -1,11 +1,11 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(TypedThrowsABI)) -enable-library-evolution %S/Inputs/typed_throws_abi_impl.swift -emit-module -emit-module-path %t/TypedThrowsABI.swiftmodule -module-name TypedThrowsABI
-// RUN: %target-codesign %t/%target-library-name(TypedThrowsABI)
 
 // RUN: %target-build-swift -parse-as-library -Xfrontend -disable-availability-checking %s -lTypedThrowsABI -I %t -L %t -o %t/main %target-rpath(%t)
-// RUN: %target-codesign %t/main
+// RUN: %target-codesign %t/main %t/%target-library-name(TypedThrowsABI)
 // RUN: %target-run %t/main %t/%target-library-name(TypedThrowsABI) | %FileCheck %s
 
 // REQUIRES: executable_test
+// UNSUPPORTED: back_deployment_runtime
 
 import TypedThrowsABI
 
@@ -285,10 +285,74 @@ func checkAsync() async {
     await invoke { try await impl.nonMatching_f1(false) }
 }
 
+enum SmallError: Error {
+    case a(Int)
+}
+
+@inline(never)
+func smallResultLargerError() throws(SmallError) -> Int8? {
+  return 10
+}
+
+func callSmallResultLargerError() {
+  let res = try! smallResultLargerError()
+  print("Result is: \(String(describing: res))")
+}
+
+enum UInt8OptSingletonError: Error {
+  case a(Int8?)
+}
+
+@inline(never)
+func smallErrorLargerResult() throws(UInt8OptSingletonError) -> Int {
+  throw .a(10)
+}
+
+func callSmallErrorLargerResult() {
+  do {
+    _ = try smallErrorLargerResult()
+  } catch {
+    switch error {
+      case .a(let x):
+        print("Error value is: \(String(describing: x))")
+    }
+  }
+}
+
+enum MyError: Error {
+    case x
+    case y
+}
+
+protocol AsyncGenProto<A> {
+  associatedtype A
+  func fn(arg: Int) async throws(MyError) -> A
+}
+
+@inline(never)
+func callAsyncIndirectResult<A>(p: any AsyncGenProto<A>, x: Int) async throws(MyError) -> A {
+  return try await p.fn(arg: x)
+}
+
+
+struct AsyncGenProtoImpl: AsyncGenProto {
+    func fn(arg: Int) async throws(MyError) -> Int {
+        print("Arg is \(arg)")
+        return arg
+    }
+}
+
 @main
 public struct Main {
     public static func main() async {
         await checkSync()
         await checkAsync()
+        // CHECK: Arg is 10
+        print(try! await callAsyncIndirectResult(p: AsyncGenProtoImpl(), x: 10))
+
+        // CHECK: Result is: Optional(10)
+        callSmallResultLargerError()
+        // CHECK: Error value is: Optional(10)
+        callSmallErrorLargerResult()
     }
 }

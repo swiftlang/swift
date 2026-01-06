@@ -175,7 +175,8 @@ static Expr *checkConstantness(Expr *expr) {
       return expr;
 
     ApplyExpr *apply = cast<ApplyExpr>(expr);
-    ValueDecl *calledValue = apply->getCalledValue();
+    ValueDecl *calledValue =
+        apply->getCalledValue(/*skipFunctionConversions=*/true);
     if (!calledValue)
       return expr;
 
@@ -300,7 +301,8 @@ static void diagnoseConstantArgumentRequirementOfCall(const CallExpr *callExpr,
                                                       const ASTContext &ctx) {
   assert(callExpr && callExpr->getType() &&
          "callExpr should have a valid type");
-  ValueDecl *calledDecl = callExpr->getCalledValue();
+  ValueDecl *calledDecl =
+      callExpr->getCalledValue(/*skipFunctionConversions=*/true);
   if (!calledDecl || !isa<AbstractFunctionDecl>(calledDecl))
     return;
   AbstractFunctionDecl *callee = cast<AbstractFunctionDecl>(calledDecl);

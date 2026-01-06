@@ -59,8 +59,8 @@ extension ExplicitHello: Copyable where T: Copyable {}
 
 public struct Hello<T: ~Copyable>: ~Copyable, ~Escapable where T: ~Escapable {}
 
-extension Hello: Escapable where T: Escapable {}
-extension Hello: Copyable where T: Copyable {}
+extension Hello: Escapable where T: Escapable, T: ~Copyable {}
+extension Hello: Copyable where T: Copyable, T: ~Escapable {}
 
 public protocol TestAssocTypes {
   associatedtype A: ~Copyable, _NoCopyP = Int
@@ -98,7 +98,7 @@ extension Outer: Copyable where A: Copyable {}
 extension Outer.InnerStruct: Copyable where C: Copyable, A: Copyable {}
 
 extension Outer.InnerVariation1: Copyable where A: Copyable, D: Copyable & Escapable {}
-extension Outer.InnerVariation2: Escapable where A: Escapable, D: Escapable {}
+extension Outer.InnerVariation2: Escapable where A: ~Copyable, A: Escapable, D: Escapable {}
 
 extension Outer.InnerStruct {
     public func hello<T: ~Escapable>(_ t: T) {}
@@ -149,5 +149,5 @@ public enum Moptional<Wrapped: ~Copyable & ~Escapable>: ~Copyable, ~Escapable {
   case none
   case some(Wrapped)
 }
-extension Moptional: Copyable where Wrapped: Copyable {}
-extension Moptional: Escapable where Wrapped: Escapable {}
+extension Moptional: Copyable where Wrapped: Copyable, Wrapped: ~Escapable {}
+extension Moptional: Escapable where Wrapped: Escapable, Wrapped: ~Copyable {}

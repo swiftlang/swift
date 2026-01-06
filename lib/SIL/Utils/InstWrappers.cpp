@@ -58,6 +58,7 @@ bool ForwardingOperation::hasSameRepresentation() const {
   case SILInstructionKind::StructExtractInst:
   case SILInstructionKind::TupleExtractInst:
   case SILInstructionKind::TuplePackExtractInst:
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
     return true;
   }
 }
@@ -98,4 +99,14 @@ bool ForwardingOperation::visitForwardedValues(
     assert(args.size() == 1 && "Transforming terminator with multiple args?!");
     return visitor(args[0]);
   });
+}
+
+bool swift::isFixedStorageSemanticsCallKind(SILFunction *function) {
+  for (auto &attr : function->getSemanticsAttrs()) {
+    if (attr == "fixed_storage.check_index" ||
+        attr == "fixed_storage.get_count") {
+      return true;
+    }
+  }
+  return false;
 }

@@ -25,8 +25,15 @@ def perform_build(args, swiftbuild_path, config, binary_name, opt_flag):
         "-Xswiftc",
         "-align-module-to-page-size",
         "-Xswiftc",
-        opt_flag,
+        opt_flag
     ]
+
+    if config == "debug":
+        swiftbuild_args += [
+            "-Xswiftc",
+            "-DDEBUG"
+        ]
+
     if args.verbose:
         swiftbuild_args.append("--verbose")
     subprocess.call(swiftbuild_args)

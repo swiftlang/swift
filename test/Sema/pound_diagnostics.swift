@@ -82,3 +82,6 @@ protocol MyProtocol {
          """) // expected-warning @-2 {{warnings support multi-line string literals}}
 
 #warning(#"warnings support \(custom string delimiters)"#) // expected-warning {{warnings support \\(custom string delimiters)}}
+
+#warning // expected-error {{#warning directive requires parentheses}} {{9-9=("<#message#>")}}
+("message") // expected-warning {{string literal is unused}}

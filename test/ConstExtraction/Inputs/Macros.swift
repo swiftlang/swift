@@ -41,10 +41,9 @@ public struct AddExtensionMacro: ExtensionMacro {
     conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
-    let typeName = declaration.declGroupName
     return protocols.map {
       ("""
-      extension \(typeName): \($0) {
+      extension \(type.trimmed): \($0) {
         struct _Extension_\($0): \($0) {
           var nested = 8
         }
@@ -53,8 +52,8 @@ public struct AddExtensionMacro: ExtensionMacro {
       .cast(ExtensionDeclSyntax.self)
     } + [
     ("""
-    extension \(typeName) {
-      static let _extension_\(typeName) = 3
+    extension \(type.trimmed) {
+      static let _extension_\(declaration.declGroupName) = 3
     }
     """ as DeclSyntax).cast(ExtensionDeclSyntax.self)
     ]

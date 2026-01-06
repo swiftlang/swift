@@ -10,11 +10,11 @@
 
 // RUN: %target-swift-frontend -emit-module -o %t -module-name HasBridgingHeader %S/../../Inputs/empty.swift -enable-objc-interop -import-objc-header %t/error-on-define.h -diagnostic-style llvm
 
-// RUN: %target-swift-frontend -typecheck %s -I %t -Xcc -DERROR -verify -show-diagnostics-after-fatal
+// RUN: %target-swift-frontend -typecheck %s -I %t -Xcc -DERROR -verify -verify-ignore-unrelated -show-diagnostics-after-fatal
 // RUN: not %target-swift-frontend -typecheck %s -I %t -Xcc -DERROR 2>&1 -diagnostic-style llvm | %FileCheck -check-prefix=HEADER-ERROR %s
 
 // RUN: rm %t/error-on-define-impl.h
-// RUN: %target-swift-frontend -typecheck %s -I %t -verify -show-diagnostics-after-fatal -diagnostic-style llvm
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify -verify-ignore-unrelated -show-diagnostics-after-fatal -diagnostic-style llvm
 // RUN: not %target-swift-frontend -typecheck %s -I %t -diagnostic-style llvm 2>&1 | %FileCheck -check-prefix=MISSING-OTHER-HEADER %s
 
 import HasBridgingHeader // expected-error {{failed to import bridging header}} expected-error {{failed to load module 'HasBridgingHeader'}}

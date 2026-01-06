@@ -26,6 +26,12 @@ public struct DistributedResolvableMacro: ExtensionMacro, PeerMacro {
 
 extension DistributedResolvableMacro {
 
+  static let attributesToCopy: [String] = [
+    "available",
+    "_spi",
+    "_spi_available",
+  ]
+
   /// Introduce the `extension MyDistributedActor` which contains default
   /// implementations of the protocol's requirements.
   public static func expansion(
@@ -45,6 +51,11 @@ extension DistributedResolvableMacro {
       return []
     }
 
+    let attributes = proto.attributes.filter { attr in
+      Self.attributesToCopy.contains(
+        attr.as(AttributeSyntax.self)?.attributeName.trimmed.description ?? ""
+      )
+    }
     let accessModifiers = proto.accessControlModifiers
 
     let requirementStubs =
@@ -64,6 +75,7 @@ extension DistributedResolvableMacro {
 
     let extensionDecl: DeclSyntax =
       """
+      \(attributes)
       extension \(proto.name.trimmed) where Self: Distributed._DistributedActorStub {
         \(raw: requirementStubs)
       }
@@ -73,9 +85,13 @@ extension DistributedResolvableMacro {
 
   static func stubMethodDecl(access: DeclModifierListSyntax, _ requirement: MemberBlockItemListSyntax.Element) -> String {
     // do we need to stub a computed variable?
-    if let variable = requirement.decl.as(VariableDeclSyntax.self) {
-      var accessorStubs: [String] = []
+    if var variable = requirement.decl.as(VariableDeclSyntax.self) {
+      variable.modifiers = variable.modifiers.filter { !$0.isAccessControl }
+      access.reversed().forEach { modifier in
+        variable.modifiers = [modifier] + variable.modifiers
+      }
 
+      var accessorStubs: [String] = []
       for binding in variable.bindings {
         if let accessorBlock = binding.accessorBlock {
           for accessor in accessorBlock.accessors.children(viewMode: .all) {
@@ -87,19 +103,31 @@ extension DistributedResolvableMacro {
 
       let name = variable.bindings.first!.pattern.trimmed
       let typeAnnotation = variable.bindings.first?.typeAnnotation.map { "\($0.trimmed)" } ?? "Any"
+
+      // computed property stub
       return """
-             \(access)\(variable.modifiers)\(variable.bindingSpecifier) \(name) \(typeAnnotation) {
+             \(variable.attributes)
+             \(variable.modifiers)\(variable.bindingSpecifier) \(name) \(typeAnnotation) {
                \(accessorStubs.joined(separator: "\n  "))
              }
              """
-    }
+    } else if var fun = requirement.decl.as(FunctionDeclSyntax.self) {
+      fun.modifiers = fun.modifiers.filter { !$0.isAccessControl }
+      access.reversed().forEach { modifier in
+        fun.modifiers = [modifier] + fun.modifiers
+      }
 
-    // normal function stub
-    return """
-           \(access)\(requirement) {
-             \(stubFunctionBody())
-           }
-           """
+      // normal function stub
+      return """
+             \(fun) {
+               \(stubFunctionBody())
+             }
+             """
+    } else {
+      // some declaration type we could not handle, let's silently ignore; we should not really need to emit
+      // anything others than var and func here, and it's cleaner to just ignore rather than crash here.
+      return ""
+    }
   }
 
   static func stubFunctionBody() -> DeclSyntax {
@@ -133,6 +161,15 @@ extension DistributedResolvableMacro {
     var isGenericOverActorSystem = false
     var specificActorSystemRequirement: TypeSyntax?
 
+    let attributes = proto.attributes.filter {
+      guard let attr = $0.as(AttributeSyntax.self) else {
+        return false
+      }
+      guard let ident = attr.attributeName.as(IdentifierTypeSyntax.self) else {
+        return false
+      }
+      return Self.attributesToCopy.contains(ident.name.text)
+    }
     let accessModifiers = proto.accessControlModifiers
 
     for req in proto.genericWhereClause?.requirements ?? [] {
@@ -232,6 +269,7 @@ extension DistributedResolvableMacro {
 
     return [
       """
+      \(attributes)
       \(proto.modifiers) distributed actor $\(proto.name.trimmed)\(raw: typeParamsClause): \(proto.name.trimmed), 
         Distributed._DistributedActorStub \(raw: whereClause)
       {

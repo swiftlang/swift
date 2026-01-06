@@ -1,7 +1,9 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 //
 // REQUIRES: CPU=i386 || CPU=x86_64
-// UNSUPPORTED: OS=windows-msvc
+//
+// Windows and Android do not expose Float80.
+// UNSUPPORTED: OS=windows-msvc, OS=linux-android
 //
 // These are tests for diagnostics produced by constant propagation pass
 // on floating-point operations that are specific to x86 architectures,

@@ -39,16 +39,15 @@ using namespace ast_scope;
 
 static SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *);
 
-/// Retrieve the character-based source range for the given source range.
-static SourceRange getCharSourceRange(
-    SourceManager &sourceMgr, SourceRange range
-){
-  range.End = Lexer::getLocForEndOfToken(sourceMgr, range.End);
-  return range;
-}
-
 void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
                                                      const ASTContext &ctx) const {
+  // Ignore attributes on extensions, currently they exist outside of the
+  // extension's source range due to the way we've setup the scope for
+  // extension binding.
+  // FIXME: We ought to fix the source range for extension scopes.
+  if (isa<ExtensionScope>(this) && child->isDeclAttribute())
+    return;
+
   // Ignore debugger bindings - they're a special mix of user code and implicit
   // wrapper code that is too difficult to check for consistency.
   if (auto d = getDeclIfAny().getPtrOrNull())
@@ -60,14 +59,14 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
 
   auto range = getCharSourceRangeOfScope(sourceMgr);
 
-  std::function<bool(SourceRange)> containedInParent;
-  containedInParent = [&](SourceRange childCharRange) {
+  auto containedInParent = [&](SourceRange childCharRange) {
     // HACK: For code completion. Handle replaced range.
+    // Note that the replaced SourceRanges here are already disguised
+    // CharSourceRanges, we don't need to adjust them. We use `rangeContains`
+    // since we're only interested in comparing within a single buffer.
     for (const auto &pair : sourceMgr.getReplacedRanges()) {
-      auto originalRange = getCharSourceRange(sourceMgr, pair.first);
-      auto newRange = getCharSourceRange(sourceMgr, pair.second);
-      if (sourceMgr.encloses(range, originalRange) &&
-          sourceMgr.encloses(newRange, childCharRange))
+      if (sourceMgr.rangeContains(range, pair.first) &&
+          sourceMgr.rangeContains(pair.second, childCharRange))
         return true;
     }
 
@@ -77,11 +76,12 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
   auto childCharRange = child->getCharSourceRangeOfScope(sourceMgr);
 
   if (!containedInParent(childCharRange)) {
-    auto &out = verificationError() << "child not contained in its parent:\n";
-    child->print(out);
-    out << "\n***Parent node***\n";
-    this->print(out);
-    abort();
+    abortWithVerificationError([&](llvm::raw_ostream &out) {
+      out << "child not contained in its parent:\n";
+      child->print(out);
+      out << "\n***Parent node***\n";
+      this->print(out);
+    });
   }
 
   if (!storedChildren.empty()) {
@@ -90,13 +90,14 @@ void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
         sourceMgr).End;
 
     if (!sourceMgr.isAtOrBefore(endOfPreviousChild, childCharRange.Start)) {
-      auto &out = verificationError() << "child overlaps previous child:\n";
-      child->print(out);
-      out << "\n***Previous child\n";
-      previousChild->print(out);
-      out << "\n***Parent node***\n";
-      this->print(out);
-      abort();
+      abortWithVerificationError([&](llvm::raw_ostream &out) {
+        out << "child overlaps previous child:\n";
+        child->print(out);
+        out << "\n***Previous child\n";
+        previousChild->print(out);
+        out << "\n***Parent node***\n";
+        this->print(out);
+      });
     }
   }
 }
@@ -298,16 +299,27 @@ CaseStmtBodyScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const 
   return stmt->getBody()->getSourceRange();
 }
 
+/// Retrieve a SourceRange for a closure that covers the elements of its body,
+/// excluding its parameter list and captures if present.
+static SourceRange getClosureBodyContentRange(AbstractClosureExpr *ACE) {
+  // Autoclosures don't have explicit capture lists or parameters so we can
+  // just use the whole range.
+  if (auto *autoClosure = dyn_cast<AutoClosureExpr>(ACE))
+    return autoClosure->getSourceRange();
+
+  // Produce a range from the first body element to the end of the closure.
+  return SourceRange::combine(ACE->getBody()->getContentStartLoc(),
+                              ACE->getEndLoc());
+}
+
 SourceRange
 BraceStmtScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
-  // The brace statements that represent closures start their scope at the
-  // 'in' keyword, when present.
-  if (auto anyClosure = parentClosureIfAny()) {
-    if (auto closure = dyn_cast<ClosureExpr>(parentClosureIfAny().get())) {
-      if (closure->getInLoc().isValid()) {
-        return SourceRange(closure->getInLoc(), endLoc);
-      }
-    }
+  // If we have a parent closure, the start location is given by the start
+  // of the first body element.
+  if (auto *closureParent = dyn_cast_or_null<ClosureParametersScope>(
+          getParent().getPtrOrNull())) {
+    auto closureRange = closureParent->getSourceRangeOfThisASTNode();
+    return SourceRange(closureRange.Start, endLoc);
   }
   return SourceRange(stmt->getStartLoc(), endLoc);
 }
@@ -324,28 +336,12 @@ SourceRange ConditionalClausePatternUseScope::getSourceRangeOfThisASTNode(
 
 SourceRange
 CaptureListScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
-  if (auto autoClosure = dyn_cast<AutoClosureExpr>(expr->getClosureBody())) {
-    return autoClosure->getSourceRange();
-  }
-  auto closureExpr = cast<ClosureExpr>(expr->getClosureBody());
-  if (!omitAssertions)
-    ASTScopeAssert(closureExpr->getInLoc().isValid(),
-                   "We don't create these if no in loc");
-  return SourceRange(closureExpr->getInLoc(), closureExpr->getEndLoc());
+  return getClosureBodyContentRange(expr->getClosureBody());
 }
 
-SourceRange ClosureParametersScope::getSourceRangeOfThisASTNode(
-    const bool omitAssertions) const {
-  if (auto autoClosure = dyn_cast<AutoClosureExpr>(closureExpr)) {
-    return autoClosure->getSourceRange();
-  }
-  auto explicitClosureExpr = cast<ClosureExpr>(closureExpr);
-  if (explicitClosureExpr->getInLoc().isValid()) {
-    return SourceRange(explicitClosureExpr->getInLoc(),
-                       explicitClosureExpr->getEndLoc());
-  }
-
-  return explicitClosureExpr->getSourceRange();
+SourceRange
+ClosureParametersScope::getSourceRangeOfThisASTNode(bool omitAssertions) const {
+  return getClosureBodyContentRange(closureExpr);
 }
 
 SourceRange CustomAttributeScope::getSourceRangeOfThisASTNode(
@@ -409,5 +405,5 @@ SourceLoc ast_scope::extractNearestSourceLoc(
 
 SourceRange TryScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  return expr->getSourceRange();
+  return SourceRange(expr->getStartLoc(), endLoc);
 }

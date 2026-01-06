@@ -28,13 +28,11 @@ function(_add_host_swift_compile_options name)
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
   endif()
 
-  # Same for backtracing
-  if (SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
-    target_compile_options(${name} PRIVATE
-      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-backtracing-module-import>")
-  endif()
+  # Emitting module seprately doesn't give us any benefit.
+  target_compile_options(${name} PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:-no-emit-module-separately-wmo>")
 
-   if(SWIFT_ANALYZE_CODE_COVERAGE)
+  if(SWIFT_ANALYZE_CODE_COVERAGE)
      set(_cov_flags $<$<COMPILE_LANGUAGE:Swift>:-profile-generate -profile-coverage-mapping>)
      target_compile_options(${name} PRIVATE ${_cov_flags})
      target_link_options(${name} PRIVATE ${_cov_flags})
@@ -69,7 +67,6 @@ function(_add_host_swift_compile_options name)
       target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-tools-directory;${tools_path};>)
     endif()
   endif()
-  _add_host_variant_swift_sanitizer_flags(${name})
 
   target_compile_options(${name} PRIVATE
     $<$<COMPILE_LANGUAGE:Swift>:-color-diagnostics>
@@ -295,6 +292,9 @@ function(add_pure_swift_host_library name)
   force_target_link_libraries(${name} PUBLIC
     ${APSHL_SWIFT_DEPENDENCIES}
   )
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_link_libraries(${name} PUBLIC swiftSwiftOnoneSupport)
+  endif()
 
   if(APSHL_EMIT_MODULE)
     set(module_triple "${SWIFT_HOST_MODULE_TRIPLE}")
@@ -460,6 +460,9 @@ function(add_pure_swift_host_tool name)
   force_target_link_libraries(${name} PUBLIC
     ${APSHT_SWIFT_DEPENDENCIES}
   )
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_link_libraries(${name} PUBLIC swiftSwiftOnoneSupport)
+  endif()
 
   # Make sure we can use the host libraries.
   target_include_directories(${name} PUBLIC

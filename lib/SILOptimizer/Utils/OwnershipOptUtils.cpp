@@ -164,6 +164,9 @@ GuaranteedOwnershipExtension::Status
 GuaranteedOwnershipExtension::checkAddressOwnership(SILValue parentAddress,
                                                     SILValue childAddress) {
   AddressOwnership addressOwnership(parentAddress);
+  if (!addressOwnership) {
+    return Invalid;
+  }
   if (!addressOwnership.hasLocalOwnershipLifetime()) {
     // Indirect Arg, Stack, Global, Unidentified, Yield
     // (these have no reference lifetime to extend).
@@ -436,6 +439,18 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
   }
 }
 
+bool OwnershipRAUWHelper::mayIntroduceUnoptimizableCopies() {
+  if (oldValue->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return false;
+  }
+
+  if (areUsesWithinValueLifetime(newValue, ctx->guaranteedUsePoints,
+                                 &ctx->deBlocks)) {
+    return false;
+  }
+  return true;
+}
+
 bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
                                               ArrayRef<Operand *> uses) {
   assert(value->isLexical());
@@ -454,6 +469,37 @@ bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
   }
 
   return false;
+}
+
+bool swift::areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses,
+                                       DeadEndBlocks *deBlocks) {
+  assert(value->getFunction()->hasOwnership());
+
+  if (value->getOwnershipKind() == OwnershipKind::None) {
+    return true;
+  }
+  if (value->getOwnershipKind() != OwnershipKind::Guaranteed &&
+      value->getOwnershipKind() != OwnershipKind::Owned) {
+    return false;
+  }
+  if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
+    // For guaranteed values, we have to find the borrow introducing guaranteed
+    // reference roots and then ensure uses are within all of their lifetimes.
+    // For simplicity, we only look through single forwarding operations to find
+    // a borrow introducer here.
+    value = findOwnershipReferenceAggregate(value);
+    BorrowedValue borrowedValue(value);
+    if (!borrowedValue) {
+      return false;
+    }
+    if (!borrowedValue.isLocalScope()) {
+      return true;
+    }
+  }
+  SSAPrunedLiveness liveness(value->getFunction());
+  liveness.initializeDef(value);
+  liveness.computeSimple();
+  return liveness.areUsesWithinBoundary(uses, deBlocks);
 }
 
 //===----------------------------------------------------------------------===//
@@ -572,7 +618,7 @@ void BorrowedLifetimeExtender::analyzeExtendedScope() {
       SWIFT_ASSERT_ONLY(reborrowedOperands.insert(endScope));
 
       // TODO: if non-phi reborrows are added, handle multiple results.
-      discoverReborrow(borrowingOper.getBorrowIntroducingUserResult().value);
+      discoverReborrow(borrowingOper.getBorrowIntroducingUserResult());
     }
     return true;
   };
@@ -759,10 +805,6 @@ struct OwnershipLifetimeExtender {
   /// the BorrowedValue that begins the scope.
   SILValue borrowOverSingleUse(SILValue newValue,
                                Operand *singleGuaranteedUse);
-
-  SILValue
-  borrowOverSingleNonLifetimeEndingUser(SILValue newValue,
-                                        SILInstruction *nonLifetimeEndingUser);
 };
 
 } // end anonymous namespace
@@ -844,7 +886,7 @@ OwnershipLifetimeExtender::createPlusZeroCopy(SILValue value,
   boundary.visitInsertionPoints(
       [&](SILBasicBlock::iterator insertPt) {
         SILBuilderWithScope builder(insertPt);
-        auto *dvi = builder.createDestroyValue(insertPt->getLoc(), copy);
+        auto *dvi = builder.createDestroyValue(RegularLocation(insertPt->getLoc()), copy);
         callbacks.createdNewInst(dvi);
       },
       &ctx.deBlocks);
@@ -927,7 +969,14 @@ BeginBorrowInst *OwnershipLifetimeExtender::borrowCopyOverGuaranteedUsers(
   // Create destroys at the end of copy's lifetime. This only needs to consider
   // uses that end the borrow scope.
   {
-    ValueLifetimeAnalysis lifetimeAnalysis(copy, borrow->getEndBorrows());
+    SmallVector<SILInstruction *, 16> users;
+    for (auto *user : guaranteedUsers) {
+      users.push_back(user);
+    }
+    for (auto *user : borrow->getEndBorrows()) {
+      users.push_back(user);
+    }
+    ValueLifetimeAnalysis lifetimeAnalysis(copy, users);
     ValueLifetimeBoundary copyBoundary;
     lifetimeAnalysis.computeLifetimeBoundary(copyBoundary);
 
@@ -1044,27 +1093,6 @@ OwnershipLifetimeExtender::borrowOverSingleUse(SILValue newValue,
     return true;
   });
   return newBeginBorrow;
-}
-
-SILValue OwnershipLifetimeExtender::borrowOverSingleNonLifetimeEndingUser(
-    SILValue newValue, SILInstruction *nonLifetimeEndingUser) {
-  // Avoid borrowing guaranteed function arguments.
-  if (isa<SILFunctionArgument>(newValue) &&
-      newValue->getOwnershipKind() == OwnershipKind::Guaranteed) {
-    return newValue;
-  }
-  auto borrowPt = newValue->getNextInstruction()->getIterator();
-  return borrowCopyOverGuaranteedUsers(
-      newValue, borrowPt, ArrayRef<SILInstruction *>(nonLifetimeEndingUser));
-}
-
-SILValue swift::makeGuaranteedValueAvailable(SILValue value,
-                                             SILInstruction *user,
-                                             DeadEndBlocks &deBlocks,
-                                             InstModCallbacks callbacks) {
-  OwnershipFixupContext ctx{callbacks, deBlocks};
-  OwnershipLifetimeExtender extender{ctx};
-  return extender.borrowOverSingleNonLifetimeEndingUser(value, user);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1195,13 +1223,14 @@ SILValue OwnershipRAUWPrepare::prepareReplacement(SILValue newValue) {
       OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue,
                                                  ctx.guaranteedUsePoints) &&
       "Should have checked if can perform this operation before calling it?!");
-  // If our new value is just none, we can pass anything to it so just RAUW
+  // If our new value is just none, we can pass it to anything so just RAUW
   // and return.
   //
   // NOTE: This handles RAUWing with undef.
-  if (newValue->getOwnershipKind() == OwnershipKind::None)
+  if (newValue->getOwnershipKind() == OwnershipKind::None) {
+    cleanupOperandsBeforeDeletion(getConsumingPoint(), ctx.callbacks);
     return newValue;
-
+  }
   assert(oldValue->getOwnershipKind() != OwnershipKind::None);
 
   switch (oldValue->getOwnershipKind()) {
@@ -1385,6 +1414,12 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   // NOTE: We also need to handle this here since a pointer_to_address is not a
   // valid base value for an access path since it doesn't refer to any storage.
   AddressOwnership addressOwnership(newValue);
+
+  if (!addressOwnership) {
+    invalidate();
+    return;
+  }
+
   if (!addressOwnership.hasLocalOwnershipLifetime())
     return;
 

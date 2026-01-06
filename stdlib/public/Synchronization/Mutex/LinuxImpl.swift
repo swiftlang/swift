@@ -23,19 +23,19 @@ extension Atomic where Value == UInt32 {
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specific error value.
   internal borrowing func _futexLock() -> UInt32 {
-    _swift_stdlib_futex_lock(.init(_rawAddress))
+    unsafe _swift_stdlib_futex_lock(.init(_rawAddress))
   }
 
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specific error value.
   internal borrowing func _futexTryLock() -> UInt32 {
-    _swift_stdlib_futex_trylock(.init(_rawAddress))
+    unsafe _swift_stdlib_futex_trylock(.init(_rawAddress))
   }
 
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specific error value.
   internal borrowing func _futexUnlock() -> UInt32 {
-    _swift_stdlib_futex_unlock(.init(_rawAddress))
+    unsafe _swift_stdlib_futex_unlock(.init(_rawAddress))
   }
 }
 
@@ -137,7 +137,8 @@ extension _MutexHandle {
       // Block until an equivalent '_futexUnlock' has been called by the owner.
       // This returns '0' on success which means the kernel has acquired the
       // lock for us.
-      switch storage._futexLock() {
+      let lockResult = storage._futexLock()
+      switch lockResult {
       case 0:
         // Locked!
         return
@@ -191,7 +192,7 @@ extension _MutexHandle {
       // ESRCH  - "The thread ID in the futex word at uaddr does not exist."
       default:
         // TODO: Replace with a colder function / one that takes a StaticString
-        fatalError("Unknown error occurred while attempting to acquire a Mutex")
+        fatalError("Unknown error occurred while attempting to acquire a Mutex: \(lockResult)")
       }
     }
   }
@@ -235,8 +236,7 @@ extension _MutexHandle {
 
     // EDEADLK - "The futex word at uaddr is already locked by the caller."
     case 35:
-      // TODO: Replace with a colder function / one that takes a StaticString
-      fatalError("Attempt to try to lock Mutex in already acquired thread")
+      return false
 
     // This handles all of the following errors which generally aren't
     // applicable to this implementation:
@@ -309,7 +309,8 @@ extension _MutexHandle {
   @usableFromInline
   internal borrowing func _unlockSlow() {
     while true {
-      switch storage._futexUnlock() {
+      let unlockResult = storage._futexUnlock()
+      switch unlockResult {
       case 0:
         // Unlocked!
         return
@@ -361,7 +362,7 @@ extension _MutexHandle {
       //           space.)"
       default:
         // TODO: Replace with a colder function / one that takes a StaticString
-        fatalError("Unknown error occurred while attempting to release a Mutex")
+        fatalError("Unknown error occurred while attempting to release a Mutex: \(unlockResult)")
       }
     }
   }

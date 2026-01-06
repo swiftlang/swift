@@ -153,6 +153,13 @@ bool ValueBase::isLexical() const {
     return bbi->isLexical();
   if (auto *mvi = dyn_cast<MoveValueInst>(this))
     return mvi->isLexical();
+
+  // TODO: This is only a workaround. Optimizations should look through such instructions to
+  // get the isLexical state, instead of doing it here.
+  // rdar://143577158
+  if (auto *eilr = dyn_cast<EndInitLetRefInst>(this))
+    return eilr->getOperand()->isLexical();
+
   return false;
 }
 
@@ -185,11 +192,11 @@ bool ValueBase::isGuaranteedForwarding() const {
   }
   // If not a phi, return false
   auto *phi = dyn_cast<SILPhiArgument>(this);
-  if (!phi || !phi->isPhi()) {
-    return false;
+  if (phi && phi->isPhi()) {
+    return phi->isGuaranteedForwarding();
   }
 
-  return phi->isGuaranteedForwarding();
+  return isBorrowAccessorResult();
 }
 
 bool ValueBase::isBeginApplyToken() const {
@@ -197,6 +204,19 @@ bool ValueBase::isBeginApplyToken() const {
   if (!result)
     return false;
   return result->isBeginApplyToken();
+}
+
+bool ValueBase::isBorrowAccessorResult() const {
+  auto *apply = dyn_cast_or_null<ApplyInst>(getDefiningInstruction());
+  if (!apply)
+    return false;
+  if (apply->getSubstCalleeConv().funcTy->getNumResults() != 1) {
+    return false;
+  }
+  auto resultConvention =
+      apply->getSubstCalleeConv().funcTy->getSingleResult().getConvention();
+  return resultConvention == ResultConvention::Guaranteed ||
+         resultConvention == ResultConvention::GuaranteedAddress;
 }
 
 bool ValueBase::hasDebugTrace() const {
@@ -557,6 +577,8 @@ StringRef OperandOwnership::asString() const {
     return "forwarding-consume";
   case OperandOwnership::InteriorPointer:
     return "interior-pointer";
+  case OperandOwnership::AnyInteriorPointer:
+    return "any-interior-pointer";
   case OperandOwnership::GuaranteedForwarding:
     return "guaranteed-forwarding";
   case OperandOwnership::EndBorrow:

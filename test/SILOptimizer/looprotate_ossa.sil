@@ -18,6 +18,7 @@ class Bar {
   @objc func foo_objc()
 }
 
+sil [ossa] @getBar : $@convention(thin) () -> @owned Bar
 sil [ossa] @_TFC4main3Bar3foofS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> ()
 sil [ossa] @_TFC4main3Bar3boofS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> Int64
 sil [ossa] @_TFC4main3Bar3foo_objcfS0_FT_T_ : $@convention(objc_method) (Bar) -> ()
@@ -711,5 +712,41 @@ bb14:
   destroy_value %0
   %27 = tuple ()
   return %27
+}
+
+// Incomplete liveranges in dead-end exit blocks can cause a missing phi in the rotated loop.
+// CHECK-LABEL: sil [ossa] @incomplete_liverange_in_dead_end_exit :
+// CHECK:       bb1:
+// CHECK:         apply
+// CHECK:       bb2:
+// CHECK-LABEL: } // end sil function 'incomplete_liverange_in_dead_end_exit'
+sil [ossa] @incomplete_liverange_in_dead_end_exit : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %1 = function_ref @getBar : $@convention(thin) () -> @owned Bar
+  %2 = apply %1() : $@convention(thin) () -> @owned Bar
+  %3 = begin_borrow %2
+  cond_br undef, bb3, bb2
+
+bb2:
+  br bb4
+
+bb3:
+  end_borrow %3
+  unreachable
+
+bb4:
+  end_borrow %3
+  destroy_value %2
+  cond_br undef, bb6, bb5
+
+bb5:
+  br bb1
+
+bb6:
+  %12 = tuple ()
+  return %12
 }
 

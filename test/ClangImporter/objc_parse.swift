@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify -disable-experimental-clang-importer-diagnostics
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify -verify-ignore-unrelated -disable-experimental-clang-importer-diagnostics
 
 // REQUIRES: objc_interop
 
@@ -648,24 +648,24 @@ class NewtypeUser {
   @objc func stringNewtype(a: SNTErrorDomain) {} // expected-error {{'SNTErrorDomain' has been renamed to 'ErrorDomain'}}{{31-45=ErrorDomain}}
   @objc func stringNewtypeOptional(a: SNTErrorDomain?) {} // expected-error {{'SNTErrorDomain' has been renamed to 'ErrorDomain'}}{{39-53=ErrorDomain}}
   @objc func intNewtype(a: MyInt) {}
-  @objc func intNewtypeOptional(a: MyInt?) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
-  @objc func intNewtypeArray(a: [MyInt]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  @objc func intNewtypeOptional(a: MyInt?) {} // expected-error {{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  @objc func intNewtypeArray(a: [MyInt]) {} // expected-error {{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-1 {{Swift structs cannot be represented in Objective-C}}
-  @objc func intNewtypeDictionary(a: [MyInt: NSObject]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  @objc func intNewtypeDictionary(a: [MyInt: NSObject]) {} // expected-error {{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-1 {{Swift structs cannot be represented in Objective-C}}
   @objc func cfNewtype(a: CFNewType) {}
-  @objc func cfNewtypeArray(a: [CFNewType]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  @objc func cfNewtypeArray(a: [CFNewType]) {} // expected-error {{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-1 {{Swift structs cannot be represented in Objective-C}}
 
   typealias MyTuple = (Int, AnyObject?)
   typealias MyNamedTuple = (a: Int, b: AnyObject?)
   
   @objc func blockWithTypealias(_ input: @escaping (MyTuple) -> MyInt) {}
-  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-error@-1{{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2{{function types cannot be represented in Objective-C}}
 
   @objc func blockWithTypealiasWithNames(_ input: (MyNamedTuple) -> MyInt) {}
-  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-error@-1{{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2{{function types cannot be represented in Objective-C}}
 }
 

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
@@ -48,7 +49,7 @@ static void widenOrSet(SourceRange &First, SourceRange Second) {
 static bool isFirstTokenOnLine(SourceManager &SM, SourceLoc Loc) {
   assert(Loc.isValid());
   SourceLoc LineStart = Lexer::getLocForStartOfLine(SM, Loc);
-  CommentRetentionMode SkipComments = CommentRetentionMode::None;
+  CommentRetentionMode SkipComments = CommentRetentionMode::AttachToNextToken;
   Token First = Lexer::getTokenAtLocation(SM, LineStart, SkipComments);
   return First.getLoc() == Loc;
 }
@@ -75,8 +76,8 @@ static std::optional<Token> getTokenAfter(SourceManager &SM, SourceLoc Loc,
                                           bool SkipComments = true) {
   assert(Loc.isValid());
   CommentRetentionMode Mode = SkipComments
-    ? CommentRetentionMode::None
-    : CommentRetentionMode::ReturnAsTokens;
+                                  ? CommentRetentionMode::AttachToNextToken
+                                  : CommentRetentionMode::ReturnAsTokens;
   assert(Lexer::getTokenAtLocation(SM, Loc, Mode).getLoc() == Loc);
   SourceLoc End = Lexer::getLocForEndOfToken(SM, Loc);
   Token Next = Lexer::getTokenAtLocation(SM, End, Mode);
@@ -517,15 +518,13 @@ private:
         if (!handleBraces(cast<SubscriptDecl>(D)->getBracesRange(), ContextLoc))
           return Action::Stop();
       }
-      auto *PL = getParameterList(cast<ValueDecl>(D));
+      auto *PL = cast<ValueDecl>(D)->getParameterList();
       if (!handleParens(PL->getLParenLoc(), PL->getRParenLoc(), ContextLoc))
         return Action::Stop();
     } else if (auto *PGD = dyn_cast<PrecedenceGroupDecl>(D)) {
       SourceRange Braces(PGD->getLBraceLoc(), PGD->getRBraceLoc());
       if (!handleBraces(Braces, ContextLoc))
         return Action::Stop();
-    } else if (auto *PDD = dyn_cast<PoundDiagnosticDecl>(D)) {
-      // TODO: add paren locations to PoundDiagnosticDecl
     }
 
     return Action::Continue();
@@ -580,7 +579,7 @@ private:
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       if (!handleBraceStmt(WS->getBody(), WS->getWhileLoc()))
         return Action::Stop();
-    } else if (auto *PAS = dyn_cast<PoundAssertStmt>(S)) {
+    } else if (isa<PoundAssertStmt>(S)) {
       // TODO: add paren locations to PoundAssertStmt
     }
 
@@ -588,15 +587,6 @@ private:
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    // Walk through error expressions.
-    if (auto *EE = dyn_cast<ErrorExpr>(E)) {
-      if (auto *OE = EE->getOriginalExpr()) {
-        llvm::SaveAndRestore<ASTWalker::ParentTy>(Parent, EE);
-        OE->walk(*this);
-      }
-      return Action::Continue(E);
-    }
-
     if (E->isImplicit())
       return Action::Continue(E);
 
@@ -824,8 +814,8 @@ class OutdentChecker: protected RangeWalker {
     } else if (R.isValid()) {
       // Check condition 2a.
       SourceLoc LineStart = Lexer::getLocForStartOfLine(SM, R);
-      Token First = Lexer::getTokenAtLocation(SM, LineStart,
-                                              CommentRetentionMode::None);
+      Token First = Lexer::getTokenAtLocation(
+          SM, LineStart, CommentRetentionMode::AttachToNextToken);
       IsOutdenting |= First.getLoc() == R;
     }
 
@@ -1492,17 +1482,6 @@ private:
       }
     }
 
-    // Walk through error expressions.
-    if (auto *EE = dyn_cast<ErrorExpr>(E)) {
-      if (Action.shouldVisitChildren()) {
-        if (auto *OE = EE->getOriginalExpr()) {
-          llvm::SaveAndRestore<ASTWalker::ParentTy>(Parent, EE);
-          OE->walk(*this);
-        }
-        return Action::SkipNode(E);
-      }
-    }
-
     // FIXME: We ought to be able to use Action::VisitChildrenIf here, but we'd
     // need to ensure the AST is walked in source order (currently not the case
     // for things like postfix operators).
@@ -1905,17 +1884,6 @@ private:
         return Ctx;
       }
 
-      return IndentContext {ContextLoc, !OutdentChecker::hasOutdent(SM, D)};
-    }
-
-    if (auto *PDD = dyn_cast<PoundDiagnosticDecl>(D)) {
-      SourceLoc ContextLoc = PDD->getStartLoc();
-      // FIXME: add paren source locations to the AST Node.
-      if (auto *SLE = PDD->getMessage()) {
-        SourceRange MessageRange = SLE->getSourceRange();
-        if (MessageRange.isValid() && overlapsTarget(MessageRange))
-          return IndentContext {ContextLoc, true};
-      }
       return IndentContext {ContextLoc, !OutdentChecker::hasOutdent(SM, D)};
     }
 

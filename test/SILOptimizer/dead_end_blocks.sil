@@ -47,4 +47,64 @@ exit:
   return %retval : $()
 }
 
+// no dead ends - simple return
+// CHECK-LABEL: begin running test {{.*}} on simple_function: has_any_dead_ends
+// CHECK:         no dead ends
+// CHECK-LABEL: end running test {{.*}} on simple_function: has_any_dead_ends
+sil @simple_function : $@convention(thin) () -> () {
+entry:
+  specify_test "has_any_dead_ends"
+  %retval = tuple ()
+  return %retval : $()
+}
 
+// dead ends - unreachable blocks
+// CHECK-LABEL: begin running test {{.*}} on function_with_dead_ends: has_any_dead_ends
+// CHECK:         has dead ends
+// CHECK-LABEL: end running test {{.*}} on function_with_dead_ends: has_any_dead_ends
+sil @function_with_dead_ends : $@convention(thin) () -> () {
+entry:
+  specify_test "has_any_dead_ends"
+  cond_br undef, die, exit
+
+die:
+  unreachable
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// dead ends – infinite loop
+// CHECK-LABEL: begin running test {{.*}} on function_with_loop: has_any_dead_ends
+// CHECK:         has dead ends
+// CHECK-LABEL: end running test {{.*}} on function_with_loop: has_any_dead_ends
+sil @function_with_loop : $@convention(thin) () -> () {
+entry:
+  specify_test "has_any_dead_ends"
+  cond_br undef, exit, loop
+
+loop:
+  br loop
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// no dead ends – conditional branches but all paths return
+// CHECK-LABEL: begin running test {{.*}} on branching_no_dead_ends: has_any_dead_ends
+// CHECK:         no dead ends
+// CHECK-LABEL: end running test {{.*}} on branching_no_dead_ends: has_any_dead_ends
+sil @branching_no_dead_ends : $@convention(thin) () -> () {
+entry:
+  specify_test "has_any_dead_ends"
+  cond_br undef, then, else
+
+then:
+  br else
+
+else:
+  %retval2 = tuple ()
+  return %retval2 : $()
+}

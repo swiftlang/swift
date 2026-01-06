@@ -155,7 +155,7 @@ var f2 : (Int) -> Int = (+-+)
 var f3 : (inout Int) -> Int = (-+-) // expected-error{{ambiguous use of operator '-+-'}}
 var f4 : (inout Int, Int) -> Int = (+-+=)
 var r5 : (a : (Int, Int) -> Int, b : (Int, Int) -> Int) = (+, -)
-var r6 : (a : (Int, Int) -> Int, b : (Int, Int) -> Int) = (b : +, a : -) // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated}}
+var r6 : (a : (Int, Int) -> Int, b : (Int, Int) -> Int) = (b : +, a : -) // expected-warning {{implicit reordering of tuple elements from 'b:a:' to 'a:b:' is deprecated; this will be an error in a future Swift language mode}}
 
 struct f6_S {
   subscript(op : (Int, Int) -> Int) -> Int {
@@ -195,27 +195,27 @@ infix prefix func +-+(x: Double, y: Double) {} // expected-error {{'infix' modif
 
 // Don't allow one to define a postfix '!'; it's built into the
 // language. Also illegal to have any postfix operator starting with '!'.
-postfix operator !  // expected-error {{cannot declare a custom postfix '!' operator}} expected-error {{postfix operator names starting with '?' or '!' are disallowed}}
-prefix operator &  // expected-error {{cannot declare a custom prefix '&' operator}}
+postfix operator !  // expected-error {{cannot declare a custom 'postfix' '!' operator}} expected-error {{postfix operator names starting with '?' or '!' are disallowed}}
+prefix operator &  // expected-error {{cannot declare a custom 'prefix' '&' operator}}
 
 // <rdar://problem/14607026> Restrict use of '<' and '>' as prefix/postfix operator names
-postfix operator >  // expected-error {{cannot declare a custom postfix '>' operator}}
-prefix operator <  // expected-error {{cannot declare a custom prefix '<' operator}}
+postfix operator >  // expected-error {{cannot declare a custom 'postfix' '>' operator}}
+prefix operator <  // expected-error {{cannot declare a custom 'prefix' '<' operator}}
 
-infix operator =  // expected-error {{cannot declare a custom infix '=' operator}}
-infix operator ->  // expected-error {{cannot declare a custom infix '->' operator}}
+infix operator =  // expected-error {{cannot declare a custom 'infix' '=' operator}}
+infix operator ->  // expected-error {{cannot declare a custom 'infix' '->' operator}}
 
-postfix func !(x: Int) { } // expected-error{{cannot declare a custom postfix '!' operator}}
-postfix func!(x: Int8) { } // expected-error{{cannot declare a custom postfix '!' operator}}
-prefix func & (x: Int) {} // expected-error {{cannot declare a custom prefix '&' operator}}
+postfix func !(x: Int) { } // expected-error{{cannot declare a custom 'postfix' '!' operator}}
+postfix func!(x: Int8) { } // expected-error{{cannot declare a custom 'postfix' '!' operator}}
+prefix func & (x: Int) {} // expected-error {{cannot declare a custom 'prefix' '&' operator}}
 
 // Only allow operators at global scope:
 func operator_in_func_bad () {
     prefix func + (input: String) -> String { return "+" + input } // expected-error {{operator functions can only be declared at global or in type scope}}
 }
 
-infix operator ?  // expected-error {{cannot declare a custom infix '?' operator}}
-prefix operator ?  // expected-error {{cannot declare a custom prefix '?' operator}}
+infix operator ?  // expected-error {{cannot declare a custom 'infix' '?' operator}}
+prefix operator ?  // expected-error {{cannot declare a custom 'prefix' '?' operator}}
 
 infix operator ??=
 

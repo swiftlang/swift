@@ -142,24 +142,20 @@ public:
   public:
     /*implicit*/ Serialized(serialization::BitOffset offset) : Value(offset) {}
 
-    bool isComplete() const {
-      return Value.template is<T>();
-    }
+    bool isComplete() const { return isa<T>(Value); }
 
-    T get() const {
-      return Value.template get<T>();
-    }
+    T get() const { return cast<T>(Value); }
 
     /*implicit*/ operator T() const {
       return get();
     }
 
     /*implicit*/ operator serialization::BitOffset() const {
-      return Value.template get<serialization::BitOffset>();
+      return cast<serialization::BitOffset>(Value);
     }
 
     /*implicit*/ operator RawBitOffset() const {
-      return Value.template get<serialization::BitOffset>();
+      return cast<serialization::BitOffset>(Value);
     }
 
     Serialized &operator=(T deserialized) {
@@ -261,6 +257,9 @@ private:
 
   /// Protocol conformances referenced by this module.
   MutableArrayRef<Serialized<ProtocolConformance *>> Conformances;
+
+  /// Abstract conformances referenced by this module.
+  MutableArrayRef<Serialized<AbstractConformance *>> AbstractConformances;
 
   /// Pack conformances referenced by this module.
   MutableArrayRef<Serialized<PackConformance *>> PackConformances;
@@ -507,7 +506,7 @@ private:
   ///
   /// If the record at the cursor is not a generic param list, returns null
   /// without moving the cursor.
-  GenericParamList *maybeReadGenericParams(DeclContext *DC);
+  llvm::Expected<GenericParamList *> maybeReadGenericParams(DeclContext *DC);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
   void deserializeGenericRequirements(ArrayRef<uint64_t> scratch,
@@ -691,6 +690,10 @@ public:
   /// '-experimental-allow-module-with-compiler-errors' is currently enabled).
   bool allowCompilerErrors() const;
 
+  /// Allow recovering from errors that could be unsafe when compiling
+  /// the binary. Useful for the debugger and IDE support tools.
+  bool enableExtendedDeserializationRecovery() const;
+
   /// \c true if this module has incremental dependency information.
   bool hasIncrementalInfo() const { return Core->hasIncrementalInfo(); }
 
@@ -706,6 +709,9 @@ public:
 
   /// \c true if this module was built with strict memory safety.
   bool strictMemorySafety() const { return Core->strictMemorySafety(); }
+
+  /// \c true if this module uses deferred code generation.
+  bool deferredCodeGen() const { return Core->deferredCodeGen(); }
 
   /// Associates this module file with the AST node representing it.
   ///
@@ -933,7 +939,7 @@ public:
   loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
                                       uint64_t contextData) override;
 
-  virtual ValueDecl *loadTargetFunctionDecl(const SpecializeAttr *attr,
+  virtual ValueDecl *loadTargetFunctionDecl(const AbstractSpecializeAttr *attr,
                                             uint64_t contextData) override;
   virtual AbstractFunctionDecl *
   loadReferencedFunctionDecl(const DerivativeAttr *DA,
@@ -945,20 +951,30 @@ public:
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
 
-  void
+  virtual void
   loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
                            SmallVectorImpl<Requirement> &requirements,
                            SmallVectorImpl<ProtocolTypeAlias> &typeAliases) override;
 
-  void
+  virtual void
   loadAssociatedTypes(
       const ProtocolDecl *proto, uint64_t contextData,
       SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
 
-  void
+  virtual void
   loadPrimaryAssociatedTypes(
       const ProtocolDecl *proto, uint64_t contextData,
       SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
+
+  virtual void
+  finishOpaqueTypeDecl(OpaqueTypeDecl *opaqueDecl,
+                       uint64_t contextData) override;
+
+  void deserializeConditionalSubstitutions(
+      SmallVectorImpl<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
+          &limitedAvailability);
+  void deserializeConditionalSubstitutionAvailabilityQueries(
+      SmallVectorImpl<AvailabilityQuery> &queries);
 
   std::optional<StringRef> getGroupNameById(unsigned Id) const;
   std::optional<StringRef> getSourceFileNameById(unsigned Id) const;
@@ -1093,8 +1109,7 @@ public:
   bool maybeReadLifetimeDependenceRecord(SmallVectorImpl<uint64_t> &scratch);
 
   // Reads lifetime dependence info from type if present.
-  std::optional<LifetimeDependenceInfo>
-  maybeReadLifetimeDependence(unsigned numParams);
+  std::optional<LifetimeDependenceInfo> maybeReadLifetimeDependence();
 
   // Reads lifetime dependence specifier from decl if present
   bool maybeReadLifetimeEntry(SmallVectorImpl<LifetimeEntry> &specifierList,

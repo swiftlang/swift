@@ -1,9 +1,7 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -validate-tbd-against-ir=none -Xfrontend -experimental-c-foreign-reference-types -Onone -D NO_OPTIMIZATIONS)
-// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -validate-tbd-against-ir=none -Xfrontend -experimental-c-foreign-reference-types -O)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -validate-tbd-against-ir=none -Onone -D NO_OPTIMIZATIONS)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -validate-tbd-against-ir=none -O)
 //
 // REQUIRES: executable_test
-// TODO: This should work without ObjC interop in the future rdar://97497120
-// REQUIRES: objc_interop
 
 import StdlibUnittest
 import ForeignReference
@@ -16,7 +14,7 @@ public func blackHole<T>(_ _: T) {  }
 ReferenceCountedTestSuite.test("Local") {
     var x = createLocalCount()
 #if NO_OPTIMIZATIONS
-    expectEqual(x.value, 6) // This is 6 because of "var x" "x.value" * 2 and "(x, x, x)".
+    expectEqual(x.value, 2)
 #endif
 
     let t = (x, x, x)

@@ -318,7 +318,8 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
   // The value form of zero init is not a user of any operand. The address
   // form however is easily zappable because it's always a trivial store.
   if (auto bi = dyn_cast<BuiltinInst>(Inst)) {
-    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer) {
+    if (bi->getBuiltinKind() == BuiltinValueKind::ZeroInitializer ||
+        bi->getBuiltinKind() == BuiltinValueKind::PrepareInitialization) {
       return true;
     }
   }
@@ -350,6 +351,8 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
 
   // Check if the destroyArray destroys the tail elements of allocRef.
   auto destroyPath = AccessPath::compute(destroyArray->getArguments()[1]);
+  if (!destroyPath.isValid())
+    return false;
   AccessStorage storage = destroyPath.getStorage();
   if (auto *beginDealloc = dyn_cast<BeginDeallocRefInst>(storage.getRoot())) {
     destroyPath = AccessPath(
@@ -685,7 +688,7 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
         continue;
       }
       ArraySemanticsCall AS(svi);
-      if (AS.getKind() == swift::ArrayCallKind::kArrayFinalizeIntrinsic) {
+      if (AS.getKind() == ArrayCallKind::kArrayFinalizeIntrinsic) {
         if (!recursivelyCollectInteriorUses(svi, AddressNode, IsInteriorAddress))
           return false;
         continue;

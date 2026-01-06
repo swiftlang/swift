@@ -1,9 +1,9 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %s -Onone -Xllvm \
 // RUN:   -sil-print-after=raw-sil-inst-lowering -Xllvm \
-// RUN:   -sil-print-functions=$s2fs36RecursibleDirectoryContentsGeneratorC4path10fileSystemAcA12AbsolutePathV_AA04FileH0_ptKc33_F8B132991B28208F48606E87DC165393Llfc \
-// RUN:   -Xllvm -sil-print-types -Xllvm -sil-print-debuginfo -o /dev/null 2>&1 | %FileCheck %s
+// RUN:   -sil-print-functions='$s2fs36RecursibleDirectoryContentsGeneratorC4path10fileSystemAcA12AbsolutePathV_AA04FileH0_ptKc33_F988CDD4B32A48D8BEE265DC43B61560Llfc' \
+// RUN:   -Xllvm -sil-print-types -Xllvm -sil-print-debuginfo -o /dev/null -module-name fs 2>&1 | %FileCheck %s
 
-// REQUIRES: objc_interop
+// REQUIRES: foundation
 
 
 // CHECK: [[ADR:%.*]] = ref_element_addr %{{.*}} : $RecursibleDirectoryContentsGenerator, #RecursibleDirectoryContentsGenerator.fileSystem, loc {{.*}}:39:5, scope [[SCOPE:[0-9]+]]

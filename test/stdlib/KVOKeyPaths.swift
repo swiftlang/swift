@@ -1,15 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | grep 'check-prefix' > %t/prefix-option
-// RUN: %target-run %t/a.out | %FileCheck -check-prefix=CHECK `cat %t/prefix-option` %s
+// RUN: %target-run %t/a.out > %t/output.txt
+// RUN: %FileCheck %s < %t/output.txt
+// RUN: grep "check-prefix=CHECK-51" %t/output.txt && %FileCheck %s --check-prefix=CHECK-51 < %t/output.txt
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
-
-// FIXME: https://github.com/apple/swift/issues/52252
-// Disable because it blocks PR testing.
-// UNSUPPORTED: CPU=i386
 
 import Foundation
 
@@ -126,10 +123,6 @@ print("target removed")
 // Swift 5.1 and later libraries.
 if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
   print("-check-prefix=CHECK-51")
-} else {
-  print("-check-prefix=DONT-CHECK")
-  // Need at least one check, otherwise FileCheck will complain.
-  // DONT-CHECK: {{.}}
 }
 
 class Target2 : NSObject, NSKeyValueObservingCustomization {

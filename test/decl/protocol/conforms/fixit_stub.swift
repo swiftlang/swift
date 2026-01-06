@@ -1,17 +1,20 @@
 // RUN: %target-typecheck-verify-swift
 
 protocol Protocol1 {
-  func foo(arg1: Int, arg2: String) -> String // expected-note{{protocol requires function 'foo(arg1:arg2:)' with type '(Int, String) -> String'}}
-  func bar() throws -> String // expected-note{{protocol requires function 'bar()' with type '() throws -> String'}}
-  func generic<T>(t: T) // expected-note{{protocol requires function 'generic(t:)' with type '<T> (t: T) -> ()'}}
-  init(arg: Int) // expected-note{{protocol requires initializer 'init(arg:)' with type '(arg: Int)'}}
-  var baz: Int { get } // expected-note{{protocol requires property 'baz' with type 'Int'}}
-  var baz2: Int { get set } // expected-note{{protocol requires property 'baz2' with type 'Int'}}
-  subscript(arg: Int) -> String { get } //expected-note{{rotocol requires subscript with type '(Int) -> String'}}
-  subscript(arg1: Int, arg2: Int) -> String { get set } //expected-note{{protocol requires subscript with type '(Int, Int) -> String'}}
+  func foo(arg1: Int, arg2: String) -> String // expected-note 2{{protocol requires function 'foo(arg1:arg2:)' with type '(Int, String) -> String'}}
+  func bar() throws -> String // expected-note 2{{protocol requires function 'bar()' with type '() throws -> String'}}
+  func generic<T>(t: T) // expected-note 2{{protocol requires function 'generic(t:)' with type '<T> (t: T) -> ()'}}
+  init(arg: Int) // expected-note 2{{protocol requires initializer 'init(arg:)' with type '(arg: Int)'}}
+  var baz: Int { get } // expected-note 2{{protocol requires property 'baz' with type 'Int'}}
+  var baz2: Int { get set } // expected-note 2{{protocol requires property 'baz2' with type 'Int'}}
+  subscript(arg: Int) -> String { get } //expected-note 2{{rotocol requires subscript with type '(Int) -> String'}}
+  subscript(arg1: Int, arg2: Int) -> String { get set } //expected-note 2{{protocol requires subscript with type '(Int, Int) -> String'}}
 }
 
-class Adopter: Protocol1 { // expected-error{{type 'Adopter' does not conform to protocol 'Protocol1'}} expected-note {{add stubs for conformance}} {{27-27=\n    func foo(arg1: Int, arg2: String) -> String {\n        <#code#>\n    \}\n\n    func bar() throws -> String {\n        <#code#>\n    \}\n\n    func generic<T>(t: T) {\n        <#code#>\n    \}\n\n    required init(arg: Int) {\n        <#code#>\n    \}\n\n    var baz: Int\n\n    var baz2: Int\n\n    subscript(arg: Int) -> String {\n        <#code#>\n    \}\n\n    subscript(arg1: Int, arg2: Int) -> String {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n}}
+class Adopter: Protocol1 { // expected-error{{type 'Adopter' does not conform to protocol 'Protocol1'}} expected-note {{add stubs for conformance}} {{27-27=\n    func foo(arg1: Int, arg2: String) -> String {\n        <#code#>\n    \}\n\n    func bar() throws -> String {\n        <#code#>\n    \}\n\n    func generic<T>(t: T) {\n        <#code#>\n    \}\n\n    required init(arg: Int) {\n        <#code#>\n    \}\n\n    let baz: Int\n\n    var baz2: Int\n\n    subscript(arg: Int) -> String {\n        <#code#>\n    \}\n\n    subscript(arg1: Int, arg2: Int) -> String {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n}}
+}
+
+enum EnumAdopter: Protocol1 { // expected-error{{type 'EnumAdopter' does not conform to protocol 'Protocol1'}} expected-note {{add stubs for conformance}} {{30-30=\n    func foo(arg1: Int, arg2: String) -> String {\n        <#code#>\n    \}\n\n    func bar() throws -> String {\n        <#code#>\n    \}\n\n    func generic<T>(t: T) {\n        <#code#>\n    \}\n\n    init(arg: Int) {\n        <#code#>\n    \}\n\n    var baz: Int {\n        <#code#>\n    \}\n\n    var baz2: Int {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n\n    subscript(arg: Int) -> String {\n        <#code#>\n    \}\n\n    subscript(arg1: Int, arg2: Int) -> String {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n}}
 }
 
 

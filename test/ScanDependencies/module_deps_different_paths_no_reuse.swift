@@ -1,7 +1,5 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/clang-module-cache
-// Temporarily disabled while the cache serialization code is being brought back from being stale/disabled for a long time
-// XFAIL: *
 
 // This test ensures that subsequent invocations of the dependency scanner that re-use previous cache state do not re-use cache entries that contain modules found outside of the current scanner invocation's search paths.
 
@@ -31,7 +29,7 @@ import A
 // CHECK-INITIAL-SCAN:      ],
 // CHECK-INITIAL-SCAN-NEXT:      "linkLibraries": [
 // CHECK-INITIAL-SCAN-NEXT:      ],
-// CHECK-INITIAL-SCAN-NEXT:      "details": {
+// CHECK-INITIAL-SCAN:      "details": {
 // CHECK-INITIAL-SCAN-NEXT:        "swift": {
 // CHECK-INITIAL-SCAN-NEXT:          "moduleInterfacePath": "{{.*}}/Swift/A.swiftinterface",
 
@@ -45,6 +43,6 @@ import A
 // CHECK-DIFFERENT:      ],
 // CHECK-DIFFERENT-NEXT:      "linkLibraries": [
 // CHECK-DIFFERENT-NEXT:      ],
-// CHECK-DIFFERENT-NEXT:      "details": {
+// CHECK-DIFFERENT:      "details": {
 // CHECK-DIFFERENT-NEXT:        "swift": {
 // CHECK-DIFFERENT-NEXT:          "moduleInterfacePath": "{{.*}}/SwiftDifferent/A.swiftinterface",

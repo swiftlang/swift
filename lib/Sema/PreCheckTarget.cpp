@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 //
 // Pre-checking resolves unqualified name references, type expressions and
-// operators.
+// operators. Target in this context refers to `SyntacticElementTarget`, which
+// is a unit of type-checking.
 //
 //===----------------------------------------------------------------------===//
 
@@ -317,54 +318,78 @@ static bool findNonMembers(ArrayRef<LookupResultEntry> lookupResults,
   return AllDeclRefs;
 }
 
+namespace {
+enum class MemberChainKind {
+  OptionalBind,     // A 'x?.y' optional binding chain
+  UnresolvedMember, // A '.foo.bar' chain
+};
+} // end anonymous namespace
+
 /// Find the next element in a chain of members. If this expression is (or
 /// could be) the base of such a chain, this will return \c nullptr.
-static Expr *getMemberChainSubExpr(Expr *expr) {
+static Expr *getMemberChainSubExpr(Expr *expr, MemberChainKind kind) {
   assert(expr && "getMemberChainSubExpr called with null expr!");
-  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr))
     return UDE->getBase();
-  } else if (auto *CE = dyn_cast<CallExpr>(expr)) {
+  if (auto *CE = dyn_cast<CallExpr>(expr))
     return CE->getFn();
-  } else if (auto *BOE = dyn_cast<BindOptionalExpr>(expr)) {
+  if (auto *BOE = dyn_cast<BindOptionalExpr>(expr))
     return BOE->getSubExpr();
-  } else if (auto *FVE = dyn_cast<ForceValueExpr>(expr)) {
+  if (auto *FVE = dyn_cast<ForceValueExpr>(expr))
     return FVE->getSubExpr();
-  } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
+  if (auto *SE = dyn_cast<SubscriptExpr>(expr))
     return SE->getBase();
-  } else if (auto *DSE = dyn_cast<DotSelfExpr>(expr)) {
+  if (auto *DSE = dyn_cast<DotSelfExpr>(expr))
     return DSE->getSubExpr();
-  } else if (auto *USE = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
+  if (auto *USE = dyn_cast<UnresolvedSpecializeExpr>(expr))
     return USE->getSubExpr();
-  } else if (auto *CCE = dyn_cast<CodeCompletionExpr>(expr)) {
+  if (auto *CCE = dyn_cast<CodeCompletionExpr>(expr))
     return CCE->getBase();
-  } else {
-    return nullptr;
+
+  if (kind == MemberChainKind::OptionalBind) {
+    // We allow postfix operators to be part of the optional member chain, e.g:
+    //
+    //   for?.bar++
+    //   x.y?^.foo()
+    //
+    // Note this behavior is specific to optional chains, we treat e.g
+    // `.foo^` as `(.foo)^`.
+    if (auto *PO = dyn_cast<PostfixUnaryExpr>(expr))
+      return PO->getOperand();
+
+    // Unresolved member chains can themselves be nested in optional chains
+    // since optional chains can include postfix operators.
+    if (auto *UME = dyn_cast<UnresolvedMemberChainResultExpr>(expr))
+      return UME->getSubExpr();
   }
+
+  return nullptr;
 }
 
 UnresolvedMemberExpr *TypeChecker::getUnresolvedMemberChainBase(Expr *expr) {
-  if (auto *subExpr = getMemberChainSubExpr(expr))
+  if (auto *subExpr =
+          getMemberChainSubExpr(expr, MemberChainKind::UnresolvedMember)) {
     return getUnresolvedMemberChainBase(subExpr);
-  else
-    return dyn_cast<UnresolvedMemberExpr>(expr);
+  }
+  return dyn_cast<UnresolvedMemberExpr>(expr);
 }
 
 static bool isBindOptionalMemberChain(Expr *expr) {
-  if (isa<BindOptionalExpr>(expr)) {
+  if (isa<BindOptionalExpr>(expr))
     return true;
-  } else if (auto *base = getMemberChainSubExpr(expr)) {
+
+  if (auto *base = getMemberChainSubExpr(expr, MemberChainKind::OptionalBind))
     return isBindOptionalMemberChain(base);
-  } else {
-    return false;
-  }
+
+  return false;
 }
 
 /// Whether this expression sits at the end of a chain of member accesses.
-static bool isMemberChainTail(Expr *expr, Expr *parent) {
+static bool isMemberChainTail(Expr *expr, Expr *parent, MemberChainKind kind) {
   assert(expr && "isMemberChainTail called with null expr!");
   // If this expression's parent is not itself part of a chain (or, this expr
   // has no parent expr), this must be the tail of the chain.
-  return !parent || getMemberChainSubExpr(parent) != expr;
+  return !parent || getMemberChainSubExpr(parent, kind) != expr;
 }
 
 static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
@@ -494,11 +519,12 @@ diagnoseUnqualifiedInit(UnresolvedDeclRefExpr *initExpr, DeclContext *dc,
                         initExpr->getNameLoc(), /*implicit=*/true);
 }
 
-/// Bind an UnresolvedDeclRefExpr by performing name lookup and
-/// returning the resultant expression. Context is the DeclContext used
-/// for the lookup.
-Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
-                                      DeclContext *DC) {
+/// Bind an UnresolvedDeclRefExpr by performing name lookup using the given
+/// options and returning the resultant expression. `DC` is the DeclContext
+/// used for the lookup. If the lookup doesn't find any results, returns
+/// `nullptr`.
+static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
+                                NameLookupOptions lookupOptions) {
   auto &Context = DC->getASTContext();
   DeclNameRef Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
@@ -534,16 +560,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       }
     }
 
-    DeclName lookupName(context, Name.getBaseName(), lookupLabels);
-    LookupName = DeclNameRef(lookupName);
+    LookupName = Name.withArgumentLabels(context, lookupLabels);
   }
-
-  // Perform standard value name lookup.
-  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
-  // TODO: Include all of the possible members to give a solver a
-  //       chance to diagnose name shadowing which requires explicit
-  //       name/module qualifier to access top-level name.
-  lookupOptions |= NameLookupFlags::IncludeOuterResults;
 
   LookupResult Lookup;
 
@@ -552,8 +570,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
   // First, look for a local binding in scope.
   if (Loc.isValid() && !Name.isOperator()) {
-    ASTScope::lookupLocalDecls(DC->getParentSourceFile(),
-                               LookupName.getFullName(), Loc,
+    ASTScope::lookupLocalDecls(DC->getParentSourceFile(), LookupName, Loc,
                                /*stopAfterInnermostBraceStmt=*/false,
                                ResultValues);
     for (auto *localDecl : ResultValues) {
@@ -603,17 +620,20 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   }
 
   if (!Lookup) {
-    // If we failed lookup of an operator, check to see if this is a range
-    // operator misspelling. Otherwise try to diagnose a juxtaposition
-    // e.g. (x*-4) that needs whitespace.
-    if (diagnoseRangeOperatorMisspell(Context.Diags, UDRE) ||
-        diagnoseIncDecOperator(Context.Diags, UDRE) ||
-        diagnoseOperatorJuxtaposition(UDRE, DC) ||
-        diagnoseNonexistentPowerOperator(Context.Diags, UDRE, DC)) {
-      return errorResult();
+    // Is there an incorrect module selector?
+    if (Name.hasModuleSelector()) {
+      auto anyModuleName = DeclNameRef(LookupName.getFullName());
+      ModuleSelectorCorrection correction(
+        TypeChecker::lookupUnqualified(DC, anyModuleName, Loc, lookupOptions));
+
+      if (correction.diagnose(Context, UDRE->getNameLoc(), LookupName)) {
+        // FIXME: Can we recover by assuming the first/best result is correct?
+        return errorResult();
+      }
     }
 
-    // Try ignoring access control.
+    // For the purpose of diagnosing inaccessible results, try the lookup again
+    // but ignore access control.
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
     auto inaccessibleResults =
@@ -638,134 +658,21 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       return errorResult();
     }
 
-    // Try ignoring missing imports.
-    relookupOptions |= NameLookupFlags::IgnoreMissingImports;
-    auto nonImportedResults =
-        TypeChecker::lookupUnqualified(DC, LookupName, Loc, relookupOptions);
-    if (nonImportedResults) {
-      const ValueDecl *first = nonImportedResults.front().getValueDecl();
-      maybeDiagnoseMissingImportForMember(first, DC, Loc);
-
-      // Don't try to recover here; we'll get more access-related diagnostics
-      // downstream if the type of the inaccessible decl is also inaccessible.
-      return errorResult();
-    }
-
-    // TODO: Name will be a compound name if it was written explicitly as
-    // one, but we should also try to propagate labels into this.
-    DeclNameLoc nameLoc = UDRE->getNameLoc();
-
-    Identifier simpleName = Name.getBaseIdentifier();
-    const char *buffer = simpleName.get();
-    llvm::SmallString<64> expectedIdentifier;
-    bool isConfused = false;
-    uint32_t codepoint;
-    uint32_t firstConfusableCodepoint = 0;
-    int totalCodepoints = 0;
-    int offset = 0;
-    while ((codepoint = validateUTF8CharacterAndAdvance(buffer,
-                                                        buffer +
-                                                        strlen(buffer)))
-           != ~0U) {
-      int length = (buffer - simpleName.get()) - offset;
-      if (auto expectedCodepoint =
-          confusable::tryConvertConfusableCharacterToASCII(codepoint)) {
-        if (firstConfusableCodepoint == 0) {
-          firstConfusableCodepoint = codepoint;
-        }
-        isConfused = true;
-        expectedIdentifier += expectedCodepoint;
-      } else {
-        expectedIdentifier += (char)codepoint;
-      }
-
-      totalCodepoints++;
-
-      offset += length;
-    }
-
-    auto emitBasicError = [&] {
-      
-      if (Name.isSimpleName(Context.Id_self)) {
-        // `self` gets diagnosed with a different error when it can't be found.
-        Context.Diags
-            .diagnose(Loc, diag::cannot_find_self_in_scope)
-            .highlight(UDRE->getSourceRange());
-      } else {
-        Context.Diags
-            .diagnose(Loc, diag::cannot_find_in_scope, Name,
-                      Name.isOperator())
-            .highlight(UDRE->getSourceRange());
-      }
-
-      if (!Context.LangOpts.DisableExperimentalClangImporterDiagnostics) {
-        Context.getClangModuleLoader()->diagnoseTopLevelValue(
-            Name.getFullName());
-      }
-    };
-
-    if (!isConfused) {
-      if (Name.isSimpleName(Context.Id_Self)) {
-        if (DeclContext *typeContext = DC->getInnermostTypeContext()){
-          Type SelfType = typeContext->getSelfInterfaceType();
-
-          if (typeContext->getSelfClassDecl())
-            SelfType = DynamicSelfType::get(SelfType, Context);
-          return new (Context)
-              TypeExpr(new (Context) SelfTypeRepr(SelfType, Loc));
-        }
-      }
-
-      TypoCorrectionResults corrections(Name, nameLoc);
-
-      // FIXME: Don't perform typo correction inside macro arguments, because it
-      // will invoke synthesizing declarations in this scope, which will attempt to
-      // expand this macro which leads to circular reference errors.
-      if (!namelookup::isInMacroArgument(DC->getParentSourceFile(), UDRE->getLoc())) {
-        TypeChecker::performTypoCorrection(DC, UDRE->getRefKind(), Type(),
-                                           lookupOptions, corrections);
-      }
-
-      if (auto typo = corrections.claimUniqueCorrection()) {
-        auto diag = Context.Diags.diagnose(
-            Loc, diag::cannot_find_in_scope_corrected, Name,
-            Name.isOperator(), typo->CorrectedName.getBaseIdentifier().str());
-        diag.highlight(UDRE->getSourceRange());
-        typo->addFixits(diag);
-      } else {
-        emitBasicError();
-      }
-
-      corrections.noteAllCandidates();
-    } else {
-      emitBasicError();
-
-      if (totalCodepoints == 1) {
-        auto charNames = confusable::getConfusableAndBaseCodepointNames(
-            firstConfusableCodepoint);
-        Context.Diags
-            .diagnose(Loc, diag::single_confusable_character,
-                      UDRE->getName().isOperator(), simpleName.str(),
-                      charNames.first, expectedIdentifier, charNames.second)
-            .fixItReplace(Loc, expectedIdentifier);
-      } else {
-        Context.Diags
-            .diagnose(Loc, diag::confusable_character,
-                      UDRE->getName().isOperator(), simpleName.str(),
-                      expectedIdentifier)
-            .fixItReplace(Loc, expectedIdentifier);
-      }
-    }
-
-    // TODO: consider recovering from here.  We may want some way to suppress
-    // downstream diagnostics, though.
-
-    return errorResult();
+    // No results were found.
+    return nullptr;
   }
 
   // FIXME: Need to refactor the way we build an AST node from a lookup result!
 
   auto buildTypeExpr = [&](TypeDecl *D) -> Expr * {
+    auto *LookupDC = Lookup[0].getDeclContext();
+
+    // If the type decl is a member that wasn't imported, diagnose it now when
+    // MemberImportVisibility is enabled.
+    if (!UDRE->isImplicit() && LookupDC)
+      maybeDiagnoseMissingImportForMember(D, LookupDC,
+                                          UDRE->getNameLoc().getStartLoc());
+
     // FIXME: This is odd.
     if (isa<ModuleDecl>(D)) {
       return new (Context) DeclRefExpr(
@@ -773,7 +680,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           /*Implicit=*/false, AccessSemantics::Ordinary, D->getInterfaceType());
     }
 
-    auto *LookupDC = Lookup[0].getDeclContext();
     bool makeTypeValue = false;
 
     if (isa<GenericTypeParamDecl>(D) &&
@@ -788,7 +694,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           // synthesized code, in that case, don't map the type into context,
           // but return as is -- the synthesis should ensure the type is
           // correct.
-          LookupDC ? LookupDC->mapTypeIntoContext(D->getInterfaceType())
+          LookupDC ? LookupDC->mapTypeIntoEnvironment(D->getInterfaceType())
                    : D->getInterfaceType());
     } else {
       if (makeTypeValue) {
@@ -865,8 +771,16 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           DC, UDRE->getNameLoc().getBaseNameLoc(), ResultValues);
     }
 
-    return buildRefExpr(ResultValues, DC, UDRE->getNameLoc(),
-                        UDRE->isImplicit(), UDRE->getFunctionRefInfo());
+    // If there is a single result and it's a member that wasn't imported,
+    // diagnose it now when MemberImportVisibility is enabled.
+    if (ResultValues.size() == 1) {
+      maybeDiagnoseMissingImportForMember(ResultValues.front(), DC,
+                                          UDRE->getNameLoc().getStartLoc());
+    }
+
+    return TypeChecker::buildRefExpr(ResultValues, DC, UDRE->getNameLoc(),
+                                     UDRE->isImplicit(),
+                                     UDRE->getFunctionRefInfo());
   }
 
   ResultValues.clear();
@@ -901,11 +815,11 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       BaseExpr = TypeExpr::createImplicitForDecl(
           UDRE->getNameLoc(), selfParam,
           /*DC*/ nullptr,
-          DC->mapTypeIntoContext(selfParam->getInterfaceType()));
+          DC->mapTypeIntoEnvironment(selfParam->getInterfaceType()));
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
       BaseExpr = TypeExpr::createImplicitForDecl(
           UDRE->getNameLoc(), NTD, BaseDC,
-          DC->mapTypeIntoContext(NTD->getInterfaceType()));
+          DC->mapTypeIntoEnvironment(NTD->getInterfaceType()));
     } else {
       BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
                                            /*Implicit=*/true);
@@ -953,6 +867,157 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     auto *Decl = Result.getValueDecl();
     Context.Diags.diagnose(Decl, diag::decl_declared_here, Decl);
   }
+  return errorResult();
+}
+
+Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
+                                      DeclContext *DC) {
+  auto &Context = DC->getASTContext();
+
+  // Perform standard value name lookup.
+  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
+  // TODO: Include all of the possible members to give a solver a
+  //       chance to diagnose name shadowing which requires explicit
+  //       name/module qualifier to access top-level name.
+  lookupOptions |= NameLookupFlags::IncludeOuterResults;
+
+  Expr *result = ::resolveDeclRefExpr(UDRE, DC, lookupOptions);
+  if (!result && Context.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                                             /*allowMigration=*/true)) {
+    // If we didn't find a result, try again but this time relax
+    // MemberImportVisibility restrictions. Note that diagnosing the missing
+    // import is already handled by resolveDeclRefExpr().
+    lookupOptions |= NameLookupFlags::IgnoreMissingImports;
+    result = ::resolveDeclRefExpr(UDRE, DC, lookupOptions);
+  }
+
+  if (result)
+    return result;
+
+  // We didn't find any results. Look for common mistakes to diagnose.
+  DeclNameRef Name = UDRE->getName();
+  SourceLoc Loc = UDRE->getLoc();
+  if (Loc.isInvalid())
+    DC = DC->getModuleScopeContext();
+
+  auto errorResult = [&]() -> Expr * {
+    return new (Context) ErrorExpr(UDRE->getSourceRange());
+  };
+
+  // If we failed lookup of an operator, check to see if this is a range
+  // operator misspelling. Otherwise try to diagnose a juxtaposition
+  // e.g. (x*-4) that needs whitespace.
+  if (diagnoseRangeOperatorMisspell(Context.Diags, UDRE) ||
+      diagnoseIncDecOperator(Context.Diags, UDRE) ||
+      diagnoseOperatorJuxtaposition(UDRE, DC) ||
+      diagnoseNonexistentPowerOperator(Context.Diags, UDRE, DC)) {
+    return errorResult();
+  }
+
+  // TODO: Name will be a compound name if it was written explicitly as
+  // one, but we should also try to propagate labels into this.
+  DeclNameLoc nameLoc = UDRE->getNameLoc();
+
+  Identifier simpleName = Name.getBaseIdentifier();
+  const char *buffer = simpleName.get();
+  llvm::SmallString<64> expectedIdentifier;
+  bool isConfused = false;
+  uint32_t codepoint;
+  uint32_t firstConfusableCodepoint = 0;
+  int totalCodepoints = 0;
+  int offset = 0;
+  while ((codepoint = validateUTF8CharacterAndAdvance(
+              buffer, buffer + strlen(buffer))) != ~0U) {
+    int length = (buffer - simpleName.get()) - offset;
+    if (auto expectedCodepoint =
+            confusable::tryConvertConfusableCharacterToASCII(codepoint)) {
+      if (firstConfusableCodepoint == 0) {
+        firstConfusableCodepoint = codepoint;
+      }
+      isConfused = true;
+      expectedIdentifier += expectedCodepoint;
+    } else {
+      expectedIdentifier += (char)codepoint;
+    }
+
+    totalCodepoints++;
+
+    offset += length;
+  }
+
+  auto emitBasicError = [&] {
+    if (Name.isSimpleName(Context.Id_self)) {
+      // `self` gets diagnosed with a different error when it can't be found.
+      Context.Diags.diagnose(Loc, diag::cannot_find_self_in_scope)
+          .highlight(UDRE->getSourceRange());
+    } else {
+      Context.Diags
+          .diagnose(Loc, diag::cannot_find_in_scope, Name, Name.isOperator())
+          .highlight(UDRE->getSourceRange());
+    }
+
+    if (!Context.LangOpts.DisableExperimentalClangImporterDiagnostics) {
+      Context.getClangModuleLoader()->diagnoseTopLevelValue(Name.getFullName());
+    }
+  };
+
+  if (!isConfused) {
+    if (Name.isSimpleName(Context.Id_Self)) {
+      if (DeclContext *typeContext = DC->getInnermostTypeContext()) {
+        Type SelfType = typeContext->getSelfInterfaceType();
+
+        if (typeContext->getSelfClassDecl() &&
+            !typeContext->getSelfClassDecl()->isForeignReferenceType())
+          SelfType = DynamicSelfType::get(SelfType, Context);
+        return new (Context)
+            TypeExpr(new (Context) SelfTypeRepr(SelfType, Loc));
+      }
+    }
+
+    TypoCorrectionResults corrections(Name, nameLoc);
+
+    // FIXME: Don't perform typo correction inside macro arguments, because it
+    // will invoke synthesizing declarations in this scope, which will attempt
+    // to expand this macro which leads to circular reference errors.
+    if (!namelookup::isInMacroArgument(DC->getParentSourceFile(),
+                                       UDRE->getLoc())) {
+      TypeChecker::performTypoCorrection(DC, UDRE->getRefKind(), Type(),
+                                         lookupOptions, corrections);
+    }
+
+    if (auto typo = corrections.claimUniqueCorrection()) {
+      auto diag = Context.Diags.diagnose(
+          Loc, diag::cannot_find_in_scope_corrected, Name, Name.isOperator(),
+          typo->CorrectedName.getBaseIdentifier().str());
+      diag.highlight(UDRE->getSourceRange());
+      typo->addFixits(diag);
+    } else {
+      emitBasicError();
+    }
+
+    corrections.noteAllCandidates();
+  } else {
+    emitBasicError();
+
+    if (totalCodepoints == 1) {
+      auto charNames = confusable::getConfusableAndBaseCodepointNames(
+          firstConfusableCodepoint);
+      Context.Diags
+          .diagnose(Loc, diag::single_confusable_character,
+                    UDRE->getName().isOperator(), simpleName.str(),
+                    charNames.first, expectedIdentifier, charNames.second)
+          .fixItReplace(Loc, expectedIdentifier);
+    } else {
+      Context.Diags
+          .diagnose(Loc, diag::confusable_character,
+                    UDRE->getName().isOperator(), simpleName.str(),
+                    expectedIdentifier)
+          .fixItReplace(Loc, expectedIdentifier);
+    }
+  }
+
+  // TODO: consider recovering from here.  We may want some way to suppress
+  // downstream diagnostics, though.
   return errorResult();
 }
 
@@ -1090,6 +1155,10 @@ class PreCheckTarget final : public ASTWalker {
   /// Pull some operator expressions into the optional chain.
   OptionalEvaluationExpr *hoistOptionalEvaluationExprIfNeeded(Expr *E);
 
+  /// Wrap an unresolved member or optional bind chain in an
+  /// UnresolvedMemberChainResultExpr or OptionalEvaluationExpr respectively.
+  Expr *wrapMemberChainIfNeeded(Expr *E);
+
   /// Whether the given expression "looks like" a (possibly sugared) type. For
   /// example, `(foo, bar)` "looks like" a type, but `foo + bar` does not.
   bool exprLooksLikeAType(Expr *expr);
@@ -1132,6 +1201,11 @@ class PreCheckTarget final : public ASTWalker {
   /// For the given statement, mark any valid SingleValueStmtExpr children.
   void markAnyValidSingleValueStmts(Stmt *S);
 
+  /// For the given single value expr that's a `for`-expression, run the
+  /// desugaring transformation. For all other kinds of single value statement
+  /// expressions do nothing.
+  void transformForExpression(SingleValueStmtExpr *E);
+
   PreCheckTarget(DeclContext *dc) : Ctx(dc->getASTContext()), DC(dc) {}
 
 public:
@@ -1148,7 +1222,7 @@ public:
 
   ASTContext &getASTContext() const { return Ctx; }
 
-  bool walkToClosureExprPre(ClosureExpr *expr);
+  bool walkToClosureExprPre(ClosureExpr *expr, ParentTy &parent);
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Arguments;
@@ -1223,7 +1297,8 @@ public:
         }
 
         if (isa<UnresolvedDotExpr>(parentExpr) ||
-            isa<MemberRefExpr>(parentExpr)) {
+            isa<MemberRefExpr>(parentExpr) ||
+            isa<ErrorExpr>(parentExpr)) {
           return true;
         } else if (auto *SE = dyn_cast<SubscriptExpr>(parentExpr)) {
           // 'super[]' is valid, but 'x[super]' is not.
@@ -1249,7 +1324,7 @@ public:
     // but do not walk into the body. That will be type-checked after
     // we've determine the complete function type.
     if (auto closure = dyn_cast<ClosureExpr>(expr))
-      return finish(walkToClosureExprPre(closure), expr);
+      return finish(walkToClosureExprPre(closure, Parent), expr);
 
     if (auto *unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr))
       return finish(true, TypeChecker::resolveDeclRefExpr(unresolved, DC));
@@ -1286,8 +1361,9 @@ public:
           lastInnerParenLoc = PE->getLParenLoc();
           parent = nextParent;
         }
-
-        if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent)) {
+        
+        if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent) ||
+            isa<MacroExpansionExpr>(parent)) {
           // If outermost paren is associated with a call or
           // a member reference, it might be valid to have `&`
           // before all of the parens.
@@ -1296,6 +1372,9 @@ public:
                                        diag::extraneous_address_of);
             diag.fixItExchange(expr->getLoc(), lastInnerParenLoc);
           }
+          if (!parents.empty() && isa<KeyPathExpr>(parents[0]))
+            diags.diagnose(expr->getStartLoc(),
+                           diag::cannot_pass_inout_arg_to_keypath_method);
           return finish(true, expr);
         }
 
@@ -1303,6 +1382,11 @@ public:
           diags.diagnose(expr->getStartLoc(),
                          diag::cannot_pass_inout_arg_to_subscript);
           return finish(false, nullptr);
+        }
+      }
+      if (auto *accessor = DC->getInnermostPropertyAccessorContext()) {
+        if (accessor->isMutateAccessor()) {
+          return finish(true, expr);
         }
       }
 
@@ -1318,8 +1402,10 @@ public:
     if (auto *assignment = dyn_cast<AssignExpr>(expr))
       markAcceptableDiscardExprs(assignment->getDest());
 
-    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr))
+    if (auto *SVE = dyn_cast<SingleValueStmtExpr>(expr)) {
       checkSingleValueStmtExpr(SVE);
+      transformForExpression(SVE);
+    }
 
     return finish(true, expr);
   }
@@ -1459,24 +1545,8 @@ public:
       return Action::Continue(OEE);
     }
 
-    auto *parent = Parent.getAsExpr();
-    if (isMemberChainTail(expr, parent)) {
-      Expr *wrapped = expr;
-      // If we find an unresolved member chain, wrap it in an
-      // UnresolvedMemberChainResultExpr (unless this has already been done).
-      if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(expr)) {
-        if (!parent || !isa<UnresolvedMemberChainResultExpr>(parent)) {
-          wrapped = new (ctx) UnresolvedMemberChainResultExpr(expr, UME);
-        }
-      }
-      // Wrap optional chain in an OptionalEvaluationExpr.
-      if (isBindOptionalMemberChain(expr)) {
-        if (!parent || !isa<OptionalEvaluationExpr>(parent)) {
-          wrapped = new (ctx) OptionalEvaluationExpr(wrapped);
-        }
-      }
-      expr = wrapped;
-    }
+    expr = wrapMemberChainIfNeeded(expr);
+
     return Action::Continue(expr);
   }
 
@@ -1531,7 +1601,27 @@ public:
 
 /// Perform prechecking of a ClosureExpr before we dive into it.  This returns
 /// true when we want the body to be considered part of this larger expression.
-bool PreCheckTarget::walkToClosureExprPre(ClosureExpr *closure) {
+bool PreCheckTarget::walkToClosureExprPre(ClosureExpr *closure,
+                                          ParentTy &parent) {
+  if (auto *expandedBody = closure->getExpandedBody()) {
+    if (Parent.getAsExpr()) {
+      // We cannot simply replace the body when closure i.e. is passed
+      // as an argument to a call or is a source of an assignment
+      // because the source range of the argument list would cross
+      // buffer boundaries. One way to avoid that is to inject
+      // elements into a new implicit brace statement with the original
+      // source locations. Brace statement has to be implicit because its
+      // elements are in a different buffer.
+      auto sourceRange = closure->getSourceRange();
+      closure->setBody(BraceStmt::create(getASTContext(), sourceRange.Start,
+                                         expandedBody->getElements(),
+                                         sourceRange.End,
+                                         /*implicit=*/true));
+    } else {
+      closure->setBody(expandedBody);
+    }
+  }
+
   // Pre-check the closure body.
   (void)evaluateOrDefault(Ctx.evaluator, PreCheckClosureBodyRequest{closure},
                           nullptr);
@@ -1628,6 +1718,59 @@ void PreCheckTarget::checkSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
   }
 }
 
+void PreCheckTarget::transformForExpression(SingleValueStmtExpr *SVE) {
+  if (SVE->getStmtKind() != SingleValueStmtExpr::Kind::For) {
+    return;
+  }
+
+  auto *declCtx = SVE->getDeclContext();
+  auto &astCtx = declCtx->getASTContext();
+
+  auto sveLoc = SVE->getLoc();
+
+  auto *varDecl = new (astCtx)
+      VarDecl(false, VarDecl::Introducer::Var, sveLoc,
+              astCtx.getIdentifier("$forExpressionResult"), declCtx);
+
+  auto namedPattern = NamedPattern::createImplicit(astCtx, varDecl);
+
+  auto *initFunc = new (astCtx) UnresolvedMemberExpr(
+      sveLoc, DeclNameLoc(), DeclNameRef(DeclBaseName::createConstructor()),
+      true);
+  auto *callExpr = CallExpr::createImplicitEmpty(astCtx, initFunc);
+  auto *initExpr =
+      new (astCtx) UnresolvedMemberChainResultExpr(callExpr, initFunc);
+
+  auto *bindingDecl = PatternBindingDecl::createImplicit(
+      astCtx, StaticSpellingKind::None, namedPattern, initExpr, declCtx);
+
+  SVE->setForExpressionPreamble({varDecl, bindingDecl});
+
+  // For-expressions always have a single branch.
+  SmallVector<Stmt *, 1> scratch;
+  for (auto *branch : SVE->getBranches(scratch)) {
+    auto *BS = dyn_cast<BraceStmt>(branch);
+    if (!BS)
+      continue;
+
+    auto &result = BS->getElements().back();
+    if (auto stmt = result.dyn_cast<Stmt *>()) {
+      if (auto *then = dyn_cast<ThenStmt>(stmt)) {
+        auto *declRefExpr =
+            new (astCtx) DeclRefExpr(varDecl, DeclNameLoc(), true);
+        auto *dotExpr = new (astCtx) UnresolvedDotExpr(
+            declRefExpr, SourceLoc(),
+            DeclNameRef(DeclBaseName(astCtx.Id_append)), DeclNameLoc(), true);
+        auto *argumentList = ArgumentList::createImplicit(
+            astCtx, {Argument::unlabeled(then->getResult())});
+        auto *callExpr =
+            CallExpr::createImplicit(astCtx, dotExpr, argumentList);
+        then->setResult(callExpr);
+      }
+    }
+  }
+}
+
 void PreCheckTarget::markAnyValidSingleValueStmts(Expr *E) {
   auto findAssignment = [&]() -> AssignExpr * {
     // Don't consider assignments if we have a parent expression (as otherwise
@@ -1643,6 +1786,11 @@ void PreCheckTarget::markAnyValidSingleValueStmts(Expr *E) {
       while (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(E))
         E = IIO->getSubExpr();
     }
+
+    // Look through "unsafe" expressions.
+    if (auto UE = dyn_cast<UnsafeExpr>(E))
+      E = UE->getSubExpr();
+
     return dyn_cast<AssignExpr>(E);
   };
 
@@ -1777,7 +1925,7 @@ TypeExpr *PreCheckTarget::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   // CSGen will diagnose cases that appear outside of pack expansion
   // expressions.
   options |= TypeResolutionFlags::AllowPackReferences;
-  const auto BaseTy = TypeResolution::resolveContextualType(
+  auto BaseTy = TypeResolution::resolveContextualType(
       InnerTypeRepr, DC, options,
       [](auto unboundTy) {
         // FIXME: Don't let unbound generic types escape type resolution.
@@ -1789,6 +1937,10 @@ TypeExpr *PreCheckTarget::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
       PlaceholderType::get,
       // TypeExpr pack elements are opened in CSGen.
       /*packElementOpener*/ nullptr);
+
+  // Unwrap DynamicSelfType, because Self.Foo is the same as MyClass.Foo.
+  if (auto *SelfTy = BaseTy->getAs<DynamicSelfType>())
+    BaseTy = SelfTy->getSelfType();
 
   if (BaseTy->mayHaveMembers()) {
     // See if there is a member type with this name.
@@ -1811,7 +1963,7 @@ TypeExpr *PreCheckTarget::simplifyUnresolvedSpecializeExpr(
     UnresolvedSpecializeExpr *us) {
   // If this is a reference type a specialized type, form a TypeExpr.
   // The base should be a TypeExpr that we already resolved.
-  if (auto *te = dyn_cast<TypeExpr>(us->getSubExpr())) {
+  if (auto *te = dyn_cast_or_null<TypeExpr>(us->getSubExpr())) {
     if (auto *declRefTR =
             dyn_cast_or_null<DeclRefTypeRepr>(te->getTypeRepr())) {
       return TypeExpr::createForSpecializedDecl(
@@ -1874,7 +2026,7 @@ bool PreCheckTarget::canSimplifyDiscardAssignmentExpr(
 bool PreCheckTarget::correctInterpolationIfStrange(
     InterpolatedStringLiteralExpr *ISLE) {
   // These expressions are valid in Swift 5+.
-  if (getASTContext().isSwiftVersionAtLeast(5))
+  if (getASTContext().isLanguageModeAtLeast(5))
     return true;
 
   /// Diagnoses appendInterpolation(...) calls with multiple
@@ -2039,8 +2191,9 @@ VarDecl *PreCheckTarget::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
 
   // Do an actual lookup for 'self' in case it shows up in a capture list.
   auto *methodSelf = methodContext->getImplicitSelfDecl();
-  auto *lookupSelf = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
-                                                     Ctx.Id_self, Loc);
+  auto *lookupSelf = ASTScope::lookupSingleLocalDecl(
+                                   DC->getParentSourceFile(),
+                                   DeclNameRef::createSelf(Ctx), Loc);
   if (lookupSelf && lookupSelf != methodSelf) {
     // FIXME: This is the wrong diagnostic for if someone manually declares a
     // variable named 'self' using backticks.
@@ -2304,14 +2457,17 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
       return nullptr;
     };
 
+    auto makeErrorTypeRepr = [&](Expr *E) -> ErrorTypeRepr * {
+      return ErrorTypeRepr::create(Ctx, E->getSourceRange(), E);
+    };
+
     TupleTypeRepr *ArgsTypeRepr = extractInputTypeRepr(AE->getArgsExpr());
     if (!ArgsTypeRepr) {
       Ctx.Diags.diagnose(AE->getArgsExpr()->getLoc(),
                          diag::expected_type_before_arrow);
-      auto ArgRange = AE->getArgsExpr()->getSourceRange();
-      auto ErrRepr = ErrorTypeRepr::create(Ctx, ArgRange);
+      auto ErrRepr = makeErrorTypeRepr(AE->getArgsExpr());
       ArgsTypeRepr =
-          TupleTypeRepr::create(Ctx, {ErrRepr}, ArgRange);
+          TupleTypeRepr::create(Ctx, {ErrRepr}, ErrRepr->getSourceRange());
     }
 
     TypeRepr *ThrownTypeRepr = nullptr;
@@ -2324,8 +2480,7 @@ TypeExpr *PreCheckTarget::simplifyTypeExpr(Expr *E) {
     if (!ResultTypeRepr) {
       Ctx.Diags.diagnose(AE->getResultExpr()->getLoc(),
                          diag::expected_type_after_arrow);
-      ResultTypeRepr =
-          ErrorTypeRepr::create(Ctx, AE->getResultExpr()->getSourceRange());
+      ResultTypeRepr = makeErrorTypeRepr(AE->getResultExpr());
     }
 
     auto NewTypeRepr = new (Ctx)
@@ -2452,9 +2607,9 @@ void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
           SE->getSelfLoc()));
         expr = SE->getSubExpr();
       } else if (auto UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
-        // .foo
-        components.push_back(KeyPathExpr::Component::forUnresolvedProperty(
-            UDE->getName(), UDE->getLoc()));
+        // .foo, .foo() or .foo(val value: Int)
+        components.push_back(KeyPathExpr::Component::forUnresolvedMember(
+            UDE->getName(), UDE->getFunctionRefInfo(), UDE->getLoc()));
 
         expr = UDE->getBase();
       } else if (auto CCE = dyn_cast<CodeCompletionExpr>(expr)) {
@@ -2490,6 +2645,11 @@ void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
         (void)outermostExpr;
         assert(OEE == outermostExpr);
         expr = OEE->getSubExpr();
+      } else if (auto CE = dyn_cast<CallExpr>(expr)) {
+        // foo(), foo(val value: Int) or unapplied foo
+        components.push_back(KeyPathExpr::Component::forUnresolvedApply(
+            getASTContext(), CE->getArgs()));
+        expr = CE->getFn();
       } else {
         if (emitErrors) {
           // \(<expr>) may be an attempt to write a string interpolation outside
@@ -2497,7 +2657,9 @@ void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
           if (isa<ParenExpr>(expr) || isa<TupleExpr>(expr)) {
             DE.diagnose(expr->getLoc(),
                         diag::expr_string_interpolation_outside_string);
-          } else {
+          } else if (!isa<ErrorExpr>(expr)) {
+            // If we have an `ErrorExpr`, we've probably already emitted a
+            // diagnostic explaining it.
             DE.diagnose(expr->getLoc(),
                         diag::expr_swift_keypath_invalid_component);
           }
@@ -2551,7 +2713,7 @@ void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
 Expr *PreCheckTarget::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   // If constructor call is expected to produce an optional let's not attempt
   // this optimization because literal initializers aren't failable.
-  if (!getASTContext().LangOpts.isSwiftVersionAtLeast(5)) {
+  if (!getASTContext().isLanguageModeAtLeast(5)) {
     if (!ExprStack.empty()) {
       auto *parent = ExprStack.back();
       if (isa<BindOptionalExpr>(parent) || isa<ForceValueExpr>(parent))
@@ -2623,7 +2785,6 @@ Expr *PreCheckTarget::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 ///
 ///   foo? = newFoo // LHS of the assignment operator
 ///   foo?.bar += value // LHS of 'assignment: true' precedence group operators.
-///   for?.bar++ // Postfix operator.
 ///
 /// In such cases, the operand is constructed to be an 'OperatorEvaluationExpr'
 /// wrapping the actual operand. This function hoist it and wraps the entire
@@ -2648,14 +2809,32 @@ PreCheckTarget::hoistOptionalEvaluationExprIfNeeded(Expr *expr) {
         }
       }
     }
-  } else if (auto *postfixE = dyn_cast<PostfixUnaryExpr>(expr)) {
-    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(postfixE->getOperand())) {
-      postfixE->setOperand(OEE->getSubExpr());
-      OEE->setSubExpr(postfixE);
-      return OEE;
-    }
   }
   return nullptr;
+}
+
+Expr *PreCheckTarget::wrapMemberChainIfNeeded(Expr *E) {
+  auto *parent = Parent.getAsExpr();
+  Expr *wrapped = E;
+
+  // If the parent is already wrapped, we've already formed the member chain.
+  if (parent && (isa<OptionalEvaluationExpr>(parent) ||
+                 isa<UnresolvedMemberChainResultExpr>(parent))) {
+    return E;
+  }
+
+  // If we find an unresolved member chain, wrap it in an
+  // UnresolvedMemberChainResultExpr.
+  if (isMemberChainTail(E, parent, MemberChainKind::UnresolvedMember)) {
+    if (auto *UME = TypeChecker::getUnresolvedMemberChainBase(E))
+      wrapped = new (Ctx) UnresolvedMemberChainResultExpr(E, UME);
+  }
+  // Wrap optional chain in an OptionalEvaluationExpr.
+  if (isMemberChainTail(E, parent, MemberChainKind::OptionalBind)) {
+    if (isBindOptionalMemberChain(E))
+      wrapped = new (Ctx) OptionalEvaluationExpr(wrapped);
+  }
+  return wrapped;
 }
 
 bool ConstraintSystem::preCheckTarget(SyntacticElementTarget &target) {

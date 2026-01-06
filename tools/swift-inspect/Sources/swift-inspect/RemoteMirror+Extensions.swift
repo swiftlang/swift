@@ -12,7 +12,7 @@
 
 import SwiftRemoteMirror
 
-extension swift_metadata_allocation_t: Encodable {
+extension swift_metadata_allocation_t: @retroactive Encodable {
   internal var tag: swift_metadata_allocation_tag_t { return self.Tag }
   internal var ptr: swift_reflection_ptr_t { return self.Ptr }
   internal var size: Int { return Int(self.Size) }
@@ -29,7 +29,7 @@ extension swift_metadata_allocation_t: Encodable {
   }
 }
 
-extension swift_metadata_allocation_t: Comparable {
+extension swift_metadata_allocation_t: @retroactive Comparable {
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.ptr == rhs.ptr
   }
@@ -78,6 +78,18 @@ extension SwiftReflectionContextRef {
   internal func name(type: swift_reflection_ptr_t, mangled: Bool = false) -> String? {
     let typeref = swift_reflection_typeRefForMetadata(self, UInt(type))
     if typeref == 0 { return nil }
+
+    let info = swift_reflection_infoForTypeRef(self, typeref)
+    let nominalKinds = [
+      SWIFT_STRUCT,
+      SWIFT_TUPLE,
+      SWIFT_NO_PAYLOAD_ENUM,
+      SWIFT_SINGLE_PAYLOAD_ENUM,
+      SWIFT_MULTI_PAYLOAD_ENUM,
+      SWIFT_CLASS_INSTANCE,
+      SWIFT_ARRAY
+    ]
+    guard nominalKinds.contains(info.Kind) else { return nil }
 
     guard let name = swift_reflection_copyNameForTypeRef(self, typeref, mangled) else {
       return nil

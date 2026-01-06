@@ -290,8 +290,14 @@ RegularLocation::getDebugOnlyExtendedASTNodeLoc(SILLocation L,
     return new (Module) ExtendedASTNodeLoc(Empty, {D, 0});
   if (auto E = L.getAsASTNode<Expr>())
     return new (Module) ExtendedASTNodeLoc(Empty, {E, 0});
-  if (auto S = L.getAsASTNode<Stmt>())
+  if (auto S = L.getAsASTNode<Stmt>()) {
+    // If the source location of the SILLocation passed in matches the EndLoc of
+    // the Stmt, set the primary ASTNodeTy integer to 1, so that
+    // SILLocation::getSourceLoc returns the EndLoc when queried.
+    if (L.getSourceLocForDebugging() == S->getEndLoc())
+      Empty.setInt(1);
     return new (Module) ExtendedASTNodeLoc(Empty, {S, 0});
+  }
   auto P = L.getAsASTNode<Pattern>();
   return new (Module) ExtendedASTNodeLoc(Empty, {P, 0});
 }

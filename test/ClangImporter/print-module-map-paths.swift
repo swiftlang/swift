@@ -1,17 +1,27 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/resources/linux/armv7 %t/sdk/usr/include %t/sdk/usr/lib/swift/linux/armv7
-// RUN: touch %t/sdk/usr/include/{inttypes,stdint,unistd}.h
+// RUN: touch %t/sdk/usr/include/inttypes.h
+// RUN: touch %t/sdk/usr/include/stdint.h
+// RUN: touch %t/sdk/usr/include/unistd.h
 
-// RUN: touch %t/resources/linux/armv7/{SwiftGlibc.h,glibc.modulemap}
-// RUN: touch %t/sdk/usr/lib/swift/linux/armv7/{SwiftGlibc.h,glibc.modulemap}
+// RUN: touch %t/resources/linux/armv7/SwiftGlibc.h
+// RUN: touch %t/resources/linux/armv7/glibc.modulemap
+// RUN: touch %t/sdk/usr/lib/swift/linux/armv7/SwiftGlibc.h
+// RUN: touch %t/sdk/usr/lib/swift/linux/armv7/glibc.modulemap
 // RUN: %swift %s -typecheck -parse-stdlib -dump-clang-diagnostics -target armv7-unknown-linux-gnueabihf -sdk %t/sdk -resource-dir %t/resources 2>&1 | %FileCheck -check-prefix=CHECK-LINUX %s
 
-// RUN: cp %S/../../stdlib/public/Cxx/{cxxshim/libcxxshim.modulemap,libstdcxx/libstdcxx.h,libstdcxx/libstdcxx.modulemap} %t/resources/linux
+// RUN: cp %S/../../stdlib/public/Cxx/cxxshim/libcxxshim.modulemap %t/resources/linux
+// RUN: cp %S/../../stdlib/public/Cxx/libstdcxx/libstdcxx.h %t/resources/linux
+// RUN: cp %S/../../stdlib/public/Cxx/libstdcxx/libstdcxx.modulemap %t/resources/linux
 // RUN: %target-swift-frontend %s -typecheck -parse-stdlib -dump-clang-diagnostics -resource-dir %t/resources -cxx-interoperability-mode=default 2>&1 | %FileCheck -check-prefix=CHECK-CXX -check-prefix=CHECK-%target-os-CXX %s
 
 // RUN: mkdir -p %t/resources/android/aarch64 %t/sdk/usr/lib/swift/android/aarch64
-// RUN: cp %S/../../stdlib/public/Platform/{SwiftAndroidNDK.h,SwiftBionic.h,android.modulemap} %t/resources/android/aarch64
-// RUN: cp %S/../../stdlib/public/Platform/{SwiftAndroidNDK.h,SwiftBionic.h,android.modulemap} %t/sdk/usr/lib/swift/android/aarch64
+// RUN: cp %S/../../stdlib/public/Platform/SwiftAndroidNDK.h %t/resources/android/aarch64
+// RUN: cp %S/../../stdlib/public/Platform/SwiftBionic.h %t/resources/android/aarch64
+// RUN: cp %S/../../stdlib/public/Platform/android.modulemap %t/resources/android/aarch64
+// RUN: cp %S/../../stdlib/public/Platform/SwiftAndroidNDK.h %t/sdk/usr/lib/swift/android/aarch64
+// RUN: cp %S/../../stdlib/public/Platform/SwiftBionic.h %t/sdk/usr/lib/swift/android/aarch64
+// RUN: cp %S/../../stdlib/public/Platform/android.modulemap %t/sdk/usr/lib/swift/android/aarch64
 // RUN: %swift %s -typecheck -parse-stdlib -dump-clang-diagnostics -target aarch64-unknown-linux-android -sdk %t/sdk -resource-dir %t/resources 2>&1 | %FileCheck -check-prefix=CHECK-ANDROID %s
 
 // RUN: cp %S/../../stdlib/public/Cxx/cxxshim/libcxxshim.modulemap %t/resources/android

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // https://github.com/apple/swift/issues/43735
 // Test constraint simplification of chains of binary operators.
@@ -277,14 +277,15 @@ func rdar_60185506() {
 func rdar60727310() {
   func myAssertion<T>(_ a: T, _ op: ((T,T)->Bool), _ b: T) {}
   var e: Error? = nil
-  myAssertion(e, ==, nil) // expected-error {{cannot convert value of type '(any Error)?' to expected argument type '(any Any.Type)?'}}
+  myAssertion(e, ==, nil) // expected-error {{cannot convert value of type '(any Error)?' to expected argument type '(any (~Copyable & ~Escapable).Type)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('any Error' and 'any (~Copyable & ~Escapable).Type') are expected to be equal}}
 }
 
 // https://github.com/apple/swift/issues/54877
 // FIXME: Bad diagnostic.
 func f_54877(_ e: Error) {
   func foo<T>(_ a: T, _ op: ((T, T) -> Bool)) {}
-  foo(e, ==) // expected-error {{type of expression is ambiguous without a type annotation}}
+  foo(e, ==) // expected-error {{failed to produce diagnostic for expression}}
 }
 
 // rdar://problem/62054241 - Swift compiler crashes when passing < as the sort function in sorted(by:) and the type of the array is not comparable

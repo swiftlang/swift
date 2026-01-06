@@ -34,9 +34,9 @@ public protocol UnsafeCxxInputIterator: Equatable {
   func successor() -> Self
 }
 
-extension UnsafePointer: UnsafeCxxInputIterator {}
+extension UnsafePointer: @unsafe UnsafeCxxInputIterator {}
 
-extension UnsafeMutablePointer: UnsafeCxxInputIterator {}
+extension UnsafeMutablePointer: @unsafe UnsafeCxxInputIterator {}
 
 extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator {
   public typealias Pointee = Wrapped.Pointee
@@ -79,9 +79,9 @@ public protocol UnsafeCxxRandomAccessIterator: UnsafeCxxInputIterator {
   static func +=(lhs: inout Self, rhs: Distance)
 }
 
-extension UnsafePointer: UnsafeCxxRandomAccessIterator {}
+extension UnsafePointer: @unsafe UnsafeCxxRandomAccessIterator {}
 
-extension UnsafeMutablePointer: UnsafeCxxRandomAccessIterator {}
+extension UnsafeMutablePointer: @unsafe UnsafeCxxRandomAccessIterator {}
 
 public protocol UnsafeCxxMutableRandomAccessIterator:
 UnsafeCxxRandomAccessIterator, UnsafeCxxMutableInputIterator {}

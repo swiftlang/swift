@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,103 +10,169 @@
 //
 //===----------------------------------------------------------------------===//
 
-import XCTest
+import Foundation
+import Testing
+
 @testable import SwiftXcodeGen
 
-fileprivate func expectEqual<T: Equatable>(
-  expected: [T], actual: [T], description: String,
-  file: StaticString = #file, line: UInt = #line
-) {
-  guard expected.count == actual.count else {
-    XCTFail(
-      """
-      Expected \(expected.count) '\(description)', \
-      got \(actual.count) (\(actual))
-      """,
-      file: file, line: line
-    )
-    return
-  }
-  for (expected, actual) in zip(expected, actual) {
-    XCTAssertEqual(expected, actual, file: file, line: line)
-  }
-}
-
 fileprivate func expectEqual<T, U: Equatable>(
-  _ expected: T, _ actual: T, _ kp: KeyPath<T, U>,
-  file: StaticString = #file, line: UInt = #line
+  _ expected: T,
+  _ actual: T,
+  _ kp: KeyPath<T, U>,
+  sourceLocation: SourceLocation = #_sourceLocation
 ) {
-  XCTAssertEqual(
-    expected[keyPath: kp], actual[keyPath: kp], file: file, line: line
-  )
-}
-
-fileprivate func expectEqual<T, U: Equatable>(
-  _ expected: T, _ actual: T, _ kp: KeyPath<T, [U]>,
-  file: StaticString = #file, line: UInt = #line
-) {
-  expectEqual(
-    expected: expected[keyPath: kp], actual: actual[keyPath: kp],
-    description: "\(kp)", file: file, line: line
+  #expect(
+    expected[keyPath: kp] == actual[keyPath: kp],
+    sourceLocation: sourceLocation
   )
 }
 
 fileprivate func assertParse(
   _ str: String,
-  attributes: [NinjaBuildFile.Attribute] = [],
-  rules: [NinjaBuildFile.BuildRule],
-  file: StaticString = #file, line: UInt = #line
+  bindings: [String: String] = [:],
+  rules: [String: NinjaBuildFile.Rule] = [:],
+  edges: [NinjaBuildFile.BuildEdge],
+  sourceLocation: SourceLocation = #_sourceLocation
+) {
+  let filePath: AbsolutePath = "/tmp/build.ninja"
+  let files: [AbsolutePath: String] = [
+    filePath: str
+  ]
+  assertParse(
+    filePath,
+    in: files,
+    bindings: bindings,
+    rules: rules,
+    edges: edges,
+    sourceLocation: sourceLocation
+  )
+}
+
+fileprivate func assertParse(
+  _ filePath: AbsolutePath,
+  in fileSystem: [AbsolutePath: String],
+  bindings: [String: String] = [:],
+  rules: [String: NinjaBuildFile.Rule] = [:],
+  edges: [NinjaBuildFile.BuildEdge],
+  sourceLocation: SourceLocation = #_sourceLocation
 ) {
   do {
-    let buildFile = try NinjaParser.parse(Data(str.utf8))
-    guard rules.count == buildFile.buildRules.count else {
-      XCTFail(
-        "Expected \(rules.count) rules, got \(buildFile.buildRules.count)",
-        file: file, line: line
+    let buildFile = try NinjaParser.parse(filePath: filePath, fileReader: { Data(fileSystem[$0]!.utf8) })
+    guard edges.count == buildFile.buildEdges.count else {
+      Issue.record(
+        "Expected \(edges.count) edges, got \(buildFile.buildEdges.count)",
+        sourceLocation: sourceLocation
       )
       return
     }
-    XCTAssertEqual(
-      Dictionary(uniqueKeysWithValues: attributes.map { ($0.key, $0) }), 
-      buildFile.attributes,
-      file: file, line: line
+    #expect(
+      bindings == buildFile.bindings.values,
+      sourceLocation: sourceLocation
     )
-    for (expected, actual) in zip(rules, buildFile.buildRules) {
-      expectEqual(expected, actual, \.inputs, file: file, line: line)
-      expectEqual(expected, actual, \.outputs, file: file, line: line)
-      expectEqual(expected, actual,  \.dependencies, file: file, line: line)
-      expectEqual(expected, actual,  \.attributes, file: file, line: line)
-      expectEqual(expected, actual,  \.isPhony, file: file, line: line)
+    #expect(
+      rules == buildFile.rules,
+      sourceLocation: sourceLocation
+    )
+    for (expected, actual) in zip(edges, buildFile.buildEdges) {
+      expectEqual(expected, actual, \.ruleName, sourceLocation: sourceLocation)
+      expectEqual(expected, actual, \.inputs, sourceLocation: sourceLocation)
+      expectEqual(expected, actual, \.outputs, sourceLocation: sourceLocation)
+      expectEqual(expected, actual, \.dependencies, sourceLocation: sourceLocation)
+      expectEqual(expected, actual, \.bindings, sourceLocation: sourceLocation)
 
-      XCTAssertEqual(expected, actual, file: file, line: line)
+      #expect(expected == actual, sourceLocation: sourceLocation)
     }
   } catch {
-    XCTFail("\(error)", file: file, line: line)
+    Issue.record("\(error)", sourceLocation: sourceLocation)
   }
 }
 
-class NinjaParserTests: XCTestCase {
-  func testBuildRule() throws {
-    assertParse("""
+@Suite
+struct NinjaParserTests {
+  @Test
+  func buildEdge() throws {
+    assertParse(
+      """
       # ignore comment, build foo.o: a.swift | dep || orderdep
       #another build comment
-      build foo.o foo.swiftmodule: a.swift | dep || orderdep
+      build foo.o foo.swiftmodule: SWIFTC a.swift | dep || orderdep
       notpartofthebuildrule
-      """, rules: [
+      """,
+      edges: [
         .init(
+          ruleName: "SWIFTC",
           inputs: ["a.swift"],
           outputs: ["foo.o", "foo.swiftmodule"],
           dependencies: ["dep", "orderdep"],
-          attributes: [:]
+          bindings: [:]
         )
       ]
     )
   }
 
-  func testPhonyRule() throws {
-    assertParse("""
+  @Test
+  func rule() throws {
+    assertParse(
+      """
+      rule SWIFTC
+        command = /bin/switfc -wmo -target unknown
+        other = whatever
+      notpartoftherule
+      """,
+      rules: [
+        "SWIFTC": .init(
+          name: "SWIFTC",
+          bindings: [
+            "command": "/bin/switfc -wmo -target unknown",
+            "other": "whatever",
+          ])
+      ],
+      edges: []
+    )
+  }
+
+  @Test
+  func include() throws {
+    let files: [AbsolutePath: String] = [
+      "/tmp/build.ninja": """
+        include path/to/sub.ninja
+        
+        build foo.swiftmodule : SWIFTC foo.swift
+        """,
+      "/tmp/path/to/sub.ninja": """
+        rule SWIFTC
+          command = /bin/swiftc $in -o $out
+        """
+    ]
+    assertParse(
+      "/tmp/build.ninja",
+      in: files,
+      rules: [
+        "SWIFTC": .init(
+          name: "SWIFTC",
+          bindings: [
+            "command": "/bin/swiftc $in -o $out",
+          ])
+      ],
+      edges: [
+        .init(
+          ruleName: "SWIFTC",
+          inputs: ["foo.swift"],
+          outputs: ["foo.swiftmodule"],
+          dependencies: [],
+          bindings: [:]
+        )
+      ]
+    )
+  }
+
+  @Test
+  func phonyRule() throws {
+    assertParse(
+      """
       build foo.swiftmodule : phony bar.swiftmodule
-      """, rules: [
+      """,
+      edges: [
         .phony(
           for: ["foo.swiftmodule"],
           inputs: ["bar.swiftmodule"]
@@ -115,13 +181,15 @@ class NinjaParserTests: XCTestCase {
     )
   }
 
-  func testAttributes() throws {
-    assertParse("""
+  @Test
+  func bindings() throws {
+    assertParse(
+      """
       x = y
 
       CONFIGURATION = Debug
 
-      build foo.o: xyz foo.swift | baz.o
+      build foo.o: SWIFTC xyz foo.swift | baz.o
         UNKNOWN = foobar
         SWIFT_MODULE_NAME = foobar
 
@@ -137,49 +205,60 @@ class NinjaParserTests: XCTestCase {
         COMMAND = /bin/swiftc -I /a/b -wmo
       FLAGS = -I /c/d -wmo
 
-      """, attributes: [
-        .init(key: .configuration, value: "Debug"),
+      """,
+      bindings: [
+        "x": "y",
+
+        "CONFIGURATION": "Debug",
 
         // This is considered top-level since it's not indented.
-        .init(key: .flags, value: "-I /c/d -wmo")
+        "FLAGS": "-I /c/d -wmo"
       ],
-      rules: [
+      edges: [
         .init(
+          ruleName: "SWIFTC",
           inputs: ["xyz", "foo.swift"],
           outputs: ["foo.o"],
           dependencies: ["baz.o"],
-          attributes: [
-            .swiftModuleName: .init(key: .swiftModuleName, value: "foobar"),
-            .flags: .init(key: .flags, value: "-I /a/b -wmo"),
+          bindings: [
+            "UNKNOWN": "foobar",
+            "SWIFT_MODULE_NAME": "foobar",
+            "FLAGS": "-I /a/b -wmo",
+            "ANOTHER_UNKNOWN": "a b c",
           ]
         ),
         .init(
-          inputs: ["CUSTOM_COMMAND", "baz.swift"],
+          ruleName: "CUSTOM_COMMAND",
+          inputs: ["baz.swift"],
           outputs: ["baz.o"],
           dependencies: [],
-          attributes: [
-            .command: .init(key: .command, value: "/bin/swiftc -I /a/b -wmo"),
+          bindings: [
+            "COMMAND": "/bin/swiftc -I /a/b -wmo",
           ]
         )
       ]
     )
   }
 
-  func testEscape() throws {
+  @Test
+  func escape() throws {
     for newline in ["\n", "\r", "\r\n"] {
-      assertParse("""
-        build foo.o$:: xyz$ foo$$.swift | baz$ bar.o
+      assertParse(
+        """
+        build foo.o$:: SWIFTC xyz$ foo$$.swift | baz$ bar.o
           FLAGS = -I /a$\(newline)\
                   /b -wmo
           COMMAND = swiftc$$
-        """, rules: [
+        """,
+        edges: [
           .init(
+            ruleName: "SWIFTC",
             inputs: ["xyz foo$.swift"],
             outputs: ["foo.o:"],
             dependencies: ["baz bar.o"],
-            attributes: [
-              .flags: .init(key: .flags, value: "-I /a/b -wmo"),
-              .command: .init(key: .command, value: "swiftc$")
+            bindings: [
+              "FLAGS": "-I /a/b -wmo",
+              "COMMAND": "swiftc$",
             ]
           )
         ]

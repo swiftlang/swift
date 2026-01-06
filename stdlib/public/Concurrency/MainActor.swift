@@ -12,7 +12,7 @@
 
 import Swift
 
-#if !$Embedded
+#if os(WASI) || !$Embedded
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
@@ -22,12 +22,12 @@ import Swift
 
   @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
-    return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
+    return unsafe UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
   }
 
   @inlinable
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
-    return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
+    return unsafe UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
   }
 
   @inlinable
@@ -44,12 +44,12 @@ import Swift
 
   @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
-    return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
+    return unsafe UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
   }
 
   @inlinable
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
-    return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
+    return unsafe UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
   }
 
   @inlinable
@@ -134,16 +134,20 @@ extension MainActor {
 
     /// This is guaranteed to be fatal if the check fails,
     /// as this is our "safe" version of this API.
-    let executor: Builtin.Executor = Self.shared.unownedExecutor.executor
+    let executor: Builtin.Executor = unsafe Self.shared.unownedExecutor.executor
     guard _taskIsCurrentExecutor(executor) else {
       // TODO: offer information which executor we actually got
+      #if !$Embedded
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
+      #else
+      Builtin.int_trap()
+      #endif
     }
 
     // To do the unsafe cast, we have to pretend it's @escaping.
     return try withoutActuallyEscaping(operation) {
       (_ fn: @escaping YesActor) throws -> T in
-      let rawFn = unsafeBitCast(fn, to: NoActor.self)
+      let rawFn = unsafe unsafeBitCast(fn, to: NoActor.self)
       return try rawFn()
     }
   }
@@ -158,6 +162,39 @@ extension MainActor {
     try assumeIsolated(operation, file: file, line: line)
   }
 }
+
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+@_extern(c, "pthread_main_np")
+@usableFromInline
+internal func pthread_main_np() -> CInt
+
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@_silgen_name("swift_task_deinitOnExecutorMainActorBackDeploy")
+public func _deinitOnExecutorMainActorBackDeploy(
+  _ object: __owned AnyObject,
+  _ work: @convention(thin) (__owned AnyObject) -> Void,
+  _ executor: Builtin.Executor,
+  _ flags: Builtin.Word) {
+  if #available(macOS 15.4, iOS 18.4, watchOS 11.4, tvOS 18.4, visionOS 2.4, *) {
+    // On new-enough platforms, use the runtime functionality, which allocates
+    // the task more efficiently.
+    _deinitOnExecutor(object, work, executor, flags)
+  } else if pthread_main_np() == 1 {
+    // Using "main thread" as a proxy for "main actor", immediately destroy
+    // the object.
+    work(consume object)
+  } else {
+    // Steal the local object so that the reference count stays at 1 even when
+    // the object is captured.
+    var stolenObject: AnyObject? = consume object
+    Task.detached { @MainActor in
+      work(stolenObject.take()!)
+    }
+  }
+}
 #endif
 
-#endif
+#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+#endif // os(WASI) || !$Embedded

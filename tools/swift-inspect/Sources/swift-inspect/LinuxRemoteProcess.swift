@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(Linux)
+#if os(Linux) || os(Android)
   import Foundation
   import SwiftInspectLinux
   import SwiftRemoteMirror
@@ -153,6 +153,10 @@
 
     internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
       fatalError("heap iteration is not supported on Linux")
+    }
+
+    internal func iteratePotentialMetadataPages(_ body: (swift_addr_t, UInt64) -> Void) {
+      fatalError("metadata page iteration is not supported on Linux")
     }
   }
 #endif  // os(Linux)

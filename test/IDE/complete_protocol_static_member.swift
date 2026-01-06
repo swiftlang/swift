@@ -21,7 +21,7 @@ func test<T: FontStyle>(x: T) {
 }
 
 // EXTENSION_NOT_APPLIED: Begin completions, 1 item
-// EXTENSION_NOT_APPLIED-DAG: Keyword[self]/CurrNominal:          self[#T#];
+// EXTENSION_NOT_APPLIED-DAG: Keyword[self]/CurrNominal:          self[#FontStyle#];
 // EXTENSION_NOT_APPLIED-NOT: variableDeclaredInConstraintExtension
 
 struct WrapperStruct<T: FontStyle> {

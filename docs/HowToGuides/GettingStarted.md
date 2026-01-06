@@ -142,10 +142,10 @@ toolchain as a one-off, there are a couple of differences:
 1. Install Xcode. The minimum required version is specified in the node
    information on <https://ci.swift.org>, may change frequently, and is often
    a beta release.
-1. Install [CMake][], [Ninja][] and [Sccache][]:
+1. Install [Ninja][] and [Sccache][]:
    - Via [Homebrew][] (recommended):
      ```sh
-     brew install cmake ninja sccache
+     brew install ninja sccache
      ```
    - Via [Homebrew Bundle][]:
      ```sh
@@ -153,7 +153,6 @@ toolchain as a one-off, there are a couple of differences:
      ```
 
 [Xcode]: https://developer.apple.com/xcode/resources/
-[CMake]: https://cmake.org
 [Ninja]: https://ninja-build.org
 [Homebrew]: https://brew.sh/
 [Homebrew Bundle]: https://github.com/Homebrew/homebrew-bundle
@@ -164,6 +163,7 @@ toolchain as a one-off, there are a couple of differences:
    * [Ubuntu 18.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/ubuntu/18.04/Dockerfile)
    * [Ubuntu 20.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/ubuntu/20.04/Dockerfile)
    * [Ubuntu 22.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/ubuntu/22.04/Dockerfile)
+   * [Ubuntu 24.04](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/ubuntu/24.04/Dockerfile)
    * [CentOS 7](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/centos/7/Dockerfile)
    * [Amazon Linux 2](https://github.com/swiftlang/swift-docker/blob/main/swift-ci/main/amazon-linux/2/Dockerfile)
 
@@ -199,7 +199,6 @@ toolchain as a one-off, there are a couple of differences:
 
 ### Spot check dependencies
 
-* Run `cmake --version`; this should be at least 3.19.6 (3.24.2 if you want to use Xcode for editing on macOS).
 * Run `python3 --version`; this should be at least 3.6.
 * Run `ninja --version`; check that this succeeds.
 * If you installed and want to use Sccache: Run `sccache --version`; check
@@ -407,7 +406,7 @@ In project settings, locate `Build, Execution, Deployment > CMake`. You will nee
 - Toolchain: Default should be fine
 - Generator: Ninja
 - CMake options: You want to duplicate the essential CMake flags that `build-script` had used here, so CLion understands the build configuration. You can get the full list of CMake arguments from `build-script` by providing the `-n` dry-run flag; look for the last `cmake` command with a `-G Ninja`. Here is a minimal list of what you should provide to CLion here for this setting:
-    - `-D SWIFT_PATH_TO_CMARK_BUILD=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/cmark-macosx-arm64 -D LLVM_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/llvm -D Clang_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/clang -D CMAKE_BUILD_TYPE=RelWithDebInfoAssert -D
+    - `-D SWIFT_PATH_TO_CMARK_BUILD=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/cmark-macosx-arm64 -D LLVM_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/llvm -D Clang_DIR=SOME_PATH/swift-project/build/Ninja-RelWithDebInfoAssert/llvm-macosx-arm64/lib/cmake/clang -D CMAKE_BUILD_TYPE=RelWithDebInfo -D
 SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE=SOME_PATH/swift-project/swift-syntax -G Ninja -S .`
     - replace the `SOME_PATH` to the path where your `swift-project` directory is
     - the CMAKE_BUILD_TYPE should match the build configuration name, so if you named this profile `RelWithDebInfo` the CMAKE_BUILD_TYPE should also be `RelWithDebInfo`

@@ -51,6 +51,8 @@ public:
   /// Did we parse a sil_stage for this module?
   bool DidParseSILStage = false;
 
+  bool diagnoseUndefinedValues(DiagnosticEngine &diags);
+
   bool parseDeclSIL(Parser &P) override;
   bool parseDeclSILStage(Parser &P) override;
   bool parseSILVTable(Parser &P) override;
@@ -58,6 +60,7 @@ public:
   bool parseSILGlobal(Parser &P) override;
   bool parseSILWitnessTable(Parser &P) override;
   bool parseSILDefaultWitnessTable(Parser &P) override;
+  bool parseSILDefaultOverrideTable(Parser &P) override;
   bool parseSILDifferentiabilityWitness(Parser &P) override;
   bool parseSILCoverageMap(Parser &P) override;
   bool parseSILProperty(Parser &P) override;

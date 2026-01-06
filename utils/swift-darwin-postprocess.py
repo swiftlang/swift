@@ -13,11 +13,18 @@ utils = os.path.dirname(os.path.realpath(__file__))
 get_task_allow_plist = os.path.join(utils, 'get-task-allow.plist')
 
 
+def file_path(string):
+    if os.path.isfile(string):
+        return string
+    else:
+        raise argparse.ArgumentTypeError(f"{string} is not a valid path")
+
+
 def main(arguments):
     parser = argparse.ArgumentParser(
         description='Postprocess binaries to prepare for \
                      their execution on Darwin platforms')
-    parser.add_argument('bins', nargs='+', help='one or more binary files')
+    parser.add_argument('bins', type=file_path, nargs='+', help='one or more binary files')
 
     args = parser.parse_args(arguments)
 
@@ -37,12 +44,12 @@ def unrpathize(filename):
         # `dyldinfo` has been replaced with `dyld_info`, so we try it first
         # before falling back to `dyldinfo`
         dylibsOutput = subprocess.check_output(
-            ['xcrun', 'dyld_info', '-dependents', filename],
+            ['/usr/bin/xcrun', 'dyld_info', '-dependents', filename],
             universal_newlines=True)
     except subprocess.CalledProcessError:
         sys.stderr.write("falling back to 'xcrun dyldinfo' ...\n")
         dylibsOutput = subprocess.check_output(
-            ['xcrun', 'dyldinfo', '-dylibs', filename],
+            ['/usr/bin/xcrun', 'dyldinfo', '-dylibs', filename],
             universal_newlines=True)
 
     # Do not rewrite @rpath-relative load commands for these libraries:
@@ -71,7 +78,7 @@ def unrpathize(filename):
         r"(^|.*\s)(?P<path>@rpath/(?P<filename>libswift.*\.dylib))\s*$")
 
     # Build a command to invoke install_name_tool.
-    command = ['install_name_tool']
+    command = ['/usr/bin/xcrun', 'install_name_tool']
     for line in dylibsOutput.splitlines():
         match = dylib_regex.match(line)
         if match and match.group('filename') not in allow_list:
@@ -82,7 +89,7 @@ def unrpathize(filename):
 
     # Don't run the command if we didn't find any dylibs to change:
     # it's invalid to invoke install_name_tool without any operations.
-    if len(command) == 1:
+    if len(command) == 2:
         return
 
     # The last argument is the filename to operate on.

@@ -75,7 +75,7 @@ func reabstractAsConcreteThrowing() throws -> Int {
   try passthroughCall(fiveOrTypedBust)
 }
 
-// CHECK-LABEL: define {{.*}} swiftcc void @"$sSi12typed_throws10MyBigErrorOIgdzo_SiACIegrzr_TR"(ptr noalias nocapture sret(%TSi) %0, ptr %1, ptr %2, ptr swiftself %3, ptr noalias nocapture swifterror dereferenceable(8) %4, ptr %5)
+// CHECK-LABEL: define {{.*}} swiftcc void @"$sSi12typed_throws10MyBigErrorOIgdzo_SiACIegrzr_TR"(ptr noalias sret(%TSi) captures(none) %0, ptr %1, ptr %2, ptr swiftself %3, ptr noalias swifterror captures(none) dereferenceable(8) %4, ptr %5)
 // CHECK: call swiftcc {{i32|i64}} %1
 // CHECK: [[CMP:%.*]] = icmp ne ptr {{%.*}}, null
 // CHECK: br i1 [[CMP]], label %typed.error.load
@@ -107,7 +107,7 @@ func throwsSmallError() throws(SmallError) -> (Float, Int) {
 }
 
 // CHECK: define hidden swiftcc i64 @"$s12typed_throws17catchesSmallErrorSiyF"()
-// CHECK:   [[RES:%.*]] = call swiftcc { float, i64 } @"$s12typed_throws0B10SmallErrorSf_SityAA0cD0VYKF"(ptr swiftself undef, ptr noalias nocapture swifterror dereferenceable(8) %swifterror)
+// CHECK:   [[RES:%.*]] = call swiftcc { float, i64 } @"$s12typed_throws0B10SmallErrorSf_SityAA0cD0VYKF"(ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[R0:%.*]] = extractvalue { float, i64 } [[RES]], 0
 // CHECK:   [[R1:%.*]] = extractvalue { float, i64 } [[RES]], 1
 // CHECK:   phi i64 [ [[R1]], %typed.error.load ]
@@ -284,4 +284,90 @@ func callClosureAsync<T>(t: T) async {
   _ = try! await passthroughFixedErrorAsync { () async throws(TinyError) -> T in
     return t
   }
+}
+
+enum LargeError: Error {
+  case x
+  case y(Int64, Int64, Int64, Int64, Int64)
+}
+
+// Used to crash the compiler because
+func callClosureAsyncIndirectError(f: () async throws(LargeError) -> Int) async throws(LargeError) -> Int {
+  return try await f()
+}
+
+protocol AsyncGenProto<A> {
+  associatedtype A
+  func fn(arg: Int) async throws(SmallError) -> A
+}
+
+// CHECK: define internal swifttailcc void @"$s12typed_throws23callAsyncIndirectResult1p1xxAA0D8GenProto_px1ARts_XP_SitYaAA10SmallErrorVYKlFTY0_"(ptr swiftasync %0)
+// CHECK:   musttail call swifttailcc void {{%.*}}(ptr noalias {{%.*}}, ptr swiftasync {{%.*}}, i64 {{%.*}}, ptr noalias swiftself {{%.*}}, ptr %swifterror, ptr {{%.*}}, ptr {{%.*}})
+// CHECK:   ret void
+// CHECK: }
+@inline(never)
+func callAsyncIndirectResult<A>(p: any AsyncGenProto<A>, x: Int) async throws(SmallError) -> A {
+  return try await p.fn(arg: x)
+}
+
+@inline(never)
+func smallResultLargerError() throws(SmallError) -> Int8? {
+  return 10
+}
+
+// CHECK:  [[COERCED:%.*]] = alloca { i16 }, align 2
+// CHECK:  [[RES:%.*]] = call swiftcc i64 @"$s12typed_throws22smallResultLargerErrors4Int8VSgyAA05SmallF0VYKF"(ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
+// CHECK:  [[TRUNC:%.*]] = trunc i64 [[RES]] to i16
+// CHECK:  [[COERCED_PTR:%.*]] = getelementptr inbounds{{.*}} { i16 }, ptr [[COERCED]], i32 0, i32 0
+// CHECK:  store i16 [[TRUNC]], ptr [[COERCED_PTR]], align 2
+func callSmallResultLargerError() {
+  let res = try! smallResultLargerError()
+  precondition(res! == 10)
+}
+
+enum UInt8OptSingletonError: Error {
+  case a(Int8?)
+}
+
+@inline(never)
+func smallErrorLargerResult() throws(UInt8OptSingletonError) -> Int {
+  throw .a(10)
+}
+
+// CHECK:  [[COERCED:%.*]] = alloca { i16 }, align 2
+// CHECK:  [[RES:%.*]] = call swiftcc i64 @"$s12typed_throws22smallErrorLargerResultSiyAA017UInt8OptSingletonD0OYKF"(ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
+// CHECK:  [[TRUNC:%.*]] = trunc i64 [[RES]] to i16
+// CHECK:  [[COERCED_PTR:%.*]] = getelementptr inbounds{{.*}} { i16 }, ptr [[COERCED]], i32 0, i32 0
+// CHECK:  store i16 [[TRUNC]], ptr [[COERCED_PTR]], align 2
+func callSmallErrorLargerResult() {
+  do {
+    _ = try smallErrorLargerResult()
+  } catch {
+    switch error {
+      case .a(let x):
+        precondition(x! == 10)
+    }
+  }
+}
+
+struct SomeStruct {
+    let x: Int
+    let y: UInt32
+    let z: UInt32
+}
+
+func someFunc() async throws(SmallError) -> SomeStruct {
+    SomeStruct(x: 42, y: 23, z: 25)
+}
+
+// Used to crash the compiler -- https://github.com/swiftlang/swift/issues/80732
+protocol PAssoc<T>: AnyObject {
+    associatedtype T
+    func foo() async throws(SmallError) -> (any PAssoc<T>)
+}
+
+class MyProtocolImpl<T>: PAssoc {
+    func foo() async throws(SmallError) -> (any PAssoc<T>) {
+        fatalError()
+    }
 }

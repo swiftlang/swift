@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,6 +14,7 @@
 #define SWIFT_AST_UNSAFEUSE_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
@@ -39,17 +40,26 @@ public:
     UnsafeConformance,
     /// A reference to an unowned(unsafe) entity.
     UnownedUnsafe,
+    /// A reference to an @exclusivity(unchecked) entity.
+    ExclusivityUnchecked,
     /// A reference to a nonisolated(unsafe) entity.
     NonisolatedUnsafe,
     /// A reference to an unsafe declaration.
     ReferenceToUnsafe,
+    /// A reference to an unsafe storage.
+    ReferenceToUnsafeStorage,
     /// A reference to a typealias that is not itself unsafe, but has
     /// an unsafe underlying type.
     ReferenceToUnsafeThroughTypealias,
     /// A call to an unsafe declaration.
     CallToUnsafe,
+    /// An unsafe argument in a call.
+    CallArgument,
     /// A @preconcurrency import.
     PreconcurrencyImport,
+    /// A use of withoutActuallyEscaping that lacks enforcement that the
+    /// value didn't actually escape.
+    TemporarilyEscaping,
   };
 
 private:
@@ -72,16 +82,25 @@ private:
     struct {
       TypeBase *type;
       void *conformanceRef;
-      DeclContext *declContext;
       const void *location;
     } conformance;
 
     struct {
       const Decl *decl;
-      DeclContext *declContext;
       TypeBase *type;
       const void *location;
     } entity;
+
+    MakeTemporarilyEscapableExpr *temporarilyEscaping;
+
+    struct {
+      Expr *call;
+      const Decl *calleeDecl;
+      TypeBase *paramType;
+      const void *argumentName;
+      unsigned argumentIndex;
+      Expr *argument;
+    } callArgument;
 
     const ImportDecl *importDecl;
   } storage;
@@ -105,20 +124,20 @@ private:
 
   static UnsafeUse forReference(
       Kind kind,
-      DeclContext *dc,
       const Decl *decl,
       Type type,
       SourceLoc location
   ) {
     assert(kind == UnownedUnsafe ||
+           kind == ExclusivityUnchecked ||
            kind == NonisolatedUnsafe ||
            kind == ReferenceToUnsafe ||
+           kind == ReferenceToUnsafeStorage ||
            kind == ReferenceToUnsafeThroughTypealias ||
            kind == CallToUnsafe);
 
     UnsafeUse result(kind);
     result.storage.entity.decl = decl;
-    result.storage.entity.declContext = dc;
     result.storage.entity.type = type.getPointer();
     result.storage.entity.location = location.getOpaquePointerValue();
     return result;
@@ -149,44 +168,67 @@ public:
 
   static UnsafeUse forConformance(Type subjectType,
                                   ProtocolConformanceRef conformance,
-                                  SourceLoc location,
-                                  DeclContext *dc) {
+                                  SourceLoc location) {
     assert(subjectType);
     UnsafeUse result(UnsafeConformance);
     result.storage.conformance.type = subjectType.getPointer();
     result.storage.conformance.conformanceRef = conformance.getOpaqueValue();
-    result.storage.conformance.declContext = dc;
     result.storage.conformance.location = location.getOpaquePointerValue();
     return result;
   }
 
-  static UnsafeUse forUnownedUnsafe(const Decl *decl,
-                                    SourceLoc location,
-                                    DeclContext *dc) {
-    return forReference(UnownedUnsafe, dc, decl, Type(), location);
+  static UnsafeUse forUnownedUnsafe(const Decl *decl, SourceLoc location) {
+    return forReference(UnownedUnsafe, decl, Type(), location);
+  }
+
+  static UnsafeUse forExclusivityUnchecked(const Decl *decl,
+                                           SourceLoc location) {
+    return forReference(ExclusivityUnchecked, decl, Type(), location);
   }
 
   static UnsafeUse forNonisolatedUnsafe(const Decl *decl,
-                                        SourceLoc location,
-                                        DeclContext *dc) {
-    return forReference(NonisolatedUnsafe, dc, decl, Type(), location);
+                                        SourceLoc location) {
+    return forReference(NonisolatedUnsafe, decl, Type(), location);
   }
 
   static UnsafeUse forReferenceToUnsafe(const Decl *decl,
                                         bool isCall,
-                                        DeclContext *dc,
                                         Type type,
                                         SourceLoc location) {
-    return forReference(isCall ? CallToUnsafe: ReferenceToUnsafe, dc,
+    return forReference(isCall ? CallToUnsafe: ReferenceToUnsafe,
                         decl, type, location);
   }
 
+  static UnsafeUse forReferenceToUnsafeStorage(const Decl *decl,
+                                               Type type,
+                                               SourceLoc location) {
+    return forReference(ReferenceToUnsafeStorage, decl, type, location);
+  }
+
   static UnsafeUse forReferenceToUnsafeThroughTypealias(const Decl *decl,
-                                        DeclContext *dc,
                                         Type type,
                                         SourceLoc location) {
-    return forReference(ReferenceToUnsafeThroughTypealias, dc,
+    return forReference(ReferenceToUnsafeThroughTypealias,
                         decl, type, location);
+  }
+
+  static UnsafeUse forCallArgument(
+      Expr *call, const Decl *calleeDecl, Type paramType,
+      Identifier argumentName, unsigned argumentIndex, Expr *argument) {
+    UnsafeUse result(CallArgument);
+    result.storage.callArgument.call = call;
+    result.storage.callArgument.calleeDecl = calleeDecl;
+    result.storage.callArgument.paramType = paramType.getPointer();
+    result.storage.callArgument.argumentName = argumentName.getAsOpaquePointer();
+    result.storage.callArgument.argumentIndex = argumentIndex;
+    result.storage.callArgument.argument = argument;
+    return result;
+  }
+
+  static UnsafeUse forTemporarilyEscaping(MakeTemporarilyEscapableExpr *expr) {
+    UnsafeUse result(TemporarilyEscaping);
+    result.storage.temporarilyEscaping = expr;
+    return result;
   }
 
   static UnsafeUse forPreconcurrencyImport(const ImportDecl *importDecl) {
@@ -205,25 +247,60 @@ public:
       return getDecl()->getLoc();
 
     case UnsafeConformance:
-      return SourceLoc(
-          llvm::SMLoc::getFromPointer(
-            (const char *)storage.conformance.location));
+      return SourceLoc::getFromPointer(
+          (const char *)storage.conformance.location);
 
     case TypeWitness:
-      return SourceLoc(
-          llvm::SMLoc::getFromPointer(
-            (const char *)storage.typeWitness.location));
+      return SourceLoc::getFromPointer(
+          (const char *)storage.typeWitness.location);
 
     case UnownedUnsafe:
+    case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
-      return SourceLoc(
-          llvm::SMLoc::getFromPointer((const char *)storage.entity.location));
+      return SourceLoc::getFromPointer((const char *)storage.entity.location);
+
+    case CallArgument:
+      return storage.callArgument.call->getLoc();
+
+    case TemporarilyEscaping:
+      return storage.temporarilyEscaping->getLoc();
 
     case PreconcurrencyImport:
       return storage.importDecl->getLoc();
+    }
+  }
+
+  /// Replace the location, if possible.
+  void replaceLocation(SourceLoc loc) {
+    switch (getKind()) {
+    case Override:
+    case Witness:
+    case TemporarilyEscaping:
+    case PreconcurrencyImport:
+    case CallArgument:
+      // Cannot replace location.
+      return;
+
+    case UnsafeConformance:
+      storage.conformance.location = loc.getOpaquePointerValue();
+      break;
+
+    case TypeWitness:
+      storage.typeWitness.location = loc.getOpaquePointerValue();
+      break;
+
+    case UnownedUnsafe:
+    case ExclusivityUnchecked:
+    case NonisolatedUnsafe:
+    case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
+    case ReferenceToUnsafeThroughTypealias:
+    case CallToUnsafe:
+      storage.entity.location = loc.getOpaquePointerValue();
     }
   }
 
@@ -238,13 +315,19 @@ public:
       return storage.typeWitness.assocType;
 
     case UnownedUnsafe:
+    case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       return storage.entity.decl;
 
+    case CallArgument:
+      return storage.callArgument.calleeDecl;
+
     case UnsafeConformance:
+    case TemporarilyEscaping:
       return nullptr;
 
     case PreconcurrencyImport:
@@ -258,31 +341,6 @@ public:
     return storage.typeWitness.assocType;
   }
 
-  /// Retrieve the declaration context in which the reference occurs.
-  DeclContext *getDeclContext() const {
-    switch (getKind()) {
-    case UnownedUnsafe:
-    case NonisolatedUnsafe:
-    case ReferenceToUnsafe:
-    case ReferenceToUnsafeThroughTypealias:
-    case CallToUnsafe:
-      return storage.entity.declContext;
-
-    case Override:
-      return getDecl()->getDeclContext();
-
-    case Witness:
-    case TypeWitness:
-      return getConformance().getConcrete()->getDeclContext();
-
-    case UnsafeConformance:
-      return storage.conformance.declContext;
-
-    case PreconcurrencyImport:
-      return storage.importDecl->getDeclContext();
-    }
-  }
-
   /// Get the original declaration for an issue with a polymorphic
   /// implementation, e.g., an overridden declaration or a protocol
   /// requirement.
@@ -294,12 +352,16 @@ public:
 
     case TypeWitness:
     case UnownedUnsafe:
+    case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
     case ReferenceToUnsafeThroughTypealias:
+    case ReferenceToUnsafeStorage:
     case CallToUnsafe:
+    case CallArgument:
     case UnsafeConformance:
     case PreconcurrencyImport:
+    case TemporarilyEscaping:
       return nullptr;
     }
   }
@@ -319,11 +381,19 @@ public:
       return storage.typeWitness.type;
 
     case UnownedUnsafe:
+    case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
       return storage.entity.type;
+
+    case CallArgument:
+      return storage.callArgument.paramType;
+
+    case TemporarilyEscaping:
+      return storage.temporarilyEscaping->getOpaqueValue()->getType();
     }
   }
 
@@ -342,13 +412,29 @@ public:
 
     case Override:
     case UnownedUnsafe:
+    case ExclusivityUnchecked:
     case NonisolatedUnsafe:
     case ReferenceToUnsafe:
+    case ReferenceToUnsafeStorage:
     case ReferenceToUnsafeThroughTypealias:
     case CallToUnsafe:
+    case CallArgument:
+    case TemporarilyEscaping:
     case PreconcurrencyImport:
       return ProtocolConformanceRef::forInvalid();
     }
+  }
+
+  /// Get information about the call argument.
+  ///
+  /// Produces the argument name, argument index, and argument expression for
+  /// a unsafe use describing a call argument.
+  std::tuple<Identifier, unsigned, Expr *> getCallArgument() const {
+    assert(getKind() == CallArgument);
+    return std::make_tuple(
+        Identifier::getFromOpaquePointer(storage.callArgument.argumentName),
+        storage.callArgument.argumentIndex,
+        storage.callArgument.argument);
   }
 };
 

@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
+#include "swift/AST/AttrKind.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/Version.h"
@@ -35,6 +36,21 @@ namespace llvm {
 namespace swift {
 enum class IntermoduleDepTrackingMode;
 
+/// Options for debugging the behavior of the frontend.
+struct CompilerDebuggingOptions {
+  /// Indicates whether or not the Clang importer should print statistics upon
+  /// termination.
+  bool PrintClangStats = false;
+
+  /// Indicates whether or not the availability scope trees built during
+  /// compilation should be dumped upon termination.
+  bool DumpAvailabilityScopes = false;
+
+  /// Indicates whether or not the Clang importer should dump lookup tables
+  /// upon termination.
+  bool DumpClangLookupTables = false;
+};
+
 /// Options for controlling the behavior of the frontend.
 class FrontendOptions {
   friend class ArgsToFrontendOptionsConverter;
@@ -51,11 +67,18 @@ public:
 
   bool isOutputFileDirectory() const;
 
-  /// An Objective-C header to import and make implicitly visible.
+  /// A C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
 
+  /// A C pch to import and make implicitly visible.
+  std::string ImplicitObjCPCHPath;
+
+  /// Whether the imported C header or precompiled header is considered
+  /// an internal import (vs. the default, a public import).
+  bool ImportHeaderAsInternal = false;
+
   /// The map of aliases and real names of imported or referenced modules.
-  llvm::StringMap<StringRef> ModuleAliasMap;
+  llvm::StringMap<std::string> ModuleAliasMap;
 
   /// The name of the module that the frontend is building.
   std::string ModuleName;
@@ -89,9 +112,6 @@ public:
   /// The path to which we should store indexing data, if any.
   std::string IndexStorePath;
 
-  /// The path to load access notes from.
-  std::string AccessNotesPath;
-
   /// The path to look in when loading a module interface file, to see if a
   /// binary module has already been built for use by the compiler.
   std::string PrebuiltModuleCachePath;
@@ -99,6 +119,10 @@ public:
   /// The path to output explicit module dependencies. Only relevant during
   /// dependency scanning.
   std::string ExplicitModulesOutputPath;
+
+  /// The path to output explicitly-built SDK module dependencies. Only relevant during
+  /// dependency scanning.
+  std::string ExplicitSDKModulesOutputPath;
 
   /// The path to look in to find backup .swiftinterface files if those found
   /// from SDKs are failing.
@@ -117,6 +141,9 @@ public:
   /// A set of modules allowed to import this module.
   std::set<std::string> AllowableClients;
 
+  /// Options for debugging the compiler.
+  CompilerDebuggingOptions CompilerDebuggingOpts;
+
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
@@ -128,6 +155,9 @@ public:
 
   /// Include local definitions/references in the index data.
   bool IndexIncludeLocals = false;
+  
+  /// Whether to compress the record and unit files in the index store.
+  bool IndexStoreCompress = false;
 
   bool SerializeDebugInfoSIL = false;
   /// If building a module from interface, ignore compiler flags
@@ -138,7 +168,7 @@ public:
   std::string VerifyGenericSignaturesInModule;
 
   /// CacheReplay PrefixMap.
-  std::vector<std::string> CacheReplayPrefixMap;
+  std::vector<std::pair<std::string, std::string>> CacheReplayPrefixMap;
 
   /// Number of retry opening an input file if the previous opening returns
   /// bad file descriptor error.
@@ -156,9 +186,6 @@ public:
 
     /// Parse and dump scope map.
     DumpScopeMaps,
-
-    /// Parse, type-check, and dump availability scopes
-    DumpAvailabilityScopes,
 
     EmitImportedModules, ///< Emit the modules that this one imports
     EmitPCH,             ///< Emit PCH of imported bridging header
@@ -194,7 +221,7 @@ public:
 
     ScanDependencies, ///< Scan dependencies of Swift source files
     PrintVersion,     ///< Print version information.
-    PrintFeature,     ///< Print supported feature of this compiler
+    PrintArguments,   ///< Print supported arguments of this compiler
   };
 
   /// Indicates the action the user requested that the frontend perform.
@@ -272,30 +299,23 @@ public:
   /// \see ModuleDecl::isImplicitDynamicEnabled
   bool EnableImplicitDynamic = false;
 
-  /// Enables the "fully resilient" resilience strategy.
-  ///
-  /// \see ResilienceStrategy::Resilient
-  bool EnableLibraryEvolution = false;
-
   /// If set, this module is part of a mixed Objective-C/Swift framework, and
   /// the Objective-C half should implicitly be visible to the Swift sources.
   bool ImportUnderlyingModule = false;
 
   /// If set, the header provided in ImplicitObjCHeaderPath will be rewritten
   /// by the Clang importer as part of semantic analysis.
-  bool SerializeBridgingHeader = false;
+  bool ModuleHasBridgingHeader = false;
+
+  /// Generate reproducer.
+  bool GenReproducer = false;
+
+  /// Directory to generate reproducer.
+  std::string GenReproducerDir;
 
   /// Indicates whether or not the frontend should print statistics upon
   /// termination.
   bool PrintStats = false;
-
-  /// Indicates whether or not the Clang importer should print statistics upon
-  /// termination.
-  bool PrintClangStats = false;
-
-  /// Indicates whether or not the Clang importer should dump lookup tables
-  /// upon termination.
-  bool DumpClangLookupTables = false;
 
   /// Indicates whether standard help should be shown.
   bool PrintHelp = false;
@@ -306,6 +326,14 @@ public:
   /// Indicates that the frontend should print the target triple and then
   /// exit.
   bool PrintTargetInfo = false;
+
+  /// Indicates that the frontend should print the static build configuration
+  /// information as JSON.
+  bool PrintBuildConfig = false;
+
+  /// Indicates that the frontend should print the supported features and then
+  /// exit.
+  bool PrintSupportedFeatures = false;
 
   /// See the \ref SILOptions.EmitVerboseSIL flag.
   bool EmitVerboseSIL = false;
@@ -363,11 +391,25 @@ public:
   /// Load and re-use a prior serialized dependency scanner cache.
   bool ReuseDependencyScannerCache = false;
 
+  /// Upon loading a prior serialized dependency scanner cache, filter out
+  /// dependency module information which is no longer up-to-date with respect
+  /// to input files of every given module.
+  bool ValidatePriorDependencyScannerCache = false;
+
   /// The path at which to either serialize or deserialize the dependency scanner cache.
   std::string SerializedDependencyScannerCachePath;
 
+  /// Emit dependency scanning related remarks.
+  bool EmitDependencyScannerRemarks = false;
+
   /// Emit remarks indicating use of the serialized module dependency scanning cache.
   bool EmitDependencyScannerCacheRemarks = false;
+
+  /// The path at which the dependency scanner can write generated files.
+  std::string ScannerOutputDir;
+
+  /// If the scanner output is written directly to the disk for debugging.
+  bool WriteScannerOutput = false;
 
   /// Whether the dependency scanner invocation should resolve imports
   /// to filesystem modules in parallel.
@@ -433,6 +475,17 @@ public:
   /// -dump-scope-maps.
   SmallVector<std::pair<unsigned, unsigned>, 2> DumpScopeMapLocations;
 
+  /// The possible output formats supported for dumping ASTs.
+  enum class ASTFormat {
+    Default,                ///< S-expressions for debugging
+    DefaultWithDeclContext, ///< S-expressions with DeclContext hierarchy
+    JSON,                   ///< Structured JSON for analysis
+    JSONZlib,               ///< Like JSON, but zlib-compressed
+  };
+
+  /// The output format generated by the `-dump-ast` flag.
+  ASTFormat DumpASTFormat = ASTFormat::Default;
+
   /// Determines whether the static or shared resource folder is used.
   /// When set to `true`, the default resource folder will be set to
   /// '.../lib/swift', otherwise '.../lib/swift_static'.
@@ -451,6 +504,10 @@ public:
   /// Indicates which declarations should be exposed in the generated clang
   /// header.
   std::optional<ClangHeaderExposeBehavior> ClangHeaderExposedDecls;
+
+  // Include declarations that are at least as visible as the acces specified
+  // by -emit-clang-header-min-access
+  std::optional<AccessLevel> ClangHeaderMinAccess;
 
   struct ClangHeaderExposedImportedModule {
     std::string moduleName;
@@ -562,6 +619,20 @@ public:
 
   /// All block list configuration files to be honored in this compilation.
   std::vector<std::string> BlocklistConfigFilePaths;
+
+  struct CustomAvailabilityDomains {
+    /// Domains defined with `-define-enabled-availability-domain=`.
+    llvm::SmallVector<std::string> EnabledDomains;
+    /// Domains defined with `-define-always-enabled-availability-domain=`.
+    llvm::SmallVector<std::string> AlwaysEnabledDomains;
+    /// Domains defined with `-define-disabled-availability-domain=`.
+    llvm::SmallVector<std::string> DisabledDomains;
+    /// Domains defined with `-define-dynamic-availability-domain=`.
+    llvm::SmallVector<std::string> DynamicDomains;
+  };
+
+  /// The collection of AvailabilityDomain definitions specified as arguments.
+  CustomAvailabilityDomains AvailabilityDomains;
 
 private:
   static bool canActionEmitDependencies(ActionType);

@@ -378,44 +378,26 @@ static SILValue constantFoldIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID,
     return constantFoldBinaryWithOverflow(BI, ID,
                                           /* ReportOverflow */ false,
                                           ResultsInError);
+  case llvm::Intrinsic::rint:
+    if (auto *floatLiteral = dyn_cast<FloatLiteralInst>(BI->getArguments()[0])) {
+      SILBuilderWithScope builder(BI);
+      APFloat result = floatLiteral->getValue();
+      // The following code is taken from LLVM's constant folder.
+      result.roundToIntegral(APFloat::rmNearestTiesToEven);
+      return builder.createFloatLiteral(BI->getLoc(), BI->getType(), result);
+    }
   }
   return nullptr;
 }
 
-static bool isFiniteFloatLiteral(SILValue v) {
-  if (auto *lit = dyn_cast<FloatLiteralInst>(v)) {
-    return lit->getValue().isFinite();
+static bool isNanLiteral(SILValue v) {
+  if (auto *literal = dyn_cast<FloatLiteralInst>(v)) {
+    return literal->getValue().isNaN();
   }
   return false;
 }
 
 static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
-  static auto hasIEEEFloatNanBitRepr = [](const APInt val) -> bool {
-    auto bitWidth = val.getBitWidth();
-    if (bitWidth == 32) {
-      APInt nanBitRepr =
-          APFloat::getNaN(llvm::APFloatBase::IEEEsingle()).bitcastToAPInt();
-      return bitWidth == nanBitRepr.getBitWidth() && val == nanBitRepr;
-    } else {
-      APInt nanBitRepr =
-          APFloat::getNaN(llvm::APFloatBase::IEEEdouble()).bitcastToAPInt();
-      return bitWidth == nanBitRepr.getBitWidth() && val == nanBitRepr;
-    }
-  };
-
-  static auto hasIEEEFloatPosInfBitRepr = [](const APInt val) -> bool {
-    auto bitWidth = val.getBitWidth();
-    if (bitWidth == 32) {
-      APInt infBitRepr =
-          APFloat::getInf(llvm::APFloatBase::IEEEsingle()).bitcastToAPInt();
-      return bitWidth == infBitRepr.getBitWidth() && val == infBitRepr;
-    } else {
-      APInt infBitRepr =
-          APFloat::getInf(llvm::APFloatBase::IEEEdouble()).bitcastToAPInt();
-      return bitWidth == infBitRepr.getBitWidth() && val == infBitRepr;
-    }
-  };
-
   OperandValueArrayRef Args = BI->getArguments();
 
   // Fold for floating point constant arguments.
@@ -428,270 +410,32 @@ static SILValue constantFoldCompareFloat(BuiltinInst *BI, BuiltinValueKind ID) {
     return B.createIntegerLiteral(BI->getLoc(), BI->getType(), Res);
   }
 
-  using namespace swift::PatternMatch;
-
-  // Ordered comparisons with NaN always return false
-  SILValue Other;
-  IntegerLiteralInst *builtinArg;
-  if (match(BI, m_CombineOr(
-                    // x == NaN
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OEQ, 
-                                  m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                    // x == NaN
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OGT, 
-                                  m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                    // x >= NaN
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OGE, 
-                                  m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                    // x < NaN
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OLT, 
-                                  m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                    // x <= NaN
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OLE, 
-                                  m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                    // x != NaN
-                    m_BuiltinInst(BuiltinValueKind::FCMP_ONE, 
-                                  m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                    // NaN == x
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OEQ, 
-                                  m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                    // NaN > x
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OGT, 
-                                  m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                    // NaN >= x
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OGE, 
-                                  m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                    // NaN < x
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OLT, 
-                                  m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                    // NaN <= x
-                    m_BuiltinInst(BuiltinValueKind::FCMP_OLE, 
-                                  m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                    // NaN != x
-                    m_BuiltinInst(BuiltinValueKind::FCMP_ONE, 
-                                  m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other))))) {
-    APInt val = builtinArg->getValue();
-    if (hasIEEEFloatNanBitRepr(val)) {
-      SILBuilderWithScope B(BI);
-      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 0));
-    } else {
-      // An edge case where we're comparing NaN with another value
-      // defined using the BitCast builtin instruction.
-      //
-      // In this case, the `builtinArg` capture does not actually represent the NaN
-      // argument that we want. Therefore we need to pattern-match
-      // the definition of the SILValue `Other`, to see if it represents a NaN.
-      if (auto *bci = dyn_cast<BuiltinInst>(Other)) {
-        if (bci->getBuiltinInfo().ID == BuiltinValueKind::BitCast) {
-          if (auto *arg = dyn_cast<IntegerLiteralInst>(bci->getArguments()[0])) {
-            if (hasIEEEFloatNanBitRepr(arg->getValue())) {
-              SILBuilderWithScope B(BI);
-              return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 0));
-            }
-          }
-        }
+  if (isNanLiteral(Args[0]) || isNanLiteral(Args[1])) {
+    switch (BI->getBuiltinInfo().ID) {
+      // Ordered comparisons with NaN always return false
+      case BuiltinValueKind::FCMP_OEQ:   // ==
+      case BuiltinValueKind::FCMP_OGT:   // >=
+      case BuiltinValueKind::FCMP_OGE:   // <
+      case BuiltinValueKind::FCMP_OLT:   // <
+      case BuiltinValueKind::FCMP_OLE:   // <=
+      case BuiltinValueKind::FCMP_ONE: { // !=
+        SILBuilderWithScope B(BI);
+        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 0));
       }
-    }
-  }
-
-  // Unordered comparisons with NaN always return true
-  if (match(BI, 
-            m_CombineOr(
-                // x == NaN
-                m_BuiltinInst(BuiltinValueKind::FCMP_UEQ, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // x == NaN
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGT, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // x >= NaN
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGE, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // x < NaN
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULT, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // x <= NaN
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // x != NaN
-                m_BuiltinInst(BuiltinValueKind::FCMP_UNE, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // NaN == x
-                m_BuiltinInst(BuiltinValueKind::FCMP_UEQ, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                // NaN > x
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGT, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                // NaN >= x
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGE, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                // NaN < x
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULT, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                // NaN <= x
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                // NaN != x
-                m_BuiltinInst(BuiltinValueKind::FCMP_UNE, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other))))) {
-    APInt val = builtinArg->getValue();
-    if (hasIEEEFloatNanBitRepr(val)) {
-      SILBuilderWithScope B(BI);
-      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
-    } else {
-      // An edge case where we're comparing NaN with another value
-      // defined using the BitCast builtin instruction.
-      //
-      // In this case, the `builtinArg` capture does not actually represent the NaN
-      // argument that we want. Therefore we need to pattern-match
-      // the definition of the SILValue `Other`, to see if it represents a NaN.
-      if (auto *bci = dyn_cast<BuiltinInst>(Other)) {
-        if (bci->getBuiltinInfo().ID == BuiltinValueKind::BitCast) {
-          if (auto *arg = dyn_cast<IntegerLiteralInst>(bci->getArguments()[0])) {
-            if (hasIEEEFloatNanBitRepr(arg->getValue())) {
-              SILBuilderWithScope B(BI);
-              return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
-            }
-          }
-        }
+      // Unordered comparisons with NaN always return true
+      case BuiltinValueKind::FCMP_UEQ:   // ==
+      case BuiltinValueKind::FCMP_UGT:   // >=
+      case BuiltinValueKind::FCMP_UGE:   // <
+      case BuiltinValueKind::FCMP_ULT:   // <
+      case BuiltinValueKind::FCMP_ULE:   // <=
+      case BuiltinValueKind::FCMP_UNE: { // !=
+        SILBuilderWithScope B(BI);
+        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
       }
+      default:
+        break;
     }
   }
-
-  // Infinity is equal to, greater than equal to and less than equal to itself
-  IntegerLiteralInst *inf1;
-  IntegerLiteralInst *inf2;
-
-  if (match(BI, 
-            m_CombineOr(
-                // Inf == Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OEQ, 
-                              m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
-                // Inf >= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OGE, 
-                              m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
-                // Inf <= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OLE, 
-                              m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),                                                            
-                // Inf == Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_UEQ, 
-                              m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
-                // Inf >= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGE, 
-                              m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
-                // Inf <= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
-                              m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2)))))) {
-    APInt val1 = inf1->getValue();
-    APInt val2 = inf2->getValue();
-
-    if (hasIEEEFloatPosInfBitRepr(val1) && hasIEEEFloatPosInfBitRepr(val2)) {
-      SILBuilderWithScope B(BI);
-      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
-    }
-  }
-
-  // Infinity cannot be unequal to, greater than or less than itself
-  if (match(BI, 
-            m_CombineOr(
-                // Inf != Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_ONE, 
-                              m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
-                // Inf > Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OGT, 
-                              m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
-                // Inf < Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OLT, 
-                              m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
-                // Inf != Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_UNE, 
-                              m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
-                // Inf > Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGT, 
-                              m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2))),
-                // Inf < Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULT, 
-                              m_BitCast(m_IntegerLiteralInst(inf1)), m_BitCast(m_IntegerLiteralInst(inf2)))))) {
-    APInt val1 = inf1->getValue();
-    APInt val2 = inf2->getValue();
-
-    if (hasIEEEFloatPosInfBitRepr(val1) && hasIEEEFloatPosInfBitRepr(val2)) {
-      SILBuilderWithScope B(BI);
-      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 0));
-    }
-  }
-
-  // Everything is less than or less than equal to positive infinity
-  if (match(BI,
-            m_CombineOr(
-                // Inf > x
-                m_BuiltinInst(BuiltinValueKind::FCMP_OGT, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                // Inf >= x
-                m_BuiltinInst(BuiltinValueKind::FCMP_OGE, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                // x < Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OLT, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // x <= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OLE, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // Inf > x
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGT, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                // Inf >= x
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGE, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                // x < Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULT, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // x <= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg)))))) {
-    APInt val = builtinArg->getValue();
-    if (hasIEEEFloatPosInfBitRepr(val) &&
-        // Only if `Other` is a literal we can be sure that it's not Inf or NaN.
-        isFiniteFloatLiteral(Other)) {
-      SILBuilderWithScope B(BI);
-      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 1));
-    }
-  }
-
-  // Positive infinity is not less than or less than equal to anything
-  if (match(BI, 
-            m_CombineOr(
-                // x > Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OGT, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // x >= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_OGE, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // Inf < x
-                m_BuiltinInst(BuiltinValueKind::FCMP_OLT, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                // Inf <= x
-                m_BuiltinInst(BuiltinValueKind::FCMP_OLE, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                // x > Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGT, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // x >= Inf
-                m_BuiltinInst(BuiltinValueKind::FCMP_UGE, 
-                              m_SILValue(Other), m_BitCast(m_IntegerLiteralInst(builtinArg))),
-                // Inf < x
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULT, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other)),
-                // Inf <= x
-                m_BuiltinInst(BuiltinValueKind::FCMP_ULE, 
-                              m_BitCast(m_IntegerLiteralInst(builtinArg)), m_SILValue(Other))))) {
-    APInt val = builtinArg->getValue();
-    if (hasIEEEFloatPosInfBitRepr(val) &&
-        // Only if `Other` is a literal we can be sure that it's not Inf or NaN.
-        isFiniteFloatLiteral(Other)) {
-      SILBuilderWithScope B(BI);
-      return B.createIntegerLiteral(BI->getLoc(), BI->getType(), APInt(1, 0));
-    }
-  }
-
   return nullptr;
 }
 
@@ -1551,6 +1295,41 @@ case BuiltinValueKind::id:
     return constantFoldAndCheckIntegerConversions(BI, Builtin, ResultsInError);
   }
 
+  case BuiltinValueKind::SIToFP: {
+    auto *intLiteral = dyn_cast<IntegerLiteralInst>(Args[0]);
+    if (!intLiteral)
+      return nullptr;
+    APInt api = intLiteral->getValue();
+    auto *destTy = Builtin.Types[1]->castTo<BuiltinFloatType>();
+
+    // The following code is taken from LLVM's constant folder.
+    APFloat apf(destTy->getAPFloatSemantics(),
+                APInt::getZero(destTy->getBitWidth()));
+    apf.convertFromAPInt(api, Builtin.ID==BuiltinValueKind::SIToFP,
+                         APFloat::rmNearestTiesToEven);
+
+    SILBuilderWithScope B(BI);
+    return B.createFloatLiteral(BI->getLoc(), BI->getType(), apf);
+  }
+
+  case BuiltinValueKind::BitCast: {
+    auto destTy = Builtin.Types[1];
+    // The following code is taken from LLVM's constant folder.
+    if (auto *intLiteral = dyn_cast<IntegerLiteralInst>(Args[0])) {
+      if (auto *floatDestTy = destTy->getAs<BuiltinFloatType>()) {
+        SILBuilderWithScope B(BI);
+        return B.createFloatLiteral(BI->getLoc(), BI->getType(),
+                 APFloat(floatDestTy->getAPFloatSemantics(), intLiteral->getValue()));
+      }
+    } else if (auto *floatLiteral = dyn_cast<FloatLiteralInst>(Args[0])) {
+      if (destTy->is<BuiltinIntegerType>()) {
+        SILBuilderWithScope B(BI);
+        return B.createIntegerLiteral(BI->getLoc(), BI->getType(), floatLiteral->getValue().bitcastToAPInt());
+      }
+    }
+    return nullptr;
+  }
+
   case BuiltinValueKind::IntToFPWithOverflow: {
     // Get the value. It should be a constant in most cases.
     // Note, this will not always be a constant, for example, when analyzing
@@ -1886,7 +1665,8 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
       // to be folded, if needed.
       if (auto *floatLit = dyn_cast<FloatLiteralInst>(inst)) {
         APFloat fpVal = floatLit->getValue();
-        if (EnableDiagnostics && fpVal.isInfinity()) {
+        if (EnableDiagnostics && fpVal.isInfinity() &&
+            floatLit->getLoc().getAsASTNode<FloatLiteralExpr>()) {
           SmallString<10> litStr;
           tryExtractLiteralText(floatLit, litStr);
           diagnose(inst->getModule().getASTContext(), inst->getLoc().getSourceLoc(),

@@ -1184,6 +1184,16 @@ static bool sinkArgument(EnumCaseDataflowContext &Context, SILBasicBlock *BB, un
   if (hasOwnershipOperandsOrResults(FSI))
     return false;
 
+  // Even if the incoming instruction has no ownership, the argument may have.
+  // This can happen with enums which are constructed with a non-payload case:
+  //
+  //   %1 = enum $Optional<C>, #Optional.none!enumelt
+  //   br bb3(%1)
+  // bb1(%3 : @owned $Optional<C>):
+  //
+  if (BB->getArgument(ArgNum)->getOwnershipKind() != OwnershipKind::None)
+    return false;
+
   // The list of identical instructions.
   SmallVector<SingleValueInstruction *, 8> Clones;
   Clones.push_back(FSI);

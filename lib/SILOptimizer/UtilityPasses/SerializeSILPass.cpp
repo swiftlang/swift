@@ -114,7 +114,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   // Check substitution maps.
   switch (inst.getKind()) {
   case SILInstructionKind::AllocStackInst:
-  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::AllocPackInst:
   case SILInstructionKind::AllocPackMetadataInst:
   case SILInstructionKind::AllocRefInst:
@@ -167,6 +166,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MarkDependenceAddrInst:
   case SILInstructionKind::MergeIsolationRegionInst:
   case SILInstructionKind::CopyBlockInst:
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
@@ -185,7 +185,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
@@ -209,6 +209,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::ObjCProtocolInst:
   case SILInstructionKind::ObjectInst:
   case SILInstructionKind::VectorInst:
+  case SILInstructionKind::VectorBaseAddrInst:
   case SILInstructionKind::TupleInst:
   case SILInstructionKind::TupleAddrConstructorInst:
   case SILInstructionKind::TupleExtractInst:
@@ -240,6 +241,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::KeyPathInst:
   case SILInstructionKind::UnreachableInst:
   case SILInstructionKind::ReturnInst:
+  case SILInstructionKind::ReturnBorrowInst:
   case SILInstructionKind::ThrowInst:
   case SILInstructionKind::ThrowAddrInst:
   case SILInstructionKind::YieldInst:
@@ -288,7 +290,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::EndUnpairedAccessInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::AssignInst:
-  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::AssignOrInitInst:
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::DebugValueInst:
@@ -321,6 +322,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::EndCOWMutationAddrInst:
   case SILInstructionKind::IncrementProfilerCounterInst:
   case SILInstructionKind::GetAsyncContinuationInst:
   case SILInstructionKind::GetAsyncContinuationAddrInst:
@@ -333,6 +335,9 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::PackElementSetInst:
   case SILInstructionKind::TuplePackElementAddrInst:
   case SILInstructionKind::TypeValueInst:
+  case SILInstructionKind::IgnoredUseInst:
+  case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
+  case SILInstructionKind::UncheckedOwnershipInst:
     // Handle by operand and result check.
     break;
 

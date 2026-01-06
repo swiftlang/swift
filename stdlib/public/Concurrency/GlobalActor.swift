@@ -77,7 +77,7 @@ public protocol GlobalActor {
 @available(SwiftStdlib 5.1, *)
 extension GlobalActor {
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
-    shared.unownedExecutor
+    unsafe shared.unownedExecutor
   }
 }
 

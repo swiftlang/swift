@@ -35,7 +35,7 @@ ImportSet::ImportSet(bool hasHeaderImportModule,
     NumTopLevelImports(topLevelImports.size()),
     NumTransitiveImports(transitiveImports.size()),
     NumTransitiveSwiftOnlyImports(transitiveSwiftOnlyImports.size()) {
-  auto buffer = getTrailingObjects<ImportedModule>();
+  auto *buffer = getTrailingObjects();
   std::uninitialized_copy(topLevelImports.begin(), topLevelImports.end(),
                           buffer);
   std::uninitialized_copy(transitiveImports.begin(), transitiveImports.end(),
@@ -428,7 +428,17 @@ ImportCache::getWeakImports(const ModuleDecl *mod) {
       ModuleDecl *importedModule = import.module.importedModule;
       result.insert(importedModule);
 
-      auto reexportedModules = getImportSet(importedModule).getAllImports();
+      // Only explicit re-exports of a weak-linked module are themselves
+      // weak-linked.
+      //
+      // // Module A
+      // @_weakLinked import B
+      //
+      // // Module B
+      // @_exported import C
+      SmallVector<ImportedModule, 4> reexportedModules;
+      importedModule->getImportedModules(
+          reexportedModules, ModuleDecl::ImportFilterKind::Exported);
       for (auto reexportedModule : reexportedModules) {
         result.insert(reexportedModule.importedModule);
       }

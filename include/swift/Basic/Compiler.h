@@ -90,13 +90,6 @@
 #define SWIFT_IMPORT_UNSAFE
 #endif
 
-/// Same as `SWIFT_SELF_CONTAINED` in <swift/bridging>.
-#if __has_attribute(swift_attr)
-#define SWIFT_SELF_CONTAINED __attribute__((swift_attr("import_owned")))
-#else
-#define SWIFT_SELF_CONTAINED
-#endif
-
 #ifdef __GNUC__
 #define SWIFT_ATTRIBUTE_NORETURN __attribute__((noreturn))
 #elif defined(_MSC_VER)
@@ -196,5 +189,11 @@ inline const char *operator""_swift_u8(const char8_t *p, size_t) {
 #define SWIFT_UTF8(literal) u8##literal
 #endif // defined(__cpp_char8_t)
 #endif // defined(__cplusplus)
+
+#if __has_attribute(trivial_abi)
+#define SWIFT_TRIVIAL_ABI __attribute__((trivial_abi))
+#else
+#define SWIFT_TRIVIAL_ABI
+#endif
 
 #endif // SWIFT_BASIC_COMPILER_H

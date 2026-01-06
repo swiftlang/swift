@@ -36,12 +36,27 @@
 // CHECK:   var x: MyTemplatedStruct<CInt>
 // CHECK: }
 
-// CHECK: struct HasUninstantiatableTemplateMember<NoDefinition, TemplateClassWithMemberTemplates<NoDefinition>> {
+// CHECK: struct HasNestedInstantiation {
+// CHECK:   struct MyNestedTemplatedStruct<T> {
+// CHECK:   }
+// CHECK:   typealias NestedInst = MyTemplatedStruct<HasNestedInstantiation.MyNestedTemplatedStruct<CInt>>
+// CHECK: }
+
+// CHECK: enum NS {
+// CHECK:   struct HasNestedInstantiation {
+// CHECK:     struct MyNestedTemplatedStruct<T> {
+// CHECK:     }
+// CHECK:     typealias NestedInst = MyTemplatedStruct<NS.HasNestedInstantiation.MyNestedTemplatedStruct<CInt>>
+// CHECK:   }
+// CHECK: }
+
+
+// CHECK: struct HasUninstantiatableTemplateMember<HasTemplateInstantiationWithForwardDecl.NoDefinition, TemplateClassWithMemberTemplates<HasTemplateInstantiationWithForwardDecl.NoDefinition>> {
 // CHECK:   init(pointer: OpaquePointer!)
 // CHECK:   var pointer: OpaquePointer!
 // CHECK: }
 
 // CHECK: struct HasTemplateInstantiationWithForwardDecl {
-// CHECK:   init(noDefMember: HasUninstantiatableTemplateMember<NoDefinition, TemplateClassWithMemberTemplates<NoDefinition>>)
-// CHECK:   var noDefMember: HasUninstantiatableTemplateMember<NoDefinition, TemplateClassWithMemberTemplates<NoDefinition>>
+// CHECK:   init(noDefMember: HasUninstantiatableTemplateMember<HasTemplateInstantiationWithForwardDecl.NoDefinition, TemplateClassWithMemberTemplates<HasTemplateInstantiationWithForwardDecl.NoDefinition>>)
+// CHECK:   var noDefMember: HasUninstantiatableTemplateMember<HasTemplateInstantiationWithForwardDecl.NoDefinition, TemplateClassWithMemberTemplates<HasTemplateInstantiationWithForwardDecl.NoDefinition>>
 // CHECK: }

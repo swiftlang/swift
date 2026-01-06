@@ -1,4 +1,4 @@
-//===--- ConformanceLookupTable - Conformance Lookup Table ------*- C++ -*-===//
+//===--- ConformanceLookupTable.h - Conformance Lookup Table ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -21,6 +21,7 @@
 #define SWIFT_AST_CONFORMANCE_LOOKUP_TABLE_H
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/ConformanceAttributes.h"
 #include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
@@ -87,22 +88,20 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   class ConformanceSource {
     void *Storage;
 
+    /// The `TypeRepr` of the inheritance clause entry that declares this
+    /// conformance, if any. For example, if this is a conformance to `Y`
+    /// declared as `struct S: X, Y & Z {}`, this is the `TypeRepr` for `Y & Z`.
+    ///
+    /// - Important: The value can be valid only for an explicit conformance.
+    TypeRepr *inheritedTypeRepr;
+
     ConformanceEntryKind Kind;
 
-    /// The location of the "unchecked" attribute, if there is one.
-    SourceLoc uncheckedLoc;
+    ConformanceAttributes attributes;
 
-    /// The location of the "preconcurrency" attribute, if there is one.
-    SourceLoc preconcurrencyLoc;
-
-    /// The location of the "unsafe" attribute, if there is one.
-    SourceLoc unsafeLoc;
-
-    /// The range of the "@safe(unchecked)" attribute, if there is one.
-    SourceRange safeRange;
-
-    ConformanceSource(void *ptr, ConformanceEntryKind kind)
-      : Storage(ptr), Kind(kind) { }
+    ConformanceSource(void *ptr, ConformanceEntryKind kind,
+                      TypeRepr *inheritedTypeRepr = nullptr)
+        : Storage(ptr), inheritedTypeRepr(inheritedTypeRepr), Kind(kind) {}
 
   public:
     /// Create an inherited conformance.
@@ -118,8 +117,10 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     /// The given declaration context (nominal type declaration or
     /// extension thereof) explicitly specifies conformance to the
     /// protocol.
-    static ConformanceSource forExplicit(DeclContext *dc) {
-      return ConformanceSource(dc, ConformanceEntryKind::Explicit);
+    static ConformanceSource forExplicit(DeclContext *dc,
+                                         TypeRepr *inheritedEntry) {
+      return ConformanceSource(dc, ConformanceEntryKind::Explicit,
+                               inheritedEntry);
     }
 
     /// Create an implied conformance.
@@ -143,38 +144,23 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
       return ConformanceSource(dc, ConformanceEntryKind::PreMacroExpansion);
     }
 
-    /// Return a new conformance source with the given location of "@unchecked".
-    ConformanceSource withUncheckedLoc(SourceLoc uncheckedLoc) {
+    /// Return the `TypeRepr` of the inheritance clause entry that declares this
+    /// conformance, if any. For example, if this is a conformance to `Y`
+    /// declared as `struct S: X, Y & Z {}`, this is the `TypeRepr` for `Y & Z`.
+    ///
+    /// - Important: The value can be valid only for an explicit conformance.
+    TypeRepr *getInheritedTypeRepr() const { return inheritedTypeRepr; }
+
+    /// Return a new conformance source with the given conformance
+    /// attributes.
+    ConformanceSource withAttributes(ConformanceAttributes attributes) {
       ConformanceSource result(*this);
-      if (uncheckedLoc.isValid())
-        result.uncheckedLoc = uncheckedLoc;
+      result.attributes |= attributes;
       return result;
     }
 
-    /// Return a new conformance source with the given location of
-    /// "@preconcurrency".
-    ConformanceSource withPreconcurrencyLoc(SourceLoc preconcurrencyLoc) {
-      ConformanceSource result(*this);
-      if (preconcurrencyLoc.isValid())
-        result.preconcurrencyLoc = preconcurrencyLoc;
-      return result;
-    }
-
-    /// Return a new conformance source with the given location of "@unsafe".
-    ConformanceSource withUnsafeLoc(SourceLoc unsafeLoc) {
-      ConformanceSource result(*this);
-      if (unsafeLoc.isValid())
-        result.unsafeLoc = unsafeLoc;
-      return result;
-    }
-
-    /// Return a new conformance source with the given range of
-    /// "@safe(unchecked)".
-    ConformanceSource withSafeRange(SourceRange safeRange) {
-      ConformanceSource result(*this);
-      if (safeRange.isValid())
-        result.safeRange = safeRange;
-      return result;
+    ConformanceAttributes getAttributes() const {
+      return attributes;
     }
 
     ProtocolConformanceOptions getOptions() const {
@@ -183,10 +169,12 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
         options |= ProtocolConformanceFlags::Unchecked;
       if (getPreconcurrencyLoc().isValid())
         options |= ProtocolConformanceFlags::Preconcurrency;
-      if (getUnsafeLoc().isValid() || isUnsafeContext(getDeclContext()))
+      if (getUnsafeLoc().isValid())
         options |= ProtocolConformanceFlags::Unsafe;
-      if (getSafeRange().isValid())
-        options |= ProtocolConformanceFlags::Safe;
+      if (getNonisolatedLoc().isValid())
+        options |= ProtocolConformanceFlags::Nonisolated;
+      if (attributes.globalActorType)
+        options.setGlobalActorIsolation(attributes.globalActorType);
       return options;
     }
 
@@ -230,21 +218,21 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
 
     /// The location of the @unchecked attribute, if any.
     SourceLoc getUncheckedLoc() const {
-      return uncheckedLoc;
+      return attributes.uncheckedLoc;
     }
 
     SourceLoc getPreconcurrencyLoc() const {
-      return preconcurrencyLoc;
+      return attributes.preconcurrencyLoc;
     }
 
     /// The location of the @unsafe attribute, if any.
     SourceLoc getUnsafeLoc() const {
-      return unsafeLoc;
+      return attributes.unsafeLoc;
     }
 
-    /// The range of the @safe(unchecked) attribute, if any.
-    SourceRange getSafeRange() const {
-      return safeRange;
+    /// The location of the isolated modifier, if any.
+    SourceLoc getNonisolatedLoc() const {
+      return attributes.nonisolatedLoc;
     }
 
     /// For an inherited conformance, retrieve the class declaration
@@ -283,10 +271,6 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     /// Get the declaration context that this conformance will be
     /// associated with.
     DeclContext *getDeclContext() const;
-
-  private:
-    /// Whether this declaration context is @unsafe.
-    static bool isUnsafeContext(DeclContext *dc);
   };
 
   /// An entry in the conformance table.

@@ -3,7 +3,6 @@
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test,swift_stdlib_no_asserts,optimized_stdlib
-// REQUIRES: rdar89260664
 
 final class Storage {
   var v : Int

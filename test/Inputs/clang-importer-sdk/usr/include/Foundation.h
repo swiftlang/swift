@@ -90,6 +90,24 @@ __attribute__((availability(ios,introduced=8.0)))
 
 @end
 
+
+/// macCatalyst availability
+
+void availableOnIOSButUnavailableOnmacCatalyst() __attribute__((availability(ios, introduced=8.0))) __attribute__((availability(maccatalyst, unavailable)));
+void availableOnIOSButDeprecatedOnmacCatalyst() __attribute__((availability(ios, introduced=8.0))) __attribute__((availability(maccatalyst,  introduced=8.0, deprecated=9.0)));
+
+void unavailableOnIOS() __attribute__((availability(ios, unavailable)));
+void deprecatedOniOSButNotOnmacCatalyst() __attribute__((availability(ios, introduced=8.0, deprecated=9.0))) __attribute__((availability(maccatalyst, introduced=8.0)));
+
+void availableOnIOSButUnavailableOniOSAppExtension() __attribute__((availability(ios, introduced=8.0))) __attribute__((availability(ios_app_extension, unavailable)));
+void availableOnIOSButUnavailableOnmacCatalystAppExtension() __attribute__((availability(ios, introduced=8.0))) __attribute__((availability(maccatalyst_app_extension, unavailable)));
+void availableOnIOSAppExtensionButUnavailableOnmacCatalystAppExtension() __attribute__((availability(ios_application_extension, introduced=8.0))) __attribute__((availability(maccatalyst_app_extension, unavailable)));
+
+void availableOnIOSButDeprecatedOniOSAppExtension() __attribute__((availability(ios, introduced=8.0))) __attribute__((availability(ios_app_extension, introduced=8.0, deprecated=9.0)));
+void availableOnIOSButDeprecatedOnmacCatalystAppExtension() __attribute__((availability(ios, introduced=8.0))) __attribute__((availability(maccatalyst_app_extension, introduced=8.0, deprecated=9.0)));
+void availableOnIOSAppExtensionButDeprecatedOnmacCatalystAppExtension() __attribute__((availability(ios_application_extension, introduced=8.0))) __attribute__((availability(maccatalyst_app_extension, introduced=8.0, deprecated=9.0)));
+
+
 @class NSString, NSArray, NSDictionary, NSSet, NSEnumerator;
 
 @class NSMutableArray<ObjectType>;
@@ -867,6 +885,8 @@ extern void CGColorRelease(CGColorRef color) __attribute__((availability(macosx,
 
 typedef NSString *_Nonnull NSNotificationName
     __attribute((swift_newtype(struct)));
+typedef NSString *_Nonnull NSFileAttributeKey
+    __attribute((swift_newtype(struct)));
 
 NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 extern NSString * const NSConnectionReplyMode;
@@ -1240,4 +1260,12 @@ void takeNullableId(_Nullable id);
 
 @interface PaletteDescriptor : NSObject <NSCopying>
 @property (readonly, nonnull) ColorArray *colors;
+@end
+
+@protocol NSIndexable <NSObject>
+- (id)objectAtIndex:(NSInteger)index;
+@end
+
+@interface NSCouldConformToIndexable : NSObject
+- (id)objectAtIndex:(NSInteger)index;
 @end

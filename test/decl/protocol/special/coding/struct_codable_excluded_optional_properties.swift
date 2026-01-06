@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 struct StructWithNonExcludedLetMembers : Codable { // expected-error {{type 'StructWithNonExcludedLetMembers' does not conform to protocol 'Decodable'}}
     // expected-error@-1 {{type 'StructWithNonExcludedLetMembers' does not conform to protocol 'Encodable'}}

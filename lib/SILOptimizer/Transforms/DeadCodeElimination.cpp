@@ -17,7 +17,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/NodeBits.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -51,12 +51,9 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
-  // Even though begin_access/destroy_value/copy_value/end_lifetime have
-  // side-effects, they can be DCE'ed if they do not have useful
-  // dependencies/reverse dependencies
-  if (isa<BeginAccessInst>(I) || isa<CopyValueInst>(I) ||
-      isa<DestroyValueInst>(I) || isa<EndLifetimeInst>(I) ||
-      isa<EndBorrowInst>(I))
+  // Even though end_lifetime has side-effects, it can be DCE'ed if it does not
+  // have useful dependencies/reverse dependencies
+  if (isa<EndLifetimeInst>(I))
     return false;
 
   if (isa<UnconditionalCheckedCastInst>(I)) {
@@ -74,6 +71,28 @@ static bool seemsUseful(SILInstruction *I) {
 
   if (llvm::any_of(I->getResults(),
                    [](auto result) { return result->isLexical(); })) {
+    return true;
+  }
+
+  // Instructions which end the lifetimes of values which escape can only be
+  // deleted if compensating lifetime ends are added.  Compensating lifetime
+  // ends are added by OSSACompleteLifetime when the def block of the value
+  // is different from the parent block of the instruction.  But
+  // OSSACompleteLifetime requires that liveness be complete--that there are no
+  // pointer escapes.  So we can't delete instructions which end the lifetime
+  // of values which escape to a pointer and whose parent blocks are different.
+  if (llvm::any_of(I->getAllOperands(), [I](Operand &operand) {
+        if (!operand.isLifetimeEnding())
+          return false;
+        auto value = operand.get();
+        if (isa<SILUndef>(value))
+          return false;
+        auto *insertionPoint = value->getDefiningInsertionPoint();
+        ASSERT(insertionPoint);
+        if (insertionPoint->getParent() == I->getParent())
+          return false;
+        return findPointerEscape(value);
+      })) {
     return true;
   }
 
@@ -129,7 +148,6 @@ class DCE {
   BasicBlockSet LiveBlocks;
   llvm::SmallVector<SILInstruction *, 64> Worklist;
   PostDominanceInfo *PDT;
-  DominanceInfo *DT;
   DeadEndBlocks *deadEndBlocks;
   llvm::DenseMap<SILBasicBlock *, ControllingInfo> ControllingInfoMap;
   SmallBlotSetVector<SILValue, 8> valuesToComplete;
@@ -184,6 +202,7 @@ class DCE {
 
   void markValueLive(SILValue V);
   void markInstructionLive(SILInstruction *Inst);
+  void markOwnedDeadValueLive(SILValue v);
   void markTerminatorArgsLive(SILBasicBlock *Pred, SILBasicBlock *Succ,
                               size_t ArgIndex);
   void markControllingTerminatorsLive(SILBasicBlock *Block);
@@ -203,7 +222,7 @@ public:
   DCE(SILFunction *F, PostDominanceInfo *PDT, DominanceInfo *DT,
       DeadEndBlocks *deadEndBlocks)
       : F(F), LiveArguments(F), LiveInstructions(F), LiveBlocks(F), PDT(PDT),
-        DT(DT), deadEndBlocks(deadEndBlocks) {}
+        deadEndBlocks(deadEndBlocks) {}
 
   /// The entry point to the transformation.
   bool run() {
@@ -244,6 +263,20 @@ void DCE::markInstructionLive(SILInstruction *Inst) {
   LLVM_DEBUG(llvm::dbgs() << "Marking as live: " << *Inst);
 
   Worklist.push_back(Inst);
+}
+
+void DCE::markOwnedDeadValueLive(SILValue v) {
+  if (v->getOwnershipKind() == OwnershipKind::Owned) {
+    // When an owned value has no lifetime ending uses it means that it is in a
+    // dead-end region. We must not remove and inserting compensating destroys
+    // for it because that would potentially destroy the value too early.
+    // TODO: we can remove this once we have complete OSSA lifetimes
+    for (Operand *use : v->getUses()) {
+      if (use->isLifetimeEnding())
+        return;
+    }
+    markValueLive(v);
+  }
 }
 
 /// Gets the producing instruction of a cond_fail condition. Currently these
@@ -312,6 +345,9 @@ void DCE::markLive() {
   // to be live in the sense that they are not trivially something we
   // can delete by examining only that instruction.
   for (auto &BB : *F) {
+    for (SILArgument *arg : BB.getArguments()) {
+      markOwnedDeadValueLive(arg);
+    }
     for (auto &I : BB) {
       switch (I.getKind()) {
       case SILInstructionKind::CondFailInst: {
@@ -337,22 +373,6 @@ void DCE::markLive() {
         } else {
           markInstructionLive(&I);
         }
-        break;
-      }
-      case SILInstructionKind::EndAccessInst: {
-        // An end_access is live only if it's begin_access is also live.
-        auto *beginAccess = cast<EndAccessInst>(&I)->getBeginAccess();
-        addReverseDependency(beginAccess, &I);
-        break;
-      }
-      case SILInstructionKind::DestroyValueInst: {
-        auto phi = PhiValue(I.getOperand(0));
-        // Disable DCE of phis which are lexical or may have a pointer escape.
-        if (phi && (phi->isLexical() || findPointerEscape(phi))) {
-          markInstructionLive(&I);
-        }
-        // The instruction is live only if it's operand value is also live
-        addReverseDependency(I.getOperand(0), &I);
         break;
       }
       case SILInstructionKind::EndBorrowInst: {
@@ -392,6 +412,9 @@ void DCE::markLive() {
       default:
         if (seemsUseful(&I))
           markInstructionLive(&I);
+        for (SILValue result : I.getResults()) {
+          markOwnedDeadValueLive(result);
+        }
       }
     }
   }
@@ -443,6 +466,7 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
 
   switch (Term->getTermKind()) {
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
   case TermKind::ThrowInst:
   case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
@@ -554,6 +578,7 @@ void DCE::propagateLiveness(SILInstruction *I) {
     return;
 
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
   case TermKind::ThrowInst:
   case TermKind::CondBranchInst:
   case TermKind::SwitchEnumInst:
@@ -813,12 +838,12 @@ bool DCE::removeDead() {
     }
   }
 
-  OSSALifetimeCompletion completion(F, DT, *deadEndBlocks);
+  OSSACompleteLifetime completion(F, *deadEndBlocks);
   for (auto value : valuesToComplete) {
     if (!value.has_value())
       continue;
     completion.completeOSSALifetime(*value,
-                                    OSSALifetimeCompletion::Boundary::Liveness);
+                                    OSSACompleteLifetime::Boundary::Liveness);
   }
 
   return Changed;

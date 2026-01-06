@@ -16,7 +16,7 @@
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Edit/EditsReceiver.h"
-#include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "llvm/ADT/RewriteBuffer.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -26,12 +26,13 @@ namespace swift {
 namespace migrator {
 
 /// An EditsReceiver that collects edits from an EditedSource and directly
-/// applies it to a clang::RewriteBuffer.
+/// applies it to a llvm::RewriteBuffer.
 class RewriteBufferEditsReceiver final : public clang::edit::EditsReceiver {
   const clang::SourceManager &ClangSourceManager;
   const clang::FileID InputFileID;
   const StringRef InputText;
-  clang::RewriteBuffer RewriteBuf;
+  llvm::RewriteBuffer RewriteBuf;
+
 public:
   RewriteBufferEditsReceiver(const clang::SourceManager &ClangSourceManager,
                              const clang::FileID InputFileID,

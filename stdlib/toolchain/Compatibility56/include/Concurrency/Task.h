@@ -600,6 +600,8 @@ private:
   }
 };
 
+enum { NumWords_AsyncTask = 24 };
+
 // The compiler will eventually assume these.
 static_assert(sizeof(AsyncTask) == NumWords_AsyncTask * sizeof(void*),
               "AsyncTask size is wrong");

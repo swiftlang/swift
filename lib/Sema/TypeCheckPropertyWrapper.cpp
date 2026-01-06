@@ -73,8 +73,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
     nominal->diagnose(diag::property_wrapper_ambiguous_value_property,
                       nominal->getDeclaredType(), name);
     for (auto var : vars) {
-      var->diagnose(diag::kind_declname_declared_here,
-                    var->getDescriptiveKind(), var->getName());
+      var->diagnose(diag::decl_declared_here_with_kind, var);
     }
     return nullptr;
   }
@@ -109,7 +108,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 
   // The property may not have any effects right now.
   if (auto getter = var->getEffectfulGetAccessor()) {
-    getter->diagnose(diag::property_wrapper_effectful, getter->getDescriptiveKind());
+    getter->diagnose(diag::property_wrapper_effectful, getter);
     return nullptr;
   }
 
@@ -149,7 +148,8 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
 
   for (const auto &decl : decls) {
     auto init = dyn_cast<ConstructorDecl>(decl);
-    if (!init || init->getDeclContext() != nominal || init->isGeneric())
+    if (!init || init->getDeclContext() != nominal ||
+        init->hasGenericParamList())
       continue;
 
     ParamDecl *argumentParam = nullptr;
@@ -310,9 +310,7 @@ static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
     nominal->diagnose(diag::property_wrapper_ambiguous_enclosing_self_subscript,
                       nominal->getDeclaredType(), subscriptName);
     for (auto subscript : subscripts) {
-      subscript->diagnose(diag::kind_declname_declared_here,
-                          subscript->getDescriptiveKind(),
-                          subscript->getName());
+      subscript->diagnose(diag::decl_declared_here_with_kind, subscript);
     }
     return nullptr;
 
@@ -357,7 +355,7 @@ PropertyWrapperTypeInfoRequest::evaluate(
 
   PropertyWrapperTypeInfo result;
   result.valueVar = valueVar;
-  if (auto init = findSuitableWrapperInit(ctx, nominal, valueVar,
+  if (findSuitableWrapperInit(ctx, nominal, valueVar,
                               PropertyWrapperInitKind::WrappedValue, decls)) {
     result.wrappedValueInit = PropertyWrapperTypeInfo::HasWrappedValueInit;
   } else if (auto init = findSuitableWrapperInit(
@@ -443,13 +441,9 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
   llvm::TinyPtrVector<CustomAttr *> result;
 
   for (auto attr : var->getExpandedAttrs().getAttributes<CustomAttr>()) {
-    auto mutableAttr = const_cast<CustomAttr *>(attr);
-    // Figure out which nominal declaration this custom attribute refers to.
-    auto *nominal = evaluateOrDefault(
-      ctx.evaluator, CustomAttrNominalRequest{mutableAttr, dc}, nullptr);
-
     // If we didn't find a nominal type with a @propertyWrapper attribute,
     // skip this custom attribute.
+    auto *nominal = attr->getNominalDecl();
     if (!nominal || !nominal->getAttrs().hasAttribute<PropertyWrapperAttr>())
       continue;
 
@@ -457,7 +451,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
     // the semantic checking required.
     auto sourceFile = dc->getParentSourceFile();
     if (!sourceFile) {
-      result.push_back(mutableAttr);
+      result.push_back(attr);
       continue;
     }
       
@@ -484,11 +478,15 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       continue;
     }
 
+    auto abiRole = ABIRoleInfo(var);
+    bool hasOrIsABI = !abiRole.providesAPI() || !abiRole.providesABI();
+
     // Note: Getting the semantic attrs here would trigger a request cycle.
     auto attachedAttrs = var->getAttrs();
 
     // Check for conflicting attributes.
-    if (attachedAttrs.hasAttribute<LazyAttr>() ||
+    if (hasOrIsABI ||
+        attachedAttrs.hasAttribute<LazyAttr>() ||
         attachedAttrs.hasAttribute<NSCopyingAttr>() ||
         attachedAttrs.hasAttribute<NSManagedAttr>() ||
         (attachedAttrs.hasAttribute<ReferenceOwnershipAttr>() &&
@@ -501,9 +499,11 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
         whichKind = 1;
       else if (attachedAttrs.hasAttribute<NSManagedAttr>())
         whichKind = 2;
+      else if (hasOrIsABI)
+        whichKind = 3;
       else {
         auto attr = attachedAttrs.getAttribute<ReferenceOwnershipAttr>();
-        whichKind = 2 + static_cast<unsigned>(attr->get());
+        whichKind = 3 + static_cast<unsigned>(attr->get());
       }
       var->diagnose(diag::property_with_wrapper_conflict_attribute,
                     var->getName(), whichKind);
@@ -542,7 +542,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       }
     }
 
-    result.push_back(mutableAttr);
+    result.push_back(attr);
   }
 
   // Attributes are stored in reverse order in the AST, but we want them in

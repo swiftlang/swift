@@ -68,6 +68,10 @@ public:
     OpaqueTypeDescriptorAsArgument,
     ContextDescriptorAsArgument,
     TypeLayoutString,
+    CoroAllocationFunction,
+    CoroDeallocationFunction,
+    CoroFrameAllocationFunction,
+    CoroFrameDeallocationFunction,
   };
 
 private:
@@ -86,7 +90,7 @@ private:
   using Members = ExternalUnionMembers<void,
                                        Special,
                                        ValueWitness,
-                                       AssociatedType,
+                                       AssociatedTypeDecl *,
                                        AssociatedConformance,
                                        CanSILFunctionType,
                                        SILDeclRef,
@@ -105,7 +109,7 @@ private:
     case Kind::SILDeclRef:
       return Members::indexOf<SILDeclRef>();
     case Kind::AssociatedType:
-      return Members::indexOf<AssociatedType>();
+      return Members::indexOf<AssociatedTypeDecl *>();
     case Kind::AssociatedConformance:
       return Members::indexOf<AssociatedConformance>();
     case Kind::SILFunction:
@@ -139,9 +143,9 @@ public:
     assert(isValueWitnessFunction(witness));
     Storage.emplace<ValueWitness>(StoredKind, witness);
   }
-  PointerAuthEntity(AssociatedType association)
+  PointerAuthEntity(AssociatedTypeDecl *assocType)
       : StoredKind(Kind::AssociatedType) {
-    Storage.emplaceAggregate<AssociatedType>(StoredKind, association);
+    Storage.emplaceAggregate<AssociatedTypeDecl *>(StoredKind, assocType);
   }
   PointerAuthEntity(const AssociatedConformance &association)
       : StoredKind(Kind::AssociatedConformance) {

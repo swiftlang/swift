@@ -13,22 +13,26 @@
 import Foundation
 
 struct NinjaParser {
+  private let filePath: AbsolutePath
+  private let fileReader: (AbsolutePath) throws -> Data
   private var lexer: Lexer
 
-  private init(_ input: UnsafeRawBufferPointer) throws {
+  private init(input: UnsafeRawBufferPointer, filePath: AbsolutePath, fileReader: @escaping (AbsolutePath) throws -> Data) throws {
+    self.filePath = filePath
+    self.fileReader = fileReader
     self.lexer = Lexer(ByteScanner(input))
   }
 
-  static func parse(_ input: Data) throws -> NinjaBuildFile {
-    try input.withUnsafeBytes { bytes in
-      var parser = try Self(bytes)
+  static func parse(filePath: AbsolutePath, fileReader: @escaping (AbsolutePath) throws -> Data = { try $0.read() }) throws -> NinjaBuildFile {
+
+    try fileReader(filePath).withUnsafeBytes { bytes in
+      var parser = try Self(input: bytes, filePath: filePath, fileReader: fileReader)
       return try parser.parse()
     }
   }
 }
 
 fileprivate enum NinjaParseError: Error {
-  case badAttribute
   case expected(NinjaParser.Lexeme)
 }
 
@@ -42,13 +46,11 @@ fileprivate extension ByteScanner {
       // Ninja uses '$' as the escape character.
       if c == "$" {
         switch consumer.peek(ahead: 1) {
-        case let c? where c.isSpaceOrTab:
-          fallthrough
-        case "$", ":":
+        case "$", ":", \.isSpaceOrTab:
           // Skip the '$' and take the unescaped character.
           consumer.skip()
           return consumer.eat()
-        case let c? where c.isNewline:
+        case \.isNewline:
           // This is a line continuation, skip the newline, and strip any
           // following space.
           consumer.skip(untilAfter: \.isNewline)
@@ -66,18 +68,20 @@ fileprivate extension ByteScanner {
 }
 
 fileprivate extension NinjaParser {
-  typealias BuildRule = NinjaBuildFile.BuildRule
-  typealias Attribute = NinjaBuildFile.Attribute
+  typealias Rule = NinjaBuildFile.Rule
+  typealias BuildEdge = NinjaBuildFile.BuildEdge
 
-  struct ParsedAttribute: Hashable {
+  struct ParsedBinding: Hashable {
     var key: String
     var value: String
   }
 
   enum Lexeme: Hashable {
-    case attribute(ParsedAttribute)
+    case binding(ParsedBinding)
     case element(String)
+    case rule
     case build
+    case include
     case newline
     case colon
     case equal
@@ -132,14 +136,6 @@ fileprivate extension Byte {
   }
 }
 
-fileprivate extension NinjaBuildFile.Attribute {
-  init?(_ parsed: NinjaParser.ParsedAttribute) {
-    // Ignore unknown attributes for now.
-    guard let key = Key(rawValue: parsed.key) else { return nil }
-    self.init(key: key, value: parsed.value)
-  }
-}
-
 extension NinjaParser.Lexer {
   typealias Lexeme = NinjaParser.Lexeme
 
@@ -162,7 +158,7 @@ extension NinjaParser.Lexer {
   private mutating func consumeElement() -> String? {
     input.consumeUnescaped(while: { char in
       switch char {
-      case let c where c.isNinjaOperator || c.isSpaceTabOrNewline:
+      case \.isNinjaOperator, \.isSpaceTabOrNewline:
         false
       default:
         true
@@ -170,7 +166,7 @@ extension NinjaParser.Lexer {
     })
   }
 
-  private mutating func tryConsumeAttribute(key: String) -> Lexeme? {
+  private mutating func tryConsumeBinding(key: String) -> Lexeme? {
     input.tryEating { input in
       input.skip(while: \.isSpaceOrTab)
       guard input.tryEat("=") else { return nil }
@@ -178,7 +174,7 @@ extension NinjaParser.Lexer {
       guard let value = input.consumeUnescaped(while: { !$0.isNewline }) else {
         return nil
       }
-      return .attribute(.init(key: key, value: value))
+      return .binding(.init(key: key, value: value))
     }
   }
 
@@ -204,15 +200,24 @@ extension NinjaParser.Lexer {
       if c.isNinjaOperator {
         return consumeOperator()
       }
-      if isAtStartOfLine && input.tryEat(utf8: "build") {
-        return .build
+      if isAtStartOfLine {
+        // decl keywords.
+        if input.tryEat(utf8: "build") {
+          return .build
+        }
+        if input.tryEat(utf8: "rule") {
+          return .rule
+        }
+        if input.tryEat(utf8: "include") {
+          return .include
+        }
       }
       guard let element = consumeElement() else { return nil }
 
-      // If we're on a newline, check to see if we can lex an attribute.
+      // If we're on a newline, check to see if we can lex a binding.
       if isAtStartOfLine {
-        if let attr = tryConsumeAttribute(key: element) {
-          return attr
+        if let binding = tryConsumeBinding(key: element) {
+          return binding
         }
       }
       return .element(element)
@@ -233,14 +238,42 @@ fileprivate extension NinjaParser {
     while let lexeme = eat(), lexeme != .newline {}
   }
 
-  mutating func parseAttribute() throws -> ParsedAttribute? {
-    guard case let .attribute(attr) = peek else { return nil }
+  mutating func parseBinding() throws -> ParsedBinding? {
+    guard case let .binding(binding) = peek else { return nil }
     eat()
     tryEat(.newline)
-    return attr
+    return binding
   }
 
-  mutating func parseBuildRule() throws -> BuildRule? {
+  /// ```
+  /// rule rulename
+  ///   command = ...
+  ///   var = ...
+  /// ```
+  mutating func parseRule() throws -> Rule? {
+    let indent = lexer.leadingTriviaCount
+    guard tryEat(.rule) else { return nil }
+
+    guard let ruleName = tryEatElement() else {
+      throw NinjaParseError.expected(.element("<rule name>"))
+    }
+    guard tryEat(.newline) else {
+      throw NinjaParseError.expected(.newline)
+    }
+
+    var bindings: [String: String] = [:]
+    while indent < lexer.leadingTriviaCount, let binding = try parseBinding() {
+      bindings[binding.key] = binding.value
+    }
+
+    return Rule(name: ruleName, bindings: bindings)
+  }
+
+  /// ```
+  /// build out1... | implicit-out... : rulename input... | dep... || order-only-dep...
+  ///   var = ...
+  /// ```
+  mutating func parseBuildEdge() throws -> BuildEdge? {
     let indent = lexer.leadingTriviaCount
     guard tryEat(.build) else { return nil }
 
@@ -258,17 +291,16 @@ fileprivate extension NinjaParser {
       throw NinjaParseError.expected(.colon)
     }
 
-    var isPhony = false
-    var inputs: [String] = []
-    while let str = tryEatElement() {
-      if str == "phony" {
-        isPhony = true
-      } else {
-        inputs.append(str)
-      }
+    guard let ruleName = tryEatElement() else {
+      throw NinjaParseError.expected(.element("<rule name>"))
     }
 
-    if isPhony {
+    var inputs: [String] = []
+    while let str = tryEatElement() {
+      inputs.append(str)
+    }
+
+    if ruleName == "phony" {
       skipLine()
       return .phony(for: outputs, inputs: inputs)
     }
@@ -280,7 +312,7 @@ fileprivate extension NinjaParser {
         continue
       }
       if tryEat(.pipe) || tryEat(.doublePipe) {
-        // Currently we don't distinguish between implicit and explicit deps.
+        // Currently we don't distinguish between implicit deps and order-only deps.
         continue
       }
       break
@@ -289,38 +321,61 @@ fileprivate extension NinjaParser {
     // We're done with the line, skip to the next.
     skipLine()
 
-    var attributes: [Attribute.Key: Attribute] = [:]
-    while indent < lexer.leadingTriviaCount, let attr = try parseAttribute() {
-      if let attr = Attribute(attr) {
-        attributes[attr.key] = attr
-      }
+    var bindings: [String: String] = [:]
+    while indent < lexer.leadingTriviaCount, let binding = try parseBinding() {
+      bindings[binding.key] = binding.value
     }
 
-    return BuildRule(
-      inputs: inputs, 
+    return BuildEdge(
+      ruleName: ruleName,
+      inputs: inputs,
       outputs: outputs,
       dependencies: dependencies,
-      attributes: attributes
+      bindings: bindings
     )
   }
 
+  /// ```
+  /// include path/to/sub.ninja
+  /// ```
+  mutating func parseInclude() throws -> NinjaBuildFile? {
+    guard tryEat(.include) else { return nil }
+
+    guard let fileName = tryEatElement() else {
+      throw NinjaParseError.expected(.element("<path>"))
+    }
+
+    let baseDirectory = self.filePath.parentDir!
+    let path = AnyPath(fileName).absolute(in: baseDirectory)
+    return try NinjaParser.parse(filePath: path, fileReader: fileReader)
+  }
+
   mutating func parse() throws -> NinjaBuildFile {
-    var buildRules: [BuildRule] = []
-    var attributes: [Attribute.Key: Attribute] = [:]
+    var bindings: [String: String] = [:]
+    var rules: [String: Rule] = [:]
+    var buildEdges: [BuildEdge] = []
     while peek != nil {
-      if let rule = try parseBuildRule() {
-        buildRules.append(rule)
+      if let rule = try parseRule() {
+        rules[rule.name] = rule
         continue
       }
-      if let attr = try parseAttribute() {
-        if let attr = Attribute(attr) {
-          attributes[attr.key] = attr
-        }
+      if let edge = try parseBuildEdge() {
+        buildEdges.append(edge)
         continue
       }
-      // Ignore unknown bits of syntax like 'include' for now.
+      if let binding = try parseBinding() {
+        bindings[binding.key] = binding.value
+        continue
+      }
+      if let included = try parseInclude() {
+        bindings.merge(included.bindings.values, uniquingKeysWith: { _, other in other })
+        rules.merge(included.rules, uniquingKeysWith: { _, other in other })
+        buildEdges.append(contentsOf: included.buildEdges)
+        continue
+      }
+      // Ignore unknown bits of syntax like 'subninja' for now.
       eat()
     }
-    return NinjaBuildFile(attributes: attributes, buildRules: buildRules)
+    return NinjaBuildFile(bindings: bindings, rules: rules, buildEdges: buildEdges)
   }
 }

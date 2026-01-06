@@ -64,7 +64,8 @@ struct TypeOffsetSizePair {
   /// be a child type of \p ancestorType.
   std::optional<std::pair<TypeOffsetSizePair, SILType>>
   walkOneLevelTowardsChild(TypeOffsetSizePair ancestorOffsetSize,
-                           SILType ancestorType, SILFunction *fn) const;
+                           SILType ancestorType, SILType childType,
+                           SILFunction *fn) const;
 
   /// Given an ancestor offset \p ancestorOffset and a type called \p
   /// ancestorType, walk one level towards this current type inserting on value,

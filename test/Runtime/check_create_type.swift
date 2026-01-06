@@ -1,6 +1,5 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature ValueGenerics)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking)
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_ValueGenerics
 
 // UNSUPPORTED: CPU=arm64e
 // UNSUPPORTED: use_os_stdlib

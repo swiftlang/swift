@@ -6,7 +6,8 @@ target_link_libraries(swiftSIL PRIVATE
   swiftAST
   swiftClangImporter
   swiftSema
-  swiftSerialization)
+  swiftSerialization
+  swiftSILOptimizer)
 
 add_subdirectory(IR)
 add_subdirectory(Utils)

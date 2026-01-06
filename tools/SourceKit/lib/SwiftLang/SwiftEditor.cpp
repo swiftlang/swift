@@ -147,24 +147,18 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   if (Info.ID == diag::lex_editor_placeholder.ID ||
       Info.ID == diag::oslog_invalid_log_message.ID)
     return;
-
   bool IsNote = (Info.Kind == DiagnosticKind::Note);
 
   if (IsNote && !haveLastDiag())
     // Is this possible?
     return;
 
-  if (Info.Kind == DiagnosticKind::Remark) {
-    // FIXME: we may want to handle optimization remarks in sourcekitd.
-    LOG_WARN_FUNC("unhandled optimization remark");
-    return;
-  }
-
   DiagnosticEntryInfo SKInfo;
 
   SKInfo.ID = DiagnosticEngine::diagnosticIDStringFor(Info.ID).str();
 
-  if (Info.Category == "deprecation") {
+  if (Info.Category == "deprecation" ||
+      Info.Category.starts_with("Deprecated")) {
     SKInfo.Categories.push_back(DiagnosticCategory::Deprecation);
   } else if (Info.Category == "no-usage") {
     SKInfo.Categories.push_back(DiagnosticCategory::NoUsage);
@@ -179,8 +173,8 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   }
   SKInfo.Description = Text.str();
 
-  for (auto notePath : Info.EducationalNotePaths)
-    SKInfo.EducationalNotePaths.push_back(notePath);
+  if (!Info.CategoryDocumentationURL.empty())
+    SKInfo.EducationalNotePaths.push_back(Info.CategoryDocumentationURL);
 
   std::optional<unsigned> BufferIDOpt;
   if (Info.Loc.isValid()) {
@@ -236,7 +230,6 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
     getLastDiag().Notes.push_back(std::move(SKInfo));
     return;
   }
-
   switch (Info.Kind) {
   case DiagnosticKind::Error:
     SKInfo.Severity = DiagnosticSeverityKind::Error;
@@ -244,8 +237,10 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   case DiagnosticKind::Warning:
     SKInfo.Severity = DiagnosticSeverityKind::Warning;
     break;
-  case DiagnosticKind::Note:
   case DiagnosticKind::Remark:
+    SKInfo.Severity = DiagnosticSeverityKind::Remark;
+    break;
+  case DiagnosticKind::Note:
     llvm_unreachable("already covered");
   }
 
@@ -989,8 +984,8 @@ public:
     }
   }
 
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
     if (Data.isImplicit)
       return true;
@@ -1003,9 +998,12 @@ public:
     if (D->isUnavailable())
       return true;
 
+    CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
+        D->getASTContext().SourceMgr, Range);
+
     auto &SM = D->getASTContext().SourceMgr;
     if (D == D->getASTContext().getOptionalNoneDecl() &&
-        SM.extractText(Range, BufferID) == "nil") {
+        SM.extractText(CharRange, BufferID) == "nil") {
       // If a 'nil' literal occurs in a swift-case statement, it gets replaced
       // by a reference to 'Optional.none' in the AST. We want to continue
       // highlighting 'nil' as a keyword and not as an enum element.
@@ -1014,11 +1012,11 @@ public:
 
     if (CtorTyRef)
       D = CtorTyRef;
-    annotate(D, /*IsRef=*/true, Range);
+    annotate(D, /*IsRef=*/true, CharRange);
     return true;
   }
 
-  bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+  bool visitSubscriptReference(ValueDecl *D, SourceRange Range,
                                ReferenceMetaData Data,
                                bool IsOpenBracket) override {
     // We should treat both open and close brackets equally
@@ -1029,12 +1027,11 @@ public:
     if (!Range.isValid())
       return;
 
-    // If we are walking into macro expansions, make sure we only report ranges
-    // from the requested buffer, not any buffers of child macro expansions.
-    if (IsWalkingMacroExpansionBuffer &&
-        SM.findBufferContainingLoc(Range.getStart()) != BufferID) {
+    // Make sure we only report from the requested buffer, not any buffers of
+    // child macro expansions.
+    if (SM.findBufferContainingLoc(Range.getStart()) != BufferID)
       return;
-    }
+
     unsigned ByteOffset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
     unsigned Length = Range.getByteLength();
     auto Kind = ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(D);
@@ -1453,9 +1450,8 @@ public:
     // We only report runtime name for classes and protocols with an explicitly
     // defined ObjC name, i.e. those that have @objc("SomeName")
     if (D && (isa<ClassDecl>(D) || isa<ProtocolDecl>(D))) {
-      auto *ObjCNameAttr = D->getAttrs().getAttribute<ObjCAttr>();
-      if (ObjCNameAttr && ObjCNameAttr->hasName())
-        return ObjCNameAttr->getName()->getString(Buf);
+      if (auto objcName = D->getExplicitObjCName())
+        return objcName->getString(Buf);
     }
     return StringRef();
   }
@@ -1592,6 +1588,10 @@ private:
       return MacroWalking::Arguments;
     }
 
+    bool shouldWalkIntoCustomAttrs() const override {
+      return true;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (isa<EditorPlaceholderExpr>(E) && E->getStartLoc() == PlaceholderLoc) {
         Found = cast<EditorPlaceholderExpr>(E);
@@ -1679,40 +1679,71 @@ private:
     public:
       const SourceManager &SM;
       SourceLoc TargetLoc;
-      std::pair<Expr *, ArgumentList *> EnclosingCallAndArg;
+      std::pair<ASTNode, ArgumentList *> EnclosingCallAndArg;
       Expr *OuterExpr;
       Stmt *OuterStmt;
-      explicit CallExprFinder(const SourceManager &SM)
-        :SM(SM) { }
+      Decl *OuterDecl;
 
-      bool checkCallExpr(Expr *E) {
-        ArgumentList *Args = nullptr;
-        if (auto *CE = dyn_cast<CallExpr>(E)) {
-          // Call expression can have argument.
-          Args = CE->getArgs();
+      explicit CallExprFinder(const SourceManager &SM) : SM(SM) {}
+
+      void checkArgumentList(ArgumentList *Args) {
+        ASTNode Enclosing;
+        if (auto *E = Parent.getAsExpr()) {
+          // Must have a function call or macro parent.
+          if (!isa<CallExpr, MacroExpansionExpr>(E) ||
+              E->getArgs() != Args) {
+            return;
+          }
+          // If the outer expression is the call itself, disregard it.
+          if (OuterExpr == E)
+            OuterExpr = nullptr;
+
+          Enclosing = E;
         }
-        if (!Args)
-          return false;
-        if (EnclosingCallAndArg.first)
-          OuterExpr = EnclosingCallAndArg.first;
-        EnclosingCallAndArg = {E, Args};
-        return true;
+        if (auto *D = Parent.getAsDecl()) {
+          // Must have a macro decl parent.
+          auto *MED = dyn_cast<MacroExpansionDecl>(D);
+          if (!MED || MED->getArgs() != Args)
+            return;
+          Enclosing = D;
+        }
+        if (!Enclosing)
+          return;
+
+        // If we have an outer enclosing call, update the outer nodes if needed.
+        if (auto EnclosingCall = EnclosingCallAndArg.first) {
+          if (!OuterExpr)
+            OuterExpr = EnclosingCall.dyn_cast<Expr *>();
+          if (!OuterDecl)
+            OuterDecl = EnclosingCall.dyn_cast<Decl *>();
+        }
+
+        EnclosingCallAndArg = {Enclosing, Args};
       }
 
       MacroWalking getMacroWalkingBehavior() const override {
         return MacroWalking::Arguments;
       }
 
+      PreWalkResult<ArgumentList *>
+      walkToArgumentListPre(ArgumentList *ArgList) override {
+        auto SR = ArgList->getSourceRange();
+        if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc))
+          checkArgumentList(ArgList);
+
+        return Action::Continue(ArgList);
+      }
+
       PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
         auto SR = E->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc) &&
-            !checkCallExpr(E) && !EnclosingCallAndArg.first) {
-          if (!isa<TryExpr>(E) && !isa<AwaitExpr>(E) &&
+            !OuterExpr && !EnclosingCallAndArg.first) {
+          if (!isa<TryExpr>(E) && !isa<AwaitExpr>(E) && !isa<UnsafeExpr>(E) &&
               !isa<PrefixUnaryExpr>(E)) {
             // We don't want to expand to trailing closures if the call is
             // nested inside another expression that has closing characters,
             // like a `)` for a function call. This is not the case for
-            // `try`, `await` and prefix operator applications.
+            // `try`, `await`, `unsafe` and prefix operator applications.
             OuterExpr = E;
           }
         }
@@ -1782,6 +1813,7 @@ private:
         EnclosingCallAndArg = {nullptr, nullptr};
         OuterExpr = nullptr;
         OuterStmt = nullptr;
+        OuterDecl = nullptr;
         TargetLoc = SL;
         SF.walk(*this);
         return EnclosingCallAndArg.second;
@@ -1791,14 +1823,9 @@ private:
     CallExprFinder CEFinder(SM);
     auto *Args = CEFinder.findEnclosingCallArg(SF, SL);
 
-    if (!Args)
-      return std::make_pair(Args, false);
-    if (CEFinder.OuterExpr)
-      return std::make_pair(Args, false);
-    if (CEFinder.OuterStmt)
-      return std::make_pair(Args, false);
-
-    return std::make_pair(Args, true);
+    auto HasOuterNode =
+        CEFinder.OuterExpr || CEFinder.OuterStmt || CEFinder.OuterDecl;
+    return std::make_pair(Args, /*useTrailingClosure*/ Args && !HasOuterNode);
   }
 
   struct ParamClosureInfo {

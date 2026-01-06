@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
@@ -13,6 +13,7 @@ distributed actor Fish {
   // expected-error@-3{{type 'Fish' does not conform to protocol 'DistributedActor'}}
   // expected-note@-4{{you can provide a module-wide default actor system by declaring:\ntypealias DefaultDistributedActorSystem = <#ConcreteActorSystem#>}}
   // expected-note@-5 {{add stubs for conformance}}
+  // expected-error@-6 {{type 'Fish' does not conform to protocol 'Identifiable'}}
 
   distributed func tell(_ text: String, by: Fish) {
     // What would the fish say, if it could talk?

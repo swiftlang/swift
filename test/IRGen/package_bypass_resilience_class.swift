@@ -46,7 +46,7 @@ final public class Pub {
   // method lookup function for Core.Pub
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3PubCMu"(ptr %0, ptr %1)
 
-  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3PubCfd"(ptr readnone returned swiftself %0)
+  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3PubCfd"(ptr readnone returned swiftself{{.*}} %0)
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc void @"$s4Core3PubCfD"(ptr swiftself %0)
 }
 
@@ -97,7 +97,7 @@ package class Foo {
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc { ptr, ptr } @"$s4Core3FooC02myB0AA3PubCSgvMTj"
 
   // Core.Foo.deinit
-  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3FooCfd"(ptr readonly returned swiftself %0)
+  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3FooCfd"(ptr readonly returned swiftself{{.*}} %0)
 
   // Core.Foo.__deallocating_deinit
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc void @"$s4Core3FooCfD"(ptr swiftself %0)
@@ -119,7 +119,7 @@ final package class Bar {
   // method lookup function for Core.Bar
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3BarCMu"(ptr %0, ptr %1)
 
-  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3BarCfd"(ptr readonly returned swiftself %0)
+  // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc ptr @"$s4Core3BarCfd"(ptr readonly returned swiftself{{.*}} %0)
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc void @"$s4Core3BarCfD"(ptr swiftself %0)
 
   package var myBar: Pub?

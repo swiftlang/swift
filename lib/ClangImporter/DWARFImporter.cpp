@@ -112,14 +112,15 @@ ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
 
   // FIXME: Implement submodule support!
   Identifier name = path[0].Item;
-  auto it = DWARFModuleUnits.find(name);
-  if (it != DWARFModuleUnits.end())
+  auto [it, inserted] = DWARFModuleUnits.try_emplace(name, nullptr);
+  if (!inserted)
     return it->second->getParentModule();
 
+  auto itCopy = it; // Capturing structured bindings is a C++20 feature.
   auto *M = ModuleDecl::create(name, SwiftContext,
                                [&](ModuleDecl *M, auto addFile) {
     auto *wrapperUnit = new (SwiftContext) DWARFModuleUnit(*M, *this);
-    DWARFModuleUnits.insert({name, wrapperUnit});
+    itCopy->second = wrapperUnit;
     addFile(wrapperUnit);
   });
   M->setIsNonSwiftModule();

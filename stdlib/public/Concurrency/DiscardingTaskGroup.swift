@@ -22,10 +22,10 @@ import Swift
 /// best applied in situations where the result of a child task is some form
 /// of side-effect.
 ///
-/// A group waits for all of its child tasks
-/// to complete before it returns. Even cancelled tasks must run until
+/// A group *always* waits for all of its child tasks
+/// to complete before it returns. Even canceled tasks must run until
 /// completion before this function returns.
-/// Cancelled child tasks cooperatively react to cancellation and attempt
+/// Canceled child tasks cooperatively react to cancellation and attempt
 /// to return as early as possible.
 /// After this function returns, the task group is always empty.
 ///
@@ -40,6 +40,8 @@ import Swift
 /// }
 /// // guaranteed that slow-task has completed and the group is empty & destroyed
 /// ```
+///
+/// Refer to ``TaskGroup`` documentation for detailed discussion of semantics shared between all task groups.
 ///
 /// Task Group Cancellation
 /// =======================
@@ -65,6 +67,7 @@ import Swift
 /// For tasks that need to handle cancellation by throwing an error,
 /// use the `withThrowingDiscardingTaskGroup(returning:body:)` method instead.
 ///
+/// - SeeAlso: ``TaskGroup``
 /// - SeeAlso: ``withThrowingDiscardingTaskGroup(returning:body:)``
 @available(SwiftStdlib 5.9, *)
 #if !hasFeature(Embedded)
@@ -80,7 +83,7 @@ public func withDiscardingTaskGroup<GroupResult>(
     discardResults: true
   )
 
-  let _group = Builtin.createTaskGroupWithFlags(flags, GroupResult.self)
+  let _group = Builtin.createTaskGroupWithFlags(flags, Void.self)
   var group = DiscardingTaskGroup(group: _group)
   defer { Builtin.destroyTaskGroup(_group) }
 
@@ -108,7 +111,7 @@ public func _unsafeInheritExecutor_withDiscardingTaskGroup<GroupResult>(
     discardResults: true
   )
 
-  let _group = Builtin.createTaskGroupWithFlags(flags, GroupResult.self)
+  let _group = Builtin.createTaskGroupWithFlags(flags, Void.self)
   var group = DiscardingTaskGroup(group: _group)
   defer { Builtin.destroyTaskGroup(_group) }
 
@@ -131,9 +134,7 @@ public func _unsafeInheritExecutor_withDiscardingTaskGroup<GroupResult>(
 /// and mutation operations can't be performed
 /// from a concurrent execution context like a child task.
 ///
-/// ### Task execution order
-/// Tasks added to a task group execute concurrently, and may be scheduled in
-/// any order.
+/// Refer to ``TaskGroup`` documentation for detailed discussion of semantics shared between all task groups.
 ///
 /// ### Discarding behavior
 /// A discarding task group eagerly discards and releases its child tasks as
@@ -142,18 +143,18 @@ public func _unsafeInheritExecutor_withDiscardingTaskGroup<GroupResult>(
 /// be the case with a ``TaskGroup``.
 ///
 /// ### Cancellation behavior
-/// A discarding task group becomes cancelled in one of the following ways:
+/// A discarding task group becomes canceled in one of the following ways:
 ///
 /// - when ``cancelAll()`` is invoked on it,
-/// - when the ``Task`` running this task group is cancelled.
+/// - when the ``Task`` running this task group is canceled.
 ///
 /// Since a `DiscardingTaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child
 /// tasks).
 ///
-/// A cancelled task group can still keep adding tasks, however they will start
-/// being immediately cancelled, and may act accordingly to this. To avoid adding
-/// new tasks to an already cancelled task group, use ``addTaskUnlessCancelled(priority:body:)``
+/// A canceled task group can still keep adding tasks, however they will start
+/// being immediately canceled, and may act accordingly to this. To avoid adding
+/// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(priority:body:)``
 /// rather than the plain ``addTask(priority:body:)`` which adds tasks unconditionally.
 ///
 /// For information about the language-level concurrency model that `DiscardingTaskGroup` is part of,
@@ -186,152 +187,6 @@ public struct DiscardingTaskGroup {
     let _: Void? = try await _taskGroupWaitAll(group: _group, bodyError: nil)
   }
 
-  /// Adds a child task to the group.
-  ///
-  /// - Parameters:
-  ///   - priority: The priority of the operation task.
-  ///     Omit this parameter or pass `.unspecified`
-  ///     to set the child task's priority to the priority of the group.
-  ///   - operation: The operation to execute as part of the task group.
-  @_alwaysEmitIntoClient
-  #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
-  #endif
-  public mutating func addTask(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async -> Void
-  ) {
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
-    )
-#else
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
-    )
-#endif
-
-    // Create the task in this group.
-    let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-
-    _ = Builtin.createDiscardingTask(flags: flags,
-                                     initialSerialExecutor: builtinSerialExecutor,
-                                     taskGroup: _group,
-                                     operation: operation)
-  }
-
-  /// Adds a child task to the group, unless the group has been canceled.
-  ///
-  /// - Parameters:
-  ///   - priority: The priority of the operation task.
-  ///     Omit this parameter or pass `.unspecified`
-  ///     to set the child task's priority to the priority of the group.
-  ///   - operation: The operation to execute as part of the task group.
-  /// - Returns: `true` if the child task was added to the group;
-  ///   otherwise `false`.
-  @_alwaysEmitIntoClient
-  #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
-  #endif
-  public mutating func addTaskUnlessCancelled(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async -> Void
-  ) -> Bool {
-    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
-
-    guard canAdd else {
-      // the group is cancelled and is not accepting any new work
-      return false
-    }
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
-    )
-#else
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
-    )
-#endif
-
-    // Create the task in this group.
-    let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-
-    _ = Builtin.createDiscardingTask(flags: flags,
-                                     initialSerialExecutor: builtinSerialExecutor,
-                                     taskGroup: _group,
-                                     operation: operation)
-
-    return true
-  }
-
-  @_alwaysEmitIntoClient
-  public mutating func addTask(
-    operation: sending @escaping @isolated(any) () async -> Void
-  ) {
-    let flags = taskCreateFlags(
-      priority: nil, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
-    )
-
-    // Create the task in this group.
-    let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-
-    _ = Builtin.createDiscardingTask(flags: flags,
-                                     initialSerialExecutor: builtinSerialExecutor,
-                                     taskGroup: _group,
-                                     operation: operation)
-  }
-
-  /// Adds a child task to the group, unless the group has been canceled.
-  ///
-  /// - Parameters:
-  ///   - operation: The operation to execute as part of the task group.
-  /// - Returns: `true` if the child task was added to the group;
-  ///   otherwise `false`.
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTaskUnlessCancelled(operation:)")
-#endif
-  @_alwaysEmitIntoClient
-  public mutating func addTaskUnlessCancelled(
-    operation: sending @escaping @isolated(any) () async -> Void
-  ) -> Bool {
-    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
-
-    guard canAdd else {
-      // the group is cancelled and is not accepting any new work
-      return false
-    }
-
-    let flags = taskCreateFlags(
-      priority: nil, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
-    )
-
-    // Create the task in this group.
-    let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-
-    _ = Builtin.createDiscardingTask(flags: flags,
-                                     initialSerialExecutor: builtinSerialExecutor,
-                                     taskGroup: _group,
-                                     operation: operation)
-
-    return true
-  }
-
   /// A Boolean value that indicates whether the group has any remaining tasks.
   ///
   /// At the start of the body of a `withDiscardingTaskGroup(of:returning:body:)` call,
@@ -350,7 +205,7 @@ public struct DiscardingTaskGroup {
   /// If you add a task to a group after canceling the group,
   /// that task is canceled immediately after being added to the group.
   ///
-  /// Immediately cancelled child tasks should therefore cooperatively check for and
+  /// Immediately canceled child tasks should therefore cooperatively check for and
   /// react  to cancellation, e.g. by throwing an `CancellationError` at their
   /// earliest convenience, or otherwise handling the cancellation.
   ///
@@ -391,10 +246,10 @@ extension DiscardingTaskGroup: Sendable { }
 /// best applied in situations where the result of a child task is some form
 /// of side-effect.
 ///
-/// A group waits for all of its child tasks
-/// to complete before it returns. Even cancelled tasks must run until
+/// A group *always* waits for all of its child tasks
+/// to complete before it returns. Even canceled tasks must run until
 /// completion before this function returns.
-/// Cancelled child tasks cooperatively react to cancellation and attempt
+/// Canceled child tasks cooperatively react to cancellation and attempt
 /// to return as early as possible.
 /// After this function returns, the task group is always empty.
 ///
@@ -409,6 +264,8 @@ extension DiscardingTaskGroup: Sendable { }
 /// }
 /// // guaranteed that slow-task has completed and the group is empty & destroyed
 /// ```
+///
+/// Refer to ``TaskGroup`` documentation for detailed discussion of semantics shared between all task groups.
 ///
 /// Task Group Cancellation
 /// =======================
@@ -493,7 +350,7 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
       discardResults: true
   )
 
-  let _group = Builtin.createTaskGroupWithFlags(flags, GroupResult.self)
+  let _group = Builtin.createTaskGroupWithFlags(flags, Void.self)
   var group = ThrowingDiscardingTaskGroup<Error>(group: _group)
   defer { Builtin.destroyTaskGroup(_group) }
 
@@ -524,7 +381,7 @@ public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
       discardResults: true
   )
 
-  let _group = Builtin.createTaskGroupWithFlags(flags, GroupResult.self)
+  let _group = Builtin.createTaskGroupWithFlags(flags, Void.self)
   var group = ThrowingDiscardingTaskGroup<Error>(group: _group)
   defer { Builtin.destroyTaskGroup(_group) }
 
@@ -557,9 +414,7 @@ public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
 /// and mutation operations can't be performed
 /// from a concurrent execution context like a child task.
 ///
-/// ### Task execution order
-/// Tasks added to a task group execute concurrently, and may be scheduled in
-/// any order.
+/// Refer to ``TaskGroup`` documentation for detailed discussion of semantics shared between all task groups.
 ///
 /// ### Discarding behavior
 /// A discarding task group eagerly discards and releases its child tasks as
@@ -568,20 +423,20 @@ public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
 /// be the case with a ``TaskGroup``.
 ///
 /// ### Cancellation behavior
-/// A throwing discarding task group becomes cancelled in one of the following ways:
+/// A throwing discarding task group becomes canceled in one of the following ways:
 ///
 /// - when ``cancelAll()`` is invoked on it,
 /// - when an error is thrown out of the `withThrowingDiscardingTaskGroup { ... }` closure,
-/// - when the ``Task`` running this task group is cancelled.
+/// - when the ``Task`` running this task group is canceled.
 ///
 /// But also, and uniquely in *discarding* task groups:
 /// - when *any* of its child tasks throws.
 ///
-/// The group becoming cancelled automatically, and cancelling all of its child tasks,
+/// The group becoming canceled automatically, and cancelling all of its child tasks,
 /// whenever *any* child task throws an error is a behavior unique to discarding task groups,
 /// because achieving such semantics is not possible otherwise, due to the missing `next()` method
 /// on discarding groups. Accumulating task groups can implement this by manually polling `next()`
-/// and deciding to `cancelAll()` when they decide an error should cause the group to become cancelled,
+/// and deciding to `cancelAll()` when they decide an error should cause the group to become canceled,
 /// however a discarding group cannot poll child tasks for results and therefore assumes that child
 /// task throws are an indication of a group wide failure. In order to avoid such behavior,
 /// use a ``DiscardingTaskGroup`` instead of a throwing one, or catch specific errors in
@@ -591,9 +446,9 @@ public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
 /// automatically propagated through all of its child-tasks (and their child
 /// tasks).
 ///
-/// A cancelled task group can still keep adding tasks, however they will start
-/// being immediately cancelled, and may act accordingly to this. To avoid adding
-/// new tasks to an already cancelled task group, use ``addTaskUnlessCancelled(priority:body:)``
+/// A canceled task group can still keep adding tasks, however they will start
+/// being immediately canceled, and may act accordingly to this. To avoid adding
+/// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(priority:body:)``
 /// rather than the plain ``addTask(priority:body:)`` which adds tasks unconditionally.
 ///
 /// For information about the language-level concurrency model that `DiscardingTaskGroup` is part of,
@@ -624,63 +479,6 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
     let _: Void? = try await _taskGroupWaitAll(group: _group, bodyError: bodyError)
   }
 
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
-#endif
-  @_alwaysEmitIntoClient
-  public mutating func addTask(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async throws -> Void
-  ) {
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true, isDiscardingTask: true
-    )
-
-    // Create the task in this group.
-    let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-
-    _ = Builtin.createDiscardingTask(flags: flags,
-                                     initialSerialExecutor: builtinSerialExecutor,
-                                     taskGroup: _group,
-                                     operation: operation)
-  }
-
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")
-#endif
-  @_alwaysEmitIntoClient
-  public mutating func addTaskUnlessCancelled(
-    priority: TaskPriority? = nil,
-    operation: sending @escaping @isolated(any) () async throws -> Void
-  ) -> Bool {
-    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
-
-    guard canAdd else {
-      // the group is cancelled and is not accepting any new work
-      return false
-    }
-
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
-    )
-
-    // Create the task in this group.
-    let builtinSerialExecutor =
-      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-
-    _ = Builtin.createDiscardingTask(flags: flags,
-                                     initialSerialExecutor: builtinSerialExecutor,
-                                     taskGroup: _group,
-                                     operation: operation)
-
-    return true
-  }
-
   /// A Boolean value that indicates whether the group has any remaining tasks.
   ///
   /// At the start of the body of a `withThrowingDiscardingTaskGroup(returning:body:)` call,
@@ -699,7 +497,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   /// If you add a task to a group after canceling the group,
   /// that task is canceled immediately after being added to the group.
   ///
-  /// Immediately cancelled child tasks should therefore cooperatively check for and
+  /// Immediately canceled child tasks should therefore cooperatively check for and
   /// react  to cancellation, e.g. by throwing an `CancellationError` at their
   /// earliest convenience, or otherwise handling the cancellation.
   ///

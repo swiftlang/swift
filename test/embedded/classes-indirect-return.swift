@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-sil %s -enable-experimental-feature Embedded -wmo | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_feature_Embedded
 
 // CHECK: sil @$e4main1XC3fooxyFSi_Tg5 : $@convention(method) (@guaranteed X<Int>) -> Int {

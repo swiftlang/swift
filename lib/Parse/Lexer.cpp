@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -270,7 +270,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
          "location from the wrong buffer");
 
   Lexer L(LangOpts, SourceMgr, BufferID, getUnderlyingDiags(), LexMode,
-          HashbangMode::Allowed, CommentRetentionMode::None);
+          HashbangMode::Allowed, CommentRetentionMode::AttachToNextToken);
   L.restoreState(State(Loc));
   return L.peekNextToken();
 }
@@ -348,7 +348,7 @@ Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
     }
     break;
   }
-  return State(SourceLoc(llvm::SMLoc::getFromPointer(Ptr)));
+  return State(SourceLoc::getFromPointer(Ptr));
 }
 
 //===----------------------------------------------------------------------===//
@@ -581,6 +581,45 @@ static bool isValidIdentifierStartCodePoint(uint32_t c) {
   return true;
 }
 
+static bool isForbiddenRawIdentifierWhitespace(uint32_t c) {
+  if ((c >= 0x0009 && c <= 0x000D) ||
+      c == 0x0085 ||
+      c == 0x00A0 ||
+      c == 0x1680 ||
+      (c >= 0x2000 && c <= 0x200A) ||
+      (c >= 0x2028 && c <= 0x2029) ||
+      c == 0x202F ||
+      c == 0x205F ||
+      c == 0x3000)
+    return true;
+
+  return false;
+}
+
+static bool isPermittedRawIdentifierWhitespace(uint32_t c) {
+  return c == 0x0020 || c == 0x200E || c == 0x200F;
+}
+
+static bool isValidIdentifierEscapedCodePoint(uint32_t c) {
+  // An escaped identifier is terminated by a backtick, and the backslash is
+  // reserved for possible future escaping.
+  if (c == '`' || c == '\\')
+    return false;
+
+  if ((c >= 0x0000 && c <= 0x001F) || c == 0x007F)
+    return false;
+
+  // This is the set of code points satisfying the `White_Space` property,
+  // excluding the set satisfying the `Pattern_White_Space` property, and
+  // excluding any other ASCII non-printables and Unicode separators. In
+  // other words, the only whitespace code points allowed in a raw
+  // identifier are U+0020, and U+200E/200F (LTR/RTL marks).
+  if (isForbiddenRawIdentifierWhitespace(c))
+    return false;
+
+  return true;
+}
+
 static bool advanceIf(char const *&ptr, char const *end,
                       bool (*predicate)(uint32_t)) {
   char const *next = ptr;
@@ -605,6 +644,10 @@ static bool advanceIfValidContinuationOfIdentifier(char const *&ptr,
   return advanceIf(ptr, end, isValidIdentifierContinuationCodePoint);
 }
 
+static bool advanceIfValidEscapedIdentifier(char const *&ptr, char const *end) {
+  return advanceIf(ptr, end, isValidIdentifierEscapedCodePoint);
+}
+
 static bool advanceIfValidStartOfOperator(char const *&ptr,
                                           char const *end) {
   return advanceIf(ptr, end, Identifier::isOperatorStartCodePoint);
@@ -615,6 +658,17 @@ static bool advanceIfValidContinuationOfOperator(char const *&ptr,
   return advanceIf(ptr, end, Identifier::isOperatorContinuationCodePoint);
 }
 
+/// Returns true if the given string is entirely whitespace (considering only
+/// those whitespace code points permitted in raw identifiers).
+static bool isEscapedIdentifierEntirelyWhitespace(StringRef string) {
+  if (string.empty()) return true;
+  char const *p = string.data(), *end = string.end();
+  if (!advanceIf(p, end, isPermittedRawIdentifierWhitespace))
+    return false;
+  while (p < end && advanceIf(p, end, isPermittedRawIdentifierWhitespace));
+  return p == end;
+}
+
 bool Lexer::isIdentifier(StringRef string) {
   if (string.empty()) return false;
   char const *p = string.data(), *end = string.end();
@@ -622,6 +676,34 @@ bool Lexer::isIdentifier(StringRef string) {
     return false;
   while (p < end && advanceIfValidContinuationOfIdentifier(p, end));
   return p == end;
+}
+
+bool Lexer::identifierMustAlwaysBeEscaped(StringRef str) {
+  if (str.empty())
+    return false;
+
+  bool mustEscape =
+      !isOperator(str) && !isIdentifier(str) &&
+      str.front() != '$'; // a property wrapper does not need to be escaped
+
+  // dollar sign must be escaped
+  if (str == "$") {
+    mustEscape = true;
+  }
+  return mustEscape;
+}
+
+bool Lexer::isValidAsEscapedIdentifier(StringRef string) {
+  if (string.empty())
+    return false;
+  char const *p = string.data(), *end = string.end();
+  if (!advanceIfValidEscapedIdentifier(p, end))
+    return false;
+  while (p < end && advanceIfValidEscapedIdentifier(p, end))
+    ;
+  if (p != end)
+    return false;
+  return !isEscapedIdentifierEntirelyWhitespace(string);
 }
 
 /// Determines if the given string is a valid operator identifier,
@@ -737,9 +819,12 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
 static bool isRightBound(const char *tokEnd, bool isLeftBound,
                          const char *codeCompletionPtr) {
   switch (*tokEnd) {
+  case ':':     // ':' is an expression separator; '::' is not
+    return tokEnd[1] == ':';
+
   case ' ': case '\r': case '\n': case '\t': // whitespace
   case ')': case ']': case '}':              // closing delimiters
-  case ',': case ';': case ':':              // expression separators
+  case ',': case ';':                        // expression separators
     return false;
 
   case '\0':
@@ -1294,14 +1379,27 @@ static bool delimiterMatches(unsigned CustomDelimiterLen, const char *&BytesPtr,
 
 /// advanceIfMultilineDelimiter - Centralized check for multiline delimiter.
 static bool advanceIfMultilineDelimiter(unsigned CustomDelimiterLen,
-                                        const char *&CurPtr,
+                                        const char *&CurPtr, const char *EndPtr,
                                         DiagnosticEngine *Diags,
                                         bool IsOpening = false) {
+  auto scanDelimiter = [&]() -> const char * {
+    // CurPtr here points to the character after `"`.
+    const char *TmpPtr = CurPtr;
+    if (*(TmpPtr - 1) == '"' &&
+        diagnoseZeroWidthMatchAndAdvance('"', TmpPtr, Diags) &&
+        diagnoseZeroWidthMatchAndAdvance('"', TmpPtr, Diags)) {
+      return TmpPtr;
+    }
+    return nullptr;
+  };
+  auto *DelimEnd = scanDelimiter();
+  if (!DelimEnd)
+    return false;
 
   // Test for single-line string literals that resemble multiline delimiter.
-  const char *TmpPtr = CurPtr + 1;
+  const char *TmpPtr = DelimEnd - 1;
   if (IsOpening && CustomDelimiterLen) {
-    while (*TmpPtr != '\r' && *TmpPtr != '\n') {
+    while (TmpPtr != EndPtr && *TmpPtr != '\r' && *TmpPtr != '\n') {
       if (*TmpPtr == '"') {
         if (delimiterMatches(CustomDelimiterLen, ++TmpPtr, nullptr)) {
           return false;
@@ -1312,15 +1410,8 @@ static bool advanceIfMultilineDelimiter(unsigned CustomDelimiterLen,
     }
   }
 
-  TmpPtr = CurPtr;
-  if (*(TmpPtr - 1) == '"' &&
-      diagnoseZeroWidthMatchAndAdvance('"', TmpPtr, Diags) &&
-      diagnoseZeroWidthMatchAndAdvance('"', TmpPtr, Diags)) {
-    CurPtr = TmpPtr;
-    return true;
-  }
-
-  return false;
+  CurPtr = DelimEnd;
+  return true;
 }
 
 /// lexCharacter - Read a character and return its UTF32 code.  If this is the
@@ -1365,8 +1456,8 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
 
       DiagnosticEngine *D = EmitDiagnostics ? getTokenDiags() : nullptr;
       auto TmpPtr = CurPtr;
-      if (IsMultilineString &&
-          !advanceIfMultilineDelimiter(CustomDelimiterLen, TmpPtr, D))
+      if (IsMultilineString && !advanceIfMultilineDelimiter(
+                                   CustomDelimiterLen, TmpPtr, BufferEnd, D))
         return '"';
       if (CustomDelimiterLen &&
           !delimiterMatches(CustomDelimiterLen, TmpPtr, D, /*IsClosing=*/true))
@@ -1502,9 +1593,8 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
       if (!inStringLiteral()) {
         // Open string literal.
         OpenDelimiters.push_back(CurPtr[-1]);
-        AllowNewline.push_back(advanceIfMultilineDelimiter(CustomDelimiterLen,
-                                                           CurPtr, nullptr,
-                                                           true));
+        AllowNewline.push_back(advanceIfMultilineDelimiter(
+            CustomDelimiterLen, CurPtr, EndPtr, nullptr, true));
         CustomDelimiter.push_back(CustomDelimiterLen);
         continue;
       }
@@ -1517,7 +1607,8 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
 
       // Multi-line string can only be closed by '"""'.
       if (AllowNewline.back() &&
-          !advanceIfMultilineDelimiter(CustomDelimiterLen, CurPtr, nullptr))
+          !advanceIfMultilineDelimiter(CustomDelimiterLen, CurPtr, EndPtr,
+                                       nullptr))
         continue;
 
       // Check whether we have equivalent number of '#'s.
@@ -1862,7 +1953,7 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
   assert((QuoteChar == '"' || QuoteChar == '\'') && "Unexpected start");
 
   bool IsMultilineString = advanceIfMultilineDelimiter(
-      CustomDelimiterLen, CurPtr, getTokenDiags(), true);
+      CustomDelimiterLen, CurPtr, BufferEnd, getTokenDiags(), true);
   if (IsMultilineString && *CurPtr != '\n' && *CurPtr != '\r')
     diagnose(CurPtr, diag::lex_illegal_multiline_string_start)
         .fixItInsert(Lexer::getSourceLoc(CurPtr), "\n");
@@ -2216,7 +2307,7 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
 }
 
 /// lexEscapedIdentifier:
-///   identifier ::= '`' identifier '`'
+///   identifier ::= '`' escaped-identifier '`'
 ///
 /// If it doesn't match this production, the leading ` is a punctuator.
 void Lexer::lexEscapedIdentifier() {
@@ -2227,21 +2318,15 @@ void Lexer::lexEscapedIdentifier() {
   // Check whether we have an identifier followed by another backtick, in which
   // case this is an escaped identifier.
   const char *IdentifierStart = CurPtr;
-  if (advanceIfValidStartOfIdentifier(CurPtr, BufferEnd)) {
-    // Keep continuing the identifier.
-    while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
+  while (advanceIfValidEscapedIdentifier(CurPtr, BufferEnd))
+    ;
 
-    // If we have the terminating "`", it's an escaped identifier.
-    if (*CurPtr == '`') {
-      ++CurPtr;
-      formEscapedIdentifierToken(Quote);
-      return;
-    }
-  }
-
-  // Special case; allow '`$`'.
-  if (Quote[1] == '$' && Quote[2] == '`') {
-    CurPtr = Quote + 3;
+  // If we have the terminating "`", it's an escaped/raw identifier, unless it
+  // contained only operator characters or was entirely whitespace.
+  StringRef IdStr(IdentifierStart, CurPtr - IdentifierStart);
+  if (*CurPtr == '`' && !isOperator(IdStr) &&
+      !isEscapedIdentifierEntirelyWhitespace(IdStr)) {
+    ++CurPtr;
     formEscapedIdentifierToken(Quote);
     return;
   }
@@ -2686,8 +2771,14 @@ void Lexer::lexImpl() {
 
   case ',': return formToken(tok::comma, TokStart);
   case ';': return formToken(tok::semi, TokStart);
-  case ':': return formToken(tok::colon, TokStart);
   case '\\': return formToken(tok::backslash, TokStart);
+
+  case ':':
+    if (CurPtr[0] == ':') {
+      CurPtr++;
+      return formToken(tok::colon_colon, TokStart);
+    }
+    return formToken(tok::colon, TokStart);
 
   case '#': {
     // Try lex a raw string literal.
@@ -2944,7 +3035,7 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
   LangOptions FakeLangOptions;
 
   Lexer L(FakeLangOptions, SM, BufferID, nullptr, LexerMode::Swift,
-          HashbangMode::Allowed, CommentRetentionMode::None,
+          HashbangMode::Allowed, CommentRetentionMode::AttachToNextToken,
           BufferStart, BufferEnd);
 
   // Lex tokens until we find the token that contains the source location.

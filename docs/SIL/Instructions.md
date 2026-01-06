@@ -55,27 +55,6 @@ type, use `alloc_box`.
 
 `T` must not be a pack type. To allocate a pack, use `alloc_pack`.
 
-### alloc_vector
-
-```
-sil-instruction ::= 'alloc_vector' sil-type, sil-operand
-
-%1 = alloc_vector $T, %0 : $Builtin.Word
-// %1 has type $*T
-```
-
-Allocates uninitialized memory that is sufficiently aligned on the stack
-to contain a vector of values of type `T`. The result of the instruction
-is the address of the allocated memory. The number of vector elements is
-specified by the operand, which must be a builtin integer value.
-
-`alloc_vector` either allocates memory on the stack or - if contained in
-a global variable static initializer list - in the data section.
-
-`alloc_vector` is a stack allocation instruction, unless it's contained
-in a global initializer list. See the section above on stack discipline.
-The corresponding stack deallocation instruction is `dealloc_stack`.
-
 ### alloc_pack
 
 ```
@@ -853,7 +832,7 @@ load-ownership-kind ::= 'take'
 ```
 
 Loads the value at address `%0` from memory. `T` must be a loadable
-type. This does not affect the reference count, if any, of the loaded
+type. An unqualified load does not affect the reference count, if any, of the loaded
 value; the value must be retained explicitly if necessary. It is
 undefined behavior to load from uninitialized memory or to load from an
 address that points to deallocated storage.
@@ -861,8 +840,8 @@ address that points to deallocated storage.
 In OSSA the ownership kind specifies how to handle ownership:
 -  **trivial**: the loaded value is trivial and no further action must be taken
                 than to load the raw bits of the value
--  **copy**: the loaded value is copied and the original value stays in the
-             memory location.
+-  **copy**: the loaded value is copied (e.g., retained) and the original value
+                stays in the memory location.
 -  **take**: the value is _moved_ from the memory location without copying.
              After the `load`, the memory location remains uninitialized.
 
@@ -1053,7 +1032,7 @@ extend_lifetime %0 : $X
 ```
 
 Indicates that a value's linear lifetime extends to this point.
-Inserted by OSSALifetimeCompletion(AvailabilityBoundary) in order to
+Inserted by OSSACompleteLifetime(AvailabilityBoundary) in order to
 provide the invariant that a value is either consumed OR has an
 `extend_lifetime` user on all paths and furthermore that all
 uses are within the boundary defined by that set of instructions (the
@@ -1085,43 +1064,49 @@ a sequence that also correctly destroys the current value.
 This instruction is only valid in Raw SIL and is rewritten as
 appropriate by the definitive initialization pass.
 
-### assign_by_wrapper
+### assign_or_init 
 
 ```
-sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' mode? sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
+sil-instruction ::= 'assign_or_init' mode? attached-property ',' self-or-local ',' sil-operand ',' 'value' ',' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
 
-mode ::= '[init]' | '[assign]' | '[assign_wrapped_value]'
+mode ::= '[init]' | '[assign]'
+attached-property ::= '#' sil-decl-ref
+self-or-local ::= 'self' | 'local'
 
-assign_by_wrapper %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
-// $S can be a value or address type
-// $T must be the type of a property wrapper.
-// $F must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and returning $T
-// $G must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and without a return value
+// Nominal Context:
+assign_or_init #MyStruct.x, self %A, value %V, init %I, set %S
+// Local Context (only emitted with compiler synthesized thunks currently):   
+assign_or_init #x, local %L, value %V, init %I, set %S
 ```
 
-Similar to the [assign](#assign) instruction, but the assignment is done
-via a delegate.
+Assigns or initializes a computed property with an attached init accessor. 
+This instruction is emitted during SILGen without an explicit mode. 
+The definitive initialization (DI) pass resolves the mode and rewrites
+the instruction accordingly:
 
-Initially the instruction is created with no mode. Once the mode is
-decided (by the definitive initialization pass), the instruction is
-lowered as follows:
+- `[init]`: In this mode, the init accessor `%I` is called with `%V` 
+as an argument. 
+- `[assign]`: In this mode, the setter function `%S` is called with `%V`
+as an argument.
 
-If the mode is `initialization`, the function `%2` is called with `%0`
-as argument. The result is stored to `%1`. In case of an address type,
-`%1` is simply passed as a first out-argument to `%2`.
+This instruction is only valid in Raw SIL and is rewritten as appropriate by
+the DI pass.
 
-The `assign` mode works similar to `initialization`, except that the
-destination is "assigned" rather than "initialized". This means that
-the existing value in the destination is destroyed before the new value
-is stored.
-
-If the mode is `assign_wrapped_value`, the function `%3` is called with
-`%0` as argument. As `%3` is a setter (e.g. for the property in the
-containing nominal type), the destination address `%1` is not used in
-this case.
-
-This instruction is only valid in Raw SIL and is rewritten as
-appropriate by the definitive initialization pass.
+Operand Roles:
+- `attached-property`: The property being written to. For nominal contexts, this 
+refers to a property with an attached init accessor (e.g. `#MyStruct.x`). For local 
+contexts, it refers to a local variable name (e.g. `#x`).
+- `self-or-local`: 
+  - `self %A`: Refers to the instance of the type that owns the property with the 
+  attached init accessor.
+  - `local %L`: Indicates the assignment is to a local variable (`%L`) rather than 
+  a property of a nominal type. While init accessors are not currently available to be 
+  used in local contexts in user-authored code, the compiler can synthesize an `assign_or_init`
+  in local contexts using an init accessor thunk in special cases.
+- `value %V`: The input value passed to either the `init` or `set` function, depending on 
+the selected DI mode.
+- `init %I`: A partially applied function implementing the property's init accessor.
+- `set %S`: A partially applied function implementing the property's setter.
 
 ### mark_uninitialized
 
@@ -1213,6 +1198,17 @@ It is expected that the `init-case` is passed some sort of storage and
 the `set` case is passed `self`.
 
 This is only valid in Raw SIL.
+
+### unchecked_ownership
+
+```
+sil-instruction ::= 'unchecked_ownership' sil-operand
+
+unchecked_ownership %1 : $T
+```
+
+unchecked_ownership disables the ownership verification of it's operand. This used in cases 
+we cannot resolve ownership until a mandatory pass runs. This is only valid in Raw SIL. 
 
 ### copy_addr
 
@@ -1985,35 +1981,118 @@ destroy the value, such as `release_value`, `strong_release`,
 ### mark_dependence
 
 ```
-sil-instruction :: 'mark_dependence' '[nonescaping]'? sil-operand 'on' sil-operand
+sil-instruction :: 'mark_dependence' mark-dep-option? sil-operand 'on' sil-operand
+mark-dep-option ::= '[nonescaping]'
+mark-dep-option ::= '[unresolved]'
 
 %2 = mark_dependence %value : $*T on %base : $Builtin.NativeObject
 ```
 
 `%base` must not be identical to `%value`.
 
-Indicates that the validity of `%value` depends on the value of `%base`.
+The value of the result depends on the value of `%base`.
 Operations that would destroy `%base` must not be moved before any
-instructions which depend on the result of this instruction, exactly as
+instructions that depend on the result of this instruction, exactly as
 if the address had been directly derived from that operand (e.g. using
 `ref_element_addr`).
 
-The result is the forwarded value of `%value`. `%value` may be an
-address, but it could be an address in a non-obvious form, such as a
-Builtin.RawPointer or a struct containing the same.
+The result is the forwarded value of `%value`. If `%value` is an
+address, then result is also an address, and the semantics are the
+same as the non-address form: the dependency is on any value derived
+from the resulting address. The value could also be a
+Builtin.RawPointer or a struct containing the same, in which case,
+pointed-to values have a dependency if they are derived from this
+instruction's result. Note that in-memory values are only dependent on
+base if they are derived from this instruction's result. In this
+example, the load of `%dependent_value` depends on `%base`, but the
+load of `%independent_value` does not:
 
-`%base` may have either object or address type. In the latter case, the
-dependency is on the current value stored in the address.
+```
+%dependent_address = mark_dependence %original_address on %base
+%dependent_value = load [copy] %dependent_address
+%independent_value = load %original_address
+destroy_value %base
+```
 
-The optional `nonescaping` attribute indicates that no value derived from
-`%value` escapes the lifetime of `%base`. As with escaping `mark_dependence`,
-all values transitively forwarded from `%value` must be destroyed within the
-lifetime of `base`. Unlike escaping`mark_dependence`, this must be statically
-verifiable. Additionally, unlike escaping`mark_dependence`, derived values
-include copies of`%value`and values transitively forwarded from those copies.
-If`%base`must not be identical to`%value`. Unlike escaping`mark_dependence`,
-no value derived from`%value`may have a bitwise escape (conversion to
-UnsafePointer) or pointer escape (unknown use). 
+`%base` may have either object or address type. If it is an address,
+then the dependency is on the current value stored at the address.
+
+The optional `nonescaping` attribute indicates that the lifetime
+guarantee is statically verifiable via a def-use walk starting at this
+instruction's result. No value derived from a nonescaping
+`mark_dependence` may have a bitwise escape (conversion to
+UnsafePointer) or pointer escape (unknown use). The `unresolved`
+attribute indicates that this verification is required but has not yet
+been diagnosed.
+
+`mark_dependence` may only have a non-`Escapable` result if it also
+has a `nonescaping` or `unresolved` attribute. A non-`Escapable`
+`mark_dependence` extends the lifetime of `%base` through copies of
+`%value` and values transitively forwarded from those copies. If
+`%value` is an address, then that includes loads from the
+address. None of those values may be used by a bitwise escape
+(conversion to UnsafePointer) or pointer escape (unknown use). In this
+example, the apply depends on `%base` because `%value` has a
+non-`Escapable` type:
+
+```
+%dependent_address = mark_dependence [nonescaping] %value : %*NonescapableType on %base
+%dependent_value = load %dependent_address
+%copied_value = copy_value %dependent_value
+apply %f(%dependent_value)
+destroy_value %base
+```
+
+### mark_dependence_addr
+
+```
+sil-instruction :: 'mark_dependence_addr' mark-dep-option? sil-operand 'on' sil-operand
+mark-dep-option ::= '[nonescaping]'
+mark-dep-option ::= '[unresolved]'
+
+mark_dependence_addr [nonescaping] %address : $*T on %base : $Builtin.NativeObject
+```
+
+The in-memory value at `%address` depends on the value of `%base`.
+Operations that would destroy `%base` must not be moved before any
+instructions that depend on that value, exactly as if the location at
+`%address` aliases `%base` on all paths reachable from this instruction.
+
+In this example, the load of `%dependent_value` depends on `%base`:
+
+```
+mark_dependence_addr %address on %base
+%dependent_value = load [copy] %address
+destroy_value %base
+```
+
+`%base` may have either object or address type. If it is an address,
+then the dependency is on the current value stored at the address.
+
+The optional `nonescaping` attribute indicates that the lifetime
+guarantee is statically verifiable via a data flow over all paths
+reachable from this instruction considering all addresses that may
+alias with `%address`. No aliasing address may be used by a bitwise
+escape (conversion to UnsafePointer) or pointer escape (unknown
+use). The `unresolved` attribute indicates that this verification is
+required but has not yet been diagnosed.
+
+`mark_dependence_addr` may only have a non-`Escapable` `%address` if
+it also has a `nonescaping` or `unresolved` attribute. A
+non-`Escapable` `mark_dependence_addr` extends the lifetime of `%base`
+through values loaded from the memory location at `%address` and
+through any transitively forwarded or copied values. None of those
+values may be used by a bitwise escape (conversion to UnsafePointer)
+or pointer escape (unknown use). In this example, the apply depends on
+`%base` because `%address` has a non-`Escapable` type:
+
+```
+mark_dependence_addr [nonescaping] %address : %*NonescapableType on %base
+%dependent_value = load %address
+%copied_value = copy_value %dependent_value
+apply %f(%dependent_value)
+destroy_value %base
+```
 
 ### is_unique
 
@@ -2084,18 +2163,35 @@ not replace this reference with a not uniquely reference object.
 
 For details see [Copy-on-Write Representation](SIL.md#Copy-on-Write-Representation).
 
-### is_escaping_closure
+### end_cow_mutation_addr
 
 ```
-sil-instruction ::= 'is_escaping_closure' sil-operand
+sil-instruction ::= 'end_cow_mutation_addr' sil-operand
 
-%1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
+end_cow_mutation_addr %0 : $*T
+// %0 must be of an address $*T type
+```
+
+This instruction marks the end of mutation of an address. The address could be
+an opaque archetype, a struct, tuple or enum type and the end_cow_mutation_addr
+will apply to all members contained within it.
+It is currently only generated in cases where we maybe deriving a MutableSpan from
+`%0` since it is not possible to schedule an `end_cow_mutation` in the standard
+library automatically for Array.mutableSpan etc.
+
+### destroy_not_escaped_closure
+
+```
+sil-instruction ::= 'destroy_not_escaped_closure' sil-operand
+
+%1 = destroy_not_escaped_closure %0 : $@callee_guaranteed () -> ()
 // %0 must be an escaping swift closure.
 // %1 will be of type Builtin.Int1
 ```
 
-Checks whether the context reference is not nil and bigger than one and
-returns true if it is.
+Checks if the closure context escaped and then destroys the context.
+The escape-check is done by checking if its reference count is exactly 1.
+Returns true if it is.
 
 ### copy_block
 
@@ -2536,11 +2632,11 @@ except:
     instead of its normal results.
 
 The final (in the case of `@yield_once`) or penultimate (in the case of
-`@yield_once_2`) result of a `begin_apply` is a "token", a special
-value which can only be used as the operand of an `end_apply` or
-`abort_apply` instruction. Before this second instruction is executed,
-the coroutine is said to be "suspended", and the token represents a
-reference to its suspended activation record.
+`@yield_once_2`) result of a `begin_apply` is a "token", a special value which
+can only be used as the operand of an `end_apply`, `abort_apply`, or
+`end_borrow` instruction. Before this second instruction is executed, the
+coroutine is said to be "suspended", and the token represents a reference to its
+suspended activation record.
 
 If the coroutine's kind `yield_once_2`, its final result is an address
 of a "token", representing the allocation done by the callee
@@ -3387,6 +3483,20 @@ vector (%a : $T, %b : $T, ...)
 Constructs a statically initialized vector of elements. This instruction
 can only appear as final instruction in a global variable static
 initializer list.
+
+### vector_base_addr
+
+```
+sil-instruction ::= 'vector_base_addr' sil-operand
+
+%1 = vector_base_addr %0 : $*Builtin.FixedArray<N, Element>
+// %0 must have type $*Builtin.FixedArray
+// %1 will be of the element type of the Builtin.FixedArray
+```
+
+Derives the address of the first element of a vector, i.e. a `Builtin.FixedArray`,
+from the address of the vector itself.
+Addresses of other vector elements can then be derived with `index_addr`.
 
 ### ref_element_addr
 
@@ -4456,6 +4566,9 @@ copy.
 The resulting value must meet the usual ownership requirements; for
 example, a trivial type must have '.none' ownership.
 
+NOTE: A guaranteed result value is assumed to be a non-dependent guaranteed
+value like a function argument.
+
 ### ref_to_raw_pointer
 
 ```
@@ -4772,6 +4885,27 @@ TODO
 
 TODO
 
+### cast_implicitactor_to_opaqueisolation
+
+```
+sil-instruction ::= 'cast_implicitactor_to_opaqueisolation' sil-operand
+
+%1 = cast_implicitactor_to_opaqueisolation %0 : $Builtin.ImplicitActor
+// %0 must have guaranteed ownership
+// %1 must have guaranteed ownership
+// %1 will have type $Optional<any Actor>
+```
+
+Convert a `$Builtin.ImplicitActor` to a `$Optional<any Actor>` masking out any
+bits that we have stolen from the witness table pointer.
+
+At IRGen time, we lower this to the relevant masking operations, allowing us to
+avoid exposing these low level details to the SIL optimizer. On platforms where
+we support TBI, IRGen uses a mask that is the bottom 2 bits of the top nibble of
+the pointer. On 64 bit platforms this is bit 60,61. If the platform does not
+support TBI, then IRGen uses the bottom two tagged pointer bits of the pointer
+(bits 0,1).
+
 ## Checked Conversions
 
 Some user-level cast operations can fail and thus require runtime
@@ -4788,7 +4922,9 @@ on whether the cast succeeds or not.
 ### unconditional_checked_cast
 
 ```
-sil-instruction ::= 'unconditional_checked_cast' sil-operand 'to' sil-type
+sil-instruction ::= 'unconditional_checked_cast' 
+                    sil-prohibit-isolated-conformances?
+                    sil-operand 'to' sil-type
 
 %1 = unconditional_checked_cast %0 : $A to $B
 %1 = unconditional_checked_cast %0 : $*A to $*B
@@ -4804,8 +4940,9 @@ ownership are unsupported.
 
 ```
 sil-instruction ::= 'unconditional_checked_cast_addr'
-                     sil-type 'in' sil-operand 'to'
-                     sil-type 'in' sil-operand
+                    sil-prohibit-isolated-conformances?
+                    sil-type 'in' sil-operand 'to'
+                    sil-type 'in' sil-operand
 
 unconditional_checked_cast_addr $A in %0 : $*@thick A to $B in %1 : $*@thick B
 // $A and $B must be both addresses
@@ -4876,6 +5013,20 @@ does not apply in the `raw` SIL stage.
 `return` does not retain or release its operand or any other values.
 
 A function must not contain more than one `return` instruction.
+
+### return_borrow
+
+```
+sil-terminator ::= 'return_borrow' sil-operand 'from_scopes' '(' (sil-operand (',' sil-operand)*)? ')'
+
+return_borrow %0 : $T from_scopes (%1, %2 ...)
+// %0 must be a @guaranteed value
+// %1, %2, ... must be borrow introducers for %0, like `load_borrow`
+// $T must be the return type of the current function
+```
+
+return_borrow instruction is valid only for functions @guaranteed results.
+It is used to a return a @guaranteed value that maybe produced within borrow scopes local to the function.
 
 ### throw
 
@@ -5168,10 +5319,12 @@ instruction branches to `bb2`.
 
 ```
 sil-terminator ::= 'checked_cast_br' sil-checked-cast-exact?
+                    sil-prohibit-isolated-conformances?
                     sil-type 'in'
                     sil-operand 'to' sil-type ','
                     sil-identifier ',' sil-identifier
 sil-checked-cast-exact ::= '[' 'exact' ']'
+sil-prohibit-isolated-conformances ::= '[' 'prohibit_isolated_conformances' ']'
 
 checked_cast_br A in %0 : $A to $B, bb1, bb2
 checked_cast_br *A in %0 : $*A to $*B, bb1, bb2
@@ -5190,10 +5343,14 @@ An exact cast checks whether the dynamic type is exactly the target
 type, not any possible subtype of it. The source and target types must
 be class types.
 
+A cast can specify that the runtime should prohibit all uses of isolated
+conformances when attempting to satisfy protocol requirements of existentials.
+
 ### checked_cast_addr_br
 
 ```
 sil-terminator ::= 'checked_cast_addr_br'
+                    sil-prohibit-isolated-conformances?
                     sil-cast-consumption-kind
                     sil-type 'in' sil-operand 'to'
                     sil-stype 'in' sil-operand ','
@@ -5551,3 +5708,21 @@ sil-instruction ::= 'has_symbol' sil-decl-ref
 Returns true if each of the underlying symbol addresses associated with
 the given declaration are non-null. This can be used to determine
 whether a weakly-imported declaration is available at runtime.
+
+## Miscellaneous instructions
+
+### ignored_use
+
+```none
+sil-instruction ::= 'ignored_use'
+```
+
+This instruction acts as a synthetic use instruction that suppresses unused
+variable warnings. In Swift the equivalent operation is '_ = x'. This
+importantly also provides a way to find the source location for '_ = x' when
+emitting SIL diagnostics. It is only legal in Raw SIL and is removed as dead
+code when we convert to Canonical SIL.
+
+DISCUSSION: Before the introduction of this instruction, in certain cases,
+SILGen would just not emit anything for '_ = x'... so one could not emit
+diagnostics upon this case.

@@ -35,3 +35,15 @@ func test(s: String, answer: Int) {
   let r2c = f2(s)
   let _: A = r2c
 }
+
+do {
+  @available(*, deprecated)
+  @_disfavoredOverload
+  func test(v: Int) {}
+
+  func test(v: Any) {}
+
+  func call(v: Int) {
+    test(v: v) // Ok (the overload that takes `Int` is disfavored)
+  }
+}

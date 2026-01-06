@@ -9,7 +9,7 @@ enum MyError: Error {
 }
 
 func bad() -> Any.Type {
-  // expected-note@-1{{add @available attribute to enclosing global function}}
+  // expected-note@-1{{add '@available' attribute to enclosing global function}}
   typealias Fn = () throws(MyError) -> ()
   // expected-error@+2{{runtime support for typed throws function types is only available in macOS 15.0.0 or newer}}
   // expected-note@+1{{add 'if #available' version check}}

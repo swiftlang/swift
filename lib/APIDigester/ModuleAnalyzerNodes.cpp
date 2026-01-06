@@ -3,6 +3,8 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/DeclObjC.h"
+#include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/STLExtras.h"
 #include <algorithm>
 #include <swift/APIDigester/ModuleAnalyzerNodes.h>
@@ -130,7 +132,7 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         SugaredGenericSig(Info.SugaredGenericSig),
         FixedBinaryOrder(Info.FixedBinaryOrder),
         introVersions({Info.IntromacOS, Info.IntroiOS, Info.IntrotvOS,
-                       Info.IntrowatchOS, Info.Introswift}),
+                       Info.IntrowatchOS, Info.IntrovisionOS, Info.Introswift}),
         ObjCName(Info.ObjCName) {}
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
@@ -752,7 +754,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
         AccessorKind unknownKind = (AccessorKind)((uint8_t)(AccessorKind::Last) + 1);
         Info.AccKind = llvm::StringSwitch<AccessorKind>(
           GetScalarString(Pair.getValue()))
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define SINGLETON_ACCESSOR(ID, KEYWORD) .Case(#KEYWORD, AccessorKind::ID)
 #include "swift/AST/AccessorKinds.def"
           .Default(unknownKind);
@@ -1063,10 +1065,11 @@ static StringRef getPrintedName(SDKContext &Ctx, Type Ty,
   llvm::raw_string_ostream OS(S);
   PrintOptions PO = getTypePrintOpts(Ctx.getOpts());
   PO.SkipAttributes = true;
+  NonRecursivePrintOptions OPO;
   if (IsImplicitlyUnwrappedOptional)
-    PO.PrintOptionalAsImplicitlyUnwrapped = true;
+    OPO |= NonRecursivePrintOption::ImplicitlyUnwrappedOptional;
 
-  Ty.print(OS, PO);
+  Ty.print(OS, PO, OPO);
   return Ctx.buffer(OS.str());
 }
 
@@ -1117,8 +1120,7 @@ static StringRef calculateMangledName(SDKContext &Ctx, ValueDecl *VD) {
     return Ctx.buffer(attr->Name);
   }
   Mangle::ASTMangler NewMangler(VD->getASTContext());
-  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, true,
-                                    /*bool respectOriginallyDefinedIn*/true));
+  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, /*addPrefix*/ true));
 }
 
 static StringRef calculateLocation(SDKContext &SDKCtx, Decl *D) {
@@ -1165,8 +1167,9 @@ static StringRef getSimpleName(ValueDecl *VD) {
   }
   if (auto *AD = dyn_cast<AccessorDecl>(VD)) {
     switch(AD->getAccessorKind()) {
-#define ACCESSOR(ID) \
-case AccessorKind::ID: return #ID;
+#define ACCESSOR(ID, KEYWORD)                                                  \
+    case AccessorKind::ID:                                                     \
+      return #ID;
 #include "swift/AST/AccessorKinds.def"
     }
   }
@@ -1339,16 +1342,14 @@ std::optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
 // check for if it has @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 static bool isABIPlaceHolder(Decl *D) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
-  for (auto semanticAttr : D->getSemanticAvailableAttrs()) {
-    auto attr = semanticAttr.getParsedAttr();
-    auto domain = semanticAttr.getDomain();
-    if (domain.isPlatform() && attr->Introduced &&
-        attr->Introduced->getMajor() == 9999) {
-      Platforms.insert(attr->getPlatform());
+  for (auto attr : D->getSemanticAvailableAttrs()) {
+    if (attr.isPlatformSpecific() && attr.getIntroduced().has_value() &&
+        attr.getIntroduced()->getMajor() == 9999) {
+      Platforms.insert(attr.getPlatform());
     }
   }
 
-  // FIXME: This probably isn't correct anymore, now that visionOS exists
+  // FIXME: [availability] This probably isn't correct now that visionOS exists
   return Platforms.size() == 4;
 }
 
@@ -1363,11 +1364,10 @@ static bool isABIPlaceholderRecursive(Decl *D) {
 StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
   if (!D)
     return StringRef();
-  for (auto semanticAttr : D->getSemanticAvailableAttrs()) {
-    auto attr = semanticAttr.getParsedAttr();
-    auto domain = semanticAttr.getDomain();
-    if (domain.getPlatformKind() == Kind && attr->Introduced) {
-      return buffer(attr->Introduced->getAsString());
+  for (auto attr : D->getSemanticAvailableAttrs()) {
+    auto domain = attr.getDomain();
+    if (domain.getPlatformKind() == Kind && attr.getIntroduced()) {
+      return buffer(attr.getIntroduced()->getAsString());
     }
   }
   return StringRef();
@@ -1376,12 +1376,11 @@ StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
 StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
   if (!D)
     return StringRef();
-  for (auto semanticAttr : D->getSemanticAvailableAttrs()) {
-    auto attr = semanticAttr.getParsedAttr();
-    auto domain = semanticAttr.getDomain();
+  for (auto attr : D->getSemanticAvailableAttrs()) {
+    auto domain = attr.getDomain();
 
-    if (domain.isSwiftLanguage() && attr->Introduced) {
-      return buffer(attr->Introduced->getAsString());
+    if (domain.isSwiftLanguageMode() && attr.getIntroduced()) {
+      return buffer(attr.getIntroduced()->getAsString());
     }
   }
   return getLanguageIntroVersion(D->getDeclContext()->getAsDecl());
@@ -1472,6 +1471,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       IntroiOS(Ctx.getPlatformIntroVersion(D, PlatformKind::iOS)),
       IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
       IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
+      IntrovisionOS(Ctx.getPlatformIntroVersion(D, PlatformKind::visionOS)),
       Introswift(Ctx.getLanguageIntroVersion(D)),
       ObjCName(Ctx.getObjcName(D)),
       InitKind(Ctx.getInitKind(D)),
@@ -1501,7 +1501,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ImportDecl *ID):
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformanceRef Conform):
-    SDKNodeInitInfo(Ctx, Conform.getRequirement()) {
+    SDKNodeInitInfo(Ctx, Conform.getProtocol()) {
   // The conformance can be conditional. The generic signature keeps track of
   // the requirements.
   if (Conform.isConcrete()) {
@@ -1764,7 +1764,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     // Exclude decls with @_alwaysEmitIntoClient if we are checking ABI.
     // These decls are considered effectively public because they are usable
     // from inline, so we have to manually exclude them here.
-    if (D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    if (D->isAlwaysEmittedIntoClient())
       return true;
   } else {
     if (D->isPrivateSystemDecl(false))
@@ -1938,8 +1938,6 @@ SwiftDeclCollector::addMembersToRoot(SDKNode *Root, IterableDeclContext *Context
       // All containing variables should have been handled.
     } else if (isa<EnumCaseDecl>(Member)) {
       // All containing variables should have been handled.
-    } else if (isa<PoundDiagnosticDecl>(Member)) {
-      // All containing members should have been handled.
     } else if (isa<DestructorDecl>(Member)) {
       // deinit has no impact.
     } else if (isa<MissingMemberDecl>(Member)) {
@@ -1989,7 +1987,7 @@ SwiftDeclCollector::addConformancesToTypeDecl(SDKNodeDeclType *Root,
   } else {
     // Avoid adding the same conformance twice.
     SmallPtrSet<ProtocolConformance*, 4> Seen;
-    for (auto &Conf: NTD->getAllConformances()) {
+    for (auto &Conf: NTD->getAllConformances(/*sorted=*/true)) {
       if (!Ctx.shouldIgnore(Conf->getProtocol()) && !Seen.count(Conf))
         Root->addConformance(constructConformanceNode(Conf));
       Seen.insert(Conf);
@@ -2272,7 +2270,7 @@ struct ScalarEnumerationTraits<DeclKind> {
 template<>
 struct ScalarEnumerationTraits<AccessorKind> {
   static void enumeration(Output &out, AccessorKind &value) {
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define SINGLETON_ACCESSOR(ID, KEYWORD) \
   out.enumCase(value, #KEYWORD, AccessorKind::ID);
 #include "swift/AST/AccessorKinds.def"
@@ -2442,7 +2440,7 @@ class ConstExtractor: public ASTWalker {
     }
     assert(ReferencedDecl);
     if (auto *VAR = dyn_cast<VarDecl>(ReferencedDecl)) {
-      if (!VAR->getAttrs().hasAttribute<CompileTimeConstAttr>()) {
+      if (!VAR->getAttrs().hasAttribute<CompileTimeLiteralAttr>()) {
         return false;
       }
       if (auto *PD = VAR->getParentPatternBinding()) {

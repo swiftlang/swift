@@ -62,10 +62,7 @@ internal struct BacktraceOptions: ParsableArguments {
   }
 }
 
-internal struct GenericMetadataOptions: ParsableArguments {
-  @Flag(help: "Show allocations in mangled form")
-  var mangled: Bool = false
-
+internal struct MetadataOptions: ParsableArguments {
   @Flag(help: "Output JSON")
   var json: Bool = false
 
@@ -136,7 +133,7 @@ internal struct SwiftInspect: ParsableCommand {
     DumpArrays.self,
     DumpConcurrency.self,
   ]
-#elseif os(Windows)
+#elseif os(Windows) || os(Android)
   static let subcommands: [ParsableCommand.Type] = [
     DumpConformanceCache.self,
     DumpRawMetadata.self,

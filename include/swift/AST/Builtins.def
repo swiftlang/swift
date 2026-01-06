@@ -209,10 +209,11 @@ BUILTIN_BINARY_PREDICATE(FCMP_ULE, "fcmp_ule", "n", FloatOrVector)
 BUILTIN_BINARY_PREDICATE(FCMP_UNE, "fcmp_une", "n", FloatOrVector)
 BUILTIN_BINARY_PREDICATE(FCMP_UNO, "fcmp_uno", "n", FloatOrVector)
 
-// BUILTIN_SIL_OPERATION - Operations that can be lowered to SIL instructions.
-// These have various types.
-// Since these operations will be lowered to SIL Instructions, we do not
-// assign any attributes on them.
+// BUILTIN_SIL_OPERATION - Operations that can be lowered to SIL
+// instructions. They can never be invoked via a BuiltinInst and are instead
+// expected to just be used by SILGen to emit sequences of non-BuiltinInst
+// instructions. These have various types. Since these operations will be
+// lowered to SIL Instructions, we do not assign any attributes on them.
 #ifndef BUILTIN_SIL_OPERATION
 #define BUILTIN_SIL_OPERATION(Id, Name, Overload) BUILTIN(Id, Name, "")
 #endif
@@ -240,6 +241,7 @@ BUILTIN_SIL_OPERATION(LoadRaw, "loadRaw", Special)
 BUILTIN_SIL_OPERATION(LoadInvariant, "loadInvariant", Special)
 
 /// Take has type (Builtin.RawPointer) -> T
+/// where T: ~Copyable & ~Escapable
 BUILTIN_SIL_OPERATION(Take, "take", Special)
 
 /// Destroy has type (T.Type, Builtin.RawPointer) -> ()
@@ -557,8 +559,9 @@ BUILTIN_RUNTIME_CALL(ErrorInMain, "errorInMain", "")
 /// nominal type is Optional.
 BUILTIN_RUNTIME_CALL(IsOptionalType, "isOptional", "")
 
-// BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.
-// These have various types.
+/// BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.
+/// These have various types. They are emitted as BuiltinInst in a standard way
+/// by SILGen.
 #ifndef BUILTIN_MISC_OPERATION
 #define BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload) \
           BUILTIN(Id, Name, Attrs)
@@ -582,7 +585,8 @@ BUILTIN_MISC_OPERATION(IsConcrete, "isConcrete", "n", Special)
 /// IsBitwiseTakable has type T.Type -> Bool
 BUILTIN_MISC_OPERATION(IsBitwiseTakable, "isbitwisetakable", "n", Special)
 
-/// IsSameMetatype has type (Any.Type, Any.Type) -> Bool
+/// IsSameMetatype has type
+/// (any (~Copyable & ~Escapable).Type, any (~Copyable & ~Escapable).Type) -> Bool
 BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
 
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
@@ -638,6 +642,8 @@ BUILTIN_MISC_OPERATION(UnprotectedStackAlloc, "unprotectedStackAlloc", "", Speci
 /// Builtin.stackAlloc(), is deallocated from the stack.
 BUILTIN_MISC_OPERATION(StackDealloc, "stackDealloc", "", Special)
 
+// Obsolete: only there to be able to read old Swift.interface files which still
+// contain the builtin.
 /// allocVector<Element>(Element.Type, Builtin.Word) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION(AllocVector, "allocVector", "", Special)
 
@@ -670,8 +676,21 @@ BUILTIN_MISC_OPERATION(ExtractElement, "extractelement", "n", Special)
 /// InsertElement has type (Vector<N, T>, T, Int32) -> Vector<N, T>.
 BUILTIN_MISC_OPERATION(InsertElement, "insertelement", "n", Special)
 
-// Shufflevector has type (VecN<T>, VecN<T>, VecM<Int32>) -> VecM<T>
+/// Select has type either
+///   (VecN<Int1>, VecN<T>, VecN<T>) -> VecN<T>
+/// or
+///   (Int1, T, T) -> T
+/// T must be trivial.
+BUILTIN_MISC_OPERATION(Select, "select", "n", Special)
+
+/// Shufflevector has type (VecN<T>, VecN<T>, VecM<Int32>) -> VecM<T>
 BUILTIN_MISC_OPERATION(ShuffleVector, "shufflevector", "n", Special)
+
+/// Interleave has type (VecN<T>, VecN<T>) -> (VecN<T>, VecN<T>)
+BUILTIN_MISC_OPERATION(Interleave, "interleave", "n", Special)
+
+/// Deinterleave has type (VecN<T>, VecN<T>) -> (VecN<T>, VecN<T>)
+BUILTIN_MISC_OPERATION(Deinterleave, "deinterleave", "n", Special)
 
 /// StaticReport has type (Builtin.Int1, Builtin.Int1, Builtin.RawPointer) -> ()
 BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
@@ -716,9 +735,6 @@ BUILTIN_MISC_OPERATION(IsNegative, "isNegative", "n", Special)
 /// Builtin.wordAtIndex_IntLiteral has type
 /// (_ value: Builtin.IntLiteral, _ index: Builtin.Word) -> Builtin.Word
 BUILTIN_MISC_OPERATION(WordAtIndex, "wordAtIndex", "n", Special)
-
-/// zeroInitializer has type <T> () -> T
-BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
 
 /// once has type (Builtin.RawPointer, (Builtin.RawPointer) -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
@@ -840,6 +856,14 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(Strideof, "strideof", "n", Special)
 /// Alignof has type T.Type -> Int
 BUILTIN_MISC_OPERATION_WITH_SILGEN(Alignof, "alignof", "n", Special)
 
+/// zeroInitializer has type <T> () -> T, but the SIL builtin has its
+/// own rules.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(ZeroInitializer, "zeroInitializer", "n", Special)
+
+/// Like `zeroInitializer`, but does not actually initialize the memory.
+/// It only indicates to mandatory passes that the memory is going to be initialized.
+BUILTIN_MISC_OPERATION(PrepareInitialization, "prepareInitialization", "n", Special)
+
 // getCurrentExecutor: () async -> Builtin.Executor?
 //
 // Retrieve the SerialExecutorRef on which the current asynchronous
@@ -861,17 +885,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "
 /// Cancel the given asynchronous task.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Special)
 
-/// startAsyncLet()<T>: (
-///     __owned @escaping () async throws -> sending T
-/// ) -> Builtin.RawPointer
-///
-/// DEPRECATED. startAsyncLetWithLocalBuffer is used instead.
-///
-/// Create, initialize and start a new async-let and associated task.
-/// Returns an AsyncLet* that must be passed to endAsyncLet for destruction.
-BUILTIN_MISC_OPERATION(StartAsyncLet, "startAsyncLet", "", Special)
-
-/// startAsyncLetWithLocalBuffer()<T>: (
+/// startAsyncLetWithLocalBuffer: <T> (
 ///     __owned @escaping () async throws -> sending T,
 ///     _ resultBuf: Builtin.RawPointer
 /// ) -> Builtin.RawPointer
@@ -912,16 +926,11 @@ BUILTIN_MISC_OPERATION(FlowSensitiveSelfIsolation, "flowSensitiveSelfIsolation",
 BUILTIN_MISC_OPERATION(FlowSensitiveDistributedSelfIsolation,
                        "flowSensitiveDistributedSelfIsolation", "", Special)
 
-/// endAsyncLet(): (Builtin.RawPointer) -> Void
+/// finishAsyncLet(Builtin.RawPointer, Builtin.RawPointer) -> Void
 ///
-/// DEPRECATED. The swift_asyncLet_finish intrinsic and endAsyncLetLifetime
-/// builtin are used instead.
-///
-/// Ends and destroys an async-let.
-/// The ClosureLifetimeFixup pass adds a second operand to the builtin to
-/// ensure that optimizations keep the stack-allocated closure arguments alive
-/// until the endAsyncLet.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(EndAsyncLet, "endAsyncLet", "", Special)
+/// End the scope of an async let. An async operation. Deallocates stack
+/// memory that was allocated by startAsyncLetWithLocalBuffer.
+BUILTIN_MISC_OPERATION(FinishAsyncLet, "finishAsyncLet", "", Special)
 
 /// endAsyncLetLifetime(): (Builtin.RawPointer) -> Void
 ///
@@ -952,7 +961,8 @@ BUILTIN_MISC_OPERATION(UnprotectedAddressOfBorrowOpaque, "unprotectedAddressOfBo
 /// createTask<T>(flags: Int,
 ///               initialSerialExecutor: (Builtin.Executor)? = nil,
 ///               taskGroup: Builtin.RawPointer? = nil,
-///               initialTaskExecutor: (Builtin.Executor)? = nil,
+///               initialTaskExecutorDeprecated: (Builtin.Executor)? = nil,
+///               initialTaskExecutorOwned: (any TaskExecutor)? = nil,
 ///               operation: sending @escaping () async throws -> T)
 ///  -> Builtin.NativeObject, Builtin.RawPointer)
 ///
@@ -1163,6 +1173,42 @@ BUILTIN_TYPE_CHECKER_OPERATION(TriggerFallbackDiagnostic, trigger_fallback_diagn
 /// @objc protocol type. The answer is a tri-state of 0 = No, 1 = Yes, 2 =
 /// Maybe.
 BUILTIN_TYPE_TRAIT_OPERATION(CanBeObjCClass, canBeClass)
+
+/// Equivalent to calling swift_task_addCancellationHandler.
+///
+/// Signature: (handler: () -> Void) -> UnsafeRawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddCancellationHandler,
+                                  "taskAddCancellationHandler", "",
+                                   Special)
+
+/// Equivalent to calling swift_task_removeCancellationHandler.
+///
+/// Signature: (record: UnsafeRawPointer) -> ()
+BUILTIN_MISC_OPERATION(TaskRemoveCancellationHandler,
+                       "taskRemoveCancellationHandler", "", Special)
+
+/// Equivalent to calling swift_task_addPriorityEscalationHandler.
+///
+/// Signature: (handler: (UInt8, UInt8) -> Void) -> UnsafeRawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddPriorityEscalationHandler,
+                                   "taskAddPriorityEscalationHandler", "",
+                                   Special)
+
+/// Equivalent to calling swift_task_removePriorityEscalationHandler.
+///
+/// Signature: (record: UnsafeRawPointer) -> ()
+BUILTIN_MISC_OPERATION(TaskRemovePriorityEscalationHandler,
+                       "taskRemovePriorityEscalationHandler", "", Special)
+
+/// Equivalent to calling swift_task_localValuePush.
+///
+/// Signature: <Value> (key: Builtin.RawPointer, value: __owned Value) -> ()
+BUILTIN_MISC_OPERATION(TaskLocalValuePush, "taskLocalValuePush", "", Special)
+
+/// Equivalent to calling swift_task_localValuePop.
+///
+/// Signature: () -> ()
+BUILTIN_MISC_OPERATION(TaskLocalValuePop, "taskLocalValuePop", "", Special)
 
 #undef BUILTIN_TYPE_TRAIT_OPERATION
 #undef BUILTIN_UNARY_OPERATION

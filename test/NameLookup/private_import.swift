@@ -30,7 +30,7 @@
 // RUN: %target-swift-frontend -emit-module -module-name Host -I %t -emit-module-path %t/Host.swiftmodule -enable-private-imports %s %S/Inputs/private_import/Host.swift
 
 // Build a thunk for the host module.
-// RUN: %target-typecheck-verify-swift -parse-as-library -I %t -DCOMPILING_THUNK
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -parse-as-library -I %t -DCOMPILING_THUNK
 
 #if COMPILING_THUNK
 @_private(sourceFile: "private_import.swift") import Host

@@ -69,11 +69,11 @@
 /// Verify functions and tables are optimized with Package CMO in Lib.
 // RUN: %FileCheck -check-prefix=CHECK-LIB %s < %t/Lib.sil
 
-// CHECK-LIB: sil [serialized] [exact_self_class] [canonical] @$s3Lib3PubCyACSicfC : $@convention(method) (Int, @thick Pub.Type) -> @owned Pub {
+// CHECK-LIB: sil [serialized] [exact_self_class] [canonical] [ossa] @$s3Lib3PubCyACSicfC : $@convention(method) (Int, @thick Pub.Type) -> @owned Pub {
 // CHECK-LIB:  function_ref @$s3Lib3PubCyACSicfc : $@convention(method) (Int, @owned Pub) -> @owned Pub
 
 // Pub.pkgVar.getter
-// CHECK-LIB: sil package [serialized_for_package] [canonical] @$s3Lib3PubC6pkgVarSivg : $@convention(method) (@guaranteed Pub) -> Int {
+// CHECK-LIB: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib3PubC6pkgVarSivg : $@convention(method) (@guaranteed Pub) -> Int {
 
 // CHECK-LIB: sil_vtable [serialized_for_package] Pub {
 // CHECK-LIB:    #Pub.pubVar!getter: (Pub) -> () -> Int : @$s3Lib3PubC6pubVarSivg  // Pub.pubVar.getter

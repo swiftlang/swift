@@ -78,17 +78,24 @@ class LowerTupleAddrConstructorTransform : public SILFunctionTransform {
     bool deletedInst = false;
     for (auto &block : *function) {
       for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
-        auto *inst = dyn_cast<TupleAddrConstructorInst>(&*ii);
+        auto *inst = &*ii;
         ++ii;
 
-        if (!inst)
+        if (auto *i = dyn_cast<IgnoredUseInst>(inst)) {
+          i->eraseFromParent();
+          deletedInst = true;
+          continue;
+        }
+
+        auto *t = dyn_cast<TupleAddrConstructorInst>(inst);
+        if (!t)
           continue;
 
         // (tuple_addr_constructor [assign/init] %addr,
         //                         (destructure_tuple %tuple))
         // ->
         // (store [assign/init] %tuple to %addr)
-        if (peepholeTupleDestructorOperand(inst)) {
+        if (peepholeTupleDestructorOperand(t)) {
           continue;
         }
 
@@ -96,17 +103,17 @@ class LowerTupleAddrConstructorTransform : public SILFunctionTransform {
 
         unsigned count = 0;
         visitExplodedTupleValue(
-            inst->getDest(),
+            t->getDest(),
             [&](SILValue value, std::optional<unsigned> index) -> SILValue {
               if (!index) {
-                SILValue elt = inst->getElement(count);
+                SILValue elt = t->getElement(count);
                 if (elt->getType().isAddress()) {
-                  builder.createCopyAddr(inst->getLoc(), elt, value, IsTake,
-                                         inst->isInitializationOfDest());
+                  builder.createCopyAddr(t->getLoc(), elt, value, IsTake,
+                                         t->isInitializationOfDest());
                 } else {
                   builder.emitStoreValueOperation(
-                      inst->getLoc(), elt, value,
-                      bool(inst->isInitializationOfDest())
+                      t->getLoc(), elt, value,
+                      bool(t->isInitializationOfDest())
                           ? StoreOwnershipQualifier::Init
                           : StoreOwnershipQualifier::Assign);
                 }
@@ -114,10 +121,10 @@ class LowerTupleAddrConstructorTransform : public SILFunctionTransform {
                 return value;
               }
               auto *teai =
-                  builder.createTupleElementAddr(inst->getLoc(), value, *index);
+                  builder.createTupleElementAddr(t->getLoc(), value, *index);
               return teai;
             });
-        inst->eraseFromParent();
+        t->eraseFromParent();
         deletedInst = true;
       }
     }

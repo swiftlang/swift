@@ -1,0 +1,38 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name IndexWhileBuilding
+
+// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/idx)
+// RUN: %target-swift-frontend -compile-module-from-interface -explicit-interface-module-build -module-name IndexWhileBuilding -index-store-path %/t/idx -index-include-locals -o %/t/IndexWhileBuilding.swiftmodule %s
+// RUN: c-index-test core -print-record %t/idx | %FileCheck %s
+
+import Swift
+// CHECK:        [[@LINE-1]]:8 | module/Swift | c:@M@Swift | Ref | rel: 0
+
+public struct MyStruct {
+  // CHECK:      [[@LINE-1]]:15 | struct/Swift | s:18IndexWhileBuilding8MyStructV | Def
+  public init()
+  // CHECK:      [[@LINE-1]]:10 | constructor/Swift | s:18IndexWhileBuilding8MyStructVACycfc | Def,RelChild
+  // CHECK-NEXT:    RelChild | s:18IndexWhileBuilding8MyStructV
+}
+
+@inlinable public func myFunc() {
+  // CHECK:      [[@LINE-1]]:24 | function/Swift | s:18IndexWhileBuilding6myFuncyyF | Def
+  let s = MyStruct()
+  // CHECK:      [[@LINE-1]]:7 | function/acc-get(local)/Swift | s:18IndexWhileBuilding6myFuncyyF1sL_AA8MyStructVvg | Def,Impl,RelChild,RelAcc
+  // CHECK-NEXT:    RelChild,RelAcc | s:18IndexWhileBuilding6myFuncyyF1sL_AA8MyStructVvp
+  // CHECK:      [[@LINE-3]]:7 | function/acc-set(local)/Swift | s:18IndexWhileBuilding6myFuncyyF1sL_AA8MyStructVvs | Def,Impl,RelChild,RelAcc
+  // CHECK-NEXT:    RelChild,RelAcc | s:18IndexWhileBuilding6myFuncyyF1sL_AA8MyStructVvp
+  // CHECK:      [[@LINE-5]]:7 | variable(local)/Swift | s:18IndexWhileBuilding6myFuncyyF1sL_AA8MyStructVvp | Def,RelChild
+  // CHECK-NEXT:    RelChild | s:18IndexWhileBuilding6myFuncyyF
+  // CHECK:      [[@LINE-7]]:11 | struct/Swift | s:18IndexWhileBuilding8MyStructV | Ref,RelCont
+  // CHECK-NEXT:    RelCont | s:18IndexWhileBuilding6myFuncyyF1sL_AA8MyStructVvp
+  // CHECK:      [[@LINE-9]]:11 | constructor/Swift | s:18IndexWhileBuilding8MyStructVACycfc | Ref,Call,RelCall,RelCont
+  // CHECK-NEXT:    RelCont | s:18IndexWhileBuilding6myFuncyyF1sL_AA8MyStructVvp
+  // CHECK-NEXT:    RelCall | s:18IndexWhileBuilding6myFuncyyF
+  _ = s
+  // CHECK:      [[@LINE-1]]:7 | function/acc-get(local)/Swift | s:18IndexWhileBuilding6myFuncyyF1sL_AA8MyStructVvg | Ref,Call,Impl,RelCall,RelCont | rel: 1
+  // CHECK-NEXT:    RelCall,RelCont | s:18IndexWhileBuilding6myFuncyyF
+  // CHECK:      [[@LINE-3]]:7 | variable(local)/Swift | s:18IndexWhileBuilding6myFuncyyF1sL_AA8MyStructVvp | Ref,Read,RelCont | rel: 1
+  // CHECK-NEXT:    RelCont | s:18IndexWhileBuilding6myFuncyyF
+}
