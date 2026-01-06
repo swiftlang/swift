@@ -111,6 +111,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-NEXT:             Keyword/None:                       nonobjc[#Func Attribute#]; name=nonobjc{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       inlinable[#Func Attribute#]; name=inlinable{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       warn_unqualified_access[#Func Attribute#]; name=warn_unqualified_access{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       c[#Func Attribute#]; name=c
 // KEYWORD2-NEXT:             Keyword/None:                       usableFromInline[#Func Attribute#]; name=usableFromInline
 // KEYWORD2-NEXT:             Keyword/None:                       discardableResult[#Func Attribute#]; name=discardableResult
 // KEYWORD2-NEXT:             Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
@@ -161,6 +162,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD4-NEXT:             Keyword/None:                       dynamicCallable[#Enum Attribute#]; name=dynamicCallable
 // KEYWORD4-NEXT:             Keyword/None:                       main[#Enum Attribute#]; name=main
 // KEYWORD4-NEXT:             Keyword/None:                       dynamicMemberLookup[#Enum Attribute#]; name=dynamicMemberLookup
+// KEYWORD4-NEXT:             Keyword/None:                       c[#Enum Attribute#]; name=c
 // KEYWORD4-NEXT:             Keyword/None:                       usableFromInline[#Enum Attribute#]; name=usableFromInline
 // KEYWORD4-NEXT:             Keyword/None:                       frozen[#Enum Attribute#]; name=frozen
 // KEYWORD4-NEXT:             Keyword/None:                       propertyWrapper[#Enum Attribute#]; name=propertyWrapper
