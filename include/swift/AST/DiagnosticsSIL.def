@@ -226,7 +226,7 @@ ERROR(ivar_not_initialized_at_implicit_superinit,none,
       (StringRef, bool))
 ERROR(ivar_not_initialized_by_init_accessor,none,
       "property %0 not initialized by init accessor",
-      (DeclName))
+      (StringRef))
 
 ERROR(noncopyable_dynamic_lifetime_unsupported,none,
       "conditional initialization or destruction of noncopyable types is not "

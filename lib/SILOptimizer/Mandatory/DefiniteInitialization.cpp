@@ -1194,13 +1194,14 @@ void LifetimeChecker::doIt() {
 
   // All of the indirect results marked as "out" have to be fully initialized
   // before their lifetime ends.
-  if (TheMemory.isOut()) {
+  if (TheMemory.isOut() &&
+      !TheMemory.getType().isEmptyTuple(TheMemory.getFunction())) {
     auto diagnoseMissingInit = [&]() {
       std::string propertyName;
-      auto *property = TheMemory.getPathStringToElement(0, propertyName);
+      TheMemory.getPathStringToElement(0, propertyName);
       diagnose(Module, F.getLocation(),
                diag::ivar_not_initialized_by_init_accessor,
-               property->getName());
+               StringRef("'" + propertyName + "'"));
       EmittedErrorLocs.push_back(TheMemory.getLoc());
     };
 
