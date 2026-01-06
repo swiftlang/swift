@@ -4274,6 +4274,17 @@ public:
 
   SWIFT_DEBUG_DUMPER(dump());
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;
+
+  /// Returns true if multiple instances of an attribute kind
+  /// can appear on a type.
+  static constexpr bool allowMultipleAttributes(TypeAttrKind TK) {
+    switch (TK) {
+    case swift::TypeAttrKind::Lifetime:
+      return true;
+    default:
+      return false;
+    }
+  }
 };
 
 class AtTypeAttrBase : public TypeAttribute {
