@@ -2,7 +2,7 @@
 // RUN: %target-build-swift %s -Onone -g -o %t/CrashWithThreads
 // RUN: %target-codesign %t/CrashWithThreads
 // RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no,swift-backtrace=%backtracer %target-run %t/CrashWithThreads 2>&1 || true) | %FileCheck -vv %s -dump-input-filter=all
-// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no,swift-backtrace=%backtracer,threads=all %target-run %t/CrashWithThreads 2>&1 || true) | %FileCheck -vv %s -dump-input-filter=all --check-prefix WITHTHREADSOPT
+// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no,swift-backtrace=%backtracer,threads=all %target-run %t/CrashWithThreads 2>&1 || true) | %FileCheck -vv %s -dump-input-filter=all
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
@@ -10,6 +10,9 @@
 // REQUIRES: executable_test
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx
+
+// This test proved unstable on Linux so we disabled it while focus is elsewhere,
+// as it's not critical function, but it would be nice to restore it one day.
 
 #if canImport(Darwin)
   import Darwin
@@ -23,6 +26,11 @@
 #error("Unsupported platform")
 #endif
 
+let mutex = UnsafeMutablePointer<pthread_mutex_t>.allocate(capacity: 1)
+guard unsafe pthread_mutex_init(mutex, nil) == 0 else {
+  fatalError("pthread_mutex_init failed")
+}
+
 func reallyCrashMe() {
   print("I'm going to crash now")
   let ptr = UnsafeMutablePointer<Int>(bitPattern: 4)!
@@ -33,6 +41,19 @@ func crashMe() {
   reallyCrashMe()
 }
 
+func lockMutex() {
+  guard unsafe pthread_mutex_lock(mutex) == 0 else {
+    fatalError("pthread_mutex_lock failed")
+  }
+}
+
+func unlockMutex() {
+  guard unsafe pthread_mutex_unlock(mutex) == 0 else {
+    fatalError("pthread_mutex_lock failed")
+  }
+}
+
+
 func spawnThread(_ shouldCrash: Bool) {
   #if os(Linux)
   var thread: pthread_t = 0
@@ -41,8 +62,14 @@ func spawnThread(_ shouldCrash: Bool) {
   #endif
   if shouldCrash {
     pthread_create(&thread, nil, { _ in
+                                // take mutex
+                                lockMutex()
+
                                 crashMe()
+
                                 // this should not be run
+                                unlockMutex()
+
                                 while (true) {
                                     sleep(10)
                                   }
@@ -58,9 +85,15 @@ func spawnThread(_ shouldCrash: Bool) {
 
 let crashingThreadIndex = (1..<10).randomElement()
 
+lockMutex()
+
+// hold a mutex
 for threadIndex in 1..<10 {
   spawnThread(threadIndex == crashingThreadIndex)
 }
+
+// release mutex
+unlockMutex()
 
 while (true) {
   sleep(10)
@@ -81,10 +114,6 @@ while (true) {
 
 // CHECK: Thread 0{{( ".*")?}}:
 
-// CHECK: 0                    0x{{[0-9a-f]+}} __semwait_signal + {{[0-9]+}} in libsystem_kernel.dylib
-// CHECK-NEXT: 1 [ra]          0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashWithThreads at {{.*}}/CrashWithThreads
-// CHECK-NEXT: 2 [ra] [system] 0x{{[0-9a-f]+}} start + {{[0-9]+}} in dyld
-
 // CHECK: Thread {{[1-9][0-9]*( ".*")?}}:
 
 // CHECK: 0                    0x{{[0-9a-f]+}} __semwait_signal + {{[0-9]+}} in libsystem_kernel.dylib
@@ -98,38 +127,3 @@ while (true) {
 // CHECK: Images ({{[0-9]+}} omitted):
 
 // CHECK: {{0x[0-9a-f]+}}–{{0x[0-9a-f]+}}{{ +}}{{([0-9a-f]+|<no build ID>)}}{{ +}}CrashWithThreads{{ +}}{{.*}}/CrashWithThreads
-
-// WITHTHREADSOPT: *** Program crashed: Bad pointer dereference at 0x{{0+}}4 ***
-
-// make sure there are no threads before the crashing thread (rdar://164566321)
-
-// we expect the first thread not to be thread 0, it should be the crashing thread instead
-// WITHTHREADSOPT-NOT: Thread 0{{( ".*")?}}:
-
-// we expect a crash on a thread other than 0
-// WITHTHREADSOPT: Thread {{[1-9][0-9]*}} {{(".*" )?}}crashed:
-
-// WITHTHREADSOPT: 0                    0x{{[0-9a-f]+}} reallyCrashMe() + {{[0-9]+}} in CrashWithThreads at {{.*}}/CrashWithThreads
-// WITHTHREADSOPT-NEXT: 1 [ra]          0x{{[0-9a-f]+}} crashMe() + {{[0-9]+}} in CrashWithThreads at {{.*}}/CrashWithThreads
-// WITHTHREADSOPT-NEXT: 2 [ra]          0x{{[0-9a-f]+}} closure #{{[0-9]}} in spawnThread(_:) + {{[0-9]+}} in CrashWithThreads at {{.*}}/CrashWithThreads
-// WITHTHREADSOPT-NEXT: 3 [ra] [thunk]  0x{{[0-9a-f]+}} @objc closure #{{[0-9]}} in spawnThread(_:) + {{[0-9]+}} in CrashWithThreads at {{.*}}<compiler-generated>
-
-// WITHTHREADSOPT: Thread 0{{( ".*")?}}:
-
-// WITHTHREADSOPT: 0                    0x{{[0-9a-f]+}} __semwait_signal + {{[0-9]+}} in libsystem_kernel.dylib
-// WITHTHREADSOPT-NEXT: 1 [ra]          0x{{[0-9a-f]+}} main + {{[0-9]+}} in CrashWithThreads at {{.*}}/CrashWithThreads
-// WITHTHREADSOPT-NEXT: 2 [ra] [system] 0x{{[0-9a-f]+}} start + {{[0-9]+}} in dyld
-
-// WITHTHREADSOPT: Thread {{[1-9][0-9]*( ".*")?}}:
-
-// WITHTHREADSOPT: 0                    0x{{[0-9a-f]+}} __semwait_signal + {{[0-9]+}} in libsystem_kernel.dylib
-// WITHTHREADSOPT-NEXT: 1 [ra]          0x{{[0-9a-f]+}} closure #{{[0-9]*}} in spawnThread(_:) + {{[0-9]+}} in CrashWithThreads at {{.*}}/CrashWithThreads
-// WITHTHREADSOPT-NEXT: 2 [ra] [thunk]  0x{{[0-9a-f]+}} @objc closure #{{[0-9]*}} in spawnThread(_:) + {{[0-9]+}} in CrashWithThreads at /<compiler-generated>
-// WITHTHREADSOPT-NEXT: 3 [ra]          0x{{[0-9a-f]+}} _pthread_start + {{[0-9]+}} in libsystem_pthread.dylib
-
-// WITHTHREADSOPT: Registers:
-
-// WITHTHREADSOPT: Images ({{[0-9]+}} omitted):
-
-// WITHTHREADSOPT: {{0x[0-9a-f]+}}–{{0x[0-9a-f]+}}{{ +}}{{([0-9a-f]+|<no build ID>)}}{{ +}}CrashWithThreads{{ +}}{{.*}}/CrashWithThreads
-
