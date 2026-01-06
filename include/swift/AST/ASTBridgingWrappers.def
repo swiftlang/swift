@@ -87,7 +87,7 @@
 
 #ifndef TYPE_ATTR
 #define SIMPLE_TYPE_ATTR(...)
-#define TYPE_ATTR(SPELLING, CLASS) AST_BRIDGING_WRAPPER_NONNULL(CLASS##TypeAttr)
+#define TYPE_ATTR(SPELLING, CLASS, ...) AST_BRIDGING_WRAPPER_NONNULL(CLASS##TypeAttr)
 #endif
 #include "swift/AST/TypeAttr.def"
 

@@ -63,7 +63,7 @@ static_assert(IsTriviallyDestructible<DeclAttributes>::value,
                 #Name " needs to specify exactly one of ForbiddenInABIAttr, UnconstrainedInABIAttr, EquivalentInABIAttr, or UnreachableInABIAttr");
 #include "swift/AST/DeclAttr.def"
 
-#define TYPE_ATTR(_, Id)                                                       \
+#define TYPE_ATTR(_, Id, ...)                                                  \
   static_assert(TypeAttrKind::Id <= TypeAttrKind::Last_TypeAttr);
 #include "swift/AST/TypeAttr.def"
 
@@ -91,7 +91,7 @@ StringRef swift::getAccessLevelSpelling(AccessLevel value) {
 
 SourceLoc TypeAttribute::getStartLoc() const {
   switch (getKind()) {
-#define TYPE_ATTR(_, CLASS)                                                    \
+#define TYPE_ATTR(_, CLASS, ...)                                               \
   case TypeAttrKind::CLASS:                                                    \
     return static_cast<const CLASS##TypeAttr *>(this)->getStartLocImpl();
 #include "swift/AST/TypeAttr.def"
@@ -101,7 +101,7 @@ SourceLoc TypeAttribute::getStartLoc() const {
 
 SourceLoc TypeAttribute::getEndLoc() const {
   switch (getKind()) {
-#define TYPE_ATTR(_, CLASS)                                                    \
+#define TYPE_ATTR(_, CLASS, ...)                                               \
   case TypeAttrKind::CLASS:                                                    \
     return static_cast<const CLASS##TypeAttr *>(this)->getEndLocImpl();
 #include "swift/AST/TypeAttr.def"
@@ -111,7 +111,7 @@ SourceLoc TypeAttribute::getEndLoc() const {
 
 SourceRange TypeAttribute::getSourceRange() const {
   switch (getKind()) {
-#define TYPE_ATTR(_, CLASS)                                                    \
+#define TYPE_ATTR(_, CLASS, ...)                                               \
   case TypeAttrKind::CLASS: {                                                  \
     auto attr = static_cast<const CLASS##TypeAttr *>(this);                    \
     return SourceRange(attr->getStartLocImpl(), attr->getEndLocImpl());        \
@@ -127,14 +127,14 @@ SourceRange TypeAttribute::getSourceRange() const {
 std::optional<TypeAttrKind>
 TypeAttribute::getAttrKindFromString(StringRef Str) {
   return llvm::StringSwitch<std::optional<TypeAttrKind>>(Str)
-#define TYPE_ATTR(X, C) .Case(#X, TypeAttrKind::C)
+#define TYPE_ATTR(X, C, ...) .Case(#X, TypeAttrKind::C)
 #include "swift/AST/TypeAttr.def"
       .Default(std::nullopt);
 }
 
 bool TypeAttribute::isSilOnly(TypeAttrKind TK) {
   switch (TK) {
-#define SIL_TYPE_ATTR(X, C) case TypeAttrKind::C:
+#define SIL_TYPE_ATTR(X, C, ...) case TypeAttrKind::C:
 #include "swift/AST/TypeAttr.def"
     return true;
   default:
@@ -145,7 +145,7 @@ bool TypeAttribute::isSilOnly(TypeAttrKind TK) {
 /// Return the name (like "autoclosure") for an attribute ID.
 const char *TypeAttribute::getAttrName(TypeAttrKind kind) {
   switch (kind) {
-#define TYPE_ATTR(X, C)                                                        \
+#define TYPE_ATTR(X, C, ...)                                                   \
   case TypeAttrKind::C:                                                        \
     return #X;
 #include "swift/AST/TypeAttr.def"
@@ -159,11 +159,11 @@ bool TypeAttribute::isUserInaccessible(TypeAttrKind DK) {
   // need a user-inaccessible non-underscored attribute.
   switch (DK) {
     // SIL attributes are always considered user-inaccessible.
-#define SIL_TYPE_ATTR(SPELLING, C)                                             \
+#define SIL_TYPE_ATTR(SPELLING, C, ...)                                        \
   case TypeAttrKind::C:                                                        \
     return true;
     // For non-SIL attributes, check whether the spelling is underscored.
-#define TYPE_ATTR(SPELLING, C)                                                 \
+#define TYPE_ATTR(SPELLING, C, ...)                                            \
   case TypeAttrKind::C:                                                        \
     return StringRef(#SPELLING).starts_with("_");
 #include "swift/AST/TypeAttr.def"
@@ -180,12 +180,12 @@ TypeAttribute *TypeAttribute::createSimple(const ASTContext &context,
   // The simple cases should all be doing the exact same thing, and we
   // can reasonably hope that the optimizer will unify them so that this
   // function doesn't actually need a switch.
-#define TYPE_ATTR(SPELLING, CLASS)                                             \
+#define TYPE_ATTR(SPELLING, CLASS, ...)                                        \
   case TypeAttrKind::CLASS:                                                    \
-    llvm_unreachable("not a simple attribute");
-#define SIMPLE_TYPE_ATTR(SPELLING, CLASS)                                      \
+  llvm_unreachable("not a simple attribute");
+#define SIMPLE_TYPE_ATTR(SPELLING, CLASS, ...)                                 \
   case TypeAttrKind::CLASS:                                                    \
-    return new (context) CLASS##TypeAttr(atLoc, attrLoc);
+  return new (context) CLASS##TypeAttr(atLoc, attrLoc);
 #include "swift/AST/TypeAttr.def"
   }
   llvm_unreachable("bad type attribute kind");
@@ -200,16 +200,16 @@ void TypeAttribute::dump() const {
 void TypeAttribute::print(ASTPrinter &printer,
                           const PrintOptions &options) const {
   switch (getKind()) {
-#define TYPE_ATTR(_, CLASS)
-#define SIMPLE_TYPE_ATTR(_, CLASS) case TypeAttrKind::CLASS:
+#define TYPE_ATTR(_, CLASS, ...)
+#define SIMPLE_TYPE_ATTR(_, CLASS, ...) case TypeAttrKind::CLASS:
 #include "swift/AST/TypeAttr.def"
     printer.printSimpleAttr(getAttrName(getKind()), /*needAt*/ true);
     return;
 
-#define TYPE_ATTR(_, CLASS)                                                    \
+#define TYPE_ATTR(_, CLASS, ...)                                               \
   case TypeAttrKind::CLASS:                                                    \
     return cast<CLASS##TypeAttr>(this)->printImpl(printer, options);
-#define SIMPLE_TYPE_ATTR(_, C)
+#define SIMPLE_TYPE_ATTR(_, C, ...)
 #include "swift/AST/TypeAttr.def"
   }
   llvm_unreachable("bad kind");

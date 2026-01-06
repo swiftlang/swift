@@ -4885,8 +4885,8 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   switch (attr) {
 
   // Simple type attributes don't need any further checking.
-#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS)
-#define SIMPLE_TYPE_ATTR(SPELLING, CLASS) case TypeAttrKind::CLASS:
+#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS, ...)
+#define SIMPLE_TYPE_ATTR(SPELLING, CLASS, ...) case TypeAttrKind::CLASS:
 #include "swift/AST/TypeAttr.def"
   SimpleAttr:
     if (!justChecking) {
@@ -4896,7 +4896,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
 
   // For simple SIL type attributes, check whether we're parsing SIL,
   // then return to the SimpleAttr case.
-#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS) case TypeAttrKind::CLASS:
+#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS, ...) case TypeAttrKind::CLASS:
 #include "swift/AST/TypeAttr.def"
     if (!isInSILMode()) {
       if (!justChecking) {

@@ -479,7 +479,7 @@ public:
 // Declare `.asTypeAttr` on each BridgedXXXTypeAttr type, which upcasts a
 // wrapper for a TypeAttr subclass to a BridgedTypeAttr.
 #define SIMPLE_TYPE_ATTR(...)
-#define TYPE_ATTR(SPELLING, CLASS)                                             \
+#define TYPE_ATTR(SPELLING, CLASS, ...)                                        \
   SWIFT_NAME("getter:Bridged" #CLASS "TypeAttr.asTypeAttribute(self:)")        \
   BridgedTypeAttribute Bridged##CLASS##TypeAttr_asTypeAttribute(               \
       Bridged##CLASS##TypeAttr attr);

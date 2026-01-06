@@ -25,7 +25,7 @@ using namespace swift;
 
 // Define `.asTypeAttr` on each BridgedXXXTypeAttr type.
 #define SIMPLE_TYPE_ATTR(...)
-#define TYPE_ATTR(SPELLING, CLASS)                                             \
+#define TYPE_ATTR(SPELLING, CLASS, ...)                                        \
   SWIFT_NAME("getter:Bridged" #CLASS "TypeAttr.asTypeAttribute(self:)")        \
   BridgedTypeAttribute Bridged##CLASS##TypeAttr_asTypeAttribute(               \
       Bridged##CLASS##TypeAttr attr) {                                         \
