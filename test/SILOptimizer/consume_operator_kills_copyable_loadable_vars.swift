@@ -216,7 +216,7 @@ struct S {
             try f()
             let maybeNewB = exchangeUse(b)
             self = .init(buffer: maybeNewB)
-            } catch {
+        } catch {
             self = .init(buffer: nil)
         }
     }

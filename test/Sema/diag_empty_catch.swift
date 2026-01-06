@@ -3,6 +3,8 @@
 enum MyError: Error { case bad }
 
 func something() throws {}
+func dangerous() throws { throw MyError.bad }
+func safe() {}
 
 func testStrictCatch() {
   // 1. Standard Empty Catch -> WARN
@@ -32,12 +34,11 @@ func testStrictCatch() {
     if true {}
   }
 
-  // 5. Catch All with Explicit Binding -> WARN
-  // Even if you bind 'let e', if the body is empty, it's effectively an ignored error.
+  // 5. Catch All with Explicit Binding -> PASS
   do {
     try something()
   } catch let e {
-        // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing i}}}
+    // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
   }
 }
 
@@ -48,6 +49,80 @@ func testCatchChain() {
   } catch MyError.bad {
     print("bad")
   } catch {
-        // Valid: implicitly ignore the rest
+    // Valid: implicitly ignore the rest
+  }
+}
+
+func testDeepRecursion(flag: Bool, val: Int) {
+  // 7. Hidden in If/Else -> WARN
+  do {
+    if flag {
+      try something()
+    } else {
+      try something()
+    }
+  } catch { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+  }
+
+  // 8. Hidden in Guard -> WARN
+  do {
+    guard flag else {
+      try something()
+      return
+    }
+  } catch { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+  }
+
+  // 9. Hidden in Loops -> WARN
+  do {
+    for _ in 0..<5 {
+      try something()
+    }
+  } catch { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+  }
+
+  // 10. Hidden in Switch -> WARN
+  do {
+    switch val {
+    case 1:
+      try something()
+    default:
+      break
+    }
+  } catch { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+  }
+
+  // 11. Explicit Throw Stmt -> WARN
+  do {
+    if flag {
+      throw MyError.bad
+    }
+  } catch { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+  }
+
+  // 12. Nested Rethrow -> WARN
+  do {
+    do {
+      try something()
+    } catch {
+      throw MyError.bad
+    }
+  } catch { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+  }
+}
+
+func testReachabilityConflict(flag: Bool) {
+  // 13. True Unreachable -> Should warn 'unreachable', NOT 'empty catch'
+  do {
+    safe()
+  } catch { // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+  }
+
+  // 14. Deeply Reachable -> Should warn 'empty catch', NOT 'unreachable'
+  do {
+    if flag {
+      try dangerous()
+    }
+  } catch { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
   }
 }
