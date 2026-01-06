@@ -81,9 +81,13 @@ static void gatherDestroysOfContainer(const DIMemoryObjectInfo &memoryInfo,
 static unsigned getElementCountRec(TypeExpansionContext context,
                                    SILModule &Module, SILType T,
                                    bool IsSelfOfNonDelegatingInitializer) {
-  // If this is a tuple, it is always recursively flattened.
+  // If this is a tuple, it is usually recursively flattened.
   if (CanTupleType TT = T.getAs<TupleType>()) {
     assert(!IsSelfOfNonDelegatingInitializer && "self never has tuple type");
+    // Don't flatten tuples containing pack expansions - they have a dynamic
+    // number of elements that cannot be statically enumerated.
+    if (TT->containsPackExpansionType())
+      return 1;
     unsigned NumElements = 0;
     for (unsigned i = 0, e = TT->getNumElements(); i < e; ++i)
       NumElements +=
@@ -216,6 +220,11 @@ static SILType getElementTypeRec(TypeExpansionContext context,
   // If this is a tuple type, walk into it.
   if (CanTupleType TT = T.getAs<TupleType>()) {
     assert(!IsSelfOfNonDelegatingInitializer && "self never has tuple type");
+    // Tuples containing pack expansions are treated as single elements.
+    if (TT->containsPackExpansionType()) {
+      assert(EltNo == 0 && "pack expansion tuple should be single element");
+      return T;
+    }
     for (unsigned i = 0, e = TT->getNumElements(); i < e; ++i) {
       auto FieldType = T.getTupleElementType(i);
       unsigned NumFieldElements =
@@ -308,6 +317,13 @@ SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
     // If we have a tuple, flatten it.
     if (CanTupleType TT = PointeeType.getAs<TupleType>()) {
       assert(!IsSelf && "self never has tuple type");
+
+      // Tuples containing pack expansions are treated as single elements
+      // since they have a dynamic number of elements.
+      if (TT->containsPackExpansionType()) {
+        assert(EltNo == 0 && "pack expansion tuple should be single element");
+        return Ptr;
+      }
 
       // Figure out which field we're walking into.
       unsigned FieldNo = 0;
@@ -403,6 +419,12 @@ static void getPathStringToElementRec(TypeExpansionContext context,
   if (!TT) {
     // Otherwise, there are no subelements.
     assert(EltNo == 0 && "Element count problem");
+    return;
+  }
+
+  // Tuples containing pack expansions are treated as single elements.
+  if (TT->containsPackExpansionType()) {
+    assert(EltNo == 0 && "pack expansion tuple should be single element");
     return;
   }
 
