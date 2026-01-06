@@ -946,6 +946,44 @@ More generally, multiple availabilities can be specified, like so:
 enum Toast { ... }
 ```
 
+## `@_owned`
+
+Indicates that the [conservative access pattern](/docs/Lexicon.md#access-pattern)
+for some storage (a subscript or a property) should use the `get` accessor instead of `_read`.
+
+This attribute is particularly useful for accessors returning noncopyable values.
+By default, all explicitly-declared `get` accessors that return a noncopyable value and are declared in
+resilient libraries, or accessed opaquely via a protocol, are treated as if they return a borrowed value, 
+rather than one that is valid to consume:
+
+```swift
+// MutableSpan is noncopyable
+
+public protocol Giver {
+  var mutableSpan: MutableSpan { get } // has 'yielding borrow' semantics
+} 
+
+func example(_ s: some Giver) {
+  let x = s.mutableSpan // error
+}
+```
+
+This `@_owned` attribute allows you to override that behavior, so that the `get` requirement (or accessor) is truly
+exposed in a resilient interface, yielding an owned value of noncopyable type:
+
+```swift
+public protocol Giver {
+  @_owned
+  var mutableSpan: MutableSpan { get } // has 'get' semantics
+}
+
+func example(_ s: some Giver) {
+  let x = s.mutableSpan // ok
+}
+```
+
+Adding or removing this attribute is potentially an ABI and Source breaking change.
+
 ## `@_preInverseGenerics`
 
 By default when mangling a generic signature, the presence of a conformance 

@@ -291,6 +291,7 @@ extension ASTGenVisitor {
         .NSManaged,
         .ObjCMembers,
         .ObjCNonLazyRealization,
+        .Owned,
         .Preconcurrency,
         .PreInverseGenerics,
         .PropertyWrapper,
