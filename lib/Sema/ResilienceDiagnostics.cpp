@@ -83,11 +83,26 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
       D->getFormalAccessScope(/*useDC=*/DC,
                               /*allowUsableFromInline=*/true);
 
-  // Public declarations are OK, even if they're SPI or came from an
-  // implementation-only import. We'll diagnose exportability violations
-  // from diagnoseDeclRefExportability().
-  if (declAccessScope.isPublic())
+  if (declAccessScope.isPublic()) {
+    // Diagnose private setters accessed from inlinable functions
+    if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
+      if (accessor->getAccessorKind() == AccessorKind::Set) {
+        auto storage = accessor->getStorage();
+        if (accessor->getFormalAccess() < storage->getFormalAccess()) {
+          auto diagID = diag::resilience_decl_unavailable;
+          Context.Diags
+              .diagnose(loc, diagID, D, accessor->getFormalAccess(),
+                        fragileKind.getSelector())
+              .limitBehavior(DiagnosticBehavior::Warning);
+          Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
+        }
+      }
+    }
+    // Public declarations are OK, even if they're SPI or came from an
+    // implementation-only import. We'll diagnose exportability violations
+    // from diagnoseDeclRefExportability().
     return false;
+  }
 
   // Dynamic declarations were mistakenly not checked in Swift 4.2.
   // Do enforce the restriction even in pre-Swift-5 modes if the module we're
