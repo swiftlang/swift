@@ -1620,34 +1620,9 @@ needsCustomConversion(CollectionUpcastConversionExpr::ConversionPair const & pai
         case ExprKind::DestructureTuple: {
           return false;
         }
-        case ExprKind::Load:
-        case ExprKind::ABISafeConversion:
-        case ExprKind::CovariantFunctionConversion:
-        case ExprKind::CovariantReturnConversion:
-        case ExprKind::ConditionalBridgeFromObjC:
-        case ExprKind::ClassMetatypeToObject:
-        case ExprKind::ExistentialMetatypeToObject:
-        case ExprKind::ProtocolMetatypeToObject:
-        case ExprKind::InOutToPointer:
-        case ExprKind::ArrayToPointer:
-        case ExprKind::StringToPointer:
-        case ExprKind::PointerToPointer:
-        case ExprKind::ForeignObjectConversion:
-        case ExprKind::UnevaluatedInstance:
-        case ExprKind::UnderlyingToOpaque:
-        case ExprKind::Unreachable:
-        case ExprKind::DifferentiableFunction:
-        case ExprKind::LinearFunction:
-        case ExprKind::DifferentiableFunctionExtractOriginal:
-        case ExprKind::LinearFunctionExtractOriginal:
-        case ExprKind::LinearToDifferentiableFunction:
-        case ExprKind::ActorIsolationErasure:
-        case ExprKind::UnsafeCast:
-          conv->dump(llvm::errs());
-          llvm::errs() << "\n";
-          assert(false && "TODO");
-        default:
-          break;
+        default: {
+          llvm_unreachable("unsupported collection element conversion");
+        }
       }
     }
   }
