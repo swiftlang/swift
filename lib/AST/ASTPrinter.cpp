@@ -3318,6 +3318,13 @@ static void suppressingFeatureTildeSendable(PrintOptions &options,
   action();
 }
 
+static void
+suppressingFeatureCAttribute(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressCAttribute, true);
+  action();
+}
+
 namespace {
 struct ExcludeAttrRAII {
   std::vector<AnyAttrKind> &ExcludeAttrList;
@@ -3413,6 +3420,14 @@ static void printCompatibilityCheckIf(ASTPrinter &printer, bool isElseIf,
     } else {
       first = false;
     }
+
+    // Special case: CAttribute feature prints has a hasAttribute(c) check. We
+    // might want to generalize this notion if we keep having to do it.
+    if (Feature(feature) == Feature::CAttribute) {
+      printer << "hasAttribute(c)";
+      continue;
+    }
+
     printer << "$" << Feature(feature).getName();
   }
 

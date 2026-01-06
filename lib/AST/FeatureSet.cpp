@@ -149,6 +149,16 @@ UNINTERESTING_FEATURE(CheckImplementationOnly)
 UNINTERESTING_FEATURE(CheckImplementationOnlyStrict)
 UNINTERESTING_FEATURE(EnforceSPIOperatorGroup)
 
+static bool usesFeatureCAttribute(Decl *decl) {
+  for (auto attr : decl->getAttrs()) {
+    if (auto cdeclAttr = dyn_cast<CDeclAttr>(attr))
+      if (!cdeclAttr->Underscored)
+        return true;
+  }
+
+  return false;
+}
+
 static bool findLifetimeAttr(Decl *decl, bool findUnderscored) {
   auto hasLifetimeAttr = [&](Decl *decl) {
     if (!decl->getAttrs().hasAttribute<LifetimeAttr>()) {

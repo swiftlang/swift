@@ -279,6 +279,10 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums"
 LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)")
 LANGUAGE_FEATURE(BuiltinConcurrencyStackNesting, 0, "Concurrency Stack Nesting Builtins")
 
+// TEMPORARY: Never use this, because it is only meant to allow us to model
+// suppression of @c in Swift interfaces as a temporary measure.
+SUPPRESSIBLE_LANGUAGE_FEATURE(CAttribute, 495, "@c attribute")
+
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
