@@ -213,6 +213,20 @@ bool SILType::isEmpty(const SILFunction &F) const {
   return false;
 }
 
+bool SILType::isEmptyTuple(const SILFunction &F) const {
+  if (auto tupleTy = getAs<TupleType>()) {
+    // A tuple is empty if it either has no elements or if all elements are
+    // empty.
+    for (unsigned idx = 0, num = tupleTy->getNumElements(); idx < num; ++idx) {
+      if (!getTupleElementType(idx).isEmptyTuple(F))
+        return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
 bool SILType::isReferenceCounted(SILModule &M) const {
   return M.Types.getTypeLowering(*this,
                                  TypeExpansionContext::minimal())
