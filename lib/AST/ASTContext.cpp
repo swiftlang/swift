@@ -7036,6 +7036,14 @@ SILBoxType::withMutable(ASTContext &ctx,
       getSubstitutions());
 }
 
+ArrayRef<SILField> SILBoxType::getFields() const {
+  return getLayout()->getFields();
+}
+
+bool SILBoxType::isFieldMutable(unsigned index) const {
+  return getFields()[index].isMutable();
+}
+
 LayoutConstraint
 LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind,
                                       ASTContext &C) {
