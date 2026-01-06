@@ -278,7 +278,8 @@
     "EmbeddedPrint.swift",
     "InlineArray.swift",
     "_InlineArray.swift",
-    "Exclusivity.swift"
+    "Exclusivity.swift",
+    "Box.swift"
   ],
   "Result": [
     "Result.swift"
