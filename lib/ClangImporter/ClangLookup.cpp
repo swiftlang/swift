@@ -210,3 +210,160 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
 
   return result;
 }
+
+TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
+    Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
+  NominalTypeDecl *recordDecl = desc.recordDecl;
+  NominalTypeDecl *inheritingDecl = desc.inheritingDecl;
+  DeclName name = desc.name;
+  ClangInheritanceInfo inheritance = desc.inheritance;
+
+  auto &ctx = recordDecl->getASTContext();
+
+  // Whether to skip non-public members. Feature::ImportNonPublicCxxMembers says
+  // to import all non-public members by default; if that is disabled, we only
+  // import non-public members annotated with SWIFT_PRIVATE_FILEID (since those
+  // are the only classes that need non-public members.)
+  auto *cxxRecordDecl =
+      dyn_cast<clang::CXXRecordDecl>(inheritingDecl->getClangDecl());
+  auto skipIfNonPublic =
+      !ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers) &&
+      cxxRecordDecl && importer::getPrivateFileIDAttrs(cxxRecordDecl).empty();
+
+  auto directResults = evaluateOrDefault(
+      ctx.evaluator,
+      ClangDirectLookupRequest({recordDecl, recordDecl->getClangDecl(), name}),
+      {});
+
+  // The set of declarations we found.
+  TinyPtrVector<ValueDecl *> result;
+  CollectLookupResults collector(name, result);
+
+  // Find the results that are actually a member of "recordDecl".
+  ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
+  for (auto foundEntry : directResults) {
+    auto found = cast<clang::NamedDecl *>(foundEntry);
+    if (dyn_cast<clang::Decl>(found->getDeclContext()) !=
+        recordDecl->getClangDecl())
+      continue;
+
+    // We should not import 'found' if the following are all true:
+    //
+    // -  Feature::ImportNonPublicCxxMembers is not enabled
+    // -  'found' is not a member of a SWIFT_PRIVATE_FILEID-annotated class
+    // -  'found' is a non-public member.
+    // -  'found' is not a non-inherited FieldDecl; we must import private
+    //    fields because they may affect implicit conformances that iterate
+    //    through all of a struct's fields, e.g., Sendable (#76892).
+    //
+    // Note that we can skip inherited FieldDecls because implicit conformances
+    // handle those separately.
+    //
+    // The first two conditions are captured by skipIfNonPublic. The next two
+    // are conveyed by the following:
+    auto nonPublic = found->getAccess() == clang::AS_private ||
+                     found->getAccess() == clang::AS_protected;
+    auto noninheritedField = !inheritance && isa<clang::FieldDecl>(found);
+    if (skipIfNonPublic && nonPublic && !noninheritedField)
+      continue;
+
+    // Don't import constructors on foreign reference types.
+    if (isa<clang::CXXConstructorDecl>(found) && isa<ClassDecl>(recordDecl))
+      continue;
+
+    auto imported = clangModuleLoader->importDeclDirectly(found);
+    if (!imported)
+      continue;
+
+    // If this member is found due to inheritance, clone it from the base class
+    // by synthesizing getters and setters.
+    if (inheritance) {
+      imported = clangModuleLoader->importBaseMemberDecl(
+          cast<ValueDecl>(imported), inheritingDecl, inheritance);
+      if (!imported)
+        continue;
+    }
+
+    collector.add(cast<ValueDecl>(imported));
+  }
+
+  if (inheritance) {
+    // For inherited members, add members that are synthesized eagerly, such as
+    // subscripts. This is not necessary for non-inherited members because those
+    // should already be in the lookup table.
+    for (auto member :
+         cast<NominalTypeDecl>(recordDecl)->getCurrentMembersWithoutLoading()) {
+      auto namedMember = dyn_cast<ValueDecl>(member);
+      if (!namedMember || !namedMember->hasName() ||
+          namedMember->getName().getBaseName() != name ||
+          clangModuleLoader->isMemberSynthesizedPerType(namedMember) ||
+          clangModuleLoader->getOriginalForClonedMember(namedMember))
+        continue;
+
+      auto *imported = clangModuleLoader->importBaseMemberDecl(
+          namedMember, inheritingDecl, inheritance);
+      if (!imported)
+        continue;
+
+      collector.add(imported);
+    }
+  }
+
+  // If this is a C++ record, look through any base classes.
+  const clang::CXXRecordDecl *cxxRecord;
+  if ((cxxRecord =
+           dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl())) &&
+      cxxRecord->isCompleteDefinition()) {
+    // Capture the arity of already found members in the
+    // current record, to avoid adding ambiguous members
+    // from base classes.
+    llvm::SmallSet<DeclName, 4> foundMethodNames;
+    for (const auto *valueDecl : result)
+      foundMethodNames.insert(valueDecl->getName());
+
+    for (auto base : cxxRecord->bases()) {
+      if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)
+        continue;
+
+      clang::QualType baseType = base.getType();
+      if (auto spectType =
+              dyn_cast<clang::TemplateSpecializationType>(baseType))
+        baseType = spectType->desugar();
+      if (!isa<clang::RecordType>(baseType.getCanonicalType()))
+        continue;
+
+      auto *baseRecord = baseType->getAs<clang::RecordType>()->getDecl();
+
+      if (importer::isSymbolicCircularBase(cxxRecord, baseRecord))
+        // Skip circular bases to avoid unbounded recursion
+        continue;
+
+      if (auto import = clangModuleLoader->importDeclDirectly(baseRecord)) {
+        // If we are looking up the base class, go no further. We will have
+        // already found it during the other lookup.
+        if (cast<ValueDecl>(import)->getName() == name)
+          continue;
+
+        auto baseInheritance = ClangInheritanceInfo(inheritance, base);
+
+        // Add Clang members that are imported lazily.
+        auto baseResults = evaluateOrDefault(
+            ctx.evaluator,
+            ClangRecordMemberLookup({cast<NominalTypeDecl>(import), name,
+                                     inheritingDecl, baseInheritance}),
+            {});
+
+        for (auto foundInBase : baseResults) {
+          // Do not add duplicate entry with the same DeclName,
+          // as that would cause an ambiguous lookup.
+          if (foundMethodNames.count(foundInBase->getName()))
+            continue;
+
+          collector.add(foundInBase);
+        }
+      }
+    }
+  }
+
+  return result;
+}
