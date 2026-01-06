@@ -7,6 +7,9 @@
 // RUN: %target-swift-frontend -c -emit-module -o %t/Lib.o %t/Lib.swift -enable-experimental-feature Embedded -parse-as-library -disable-objc-interop -wmo -O
 // RUN: %target-swift-frontend -I %t -c -o %t/Client.o %t/Client.swift -enable-experimental-feature Embedded -parse-as-library -disable-objc-interop -wmo -O
 
+// REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
+
 //--- Lib.swift
 
 public struct S {
