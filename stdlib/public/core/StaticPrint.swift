@@ -747,7 +747,7 @@ extension ConstantVPrintFArguments {
   @_optimize(none)
   internal mutating func append(_ value: @escaping () -> UnsafeRawPointer) {
     argumentClosures.append({ continuation in
-      continuation(value()._cVarArgEncoding)
+      unsafe continuation(value()._cVarArgEncoding)
     })
   }
 }
