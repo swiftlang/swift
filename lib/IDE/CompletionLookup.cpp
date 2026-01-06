@@ -3032,9 +3032,9 @@ void CompletionLookup::getTypeAttributeKeywordCompletions(
   };
 
   // Add simple user-accessible attributes.
-#define SIL_TYPE_ATTR(SPELLING, C)
-#define SIMPLE_SIL_TYPE_ATTR(SPELLING, C)
-#define SIMPLE_TYPE_ATTR(SPELLING, C)                                          \
+#define SIL_TYPE_ATTR(SPELLING, C, ...)
+#define SIMPLE_SIL_TYPE_ATTR(SPELLING, C, ...)
+#define SIMPLE_TYPE_ATTR(SPELLING, C, ...)                                     \
   if (!TypeAttribute::isUserInaccessible(TypeAttrKind::C))                     \
     addTypeAttr(TypeAttrKind::C, #SPELLING);
 #include "swift/AST/TypeAttr.def"

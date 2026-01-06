@@ -22,28 +22,28 @@
 #ifdef SIMPLE_TYPE_ATTR
 #error ambiguous delegation, must set SIMPLE_SIL_TYPE_ATTR explicitly
 #else
-#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS) SIL_TYPE_ATTR(SPELLING, CLASS)
+#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS, BEHAVIOR) SIL_TYPE_ATTR(SPELLING, CLASS, BEHAVIOR)
 #endif
 #else
-#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS) SIMPLE_TYPE_ATTR(SPELLING, CLASS)
+#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS, BEHAVIOR) SIMPLE_TYPE_ATTR(SPELLING, CLASS, BEHAVIOR)
 #endif
 #endif
 
 // Any kind of type attribute.
 #ifndef TYPE_ATTR
-#define TYPE_ATTR(SPELLING, CLASS)
+#define TYPE_ATTR(SPELLING, CLASS, BEHAVIOR)
 #endif
 
 // A type attribute that is only valid in SIL mode.  Usually this means
 // that it's only valid in lowered types, but sometimes SIL files
 // also allow things in formal types that aren't normally expressible.
 #ifndef SIL_TYPE_ATTR
-#define SIL_TYPE_ATTR(SPELLING, CLASS) TYPE_ATTR(SPELLING, CLASS)
+#define SIL_TYPE_ATTR(SPELLING, CLASS, BEHAVIOR) TYPE_ATTR(SPELLING, CLASS, BEHAVIOR)
 #endif
 
 // A type attribute that's always just spelled `@identifier` in source.
 #ifndef SIMPLE_TYPE_ATTR
-#define SIMPLE_TYPE_ATTR(SPELLING, CLASS) TYPE_ATTR(SPELLING, CLASS)
+#define SIMPLE_TYPE_ATTR(SPELLING, CLASS, BEHAVIOR) TYPE_ATTR(SPELLING, CLASS, BEHAVIOR)
 #endif
 
 #ifndef LAST_TYPE_ATTR
@@ -51,73 +51,73 @@
 #endif
 
 // Type attributes
-SIMPLE_TYPE_ATTR(autoclosure, Autoclosure)
-TYPE_ATTR(convention, Convention)
-SIMPLE_TYPE_ATTR(escaping, Escaping)
-TYPE_ATTR(differentiable, Differentiable)
-SIMPLE_TYPE_ATTR(noDerivative, NoDerivative)
-SIMPLE_TYPE_ATTR(Sendable, Sendable)
-SIMPLE_TYPE_ATTR(retroactive, Retroactive)
-SIMPLE_TYPE_ATTR(unchecked, Unchecked)
-SIMPLE_TYPE_ATTR(preconcurrency, Preconcurrency)
-SIMPLE_TYPE_ATTR(unsafe, Unsafe)
-SIMPLE_TYPE_ATTR(_local, Local)
-SIMPLE_TYPE_ATTR(_noMetadata, NoMetadata)
-TYPE_ATTR(_opaqueReturnTypeOf, OpaqueReturnTypeOf)
-TYPE_ATTR(isolated, Isolated)
-SIMPLE_TYPE_ATTR(nonisolated, Nonisolated)
-SIMPLE_TYPE_ATTR(_addressable, Addressable)
-SIMPLE_TYPE_ATTR(concurrent, Concurrent)
+SIMPLE_TYPE_ATTR(autoclosure, Autoclosure, 0ull)
+TYPE_ATTR(convention, Convention, 0ull)
+SIMPLE_TYPE_ATTR(escaping, Escaping, 0ull)
+TYPE_ATTR(differentiable, Differentiable, 0ull)
+SIMPLE_TYPE_ATTR(noDerivative, NoDerivative, 0ull)
+SIMPLE_TYPE_ATTR(Sendable, Sendable, 0ull)
+SIMPLE_TYPE_ATTR(retroactive, Retroactive, 0ull)
+SIMPLE_TYPE_ATTR(unchecked, Unchecked, 0ull)
+SIMPLE_TYPE_ATTR(preconcurrency, Preconcurrency, 0ull)
+SIMPLE_TYPE_ATTR(unsafe, Unsafe, 0ull)
+SIMPLE_TYPE_ATTR(_local, Local, 0ull)
+SIMPLE_TYPE_ATTR(_noMetadata, NoMetadata, 0ull)
+TYPE_ATTR(_opaqueReturnTypeOf, OpaqueReturnTypeOf, 0ull)
+TYPE_ATTR(isolated, Isolated, 0ull)
+SIMPLE_TYPE_ATTR(nonisolated, Nonisolated, 0ull)
+SIMPLE_TYPE_ATTR(_addressable, Addressable, 0ull)
+SIMPLE_TYPE_ATTR(concurrent, Concurrent, 0ull)
 
 // SIL-specific attributes
-SIMPLE_SIL_TYPE_ATTR(async, Async)
-SIMPLE_SIL_TYPE_ATTR(block_storage, BlockStorage)
-SIMPLE_SIL_TYPE_ATTR(box, Box)
-SIMPLE_SIL_TYPE_ATTR(dynamic_self, DynamicSelf)
-#define REF_STORAGE(Name, name, ...) SIMPLE_SIL_TYPE_ATTR(sil_##name, SIL##Name)
+SIMPLE_SIL_TYPE_ATTR(async, Async, 0ull)
+SIMPLE_SIL_TYPE_ATTR(block_storage, BlockStorage, 0ull)
+SIMPLE_SIL_TYPE_ATTR(box, Box, 0ull)
+SIMPLE_SIL_TYPE_ATTR(dynamic_self, DynamicSelf, 0ull)
+#define REF_STORAGE(Name, name, ...) SIMPLE_SIL_TYPE_ATTR(sil_##name, SIL##Name, 0ull)
 #include "swift/AST/ReferenceStorage.def"
-SIMPLE_SIL_TYPE_ATTR(error, Error)
-SIMPLE_SIL_TYPE_ATTR(error_indirect, ErrorIndirect)
-SIMPLE_SIL_TYPE_ATTR(error_unowned, ErrorUnowned)
-SIMPLE_SIL_TYPE_ATTR(out, Out)
-SIMPLE_SIL_TYPE_ATTR(direct, Direct)
-SIMPLE_SIL_TYPE_ATTR(in, In)
-SIMPLE_SIL_TYPE_ATTR(inout, Inout)
-SIMPLE_SIL_TYPE_ATTR(inout_aliasable, InoutAliasable)
-SIMPLE_SIL_TYPE_ATTR(in_guaranteed, InGuaranteed)
-SIMPLE_SIL_TYPE_ATTR(in_cxx, InCXX)
-SIMPLE_SIL_TYPE_ATTR(in_constant, InConstant)
-SIMPLE_SIL_TYPE_ATTR(noescape, NoEscape)
-SIMPLE_SIL_TYPE_ATTR(pack_owned, PackOwned)
-SIMPLE_SIL_TYPE_ATTR(pack_guaranteed, PackGuaranteed)
-SIMPLE_SIL_TYPE_ATTR(pack_inout, PackInout)
-SIMPLE_SIL_TYPE_ATTR(pack_out, PackOut)
-SIMPLE_SIL_TYPE_ATTR(owned, Owned)
-SIMPLE_SIL_TYPE_ATTR(unowned_inner_pointer, UnownedInnerPointer)
-SIMPLE_SIL_TYPE_ATTR(guaranteed, Guaranteed)
-SIMPLE_SIL_TYPE_ATTR(guaranteed_address, GuaranteedAddress)
-SIMPLE_SIL_TYPE_ATTR(autoreleased, Autoreleased)
-SIMPLE_SIL_TYPE_ATTR(callee_owned, CalleeOwned)
-SIMPLE_SIL_TYPE_ATTR(callee_guaranteed, CalleeGuaranteed)
-SIMPLE_SIL_TYPE_ATTR(objc_metatype, ObjCMetatype)
-SIL_TYPE_ATTR(opened, Opened)
-SIL_TYPE_ATTR(pack_element, PackElement)
-SIMPLE_SIL_TYPE_ATTR(pseudogeneric, Pseudogeneric)
-SIMPLE_SIL_TYPE_ATTR(unimplementable, Unimplementable)
-SIMPLE_SIL_TYPE_ATTR(yields, Yields)
-SIMPLE_SIL_TYPE_ATTR(yield_once, YieldOnce)
-SIMPLE_SIL_TYPE_ATTR(yield_once_2, YieldOnce2)
-SIMPLE_SIL_TYPE_ATTR(yield_many, YieldMany)
-SIMPLE_SIL_TYPE_ATTR(captures_generics, CapturesGenerics)
+SIMPLE_SIL_TYPE_ATTR(error, Error, 0ull)
+SIMPLE_SIL_TYPE_ATTR(error_indirect, ErrorIndirect, 0ull)
+SIMPLE_SIL_TYPE_ATTR(error_unowned, ErrorUnowned, 0ull)
+SIMPLE_SIL_TYPE_ATTR(out, Out, 0ull)
+SIMPLE_SIL_TYPE_ATTR(direct, Direct, 0ull)
+SIMPLE_SIL_TYPE_ATTR(in, In, 0ull)
+SIMPLE_SIL_TYPE_ATTR(inout, Inout, 0ull)
+SIMPLE_SIL_TYPE_ATTR(inout_aliasable, InoutAliasable, 0ull)
+SIMPLE_SIL_TYPE_ATTR(in_guaranteed, InGuaranteed, 0ull)
+SIMPLE_SIL_TYPE_ATTR(in_cxx, InCXX, 0ull)
+SIMPLE_SIL_TYPE_ATTR(in_constant, InConstant, 0ull)
+SIMPLE_SIL_TYPE_ATTR(noescape, NoEscape, 0ull)
+SIMPLE_SIL_TYPE_ATTR(pack_owned, PackOwned, 0ull)
+SIMPLE_SIL_TYPE_ATTR(pack_guaranteed, PackGuaranteed, 0ull)
+SIMPLE_SIL_TYPE_ATTR(pack_inout, PackInout, 0ull)
+SIMPLE_SIL_TYPE_ATTR(pack_out, PackOut, 0ull)
+SIMPLE_SIL_TYPE_ATTR(owned, Owned, 0ull)
+SIMPLE_SIL_TYPE_ATTR(unowned_inner_pointer, UnownedInnerPointer, 0ull)
+SIMPLE_SIL_TYPE_ATTR(guaranteed, Guaranteed, 0ull)
+SIMPLE_SIL_TYPE_ATTR(guaranteed_address, GuaranteedAddress, 0ull)
+SIMPLE_SIL_TYPE_ATTR(autoreleased, Autoreleased, 0ull)
+SIMPLE_SIL_TYPE_ATTR(callee_owned, CalleeOwned, 0ull)
+SIMPLE_SIL_TYPE_ATTR(callee_guaranteed, CalleeGuaranteed, 0ull)
+SIMPLE_SIL_TYPE_ATTR(objc_metatype, ObjCMetatype, 0ull)
+SIL_TYPE_ATTR(opened, Opened, 0ull)
+SIL_TYPE_ATTR(pack_element, PackElement, 0ull)
+SIMPLE_SIL_TYPE_ATTR(pseudogeneric, Pseudogeneric, 0ull)
+SIMPLE_SIL_TYPE_ATTR(unimplementable, Unimplementable, 0ull)
+SIMPLE_SIL_TYPE_ATTR(yields, Yields, 0ull)
+SIMPLE_SIL_TYPE_ATTR(yield_once, YieldOnce, 0ull)
+SIMPLE_SIL_TYPE_ATTR(yield_once_2, YieldOnce2, 0ull)
+SIMPLE_SIL_TYPE_ATTR(yield_many, YieldMany, 0ull)
+SIMPLE_SIL_TYPE_ATTR(captures_generics, CapturesGenerics, 0ull)
 // Used at the SIL level to mark a type as moveOnly.
-SIMPLE_SIL_TYPE_ATTR(moveOnly, MoveOnly)
-SIMPLE_SIL_TYPE_ATTR(sil_isolated, SILIsolated)
-SIMPLE_SIL_TYPE_ATTR(sil_sending, SILSending)
-SIMPLE_SIL_TYPE_ATTR(sil_implicit_leading_param, SILImplicitLeadingParam)
+SIMPLE_SIL_TYPE_ATTR(moveOnly, MoveOnly, 0ull)
+SIMPLE_SIL_TYPE_ATTR(sil_isolated, SILIsolated, 0ull)
+SIMPLE_SIL_TYPE_ATTR(sil_sending, SILSending, 0ull)
+SIMPLE_SIL_TYPE_ATTR(sil_implicit_leading_param, SILImplicitLeadingParam, 0ull)
 
 // SIL metatype attributes.
-SIMPLE_SIL_TYPE_ATTR(thin, Thin)
-SIMPLE_SIL_TYPE_ATTR(thick, Thick)
+SIMPLE_SIL_TYPE_ATTR(thin, Thin, 0ull)
+SIMPLE_SIL_TYPE_ATTR(thick, Thick, 0ull)
 
 LAST_TYPE_ATTR(Thick)
 
