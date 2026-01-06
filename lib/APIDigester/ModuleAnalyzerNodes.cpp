@@ -715,7 +715,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
         for (auto &N : *Seq) {
           auto Result = llvm::StringSwitch<std::optional<TypeAttrKind>>(
                             GetScalarString(&N))
-#define TYPE_ATTR(X, C) .Case(#X, TypeAttrKind::C)
+#define TYPE_ATTR(X, C, ...) .Case(#X, TypeAttrKind::C)
 #include "swift/AST/TypeAttr.def"
                             .Default(std::nullopt);
 
@@ -2244,7 +2244,7 @@ struct ScalarEnumerationTraits<TypeAttrKind> {
   static void enumeration(Output &out, TypeAttrKind &value) {
 // NOTE: For historical reasons. TypeAttribute uses the spelling, but
 // DeclAttribute uses the kind name.
-#define TYPE_ATTR(X, C) out.enumCase(value, #X, TypeAttrKind::C);
+#define TYPE_ATTR(X, C, ...) out.enumCase(value, #X, TypeAttrKind::C);
 #include "swift/AST/TypeAttr.def"
   }
 };

@@ -4217,6 +4217,12 @@ protected:
   }
 
 public:
+  enum TypeAttrBehaviours : uint64_t {
+    /// True if multiple instances of this attribute are allowed on a single
+    /// type.
+    AllowMultipleAttributes = 1ull << 0,
+  };
+
   TypeAttrKind getKind() const {
     return TypeAttrKind(Bits.TypeAttribute.Kind);
   }
@@ -4274,6 +4280,22 @@ public:
 
   SWIFT_DEBUG_DUMPER(dump());
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;
+
+  LLVM_READNONE static constexpr uint64_t getBehaviors(TypeAttrKind TK) {
+    switch (TK) {
+#define TYPE_ATTR(SPELLING, CLASS, BEHAVIOR)                                   \
+  case TypeAttrKind::CLASS:                                                    \
+    return BEHAVIOR;
+#include "swift/AST/TypeAttr.def"
+    }
+    llvm_unreachable("bad kind");
+  }
+
+  /// Returns true if multiple instances of an attribute kind
+  /// can appear on a type.
+  static constexpr bool allowMultipleAttributes(TypeAttrKind TK) {
+    return getBehaviors(TK) & AllowMultipleAttributes;
+  }
 };
 
 class AtTypeAttrBase : public TypeAttribute {
@@ -4318,7 +4340,7 @@ public:
 template <TypeAttrKind Kind>
 using SimpleTypeAttrWithArgs = SimpleTypeAttr<Kind, AtTypeAttrWithArgsBase>;
 
-#define SIMPLE_TYPE_ATTR(SPELLING, CLASS)                                      \
+#define SIMPLE_TYPE_ATTR(SPELLING, CLASS, ...)                                 \
   using CLASS##TypeAttr = SimpleTypeAttr<TypeAttrKind::CLASS>;
 #include "swift/AST/TypeAttr.def"
 
